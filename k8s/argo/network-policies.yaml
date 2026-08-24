@@ -1,0 +1,47 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-control-plane-worker-to-argo-events-webhook
+  namespace: argo-events
+spec:
+  podSelector:
+    matchLabels:
+      eventsource-name: webhook-eventsource
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-control-plane
+          podSelector:
+            matchLabels:
+              app: mlops-paas-control-plane-worker
+      ports:
+        - protocol: TCP
+          port: 12000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: isolate-argo-events-eventbus
+  namespace: argo-events
+spec:
+  podSelector:
+    matchLabels:
+      controller: eventbus-controller
+      eventbus-name: default
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              controller: eventbus-controller
+              eventbus-name: default
+        - podSelector:
+            matchLabels:
+              eventsource-name: webhook-eventsource
+        - podSelector:
+            matchLabels:
+              sensor-name: model-sensor

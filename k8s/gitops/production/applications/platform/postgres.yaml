@@ -1,0 +1,80 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-platform-postgres
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+  labels:
+    mlops-paas.io/plane: platform
+    mlops-paas.io/component: postgres
+spec:
+  project: mlops-platform
+  info:
+    - name: Owner
+      value: Platform Engineering
+    - name: Source
+      value: k8s/platform/postgres
+    - name: Runbook
+      value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#postgres
+  source:
+    repoURL: https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
+    targetRevision: main
+    path: k8s/platform/postgres
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mlops-postgres
+  ignoreDifferences:
+    - group: external-secrets.io
+      kind: ExternalSecret
+      jsonPointers:
+        - /metadata/annotations/force-sync
+      jqPathExpressions:
+        - .spec.data[].remoteRef.conversionStrategy
+        - .spec.data[].remoteRef.decodingStrategy
+        - .spec.data[].remoteRef.metadataPolicy
+        - .spec.data[].remoteRef.nullBytePolicy
+    - group: postgresql.cnpg.io
+      kind: Cluster
+      name: mlops-paas-postgres
+      namespace: mlops-postgres
+      jsonPointers:
+        - /spec/bootstrap/initdb/encoding
+        - /spec/bootstrap/initdb/localeCType
+        - /spec/bootstrap/initdb/localeCollate
+        - /spec/failoverDelay
+        - /spec/logLevel
+        - /spec/maxSyncReplicas
+        - /spec/minSyncReplicas
+        - /spec/monitoring
+        - /spec/postgresGID
+        - /spec/postgresUID
+        - /spec/postgresql/parameters/archive_mode
+        - /spec/postgresql/parameters/archive_timeout
+        - /spec/postgresql/parameters/dynamic_shared_memory_type
+        - /spec/postgresql/parameters/log_destination
+        - /spec/postgresql/parameters/log_directory
+        - /spec/postgresql/parameters/log_filename
+        - /spec/postgresql/parameters/log_rotation_age
+        - /spec/postgresql/parameters/log_rotation_size
+        - /spec/postgresql/parameters/log_truncate_on_rotation
+        - /spec/postgresql/parameters/logging_collector
+        - /spec/postgresql/parameters/max_parallel_workers
+        - /spec/postgresql/parameters/max_replication_slots
+        - /spec/postgresql/parameters/max_worker_processes
+        - /spec/postgresql/parameters/shared_memory_type
+        - /spec/postgresql/parameters/shared_preload_libraries
+        - /spec/postgresql/parameters/ssl_max_protocol_version
+        - /spec/postgresql/parameters/ssl_min_protocol_version
+        - /spec/postgresql/parameters/wal_keep_size
+        - /spec/postgresql/parameters/wal_receiver_timeout
+        - /spec/postgresql/parameters/wal_sender_timeout
+        - /spec/postgresql/syncReplicaElectionConstraint
+        - /spec/primaryUpdateMethod
+        - /spec/primaryUpdateStrategy
+        - /spec/replicationSlots
+        - /spec/smartShutdownTimeout
+        - /spec/startDelay
+        - /spec/stopDelay
+        - /spec/storage/resizeInUseVolumes
+        - /spec/switchoverDelay

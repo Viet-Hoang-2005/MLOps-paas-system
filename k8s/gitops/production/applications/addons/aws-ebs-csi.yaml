@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-addon-aws-ebs-csi
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-40"
+  labels:
+    mlops-paas.io/plane: addon
+    mlops-paas.io/component: aws-ebs-csi
+spec:
+  project: mlops-addons
+  info:
+    - name: Owner
+      value: Platform Engineering
+    - name: Source
+      value: kubernetes-sigs.github.io/aws-ebs-csi-driver@2.40.1
+    - name: Runbook
+      value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
+  source:
+    repoURL: https://kubernetes-sigs.github.io/aws-ebs-csi-driver
+    chart: aws-ebs-csi-driver
+    targetRevision: 2.40.1
+    helm:
+      releaseName: aws-ebs-csi-driver
+      values: |
+        controller:
+          replicaCount: 1
+          nodeSelector:
+            workload-type: worker
+        node:
+          nodeSelector:
+            workload-type: worker
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system

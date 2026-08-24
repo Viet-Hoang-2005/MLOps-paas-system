@@ -1,0 +1,83 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: mlops-paas-training-cpu
+  labels:
+    app.kubernetes.io/part-of: mlops-paas
+    mlops-paas.io/environment: production
+spec:
+  limits:
+    nodes: 1
+  template:
+    metadata:
+      labels:
+        mlops-paas/nodepool: training-cpu
+        workload-type: training
+    spec:
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - c6i.2xlarge
+            - c6i.4xlarge
+      expireAfter: 24h
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: training-cpu
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 5m
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: mlops-paas-training-gpu
+  labels:
+    app.kubernetes.io/part-of: mlops-paas
+    mlops-paas.io/environment: production
+spec:
+  limits:
+    nodes: 1
+  template:
+    metadata:
+      labels:
+        mlops-paas/nodepool: training-gpu
+        workload-type: training
+    spec:
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - g4dn.xlarge
+            - g5.xlarge
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: training-gpu
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+      expireAfter: 24h
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 5m

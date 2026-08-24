@@ -1,0 +1,8 @@
+bentoml>=1.2.0
+fastapi>=0.110.0
+pydantic>=2.0.0
+python-multipart==0.0.20
+mlflow==3.11.1
+pandas==2.2.1
+numpy==1.26.4
+scikit-learn==1.7.2

@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - github.com/kubeflow/trainer/manifests/overlays/standalone?ref=v1.9.2
+
+patches:
+  - target:
+      version: v1
+      kind: Namespace
+      name: kubeflow
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: kubeflow
+  - target:
+      kind: CustomResourceDefinition
+    patch: |-
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: "-2"
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: training-operator
+      namespace: kubeflow
+    path: training-operator-node-selector.yaml

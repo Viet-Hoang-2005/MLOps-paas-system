@@ -1,0 +1,4 @@
+interface:
+  display_name: "MLOps PaaS Deployment"
+  short_description: "K3s, GitOps, and platform deployment guidance"
+  default_prompt: "Use $mlops-paas-deployment to update and validate this K3s deployment."

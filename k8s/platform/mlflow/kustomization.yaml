@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- configmap.yaml
+- service.yaml
+- deployment.yaml
+- external-secrets.yaml
+
+images:
+- name: mlops-paas-mlflow
+  newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-mlflow
+  newTag: 375afde3ae576f56733e93b52b2d27fb0faed48d

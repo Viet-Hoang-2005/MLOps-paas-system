@@ -1,15 +1,35 @@
 ---
-- name: Check if Helm is installed
-  command: which helm
-  register: helm_installed
-  failed_when: false
+- name: Read the installed Helm version
+  ansible.builtin.command: /usr/local/bin/helm version --short
+  register: installed_helm_version
   changed_when: false
+  failed_when: false
 
-- name: Download and install Helm 3
+- name: Download the pinned Helm archive
   become: true
-  shell: |
-    curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-    chmod 700 get_helm.sh
-    ./get_helm.sh
-    rm -f get_helm.sh
-  when: helm_installed.rc != 0
+  ansible.builtin.get_url:
+    url: "https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    dest: "/usr/local/src/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    owner: root
+    group: root
+    mode: "0644"
+  when: helm_version not in installed_helm_version.stdout
+
+- name: Extract the pinned Helm archive
+  become: true
+  ansible.builtin.unarchive:
+    src: "/usr/local/src/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    dest: /usr/local/src
+    remote_src: true
+  when: helm_version not in installed_helm_version.stdout
+
+- name: Install the pinned Helm binary
+  become: true
+  ansible.builtin.copy:
+    src: /usr/local/src/linux-amd64/helm
+    dest: /usr/local/bin/helm
+    owner: root
+    group: root
+    mode: "0755"
+    remote_src: true
+  when: helm_version not in installed_helm_version.stdout

@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlops-paas-model-server
+  labels:
+    app: mlops-paas-model-server
+    component: model-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mlops-paas-model-server
+  template:
+    metadata:
+      labels:
+        app: mlops-paas-model-server
+        component: model-gateway
+    spec:
+      nodeSelector:
+        workload-type: worker
+      containers:
+        - name: model-server
+          image: mlops-paas-model-server
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5000
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: model-server-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: model-server-secret
+                  key: DB_PASSWORD
+          envFrom:
+            - configMapRef:
+                name: mlops-paas-model-server-config
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: 750m
+              memory: 768Mi

@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-addon-argo-events
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-40"
+  labels:
+    mlops-paas.io/plane: addon
+    mlops-paas.io/component: argo-events
+spec:
+  project: mlops-addons
+  info:
+    - name: Owner
+      value: Platform Engineering
+    - name: Source
+      value: argoproj.github.io/argo-helm/argo-events@2.4.16
+    - name: Runbook
+      value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-events
+    targetRevision: 2.4.16
+    helm:
+      releaseName: argo-events
+      values: |
+        crds:
+          install: true
+        controller:
+          nodeSelector:
+            workload-type: worker
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-events

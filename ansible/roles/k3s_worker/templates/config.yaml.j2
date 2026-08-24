@@ -1,0 +1,9 @@
+server: "https://{{ hostvars[groups['master'][0]].private_ip }}:6443"
+token: "{{ hostvars[groups['master'][0]].k3s_node_token }}"
+node-name: "{{ k3s_node_name | default(inventory_hostname) }}"
+node-label:
+{% for label in k3s_node_labels %}
+  - "{{ label }}"
+{% endfor %}
+kubelet-arg:
+  - "provider-id=aws:///{{ imds_availability_zone.content }}/{{ imds_instance_id.content }}"

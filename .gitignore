@@ -7,6 +7,7 @@ env/
 # IDE
 .vscode/
 .idea/
+.codex/
 *.swp
 *.swo
 *~
@@ -15,17 +16,19 @@ env/
 __pycache__/
 .mypy_cache/
 .pytest_cache/
+.ruff_cache/
 *.py[cod]
 *$py.class
 *.so
 .Python
 venv/
+.venv-ansible/
 *.egg-info/
 dist/
 build/
 
 # Django static files
-services/control-plane/src/staticfiles/
+services/control-plane/staticfiles/
 
 # Jupyter
 .ipynb_checkpoints/
@@ -64,12 +67,10 @@ logs/
 *.synctex.gz
 *.toc
 
-# Docker
-.dockerignore
-
 # OS
 .DS_Store
 Thumbs.db
+.pnpm-store/
 
 # Secrets
 *.pem
@@ -79,6 +80,7 @@ credentials.json
 # Testing
 .pytest_cache/
 .coverage
+coverage.xml
 htmlcov/
 .tox/
 
@@ -89,9 +91,20 @@ htmlcov/
 .terraform.tfstate
 .terraform.lock.hcl
 terraform.tfvars
+tfplan
+ansible/artifacts/
+ansible/.cache/
 .ssh/
 *.zip
+*.tar.gz
 *.pem
 
-# K3s Config
+# Ansible
+.ansible/
+
+# Kube config
 .kube/
+kubeconform
+
+# Kustomize Helm chart cache
+k8s/platform/harbor/charts/

@@ -1,0 +1,158 @@
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\input{glyphtounicode}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.55in}
+\addtolength{\textheight}{1.1in}
+
+\urlstyle{same}
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+\titleformat{\section}{
+  \vspace{-5pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-6pt}]
+
+\pdfgentounicode=1
+
+\newcommand{\resumeItem}[1]{
+  \item\small{{#1 \vspace{-2pt}}}
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{p{0.78\textwidth}@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}[leftmargin=0.18in]}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+\begin{document}
+
+%----------HEADING----------
+\begin{center}
+    \textbf{\Huge \scshape Tran Nguyen Viet Hoang} \\ \vspace{1pt}
+    \small (+84)828552878 $|$
+    \href{mailto:tnvhoang2005@gmail.com}{tnvhoang2005@gmail.com} $|$
+    \href{https://github.com/Viet-Hoang-2005}{github.com/Viet-Hoang-2005} $|$
+    \href{https://www.linkedin.com/in/tnvhoang2005/}{linkedin.com/in/tnvhoang2005}
+\end{center}
+
+%-----------SUMMARY-----------
+\section{Summary}
+\begin{itemize}[leftmargin=0.15in, label={}]
+  \small{\item{Third-year Computer Networks and Data Communications student pursuing a \textbf{DevOps Intern} role. Interested in containerization, infrastructure, cloud-native platforms, CI/CD pipeline and MLOps. Architected scalable systems using Docker, Kubernetes, Terraform, and GitHub Actions.
+}}
+\end{itemize}
+
+%-----------EDUCATION-----------
+\section{Education}
+\resumeSubHeadingListStart
+  \resumeSubheading
+    {University of Information Technology, VNU-HCM}{Ho Chi Minh City, Vietnam}
+    {B.Eng. in Computer Networks and Data Communications}{2023 -- Expected 2027}
+  \resumeItemListStart
+    \resumeItem{GPA: 8.71/10.00}
+  \resumeItemListEnd
+\resumeSubHeadingListEnd
+
+%-----------PROJECTS-----------
+\section{Projects}
+\resumeSubHeadingListStart
+
+\resumeProjectHeading
+{\textbf{MLOps PaaS System} $|$ \href{https://github.com/Viet-Hoang-2005/mlops-paas-system}{GitHub} $|$ \emph{Django, FastAPI, Redpanda, PostgreSQL, Docker, Kubernetes, AWS, GitHub Actions, ArgoCD, Argo Workflows, MLflow, Kubeflow, BentoML}}
+{3/2026 -- Present}
+\resumeItemListStart
+\resumeItem{Built a multi-tenant MLOps platform automating model training, dynamic deployment, version management, and data drift monitoring for diverse ML/DL models (XGBoost, Scikit-Learn, PyTorch, TensorFlow).}
+\resumeItem{Developed a Django RESTful API as the central control system for managing user resources, model state, and an immutable registry, with Argo Workflows orchestrating all Kubernetes workloads (build, deploy, train, drift).}
+\resumeItem{Packaged multi-framework models via MLflow Model Packaging, then dynamically served ML models through FastAPI + MLflow Model Loading and DL models through BentoML, each deployed as isolated per-version pods.}
+\resumeItem{Implemented data drift monitoring using Evidently AI, comparing reference datasets against live production data streamed through a Redpanda event pipeline and persisted by a KEDA-scaled consumer.}
+\resumeItem{Orchestrated distributed model training with Kubeflow Training Operator (PyTorchJob) and dynamically provisioned GPU/CPU compute nodes on-demand via Karpenter auto-scaling.}
+\resumeItem{Achieved zero-downtime model serving using rolling updates and HPA, benchmarked at \textasciitilde100 concurrent users with p95 latency $\leq$ 100\,ms and throughput of $\geq$ 50\,req/s.}
+\resumeItem{Implemented a GitOps-driven CI/CD pipeline using GitHub Actions and ArgoCD, automating code quality checks, unit testing, container image scanning, building, and declarative cluster state synchronization via Kustomize.}
+\resumeItemListEnd
+
+\resumeProjectHeading
+{\textbf{SageLMS} $|$ \href{https://github.com/daithang59/sagelms}{GitHub} $|$ \emph{Spring Boot, FastAPI, LangChain, Redis, PostgreSQL, Docker, Kubernetes, GCP, GitHub Actions, FluxCD, Kyverno, Grafana \& Prometheus}}
+{4/2026 -- 6/2026}
+\resumeItemListStart
+\resumeItem{Architected a secure-by-design microservices platform (Spring Boot gateway, auth, course, assessment, challenge, and a FastAPI + LangChain AI tutor) following DevSecOps principles across the entire software lifecycle.}
+\resumeItem{Implemented a shift-left CI gate on every PR: Conventional Commit linting, secret scanning (Gitleaks), path-filtered unit tests (JUnit/pytest/Vitest), Dockerfile linting (Hadolint), dependency vulnerability scanning (Trivy filesystem), IaC validation (OpenTofu fmt/validate + Checkov), and static code analysis with quality gate enforcement (SonarCloud).}
+\resumeItem{Built an automated CD pipeline that detects changed services, builds Docker images, Trivy scans for HIGH/CRITICAL vulnerabilities, pushes to a private Harbor registry, then cryptographically signs each image and attests its CycloneDX SBOM using Cosign, and finally opens a deploy PR that pins image digests in the Kustomization manifest for FluxCD to reconcile.}
+\resumeItem{Enforced supply-chain and runtime security in the Kubernetes cluster via Kyverno admission policies: requiring images from the trusted Harbor registry only, pinning by immutable SHA-256 digest, disallowing the mutable \texttt{:latest} tag, verifying Cosign keyless signatures against the CI workflow identity, enforcing Pod Security Baseline, requiring resource limits/health probes, and mandating non-root containers with no privilege escalation.}
+\resumeItem{Managed secrets securely through GCP Workload Identity Federation for passwordless CI/CD authentication, External Secrets Operator for runtime credential injection, and automated post-deploy verification (GKE rollout status checks and endpoint health probes).}
+\resumeItemListEnd
+
+\resumeSubHeadingListEnd
+%-----------RESEARCH-----------
+\section{Research}
+\resumeSubHeadingListStart
+  \resumeProjectHeading
+    {\parbox[t]{0.79\textwidth}{\textbf{\href{https://csonet-conf.github.io/csonet26/index.html}{CSoNet 2026: A Drift-Aware MLOps Framework for Multi-Model Serving: A Network Intrusion Detection Case Study}}}}{Preview}
+  \resumeItemListStart
+    \resumeItem{First author; proposed a cloud-native MLOps architecture for multi-model ML and DL lifecycle management, featuring a decoupled control-plane/data-plane design to separate model governance from online prediction serving.}
+    \resumeItem{Addressed the data drift problem---where changing production data distributions degrade model reliability---by designing a monitoring pipeline that asynchronously logs predictions, computes statistical drift scores over production windows, and triggers review-driven adaptation actions (e.g., alerts, retraining).}
+    \resumeItem{Validated the framework on a CIC-IDS2017 Network Intrusion Detection case study across 3 attack families $\times$ 3 severity levels; drift-triggered retraining recovered Macro-F1 from 0.13--0.46 (fixed model) to 0.98--1.00 (retrained challenger), demonstrating $\Delta$Macro-F1 gains of +0.54 to +0.87.}
+  \resumeItemListEnd
+\resumeSubHeadingListEnd
+
+%-----------AWARDS-----------
+\section{Awards}
+\resumeSubHeadingListStart
+  \resumeProjectHeading
+    {\parbox[t]{0.79\textwidth}{\textbf{Encouragement Scholarship for Academic Excellence}}}{}
+  \resumeItemListStart
+    \resumeItem{Semester 1, 2023--2024}
+    \resumeItem{Semester 1, 2024--2025}
+    \resumeItem{Semester 2, 2024--2025}
+  \resumeItemListEnd
+\resumeSubHeadingListEnd
+
+%-----------TECHNICAL SKILLS-----------
+\section{Technical Skills}
+\begin{itemize}[leftmargin=0.15in, label={}]
+  \small{\item{
+    \textbf{Software:} ReactJS, Django, FastAPI, PostgreSQL, Redis, Redpanda/Kafka \\
+    \textbf{Containers \& Orchestration:} Docker, Kubernetes, EKS, GKE, Argo Workflows \\
+    \textbf{Infrastructure:} GCP, AWS, Terraform, Ansible, Helm \\
+    \textbf{CI/CD \& GitOps:} Git, GitHub, GitHub Actions, Argo CD, Flux CD \\
+    \textbf{MLOps:} MLflow, Kubeflow, BentoML \\
+    \textbf{Observability \& Networking:} Prometheus, Grafana, Cloudflare, Cisco Packet Tracer
+  }}
+\end{itemize}
+
+\end{document}

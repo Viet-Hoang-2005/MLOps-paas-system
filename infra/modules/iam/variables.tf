@@ -19,7 +19,7 @@ variable "mlflow_basic_auth_arn" {
 }
 
 
-variable "enable_github_actions_iam" {
+variable "enable_github_oidc" {
   description = "Whether to create GitHub Actions OIDC and IAM resources"
   type        = bool
   default     = false
@@ -35,4 +35,10 @@ variable "karpenter_cluster_name" {
   description = "Logical cluster name used by Karpenter discovery tags and IAM conditions"
   type        = string
   default     = "mlops-paas-cluster"
+}
+
+variable "karpenter_k3s_token_secret_arn" {
+  description = "ARN of the only Secrets Manager secret Karpenter nodes may read during K3s bootstrap"
+  type        = string
+  default     = ""
 }

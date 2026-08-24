@@ -1,0 +1,6 @@
+---
+- name: Load K3s kernel modules
+  become: true
+  ansible.builtin.systemd_service:
+    name: systemd-modules-load.service
+    state: restarted

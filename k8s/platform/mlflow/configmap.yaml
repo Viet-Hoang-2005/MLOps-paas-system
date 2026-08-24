@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlflow-server-config
+  namespace: mlflow-server
+data:
+  AWS_DEFAULT_REGION: "ap-southeast-1"
+  AWS_BUCKET_NAME: "mlops-paas-artifacts"

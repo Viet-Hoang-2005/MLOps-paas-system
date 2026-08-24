@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-platform-mlflow
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    mlops-paas.io/plane: platform
+    mlops-paas.io/component: mlflow
+spec:
+  project: mlops-platform
+  info:
+    - name: Owner
+      value: Platform Engineering
+    - name: Source
+      value: k8s/platform/mlflow
+    - name: Runbook
+      value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#mlflow
+  source:
+    repoURL: https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
+    targetRevision: main
+    path: k8s/platform/mlflow
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mlflow-server
+  ignoreDifferences:
+    - group: external-secrets.io
+      kind: ExternalSecret
+      jsonPointers:
+        - /metadata/annotations/force-sync
+      jqPathExpressions:
+        - .spec.data[].remoteRef.conversionStrategy
+        - .spec.data[].remoteRef.decodingStrategy
+        - .spec.data[].remoteRef.metadataPolicy
+        - .spec.data[].remoteRef.nullBytePolicy

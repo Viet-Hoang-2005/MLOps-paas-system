@@ -19,6 +19,7 @@ spec:
       labels:
         app: mlops-paas-control-plane
     spec:
+      automountServiceAccountToken: false
       nodeSelector:
         workload-type: worker
       affinity:
@@ -33,100 +34,138 @@ spec:
                       values:
                         - mlops-paas-control-plane
                 topologyKey: "kubernetes.io/hostname"
+      volumes:
+        - name: staticfiles
+          emptyDir: {}
       initContainers:
         - name: db-migrate
-          image: mlops-paas-django:latest
+          image: mlops-paas-control-plane
           imagePullPolicy: IfNotPresent
           command: ["sh", "-c"]
           args:
-            - "python src/manage.py ensure_db_schema && python src/manage.py migrate && python src/manage.py collectstatic --noinput"
+            - "python manage.py migrate && python manage.py collectstatic --noinput"
           env:
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secrets
+                  name: control-plane-api-secret
                   key: DB_USER
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secrets
+                  name: control-plane-api-secret
                   key: DB_PASSWORD
             - name: DJANGO_SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: mlops-paas-secret
+                  name: control-plane-api-secret
                   key: DJANGO_SECRET_KEY
+            - name: JWT_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-api-secret
+                  key: JWT_PRIVATE_KEY
+            - name: JWT_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-api-secret
+                  key: JWT_PUBLIC_KEY
+            - name: CONTROL_PLANE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-api-secret
+                  key: CONTROL_PLANE_WEBHOOK_SECRET
+            - name: ARGO_EVENTS_WEBHOOK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-api-secret
+                  key: ARGO_EVENTS_WEBHOOK_TOKEN
           envFrom:
             - configMapRef:
                 name: mlops-paas-control-plane-config
+          volumeMounts:
+            - name: staticfiles
+              mountPath: /app/staticfiles
       containers:
         - name: control-plane
-          image: mlops-paas-django:latest
+          image: mlops-paas-control-plane
           imagePullPolicy: IfNotPresent
           command: ["sh", "-c"]
           args:
-            - "cd src && daphne -b 0.0.0.0 -p 8000 core.asgi:application"
+            - "gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120 --graceful-timeout 30 --access-logfile -"
           ports:
             - containerPort: 8000
           env:
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secrets
+                  name: control-plane-api-secret
                   key: DB_USER
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secrets
+                  name: control-plane-api-secret
                   key: DB_PASSWORD
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
             - name: DJANGO_SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: mlops-paas-secret
+                  name: control-plane-api-secret
                   key: DJANGO_SECRET_KEY
             - name: JWT_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
-                  name: mlops-paas-secret
+                  name: control-plane-api-secret
                   key: JWT_PRIVATE_KEY
             - name: JWT_PUBLIC_KEY
               valueFrom:
                 secretKeyRef:
-                  name: mlops-paas-secret
+                  name: control-plane-api-secret
                   key: JWT_PUBLIC_KEY
             - name: CONTROL_PLANE_WEBHOOK_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: mlops-paas-secret
+                  name: control-plane-api-secret
                   key: CONTROL_PLANE_WEBHOOK_SECRET
+            - name: ARGO_EVENTS_WEBHOOK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-api-secret
+                  key: ARGO_EVENTS_WEBHOOK_TOKEN
             - name: GOOGLE_OAUTH2_CLIENT_ID
               valueFrom:
                 secretKeyRef:
-                  name: mlops-paas-secret
+                  name: control-plane-api-secret
                   key: GOOGLE_OAUTH2_CLIENT_ID
             - name: GITHUB_OAUTH2_CLIENT_ID
               valueFrom:
                 secretKeyRef:
-                  name: mlops-paas-secret
+                  name: control-plane-api-secret
                   key: GITHUB_OAUTH2_CLIENT_ID
             - name: GITHUB_OAUTH2_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: mlops-paas-secret
+                  name: control-plane-api-secret
                   key: GITHUB_OAUTH2_CLIENT_SECRET
             - name: EMAIL_HOST_USER
               valueFrom:
                 secretKeyRef:
-                  name: mlops-paas-secret
+                  name: control-plane-api-secret
                   key: EMAIL_HOST_USER
             - name: EMAIL_HOST_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: mlops-paas-secret
+                  name: control-plane-api-secret
                   key: EMAIL_HOST_PASSWORD
           envFrom:
             - configMapRef:
                 name: mlops-paas-control-plane-config
+          volumeMounts:
+            - name: staticfiles
+              mountPath: /app/staticfiles
           resources:
             requests:
               cpu: 250m
@@ -134,3 +173,20 @@ spec:
             limits:
               cpu: 1000m
               memory: 1Gi
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: 8000
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8000
+            periodSeconds: 20

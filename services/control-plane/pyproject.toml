@@ -1,0 +1,30 @@
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+pythonpath = ["src"]
+testpaths = ["src/apps"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+exclude = ["**/migrations/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "DJ"]
+ignore = ["DJ001"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/config/settings/local.py" = ["F403", "F405"]
+"src/config/settings/production.py" = ["F403", "F405"]
+"src/config/settings/test.py" = ["F403", "F405"]
+
+[tool.mypy]
+python_version = "3.10"
+plugins = ["mypy_django_plugin.main"]
+mypy_path = "src"
+ignore_missing_imports = true
+check_untyped_defs = true
+disable_error_code = ["import-untyped"]
+exclude = "migrations"
+
+[tool.django-stubs]
+django_settings_module = "config.settings.test"

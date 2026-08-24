@@ -19,25 +19,29 @@ infra/
     ├── iam/         # IAM Roles + Policies: EC2 Instance Profile, Karpenter, GitHub Actions OIDC
     ├── storage/     # S3 Buckets: mlops-paas-artifacts (model artifacts, training data, drift reports)
     ├── alb/         # Application Load Balancer, Listener, Target Group
-    ├── dns/         # Route53 Hosted Zone, A Record, ACM Certificate (HTTPS)
-    └── secrets/     # AWS Secrets Manager: 3 secret resources
+    ├── dns/         # Private Route53 K3s API DNS + ACM Certificate (HTTPS)
+    └── secrets/     # AWS Secrets Manager metadata, including K3s join-token container
 ```
 
 ---
 
 ## Feature Flags (variables.tf)
 
-Mỗi module có thể bật/tắt độc lập qua `terraform.tfvars`:
+Các nhóm tài nguyên có thể bật/tắt qua `terraform.tfvars`. Terraform kiểm tra dependency giữa các nhóm và báo lỗi sớm nếu một tổ hợp không thể hoạt động:
 
 | Variable | Default | Mô tả |
 |---|---|---|
-| `enable_compute` | `true` | EC2 Master + Worker nodes |
+| `enable_artifact_storage` | `true` | S3 artifact bucket bền vững |
+| `enable_secrets_manager` | `true` | Secrets Manager resources bền vững |
+| `enable_github_oidc` | `true` | GitHub Actions OIDC provider và deployment role |
+| `enable_acm_certificate` | `true` | ACM certificate cho public ALB |
+| `enable_network` | `true` | VPC, subnets, routes và Internet Gateway |
+| `enable_nat_gateway` | `true` | NAT Gateway cho private K3s workers |
+| `enable_k3s_compute` | `true` | EC2 K3s server và static worker nodes |
 | `enable_alb` | `true` | Application Load Balancer |
-| `enable_dns` | `true` | Route53 + ACM Certificate |
-| `enable_nat_gateway` | `true` | NAT Gateway cho Private Subnet |
 | `enable_karpenter` | `true` | IAM + discovery tags cho Karpenter |
-| `enable_github_actions_iam` | `true` | OIDC Provider cho GitHub Actions |
-| `enable_secrets_manager` | `true` | AWS Secrets Manager resources |
+
+`enable_k3s_compute` hiện cần Network, NAT Gateway, S3 và Secrets Manager. ALB cần Network, K3s Compute và ACM. Karpenter cần cụm K3s tĩnh cùng Network/NAT. GitHub OIDC hiện cần S3 và Secrets Manager vì deployment policy tham chiếu các ARN này.
 
 ---
 
@@ -63,7 +67,7 @@ Mỗi module có thể bật/tắt độc lập qua `terraform.tfvars`:
 ### IAM (`modules/iam/`)
 - **EC2 Instance Profile** (`mlops-ec2-node-profile`): Quyền S3 full access, Secrets Manager read
 - **Karpenter Controller Role**: Quyền tạo/xóa EC2 instances, describe launch templates
-- **Karpenter Node Profile** (`mlops-karpenter-node-profile`): Profile cho EC2 nodes do Karpenter tạo; quyền read `mlops/k3s-agent-token` để tự động join K3s cluster
+- **Karpenter Node Profile** (`mlops-karpenter-node-profile`): Chỉ được đọc `mlops/k3s-agent-token` trong Secrets Manager để tự động join K3s cluster
 - **GitHub Actions OIDC**: Cho phép GitHub Actions Assume Role → deploy secrets, không cần Access Key tĩnh
 - **SQS + EventBridge**: Interruption queue để Karpenter nhận Spot termination events
 
@@ -71,28 +75,30 @@ Mỗi module có thể bật/tắt độc lập qua `terraform.tfvars`:
 S3 Bucket `mlops-paas-artifacts`:
 ```
 mlops-paas-artifacts/
-├── user-models/{tenant_id}/{model_id}/    # Model artifact ZIPs (upload từ Tenant)
+├── users/{tenant_id}/models/{project_id}/ # Workspace và model artifacts theo project
 ├── training-data/                          # Training datasets
 ├── training-artifacts/{job_id}/            # model.tar.gz output từ Training Runner
 ├── drift-reports/{job_id}/                 # HTML + JSON drift reports từ Evidently
-└── users/{tenant_id}/models/{hashid}/...  # MLflow artifact store
+└── users/{tenant_id}/models/{project_uuid}/training/jobs/{job_uuid}/mlflow/...
 ```
 
 ### ALB (`modules/alb/`)
 - ALB `mlops-api-lb` → Target Group → Worker Port 80 (Traefik Ingress)
 
 ### DNS (`modules/dns/`)
-- Route53 Hosted Zone cho domain `mlops-nids-nt114.id.vn`
-- ACM Certificate (HTTPS) + DNS validation
+- Private Route53 zone `internal.mlops-nids-nt114.id.vn` liên kết với VPC
+- `k3s-api.internal.mlops-nids-nt114.id.vn` trỏ tới private IP hiện tại của K3s server
+- ACM Certificate (HTTPS) + DNS validation cho public ALB
 
 ### Secrets Manager (`modules/secrets/`)
-Ba kho secret (trống khi tạo, được điền bởi `scripts/push_secrets_to_aws.py`):
+Các secret container do Terraform quản lý metadata; Terraform không lưu secret value:
 
 | Secret Name | Dùng cho |
 |---|---|
 | `mlops/aws-secrets` | AWS Credentials (local dev) |
 | `mlops/github-actions-secrets` | Harbor Robot Account, Cosign Keys |
 | `mlops/production-secrets` | DB, JWT, OAuth, Harbor, Webhook, HARBOR_DOCKERCONFIG |
+| `mlops/k3s-agent-token` | Token do Ansible publish sau khi K3s server khởi tạo |
 
 ---
 

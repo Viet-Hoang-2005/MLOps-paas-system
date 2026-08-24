@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: karpenter-public-oci
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+    app.kubernetes.io/part-of: mlops-paas
+    mlops-paas.io/environment: production
+stringData:
+  type: helm
+  name: karpenter-public-oci
+  url: public.ecr.aws/karpenter
+  enableOCI: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nfd-public-oci
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+    app.kubernetes.io/part-of: mlops-paas
+    mlops-paas.io/environment: production
+stringData:
+  type: helm
+  name: nfd-public-oci
+  url: registry.k8s.io/nfd/charts
+  enableOCI: "true"

@@ -1,0 +1,44 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - cluster
+  - addons
+  - platform
+  - execution
+  - workloads
+
+patches:
+  - target:
+      group: argoproj.io
+      version: v1alpha1
+      kind: Application
+    patch: |-
+      - op: add
+        path: /metadata/labels/app.kubernetes.io~1part-of
+        value: mlops-paas
+      - op: add
+        path: /metadata/labels/mlops-paas.io~1environment
+        value: production
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 10
+      - op: add
+        path: /spec/syncPolicy
+        value:
+          automated:
+            prune: true
+            selfHeal: true
+            allowEmpty: false
+          syncOptions:
+            - ApplyOutOfSyncOnly=true
+            - ServerSideApply=true
+            - RespectIgnoreDifferences=true
+            - PruneLast=true
+            - FailOnSharedResource=true
+          retry:
+            limit: 5
+            backoff:
+              duration: 5s
+              factor: 2
+              maxDuration: 3m

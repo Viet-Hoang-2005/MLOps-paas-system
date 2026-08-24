@@ -1,0 +1,4 @@
+interface:
+  display_name: "MLOps PaaS Backend"
+  short_description: "Backend service contracts and workflow guidance"
+  default_prompt: "Use $mlops-paas-backend to implement this backend service change safely."

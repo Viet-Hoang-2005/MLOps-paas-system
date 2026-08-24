@@ -1,0 +1,236 @@
+---
+- name: Verify Argo CD owns the training addons and capacity application
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    name: "{{ item }}"
+    namespace: argocd
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_training_application
+  failed_when: >-
+    verified_training_application.resources | length != 1 or
+    verified_training_application.resources[0].status.sync.status | default('') != 'Synced' or
+    verified_training_application.resources[0].status.health.status | default('') != 'Healthy'
+  loop: "{{ training_addon_application_names + training_cluster_application_names }}"
+
+- name: Verify the PyTorchJob CRD is Established
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: pytorchjobs.kubeflow.org
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: Established
+      status: "True"
+
+- name: Verify the training controllers are Ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: "{{ item.name }}"
+    namespace: "{{ item.namespace }}"
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    wait: true
+    wait_timeout: 300
+  loop:
+    - {name: training-operator, namespace: kubeflow}
+    - {name: karpenter, namespace: karpenter}
+
+- name: Verify Karpenter NodeClasses and NodePools
+  kubernetes.core.k8s_info:
+    api_version: "{{ item.api_version }}"
+    kind: "{{ item.kind }}"
+    name: "{{ item.name }}"
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: Ready
+      status: "True"
+  loop:
+    - {api_version: karpenter.k8s.aws/v1, kind: EC2NodeClass, name: training-cpu}
+    - {api_version: karpenter.sh/v1, kind: NodePool, name: mlops-paas-training-cpu}
+    - {api_version: karpenter.k8s.aws/v1, kind: EC2NodeClass, name: training-gpu}
+    - {api_version: karpenter.sh/v1, kind: NodePool, name: mlops-paas-training-gpu}
+
+- name: Verify NVIDIA GPU Operator control plane
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: gpu-operator
+    namespace: gpu-operator
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    wait: true
+    wait_timeout: 300
+
+- name: Run isolated CPU and GPU PyTorchJob smoke tests
+  block:
+    - name: Create the isolated training smoke namespace
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ k3s_remote_kubeconfig }}"
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ training_smoke_namespace }}"
+            labels:
+              app.kubernetes.io/part-of: mlops-paas
+              app.kubernetes.io/component: training-smoke
+
+    - name: Create CPU and GPU PyTorchJob smoke workloads
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ k3s_remote_kubeconfig }}"
+        definition: "{{ item }}"
+      loop:
+        - apiVersion: kubeflow.org/v1
+          kind: PyTorchJob
+          metadata:
+            name: ansible-cpu-smoke
+            namespace: "{{ training_smoke_namespace }}"
+          spec:
+            pytorchReplicaSpecs:
+              Master:
+                replicas: 1
+                restartPolicy: Never
+                template:
+                  spec:
+                    automountServiceAccountToken: false
+                    nodeSelector:
+                      mlops-paas/nodepool: training-cpu
+                    containers:
+                      - name: pytorch
+                        image: "{{ training_smoke_image }}"
+                        imagePullPolicy: IfNotPresent
+                        command: ["/bin/sh", "-ec", "echo cpu-smoke"]
+                        resources:
+                          requests:
+                            cpu: "1"
+                            memory: 1Gi
+                          limits:
+                            cpu: "1"
+                            memory: 1Gi
+        - apiVersion: kubeflow.org/v1
+          kind: PyTorchJob
+          metadata:
+            name: ansible-gpu-smoke
+            namespace: "{{ training_smoke_namespace }}"
+          spec:
+            pytorchReplicaSpecs:
+              Master:
+                replicas: 1
+                restartPolicy: Never
+                template:
+                  spec:
+                    automountServiceAccountToken: false
+                    nodeSelector:
+                      mlops-paas/nodepool: training-gpu
+                    tolerations:
+                      - key: nvidia.com/gpu
+                        operator: Equal
+                        value: "true"
+                        effect: NoSchedule
+                    containers:
+                      - name: pytorch
+                        image: "{{ training_smoke_image }}"
+                        imagePullPolicy: IfNotPresent
+                        command: ["nvidia-smi"]
+                        resources:
+                          requests:
+                            cpu: "1"
+                            memory: 1Gi
+                            nvidia.com/gpu: "1"
+                          limits:
+                            cpu: "1"
+                            memory: 1Gi
+                            nvidia.com/gpu: "1"
+      when: >-
+        item.metadata.name != 'ansible-gpu-smoke' or
+        training_gpu_smoke_enabled | bool
+
+    - name: Wait for CPU and GPU PyTorchJob smoke workloads to succeed
+      kubernetes.core.k8s_info:
+        api_version: kubeflow.org/v1
+        kind: PyTorchJob
+        name: "{{ item }}"
+        namespace: "{{ training_smoke_namespace }}"
+        kubeconfig: "{{ k3s_remote_kubeconfig }}"
+        wait: true
+        wait_timeout: "{{ training_smoke_timeout_seconds }}"
+        wait_condition:
+          type: Succeeded
+          status: "True"
+      loop: "{{ ['ansible-cpu-smoke'] + (['ansible-gpu-smoke'] if training_gpu_smoke_enabled | bool else []) }}"
+
+    - name: Verify the GPU node advertises an allocatable GPU
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Node
+        kubeconfig: "{{ k3s_remote_kubeconfig }}"
+        label_selectors:
+          - mlops-paas/nodepool=training-gpu
+      register: training_smoke_gpu_nodes
+      when: training_gpu_smoke_enabled | bool
+
+    - name: Require an allocatable GPU on the smoke node
+      ansible.builtin.assert:
+        that:
+          - training_smoke_gpu_nodes.resources | length > 0
+          - training_smoke_gpu_nodes.resources[0].status.allocatable['nvidia.com/gpu'] | default(0) | int >= 1
+        fail_msg: NVIDIA GPU Operator did not expose nvidia.com/gpu on the Karpenter node.
+      when: training_gpu_smoke_enabled | bool
+
+    - name: Verify GPU Operator and feature-discovery DaemonSets on the GPU node
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: DaemonSet
+        name: "{{ item }}"
+        namespace: gpu-operator
+        kubeconfig: "{{ k3s_remote_kubeconfig }}"
+        wait: true
+        wait_timeout: 300
+      loop:
+        - nfd-worker
+        - nvidia-driver-daemonset
+        - nvidia-container-toolkit-daemonset
+        - nvidia-device-plugin-daemonset
+        - nvidia-dcgm-exporter
+      when: training_gpu_smoke_enabled | bool
+  always:
+    - name: Remove the isolated training smoke namespace
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Namespace
+        name: "{{ training_smoke_namespace }}"
+        kubeconfig: "{{ k3s_remote_kubeconfig }}"
+        wait: true
+        wait_timeout: 300
+
+- name: Wait for CPU training nodes to consolidate after smoke cleanup
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    label_selectors:
+      - mlops-paas/nodepool=training-cpu
+  register: remaining_cpu_training_nodes
+  until: remaining_cpu_training_nodes.resources | length == 0
+  retries: "{{ (training_smoke_node_cleanup_timeout_seconds | int / 10) | round(0, 'ceil') | int }}"
+  delay: 10
+
+- name: Wait for GPU training nodes to consolidate after smoke cleanup
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    label_selectors:
+      - mlops-paas/nodepool=training-gpu
+  register: remaining_gpu_training_nodes
+  until: remaining_gpu_training_nodes.resources | length == 0
+  retries: "{{ (training_smoke_node_cleanup_timeout_seconds | int / 10) | round(0, 'ceil') | int }}"
+  delay: 10
+  when: training_gpu_smoke_enabled | bool

@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-workload-control-plane
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+  labels:
+    mlops-paas.io/plane: workload
+    mlops-paas.io/component: control-plane
+spec:
+  project: mlops-workloads
+  info:
+    - name: Owner
+      value: Application Engineering
+    - name: Source
+      value: k8s/apps/overlays/production/control-plane
+    - name: Runbook
+      value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#workloads
+  source:
+    repoURL: https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
+    targetRevision: main
+    path: k8s/apps/overlays/production/control-plane
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mlops-control-plane
+  ignoreDifferences:
+    - group: external-secrets.io
+      kind: ExternalSecret
+      jsonPointers:
+        - /metadata/annotations/force-sync
+      jqPathExpressions:
+        - .spec.data[].remoteRef.conversionStrategy
+        - .spec.data[].remoteRef.decodingStrategy
+        - .spec.data[].remoteRef.metadataPolicy
+        - .spec.data[].remoteRef.nullBytePolicy

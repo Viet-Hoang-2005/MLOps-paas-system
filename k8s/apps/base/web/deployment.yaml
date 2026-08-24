@@ -18,7 +18,7 @@ spec:
         workload-type: worker
       containers:
         - name: web
-          image: mlops-paas-web:latest
+          image: mlops-paas-web
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80

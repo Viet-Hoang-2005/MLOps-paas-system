@@ -1,0 +1,19 @@
+node-name: "{{ k3s_node_name | default(inventory_hostname) }}"
+cluster-init: true
+secrets-encryption: true
+write-kubeconfig-mode: "0600"
+tls-san:
+  - "{{ private_ip }}"
+{% if enable_karpenter | bool %}
+  - "{{ terraform_karpenter_k3s_api_hostname }}"
+{% endif %}
+node-label:
+{% for label in k3s_node_labels %}
+  - "{{ label }}"
+{% endfor %}
+node-taint:
+{% for taint in k3s_node_taints %}
+  - "{{ taint }}"
+{% endfor %}
+etcd-snapshot-schedule-cron: "{{ k3s_etcd_snapshot_schedule }}"
+etcd-snapshot-retention: {{ k3s_etcd_snapshot_retention }}

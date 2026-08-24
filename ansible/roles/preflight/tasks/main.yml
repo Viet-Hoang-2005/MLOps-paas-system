@@ -1,0 +1,73 @@
+---
+- name: Require a Linux control host
+  ansible.builtin.assert:
+    that:
+      - ansible_system == "Linux"
+    fail_msg: Run the Ansible control plane from WSL Ubuntu or another Linux host.
+
+- name: Verify required control-host commands
+  ansible.builtin.command: "which {{ item }}"
+  loop:
+    - terraform
+    - aws
+    - ssh
+  changed_when: false
+
+- name: Inspect the configured SSH private key
+  ansible.builtin.stat:
+    path: "{{ lookup('ansible.builtin.env', 'HOME') }}/.ssh/aws_key"
+  register: ansible_ssh_key
+
+- name: Require a private SSH key with mode 0600
+  ansible.builtin.assert:
+    that:
+      - ansible_ssh_key.stat.exists
+      - ansible_ssh_key.stat.isreg
+      - ansible_ssh_key.stat.mode == "0600"
+    fail_msg: Copy the EC2 private key to ~/.ssh/aws_key and run chmod 600 ~/.ssh/aws_key.
+
+- name: Validate the expected inventory topology
+  ansible.builtin.assert:
+    that:
+      - groups.get('master', []) | length == 1
+      - groups.get('workers', []) | length == k3s_expected_worker_count | int
+      - hostvars[groups['master'][0]].private_ip | length > 0
+      - terraform_vpc_id | length > 0
+      - terraform_ec2_key_pair_name | length > 0
+    fail_msg: Terraform inventory must contain one master and the configured number of workers.
+
+- name: Validate pinned software versions and rollout flags
+  ansible.builtin.assert:
+    that:
+      - k3s_version is match('^v[0-9]+\\.[0-9]+\\.[0-9]+\\+k3s[0-9]+$')
+      - helm_version is match('^v[0-9]+\\.[0-9]+\\.[0-9]+$')
+      - not enable_karpenter | bool or deploy_training_platform | bool
+    fail_msg: Version pins or phased rollout flags are inconsistent.
+
+- name: Validate Terraform Karpenter bootstrap outputs
+  ansible.builtin.assert:
+    that:
+      - hostvars[groups['master'][0]].terraform_karpenter_node_instance_profile_name | default('') | length > 0
+      - hostvars[groups['master'][0]].terraform_karpenter_interruption_queue_name | default('') | length > 0
+      - hostvars[groups['master'][0]].terraform_karpenter_controller_policy_arn | default('') | length > 0
+      - hostvars[groups['master'][0]].terraform_karpenter_k3s_api_hostname | default('') | length > 0
+      - hostvars[groups['master'][0]].terraform_karpenter_k3s_api_endpoint | default('') | length > 0
+      - hostvars[groups['master'][0]].terraform_karpenter_k3s_token_secret_arn | default('') | length > 0
+      - hostvars[groups['master'][0]].terraform_karpenter_node_instance_profile_name == 'mlops-karpenter-node-profile'
+      - hostvars[groups['master'][0]].terraform_karpenter_interruption_queue_name == 'mlops-paas-cluster'
+      - hostvars[groups['master'][0]].terraform_karpenter_k3s_api_hostname == ('k3s-api.internal.' ~ domain_name)
+      - hostvars[groups['master'][0]].terraform_karpenter_k3s_api_endpoint == ('https://k3s-api.internal.' ~ domain_name ~ ':6443')
+      - hostvars[groups['master'][0]].terraform_karpenter_k3s_token_secret_arn is search(':secret:mlops/k3s-agent-token-')
+    fail_msg: Enable and apply the complete Terraform Karpenter stack before Ansible bootstrap.
+  when: enable_karpenter | bool
+
+- name: Validate the WSL AWS session
+  ansible.builtin.command: aws sts get-caller-identity --output json
+  changed_when: false
+  no_log: true
+
+- name: Create the local ignored artifacts directory
+  ansible.builtin.file:
+    path: "{{ ansible_artifacts_directory }}"
+    state: directory
+    mode: "0700"

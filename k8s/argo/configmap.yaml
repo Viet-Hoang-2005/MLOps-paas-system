@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlops-paas-execution-config
+  namespace: mlops-execution
+data:
+  AWS_DEFAULT_REGION: "ap-southeast-1"
+  AWS_BUCKET_NAME: "mlops-paas-artifacts"
+  DB_HOST_RO: "mlops-paas-postgres-ro.mlops-postgres.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "mlops_paas_db"
+  REDIS_URL: "redis://mlops-paas-redis.mlops-redis.svc.cluster.local:6379/1"

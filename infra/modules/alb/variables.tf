@@ -17,3 +17,8 @@ variable "worker_instance_ids" {
 variable "certificate_arn" {
   type = string
 }
+
+variable "idle_timeout_seconds" {
+  description = "Maximum idle time for client connections through the ALB."
+  type        = number
+}

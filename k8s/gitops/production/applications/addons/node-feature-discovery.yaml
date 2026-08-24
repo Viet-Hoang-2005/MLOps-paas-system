@@ -1,0 +1,56 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-addon-node-feature-discovery
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-24"
+  labels:
+    app.kubernetes.io/part-of: mlops-paas
+    mlops-paas.io/environment: production
+    mlops-paas.io/plane: addon
+    mlops-paas.io/component: node-feature-discovery
+spec:
+  project: mlops-addons
+  info:
+    - name: Owner
+      value: Platform Engineering
+    - name: Source
+      value: registry.k8s.io/nfd/charts/node-feature-discovery@0.18.3
+    - name: Runbook
+      value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
+  source:
+    repoURL: registry.k8s.io/nfd/charts
+    chart: node-feature-discovery
+    targetRevision: 0.18.3
+    helm:
+      releaseName: nfd
+      values: |
+        master:
+          nodeSelector:
+            workload-type: worker
+        worker:
+          nodeSelector:
+            workload-type: training
+          tolerations:
+            - key: nvidia.com/gpu
+              operator: Equal
+              value: "true"
+              effect: NoSchedule
+        gc:
+          nodeSelector:
+            workload-type: worker
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gpu-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+      - PruneLast=true
+      - FailOnSharedResource=true

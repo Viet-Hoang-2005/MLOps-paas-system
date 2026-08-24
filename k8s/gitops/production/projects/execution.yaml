@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: mlops-execution
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: mlops-paas
+    mlops-paas.io/environment: production
+    mlops-paas.io/plane: execution
+spec:
+  description: Argo Events and Workflows execution resources for production.
+  sourceRepos:
+    - https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
+  destinations:
+    - namespace: argo-events
+      server: https://kubernetes.default.svc
+    - namespace: mlops-execution
+      server: https://kubernetes.default.svc
+    - namespace: mlops-model-runtimes
+      server: https://kubernetes.default.svc
+    - namespace: user-jobs
+      server: https://kubernetes.default.svc
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: rbac.authorization.k8s.io
+      kind: Role
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: external-secrets.io
+      kind: ExternalSecret
+    - group: argoproj.io
+      kind: EventBus
+    - group: argoproj.io
+      kind: EventSource
+    - group: argoproj.io
+      kind: Sensor
+    - group: argoproj.io
+      kind: WorkflowTemplate
+  orphanedResources:
+    warn: true
+    ignore:
+      # Created and maintained by the Argo Workflows controller.
+      - group: rbac.authorization.k8s.io
+        kind: Role
+        name: argo-workflows-workflow
+      - group: rbac.authorization.k8s.io
+        kind: RoleBinding
+        name: argo-workflows-workflow

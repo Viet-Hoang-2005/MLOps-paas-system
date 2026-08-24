@@ -1,0 +1,82 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-addon-monitoring
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-40"
+  labels:
+    mlops-paas.io/plane: addon
+    mlops-paas.io/component: monitoring
+spec:
+  project: mlops-addons
+  info:
+    - name: Owner
+      value: Platform Engineering
+    - name: Source
+      value: prometheus-community.github.io/helm-charts/kube-prometheus-stack@69.8.2
+    - name: Runbook
+      value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 69.8.2
+    helm:
+      releaseName: monitoring
+      values: |
+        prometheus:
+          prometheusSpec:
+            retention: 3d
+            scrapeInterval: 30s
+            nodeSelector:
+              workload-type: worker
+            resources:
+              limits:
+                memory: 1500Mi
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: local-path
+                  resources:
+                    requests:
+                      storage: 10Gi
+            podMonitorSelectorNilUsesHelmValues: false
+            serviceMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+        grafana:
+          nodeSelector:
+            workload-type: worker
+          persistence:
+            enabled: true
+            storageClassName: local-path
+            size: 5Gi
+          service:
+            type: ClusterIP
+          grafana.ini:
+            server:
+              root_url: https://grafana.mlops-nids-nt114.id.vn
+              serve_from_sub_path: false
+        alertmanager:
+          alertmanagerSpec:
+            nodeSelector:
+              workload-type: worker
+            storage:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: local-path
+                  resources:
+                    requests:
+                      storage: 2Gi
+        prometheusOperator:
+          nodeSelector:
+            workload-type: worker
+          admissionWebhooks:
+            enabled: false
+          tls:
+            enabled: false
+        kube-state-metrics:
+          nodeSelector:
+            workload-type: worker
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring

@@ -4,7 +4,6 @@ apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
   name: mlops-paas-consumer-scaler
-  namespace: default
   labels:
     app: mlops-paas-consumer
 spec:
@@ -18,7 +17,7 @@ spec:
     - type: kafka
       metadata:
         # Địa chỉ Redpanda Service bên trong K3s
-        bootstrapServers: redpanda-service.default.svc.cluster.local:9092
+        bootstrapServers: redpanda-service.mlops-redpanda.svc.cluster.local:9092
         # Tên Topic cần giám sát
         topic: mlops_paas_production_data
         consumerGroup: paas-db-writer-group

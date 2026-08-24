@@ -1,0 +1,37 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-platform-images
+  annotations:
+    policies.kyverno.io/title: Verify platform image signatures
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  background: false
+  failurePolicy: Fail
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: require-keyless-github-actions-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      verifyImages:
+        - imageReferences:
+            - registry.mlops-nids-nt114.id.vn/mlops-paas/*
+          required: true
+          mutateDigest: true
+          verifyDigest: true
+          imageRegistryCredentials:
+            secrets:
+              - kyverno-harbor-registry-auth
+          attestors:
+            - count: 1
+              entries:
+                - keyless:
+                    subject: https://github.com/Viet-Hoang-2005/MLOps-paas-system/.github/workflows/cd.yml@refs/heads/main
+                    issuer: https://token.actions.githubusercontent.com
+                    rekor:
+                      url: https://rekor.sigstore.dev

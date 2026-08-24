@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlops-paas-model-server-config
+  labels:
+    app: mlops-paas-model-server
+data:
+  DB_HOST_RO: "mlops-paas-postgres-ro.mlops-postgres.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "mlops_paas_db"
+  CONTROL_PLANE_DB_SCHEMA: "control_plane"
+  JWKS_URL: "http://mlops-paas-control-plane.mlops-control-plane.svc.cluster.local:8000/api/auth/.well-known/jwks.json"
+  REDPANDA_BROKERS: "redpanda-service.mlops-redpanda.svc.cluster.local:9092"
+  KAFKA_TOPIC: "mlops_paas_production_data"
+  REDIS_URL: "redis://mlops-paas-redis.mlops-redis.svc.cluster.local:6379/1"
+  MODEL_RUNTIME_NAMESPACE: "mlops-model-runtimes"

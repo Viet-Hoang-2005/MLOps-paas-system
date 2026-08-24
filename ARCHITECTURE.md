@@ -1,398 +1,321 @@
-# Thiết kế Kiến trúc Hệ thống (System Architecture)
+# Thiết kế Kiến trúc Hệ thống
 
-Tài liệu này đặc tả chi tiết kiến trúc của **MLOps AI PaaS - Nền tảng Quản lý Vòng đời Mô hình AI Đa Người thuê (Multi-Tenant)** phục vụ bài toán Phát hiện Tấn công Mạng (NIDS) dựa trên tập dữ liệu CIC-IDS2017.
+Tài liệu này mô tả kiến trúc đang được triển khai trong repository. Các quyết định chi tiết của Control Plane được ghi tại [`docs/control-plane/`](docs/control-plane/) và [`docs/adr/`](docs/adr/); khi có khác biệt, mã nguồn và ADR đã được chấp nhận là nguồn sự thật.
 
 ---
 
-## 1. Kiến trúc Tổng thể (High-Level Architecture)
+## 1. Tổng quan
 
-Hệ thống hoạt động như một **AI PaaS** với hai mặt phẳng điều phối tách biệt:
+MLOps PaaS được chia thành hai mặt phẳng:
 
-- **Control Plane** - Django DRF xử lý API, xác thực đa người thuê (Asymmetric JWT RS256), quản lý vòng đời mô hình và điều phối Argo Workflows.
-- **Data Plane** - Các tiến trình nền: Build Image (Kaniko), Deploy Endpoint, Training (Kubeflow), Drift Detection (Evidently AI).
+- **Control Plane**: Django REST Framework modular monolith quản lý identity, tenant, workspace, registry, training, build, deployment, drift và observability.
+- **Data Plane**: các workload dài hạn chạy qua Docker ở local hoặc Argo Workflows/Kubeflow trên K3s production. Model inference đi qua model-server gateway trung tâm tới worker của từng version.
 
 ```mermaid
 flowchart TB
-    subgraph CLIENT["Người dùng / Tenant"]
-        USER["Tenant\n(Upload Model, Gửi Request Suy luận)"]
-        BROWSER["React Dashboard\nQuản trị PaaS"]
-    end
+    CLIENT["React Dashboard / API Client"] --> TRAEFIK["Traefik / ALB"]
+    TRAEFIK --> CP["Django Control Plane"]
+    TRAEFIK --> GATEWAY["FastAPI Model Server Gateway"]
 
-    subgraph AWS_INFRA["Hạ tầng AWS (Terraform)"]
-        ALB["Application Load Balancer\nPublic Endpoint HTTPS"]
-        ASM["AWS Secrets Manager\nVault bảo mật"]
-        S3["AWS S3\nmlops-paas-artifacts\n(Model Artifacts, Training Data)"]
-        ECR["Harbor Registry\n(Private Docker Registry\ntrên K3s)"]
+    CP -->|"transaction.on_commit"| CELERY["Celery Worker"]
+    CELERY -->|"local"| DOCKER["Docker Execution Backends"]
+    CELERY -->|"production webhook"| ARGO["Argo Events + Workflows"]
 
-        subgraph K3S["K3s Production Cluster (1 Master + 2 Workers)"]
-            ESO["External Secrets Operator\nASM → K8s Secrets"]
-            TRAEFIK["Traefik Ingress\n(Dynamic IngressRoute)"]
-            REDIS["Redis\nJob Status / Build Logs"]
+    ARGO --> KANIKO["Kaniko Build"]
+    ARGO --> KUBEFLOW["Kubeflow PyTorchJob"]
+    ARGO --> EVIDENTLY["Evidently Job"]
+    ARGO --> WORKER["Model Worker Deployment + Service"]
+    DOCKER --> WORKER
 
-            subgraph CTRL["Control Plane (Django DRF)"]
-                AUTH["authentication\n(JWKS + RS256 JWT)"]
-                REGISTRY["registry\n(Model API, Deployment)"]
-                TRAINING["training\n(Kubeflow Service)"]
-                DRIFT["drift\n(Evidently Orchestration)"]
-            end
-
-            subgraph ARGO["Argo Event-Driven Layer"]
-                EVT["Argo Events\n(EventSource + Sensor)"]
-                WF["Argo Workflows\n(WorkflowTemplates)"]
-            end
-
-            subgraph KUBEFLOW["Kubeflow Training Operator"]
-                KFP_CPU["PyTorchJob (CPU)\nuser-jobs namespace"]
-                KFP_GPU["PyTorchJob (GPU)\nKarpenter NodePool"]
-            end
-
-            MLFLOW["MLflow Server\nModel Registry"]
-            EVIDENTLY["Evidently AI\nDrift Detection Job"]
-            MODEL_SVC["Model Endpoint Pods\n(Mỗi tenant có endpoint riêng)"]
-        end
-    end
-
-    USER -->|"POST /api/models/ (Upload)"| ALB
-    BROWSER -->|"Quản lý Model / Job"| ALB
-    ALB --> TRAEFIK
-    TRAEFIK --> CTRL
-    TRAEFIK -->|"/tenant_id/models/hashid/version/predict"| MODEL_SVC
-
-    CTRL -->|"Webhook → Argo Events"| EVT
-    EVT -->|"Trigger"| WF
-    WF -->|"Build 3-Step Pipeline"| ECR
-    WF -->|"Deploy IngressRoute"| MODEL_SVC
-    WF -->|"Create PyTorchJob"| KUBEFLOW
-    WF -->|"Run Drift Job"| EVIDENTLY
-
-    KUBEFLOW -->|"Log Metrics"| MLFLOW
-    KUBEFLOW -->|"Upload Artifacts"| S3
-    EVIDENTLY -->|"Download Model / Reference Data"| S3
-    EVIDENTLY -->|"Webhook kết quả"| CTRL
-
-    ASM -->|"IAM / ESO"| ESO
-    ESO -->|"K8s Secrets"| CTRL
-    ESO -->|"K8s Secrets"| KUBEFLOW
-    CTRL -->|"Job Status"| REDIS
+    GATEWAY -->|"resolve UUID / health"| WORKER
+    GATEWAY -->|"inference events"| REDPANDA["Redpanda"]
+    CP --> POSTGRES["PostgreSQL"]
+    CELERY --> REDIS["Redis broker / results / runtime logs"]
+    CELERY --> S3["S3 Artifacts"]
+    KUBEFLOW --> MLFLOW["MLflow Tracking"]
+    KANIKO --> HARBOR["Harbor Registry"]
 ```
+
+Control Plane không chạy workload dài trong HTTP worker. API chỉ validate command và commit trạng thái; Celery sở hữu background execution, retry và callback lifecycle.
 
 ---
 
-## 2. Chi tiết Từng Thành phần
+## 2. Control Plane Modular Monolith
 
-### 2.1. Lớp Xác thực Đa Người thuê (Multi-Tenant Authentication)
+Mỗi Django app sở hữu bảng và write rules của capability tương ứng. Cross-domain read sử dụng selector; cross-domain write sử dụng service. API endpoint không gọi trực tiếp hạ tầng.
 
-Hệ thống sử dụng **Asymmetric RS256 JWT** để xác thực. Access Token được ký bằng Private Key và xác thực bằng Public Key qua chuẩn JWKS - đảm bảo các service khác (Model Endpoints) có thể xác thực Token mà không cần truy cập Control Plane.
+```text
+HTTP request
+  -> DRF endpoint + serializer
+  -> selector / application service
+  -> domain model + transaction
+  -> transaction.on_commit
+  -> Celery task
+  -> execution backend
+  -> Docker local hoặc Argo production
+```
+
+| App | Trách nhiệm | Entity chính |
+| --- | --- | --- |
+| `auth` | Identity, tenant, JWT, JWKS, OTP, OAuth, profile | `CustomUser`, `UserAvatar` |
+| `access` | API key có thể scope theo project | `UserAPIKey` |
+| `catalog` | Workspace mutable của model | `ModelProject`, `WorkspaceAsset` |
+| `training` | Snapshot và một lần chạy training | `TrainingJob`, `TrainingJobEvent`, `TrainingOutput` |
+| `registry` | Registry bất biến, artifact, metric, alias, lineage | `ModelVersion`, `ModelArtifact`, `ModelMetric`, `RegistryAlias`, `RegistryEvent` |
+| `deployment` | Build image, rollout và runtime endpoint | `Build`, `Deployment`, `Endpoint` |
+| `drift` | Cấu hình monitor và kết quả Evidently | `DriftMonitor`, `DriftRun` |
+| `observability` | Health, model telemetry và transactional outbox | `EventOutbox` |
+
+Mọi tài nguyên được expose ra ngoài dùng UUID `public_id`. Integer primary key chỉ tồn tại trong database và không xuất hiện trong URL hoặc S3 key.
+
+### 2.1. API public
+
+Các nhóm route hiện tại:
+
+| Capability | Route gốc |
+| --- | --- |
+| Identity | `/api/auth/` |
+| API keys | `/api/api-keys/` |
+| Projects/workspace | `/api/models/` |
+| Registry versions/aliases | `/api/registry/` |
+| Training jobs | `/api/training-jobs/` |
+| Builds | `/api/builds/` |
+| Deployments | `/api/deployments/` |
+| Endpoints | `/api/endpoints/` |
+| Drift | `/api/drift-monitors/` |
+| Model observability | `/api/observability/` |
+| Operations | `/health/live`, `/health/ready`, `/health/metrics` |
+
+API không có prefix `/v1` và không duy trì route alias legacy. Catalog đầy đủ nằm tại [`docs/control-plane/api-catalog.md`](docs/control-plane/api-catalog.md).
+
+### 2.2. Authentication và tenant isolation
+
+Control Plane phát hành access/refresh token RS256 qua `/api/auth/token/`. JWT chứa `tenant_id`, `audience=mlops-paas` và `kid`; public key được expose ở `/api/auth/.well-known/jwks.json`.
 
 ```mermaid
 sequenceDiagram
-    participant USER as Tenant (Browser)
-    participant CP as Control Plane (Django)
-    participant ENDPOINT as Model Endpoint (FastAPI)
-
-    USER->>CP: POST /api/auth/login/ (username + password)
-    CP-->>USER: access_token (RS256 JWT) + refresh_token
-
-    USER->>ENDPOINT: POST /predict (Authorization: Bearer <token>)
-    ENDPOINT->>CP: GET /api/auth/.well-known/jwks.json
-    CP-->>ENDPOINT: Public Key (JWK)
-    ENDPOINT-->>ENDPOINT: Verify Token locally
-    ENDPOINT-->>USER: Kết quả suy luận
-```
-
-**Kiến trúc cô lập dữ liệu (Multi-Tenant Isolation):**
-
-- Mỗi Tenant có `tenant_id` duy nhất được nhúng vào JWT Payload.
-- Tất cả query Django đều tự động lọc theo `request.tenant` - không tenant nào có thể truy cập tài nguyên của tenant khác.
-- Resource Quota của Kubeflow được áp dụng theo namespace `user-jobs` để chống Noisy Neighbor.
-
----
-
-### 2.2. Luồng Đóng gói Mô hình (Model Build & Package Flow)
-
-#### Môi trường Local (Docker Compose)
-
-Control Plane sử dụng **Docker SDK (docker-py)** để khởi tạo container `model-packager` với Docker Socket mount.
-
-```
-Control Plane (Django) → DockerBuildAdapter → docker run model-packager → Docker Daemon → Harbor Registry
-```
-
-#### Môi trường Production (K3s)
-
-Control Plane sử dụng **ArgoBuildAdapter** để gửi Webhook tới Argo Events. Pipeline được thực thi theo 3 bước tuần tự (DAG Steps) qua volume dùng chung `emptyDir`:
-
-```mermaid
-flowchart LR
-    CP["Control Plane\nArgoBuildAdapter"] -->|"Webhook"| EVT["Argo Events\n(EventSource /build)"]
-    EVT -->|"Trigger"| WF["Argo Workflows\n(build-workflowtemplate)"]
-
-    subgraph WF["Build Pipeline (3 Steps)"]
-        direction TB
-        S1["① prepare-package\n(model-packager container)\nTải S3 → MLflow format\n→ Sinh Dockerfile + webhook_payload.json\nvào /workspace (emptyDir)"]
-        S2["② kaniko-build\n(gcr.io/kaniko-project/executor)\nĐọc /workspace/Dockerfile\nBuild rootless → Push Harbor"]
-        S3["③ notify-success\n(model-packager NOTIFY_BUILD)\nĐọc webhook_payload.json\n→ POST Webhook về Control Plane"]
-        S1 --> S2 --> S3
-    end
-
-    S3 -->|"Webhook: status=success"| CP
-    S2 -->|"Push Image"| HARBOR["Harbor Registry"]
-```
-
----
-
-### 2.3. Luồng Deploy Model Endpoint (Dynamic Routing)
-
-Sau khi Build hoàn tất, Control Plane kích hoạt Argo Workflows để tự động tạo Kubernetes Deployment + Service + Traefik IngressRoute cho mỗi mô hình:
-
-```mermaid
-flowchart TB
-    CP["Control Plane\n(deploy_adapter.py)"] -->|"Webhook → /deploy"| ARGO["Argo Events + Workflows\n(deploy-workflowtemplate)"]
-    ARGO -->|"kubectl apply"| K8S
-
-    subgraph K8S["K3s Cluster"]
-        DEP["Deployment\nModel Endpoint Pod"]
-        SVC["Service\n:5000"]
-        INGRESS["Traefik IngressRoute\n/:tenant_id/models/:hashid/:version/predict"]
-    end
-
-    CLIENT["Tenant"] -->|"POST /predict"| INGRESS
-    INGRESS -->|"RewritePath"| SVC --> DEP
-```
-
-**Chiến lược cô lập:** Mỗi mô hình được deploy thành một Pod riêng biệt với tên container theo pattern `{tenant_id}-model-{hashid}`. Traefik IngressRoute định tuyến dựa trên đường dẫn URL, đảm bảo tenant không thể truy nhập endpoint của nhau.
-
----
-
-### 2.4. Luồng Huấn luyện Mô hình (Training Orchestration)
-
-Tenant gửi yêu cầu huấn luyện từ React Dashboard. Control Plane gửi Webhook tới Argo Events để kích hoạt `training-workflowtemplate`:
-
-```mermaid
-sequenceDiagram
-    participant USER as Tenant
-    participant CP as Control Plane (Django)
-    participant ARGO as Argo Events + Workflows
-    participant KF as Kubeflow PyTorchJob
-    participant KARPENTER as Karpenter (Node Autoscaler)
-    participant S3 as AWS S3
-    participant MLFLOW as MLflow Server
-    participant REDIS as Redis (Job Status)
-
-    USER->>CP: POST /api/training/jobs/ (hyperparams, data_uri)
-    CP->>ARGO: Webhook → /train (payload: job_id, resources, s3_uri)
-    ARGO->>KF: Tạo PyTorchJob CRD (user-jobs namespace)
-
-    alt Yêu cầu GPU
-        KF->>KARPENTER: Yêu cầu GPU Node
-        KARPENTER-->>KF: Provision EC2 GPU Instance
-    end
-
-    KF->>S3: Tải training data + source code
-    KF-->>KF: Huấn luyện (train_runner.py)
-    KF->>MLFLOW: Log metrics, Register Model (Staging)
-    KF->>S3: Upload model artifact (model.tar.gz)
-    KF->>CP: Webhook: status=completed / failed
-
-    CP->>REDIS: Cập nhật trạng thái Job
-    CP-->>USER: HTTP Polling → training status
-```
-
-**Scale-to-Zero:** Sau khi Job hoàn tất, Karpenter tự động thu hồi GPU Node EC2 - chi phí tính theo thời gian thực tế sử dụng.
-
----
-
-### 2.5. Luồng Giám sát Drift Dữ liệu (Data Drift Detection)
-
-```mermaid
-flowchart TB
-    subgraph CP["Control Plane"]
-        SCHED["Argo Events\n(drift EventSource)"]
-    end
-
-    subgraph DRIFT_PIPELINE["Evidently Drift Pipeline (Argo Workflows)"]
-        EV["Evidently Container\n(detect_drift.py)"]
-        EV --> LOAD["Tải Production Data\n+ Reference Data (S3 / DB)"]
-        LOAD --> ANALYSIS["Phân tích Drift\n(DataDrift + DataQuality)"]
-        ANALYSIS --> REPORT["Tạo HTML Report\n+ JSON Summary → S3"]
-        REPORT --> DECISION{"Drift Score\n≥ Ngưỡng?"}
-    end
-
-    DECISION -->|"Có"| WEBHOOK_YES["Webhook về Control Plane\nstatus=drifted"]
-    DECISION -->|"Không"| WEBHOOK_NO["Webhook về Control Plane\nstatus=no_drift"]
-    WEBHOOK_YES --> CP
-    WEBHOOK_NO --> CP
-
-    CP -->|"Trigger"| SCHED
-    SCHED -->|"Kích hoạt"| DRIFT_PIPELINE
-```
-
-Tenant có thể lập lịch chạy Drift Detection theo định kỳ hoặc kích hoạt thủ công từ Dashboard. Kết quả (HTML Report, JSON Summary) được upload lên S3 và URL được đính kèm trong phản hồi webhook.
-
----
-
-### 2.6. Lớp Secret Management (External Secrets Operator)
-
-```mermaid
-flowchart LR
-    ASM["AWS Secrets Manager\n(mlops/production-secrets\nmlops/aws-secrets\nmlops/github-actions-secrets)"]
-
-    subgraph ESO["External Secrets Operator"]
-        SYNC1["harbor-registry-secret-sync"]
-        SYNC2["harbor-registry-dockerconfig-sync-default"]
-        SYNC3["mlops-paas-app-secret-sync"]
-    end
-
-    subgraph K8S_SECRETS["K8s Secrets (auto-generated)"]
-        S_APP["mlops-paas-secret\n(Django, JWT, OAuth, Webhook)"]
-        S_HARBOR["harbor-registry-secret\n(HARBOR_USERNAME/PASSWORD)"]
-        S_DOCKER["harbor-registry-dockerconfig\n(config.json → Kaniko Auth)"]
-    end
-
-    ASM -->|"Đồng bộ mỗi 1 giờ"| ESO
-    ESO --> S_APP
-    ESO --> S_HARBOR
-    ESO --> S_DOCKER
-```
-
----
-
-## 3. Lược đồ Cơ sở Dữ liệu (Database Schema Overview)
-
-Hệ thống sử dụng **PostgreSQL** với Schema isolation theo module:
-
-```
-PostgreSQL (mlops_paas_db)
-├── Schema: control_plane (Django ORM)
-│   ├── authentication_user        - Thông tin tài khoản + tenant_id
-│   ├── authentication_tenantprofile - Tenant metadata, quota, tier
-│   ├── authentication_modelapi    - Vòng đời mô hình (upload → build → deploy)
-│   ├── training_trainingjob       - Lịch sử huấn luyện, status, hyperparams
-│   └── drift_driftjob             - Lịch sử drift detection, report URLs
-│
-└── Schema: mlflow
-    └── (MLflow tự quản lý - Runs, Experiments, Registered Models)
-```
-
----
-
-## 4. Hạ tầng AWS (Terraform)
-
-```
-ap-southeast-1 (Singapore)
-├── VPC: 10.0.0.0/16
-│   ├── Public Subnet 1a (10.0.1.0/24)  - Master Node + NAT Gateway
-│   ├── Public Subnet 1b (10.0.3.0/24)  - ALB (Multi-AZ)
-│   └── Private Subnet 1a (10.0.2.0/24) - Worker Nodes
-│
-├── EC2 Instances (K3s Cluster)
-│   ├── t3.medium  - K3s Master (Control Plane Only, node-label: workload-type=control-plane)
-│   ├── t3.large   - K3s Worker 1 (node-label: workload-type=worker)
-│   └── t3.large   - K3s Worker 2 (node-label: workload-type=worker)
-│
-├── EC2 GPU Pool (Karpenter NodePool - On-Demand, Scale-to-Zero)
-│   └── g4dn.xlarge / p3.2xlarge  - GPU Nodes (mlops-paas/nodepool=training-gpu)
-│
-├── Application Load Balancer (mlops-api-lb)
-│   └── Listener :443 HTTPS → Target Group → Worker :80 (Traefik Ingress)
-│
-├── AWS Secrets Manager
-│   ├── mlops/aws-secrets           - AWS Credentials (cho local dev)
-│   ├── mlops/github-actions-secrets - Harbor Robot + Cosign Keys
-│   └── mlops/production-secrets    - DB, JWT, OAuth, Harbor, Webhook...
-│
-└── S3 Bucket: mlops-paas-artifacts
-    ├── user-models/{tenant_id}/{model_id}/   - MLflow ZIP packages
-    ├── training-data/                         - Dữ liệu huấn luyện
-    ├── training-artifacts/{job_id}/           - model.tar.gz output
-    └── drift-reports/{job_id}/                - HTML + JSON drift reports
-```
-
----
-
-## 5. Chiến lược Bảo mật (Security Architecture)
-
-| Lớp bảo mật            | Cơ chế                                                                 |
-| ----------------------- | ---------------------------------------------------------------------- |
-| **API Authentication**  | Asymmetric RS256 JWT (Private Key ký, Public Key xác thực qua JWKS)   |
-| **Multi-Tenant Isolation** | Query filter theo `tenant_id` ở tầng ORM; Namespace isolation K8s  |
-| **Secret Management**   | AWS Secrets Manager + External Secrets Operator (không lưu secret trong Git) |
-| **Image Build Security**| Kaniko Rootless (không Docker Socket; không root trong container)      |
-| **Harbor Auth for Kaniko** | `harbor-registry-dockerconfig` Secret (dockerconfigjson) mount vào `/kaniko/.docker/` |
-| **Webhook Validation**  | HMAC `X-Webhook-Secret` header trên mọi internal callback             |
-| **AWS Access**          | EC2 IAM Role (Production); `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` (Local) |
-| **Network**             | ALB (Public) → Traefik Ingress → Services (Private); Master Node không expose workload port |
-| **DNS + TLS**           | Route53 + ACM Certificate; Cloudflare Tunnel cho internal dashboards  |
-
----
-
-## 6. Luồng CI/CD GitOps (GitHub Actions)
-
-```mermaid
-flowchart LR
-    DEV["Developer\ngit push"] -->|"Trigger"| GH["GitHub Actions\n(ci_cd_pipeline.yml)"]
-    GH -->|"docker build + push"| HARBOR["Harbor Registry\n(robot account)"]
-    GH -->|"Cosign sign image"| HARBOR
-    GH -->|"Update image tag\nin k8s/apps/"| GIT["Git Repo"]
-    GIT -->|"Auto-sync"| ARGOCD["ArgoCD\n(GitOps Pull-based)"]
-    ARGOCD -->|"kubectl apply"| K3S["K3s Cluster\n(Rolling Update)"]
-```
-
-**Services được CI/CD quản lý:**
-
-- `mlops-paas-control-plane` - Django DRF Backend
-- `mlops-paas-model-packager` - Model packaging + Dockerfile generation
-- `mlops-paas-model-server` - FastAPI Model Endpoint base image
-- `mlops-paas-evidently` - Drift Detection Worker
-- `mlops-paas-training-runner` - PyTorchJob Training Runner
-- `mlops-paas-consumer` - Kafka/Redpanda Consumer (Production Data Logging)
-
----
-
-## 7. Mục tiêu Hiệu năng (Performance SLA)
-
-| Chỉ số                        | Mục tiêu       | Cơ chế đạt được                                     |
-| ----------------------------- | -------------- | ---------------------------------------------------- |
-| **Latency API Inference**     | < 150ms        | Model load in-memory; Traefik Proxy trực tiếp        |
-| **Build Image Time**          | < 5 phút       | Kaniko layer cache; Base image pre-built trên Harbor |
-| **Deploy Endpoint Time**      | < 2 phút       | Argo Workflows DAG; `kubectl apply` trực tiếp        |
-| **Training Job Startup**      | < 3 phút       | Karpenter provision node; Harbor image pull          |
-| **GPU Scale-to-Zero**         | 0 chi phí idle | Karpenter thu hồi node sau khi Job kết thúc          |
-| **Drift Detection**           | < 10 phút      | Evidently Argo Job; dữ liệu truy vấn từ PostgreSQL   |
-| **Secret Sync**               | Mỗi 1 giờ     | External Secrets Operator refresh interval           |
-| **API Auth Latency**          | < 5ms overhead | JWT verify local (không cần gọi về Control Plane)    |
-
----
-
-## 8. Luồng Hoạt động Đầy đủ (End-to-End)
-
-```mermaid
-sequenceDiagram
-    participant USER as Tenant
+    participant Client
     participant CP as Control Plane
-    participant ARGO as Argo Workflows
-    participant KANIKO as Kaniko Build
-    participant HARBOR as Harbor Registry
-    participant TRAEFIK as Traefik Ingress
-    participant ENDPOINT as Model Endpoint
+    participant Gateway as Model Server
 
-    Note over USER,CP: Bước 1 - Upload & Build
-    USER->>CP: POST /api/models/ (Upload ZIP + metadata)
-    CP->>CP: Lưu artifact lên S3
-    CP->>ARGO: Webhook /build (model_id, tenant_id, flavor)
-    ARGO->>ARGO: Step 1: prepare-package → Sinh Dockerfile
-    ARGO->>KANIKO: Step 2: kaniko-build → Build Image
-    KANIKO->>HARBOR: Push Image
-    ARGO->>CP: Step 3: NOTIFY_BUILD → Webhook success
-
-    Note over USER,CP: Bước 2 - Deploy Endpoint
-    USER->>CP: POST /api/models/{id}/deploy/
-    CP->>ARGO: Webhook /deploy (image_name, container_name)
-    ARGO->>TRAEFIK: kubectl apply Deployment + Service + IngressRoute
-    CP-->>USER: endpoint_url: /tenant_id/models/hashid/v1/predict
-
-    Note over USER,ENDPOINT: Bước 3 - Inference
-    USER->>TRAEFIK: POST /tenant_id/models/hashid/v1/predict
-    TRAEFIK->>ENDPOINT: Rewrite path → /models/hashid/predict
-    ENDPOINT-->>USER: Kết quả suy luận (JSON)
+    Client->>CP: POST /api/auth/token/
+    CP-->>Client: RS256 access + refresh token
+    Client->>Gateway: POST /{tenant}/models/{project_uuid}/{version_uuid}/predict
+    Gateway->>CP: GET /api/auth/.well-known/jwks.json
+    CP-->>Gateway: JWK public key
+    Gateway->>Gateway: verify signature, audience và tenant_id
 ```
+
+Model project có access mode. Gateway cho phép public access, project-scoped `X-API-Key`, hoặc Bearer JWT; tenant của credential phải khớp tenant sở hữu version. Tenant-facing ORM query bắt đầu từ selector đã scope theo user.
+
+Internal callback sử dụng UUID URL và shared secret qua `X-Control-Plane-Secret` hoặc Bearer token. Callback terminal được xử lý idempotent.
+
+---
+
+## 3. Async Execution và Backend Selection
+
+Redis là Celery broker/result backend. Service enqueue task bằng `transaction.on_commit`; task lock row cần thay đổi, lưu `celery_task_id`, retry lỗi kết nối tạm thời và cập nhật event/status trong transaction.
+
+`EXECUTION_BACKEND` là cấu hình mặc định. Có thể override độc lập bằng:
+
+- `BUILD_BACKEND`
+- `DEPLOYMENT_BACKEND`
+- `TRAINING_BACKEND`
+- `DRIFT_BACKEND`
+
+Giá trị hợp lệ là `docker` hoặc `argo`. Factory ánh xạ training `argo` sang workflow tạo Kubeflow workload; tên `kubeflow` cũ không còn là giá trị settings hợp lệ.
+
+| Capability | Docker backend | Argo backend |
+| --- | --- | --- |
+| Build | Chạy `model-packager`, dùng Docker socket để build | Argo DAG chuẩn bị package, Kaniko build/push, callback |
+| Training | Chạy `training-runner` container | Argo Workflow tạo Kubeflow `PyTorchJob` |
+| Deployment | Tạo model worker container và health-check | Argo tạo Kubernetes Deployment/Service |
+| Drift | Chạy Evidently container | Argo chạy Evidently Workflow |
+
+---
+
+## 4. Model Workspace, Training và Registry
+
+### 4.1. S3 layout
+
+```text
+users/{tenant_id}/models/{project_uuid}/
+├── code/                                  # Source editable mới nhất
+├── data/                                  # Dataset editable mới nhất
+├── training/jobs/{job_uuid}/
+│   ├── input/code/source.zip              # Snapshot bất biến
+│   ├── input/data/train.csv               # Snapshot bất biến
+│   ├── output/model.tar.gz                 # Output của trainer
+│   └── mlflow/                             # Artifact MLflow theo job
+├── versions/{version_uuid}/artifacts/      # Artifact registry/build bất biến
+└── drift/{monitor_uuid}/{run_uuid}/        # HTML, JSON và summary report
+```
+
+Không có global MLflow artifact root và không đặt editable code/data dưới version. Khi đăng ký output training, Control Plane ánh xạ snapshot và artifact của job vào metadata của immutable `ModelVersion` thay vì di chuyển workspace mutable.
+
+### 4.2. Training flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CP as Control Plane
+    participant Celery
+    participant Backend as Docker / Argo
+    participant Runner as Training Runner
+    participant S3
+    participant MLflow
+
+    User->>CP: POST /api/training-jobs/
+    CP->>S3: snapshot code, data, requirements
+    User->>CP: POST /api/training-jobs/{job_uuid}/submit/
+    CP->>Celery: enqueue sau transaction commit
+    Celery->>Backend: run(job snapshot)
+    Backend->>Runner: start container / PyTorchJob
+    Runner->>S3: download code + data qua presigned URL
+    Runner->>Runner: install requirements và chạy entry point
+    Runner->>MLflow: log params, metrics và artifacts theo job
+    Runner->>S3: upload model.tar.gz
+    Backend->>CP: callback UUID + shared secret
+    CP-->>User: status, events và download URL
+```
+
+Training runner xuất `_mlops/` metadata bundle gồm stdout/stderr, metrics, params, warnings, model insights, artifact manifest và training summary. GPU job có resource selector/toleration để Karpenter cấp node phù hợp; tenant quota và multi-framework TFJob/XGBoostJob/MPIJob chưa được triển khai.
+
+### 4.3. Registry flow
+
+`ModelVersion` được tạo từ upload hoặc `TrainingOutput`, giữ requirements snapshot và lineage. Artifact, metric và event là dữ liệu thuộc version; alias trỏ tới version để hỗ trợ promotion/rollback mà không sửa version bất biến. Smoke test và alias prediction chỉ resolve endpoint khỏe mạnh thuộc đúng tenant.
+
+---
+
+## 5. Build, Deployment và Inference
+
+### 5.1. Build
+
+Local backend chạy image `mlops-paas-model-packager`; production backend gửi `/build` event vào Argo. Production pipeline:
+
+```mermaid
+flowchart LR
+    CELERY["Celery Build Task"] --> EVENT["Argo EventSource /build"]
+    EVENT --> PREPARE["prepare-package"]
+    PREPARE --> KANIKO["kaniko-build"]
+    KANIKO --> HARBOR["Harbor Registry"]
+    KANIKO --> NOTIFY["notify-success / failure"]
+    NOTIFY --> CP["Control Plane Build Webhook"]
+```
+
+Packager chọn base runtime theo flavor/model type: FastAPI runtime cho ML truyền thống và BentoML runtime cho deep learning. Artifact được đưa vào image để worker không cần tải model từ S3 khi khởi động.
+
+### 5.2. Deployment và gateway trung tâm
+
+Mỗi deployment tạo runtime worker riêng, nhưng **không tạo ingress riêng cho từng model**. Traefik có ingress dùng chung, rewrite public path vào model-server gateway:
+
+```text
+/{tenant_id}/models/{project_uuid}/{version_uuid}/predict
+/{tenant_id}/models/{project_uuid}/{version_uuid}/health
+                      │
+                      ▼ rewrite
+          /models/{version_uuid}/{action}
+                      │
+                      ▼
+       model-server gateway -> healthy worker Service
+```
+
+Gateway đọc registry/deployment metadata, kiểm tra access mode/JWT/API key, resolve worker URL, forward payload và ghi prediction event sang Redpanda. Nó expose Prometheus counters/histograms theo tenant, model và status. Control Plane cũng có alias prediction route cho registry aliases.
+
+---
+
+## 6. Drift và Observability
+
+Gateway gửi feature/prediction event tới topic Redpanda. Consumer ghi production data vào PostgreSQL. Một `DriftMonitor` liên kết model version và reference workspace asset; mỗi request tạo một `DriftRun` bất biến.
+
+```mermaid
+flowchart LR
+    CP["Control Plane"] --> CELERY["Celery Drift Task"]
+    CELERY --> BACKEND["Docker hoặc Argo Evidently"]
+    BACKEND --> REF["Reference data từ S3"]
+    BACKEND --> PROD["Production data từ PostgreSQL"]
+    REF --> REPORT["Evidently report"]
+    PROD --> REPORT
+    REPORT --> S3["HTML / JSON / summary trên S3"]
+    REPORT --> CALLBACK["UUID webhook về Control Plane"]
+```
+
+Hiện hệ thống cung cấp data drift, gateway traffic metrics, endpoint health và resource query qua Prometheus. Prediction drift chuẩn hóa, ground-truth feedback, quality metrics theo thời gian, GPU/DCGM metrics và frontend time-series dashboard vẫn là phần mở rộng tiếp theo.
+
+Transactional `EventOutbox` lưu domain event trong cùng transaction và Celery publisher chuyển event pending sang Redpanda, tránh phát event trước khi database commit.
+
+---
+
+## 7. Database và State Ownership
+
+```text
+PostgreSQL
+├── schema control_plane
+│   ├── auth_*             # user/tenant/profile
+│   ├── access_*           # API keys
+│   ├── catalog_*          # projects/workspace assets
+│   ├── training_*         # jobs/events/outputs
+│   ├── registry_*         # versions/artifacts/metrics/aliases/events
+│   ├── deployment_*       # builds/deployments/endpoints
+│   ├── drift_*            # monitors/runs
+│   └── observability_*    # event outbox
+├── schema mlflow          # MLflow tracking metadata
+└── production inference data do consumer quản lý
+```
+
+CloudNativePG cung cấp PostgreSQL trên production; Docker Compose dùng PostgreSQL 15 đơn node cho local. S3 là durable artifact store, PostgreSQL là domain state, Redis không phải nguồn sự thật cho lifecycle.
+
+---
+
+## 8. Hạ tầng Production
+
+Terraform tạo các module:
+
+- VPC, public/private subnets, IGW và NAT tùy feature flag.
+- EC2 k3s master/worker, security groups và ALB.
+- S3 artifact bucket.
+- IAM cho worker, GitHub Actions OIDC và Karpenter.
+- ACM/DNS và AWS Secrets Manager tùy feature flag.
+- SQS interruption queue và EventBridge rules cho Karpenter.
+
+Ansible cài common packages, k3s master/worker, Helm và platform add-ons. Root Kustomization triển khai CloudNativePG, Redis, Redpanda, ESO, storage, health, monitoring, Argo Workflows, MLflow, application overlay và Karpenter. Kubeflow Training Operator, ArgoCD, ESO, KEDA và các operator khác được bootstrap bằng scripts/Ansible trước GitOps sync.
+
+AWS Secrets Manager được External Secrets Operator đồng bộ thành Kubernetes Secrets. Production workload dùng IAM role; local có thể dùng credentials trong `.env`, nhưng secret không được commit vào Git.
+
+---
+
+## 9. CI/CD và GitOps
+
+```mermaid
+flowchart LR
+    PR["Pull Request"] --> CI["CI: lint, type-check, test, scan"]
+    MAIN["Push main"] --> CD["CD: detect changed services"]
+    CD --> BUILD["Build + push Harbor"]
+    BUILD --> SIGN["Cosign sign"]
+    SIGN --> PRGITOPS["Update Kustomize image tags"]
+    PRGITOPS --> ARGOCD["ArgoCD sync + prune"]
+    ARGOCD --> K3S["K3s rolling update"]
+```
+
+CI kiểm tra frontend lint/build, backend Ruff/mypy/Django/pytest, Kustomize/Kubeconform, secret scanning và Trivy image scan. CD sử dụng GitHub OIDC để đọc deployment credentials từ AWS Secrets Manager, build các service thay đổi và tạo GitOps promotion PR.
+
+---
+
+## 10. Quy tắc phát triển kiến trúc
+
+1. API public chỉ dùng UUID và phải validate tenant ownership.
+2. Endpoint chỉ gọi serializer, selector và application service; không gọi trực tiếp Docker/S3/Argo.
+3. Tác vụ dài phải chạy qua Celery, không tạo thread hoặc block HTTP worker.
+4. Enqueue chỉ sau database commit; callback phải idempotent.
+5. Workspace mutable thuộc project; job/version giữ snapshot bất biến.
+6. Thêm execution engine mới bằng backend contract, không rẽ nhánh logic trong API.
+7. Model worker không có public ingress riêng; inference đi qua gateway trung tâm.
+8. PostgreSQL và S3 là nguồn sự thật; Redis dùng cho broker, result và runtime stream.
+
+Xem thêm:
+
+- [`docs/control-plane/architecture.md`](docs/control-plane/architecture.md)
+- [`docs/control-plane/api-catalog.md`](docs/control-plane/api-catalog.md)
+- [`docs/control-plane/webhooks.md`](docs/control-plane/webhooks.md)
+- [`docs/control-plane/runbook.md`](docs/control-plane/runbook.md)
+- [`docs/adr/`](docs/adr/)

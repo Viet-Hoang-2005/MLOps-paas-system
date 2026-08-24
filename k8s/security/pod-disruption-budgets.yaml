@@ -5,7 +5,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: mlops-paas-control-plane-pdb
-  namespace: default
+  namespace: mlops-control-plane
 spec:
   minAvailable: 1 # Luôn giữ ít nhất 1 Pod phục vụ API
   selector:
@@ -17,6 +17,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: cloudflared-pdb
+  namespace: cloudflare
 spec:
   minAvailable: 1
   selector:
@@ -28,7 +29,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: mlops-paas-web-pdb
-  namespace: default
+  namespace: mlops-web
 spec:
   minAvailable: 1
   selector:

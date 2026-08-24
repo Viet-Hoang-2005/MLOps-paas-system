@@ -1,131 +1,144 @@
-# K8s Manifests — Kubernetes Configuration
+# Production Kubernetes GitOps
 
-Thư mục `k8s/` chứa toàn bộ cấu hình Kubernetes theo phương pháp **Khai báo (Declarative)** và **GitOps** thông qua ArgoCD. Mọi thay đổi hạ tầng đều phải qua Git — không dùng `kubectl apply` thủ công trực tiếp lên cluster (ngoại trừ debugging).
+`mlops-paas-system` is the single Argo CD root Application. The root owns
+AppProjects, public repository descriptors and explicit child Applications;
+each child owns one independently observable service or domain.
 
----
+## Topology
 
-## Cấu Trúc Thư Mục
+| Plane | Source | Argo CD project |
+| --- | --- | --- |
+| GitOps control | `k8s/gitops/production` | `default` |
+| Cluster configuration | `k8s/cluster` | `mlops-cluster` |
+| Cluster add-ons | Pinned Git/Helm sources | `mlops-addons` |
+| Shared platform services | `k8s/platform` | `mlops-platform` |
+| Argo execution | `k8s/argo` | `mlops-execution` |
+| Static workloads | `k8s/apps/overlays/production` | `mlops-workloads` |
 
-```
-k8s/
-├── apps/                    # Ứng dụng PaaS (Kustomize)
-│   ├── base/
-│   │   ├── control-plane/   # Django Backend: Deployment, Service, ConfigMap, HPA
-│   │   ├── consumer/        # Kafka Consumer Worker: Deployment, ConfigMap
-│   │   └── web/             # ReactJS Frontend: Deployment, Service
-│   └── production/          # Kustomize overlays: image tags, resource limits cho prod
-│
-├── argo-workflows/          # MLOps Orchestration Layer (Argo Events + Argo Workflows)
-│   ├── eventsource.yaml               # HTTP Webhook EventSource (6 endpoints)
-│   ├── sensor.yaml                    # Map events → WorkflowTemplate triggers
-│   ├── eventbus.yaml                  # NATS EventBus config
-│   ├── build-workflowtemplate.yaml    # 3-step Kaniko pipeline: prepare → build → notify
-│   ├── deploy-workflowtemplate.yaml   # Deploy: Deployment + Service + IngressRoute
-│   ├── delete-workflowtemplate.yaml   # Xóa K8s resources của model
-│   ├── training-workflowtemplate.yaml # Kubeflow PyTorchJob (CPU + GPU)
-│   ├── training-cancel-workflowtemplate.yaml  # Hủy PyTorchJob đang chạy
-│   ├── evidently-workflowtemplate.yaml        # Drift Detection job
-│   ├── training-namespace.yaml        # Namespace + RBAC cho Kubeflow jobs
-│   ├── rbac.yaml                      # ServiceAccount, ClusterRoleBinding cho Argo
-│   └── webhook-service.yaml           # Service expose EventSource webhook port
-│
-├── secrets/                 # External Secrets Operator (ESO)
-│   ├── cluster-secret-store.yaml  # ClusterSecretStore → AWS Secrets Manager
-│   └── external-secrets.yaml     # ExternalSecret definitions (4 K8s Secrets)
-│
-├── argocd/                  # ArgoCD Applications và AppProject
-├── karpenter/               # NodePool + EC2NodeClass cho GPU/CPU training autoscaling
-├── kubeflow/                # Kubeflow Training Operator CRDs/operator
-├── mlflow-server/           # MLflow Tracking Server Deployment
-├── harbor/                  # Harbor Private Registry deployment
-├── postgres/                # PostgreSQL Deployment/StatefulSet
-├── redis/                   # Redis Deployment
-├── redpanda/                # Redpanda (Kafka-compatible) Cluster
-├── monitoring/              # Prometheus + Grafana + KEDA ScaledObjects
-├── cloudflare/              # Cloudflare Tunnel (cloudflared) để expose dashboards
-├── security/                # NetworkPolicy, PodSecurityPolicy
-├── storage/                 # StorageClass, PersistentVolume (EBS CSI)
-├── health/                  # Liveness/Readiness probe configs
-├── cronjobs/                # K8s CronJobs (cleanup, scheduled tasks)
-├── scripts/                 # Helper scripts quản lý cluster
-└── kustomization.yaml       # Root Kustomize entry point
-```
+`mlops-prod-cluster-karpenter-capacity` owns the production CPU/GPU EC2NodeClasses and
+NodePools. Their non-secret cluster identifiers and stable private K3s API DNS
+are declared in Git; the K3s join-token value remains in Secrets Manager.
+Dynamic model Deployments and PyTorchJobs remain lifecycle-owned resources and
+are not adopted by Argo CD.
 
----
+## Namespace ownership
 
-## Argo Workflows — Event Mapping
+No GitOps workload or runtime is reconciled into Kubernetes `default`.
+Production uses dedicated namespaces: `mlops-control-plane`, `mlops-consumer`,
+`mlops-model-server`, `mlops-web`, `mlops-postgres`, `mlops-redis`,
+`mlops-redpanda`, `mlops-execution`, `mlops-model-runtimes`, `mlops-routing`
+and `mlops-cluster-config`. Cross-owner service calls use fully qualified
+cluster DNS names. `user-jobs` remains the fixed namespace for tenant training.
 
-Toàn bộ tác vụ MLOps nặng được điều phối qua Argo Events + Argo Workflows:
+## Cluster configuration
 
-| EventSource Path | WorkflowTemplate | Tác vụ |
-|---|---|---|
-| `/build` | `build-workflowtemplate.yaml` | Đóng gói model → Kaniko Build → Push Harbor |
-| `/deploy` | `deploy-workflowtemplate.yaml` | Tạo Deployment + Service + Traefik IngressRoute |
-| `/delete` | `delete-workflowtemplate.yaml` | Xóa Deployment + Service + IngressRoute |
-| `/train` | `training-workflowtemplate.yaml` | Tạo Kubeflow PyTorchJob (CPU hoặc GPU) |
-| `/cancel-train` | `training-cancel-workflowtemplate.yaml` | Xóa PyTorchJob đang chạy |
-| `/drift` | `evidently-workflowtemplate.yaml` | Phân tích Data Drift với Evidently AI |
+`mlops-prod-cluster-namespaces` owns production Namespace resources from
+`k8s/cluster/namespaces` at wave `-50`. Upstream add-on namespace manifests are
+removed from their rendered sources so namespace ownership remains single and
+explicit.
 
----
+`mlops-prod-cluster-storage` owns only `ebs-gp3`; the cluster secret-store and
+Karpenter capacity each have their own cluster Application. Cluster configuration
+consumes installed capabilities but never installs their controllers.
 
-## Secret Management (ESO)
+## Secrets
 
-`k8s/secrets/external-secrets.yaml` định nghĩa 4 K8s Secrets được đồng bộ tự động từ AWS Secrets Manager mỗi 1 giờ:
+`mlops-prod-cluster-secret-store` owns only the cluster-scoped `ClusterSecretStore`.
+Each workload, infrastructure domain, and execution plane owns its own
+production `ExternalSecret` beside the manifest that consumes its target
+Secret. AWS remains the shared source of values, but no Pod receives a broad
+shared application Secret. Secret values must never be committed or printed
+during debugging.
 
-| K8s Secret | AWS Source | Dùng cho |
-|---|---|---|
-| `mlops-paas-secret` | `mlops/production-secrets` | Django settings, JWT keys, OAuth, Harbor, Webhook |
-| `harbor-registry-secret` | `mlops/production-secrets` | HARBOR_USERNAME/PASSWORD (model-packager) |
-| `harbor-registry-dockerconfig` | `mlops/production-secrets` | config.json cho Kaniko auth push Harbor (namespace: default) |
-| `harbor-registry-pull-secret` | `mlops/production-secrets` | imagePullSecret cho Kubeflow PyTorchJob (namespace: user-jobs) |
+## Data and platform services
 
----
+PostgreSQL, Redis, Redpanda, Harbor and MLflow each have an independent
+Application. Runtime-default ignore rules are scoped to the Application that
+owns the affected resource.
 
-## GitOps Flow (ArgoCD)
+## Execution
 
-```
-Developer → git push k8s/ → GitHub
-  ↓
-ArgoCD phát hiện thay đổi (polling 3 phút)
-  ↓
-kubectl apply (Rolling Update / Sync)
-  ↓
-K3s Cluster
-```
+`mlops-prod-execution-argo` owns the EventBus, EventSource, Sensor and their stable
+webhook Service in `argo-events`; WorkflowTemplates and Workflow Pods run in
+`mlops-execution`, dynamic model Deployments/Services run in `mlops-model-runtimes`,
+and training runtime resources remain in `user-jobs`. The six webhook routes use a
+dedicated bearer token synchronized into the Control Plane API/worker target
+Secrets and the EventSource target Secret. Native NATS uses token authentication,
+and reconciled NetworkPolicies permit only the
+Control Plane worker to reach the EventSource and only Argo Events components
+to reach the EventBus.
 
-**Không bao giờ** chỉnh sửa trực tiếp resource trên cluster. Mọi thay đổi phải commit vào repo này.
+The Sensor can only create/list Git-managed-template Workflows. Build/drift,
+deploy, delete and training use separate least-privilege Workflow service
+accounts; Control Plane API/worker Pods do not mount Kubernetes API tokens.
+Resources created by a Workflow remain runtime-owned.
 
----
+## Workloads
 
-## Karpenter — GPU/CPU Node Autoscaling
+Control Plane, consumer, model-server and web share environment-neutral manifests
+under `k8s/apps/base`. Each service has an independent production overlay
+under `k8s/apps/overlays/production`; these overlays are the only workload
+paths reconciled by Argo CD. GitHub Actions changes only the affected production
+overlay and keeps promotion on Git SHA tags during the current phase.
 
-`k8s/karpenter/` định nghĩa 2 NodePool:
+The base image references contain only logical image names and are not deployable
+targets. Add future `dev` or `staging` overlays beside `production` rather than
+putting environment-specific registry names, tags, ConfigMaps or patches in base.
 
-| NodePool | Instance Type | Trigger |
-|---|---|---|
-| `training-cpu` | CPU instances | PyTorchJob Pod với `nodeSelector: mlops-paas/nodepool: training-cpu` |
-| `training-gpu` | GPU instances (g4dn, p3) | PyTorchJob Pod yêu cầu `nvidia.com/gpu` |
+## Cloudflare and routing
 
-K3s agent token để join cluster được lấy từ AWS Secrets Manager (`mlops/k3s-agent-token`) qua userData script — không lưu trong Git.
+`mlops-prod-platform-cloudflare` owns the Cloudflare Tunnel and its scoped
+credential. `mlops-prod-platform-routing` owns Traefik routes and the Traefik
+health endpoint in `mlops-routing`. Routes declare backend namespaces explicitly;
+the Ansible-owned Traefik configuration enables this controlled cross-namespace
+reference. Public exposure changes require a security review.
 
----
+## Cluster add-ons
 
-## KEDA — Scale-to-Zero cho Model Endpoints
+Argo CD owns upstream add-ons: AWS EBS CSI, External Secrets, CloudNativePG,
+KEDA, Argo Workflows, Argo Events, kube-prometheus-stack, Kyverno, Kubeflow
+Training, Karpenter CRDs/controller, Node Feature Discovery and NVIDIA GPU
+Operator. `mlops-addons` installs these capabilities; their configuration lives
+under `cluster` or `platform`. Ansible owns only K3s, token publication and the Argo CD bootstrap;
+there are no ignored or runtime-patched Karpenter controller fields.
 
-`k8s/monitoring/` chứa `ScaledObject` cho từng model Deployment:
-- Scale xuống 0 replica khi không có HTTP request (tiết kiệm tài nguyên)
-- Scale lên 1+ khi có request mới (Cold Start ~3-10 giây)
+## Image verification
 
----
+`mlops-prod-addon-kyverno` and `mlops-prod-cluster-image-verification` verify only images under
+`registry.mlops-nids-nt114.id.vn/mlops-paas/*`. The policy requires a keyless
+Cosign signature issued to this repository's `cd.yml` workflow on `main`, then
+resolves tags to immutable digests before admission. Unsigned or incorrectly
+signed platform images are denied. Third-party images and tenant `user-images/*`
+are intentionally outside this policy until their build path gains an isolated
+signing identity.
 
-## Triển khai lần đầu (Bootstrap)
+For a clean bootstrap, first dispatch CD with `component=all` from `main` and
+merge its GitOps promotion PR. This ensures every platform tag referenced by
+the production overlays and WorkflowTemplates has a signature matching the
+enforced GitHub Actions identity before Argo CD creates the workloads.
 
-Sau khi Ansible đã cài xong K3s cluster, apply Kustomize root:
+## Deferred security resources
+
+`k8s/security` is intentionally outside every reconciled
+Kustomization. Its broad NetworkPolicies and PDBs are not active controls. This
+does not include the execution-plane NetworkPolicies in `k8s/argo`, which are
+active production resources owned by `mlops-prod-execution-argo`.
+
+## Validation and debugging
 
 ```bash
-# Từ máy local, sau khi có kubeconfig của cluster
-kubectl apply -k k8s/
-
-# Hoặc để ArgoCD tự sync (nếu đã cài ArgoCD)
-# ArgoCD sẽ tự động sync toàn bộ k8s/ theo cấu hình trong k8s/argocd/
+kubectl kustomize --enable-helm k8s
+python3 -m k8s.validate.run_all
+kubectl get applications -n argocd -L mlops-paas.io/plane,mlops-paas.io/component
+kubectl get application -n argocd <application> -o yaml
 ```
+
+Debug the smallest unhealthy child first. Check its comparison conditions,
+rendered source, events and owned resource health before inspecting the root.
+Rollback a manifest through Git; do not delete CRDs, stateful resources or
+runtime-created workloads to repair an Application status.
+
+Orphan warnings stay enabled. AppProjects ignore only accepted runtime resources
+created by CloudNativePG, Kubernetes and Argo Workflows. Monitoring resources
+are owned directly by `mlops-prod-addon-monitoring`; a new orphan outside the accepted
+identities remains visible as an `OrphanedResourceWarning`.

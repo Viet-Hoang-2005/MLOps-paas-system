@@ -1,0 +1,170 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: mlops-paas-model-packager-template
+  namespace: mlops-execution
+spec:
+  serviceAccountName: argo-workflow-basic-sa
+  entrypoint: build-model
+  onExit: notify-build-exit
+  arguments:
+    parameters:
+      - name: control_plane_webhook_url
+  volumes:
+    - name: workspace
+      emptyDir: {}
+    - name: harbor-config
+      secret:
+        secretName: harbor-registry-dockerconfig
+        items:
+          - key: config.json
+            path: config.json
+  templates:
+    - name: build-model
+      inputs:
+        parameters:
+          - name: build_id
+          - name: project_id
+          - name: tenant_id
+          - name: image_repository
+          - name: image_tag
+          - name: flavor
+          - name: task_type
+          - name: requirements_text
+          - name: source_artifact_name
+          - name: source_type
+          - name: source_download_url
+          - name: output_upload_url
+          - name: control_plane_webhook_url
+      steps:
+        - - name: prepare-package
+            template: prepare-package
+            arguments:
+              parameters:
+                - {name: build_id, value: "{{inputs.parameters.build_id}}"}
+                - {name: project_id, value: "{{inputs.parameters.project_id}}"}
+                - {name: tenant_id, value: "{{inputs.parameters.tenant_id}}"}
+                - {name: image_repository, value: "{{inputs.parameters.image_repository}}"}
+                - {name: image_tag, value: "{{inputs.parameters.image_tag}}"}
+                - {name: flavor, value: "{{inputs.parameters.flavor}}"}
+                - {name: task_type, value: "{{inputs.parameters.task_type}}"}
+                - {name: requirements_text, value: "{{inputs.parameters.requirements_text}}"}
+                - {name: source_artifact_name, value: "{{inputs.parameters.source_artifact_name}}"}
+                - {name: source_type, value: "{{inputs.parameters.source_type}}"}
+                - {name: source_download_url, value: "{{inputs.parameters.source_download_url}}"}
+                - {name: output_upload_url, value: "{{inputs.parameters.output_upload_url}}"}
+                - {name: control_plane_webhook_url, value: "{{inputs.parameters.control_plane_webhook_url}}"}
+        - - name: build-image
+            template: build-image
+            arguments:
+              parameters:
+                - {name: build_id, value: "{{inputs.parameters.build_id}}"}
+                - {name: image_repository, value: "{{inputs.parameters.image_repository}}"}
+                - {name: image_tag, value: "{{inputs.parameters.image_tag}}"}
+        - - name: notify-success
+            template: notify-success
+            arguments:
+              parameters:
+                - {name: build_id, value: "{{inputs.parameters.build_id}}"}
+                - {name: image_repository, value: "{{inputs.parameters.image_repository}}"}
+                - {name: image_tag, value: "{{inputs.parameters.image_tag}}"}
+                - {name: control_plane_webhook_url, value: "{{inputs.parameters.control_plane_webhook_url}}"}
+    - name: prepare-package
+      nodeSelector: {workload-type: worker}
+      inputs:
+        parameters:
+          - {name: build_id}
+          - {name: project_id}
+          - {name: tenant_id}
+          - {name: image_repository}
+          - {name: image_tag}
+          - {name: flavor}
+          - {name: task_type}
+          - {name: requirements_text}
+          - {name: source_artifact_name}
+          - {name: source_type}
+          - {name: source_download_url}
+          - {name: output_upload_url}
+          - {name: control_plane_webhook_url}
+      container:
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:375afde3ae576f56733e93b52b2d27fb0faed48d
+        imagePullPolicy: Always
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+        env:
+          - {name: BUILD_ENGINE, value: kaniko}
+          - {name: BUILD_WORKSPACE_DIR, value: /workspace}
+          - {name: TASK_TYPE, value: "{{inputs.parameters.task_type}}"}
+          - {name: BUILD_ID, value: "{{inputs.parameters.build_id}}"}
+          - {name: PROJECT_ID, value: "{{inputs.parameters.project_id}}"}
+          - {name: IMAGE_REPOSITORY, value: "{{inputs.parameters.image_repository}}"}
+          - {name: IMAGE_TAG, value: "{{inputs.parameters.image_tag}}"}
+          - {name: TENANT_ID, value: "{{inputs.parameters.tenant_id}}"}
+          - {name: FLAVOR, value: "{{inputs.parameters.flavor}}"}
+          - {name: REQUIREMENTS_TEXT, value: "{{inputs.parameters.requirements_text}}"}
+          - {name: SOURCE_ARTIFACT_NAME, value: "{{inputs.parameters.source_artifact_name}}"}
+          - {name: SOURCE_TYPE, value: "{{inputs.parameters.source_type}}"}
+          - {name: SOURCE_DOWNLOAD_URL, value: "{{inputs.parameters.source_download_url}}"}
+          - {name: OUTPUT_UPLOAD_URL, value: "{{inputs.parameters.output_upload_url}}"}
+          - {name: CONTROL_PLANE_WEBHOOK_URL, value: "{{inputs.parameters.control_plane_webhook_url}}"}
+          - name: CONTROL_PLANE_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef: {name: argo-build-callback-secret, key: CONTROL_PLANE_WEBHOOK_SECRET}
+    - name: build-image
+      nodeSelector: {workload-type: worker}
+      inputs:
+        parameters:
+          - {name: build_id}
+          - {name: image_repository}
+          - {name: image_tag}
+      container:
+        image: gcr.io/kaniko-project/executor:latest
+        args:
+          - --context=dir:///workspace
+          - --dockerfile=/workspace/Dockerfile
+          - --destination={{inputs.parameters.image_repository}}:{{inputs.parameters.image_tag}}
+          - --digest-file=/workspace/image-digest
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+          - {name: harbor-config, mountPath: /kaniko/.docker/}
+    - name: notify-success
+      nodeSelector: {workload-type: worker}
+      inputs:
+        parameters:
+          - {name: build_id}
+          - {name: image_repository}
+          - {name: image_tag}
+          - {name: control_plane_webhook_url}
+      container:
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:375afde3ae576f56733e93b52b2d27fb0faed48d
+        imagePullPolicy: Always
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+        env:
+          - {name: TASK_TYPE, value: NOTIFY_BUILD}
+          - {name: BUILD_WORKSPACE_DIR, value: /workspace}
+          - {name: BUILD_ID, value: "{{inputs.parameters.build_id}}"}
+          - {name: IMAGE_URI, value: "{{inputs.parameters.image_repository}}:{{inputs.parameters.image_tag}}"}
+          - {name: CONTROL_PLANE_WEBHOOK_URL, value: "{{inputs.parameters.control_plane_webhook_url}}"}
+          - name: CONTROL_PLANE_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef: {name: argo-build-callback-secret, key: CONTROL_PLANE_WEBHOOK_SECRET}
+    - name: notify-build-exit
+      nodeSelector: {workload-type: worker}
+      container:
+        image: curlimages/curl:8.8.0
+        args:
+          - -sS
+          - -X
+          - POST
+          - "{{workflow.parameters.control_plane_webhook_url}}"
+          - -H
+          - "Content-Type: application/json"
+          - -H
+          - "X-Control-Plane-Secret: $(CONTROL_PLANE_WEBHOOK_SECRET)"
+          - --data
+          - '{"status":"{{workflow.status}}","error_message":"Argo workflow {{workflow.name}} finished with {{workflow.status}}"}'
+        env:
+          - name: CONTROL_PLANE_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef: {name: argo-build-callback-secret, key: CONTROL_PLANE_WEBHOOK_SECRET}

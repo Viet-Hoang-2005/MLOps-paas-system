@@ -1,0 +1,147 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-eventsource-sa
+  namespace: argo-events
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-sensor-sa
+  namespace: argo-events
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-sensor-workflow-submit
+  namespace: mlops-execution
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["create", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-sensor-workflow-submit
+  namespace: mlops-execution
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-sensor-workflow-submit
+subjects:
+  - kind: ServiceAccount
+    name: argo-sensor-sa
+    namespace: argo-events
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-workflow-basic-sa
+  namespace: mlops-execution
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-workflow-deploy-sa
+  namespace: mlops-execution
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-workflow-delete-sa
+  namespace: mlops-execution
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-workflow-training-sa
+  namespace: mlops-execution
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-workflow-executor
+  namespace: mlops-execution
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflowtaskresults"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-workflow-executor
+  namespace: mlops-execution
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-workflow-executor
+subjects:
+  - kind: ServiceAccount
+    name: argo-workflow-basic-sa
+    namespace: mlops-execution
+  - kind: ServiceAccount
+    name: argo-workflow-deploy-sa
+    namespace: mlops-execution
+  - kind: ServiceAccount
+    name: argo-workflow-delete-sa
+    namespace: mlops-execution
+  - kind: ServiceAccount
+    name: argo-workflow-training-sa
+    namespace: mlops-execution
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-workflow-deploy
+  namespace: mlops-model-runtimes
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "create", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "create", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-workflow-deploy
+  namespace: mlops-model-runtimes
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-workflow-deploy
+subjects:
+  - kind: ServiceAccount
+    name: argo-workflow-deploy-sa
+    namespace: mlops-execution
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-workflow-delete
+  namespace: mlops-model-runtimes
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "delete"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-workflow-delete
+  namespace: mlops-model-runtimes
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-workflow-delete
+subjects:
+  - kind: ServiceAccount
+    name: argo-workflow-delete-sa
+    namespace: mlops-execution

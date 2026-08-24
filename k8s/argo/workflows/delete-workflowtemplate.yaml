@@ -1,0 +1,91 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: mlops-paas-model-server-delete-template
+  namespace: mlops-execution
+spec:
+  serviceAccountName: argo-workflow-delete-sa
+  entrypoint: delete-model-project
+  onExit: notify-delete-exit
+  arguments:
+    parameters:
+      - name: project_id
+      - name: container_names
+      - name: control_plane_webhook_url
+  templates:
+    - name: delete-model-project
+      inputs:
+        parameters:
+          - name: project_id
+          - name: container_names
+      steps:
+        - - name: delete-runtime
+            template: delete-runtime
+            arguments:
+              parameters:
+                - {name: container_name, value: "{{item}}"}
+            withParam: "{{inputs.parameters.container_names}}"
+
+    - name: delete-runtime
+      inputs:
+        parameters:
+          - name: container_name
+      steps:
+        - - name: deployment
+            template: delete-deployment
+            arguments:
+              parameters:
+                - {name: container_name, value: "{{inputs.parameters.container_name}}"}
+          - name: service
+            template: delete-service
+            arguments:
+              parameters:
+                - {name: container_name, value: "{{inputs.parameters.container_name}}"}
+
+    - name: delete-deployment
+      inputs:
+        parameters:
+          - name: container_name
+      resource:
+        action: delete
+        flags: ["--ignore-not-found"]
+        manifest: |
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: {{=toJson(inputs.parameters.container_name)}}
+            namespace: mlops-model-runtimes
+
+    - name: delete-service
+      inputs:
+        parameters:
+          - name: container_name
+      resource:
+        action: delete
+        flags: ["--ignore-not-found"]
+        manifest: |
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: {{=toJson(sprig.printf("%s-svc", inputs.parameters.container_name))}}
+            namespace: mlops-model-runtimes
+
+    - name: notify-delete-exit
+      nodeSelector: {workload-type: worker}
+      container:
+        image: curlimages/curl:8.8.0
+        args:
+          - -sS
+          - -X
+          - POST
+          - "{{workflow.parameters.control_plane_webhook_url}}"
+          - -H
+          - "Content-Type: application/json"
+          - -H
+          - "X-Control-Plane-Secret: $(CONTROL_PLANE_WEBHOOK_SECRET)"
+          - --data
+          - '{"status":"{{workflow.status}}","error_message":"Model cleanup workflow {{workflow.name}} finished with {{workflow.status}}"}'
+        env:
+          - name: CONTROL_PLANE_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef: {name: argo-delete-callback-secret, key: CONTROL_PLANE_WEBHOOK_SECRET}

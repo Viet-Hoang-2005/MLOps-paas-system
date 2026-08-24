@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlops-paas-control-plane-worker
+  labels:
+    app: mlops-paas-control-plane-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mlops-paas-control-plane-worker
+  template:
+    metadata:
+      labels:
+        app: mlops-paas-control-plane-worker
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        workload-type: worker
+      containers:
+        - name: worker
+          image: mlops-paas-control-plane
+          imagePullPolicy: IfNotPresent
+          command: ["celery"]
+          args: ["-A", "config", "worker", "--loglevel=INFO", "--concurrency=2"]
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-worker-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-worker-secret
+                  key: DB_PASSWORD
+            - name: DJANGO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-worker-secret
+                  key: DJANGO_SECRET_KEY
+            - name: JWT_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-worker-secret
+                  key: JWT_PRIVATE_KEY
+            - name: JWT_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-worker-secret
+                  key: JWT_PUBLIC_KEY
+            - name: CONTROL_PLANE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-worker-secret
+                  key: CONTROL_PLANE_WEBHOOK_SECRET
+            - name: ARGO_EVENTS_WEBHOOK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-worker-secret
+                  key: ARGO_EVENTS_WEBHOOK_TOKEN
+            - name: HARBOR_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-worker-secret
+                  key: HARBOR_USERNAME
+            - name: HARBOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-worker-secret
+                  key: HARBOR_PASSWORD
+          envFrom:
+            - configMapRef:
+                name: mlops-paas-control-plane-config
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi

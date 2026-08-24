@@ -1,35 +1,83 @@
 ---
 domain_name: "mlops-nids-nt114.id.vn"
 aws_region: "ap-southeast-1"
-k3s_channel: "stable"
+k3s_version: "v1.34.9+k3s1"
+helm_version: "v3.17.3"
+k3s_etcd_snapshot_schedule: "0 */6 * * *"
+k3s_etcd_snapshot_retention: 12
+k3s_expected_worker_count: 2
+traefik_request_timeout: "600s"
+traefik_forwarded_headers_trusted_ips:
+  # K3s ServiceLB uses externalTrafficPolicy=Cluster, so Traefik sees the
+  # Flannel gateway of the worker selected by the ALB rather than the ALB IP.
+  - "10.42.1.0/32"
+  - "10.42.2.0/32"
 
-# Execution modes:
-# - bootstrap_k3s_cluster=true installs K3s server/agents on EC2 nodes.
-# - deploy_k8s_platform=true installs platform controllers and lets ArgoCD sync k8s/.
+# Rollout phases are deliberately independent. This production rollout enables
+# the training infrastructure, but the tenant-facing feature stays disabled.
 bootstrap_k3s_cluster: true
-deploy_k8s_platform: true
+deploy_core_platform: true
+deploy_training_platform: true
+enable_karpenter: true
 
-# Karpenter/K3s self-managed bootstrap defaults. These values match the
-# Terraform defaults and can be overridden from inventory/group_vars.
-karpenter_cluster_name: "mlops-paas-cluster"
-karpenter_node_instance_profile_name: "mlops-karpenter-node-profile"
-karpenter_interruption_queue_name: "{{ karpenter_cluster_name }}"
+# Add-ons install upstream cluster capabilities; cluster Applications configure
+# their instances. Ansible only waits for the GitOps contract.
+core_addon_application_names:
+  - mlops-prod-addon-aws-ebs-csi
+  - mlops-prod-addon-external-secrets
+  - mlops-prod-addon-cloudnative-pg
+  - mlops-prod-addon-keda
+  - mlops-prod-addon-argo-workflows
+  - mlops-prod-addon-argo-events
+  - mlops-prod-addon-monitoring
+  - mlops-prod-addon-kyverno
+core_cluster_application_names:
+  - mlops-prod-cluster-namespaces
+  - mlops-prod-cluster-storage
+  - mlops-prod-cluster-secret-store
+  - mlops-prod-cluster-image-verification
+core_addon_workloads:
+  - {namespace: kube-system, release: aws-ebs-csi-driver}
+  - {namespace: external-secrets, release: external-secrets}
+  - {namespace: cnpg-system, release: cloudnative-pg}
+  - {namespace: keda, release: keda}
+  - {namespace: argo, release: argo-workflows}
+  - {namespace: argo-events, release: argo-events}
+  - {namespace: monitoring, release: monitoring}
+  - {namespace: kyverno, release: kyverno}
+core_addon_crds:
+  - externalsecrets.external-secrets.io
+  - clusters.postgresql.cnpg.io
+  - scaledobjects.keda.sh
+  - workflows.argoproj.io
+  - eventsources.argoproj.io
+  - prometheuses.monitoring.coreos.com
+  - clusterpolicies.kyverno.io
+training_addon_application_names:
+  - mlops-prod-addon-kubeflow-training
+  - mlops-prod-addon-karpenter-crds
+  - mlops-prod-addon-karpenter
+  - mlops-prod-addon-node-feature-discovery
+  - mlops-prod-addon-gpu-operator
+training_cluster_application_names:
+  - mlops-prod-cluster-karpenter-capacity
+
+# Ansible publishes only the runtime K3s token value. Terraform owns the
+# secret container and Argo CD owns all Karpenter Kubernetes resources.
 karpenter_k3s_token_secret_name: "mlops/k3s-agent-token"
-k3s_node_token_override: ""
-karpenter_controller_role_arn: ""
-manage_karpenter_nodepools_with_ansible: true
-karpenter_cpu_instance_types:
-  - c6i.2xlarge
-  - c6i.4xlarge
-karpenter_gpu_instance_types:
-  - g4dn.xlarge
-  - g4dn.12xlarge
-  - g5.xlarge
-  - g5.12xlarge
 
-# Operator versions are intentionally configurable so a new cluster can pin the
-# exact versions used in production without editing shell scripts.
-karpenter_version: "1.13.0"
-karpenter_bridge_crd_version: "1.0.8"
-kubeflow_training_operator_version: "v1.7.0"
-cnpg_operator_chart_version: ""
+# The smoke jobs use a pinned public CUDA image. They never receive tenant
+# credentials, application Secrets, or run in the tenant workload namespace.
+training_smoke_namespace: "ansible-training-smoke"
+training_smoke_timeout_seconds: 1200
+training_smoke_node_cleanup_timeout_seconds: 900
+training_smoke_image: "nvidia/cuda@sha256:001469ea0f3dec85a1ca929aeea3b58ae369d4c11228b10aec1f642bb6ca7a6f"
+# GPU smoke remains opt-in until the AWS G/VT quota request is approved and
+# effective. The CPU smoke test remains part of every training verification.
+training_gpu_smoke_enabled: false
+
+argocd_chart_version: "7.8.23"
+
+ansible_artifacts_directory: "{{ playbook_dir }}/artifacts"
+k3s_local_kubeconfig: "{{ ansible_artifacts_directory }}/kubeconfig"
+k3s_remote_kubeconfig: "/etc/rancher/k3s/k3s.yaml"

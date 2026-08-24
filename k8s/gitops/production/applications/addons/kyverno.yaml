@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-addon-kyverno
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-40"
+  labels:
+    mlops-paas.io/plane: addon
+    mlops-paas.io/component: kyverno
+spec:
+  project: mlops-addons
+  info:
+    - name: Owner
+      value: Platform Engineering
+    - name: Source
+      value: kyverno.github.io/kyverno@3.8.2
+    - name: Runbook
+      value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#image-verification
+  source:
+    repoURL: https://kyverno.github.io/kyverno
+    chart: kyverno
+    targetRevision: 3.8.2
+    helm:
+      releaseName: kyverno
+      values: |
+        admissionController:
+          nodeSelector:
+            workload-type: worker
+        backgroundController:
+          nodeSelector:
+            workload-type: worker
+        cleanupController:
+          nodeSelector:
+            workload-type: worker
+        reportsController:
+          nodeSelector:
+            workload-type: worker
+        existingImagePullSecrets:
+          - kyverno-harbor-registry-auth
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno

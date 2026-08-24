@@ -1,25 +1,5 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Root Kustomization
-# Gọi tất cả các module hạ tầng (Infrastructure) và ứng dụng (Apps)
 resources:
-  # 1. Infrastructure & Platform Services
-  - cloudflare
-  - postgres
-  - redis
-  - redpanda
-  - secrets
-  - storage
-  - health
-  - monitoring
-  - argo-workflows
-  - mlflow-server
-
-  # 2. Applications (Dùng overlay production)
-  - apps/production
-
-  # 3. MLOps Training Platform
-  # Kubeflow Training Operator CRDs/controller are installed by
-  # k8s/scripts/kubeflow-training-operator-install.sh before GitOps sync.
-  - karpenter
+  - gitops/production

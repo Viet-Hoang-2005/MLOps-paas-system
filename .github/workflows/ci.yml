@@ -14,16 +14,20 @@ jobs:
     name: "Detect Changed Components"
     runs-on: ubuntu-latest
     outputs:
-      frontend: ${{ steps.filter.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
-      control_plane: ${{ steps.filter.outputs.control_plane == 'true' || github.event_name == 'workflow_dispatch' }}
-      consumer: ${{ steps.filter.outputs.consumer == 'true' || github.event_name == 'workflow_dispatch' }}
-      packager: ${{ steps.filter.outputs.packager == 'true' || github.event_name == 'workflow_dispatch' }}
-      evidently: ${{ steps.filter.outputs.evidently == 'true' || github.event_name == 'workflow_dispatch' }}
-      model_server: ${{ steps.filter.outputs.model_server == 'true' || github.event_name == 'workflow_dispatch' }}
-      bento_model_server: ${{ steps.filter.outputs.bento_model_server == 'true' || github.event_name == 'workflow_dispatch' }}
-      training_runner: ${{ steps.filter.outputs.training_runner == 'true' || github.event_name == 'workflow_dispatch' }}
-      infra: ${{ steps.filter.outputs.infra == 'true' || github.event_name == 'workflow_dispatch' }}
+      frontend: ${{ steps.filter.outputs.frontend == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
+      control_plane: ${{ steps.filter.outputs.control_plane == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
+      consumer: ${{ steps.filter.outputs.consumer == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
+      packager: ${{ steps.filter.outputs.packager == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
+      evidently: ${{ steps.filter.outputs.evidently == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
+      model_server: ${{ steps.filter.outputs.model_server == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
+      machine_learning_serving: ${{ steps.filter.outputs.machine_learning_serving == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
+      deep_learning_serving: ${{ steps.filter.outputs.deep_learning_serving == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
+      training_runner: ${{ steps.filter.outputs.training_runner == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
+      k8s: ${{ steps.filter.outputs.k8s == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
+      ansible: ${{ steps.filter.outputs.ansible == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
+      terraform: ${{ steps.filter.outputs.terraform == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
       matrix_targets: ${{ steps.matrix.outputs.targets }}
+      unit_test_targets: ${{ steps.matrix.outputs.unit_test_targets }}
     steps:
       - uses: actions/checkout@v4
       - name: Filter changed paths
@@ -43,13 +47,23 @@ jobs:
               - 'services/evidently/**'
             model_server:
               - 'services/model-server/**'
-            bento_model_server:
-              - 'services/bento-model-server/**'
+            machine_learning_serving:
+              - 'services/machine-learning-serving/**'
+            deep_learning_serving:
+              - 'services/deep-learning-serving/**'
             training_runner:
               - 'services/training-runner/**'
-            infra:
+            ci_workflow:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/cd.yml'
+            service_test_shared:
+              - 'services/requirements-test.txt'
+            k8s:
               - 'k8s/**'
-              - '.github/**'
+            ansible:
+              - 'ansible/**'
+            terraform:
+              - 'infra/**'
 
       - name: Generate Dynamic Matrix
         id: matrix
@@ -57,15 +71,18 @@ jobs:
           python3 -c '
           import os, json
           is_manual = "${{ github.event_name }}" == "workflow_dispatch"
+          is_ci_workflow_change = "${{ steps.filter.outputs.ci_workflow }}" == "true"
+          shared_tests = "${{ steps.filter.outputs.service_test_shared }}" == "true"
           changed = {
-              "frontend": "${{ steps.filter.outputs.frontend }}" == "true" or is_manual,
-              "control_plane": "${{ steps.filter.outputs.control_plane }}" == "true" or is_manual,
-              "consumer": "${{ steps.filter.outputs.consumer }}" == "true" or is_manual,
-              "packager": "${{ steps.filter.outputs.packager }}" == "true" or is_manual,
-              "evidently": "${{ steps.filter.outputs.evidently }}" == "true" or is_manual,
-              "model_server": "${{ steps.filter.outputs.model_server }}" == "true" or is_manual,
-              "bento_model_server": "${{ steps.filter.outputs.bento_model_server }}" == "true" or is_manual,
-              "training_runner": "${{ steps.filter.outputs.training_runner }}" == "true" or is_manual,
+              "frontend": "${{ steps.filter.outputs.frontend }}" == "true" or is_ci_workflow_change or is_manual,
+              "control_plane": "${{ steps.filter.outputs.control_plane }}" == "true" or is_ci_workflow_change or is_manual,
+              "consumer": "${{ steps.filter.outputs.consumer }}" == "true" or is_ci_workflow_change or is_manual,
+              "packager": "${{ steps.filter.outputs.packager }}" == "true" or is_ci_workflow_change or is_manual,
+              "evidently": "${{ steps.filter.outputs.evidently }}" == "true" or is_ci_workflow_change or is_manual,
+              "model_server": "${{ steps.filter.outputs.model_server }}" == "true" or is_ci_workflow_change or is_manual,
+              "machine_learning_serving": "${{ steps.filter.outputs.machine_learning_serving }}" == "true" or is_ci_workflow_change or is_manual,
+              "deep_learning_serving": "${{ steps.filter.outputs.deep_learning_serving }}" == "true" or is_ci_workflow_change or is_manual,
+              "training_runner": "${{ steps.filter.outputs.training_runner }}" == "true" or is_ci_workflow_change or is_manual,
           }
           configs = {
               "frontend": {"name": "Frontend Web", "id": "frontend", "context": "web", "image": "mlops-paas-web"},
@@ -74,12 +91,16 @@ jobs:
               "packager": {"name": "Model Packager", "id": "packager", "context": "services/model-packager", "image": "mlops-paas-model-packager"},
               "evidently": {"name": "Evidently Drift", "id": "evidently", "context": "services/evidently", "image": "mlops-paas-evidently"},
               "model_server": {"name": "Model Server", "id": "model_server", "context": "services/model-server", "image": "mlops-paas-model-server"},
-              "bento_model_server": {"name": "Bento Model Server", "id": "bento_model_server", "context": "services/bento-model-server", "image": "bento-model-server"},
+              "machine_learning_serving": {"name": "Machine Learning Serving", "id": "machine_learning_serving", "context": "services/machine-learning-serving", "image": "mlops-paas-machine-learning-serving"},
+              "deep_learning_serving": {"name": "Deep Learning Serving", "id": "deep_learning_serving", "context": "services/deep-learning-serving", "image": "mlops-paas-deep-learning-serving"},
               "training_runner": {"name": "Training Runner", "id": "training_runner", "context": "services/training-runner", "image": "mlops-paas-training-runner"}
           }
           targets = [configs[k] for k, v in changed.items() if v]
+          unit_keys = ["control_plane", "consumer", "packager", "evidently", "model_server", "machine_learning_serving", "deep_learning_serving", "training_runner"]
+          unit_test_targets = [configs[k] for k in unit_keys if changed[k] or shared_tests]
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"targets={json.dumps(targets)}\n")
+              f.write(f"unit_test_targets={json.dumps(unit_test_targets)}\n")
           '
 
   secret-scan:
@@ -101,6 +122,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       errors: ${{ steps.eslint.outputs.errors }}
+      warnings: ${{ steps.eslint.outputs.warnings }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js
@@ -117,78 +139,291 @@ jobs:
         id: eslint
         working-directory: web
         run: |
-          pnpm run lint > eslint_out.txt 2>&1 || true
-          cat eslint_out.txt
-          err_count=$(grep -oP '\d+(?= errors?)' eslint_out.txt | tail -1 || true)
-          if [ -z "$err_count" ]; then
-            err_count="0"
-          fi
+          set +e
+          pnpm exec eslint . --format json > eslint_report.json
+          eslint_exit=$?
+          set -e
+          cat eslint_report.json
+          read -r err_count warning_count < <(python3 - <<'PY'
+          import json
+
+          with open("eslint_report.json", encoding="utf-8") as report:
+              results = json.load(report)
+          print(sum(item.get("errorCount", 0) for item in results), sum(item.get("warningCount", 0) for item in results))
+          PY
+          )
           echo "errors=$err_count" >> $GITHUB_OUTPUT
+          echo "warnings=$warning_count" >> $GITHUB_OUTPUT
           if [ "$err_count" != "0" ]; then
             echo "::error::ESLint found $err_count errors!"
             exit 1
           fi
+          exit "$eslint_exit"
+
+  frontend-build:
+    name: "Frontend Typecheck and Build"
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        working-directory: web
+        run: pnpm run build
 
   lint-backend:
-    name: "Backend Code Quality (Pylint)"
+    name: "Backend Code Quality (${{ matrix.target.name }})"
     needs: detect-changes
-    if: needs.detect-changes.outputs.control_plane == 'true' || needs.detect-changes.outputs.consumer == 'true' || needs.detect-changes.outputs.packager == 'true' || needs.detect-changes.outputs.evidently == 'true' || needs.detect-changes.outputs.bento_model_server == 'true' || needs.detect-changes.outputs.training_runner == 'true'
+    if: needs.detect-changes.outputs.unit_test_targets != '[]'
     runs-on: ubuntu-latest
-    outputs:
-      score: ${{ steps.pylint.outputs.score }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.detect-changes.outputs.unit_test_targets) }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          cache: pip
+          cache-dependency-path: |
+            ${{ matrix.target.context }}/requirements.txt
+            ${{ matrix.target.context }}/requirements-test.txt
+            services/requirements-test.txt
       - name: Install Dependencies
+        working-directory: ${{ matrix.target.context }}
         run: |
           pip install pylint
-          for d in services/*/; do
-            if [ -f "$d/requirements.txt" ]; then
-              pip install -r "$d/requirements.txt" --quiet || true
-            fi
-          done
+          if [ -f requirements-test.txt ]; then
+            pip install -r requirements.txt -r requirements-test.txt --quiet
+          else
+            pip install -r requirements.txt -r ../requirements-test.txt --quiet
+          fi
       - name: Run Pylint (Warnings Only)
-        id: pylint
+        working-directory: ${{ matrix.target.context }}
         run: |
-          find services -name "*.py" -not -path "*/migrations/*" -not -path "*/venv/*" > pyfiles.txt
-          pylint $(cat pyfiles.txt) --output-format=text > pylint_report.txt || true
-          cat pylint_report.txt
-          score=$(grep -oP 'Your code has been rated at \K[0-9.]+/10' pylint_report.txt || echo "N/A")
-          echo "score=$score" >> $GITHUB_OUTPUT
+          find src -name "*.py" -not -path "*/migrations/*" -not -path "*/venv/*" > pyfiles.txt
+          pylint $(cat pyfiles.txt) --output-format=json > pylint_report.json || true
+          cat pylint_report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
 
-  lint-infra:
-    name: "Infrastructure Validation (Kustomize & Kubeconform)"
+          messages = json.loads(Path("pylint_report.json").read_text(encoding="utf-8") or "[]")
+          errors = sum(message.get("type") in {"error", "fatal"} for message in messages)
+          warnings = sum(message.get("type") not in {"error", "fatal"} for message in messages)
+          status = "Failed" if errors else "Warning" if warnings else "Passed"
+          Path("ci-lint-${{ matrix.target.id }}.json").write_text(
+              json.dumps({"display": f"{status} ({errors} error, {warnings} warning)"}),
+              encoding="utf-8",
+          )
+          PY
+      - name: Upload lint summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-summary-lint-${{ matrix.target.id }}
+          path: ${{ matrix.target.context }}/ci-lint-${{ matrix.target.id }}.json
+          if-no-files-found: ignore
+
+  service-unit-tests:
+    name: "Unit Tests (${{ matrix.target.name }})"
     needs: detect-changes
-    if: needs.detect-changes.outputs.infra == 'true'
+    if: needs.detect-changes.outputs.unit_test_targets != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.detect-changes.outputs.unit_test_targets) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+          cache-dependency-path: |
+            ${{ matrix.target.context }}/requirements.txt
+            ${{ matrix.target.context }}/requirements-test.txt
+            services/requirements-test.txt
+      - name: Install dependencies
+        working-directory: ${{ matrix.target.context }}
+        run: |
+          if [ -f requirements-test.txt ]; then
+            pip install -r requirements.txt -r requirements-test.txt
+          else
+            pip install -r requirements.txt -r ../requirements-test.txt
+          fi
+      - name: Control Plane quality gates
+        if: matrix.target.id == 'control_plane'
+        working-directory: ${{ matrix.target.context }}
+        run: |
+          python -m ruff check .
+          python -m mypy src/apps src/common src/infrastructure
+          python manage.py check --settings=config.settings.test
+          python manage.py makemigrations --check --dry-run --settings=config.settings.test
+      - name: Run Control Plane unit tests with coverage
+        id: control_plane_tests
+        if: matrix.target.id == 'control_plane'
+        continue-on-error: true
+        working-directory: ${{ matrix.target.context }}
+        run: python -m pytest src --junitxml=test-results.xml --cov=src/apps --cov-report=term-missing --cov-report=xml --cov-fail-under=70
+      - name: Run runtime service unit tests with coverage
+        id: runtime_service_tests
+        if: matrix.target.id != 'control_plane'
+        continue-on-error: true
+        working-directory: ${{ matrix.target.context }}
+        run: python -m pytest tests --junitxml=test-results.xml --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=70
+      - name: Write unit test summary
+        if: always()
+        working-directory: ${{ matrix.target.context }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          test_result = "${{ steps.control_plane_tests.outcome }}"
+          if test_result == "skipped":
+              test_result = "${{ steps.runtime_service_tests.outcome }}"
+          junit_path = Path("test-results.xml")
+          coverage_path = Path("coverage.xml")
+          if not junit_path.exists() or not coverage_path.exists():
+              display = "Failed (test execution error)"
+          else:
+              suite = ET.parse(junit_path).getroot()
+              tests = int(suite.attrib.get("tests", 0))
+              failures = int(suite.attrib.get("failures", 0))
+              errors = int(suite.attrib.get("errors", 0))
+              skipped = int(suite.attrib.get("skipped", 0))
+              passed = tests - failures - errors - skipped
+              coverage = float(ET.parse(coverage_path).getroot().attrib["line-rate"]) * 100
+              status = "Passed" if test_result == "success" else "Failed"
+              display = f"{status} ({passed} passed, {coverage:.2f}% coverage)"
+          Path("ci-unit-${{ matrix.target.id }}.json").write_text(
+              json.dumps({"display": display}), encoding="utf-8"
+          )
+          PY
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.target.id }}
+          path: ${{ matrix.target.context }}/coverage.xml
+          if-no-files-found: ignore
+      - name: Upload unit test summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-summary-unit-${{ matrix.target.id }}
+          path: ${{ matrix.target.context }}/ci-unit-${{ matrix.target.id }}.json
+          if-no-files-found: ignore
+      - name: Enforce unit test result
+        if: always()
+        run: |
+          if [ "${{ steps.control_plane_tests.outcome }}" = "failure" ] || [ "${{ steps.runtime_service_tests.outcome }}" = "failure" ]; then
+            exit 1
+          fi
+
+  validate-k8s:
+    name: "Kubernetes Validation (Kustomize & Kubeconform)"
+    needs: detect-changes
+    if: needs.detect-changes.outputs.k8s == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Python for GitOps validation
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install GitOps validation dependencies
+        run: pip install -r k8s/validate/requirements.txt
       - name: Setup Kustomize
         uses: imranismail/setup-kustomize@v2
-      - name: Install Kubeconform
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+      - name: Install Kubeconform v0.7.0
         run: |
-          wget https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
-          tar -xf kubeconform-linux-amd64.tar.gz
+          wget -q https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz
+          tar -xzf kubeconform-linux-amd64.tar.gz
           sudo mv kubeconform /usr/local/bin/
       - name: Validate K8s Manifests
         run: |
-          echo "Building Kustomize to check syntax..."
-          for i in 1 2 3; do
-            kustomize build --enable-helm k8s/ > full_manifest.yaml && break || sleep 10
+          echo "Building every Kustomize package to check syntax..."
+          mapfile -t targets < <(find k8s -name kustomization.yaml -printf '%h\n' | sort -u)
+          for target in "${targets[@]}"; do
+            output="$(echo "$target" | tr '/' '-')-manifest.yaml"
+            for i in 1 2 3; do
+              kustomize build --enable-helm "$target" > "$output" && break || sleep 10
+            done
+            if [ ! -s "$output" ]; then
+              echo "::error::Kustomize build failed for $target after 3 retries."
+              exit 1
+            fi
+            echo "Validating $target with Kubeconform..."
+            kubeconform -ignore-missing-schemas -summary "$output"
           done
-          if [ ! -s full_manifest.yaml ]; then
-            echo "::error::Kustomize build failed after 3 retries due to network timeouts!"
-            exit 1
-          fi
-          echo "Validating structure with Kubeconform..."
-          kubeconform -ignore-missing-schemas -summary full_manifest.yaml
+          python -m unittest discover -s k8s/validate/tests -p 'test_*.py'
+          python -m k8s.validate.run_all
+
+  validate-ansible:
+    name: "Ansible Validation (Syntax & Lint)"
+    needs: detect-changes
+    if: needs.detect-changes.outputs.ansible == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Ansible dependencies and collections
+        run: |
+          pip install -r ansible/requirements.txt
+          ansible-galaxy collection install -r ansible/requirements.yml
+      - name: Validate Ansible syntax
+        run: ansible-playbook -i 'localhost,' ansible/site.yml --syntax-check
+      - name: Lint Ansible
+        run: ansible-lint ansible/
+
+  validate-terraform:
+    name: "Terraform Validation (Fmt, Init & Validate)"
+    needs: detect-changes
+    if: needs.detect-changes.outputs.terraform == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.7'
+      - name: Format check
+        run: terraform fmt -check -recursive
+      - name: Initialize providers without backend
+        run: terraform init -backend=false -input=false
+      - name: Validate configuration
+        run: terraform validate
 
   build-and-scan:
     name: "Build & Scan (${{ matrix.target.name }})"
-    needs: [detect-changes, lint-frontend, lint-backend, lint-infra, secret-scan]
+    needs: [detect-changes, lint-frontend, lint-backend, service-unit-tests, frontend-build, validate-k8s, validate-ansible, validate-terraform, secret-scan]
     if: always() && needs.detect-changes.result == 'success' && needs.detect-changes.outputs.matrix_targets != '[]'
     runs-on: ubuntu-latest
     strategy:
@@ -205,99 +440,166 @@ jobs:
         with:
           context: ${{ matrix.target.context }}
           push: false
+          load: true
           tags: ${{ matrix.target.image }}:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Trivy Vulnerability Scan
+        id: trivy
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: '${{ matrix.target.image }}:test'
-          format: 'table'
+          format: 'json'
+          output: 'trivy-report.json'
           exit-code: '0'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+      - name: Write Trivy summary
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = Path("trivy-report.json")
+          if not report.exists() or "${{ steps.trivy.outcome }}" != "success":
+              display = "Failed (scan execution error)"
+          else:
+              payload = json.loads(report.read_text(encoding="utf-8"))
+              vulnerabilities = [
+                  vulnerability
+                  for result in payload.get("Results", [])
+                  for vulnerability in result.get("Vulnerabilities") or []
+              ]
+              critical = sum(item.get("Severity") == "CRITICAL" for item in vulnerabilities)
+              high = sum(item.get("Severity") == "HIGH" for item in vulnerabilities)
+              status = "Warning" if critical or high else "Passed"
+              display = f"{status} ({critical} critical, {high} high)"
+          Path("ci-trivy-${{ matrix.target.id }}.json").write_text(
+              json.dumps({"display": display}), encoding="utf-8"
+          )
+          PY
+      - name: Upload Trivy summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-summary-trivy-${{ matrix.target.id }}
+          path: ci-trivy-${{ matrix.target.id }}.json
+          if-no-files-found: ignore
 
   ci-summary:
     name: "CI Pipeline Summary Table"
-    needs: [detect-changes, secret-scan, lint-frontend, lint-backend, lint-infra, build-and-scan]
+    needs: [detect-changes, secret-scan, lint-frontend, lint-backend, service-unit-tests, frontend-build, validate-k8s, validate-ansible, validate-terraform, build-and-scan]
     if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Download service summaries
+        if: needs.lint-backend.result != 'skipped' || needs.service-unit-tests.result != 'skipped' || needs.build-and-scan.result != 'skipped'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ci-summary-*
+          path: ci-results
+          merge-multiple: true
       - name: Generate Unified CI Summary Table
         run: |
-          python3 -c '
+          python3 - <<'PY'
+          import json
           import os
+          from pathlib import Path
 
           fe_changed = "${{ needs.detect-changes.outputs.frontend }}" == "true"
           cp_changed = "${{ needs.detect-changes.outputs.control_plane }}" == "true"
           cs_changed = "${{ needs.detect-changes.outputs.consumer }}" == "true"
           pk_changed = "${{ needs.detect-changes.outputs.packager }}" == "true"
           ev_changed = "${{ needs.detect-changes.outputs.evidently }}" == "true"
-          inf_changed = "${{ needs.detect-changes.outputs.infra }}" == "true"
+          k8s_changed = "${{ needs.detect-changes.outputs.k8s }}" == "true"
+          ansible_changed = "${{ needs.detect-changes.outputs.ansible }}" == "true"
+          terraform_changed = "${{ needs.detect-changes.outputs.terraform }}" == "true"
 
           md_changed = "${{ needs.detect-changes.outputs.model_server }}" == "true"
-          bento_changed = "${{ needs.detect-changes.outputs.bento_model_server }}" == "true"
+          ml_serving_changed = "${{ needs.detect-changes.outputs.machine_learning_serving }}" == "true"
+          dl_serving_changed = "${{ needs.detect-changes.outputs.deep_learning_serving }}" == "true"
           training_runner_changed = "${{ needs.detect-changes.outputs.training_runner }}" == "true"
 
           secret_res = "${{ needs.secret-scan.result }}" == "success"
           eslint_res = "${{ needs.lint-frontend.result }}" == "success"
           eslint_errs = "${{ needs.lint-frontend.outputs.errors }}"
-          pylint_res = "${{ needs.lint-backend.result }}" in ["success", "skipped"]
-          pylint_score = "${{ needs.lint-backend.outputs.score }}"
-          trivy_res = "${{ needs.build-and-scan.result }}" == "success"
-          infra_res = "${{ needs.lint-infra.result }}" == "success"
+          eslint_warnings = "${{ needs.lint-frontend.outputs.warnings }}"
+          k8s_result = "${{ needs.validate-k8s.result }}"
+          ansible_result = "${{ needs.validate-ansible.result }}"
+          terraform_result = "${{ needs.validate-terraform.result }}"
 
           fmt = lambda ok: "Passed" if ok else "Failed"
-          err_str = eslint_errs if eslint_errs else "?"
-          eslint_fmt = fmt(eslint_res) if eslint_res else f"Failed ({err_str} errors)"
-          pylint_fmt = f"{pylint_score}" if pylint_score else fmt(pylint_res)
+          def infrastructure_result(changed, result):
+              if not changed:
+                  return "Skipped (no changes)"
+              return {
+                  "success": "Passed",
+                  "failure": "Failed",
+                  "cancelled": "Cancelled",
+                  "skipped": "Skipped",
+              }.get(result, f"Failed ({result or 'unknown'} job result)")
+          eslint_errs = int(eslint_errs or 0)
+          eslint_warnings = int(eslint_warnings or 0)
+          eslint_status = "Failed" if not eslint_res or eslint_errs else "Warning" if eslint_warnings else "Passed"
+          eslint_fmt = f"{eslint_status} ({eslint_errs} error, {eslint_warnings} warning)"
+
+          result_files = Path("ci-results")
+          def service_result(kind, service_id):
+              path = result_files / f"ci-{kind}-{service_id}.json"
+              if not path.exists():
+                  return f"Failed ({kind} execution error)"
+              return json.loads(path.read_text(encoding="utf-8"))["display"]
 
           summary = ["### Unified CI Pipeline Results\n"]
           summary.append(f"**Secret Security (GitLeaks)**: {fmt(secret_res)}\n")
 
           rows = []
           if fe_changed:
-              rows.append(f"| **Frontend Web** | {eslint_fmt} (ESLint) | {fmt(trivy_res)} |")
+              rows.append(f"| **Frontend Web** | {eslint_fmt} | N/A | {service_result('trivy', 'frontend')} |")
           if cp_changed:
-              rows.append(f"| **Control Plane** | {pylint_fmt} (Pylint) | {fmt(trivy_res)} |")
+              rows.append(f"| **Control Plane** | {service_result('lint', 'control_plane')} | {service_result('unit', 'control_plane')} | {service_result('trivy', 'control_plane')} |")
           if cs_changed:
-              rows.append(f"| **Redpanda Consumer** | {pylint_fmt} (Pylint) | {fmt(trivy_res)} |")
+              rows.append(f"| **Redpanda Consumer** | {service_result('lint', 'consumer')} | {service_result('unit', 'consumer')} | {service_result('trivy', 'consumer')} |")
           if pk_changed:
-              rows.append(f"| **Model Packager** | {pylint_fmt} (Pylint) | {fmt(trivy_res)} |")
+              rows.append(f"| **Model Packager** | {service_result('lint', 'packager')} | {service_result('unit', 'packager')} | {service_result('trivy', 'packager')} |")
           if ev_changed:
-              rows.append(f"| **Evidently Drift** | {pylint_fmt} (Pylint) | {fmt(trivy_res)} |")
+              rows.append(f"| **Evidently Drift** | {service_result('lint', 'evidently')} | {service_result('unit', 'evidently')} | {service_result('trivy', 'evidently')} |")
           if md_changed:
-              rows.append(f"| **Model Server** | {pylint_fmt} (Pylint) | {fmt(trivy_res)} |")
-          if bento_changed:
-              rows.append(f"| **Bento Model Server** | {pylint_fmt} (Pylint) | {fmt(trivy_res)} |")
+              rows.append(f"| **Model Server** | {service_result('lint', 'model_server')} | {service_result('unit', 'model_server')} | {service_result('trivy', 'model_server')} |")
+          if ml_serving_changed:
+              rows.append(f"| **Machine Learning Serving** | {service_result('lint', 'machine_learning_serving')} | {service_result('unit', 'machine_learning_serving')} | {service_result('trivy', 'machine_learning_serving')} |")
+          if dl_serving_changed:
+              rows.append(f"| **Deep Learning Serving** | {service_result('lint', 'deep_learning_serving')} | {service_result('unit', 'deep_learning_serving')} | {service_result('trivy', 'deep_learning_serving')} |")
           if training_runner_changed:
-              rows.append(f"| **Training Runner** | {pylint_fmt} (Pylint) | {fmt(trivy_res)} |")
+              rows.append(f"| **Training Runner** | {service_result('lint', 'training_runner')} | {service_result('unit', 'training_runner')} | {service_result('trivy', 'training_runner')} |")
 
           if rows:
               summary.append("#### Application Services (FE & BE)")
-              summary.append("| Services | Lint | Trivy |")
-              summary.append("| :--- | :--- | :--- |")
+              summary.append("| Services | Lint | Unit tests | Trivy |")
+              summary.append("| :--- | :--- | :--- | :--- |")
               summary.extend(rows)
               summary.append("\n")
 
-          if inf_changed:
-              summary.append("#### Kubernetes Infrastructure")
-              summary.append("| Services | Validation Status |")
-              summary.append("| :--- | :--- |")
-              summary.append(f"| **K8s Manifests (Kustomize & Kubeconform)** | {fmt(infra_res)} |")
-              summary.append("\n")
+          summary.append("#### Infrastructure")
+          summary.append("| Component | Result |")
+          summary.append("| :--- | :--- |")
+          summary.append(f"| **Kubernetes (Kustomize, Kubeconform, GitOps)** | {infrastructure_result(k8s_changed, k8s_result)} |")
+          summary.append(f"| **Ansible (Syntax, Lint)** | {infrastructure_result(ansible_changed, ansible_result)} |")
+          summary.append(f"| **Terraform (Fmt, Init, Validate)** | {infrastructure_result(terraform_changed, terraform_result)} |")
+          summary.append("\n")
 
-          if not rows and not inf_changed:
-              summary.append("*No application or K8s components changed in this run.*")
+          if not rows and not (k8s_changed or ansible_changed or terraform_changed):
+              summary.append("*No application components changed in this run.*")
 
           content = "\n".join(summary)
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
               f.write(content + "\n")
           with open("pr_comment.md", "w") as f:
               f.write(content + "\n")
-          '
+          PY
 
       - name: Comment CI Summary on PR
         if: github.event_name == 'pull_request'

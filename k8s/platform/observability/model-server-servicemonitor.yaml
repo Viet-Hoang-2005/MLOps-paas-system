@@ -1,0 +1,26 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: model-server-monitor
+  namespace: monitoring
+  labels:
+    # Nhãn này cực kỳ quan trọng, nó phải khớp với tên Release của Prometheus (mặc định là 'monitoring' theo script của chúng ta)
+    # Nếu thiếu nhãn này, Prometheus Operator sẽ bỏ qua (không nhặt file này)
+    release: monitoring
+spec:
+  selector:
+    matchExpressions:
+      # Scrape both dynamic serving workers and the central model gateway.
+      - key: component
+        operator: In
+        values:
+          - model-server
+          - model-gateway
+  namespaceSelector:
+    matchNames:
+      - mlops-model-server
+      - mlops-model-runtimes
+  endpoints:
+    - port: http # Phải khớp với name: http ở dòng 83 của file deploy-workflowtemplate.yaml
+      path: /metrics
+      interval: 15s

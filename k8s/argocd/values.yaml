@@ -6,12 +6,66 @@ global:
 configs:
   cm:
     kustomize.buildOptions: --enable-helm
+    resource.customizations.health.argoproj.io_Application: |
+      hs = {}
+      hs.status = "Progressing"
+      hs.message = "Waiting for child Application reconciliation"
+      if obj.status ~= nil then
+        if obj.status.health ~= nil and obj.status.health.status ~= nil then
+          hs.status = obj.status.health.status
+          hs.message = obj.status.health.message or hs.message
+        end
+        if obj.status.sync ~= nil and obj.status.sync.status ~= "Synced" then
+          hs.status = "Progressing"
+          hs.message = "Child Application is " .. (obj.status.sync.status or "Unknown")
+        end
+      end
+      return hs
+    resource.customizations.health.karpenter.sh_NodePool: |
+      hs = {}
+      hs.status = "Progressing"
+      hs.message = "Waiting for Karpenter NodePool readiness"
+      if obj.status ~= nil and obj.status.conditions ~= nil then
+        for _, condition in ipairs(obj.status.conditions) do
+          if condition.type == "Ready" then
+            hs.message = condition.message or condition.reason or hs.message
+            if condition.status == "True" then
+              hs.status = "Healthy"
+            elseif condition.status == "False" then
+              hs.status = "Degraded"
+            end
+            return hs
+          end
+        end
+      end
+      return hs
+    resource.customizations.health.karpenter.k8s.aws_EC2NodeClass: |
+      hs = {}
+      hs.status = "Progressing"
+      hs.message = "Waiting for Karpenter EC2NodeClass readiness"
+      if obj.status ~= nil and obj.status.conditions ~= nil then
+        for _, condition in ipairs(obj.status.conditions) do
+          if condition.type == "Ready" then
+            hs.message = condition.message or condition.reason or hs.message
+            if condition.status == "True" then
+              hs.status = "Healthy"
+            elseif condition.status == "False" then
+              hs.status = "Degraded"
+            end
+            return hs
+          end
+        end
+      end
+      return hs
     accounts.github-actions: apiKey
   rbac:
     policy.csv: |
-      p, role:github-actions, applications, get, *, allow
-      p, role:github-actions, applications, sync, default/mlops-paas-jobs, allow
-      p, role:github-actions, applications, sync, default/mlops-paas-system, allow
+      p, role:github-actions, applications, get, default/mlops-paas-system, allow
+      p, role:github-actions, applications, get, mlops-platform/*, allow
+      p, role:github-actions, applications, get, mlops-execution/*, allow
+      p, role:github-actions, applications, get, mlops-workloads/*, allow
+      p, role:github-actions, applications, get, mlops-cluster/*, allow
+      p, role:github-actions, applications, get, mlops-addons/*, allow
       g, github-actions, role:github-actions
 
 controller:

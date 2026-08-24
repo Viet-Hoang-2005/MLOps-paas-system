@@ -1,16 +1,14 @@
 import json
 import os
+import time
 import uuid
+from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import Any, Dict
 
 import httpx
 import jwt
-import numpy as np
-import pandas as pd
 import redis
-import pickle
-
-from datetime import datetime
-from typing import Any, Dict
 from confluent_kafka import Producer
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,33 +18,56 @@ from jwt.algorithms import RSAAlgorithm
 from prometheus_client import Counter, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
-from src.database import get_model_api_record, model_registry_engine
-from src.loading import load_model_for_record, MODEL_CACHE
-from contextlib import asynccontextmanager
-from hashids import Hashids
+from src.database import get_model_version_record, model_registry_engine, verify_project_api_key
 
-JWKS_URL = os.environ.get("JWKS_URL", "http://django-service/.well-known/jwks.json")
-REDPANDA_BROKERS = os.environ.get("REDPANDA_BROKERS", "localhost:19092")
+JWKS_URL = os.environ.get("JWKS_URL", "http://control-plane:8000/api/auth/.well-known/jwks.json")
+REDPANDA_BROKERS = os.environ.get("REDPANDA_BROKERS", "redpanda:9092")
 KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "mlops_paas_production_data")
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/1")
-HASHIDS_SALT = os.environ.get("HASHIDS_SALT", "mlops_paas_secret_salt")
-hashids = Hashids(salt=HASHIDS_SALT, min_length=6)
+REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/1")
+DEEP_LEARNING_FLAVORS = frozenset({"pytorch", "tensorflow"})
 
-def decode_model_id(hash_str: str) -> int:
-    res = hashids.decode(hash_str)
-    if res:
-        return res[0]
-    raise ValueError(f"Invalid model_id hash: {hash_str}")
+
+def create_redis_client():
+    try:
+        client = redis.from_url(REDIS_URL)
+        client.ping()
+        print(f"Redis Connected: {REDIS_URL}")
+        return client
+    except Exception as exc:
+        print(f"Failed to connect to Redis: {exc}")
+        return None
+
+
+def create_kafka_producer():
+    try:
+        producer = Producer({
+            "bootstrap.servers": REDPANDA_BROKERS,
+            "client.id": "central-model-server",
+            "linger.ms": 5,
+        })
+        print(f"Redpanda Connected: {REDPANDA_BROKERS} - Topic: {KAFKA_TOPIC}")
+        return producer
+    except Exception as exc:
+        print(f"Failed to setup Redpanda producer: {exc}")
+        return None
+
+
+redis_client = None
+kafka_producer = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global redis_client, kafka_producer
+    redis_client = create_redis_client()
+    kafka_producer = create_kafka_producer()
     yield
     if kafka_producer:
         kafka_producer.flush(timeout=5.0)
 
 app = FastAPI(
-    title="AI PaaS Dynamic Inference API",
-    description="Generic multi-tenant inference server backed by Django model registry.",
+    title="AI PaaS Model Server Gateway",
+    description="Model Server API Gateway handling Authentication, Routing to ML/DL Pods, and Kafka Redpanda Logging.",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -62,39 +83,19 @@ app.add_middleware(
 paas_predictions_counter = Counter(
     "paas_predictions_total",
     "Total predictions processed",
-    ["tenant_id", "model_id", "status"],
+    ["tenant_id", "project_id", "model_version_id", "status"],
 )
 
 paas_latency_histogram = Histogram(
     "paas_prediction_latency_seconds",
     "Latency of prediction requests",
-    ["tenant_id", "model_id"],
+    ["tenant_id", "project_id", "model_version_id"],
 )
 
 Instrumentator().instrument(app).expose(app)
 
-try:
-    redis_client = redis.from_url(REDIS_URL)
-    redis_client.ping()
-    print(f"Redis Connected: {REDIS_URL}")
-except Exception as exc:
-    print(f"Failed to connect to Redis: {exc}")
-    redis_client = None
-
-try:
-    kafka_producer = Producer({
-        "bootstrap.servers": REDPANDA_BROKERS,
-        "client.id": "fastapi-dynamic-model-registry",
-        "linger.ms": 5,
-    })
-    print(f"Redpanda Connected: {REDPANDA_BROKERS} - Topic: {KAFKA_TOPIC}")
-except Exception as exc:
-    print(f"Failed to setup Redpanda producer: {exc}")
-    kafka_producer = None
-
 JWKS_CACHE: Dict[str, Any] = {}
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-
 
 class InferenceRequest(BaseModel):
     features: Dict[str, Any]
@@ -116,59 +117,34 @@ async def get_public_key(kid: str):
             return None
     return JWKS_CACHE.get(kid)
 
-
-
 async def verify_model_access(
-    model_id_str: str,
+    version_id: str,
     api_key: str = Security(api_key_header),
     authorization: str = Header(None),
 ):
     try:
-        model_id = decode_model_id(model_id_str)
-        model_record = get_model_api_record(model_id)
+        uuid.UUID(version_id)
+        model_record = get_model_version_record(version_id, redis_client=redis_client)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
         
     if not model_record:
-        raise HTTPException(status_code=404, detail="Model API not found.")
+        raise HTTPException(status_code=404, detail="Model version not found.")
         
     model_tenant_id = model_record["tenant_id"]
 
     if model_record["access_mode"] == "public":
-        return {"tenant_id": model_tenant_id, "auth_type": "public", "model_api": model_record}
+        return {"tenant_id": model_tenant_id, "auth_type": "public", "model_record": model_record}
 
     if api_key:
-        if not redis_client:
-            raise HTTPException(status_code=500, detail="Internal Server Error: Redis cache unavailable")
-
-        cached_data_bytes = redis_client.get(f":1:api_key:{api_key}")
-        if not cached_data_bytes:
+        key_record = verify_project_api_key(api_key, model_record["project_pk"])
+        if not key_record:
             raise HTTPException(status_code=401, detail="Unauthorized: Invalid or revoked API Key")
-            
-        try:
-            if cached_data_bytes.startswith(b'\x80'):
-                cached_data_str = pickle.loads(cached_data_bytes)
-            else:
-                cached_data_str = cached_data_bytes.decode('utf-8')
-                
-            cached_data = json.loads(cached_data_str)
-            cached_tenant_id = cached_data.get("tenant_id")
-            scope = cached_data.get("scope", "all")
-            allowed_models = cached_data.get("allowed_models", [])
-        except json.JSONDecodeError:
-            # Fallback for old plain string API Keys
-            cached_tenant_id = cached_data_str
-            scope = "all"
-            allowed_models = []
-
+        cached_tenant_id = key_record["tenant_id"]
         if cached_tenant_id != model_tenant_id:
             raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to access this model.")
             
-        allowed_model_ids = {str(allowed_model_id) for allowed_model_id in allowed_models}
-        if scope == "specific" and str(model_id) not in allowed_model_ids:
-            raise HTTPException(status_code=403, detail="Forbidden: This API Key is not authorized for this specific endpoint.")
-
-        return {"tenant_id": cached_tenant_id, "auth_type": "api_key", "model_api": model_record, "scope": scope}
+        return {"tenant_id": cached_tenant_id, "auth_type": "api_key", "model_record": model_record}
 
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Unauthorized: Missing API Key or Bearer Token")
@@ -191,15 +167,20 @@ async def verify_model_access(
             raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to access this model.")
 
         payload["auth_type"] = "jwt"
-        payload["model_api"] = model_record
+        payload["model_record"] = model_record
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Unauthorized: Token has expired")
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status_code=401, detail=f"Unauthorized: Invalid token ({exc})")
 
-
-def send_to_redpanda(tenant_id: str, model_id: str, features_dict: dict, prediction_result: Any):
+def send_to_redpanda(
+    tenant_id: str,
+    project_id: str,
+    model_version_id: str,
+    features_dict: dict,
+    prediction_result: Any,
+):
     if kafka_producer is None:
         return
 
@@ -207,7 +188,8 @@ def send_to_redpanda(tenant_id: str, model_id: str, features_dict: dict, predict
         payload = {
             "id": str(uuid.uuid4()),
             "tenant_id": tenant_id,
-            "model_id": model_id,
+            "project_id": project_id,
+            "model_version_id": model_version_id,
             "timestamp": datetime.utcnow().isoformat(),
             "features": features_dict,
             "prediction": prediction_result,
@@ -222,149 +204,163 @@ def send_to_redpanda(tenant_id: str, model_id: str, features_dict: dict, predict
     except Exception as exc:
         print(f"Error sending log to Redpanda: {exc}")
 
+def serving_engine_for_flavor(flavor: Any) -> str:
+    normalized_flavor = str(flavor or "").strip().lower()
+    return "dl" if normalized_flavor in DEEP_LEARNING_FLAVORS else "ml"
+
+
+def resolve_worker_url(model_record: Dict[str, Any], endpoint_path: str) -> str:
+    serving_engine = serving_engine_for_flavor(model_record.get("flavor"))
+    target_port = 5001 if serving_engine == "ml" else 5002
+    container_name = model_record.get("endpoint_container_name")
+
+    if not container_name:
+        if os.environ.get("KUBERNETES_SERVICE_HOST"):
+            # On K8s there is no shared fallback pod — fail clearly.
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Model endpoint is not deployed yet. "
+                    "Please trigger a deployment from the Control Plane first."
+                ),
+            )
+        # Docker Compose local-dev: fall back to named service so images can be tested individually without a full deploy cycle.
+        fallback_host = "machine-learning-serving" if serving_engine == "ml" else "deep-learning-serving"
+        return f"http://{fallback_host}:{target_port}{endpoint_path}"
+
+    if os.environ.get("KUBERNETES_SERVICE_HOST"):
+        service_name = f"{container_name}-svc" if not container_name.endswith("-svc") else container_name
+        runtime_namespace = os.environ.get("MODEL_RUNTIME_NAMESPACE", "mlops-model-runtimes").strip()
+        host = f"{service_name}.{runtime_namespace}.svc.cluster.local"
+    else:
+        host = container_name
+    return f"http://{host}:{target_port}{endpoint_path}"
+
 @app.get("/")
 async def health_check():
     return {
         "status": "healthy",
-        "mode": "dynamic-model-registry",
+        "mode": "central-model-server",
         "model_registry_connected": model_registry_engine is not None,
-        "cached_models": list(MODEL_CACHE.keys()),
     }
 
+@app.get("/models/{version_id}/health")
+async def model_health(version_id: str, token_payload: dict = Depends(verify_model_access)):
+    model_record = token_payload["model_record"]
+    worker_url = resolve_worker_url(model_record, "/health")
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(worker_url)
+            if response.status_code == 200:
+                return response.json()
+            return JSONResponse(
+                status_code=response.status_code,
+                content={"status": "unhealthy", "message": f"Worker health returned HTTP {response.status_code}", "detail": response.text}
+            )
+    except Exception as exc:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "model_loaded": False, "error": f"Cannot reach worker pod: {exc}"}
+        )
 
-@app.get("/models/{model_id_str}/health")
-async def model_health(model_id_str: str, token_payload: dict = Depends(verify_model_access)):
-    model_record = token_payload["model_api"]
-    loaded = load_model_for_record(model_record)
-    return {
-        "status": "healthy",
-        "tenant_id": model_record["tenant_id"],
-        "model_id": str(model_record["id"]),
-        "access_mode": model_record["access_mode"],
-        "model_loaded": loaded.get("model") is not None,
-    }
-
-
-@app.post("/models/{model_id_str}/predict")
+@app.post("/models/{version_id}/predict")
 async def predict(
-    model_id_str: str,
+    version_id: str,
     request: Request,
     payload: InferenceRequest,
     background_tasks: BackgroundTasks,
     token_payload: dict = Depends(verify_model_access),
 ):
-    model_record = token_payload["model_api"]
-    loaded_model = load_model_for_record(model_record)
-    model = loaded_model["model"]
-    expected_features = loaded_model.get("expected_features")
+    model_record = token_payload["model_record"]
+    worker_url = resolve_worker_url(model_record, "/predict")
+    features_dict = payload.features
+    tenant_id = model_record["tenant_id"]
+    project_id = str(model_record["project_id"])
+    resolved_model_version_id = str(model_record["id"])
+    start_time = time.perf_counter()
 
     try:
-        features_dict = payload.model_dump().get("features", {})
-
-        if expected_features:
-            missing_cols = set(expected_features) - set(features_dict.keys())
-            if missing_cols:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Bad Request: Missing {len(missing_cols)} required features (e.g., {list(missing_cols)[:3]})",
-                )
-
-        df_input = pd.DataFrame([features_dict])
-        if expected_features:
-            df_input = df_input[expected_features]
-
-        prediction = model.predict(df_input)
-
-        if isinstance(prediction, (np.ndarray, pd.Series)):
-            result = prediction.tolist()
-        else:
-            result = prediction if isinstance(prediction, list) else [prediction]
-
-        single_result = result[0] if len(result) > 0 else result
-        
-        # Unwrap nested list if it exists
-        while isinstance(single_result, list) and len(single_result) > 0:
-            single_result = single_result[0]
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            worker_payload = {
+                "features": features_dict,
+                "model_version_id": resolved_model_version_id,
+            }
+            response = await client.post(worker_url, json=worker_payload)
             
-        tenant_id = model_record["tenant_id"]
-        resolved_model_id = str(model_record["id"])
+            if response.status_code != 200:
+                paas_predictions_counter.labels(
+                    tenant_id=tenant_id,
+                    project_id=project_id,
+                    model_version_id=resolved_model_version_id,
+                    status=f"error_{response.status_code}",
+                ).inc()
+                try:
+                    error_detail = response.json()
+                except Exception:
+                    error_detail = response.text
+                return JSONResponse(status_code=response.status_code, content=error_detail)
+                
+            data = response.json()
+            if isinstance(data, dict):
+                prediction_result = data.get("prediction")
+                confidence = data.get("confidence")
+                engine = data.get("engine", serving_engine_for_flavor(model_record.get("flavor")))
+            elif isinstance(data, list):
+                prediction_result = data
+                confidence = None
+                engine = "deep-learning-serving"
+            else:
+                prediction_result = data
+                confidence = None
+                engine = serving_engine_for_flavor(model_record.get("flavor"))
 
-        # Map label if mapping exists
-        label_mapping = loaded_model.get("label_mapping")
-        if label_mapping is not None:
-            # Try to map the result. Convert to string to check if the keys are strings.
-            str_result = str(single_result)
-            if single_result in label_mapping:
-                single_result = label_mapping[single_result]
-            elif str_result in label_mapping:
-                single_result = label_mapping[str_result]
-            elif type(single_result) == int or type(single_result) == float:
-                # sometimes mapping keys are integers
-                if int(single_result) in label_mapping:
-                    single_result = label_mapping[int(single_result)]
-
-        confidence = None
-        try:
-            raw_model = getattr(model, "_model_impl", None)
-            if not raw_model and hasattr(model, "unwrap_python_model"):
-                raw_model = model.unwrap_python_model()
-            if hasattr(raw_model, "predict_proba"):
-                proba = raw_model.predict_proba(df_input)
-                if hasattr(proba, "tolist"):
-                    proba = proba.tolist()
-                if isinstance(proba, list) and len(proba) > 0:
-                    confidence = round(max(proba[0]) * 100, 2)
-        except Exception:
-            pass
-
-        print(f"Prediction: {single_result}")
-        print(f"Confidence: {confidence}%" if confidence else "Confidence: Not available")
-
-        paas_predictions_counter.labels(tenant_id=tenant_id, model_id=resolved_model_id, status="success").inc()
-        background_tasks.add_task(send_to_redpanda, tenant_id, resolved_model_id, features_dict, single_result)
-
-        return JSONResponse(
-            content={
-                "success": True,
-                "prediction": single_result,
-                "confidence": confidence,
-                "tenant_id": tenant_id,
-                "model_id": resolved_model_id,
-            },
-            status_code=200,
-        )
-    except HTTPException:
-        paas_predictions_counter.labels(
-            tenant_id=model_record["tenant_id"], model_id=str(model_record["id"]), status="error_400"
-        ).inc()
-        raise
-    except ValueError as exc:
-        exc_str = str(exc)
-        paas_predictions_counter.labels(
-            tenant_id=model_record["tenant_id"], model_id=str(model_record["id"]), status="error_400"
-        ).inc()
-        # Sklearn raises ValueError for feature name mismatches; return 400 with a helpful message.
-        if "feature names" in exc_str.lower() or "feature_names" in exc_str.lower():
-            received = list(payload.model_dump().get("features", {}).keys())
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "success": False,
-                    "error": "Invalid feature columns",
-                    "message": exc_str,
-                    "received_features": received,
-                    "hint": (
-                        "The input columns do not match the model's training features. "
-                        "Remove label/target columns (e.g. 'label', 'target', 'y', 'class') "
-                        "from your prediction input."
-                    ),
-                },
+            paas_predictions_counter.labels(
+                tenant_id=tenant_id,
+                project_id=project_id,
+                model_version_id=resolved_model_version_id,
+                status="success",
+            ).inc()
+            background_tasks.add_task(
+                send_to_redpanda,
+                tenant_id,
+                project_id,
+                resolved_model_version_id,
+                features_dict,
+                prediction_result,
             )
-        raise HTTPException(status_code=400, detail=str(exc))
+
+            return JSONResponse(
+                content={
+                    "success": True,
+                    "prediction": prediction_result,
+                    "confidence": confidence,
+                    "tenant_id": tenant_id,
+                    "project_id": project_id,
+                    "model_version_id": resolved_model_version_id,
+                    "engine": engine,
+                },
+                status_code=200,
+            )
+    except httpx.RequestError as exc:
+        paas_predictions_counter.labels(
+            tenant_id=tenant_id,
+            project_id=project_id,
+            model_version_id=resolved_model_version_id,
+            status="error_503",
+        ).inc()
+        raise HTTPException(status_code=503, detail=f"Service Unavailable: Cannot reach model serving pod ({exc})")
     except Exception as exc:
         paas_predictions_counter.labels(
-            tenant_id=model_record["tenant_id"], model_id=str(model_record["id"]), status="error_500"
+            tenant_id=tenant_id,
+            project_id=project_id,
+            model_version_id=resolved_model_version_id,
+            status="error_500",
         ).inc()
         raise HTTPException(status_code=500, detail=str(exc))
-
-# Test endpoint to check if the model is loaded in cache
+    finally:
+        paas_latency_histogram.labels(
+            tenant_id=tenant_id,
+            project_id=project_id,
+            model_version_id=resolved_model_version_id,
+        ).observe(time.perf_counter() - start_time)

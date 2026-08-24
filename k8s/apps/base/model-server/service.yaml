@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlops-paas-model-server
+  labels:
+    app: mlops-paas-model-server
+    component: model-gateway
+spec:
+  selector:
+    app: mlops-paas-model-server
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000

@@ -6,7 +6,8 @@ metadata:
     app: mlops-paas-control-plane
 spec:
   ports:
-    - port: 8000
+    - name: http
+      port: 8000
       targetPort: 8000
   selector:
     app: mlops-paas-control-plane

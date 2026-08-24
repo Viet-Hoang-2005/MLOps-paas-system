@@ -1,0 +1,4 @@
+interface:
+  display_name: "MLOps PaaS Environment"
+  short_description: "Local and production environment guidance"
+  default_prompt: "Use $mlops-paas-environment to diagnose or configure the correct runtime environment."

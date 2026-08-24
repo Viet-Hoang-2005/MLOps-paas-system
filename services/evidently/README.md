@@ -10,6 +10,7 @@ Evidently Service là container thực thi phân tích **Data Drift** theo mô h
 - **Schema-Flexible Analysis**: Tự động flatten cột `features` dạng `JSONB` từ PostgreSQL thành Pandas DataFrame — không cần hardcode số lượng feature.
 - **Báo cáo tự động**: Xuất báo cáo HTML trực quan và JSON Summary, upload lên S3.
 - **Webhook Callback**: Sau khi phân tích, gửi kết quả (`drift_score`, S3 URLs) về Control Plane qua HTTP POST.
+- **Runtime Log Stream**: Mirror stdout/stderr vào Redis key `drift_logs:{DRIFT_RUN_ID}` để Control Plane hiển thị tiến trình theo thời gian thực.
 
 ---
 
@@ -19,7 +20,7 @@ Evidently Service là container thực thi phân tích **Data Drift** theo mô h
 Argo Workflows kích hoạt evidently-workflowtemplate
   ↓
 1. Tải Reference Data từ S3 (presigned URL do Control Plane cấp)
-2. Query Production Logs từ PostgreSQL theo model_id + tenant_id
+2. Query Production Logs từ PostgreSQL theo model_version_id + tenant_id
 3. Flatten JSONB features → Pandas DataFrame
 4. Chạy Evidently DataDriftPreset
 5. Xuất report.html + summary.json
@@ -36,7 +37,7 @@ Argo Workflows kích hoạt evidently-workflowtemplate
 
 ```
 src/
-└── detect_drift.py   # Main script: load data, run Evidently, upload S3, send webhook
+└── main.py   # Main script: load data, run Evidently, upload S3, send webhook
 ```
 
 ---
@@ -57,8 +58,10 @@ src/
 | Biến | Mô tả |
 |---|---|
 | `JOB_ID` | ID của DriftJob trên Control Plane |
+| `DRIFT_RUN_ID` | UUID của DriftRun; nếu không đặt sẽ dùng `JOB_ID` làm Redis log key |
 | `TENANT_ID` | Tenant sở hữu model |
-| `MODEL_ID` | ID của model cần phân tích |
+| `PROJECT_ID` | UUID của model project cần phân tích |
+| `MODEL_VERSION_ID` | UUID của model version bất biến cần phân tích |
 | `MODEL_NAME` | Tên model (dùng để query production logs) |
 | `MODEL_URI` | URI của model (tham khảo) |
 | `REFERENCE_DATA_URL` | Presigned URL tải Reference Data từ S3 |
@@ -67,6 +70,7 @@ src/
 | `REPORT_JSON_S3_URI` | S3 URI để upload JSON report |
 | `SUMMARY_JSON_S3_URI` | S3 URI để upload JSON summary |
 | `CONTROL_PLANE_WEBHOOK_URL` | URL gửi kết quả về Control Plane |
+| `REDIS_URL` | Redis database dùng để stream runtime log (TTL 1 giờ) |
 | `DB_HOST_RO`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | PostgreSQL (Read-Only) |
 | `AWS_BUCKET_NAME`, `AWS_DEFAULT_REGION` | S3 config |
 

@@ -1,30 +1,19 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { GoogleOAuthProvider } from '@react-oauth/google'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import './index.css'
-import App from './App.tsx'
+import '@/app/styles/globals.css'
+import App from '@/app/App'
+import { ErrorBoundary } from '@/shared/components/ErrorBoundary'
+import { AppProviders } from '@/app/providers/AppProviders'
+import { initializeTheme } from '@/app/theme/theme'
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000,
-      gcTime: 30 * 60 * 1000,
-      retry: false,
-    },
-    mutations: {
-      retry: false,
-    },
-  },
-})
+initializeTheme()
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <GoogleOAuthProvider clientId={googleClientId}>
+  <ErrorBoundary>
+    <StrictMode>
+      <AppProviders>
         <App />
-      </GoogleOAuthProvider>
-    </QueryClientProvider>
-  </StrictMode>,
+      </AppProviders>
+    </StrictMode>
+  </ErrorBoundary>,
 )

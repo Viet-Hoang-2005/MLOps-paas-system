@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: mlops-cluster
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: mlops-paas
+    mlops-paas.io/environment: production
+    mlops-paas.io/plane: cluster
+spec:
+  description: Production cluster configuration instances that consume installed add-ons.
+  sourceRepos:
+    - https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
+  destinations:
+    - namespace: mlops-cluster-config
+      server: https://kubernetes.default.svc
+    - namespace: karpenter
+      server: https://kubernetes.default.svc
+    - namespace: kyverno
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: storage.k8s.io
+      kind: StorageClass
+    - group: external-secrets.io
+      kind: ClusterSecretStore
+    - group: karpenter.k8s.aws
+      kind: EC2NodeClass
+    - group: karpenter.sh
+      kind: NodePool
+    - group: kyverno.io
+      kind: ClusterPolicy
+  namespaceResourceWhitelist:
+    - group: external-secrets.io
+      kind: ExternalSecret
+  orphanedResources:
+    warn: true

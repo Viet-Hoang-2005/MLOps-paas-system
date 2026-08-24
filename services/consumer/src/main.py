@@ -1,22 +1,49 @@
-# consumer.py: Consumer liên tục lắng nghe Redpanda, gom nhóm dữ liệu, và lưu vào PostgreSQL
 import os
 import json
 import time
-import requests
 import signal
+import threading
+from dataclasses import dataclass
+from typing import Any
 import pandas as pd
-from confluent_kafka import Consumer, KafkaError
-from src.database import save_dataframe_to_db, get_production_data_count_by_model, get_model_drift_thresholds
+from confluent_kafka import Consumer, KafkaError, TopicPartition
+from src.database import (
+    init_db,
+    save_dataframe_and_automatic_drift_signals,
+)
+from src.drift_outbox import OUTBOX_POLL_SECONDS, REQUEST_TIMEOUT_SECONDS, run_dispatcher
 
 # Lấy biến môi trường
 REDPANDA_BROKERS = os.environ.get('REDPANDA_BROKERS', 'localhost:19092')
 KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "mlops_paas_production_data")
-EVIDENTLY_TRIGGER_THRESHOLD = int(os.environ.get('EVIDENTLY_TRIGGER_THRESHOLD', '100'))
-CONTROL_PLANE_WEBHOOK_URL = os.environ.get("CONTROL_PLANE_WEBHOOK_URL", "http://control_plane:8000/api/v1/internal/trigger-drift-job")
-WEBHOOK_SECRET = os.environ.get("CONTROL_PLANE_WEBHOOK_SECRET", "super-secret-key")
-
+KAFKA_TOPIC_RETRY_SECONDS = max(1, int(os.environ.get("KAFKA_TOPIC_RETRY_SECONDS", "5")))
+KAFKA_BATCH_SIZE = max(1, int(os.environ.get("KAFKA_BATCH_SIZE", "500")))
+KAFKA_DB_RETRY_INITIAL_SECONDS = max(
+    1, int(os.environ.get("KAFKA_DB_RETRY_INITIAL_SECONDS", "5"))
+)
+KAFKA_DB_RETRY_MAX_SECONDS = max(
+    KAFKA_DB_RETRY_INITIAL_SECONDS,
+    int(os.environ.get("KAFKA_DB_RETRY_MAX_SECONDS", "60")),
+)
 # Cờ báo hiệu trạng thái hoạt động
 RUNNING = True
+DISPATCHER_JOIN_TIMEOUT_SECONDS = REQUEST_TIMEOUT_SECONDS + OUTBOX_POLL_SECONDS + 1
+
+
+@dataclass(frozen=True)
+class KafkaRecord:
+    """Application payload together with the Kafka position that owns it."""
+
+    payload: dict[str, Any]
+    topic: str
+    partition: int
+    offset: int
+
+
+@dataclass
+class RetryState:
+    attempts: int = 0
+    next_retry_at: float = 0.0
 
 # Hàm xử lý tín hiệu dừng
 def handle_sigterm(*args):
@@ -24,61 +51,132 @@ def handle_sigterm(*args):
     print("Received SIGTERM. Shutting down gracefully...")
     RUNNING = False
 
-# Hàm gửi Webhook cảnh báo về Django Control Plane để kích hoạt Argo Workflows / Celery
-def trigger_django_webhook(model_name: str, count: int):
-    print(f"[{model_name}] Triggering Django webhook for drift check...")
 
-    headers = {
-        "Authorization": f"Bearer {WEBHOOK_SECRET}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "event_type": "trigger_drift_check",
-        "model_id": model_name,
-        "current_data_count": count
-    }
+def start_outbox_dispatcher() -> tuple[threading.Event, threading.Thread]:
+    stop_event = threading.Event()
+    dispatcher = threading.Thread(
+        target=run_dispatcher,
+        args=(stop_event,),
+        name="automatic-drift-outbox",
+        daemon=True,
+    )
+    dispatcher.start()
+    return stop_event, dispatcher
 
-    try:
-        response = requests.post(CONTROL_PLANE_WEBHOOK_URL, headers=headers, json=payload, timeout=10)
-        if response.status_code in [200, 201, 204]:
-            print(f"[{model_name}] Webhook sent Successfully! Django has been notified.")
-        else:
-            print(f"[{model_name}] Webhook failed! HTTP {response.status_code}: {response.text}")
-    except Exception as e:
-        print(f"[{model_name}] Error sending webhook: {e}")
 
-# Hàm kiểm tra và gọi webhook nếu Production Data vượt ngưỡng
-def check_threshold_and_trigger(last_triggered_counts: dict, df_batch: pd.DataFrame) -> dict:
-    """Kiểm tra số lượng và gọi webhook nếu vượt ngưỡng. Trả về last_triggered_counts mới."""
-    if df_batch is None or df_batch.empty or 'model_id' not in df_batch.columns:
-        return last_triggered_counts
+def ensure_outbox_dispatcher_running(dispatcher: threading.Thread) -> None:
+    if not dispatcher.is_alive():
+        raise RuntimeError("Automatic drift outbox dispatcher stopped unexpectedly.")
 
-    thresholds = get_model_drift_thresholds()
-    unique_models = df_batch['model_id'].dropna().unique()
-    
-    for model_name in unique_models:
-        threshold = thresholds.get(model_name)
-        if not threshold:
-            continue
-            
-        count = get_production_data_count_by_model(model_name)
-        last_count = last_triggered_counts.get(model_name, 0)
-        diff = count - last_count
-        
-        print(f"Drift monitoring [{model_name}]: {count} total rows. New rows since last trigger: {diff}/{threshold}")
-        
-        if diff >= threshold:
-            trigger_django_webhook(model_name, count)
-            last_triggered_counts[model_name] = count
-            
-    return last_triggered_counts
-
-def build_batch_dataframe(records: list[dict]) -> pd.DataFrame:
-    df = pd.DataFrame(records)
+def build_batch_dataframe(records: list[KafkaRecord]) -> pd.DataFrame:
+    df = pd.DataFrame([record.payload for record in records])
     for column in ("timestamp", "created_at"):
         if column in df.columns:
             df[column] = pd.to_datetime(df[column], utc=True, errors="coerce")
     return df
+
+
+def build_automatic_drift_signals(records: list[KafkaRecord]) -> list[dict[str, str]]:
+    """Create replay-safe outbox rows for every model represented in one batch."""
+    if not records:
+        return []
+    first, last = records[0], records[-1]
+    model_version_ids = {
+        str(record.payload["model_version_id"])
+        for record in records
+        if record.payload.get("model_version_id")
+    }
+    batch_key = f"{first.topic}:{first.partition}:{first.offset}:{last.offset}"
+    return [
+        {
+            "model_version_id": model_version_id,
+            "idempotency_key": f"automatic-drift:{batch_key}:{model_version_id}",
+        }
+        for model_version_id in sorted(model_version_ids)
+    ]
+
+
+def _commit_batch_offset(consumer, record: KafkaRecord) -> bool:
+    """Synchronously commit exactly one processed partition position."""
+    next_offset = TopicPartition(record.topic, record.partition, record.offset + 1)
+    try:
+        committed_offsets = consumer.commit(offsets=[next_offset], asynchronous=False)
+    except Exception as exc:
+        print(
+            f"[{record.topic}/{record.partition}] Kafka offset commit failed at "
+            f"{record.offset + 1}: {exc}"
+        )
+        return False
+
+    failures = [offset for offset in committed_offsets or [] if getattr(offset, "error", None)]
+    if failures:
+        print(
+            f"[{record.topic}/{record.partition}] Kafka offset commit returned errors: "
+            f"{failures}"
+        )
+        return False
+    return True
+
+
+def flush_batch(consumer, records: list[KafkaRecord]) -> bool:
+    """Persist a batch and its outbox signals before its Kafka offset."""
+    if not records:
+        return True
+    partitions = {(record.topic, record.partition) for record in records}
+    if len(partitions) != 1:
+        raise ValueError("A Kafka batch must contain records from exactly one partition.")
+
+    dataframe = build_batch_dataframe(records)
+    signals = build_automatic_drift_signals(records)
+    if not save_dataframe_and_automatic_drift_signals(dataframe, "paas_production_logs", signals):
+        return False
+    if not _commit_batch_offset(consumer, records[-1]):
+        return False
+    return True
+
+
+def _partition_handle(key: tuple[str, int]) -> TopicPartition:
+    return TopicPartition(key[0], key[1])
+
+
+def _retry_delay(attempts: int) -> int:
+    return min(
+        KAFKA_DB_RETRY_INITIAL_SECONDS * (2 ** max(0, attempts - 1)),
+        KAFKA_DB_RETRY_MAX_SECONDS,
+    )
+
+
+def _schedule_retry(consumer, key: tuple[str, int], retries: dict[tuple[str, int], RetryState]) -> None:
+    retry = retries.setdefault(key, RetryState())
+    retry.attempts += 1
+    delay = _retry_delay(retry.attempts)
+    retry.next_retry_at = time.monotonic() + delay
+    if retry.attempts == 1:
+        consumer.pause([_partition_handle(key)])
+    print(
+        f"[{key[0]}/{key[1]}] Database or offset commit failed; partition paused. "
+        f"Retrying batch in {delay}s (attempt {retry.attempts})."
+    )
+
+
+def flush_pending_batch(
+    consumer,
+    pending_batches: dict[tuple[str, int], list[KafkaRecord]],
+    retries: dict[tuple[str, int], RetryState],
+    key: tuple[str, int],
+) -> bool:
+    """Flush a retained partition batch and release it only after offset commit."""
+    batch = pending_batches[key]
+    saved = flush_batch(consumer, batch)
+    if not saved:
+        _schedule_retry(consumer, key, retries)
+        return False
+
+    pending_batches.pop(key)
+    was_paused = retries.pop(key, None)
+    if was_paused:
+        consumer.resume([_partition_handle(key)])
+    return True
 
 # Hàm main để chạy Consumer liên tục lắng nghe Redpanda và xử lý dữ liệu
 def main():
@@ -91,73 +189,106 @@ def main():
         'bootstrap.servers': REDPANDA_BROKERS,
         'group.id': 'paas-db-writer-group',
         'auto.offset.reset': 'earliest',
-        'enable.auto.commit': False  # Tự quản lý commit để tránh mất data nếu crash giữa chừng
+        'enable.auto.commit': False,
+        # Store and commit offsets only after their PostgreSQL transaction succeeds.
+        'enable.auto.offset.store': False,
     }
 
-    # Khởi tạo Consumer và subscribe vào topic
-    consumer = Consumer(conf)
-    consumer.subscribe([KAFKA_TOPIC])
-
-    print(f"Consumer listening to the topic '{KAFKA_TOPIC}' at {REDPANDA_BROKERS}")
-
-    BATCH_SIZE = 500  # Số lượng gom nhóm tối đa trước khi Write DB
-    current_batch = []
-    last_triggered_counts = {} # Khởi tạo tracking số lượng theo từng model
-    print("Initial tracking dictionary initialized.")
-
+    init_db()
+    dispatcher_stop, dispatcher = start_outbox_dispatcher()
+    consumer = None
+    pending_batches: dict[tuple[str, int], list[KafkaRecord]] = {}
+    retries: dict[tuple[str, int], RetryState] = {}
     try:
+        # Khởi tạo Consumer và subscribe vào topic
+        consumer = Consumer(conf)
+        consumer.subscribe([KAFKA_TOPIC])
+        print(f"Consumer listening to the topic '{KAFKA_TOPIC}' at {REDPANDA_BROKERS}")
+
         while RUNNING:
+            ensure_outbox_dispatcher_running(dispatcher)
+            # Retry failed partitions without blocking heartbeats for the rest
+            # of the consumer group. A partition remains paused until its
+            # retained batch has both persisted and committed its exact offset.
+            now = time.monotonic()
+            for key, retry in list(retries.items()):
+                if now >= retry.next_retry_at:
+                    flush_pending_batch(consumer, pending_batches, retries, key)
+
             # Liên tục lắng nghe (poll) với timeout 1 giây
             msg = consumer.poll(timeout=1.0)
             
             # Cơ chế "Flush on Idle": Nếu không có message mới nào trong 1 giây, tự động flush batch hiện tại vào DB.
             if msg is None:
-                if len(current_batch) > 0:
-                    df = build_batch_dataframe(current_batch)
-                    # Chuyển đổi chuỗi text created_at (isoformat) lại thành DateTime object chuẩn pandas
-                    if save_dataframe_to_db(df, "paas_production_logs"):
-                        consumer.commit() # Chỉ commit khi đã lưu thẳng vào Database thành công
-                        print(f"Flushed {len(current_batch)} records to DB due to idle time.")
-                        last_triggered_counts = check_threshold_and_trigger(last_triggered_counts, df)
-                    current_batch = []
+                for key in list(pending_batches):
+                    if key in retries:
+                        continue
+                    batch_size = len(pending_batches[key])
+                    saved = flush_pending_batch(consumer, pending_batches, retries, key)
+                    if saved:
+                        print(f"Flushed {batch_size} records to DB due to idle time.")
                 continue
                 
             # Xử lý lỗi Kafka
             if msg.error():
                 if msg.error().code() == KafkaError._PARTITION_EOF:
                     continue
-                else:
-                    print(msg.error())
-                    break
+                if msg.error().code() == KafkaError.UNKNOWN_TOPIC_OR_PART or msg.error().retriable():
+                    print(
+                        f"Kafka topic '{KAFKA_TOPIC}' is temporarily unavailable; "
+                        f"retrying in {KAFKA_TOPIC_RETRY_SECONDS}s: {msg.error()}"
+                    )
+                    time.sleep(KAFKA_TOPIC_RETRY_SECONDS)
+                    continue
+                raise RuntimeError(f"Kafka consumer error: {msg.error()}")
                     
             try:
                 # Đọc payload từ API và parse lại thành Dictionary
                 val_json = msg.value().decode('utf-8')
                 row_data = json.loads(val_json)
-                current_batch.append(row_data)
+                record = KafkaRecord(
+                    payload=row_data,
+                    topic=msg.topic(),
+                    partition=msg.partition(),
+                    offset=msg.offset(),
+                )
+                key = (record.topic, record.partition)
+                current_batch = pending_batches.setdefault(key, [])
+                current_batch.append(record)
                 
-                # Gom đủ một hộp (BATCH) thì mang đi phân phối
-                if len(current_batch) >= BATCH_SIZE:
-                    df = build_batch_dataframe(current_batch)
-                    if save_dataframe_to_db(df, "paas_production_logs"):
-                        consumer.commit()
-                        print(f"Completed batch delivery: {len(current_batch)} records to DB.")
-                        last_triggered_counts = check_threshold_and_trigger(last_triggered_counts, df)
-                    current_batch = []
+                # Gom đủ một partition batch thì mang đi ghi. A failed batch
+                # pauses that partition, so its later offsets cannot overtake it.
+                if key not in retries and len(current_batch) >= KAFKA_BATCH_SIZE:
+                    batch_size = len(current_batch)
+                    saved = flush_pending_batch(consumer, pending_batches, retries, key)
+                    if saved:
+                        print(f"Completed batch delivery: {batch_size} records to DB.")
                     
             except Exception as parse_e:
-                print(f"Error parsing payload: {parse_e}")
+                # Never allow a later offset to skip an invalid message. The
+                # process exits without committing this position; Compose will
+                # restart it and preserve the event for operator remediation.
+                raise RuntimeError(f"Error parsing Kafka payload: {parse_e}") from parse_e
                 
     except KeyboardInterrupt:
         print("Received shutdown command...")
     finally:
-        # Trước khi đóng Consumer, nếu còn dữ liệu trong batch thì cũng nên flush nốt vào DB để tránh mất mát dữ liệu cuối cùng.
-        if len(current_batch) > 0:
-            df = build_batch_dataframe(current_batch)
-            if save_dataframe_to_db(df, "paas_production_logs"):
-                consumer.commit()
-                last_triggered_counts = check_threshold_and_trigger(last_triggered_counts, df)
-        consumer.close()
+        try:
+            if consumer is not None:
+                # Try every remaining batch once. Failed batches are intentionally not
+                # committed; they will be replayed after the local Compose restart.
+                for key in list(pending_batches):
+                    flush_pending_batch(consumer, pending_batches, retries, key)
+        finally:
+            dispatcher_stop.set()
+            dispatcher.join(timeout=DISPATCHER_JOIN_TIMEOUT_SECONDS)
+            if dispatcher.is_alive():
+                print(
+                    "Automatic drift outbox dispatcher did not stop before the shutdown timeout; "
+                    "leased rows will be retried after their lease expires."
+                )
+            if consumer is not None:
+                consumer.close()
         print("Consumer cleaned up safely.")
 
 if __name__ == '__main__':

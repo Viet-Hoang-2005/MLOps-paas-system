@@ -1,0 +1,60 @@
+expose:
+  type: clusterIP
+  tls:
+    enabled: false
+  ingress:
+    enabled: false
+
+externalURL: https://registry.mlops-nids-nt114.id.vn
+
+persistence:
+  enabled: true
+  resourcePolicy: "keep"
+  persistentVolumeClaim:
+    registry:
+      storageClass: local-path
+      size: 5Gi
+    jobservice:
+      storageClass: local-path
+      size: 1Gi
+    redis:
+      storageClass: local-path
+      size: 2Gi
+    database:
+      storageClass: local-path
+      size: 3Gi
+  imageChartStorage:
+    type: s3
+    redirect:
+      disable: true
+    s3:
+      region: ap-southeast-1
+      bucket: mlops-paas-artifacts
+      v4auth: true
+      secure: true
+      rootdirectory: /harbor-registry
+
+registry:
+  relativeurls: true
+  nodeSelector: { workload-type: worker }
+
+trivy:
+  enabled: false
+  nodeSelector: { workload-type: worker }
+notary:
+  enabled: false
+
+portal:
+  nodeSelector: { workload-type: worker }
+core:
+  nodeSelector: { workload-type: worker }
+jobservice:
+  nodeSelector: { workload-type: worker }
+database:
+  nodeSelector: { workload-type: worker }
+redis:
+  nodeSelector: { workload-type: worker }
+exporter:
+  nodeSelector: { workload-type: worker }
+metrics:
+  nodeSelector: { workload-type: worker }

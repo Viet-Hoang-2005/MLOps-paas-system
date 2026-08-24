@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: mlops-model-server
+
+resources:
+- ../../../base/model-server
+- external-secrets.yaml
+
+images:
+- name: mlops-paas-model-server
+  newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-server
+  newTag: 0b2ac7ed47dbda09e9108690632f175f677555b2

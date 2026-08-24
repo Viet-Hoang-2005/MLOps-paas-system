@@ -1,0 +1,129 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: mlops-paas-model-server-deploy-template
+  namespace: mlops-execution
+spec:
+  serviceAccountName: argo-workflow-deploy-sa
+  entrypoint: deploy-model
+  templates:
+    - name: deploy-model
+      inputs:
+        parameters:
+          - name: tenant_id
+          - name: project_id
+          - name: model_version_id
+          - name: version
+          - name: image_name
+          - name: container_name
+          - name: model_type
+            default: "ml"
+          - name: target_port
+            default: "5001"
+          - name: model_uri
+            default: ""
+      steps:
+        - - name: deployment
+            template: apply-deployment
+            arguments:
+              parameters:
+                - {name: tenant_id, value: "{{inputs.parameters.tenant_id}}"}
+                - {name: project_id, value: "{{inputs.parameters.project_id}}"}
+                - {name: model_version_id, value: "{{inputs.parameters.model_version_id}}"}
+                - {name: version, value: "{{inputs.parameters.version}}"}
+                - {name: image_name, value: "{{inputs.parameters.image_name}}"}
+                - {name: container_name, value: "{{inputs.parameters.container_name}}"}
+                - {name: target_port, value: "{{inputs.parameters.target_port}}"}
+                - {name: model_uri, value: "{{inputs.parameters.model_uri}}"}
+        - - name: service
+            template: apply-service
+            arguments:
+              parameters:
+                - {name: container_name, value: "{{inputs.parameters.container_name}}"}
+                - {name: model_type, value: "{{inputs.parameters.model_type}}"}
+                - {name: target_port, value: "{{inputs.parameters.target_port}}"}
+
+    - name: apply-deployment
+      inputs:
+        parameters:
+          - name: tenant_id
+          - name: project_id
+          - name: model_version_id
+          - name: version
+          - name: image_name
+          - name: container_name
+          - name: target_port
+          - name: model_uri
+      resource:
+        action: apply
+        manifest: |
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: {{=toJson(inputs.parameters.container_name)}}
+            namespace: mlops-model-runtimes
+            labels:
+              app: model-endpoint
+              tenant: {{=toJson(inputs.parameters.tenant_id)}}
+              project: {{=toJson(inputs.parameters.project_id)}}
+              model-version: {{=toJson(inputs.parameters.model_version_id)}}
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: {{=toJson(inputs.parameters.container_name)}}
+            template:
+              metadata:
+                labels:
+                  app: {{=toJson(inputs.parameters.container_name)}}
+              spec:
+                automountServiceAccountToken: false
+                nodeSelector:
+                  workload-type: worker
+                containers:
+                  - name: model-server
+                    image: {{=toJson(inputs.parameters.image_name)}}
+                    imagePullPolicy: Always
+                    ports:
+                      - containerPort: {{inputs.parameters.target_port}}
+                    env:
+                      - {name: PROJECT_ID, value: {{=toJson(inputs.parameters.project_id)}}}
+                      - {name: MODEL_VERSION_ID, value: {{=toJson(inputs.parameters.model_version_id)}}}
+                      - {name: MODEL_VERSION, value: {{=toJson(inputs.parameters.version)}}}
+                      - {name: MODEL_URI, value: {{=toJson(inputs.parameters.model_uri)}}}
+                      - {name: PYTHONPATH, value: "/app/libs:/app"}
+                    volumeMounts:
+                      - {name: dynamic-libs, mountPath: /app/libs}
+                      - {name: pip-cache, mountPath: /root/.cache/pip}
+                    resources:
+                      requests: {cpu: 250m, memory: 512Mi}
+                      limits: {cpu: 1000m, memory: 1Gi}
+                volumes:
+                  - {name: dynamic-libs, emptyDir: {}}
+                  - {name: pip-cache, emptyDir: {}}
+
+    - name: apply-service
+      inputs:
+        parameters:
+          - name: container_name
+          - name: model_type
+          - name: target_port
+      resource:
+        action: apply
+        manifest: |
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: {{=toJson(sprig.printf("%s-svc", inputs.parameters.container_name))}}
+            namespace: mlops-model-runtimes
+            labels:
+              component: model-server
+              serving-engine: {{=toJson(inputs.parameters.model_type)}}
+          spec:
+            selector:
+              app: {{=toJson(inputs.parameters.container_name)}}
+            ports:
+              - name: http
+                protocol: TCP
+                port: {{inputs.parameters.target_port}}
+                targetPort: {{inputs.parameters.target_port}}

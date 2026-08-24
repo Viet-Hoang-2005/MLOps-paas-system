@@ -1,0 +1,19 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    additionalArguments:
+      # TLS terminates at the public ALB. K3s ServiceLB SNATs that connection,
+      # so trust only the configured worker gateway hops; never enable
+      # forwardedHeaders.insecure for this public entrypoint.
+      - "--entryPoints.web.forwardedHeaders.trustedIPs={{ traefik_forwarded_headers_trusted_ips | join(',') }}"
+      - "--providers.kubernetescrd.allowCrossNamespace=true"
+      - "--entryPoints.web.transport.respondingTimeouts.readTimeout={{ traefik_request_timeout }}"
+      - "--entryPoints.web.transport.respondingTimeouts.writeTimeout={{ traefik_request_timeout }}"
+      - "--entryPoints.web.transport.respondingTimeouts.idleTimeout={{ traefik_request_timeout }}"
+      - "--entryPoints.websecure.transport.respondingTimeouts.readTimeout={{ traefik_request_timeout }}"
+      - "--entryPoints.websecure.transport.respondingTimeouts.writeTimeout={{ traefik_request_timeout }}"
+      - "--entryPoints.websecure.transport.respondingTimeouts.idleTimeout={{ traefik_request_timeout }}"

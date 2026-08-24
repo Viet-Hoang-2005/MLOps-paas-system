@@ -1,0 +1,4 @@
+interface:
+  display_name: "MLOps PaaS Security"
+  short_description: "Security boundaries and review guidance"
+  default_prompt: "Use $mlops-paas-security to review and implement this security-sensitive change."

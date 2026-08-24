@@ -37,10 +37,10 @@ spec:
         - name: init-kafka-topic
           image: docker.redpanda.com/redpandadata/redpanda:v23.3.21
           command: ["/bin/sh", "-c"]
-          args: ["rpk topic create mlops_paas_production_data --brokers redpanda-service:9092 || true"]
+          args: ["rpk topic create mlops_paas_production_data --brokers redpanda-service.mlops-redpanda.svc.cluster.local:9092 || true"]
       containers:
         - name: consumer
-          image: mlops-paas-consumer:latest
+          image: mlops-paas-consumer
           imagePullPolicy: Always
           command: ["python", "-m", "src.main"]
           envFrom:
@@ -50,28 +50,23 @@ spec:
             - name: CONTROL_PLANE_WEBHOOK_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: mlops-paas-secret
+                  name: consumer-secret
                   key: CONTROL_PLANE_WEBHOOK_SECRET
-            - name: GITHUB_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: github-secrets
-                  key: GITHUB_TOKEN
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secrets
+                  name: consumer-secret
                   key: DB_USER
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secrets
+                  name: consumer-secret
                   key: DB_PASSWORD
           # Cấu hình tài nguyên cho Consumer
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 150m
+              memory: 384Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 750m
+              memory: 768Mi

@@ -1,40 +1,83 @@
 ---
-- name: Setup common utilities and OS preparation on all nodes
+- name: Validate the WSL control host and Terraform inventory
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  tags: [preflight, always]
+  roles:
+    - preflight
+
+- name: Prepare all K3s hosts
   hosts: all
   gather_facts: true
-  tags:
-    - bootstrap
-    - platform
+  tags: [bootstrap]
   roles:
-    - common
+    - role: common
+      when: bootstrap_k3s_cluster | bool
 
-- name: Setup K3s Server (Master) and Helm
+- name: Install the pinned K3s server
   hosts: master
+  become: true
   gather_facts: true
-  tags:
-    - bootstrap
+  tags: [bootstrap]
   roles:
     - role: k3s_master
       when: bootstrap_k3s_cluster | bool
-    - role: helm
-      when: bootstrap_k3s_cluster | bool
 
-- name: Join Worker nodes to K3s cluster
+- name: Join the pinned K3s workers
   hosts: workers
   gather_facts: true
-  tags:
-    - bootstrap
+  tags: [bootstrap]
   roles:
     - role: k3s_worker
       when: bootstrap_k3s_cluster | bool
 
-- name: Deploy Kubernetes Add-ons (Storage, Secrets, Scaling, ArgoCD, Workflows, Monitoring)
+- name: Verify K3s bootstrap
   hosts: master
+  become: true
+  gather_facts: false
+  tags: [bootstrap, verify]
+  roles:
+    - role: verify
+      verify_scope: bootstrap
+      when: bootstrap_k3s_cluster | bool
+
+- name: Bootstrap Argo CD and reconcile the core platform through GitOps
+  hosts: master
+  become: true
   gather_facts: true
-  tags:
-    - platform
+  tags: [platform-core]
   roles:
     - role: helm
-      when: deploy_k8s_platform | bool
-    - role: k8s_addons
-      when: deploy_k8s_platform | bool
+      when: deploy_core_platform | bool
+    - role: platform_core
+      when: deploy_core_platform | bool
+
+- name: Wait for optional training operators and GitOps-managed capacity
+  hosts: master
+  become: true
+  gather_facts: true
+  tags: [platform-training]
+  roles:
+    - role: platform_training
+      when: deploy_training_platform | bool
+
+- name: Verify the optional training platform and smoke workloads
+  hosts: master
+  become: true
+  gather_facts: false
+  tags: [platform-training, verify]
+  roles:
+    - role: verify
+      verify_scope: training
+      when: deploy_training_platform | bool
+
+- name: Verify the reconciled platform
+  hosts: master
+  become: true
+  gather_facts: false
+  tags: [verify]
+  roles:
+    - role: verify
+      verify_scope: platform
+      when: deploy_core_platform | bool

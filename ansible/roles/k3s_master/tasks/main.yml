@@ -1,60 +1,171 @@
 ---
-- name: Check if K3s service exists
-  stat:
-    path: /usr/local/bin/k3s
-  register: k3s_bin
-
-- name: Install K3s Server
+- name: Create the K3s configuration directory
   become: true
-  shell: |
-    curl -sfL https://get.k3s.io | sh -s - server {{ k3s_server_args }}
-  when: not k3s_bin.stat.exists
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
 
-- name: Wait for K3s node-token file to be generated
+- name: Render the K3s server configuration
   become: true
-  wait_for:
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart K3s server
+
+- name: Read the installed K3s version
+  ansible.builtin.command: /usr/local/bin/k3s --version
+  register: installed_k3s_server_version
+  changed_when: false
+  failed_when: false
+
+- name: Download the official K3s installer
+  become: true
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: /usr/local/src/install-k3s.sh
+    owner: root
+    group: root
+    mode: "0700"
+  when: k3s_version not in installed_k3s_server_version.stdout
+
+- name: Install the pinned K3s server
+  become: true
+  ansible.builtin.command: /usr/local/src/install-k3s.sh
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
+    INSTALL_K3S_EXEC: server
+  when: k3s_version not in installed_k3s_server_version.stdout
+  changed_when: true
+  notify: Restart K3s server
+
+- name: Flush K3s server handlers before readiness checks
+  ansible.builtin.meta: flush_handlers
+
+- name: Ensure the K3s server is enabled and running
+  become: true
+  ansible.builtin.systemd_service:
+    name: k3s
+    enabled: true
+    state: started
+
+- name: Read systemd service state after K3s server installation
+  ansible.builtin.service_facts:
+
+- name: Confirm the K3s server systemd unit is active
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.services['k3s.service'].state == 'running'
+      - ansible_facts.services['k3s.service'].status == 'enabled'
+    fail_msg: The K3s server systemd unit is not running and enabled.
+
+- name: Confirm the K3s server journal is readable
+  become: true
+  ansible.builtin.command: journalctl --unit k3s --lines 50 --no-pager
+  register: k3s_server_journal
+  changed_when: false
+  failed_when: k3s_server_journal.rc != 0
+  no_log: true
+
+- name: Wait for the Kubernetes API server
+  ansible.builtin.command: >-
+    /usr/local/bin/k3s kubectl --kubeconfig {{ k3s_remote_kubeconfig }}
+    get --raw=/readyz
+  register: k3s_api_ready
+  until: k3s_api_ready.rc == 0 and k3s_api_ready.stdout == "ok"
+  retries: 30
+  delay: 5
+  changed_when: false
+
+- name: Render the bundled Traefik runtime configuration
+  become: true
+  ansible.builtin.template:
+    src: traefik-config.yaml.j2
+    dest: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Wait for Traefik to receive the trusted proxy configuration
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: traefik
+    namespace: kube-system
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: traefik_deployment_arguments
+  until: >-
+    traefik_deployment_arguments.resources | length == 1 and
+    ('--entryPoints.web.forwardedHeaders.trustedIPs=' ~
+    (traefik_forwarded_headers_trusted_ips | join(','))) in
+    (traefik_deployment_arguments.resources[0].spec.template.spec.containers[0].args | default([]))
+  retries: 36
+  delay: 5
+  changed_when: false
+
+- name: Wait for Traefik to finish reconciling the runtime configuration
+  become: true
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: traefik
+    namespace: kube-system
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    wait: true
+    wait_timeout: 180
+
+- name: Wait for the K3s node token
+  become: true
+  ansible.builtin.wait_for:
     path: /var/lib/rancher/k3s/server/node-token
     state: present
     timeout: 120
 
-- name: Read K3s node token
+- name: Read the K3s node token
   become: true
-  slurp:
+  ansible.builtin.slurp:
     src: /var/lib/rancher/k3s/server/node-token
   register: node_token_b64
+  no_log: true
 
-- name: Set k3s_node_token fact
-  set_fact:
-    k3s_node_token: "{{ node_token_b64['content'] | b64decode | trim }}"
+- name: Publish the K3s node token only as a protected in-memory fact
+  ansible.builtin.set_fact:
+    k3s_node_token: "{{ node_token_b64.content | b64decode | trim }}"
+  no_log: true
 
-- name: Ensure .kube directory exists for ubuntu user
-  file:
-    path: /home/ubuntu/.kube
-    state: directory
-    owner: ubuntu
-    group: ubuntu
-    mode: '0755'
-
-- name: Copy kubeconfig to ubuntu user directory
-  become: true
-  copy:
-    src: /etc/rancher/k3s/k3s.yaml
-    dest: /home/ubuntu/.kube/config
-    remote_src: true
-    owner: ubuntu
-    group: ubuntu
-    mode: '0600'
-
-- name: Add KUBECONFIG environment variable to .bashrc
-  lineinfile:
-    path: /home/ubuntu/.bashrc
-    line: 'export KUBECONFIG=/home/ubuntu/.kube/config'
+- name: Publish the K3s agent token version for elastic nodes
+  delegate_to: localhost
+  become: false
+  community.aws.secretsmanager_secret:
+    name: "{{ karpenter_k3s_token_secret_name }}"
+    description: K3s agent token for self-managed Karpenter nodes
     state: present
+    secret_type: string
+    json_secret:
+      token: "{{ k3s_node_token }}"
+    overwrite: true
+    region: "{{ aws_region }}"
+  no_log: true
+  when: enable_karpenter | bool
 
-- name: Wait for Kubernetes master node to be Ready
-  shell: kubectl get nodes | grep master-node | grep Ready
-  register: k3s_ready
-  until: k3s_ready.rc == 0
-  retries: 20
-  delay: 10
-  failed_when: false
+- name: Fetch the root-only kubeconfig into the ignored artifacts directory
+  become: true
+  ansible.builtin.fetch:
+    src: "{{ k3s_remote_kubeconfig }}"
+    dest: "{{ k3s_local_kubeconfig }}"
+    flat: true
+  no_log: true
+
+- name: Protect the fetched kubeconfig on the control host
+  delegate_to: localhost
+  become: false
+  ansible.builtin.file:
+    path: "{{ k3s_local_kubeconfig }}"
+    mode: "0600"
+  no_log: true

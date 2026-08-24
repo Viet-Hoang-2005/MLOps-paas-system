@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-server
+  namespace: mlflow-server
+  labels:
+    app: mlflow-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow-server
+  template:
+    metadata:
+      labels:
+        app: mlflow-server
+    spec:
+      nodeSelector:
+        workload-type: worker
+
+      containers:
+        - name: mlflow-server
+          image: mlops-paas-mlflow
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args:
+            - |
+              mlflow server \
+                --host 0.0.0.0 \
+                --port 5000 \
+                --workers 1 \
+                --backend-store-uri "postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@mlops-paas-postgres-rw.mlops-postgres.svc.cluster.local:5432/mlops_paas_db?options=-c%20search_path%3Dmlflow" \
+                --serve-artifacts \
+                --artifacts-destination "s3://${AWS_BUCKET_NAME}"
+          ports:
+            - containerPort: 5000
+              name: http
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-secret
+                  key: DB_PASSWORD
+          envFrom:
+            - configMapRef:
+                name: mlflow-server-config
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi

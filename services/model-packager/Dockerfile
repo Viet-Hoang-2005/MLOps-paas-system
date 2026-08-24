@@ -1,25 +1,29 @@
-# Sử dụng Python 3.10+ để hỗ trợ cú pháp type hint lowercase tuple[...] trong detect_drift.py
-FROM python:3.10-slim
+FROM python:3.10-slim AS builder
 
-# Ngăn python ghi log .pyc và bật stdout ngay lập tức
+WORKDIR /app
+
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Tạo thư mục chạy trong container
-WORKDIR /app
-
-# Cài đặt g++ và python3-dev để có thể compile các thư viện ML của Evidently
-RUN apt-get update \
-    && apt-get install -y gcc g++ python3-dev libpq-dev \
-    && apt-get clean \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ python3-dev libpq-dev build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependencies và cài đặt
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# COPY . . đặt file vào /app/ để lệnh python có thể tìm thấy detect_drift.py tại /app/detect_drift.py
+FROM python:3.10-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /install /usr/local
 COPY . .
 
-# Chạy detect_drift.py từ WORKDIR /app
-CMD ["python", "/app/detect_drift.py"]
+CMD ["python", "-u", "-m", "src.cli"]

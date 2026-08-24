@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: mlops-paas-training-cancel-template
+  namespace: mlops-execution
+spec:
+  serviceAccountName: argo-workflow-training-sa
+  entrypoint: cancel-training
+  onExit: report-cancellation
+  arguments:
+    parameters:
+      - name: job_id
+      - name: job_name
+      - name: control_plane_callback_url
+      - name: cancel_reporter_capability
+  templates:
+    - name: cancel-training
+      container:
+        image: bitnami/kubectl:1.30
+        command: [kubectl]
+        args:
+          - delete
+          - pytorchjob.kubeflow.org
+          - "{{workflow.parameters.job_name}}"
+          - "--namespace=user-jobs"
+          - "--ignore-not-found=true"
+          - "--wait=true"
+          - "--timeout=120s"
+
+    - name: report-cancellation
+      container:
+        image: curlimages/curl:8.7.1
+        command: [curl]
+        args:
+          - --fail-with-body
+          - --silent
+          - --show-error
+          - --request
+          - POST
+          - --header
+          - "Authorization: Bearer {{workflow.parameters.cancel_reporter_capability}}"
+          - --header
+          - "Content-Type: application/json"
+          - --header
+          - "Idempotency-Key: cancel-{{workflow.uid}}"
+          - --data
+          - '{"workflow_status":"{{workflow.status}}","job_id":"{{workflow.parameters.job_id}}"}'
+          - "{{workflow.parameters.control_plane_callback_url}}"

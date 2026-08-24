@@ -1,0 +1,79 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: mlops-paas-evidently-template
+  namespace: mlops-execution
+spec:
+  serviceAccountName: argo-workflow-basic-sa
+  entrypoint: run-evidently
+  templates:
+    - name: run-evidently
+      nodeSelector:
+        workload-type: worker
+      inputs:
+        parameters:
+          - name: job_id
+          - name: tenant_id
+          - name: project_id
+          - name: model_version_id
+          - name: model_name
+          - name: model_uri
+          - name: reference_data_url
+          - name: html_s3_uri
+          - name: report_json_s3_uri
+          - name: summary_json_s3_uri
+          - name: html_public_url
+          - name: html_upload_url
+          - name: report_json_upload_url
+          - name: summary_json_upload_url
+          - name: control_plane_webhook_url
+      container:
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-evidently:375afde3ae576f56733e93b52b2d27fb0faed48d
+        imagePullPolicy: Always
+        envFrom:
+          - secretRef:
+              name: argo-evidently-secret
+          - configMapRef:
+              name: mlops-paas-execution-config
+        env:
+          - name: JOB_ID
+            value: "{{inputs.parameters.job_id}}"
+          - name: TENANT_ID
+            value: "{{inputs.parameters.tenant_id}}"
+          - name: PROJECT_ID
+            value: "{{inputs.parameters.project_id}}"
+          - name: MODEL_VERSION_ID
+            value: "{{inputs.parameters.model_version_id}}"
+          - name: MODEL_NAME
+            value: "{{inputs.parameters.model_name}}"
+          - name: MODEL_URI
+            value: "{{inputs.parameters.model_uri}}"
+          - name: REFERENCE_DATA_URL
+            value: "{{inputs.parameters.reference_data_url}}"
+          - name: DRIFT_THRESHOLD
+            value: "0.6"
+          - name: HTML_S3_URI
+            value: "{{inputs.parameters.html_s3_uri}}"
+          - name: REPORT_JSON_S3_URI
+            value: "{{inputs.parameters.report_json_s3_uri}}"
+          - name: SUMMARY_JSON_S3_URI
+            value: "{{inputs.parameters.summary_json_s3_uri}}"
+          - name: HTML_PUBLIC_URL
+            value: "{{inputs.parameters.html_public_url}}"
+          - name: HTML_UPLOAD_URL
+            value: "{{inputs.parameters.html_upload_url}}"
+          - name: REPORT_JSON_UPLOAD_URL
+            value: "{{inputs.parameters.report_json_upload_url}}"
+          - name: SUMMARY_JSON_UPLOAD_URL
+            value: "{{inputs.parameters.summary_json_upload_url}}"
+          - name: CONTROL_PLANE_WEBHOOK_URL
+            value: "{{inputs.parameters.control_plane_webhook_url}}"
+          - name: DRIFT_REPORTS_S3_PREFIX
+            value: "drift-reports"
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi

@@ -1,0 +1,4 @@
+interface:
+  display_name: "MLOps PaaS Frontend"
+  short_description: "Frontend architecture and UI workflow guidance"
+  default_prompt: "Use $mlops-paas-frontend to implement this frontend change consistently."

@@ -1,75 +1,123 @@
-# database.py: Quản lý kết nối đến Control Plane Model Registry
+import hashlib
+import json
 import os
 import re
-from typing import Dict, Any
+from typing import Any, Dict
 from urllib.parse import quote_plus
-
 from sqlalchemy import create_engine, text
 
-def build_control_plane_database_url() -> str | None:
+MODEL_RECORD_CACHE_TTL = int(os.environ.get("MODEL_RECORD_CACHE_TTL_SECONDS", "30"))
+
+
+def build_control_plane_database_url():
     explicit_url = os.environ.get("CONTROL_PLANE_DATABASE_URL")
     if explicit_url:
         return explicit_url
-
     db_user = os.environ.get("DB_USER")
     db_password = os.environ.get("DB_PASSWORD")
-    db_host = os.environ.get("DB_HOST_RO", "postgres")
-    db_port = os.environ.get("DB_PORT", "5432")
-    db_name = os.environ.get("DB_NAME", "mlops_paas_db")
-
     if not db_user or not db_password:
         return None
-
     return (
         f"postgresql://{quote_plus(db_user)}:{quote_plus(db_password)}"
-        f"@{db_host}:{db_port}/{db_name}"
+        f"@{os.environ.get('DB_HOST_RO', 'postgres')}:{os.environ.get('DB_PORT', '5432')}"
+        f"/{os.environ.get('DB_NAME', 'mlops_paas_db')}"
     )
+
 
 CONTROL_PLANE_DATABASE_URL = build_control_plane_database_url()
 CONTROL_PLANE_DB_SCHEMA = os.environ.get("CONTROL_PLANE_DB_SCHEMA") or os.environ.get("DB_SCHEMA", "control_plane")
-
-if CONTROL_PLANE_DB_SCHEMA and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", CONTROL_PLANE_DB_SCHEMA):
+if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", CONTROL_PLANE_DB_SCHEMA):
     raise RuntimeError("CONTROL_PLANE_DB_SCHEMA must be a simple PostgreSQL identifier.")
 
-try:
-    model_registry_engine = (
-        create_engine(
-            CONTROL_PLANE_DATABASE_URL,
-            pool_pre_ping=True,
-            connect_args={"options": f"-c search_path={CONTROL_PLANE_DB_SCHEMA},public"},
-        )
-        if CONTROL_PLANE_DATABASE_URL
-        else None
+model_registry_engine = (
+    create_engine(
+        CONTROL_PLANE_DATABASE_URL,
+        pool_pre_ping=True,
+        connect_args={"options": f"-c search_path={CONTROL_PLANE_DB_SCHEMA},public"},
     )
-    print("Connected to Control Plane model registry." if model_registry_engine else "CONTROL_PLANE_DATABASE_URL is not set.")
-except Exception as exc:
-    print(f"Failed to connect to Control Plane model registry: {exc}")
-    model_registry_engine = None
+    if CONTROL_PLANE_DATABASE_URL
+    else None
+)
 
-def get_model_api_record(model_id: int) -> Dict[str, Any]:
+
+def _fetch_model_version_from_db(version_id: str) -> Dict[str, Any] | None:
     if model_registry_engine is None:
-        raise Exception("Model registry database is unavailable.")
-
-    query = text('''
+        raise RuntimeError("Model registry database is unavailable.")
+    query = text("""
         SELECT
-            model.id,
-            model.name,
-            model.access_mode,
-            model.model_uri,
-            model.endpoint_url,
-            model.status,
-            model.updated_at,
-            users.tenant_id
-        FROM authentication_modelapi AS model
-        INNER JOIN authentication_customuser AS users ON users.id = model.tenant_id
-        WHERE model.id = :model_id AND model.status != 'disabled'
+            version.public_id AS id,
+            version.version,
+            version.flavor,
+            version.stage,
+            project.id AS project_pk,
+            project.public_id AS project_id,
+            project.name,
+            project.access_mode,
+            users.tenant_id,
+            endpoint.runtime_name AS endpoint_container_name,
+            endpoint.internal_url,
+            endpoint.public_url,
+            endpoint.health_status,
+            deployment.status AS deployment_status
+        FROM registry_modelversion AS version
+        INNER JOIN catalog_modelproject AS project ON project.id = version.project_id
+        INNER JOIN identity_customuser AS users ON users.id = project.owner_id
+        LEFT JOIN LATERAL (
+            SELECT d.* FROM deployment_deployment AS d
+            WHERE d.version_id = version.id AND d.status IN ('healthy', 'deploying')
+            ORDER BY d.created_at DESC LIMIT 1
+        ) AS deployment ON TRUE
+        LEFT JOIN deployment_endpoint AS endpoint ON endpoint.deployment_id = deployment.id
+        WHERE version.public_id = :version_id AND project.is_active = TRUE
         LIMIT 1
-    ''')
-
-    with model_registry_engine.connect() as conn:
-        row = conn.execute(query, {"model_id": model_id}).mappings().first()
-
+    """)
+    with model_registry_engine.connect() as connection:
+        row = connection.execute(query, {"version_id": version_id}).mappings().first()
     if not row:
         return None
+    return {key: value.isoformat() if hasattr(value, "isoformat") else str(value) if key in {"id", "project_id"} else value for key, value in dict(row).items()}
 
-    return dict(row)
+
+def get_model_version_record(version_id: str, redis_client=None):
+    cache_key = f"model-version:{version_id}"
+    if redis_client is not None:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass
+    record = _fetch_model_version_from_db(version_id)
+    if record and redis_client is not None:
+        try:
+            redis_client.setex(cache_key, MODEL_RECORD_CACHE_TTL, json.dumps(record))
+        except Exception:
+            pass
+    return record
+
+
+def verify_project_api_key(raw_key: str, project_pk: int):
+    if model_registry_engine is None or not raw_key:
+        return None
+    query = text("""
+        SELECT users.tenant_id
+        FROM access_control_userapikey AS api_key
+        INNER JOIN identity_customuser AS users ON users.id = api_key.user_id
+        INNER JOIN access_control_userapikey_allowed_projects AS allowed
+            ON allowed.userapikey_id = api_key.id
+        WHERE api_key.key_prefix = :prefix
+          AND api_key.key_hash = :digest
+          AND api_key.revoked_at IS NULL
+          AND allowed.modelproject_id = :project_pk
+        LIMIT 1
+    """)
+    with model_registry_engine.connect() as connection:
+        row = connection.execute(
+            query,
+            {
+                "prefix": raw_key[:16],
+                "digest": hashlib.sha256(raw_key.encode()).hexdigest(),
+                "project_pk": project_pk,
+            },
+        ).mappings().first()
+    return dict(row) if row else None

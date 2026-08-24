@@ -8,12 +8,12 @@ Model Packager là container thực thi quá trình **đóng gói mô hình** �
 
 - **Chuẩn hóa Artifact**: Tải model artifact từ S3 (hoặc MLflow artifact URI), giải nén, tìm file model (`.pkl`, `.joblib`, `.xgb`), chuẩn hóa sang MLflow Pyfunc format.
 - **Sinh Dockerfile**: Tự động chọn Base Image phù hợp với `flavor`:
-  - `bento` (Deep Learning) → dùng `bento-model-server` base image với BentoML Adaptive Batching.
-  - Các flavor khác → dùng `model-server` base image (FastAPI thuần).
+  - `pytorch` / `keras` / `tensorflow` → dùng `deep-learning-serving` base image với BentoML.
+  - `sklearn` / `scikit-learn` / `xgboost` → dùng `machine-learning-serving` base image với FastAPI.
 - **Build Docker Image**:
-  - **Local** (`BUILD_ENGINE=docker`): Dùng Docker SDK (`docker-py`) để build và push lên Harbor.
+  - **Local** (`BUILD_ENGINE=docker`): Dùng Docker SDK (`docker-py`) để build vào Docker Desktop; chỉ push khi repository đích thuộc Harbor.
   - **Production K3s** (`BUILD_ENGINE=kaniko`): Sinh `Dockerfile` + `requirements.txt` vào `/workspace` (emptyDir volume) để Kaniko executor (step tiếp theo trong Argo Workflow) thực hiện build rootless.
-- **Log Streaming**: Ghi log build vào Redis (`build_logs:{model_id}`) để Frontend HTTP Polling hiển thị.
+- **Log Streaming**: Ghi log build vào Redis (`build_logs:{build_id}`) để Frontend HTTP Polling hiển thị.
 - **Webhook Callback** (`TASK_TYPE=NOTIFY_BUILD`): Sau khi Kaniko build xong, đọc `webhook_payload.json` từ `/workspace` và gửi POST về Control Plane thông báo trạng thái.
 
 ---
@@ -56,8 +56,8 @@ src/
 | Model Loading | `mlflow.pyfunc`, `joblib`, `xgboost` |
 | Build (Local) | `docker-py` SDK |
 | Build (Production) | Kaniko (rootless, sinh Dockerfile context vào emptyDir) |
-| Storage | `boto3` S3 |
-| Log Buffer | `redis` (key: `build_logs:{model_id}`, TTL 1h) |
+| Storage | Presigned S3 HTTP URLs via `requests` |
+| Log Buffer | `redis` (key: `build_logs:{build_id}`, TTL 1h) |
 
 ---
 
@@ -68,13 +68,15 @@ src/
 | `TASK_TYPE` | `BUILD` (chuẩn bị + build) hoặc `NOTIFY_BUILD` (gửi webhook sau Kaniko) |
 | `BUILD_ENGINE` | `docker` (local) hoặc `kaniko` (production) |
 | `BUILD_WORKSPACE_DIR` | Đường dẫn shared volume với Kaniko (mặc định: `/workspace`) |
-| `MODEL_ID` | ID mô hình cần build |
-| `MODEL_HASHID` | Hashid của model (dùng làm tag image) |
+| `BUILD_ID` | UUID của Build; correlation ID cho log, callback và tag tạm |
+| `PROJECT_ID` | UUID của ModelProject; dùng để xác định image repository |
+| `IMAGE_REPOSITORY` | Repository chuẩn hóa, ví dụ `image-{project_uuid}` |
+| `IMAGE_TAG` | Tag tạm, ví dụ `build-{build_uuid}` |
 | `TENANT_ID` | Tenant sở hữu model |
 | `FLAVOR` | Loại model (`bento` hoặc standard) |
-| `SOURCE_KEY` | S3 key của artifact ZIP |
-| `OUTPUT_KEY` | S3 key lưu build output |
-| `AWS_BUCKET_NAME`, `AWS_DEFAULT_REGION` | S3 config |
+| `SOURCE_DOWNLOAD_URL` | Presigned GET URL cho artifact model hoặc training archive |
+| `LABEL_MAPPING_DOWNLOAD_URL` | Presigned GET URL cho label mapping (optional) |
+| `OUTPUT_UPLOAD_URL` | Presigned PUT URL để tải model package lên S3 |
 | `HARBOR_REGISTRY_URL`, `HARBOR_USERNAME`, `HARBOR_PASSWORD` | Harbor config |
 | `CONTROL_PLANE_WEBHOOK_URL` | URL callback kết quả build |
 | `CONTROL_PLANE_WEBHOOK_SECRET` | HMAC secret xác thực webhook |

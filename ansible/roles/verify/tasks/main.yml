@@ -1,0 +1,348 @@
+---
+- name: Read all K3s nodes
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_k3s_nodes
+  when: verify_scope == 'bootstrap'
+
+- name: Wait for every expected K3s node to be Ready
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    name: "{{ item }}"
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: Ready
+      status: "True"
+  loop: "{{ groups['master'] + groups['workers'] }}"
+  when: verify_scope == 'bootstrap'
+
+- name: Require every expected node and pinned K3s version
+  ansible.builtin.assert:
+    that:
+      - item in (verified_k3s_nodes.resources | map(attribute='metadata.name') | list)
+      - >-
+        (verified_k3s_nodes.resources |
+        selectattr('metadata.name', 'equalto', item) |
+        map(attribute='status.nodeInfo.kubeletVersion') |
+        first) == k3s_version
+  loop: "{{ groups['master'] + groups['workers'] }}"
+  when: verify_scope == 'bootstrap'
+
+- name: Verify the control-plane taint
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    name: "{{ groups['master'][0] }}"
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_control_plane_taint
+  failed_when: >-
+    verified_control_plane_taint.resources | length != 1 or
+    'NoSchedule' not in
+    (verified_control_plane_taint.resources[0].spec.taints | default([]) |
+    selectattr('key', 'equalto', 'node-role.kubernetes.io/control-plane') |
+    map(attribute='effect') | list)
+  when: verify_scope == 'bootstrap'
+
+- name: Verify core Kubernetes components
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: kube-system
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    label_selectors:
+      - "{{ item }}"
+  register: verified_core_kubernetes_pods
+  until:
+    - verified_core_kubernetes_pods.resources | length > 0
+    - >-
+      (verified_core_kubernetes_pods.resources |
+      json_query("[?status.conditions[?type=='Ready' && status=='True']]") |
+      length) == verified_core_kubernetes_pods.resources | length
+  retries: 60
+  delay: 5
+  loop:
+    - k8s-app=kube-dns
+    - app.kubernetes.io/name=traefik
+  when: verify_scope == 'platform'
+
+- name: Verify every core addon and cluster Application is reconciled
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    name: "{{ item }}"
+    namespace: argocd
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_core_application
+  failed_when: >-
+    verified_core_application.resources | length != 1 or
+    verified_core_application.resources[0].status.sync.status | default('') != 'Synced' or
+    verified_core_application.resources[0].status.health.status | default('') != 'Healthy'
+  loop: "{{ core_addon_application_names + core_cluster_application_names }}"
+  when: verify_scope == 'platform'
+
+- name: Verify every core addon CRD is Established
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: "{{ item }}"
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    wait: true
+    wait_timeout: 300
+    wait_condition:
+      type: Established
+      status: "True"
+  loop: "{{ core_addon_crds }}"
+  when: verify_scope == 'platform'
+
+- name: Verify every core addon workload is Ready
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ item.namespace }}"
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    label_selectors:
+      - "app.kubernetes.io/instance={{ item.release }}"
+  register: verified_core_addon_pods
+  until:
+    - verified_core_addon_pods.resources | length > 0
+    - >-
+      (verified_core_addon_pods.resources |
+      json_query("[?status.conditions[?type=='Ready' && status=='True']]") |
+      length) == verified_core_addon_pods.resources | length
+  retries: 120
+  delay: 5
+  loop: "{{ core_addon_workloads }}"
+  when: verify_scope == 'platform'
+
+- name: Verify the AWS EBS CSI driver is registered
+  kubernetes.core.k8s_info:
+    api_version: storage.k8s.io/v1
+    kind: CSIDriver
+    name: ebs.csi.aws.com
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_ebs_csi_driver
+  failed_when: verified_ebs_csi_driver.resources | length != 1
+  when: verify_scope == 'platform'
+
+- name: Verify every External Secrets store is Ready
+  kubernetes.core.k8s_info:
+    api_version: external-secrets.io/v1
+    kind: ClusterSecretStore
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_external_secret_stores
+  until:
+    - verified_external_secret_stores.resources | length > 0
+    - >-
+      (verified_external_secret_stores.resources |
+      json_query("[?status.conditions[?type=='Ready' && status=='True']]") |
+      length) == verified_external_secret_stores.resources | length
+  retries: 60
+  delay: 5
+  when: verify_scope == 'platform'
+
+- name: Verify every ExternalSecret is Ready
+  kubernetes.core.k8s_info:
+    api_version: external-secrets.io/v1
+    kind: ExternalSecret
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_external_secrets
+  until:
+    - verified_external_secrets.resources | length > 0
+    - >-
+      (verified_external_secrets.resources |
+      json_query("[?status.conditions[?type=='Ready' && status=='True']]") |
+      length) == verified_external_secrets.resources | length
+  retries: 60
+  delay: 5
+  when: verify_scope == 'platform'
+
+- name: Verify Argo CD reports the root application healthy
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    name: mlops-paas-system
+    namespace: argocd
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_root_application
+  failed_when: >-
+    verified_root_application.resources | length != 1 or
+    verified_root_application.resources[0].status.sync.status | default('') != 'Synced' or
+    verified_root_application.resources[0].status.health.status | default('') != 'Healthy'
+  when: verify_scope == 'platform'
+
+- name: Verify Traefik ping on each static worker
+  ansible.builtin.uri:
+    url: "http://{{ hostvars[item].private_ip }}/ping"
+    status_code: 200
+    return_content: false
+  loop: "{{ groups['workers'] }}"
+  when: verify_scope == 'platform'
+
+- name: Read ALB target health from the WSL control host
+  delegate_to: localhost
+  become: false
+  ansible.builtin.command: >-
+    aws elbv2 describe-target-health
+    --region {{ aws_region }}
+    --target-group-arn {{ terraform_alb_target_group_arn }}
+    --query TargetHealthDescriptions[].TargetHealth.State
+    --output json
+  register: alb_target_health_raw
+  changed_when: false
+  when:
+    - verify_scope == 'platform'
+    - terraform_alb_target_group_arn | length > 0
+
+- name: Require every ALB target to be healthy
+  ansible.builtin.assert:
+    that:
+      - alb_target_health_raw.stdout | from_json | length == k3s_expected_worker_count | int
+      - (alb_target_health_raw.stdout | from_json | unique) == ['healthy']
+    fail_msg: The ALB target group does not contain only healthy static workers.
+  when:
+    - verify_scope == 'platform'
+    - terraform_alb_target_group_arn | length > 0
+
+- name: Read the CloudNativePG cluster state
+  kubernetes.core.k8s_info:
+    api_version: postgresql.cnpg.io/v1
+    kind: Cluster
+    name: mlops-paas-postgres
+    namespace: mlops-postgres
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_cnpg_cluster
+  when: verify_scope == 'platform'
+
+- name: Require both CloudNativePG instances to be Ready
+  ansible.builtin.assert:
+    that:
+      - verified_cnpg_cluster.resources | length == 1
+      - verified_cnpg_cluster.resources[0].spec.instances | int == 2
+      - verified_cnpg_cluster.resources[0].status.readyInstances | default(0) | int == 2
+    fail_msg: CloudNativePG does not have two ready instances.
+  when: verify_scope == 'platform'
+
+- name: Validate a build Workflow against the live API server
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    definition: "{{ build_workflow_dry_run }}"
+  check_mode: true
+  changed_when: false
+  when: verify_scope == 'platform'
+  tags: [workflow-dry-run]
+  vars:
+    build_workflow_dry_run:
+      apiVersion: argoproj.io/v1alpha1
+      kind: Workflow
+      metadata:
+        generateName: ansible-build-dry-run-
+        namespace: mlops-execution
+      spec:
+        workflowTemplateRef:
+          name: mlops-paas-model-packager-template
+        arguments:
+          parameters:
+            - {name: build_id, value: "00000000-0000-4000-8000-000000000001"}
+            - {name: project_id, value: "00000000-0000-4000-8000-000000000002"}
+            - {name: tenant_id, value: "00000000-0000-4000-8000-000000000003"}
+            - {name: image_repository, value: "registry.invalid/mlops-paas/dry-run"}
+            - {name: image_tag, value: "validation"}
+            - {name: flavor, value: "python"}
+            - {name: task_type, value: "classification"}
+            - {name: requirements_text, value: ""}
+            - {name: source_artifact_name, value: "dry-run.tar.gz"}
+            - {name: source_type, value: "manual_upload"}
+            - {name: source_download_url, value: "https://example.invalid/source"}
+            - {name: output_upload_url, value: "https://example.invalid/output"}
+            - name: control_plane_webhook_url
+              value: "http://mlops-paas-control-plane.mlops-control-plane.svc.cluster.local/api/v1/builds/callback"
+
+- name: Verify EBS dynamic provisioning and attachment
+  when: verify_scope == 'platform'
+  block:
+    - name: Create the temporary storage validation namespace
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ k3s_remote_kubeconfig }}"
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: ansible-storage-validation
+
+    - name: Create an EBS-backed validation pod and claim
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ k3s_remote_kubeconfig }}"
+        definition: "{{ item }}"
+      loop:
+        - apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: ebs-smoke
+            namespace: ansible-storage-validation
+          spec:
+            accessModes: [ReadWriteOnce]
+            storageClassName: ebs-gp3
+            resources:
+              requests:
+                storage: 1Gi
+        - apiVersion: v1
+          kind: Pod
+          metadata:
+            name: ebs-smoke
+            namespace: ansible-storage-validation
+          spec:
+            restartPolicy: Never
+            nodeSelector:
+              workload-type: worker
+            containers:
+              - name: verify
+                image: public.ecr.aws/docker/library/busybox:1.36
+                command: [sh, -c, "echo ready > /data/status && sleep 600"]
+                volumeMounts:
+                  - name: data
+                    mountPath: /data
+            volumes:
+              - name: data
+                persistentVolumeClaim:
+                  claimName: ebs-smoke
+
+    - name: Wait for the EBS validation pod
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        name: ebs-smoke
+        namespace: ansible-storage-validation
+        kubeconfig: "{{ k3s_remote_kubeconfig }}"
+        wait: true
+        wait_timeout: 300
+  always:
+    - name: Remove the storage validation namespace and volume
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Namespace
+        name: ansible-storage-validation
+        kubeconfig: "{{ k3s_remote_kubeconfig }}"
+        wait: true
+        wait_timeout: 300
+
+- name: Verify security hardening resources remain intentionally deferred
+  ansible.builtin.assert:
+    that:
+      - root_kustomization_text is not search('security')
+    fail_msg: k8s/security must remain outside root GitOps during this rollout phase.
+  when: verify_scope == 'platform'
+  vars:
+    root_kustomization_text: "{{ lookup('ansible.builtin.file', playbook_dir + '/../k8s/kustomization.yaml') }}"
+
+- name: Verify the optional training platform
+  ansible.builtin.import_tasks: training.yml
+  when: verify_scope == 'training'

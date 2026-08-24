@@ -4,26 +4,44 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      component:
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - frontend
+          - control_plane
+          - consumer
+          - packager
+          - evidently
+          - mlflow
+          - model_server
+          - machine_learning_serving
+          - deep_learning_serving
+          - training_runner
 
 permissions:
-  id-token: write
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   detect-changes:
     name: "Detect Changed Components"
     runs-on: ubuntu-latest
     outputs:
-      frontend: ${{ steps.filter.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
-      control_plane: ${{ steps.filter.outputs.control_plane == 'true' || github.event_name == 'workflow_dispatch' }}
-      consumer: ${{ steps.filter.outputs.consumer == 'true' || github.event_name == 'workflow_dispatch' }}
-      packager: ${{ steps.filter.outputs.packager == 'true' || github.event_name == 'workflow_dispatch' }}
-      evidently: ${{ steps.filter.outputs.evidently == 'true' || github.event_name == 'workflow_dispatch' }}
-      model_server: ${{ steps.filter.outputs.model_server == 'true' || github.event_name == 'workflow_dispatch' }}
-      bento_model_server: ${{ steps.filter.outputs.bento_model_server == 'true' || github.event_name == 'workflow_dispatch' }}
-      training_runner: ${{ steps.filter.outputs.training_runner == 'true' || github.event_name == 'workflow_dispatch' }}
+      frontend: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.frontend == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'frontend')) }}
+      control_plane: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.control_plane == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'control_plane')) }}
+      consumer: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.consumer == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'consumer')) }}
+      packager: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.packager == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'packager')) }}
+      evidently: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.evidently == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'evidently')) }}
+      mlflow: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.mlflow == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'mlflow')) }}
+      model_server: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.model_server == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'model_server')) }}
+      machine_learning_serving: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.machine_learning_serving == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'machine_learning_serving')) }}
+      deep_learning_serving: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.deep_learning_serving == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'deep_learning_serving')) }}
+      training_runner: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.training_runner == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'training_runner')) }}
       matrix_targets: ${{ steps.matrix.outputs.targets }}
+      gitops_promotion: ${{ steps.matrix.outputs.gitops_promotion }}
     steps:
       - uses: actions/checkout@v4
       - name: Filter changed paths
@@ -41,42 +59,58 @@ jobs:
               - 'services/model-packager/**'
             evidently:
               - 'services/evidently/**'
+            mlflow:
+              - 'services/mlflow/**'
             model_server:
               - 'services/model-server/**'
-            bento_model_server:
-              - 'services/bento-model-server/**'
+            machine_learning_serving:
+              - 'services/machine-learning-serving/**'
+            deep_learning_serving:
+              - 'services/deep-learning-serving/**'
             training_runner:
               - 'services/training-runner/**'
-
       - name: Generate Dynamic Matrix
         id: matrix
         run: |
           python3 -c '
           import os, json
+          manual_component = "${{ inputs.component || '' }}"
           is_manual = "${{ github.event_name }}" == "workflow_dispatch"
+          def selected(component):
+              return manual_component in ("all", component)
           changed = {
-              "frontend": "${{ steps.filter.outputs.frontend }}" == "true" or is_manual,
-              "control_plane": "${{ steps.filter.outputs.control_plane }}" == "true" or is_manual,
-              "consumer": "${{ steps.filter.outputs.consumer }}" == "true" or is_manual,
-              "packager": "${{ steps.filter.outputs.packager }}" == "true" or is_manual,
-              "evidently": "${{ steps.filter.outputs.evidently }}" == "true" or is_manual,
-              "model_server": "${{ steps.filter.outputs.model_server }}" == "true" or is_manual,
-              "bento_model_server": "${{ steps.filter.outputs.bento_model_server }}" == "true" or is_manual,
-              "training_runner": "${{ steps.filter.outputs.training_runner }}" == "true" or is_manual,
+              "frontend": selected("frontend") if is_manual else "${{ steps.filter.outputs.frontend }}" == "true",
+              "control_plane": selected("control_plane") if is_manual else "${{ steps.filter.outputs.control_plane }}" == "true",
+              "consumer": selected("consumer") if is_manual else "${{ steps.filter.outputs.consumer }}" == "true",
+              "packager": selected("packager") if is_manual else "${{ steps.filter.outputs.packager }}" == "true",
+              "evidently": selected("evidently") if is_manual else "${{ steps.filter.outputs.evidently }}" == "true",
+              "mlflow": selected("mlflow") if is_manual else "${{ steps.filter.outputs.mlflow }}" == "true",
+              "model_server": selected("model_server") if is_manual else "${{ steps.filter.outputs.model_server }}" == "true",
+              "machine_learning_serving": selected("machine_learning_serving") if is_manual else "${{ steps.filter.outputs.machine_learning_serving }}" == "true",
+              "deep_learning_serving": selected("deep_learning_serving") if is_manual else "${{ steps.filter.outputs.deep_learning_serving }}" == "true",
+              "training_runner": selected("training_runner") if is_manual else "${{ steps.filter.outputs.training_runner }}" == "true",
           }
           configs = {
               "frontend": {"name": "Frontend Web", "id": "frontend", "context": "web", "image": "mlops-paas-web"},
-              "control_plane": {"name": "Control Plane", "id": "control_plane", "context": "services/control-plane", "image": "mlops-paas-django"},
+              "control_plane": {"name": "Control Plane", "id": "control_plane", "context": "services/control-plane", "image": "mlops-paas-control-plane"},
               "consumer": {"name": "Redpanda Consumer", "id": "consumer", "context": "services/consumer", "image": "mlops-paas-consumer"},
               "packager": {"name": "Model Packager", "id": "packager", "context": "services/model-packager", "image": "mlops-paas-model-packager"},
               "evidently": {"name": "Evidently Drift", "id": "evidently", "context": "services/evidently", "image": "mlops-paas-evidently"},
+              "mlflow": {"name": "MLflow Tracking Server", "id": "mlflow", "context": "services/mlflow", "image": "mlops-paas-mlflow"},
               "model_server": {"name": "Model Server", "id": "model_server", "context": "services/model-server", "image": "mlops-paas-model-server"},
-              "bento_model_server": {"name": "Bento Model Server", "id": "bento_model_server", "context": "services/bento-model-server", "image": "bento-model-server"},
+              "machine_learning_serving": {"name": "Machine Learning Serving Base Image", "id": "machine_learning_serving", "context": "services/machine-learning-serving", "image": "machine-learning-serving"},
+              "deep_learning_serving": {"name": "Deep Learning Serving Base Image", "id": "deep_learning_serving", "context": "services/deep-learning-serving", "image": "deep-learning-serving"},
               "training_runner": {"name": "Training Runner", "id": "training_runner", "context": "services/training-runner", "image": "mlops-paas-training-runner"}
           }
           targets = [configs[k] for k, v in changed.items() if v]
+          gitops_components = {
+              "frontend", "control_plane", "consumer", "packager", "evidently",
+              "mlflow", "model_server", "training_runner",
+          }
+          gitops_promotion = any(changed[key] for key in gitops_components)
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"targets={json.dumps(targets)}\n")
+              f.write(f"gitops_promotion={'true' if gitops_promotion else 'false'}\n")
           '
 
   build-and-push:
@@ -84,6 +118,9 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.matrix_targets != '[]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -138,41 +175,37 @@ jobs:
         with:
           cosign-release: 'v2.2.4'
 
-      - name: Sign the published Docker image
+      - name: Keylessly sign and verify the published Docker image
         env:
-          COSIGN_PASSWORD: ${{ env.SECRETS_COSIGN_PASSWORD }}
-          COSIGN_PRIVATE_KEY: ${{ env.SECRETS_COSIGN_PRIVATE_KEY }}
           REGISTRY_HOST: "registry.mlops-nids-nt114.id.vn"
           IMAGE: "${{ matrix.target.image }}"
-          SHA: "${{ github.sha }}"
         run: |
-          printf "%b\n" "${COSIGN_PRIVATE_KEY}" > cosign.key
-          
           DIGEST="${{ steps.build-and-push.outputs.digest }}"
-          cosign sign --yes --key cosign.key "${REGISTRY_HOST}/mlops-paas/${IMAGE}@${DIGEST}"
-          
-          rm -f cosign.key
+          IMAGE_REFERENCE="${REGISTRY_HOST}/mlops-paas/${IMAGE}@${DIGEST}"
+          for attempt in 1 2 3 4 5; do
+            if cosign sign --yes "${IMAGE_REFERENCE}" && \
+              cosign verify "${IMAGE_REFERENCE}" \
+                --certificate-identity="https://github.com/Viet-Hoang-2005/MLOps-paas-system/.github/workflows/cd.yml@refs/heads/main" \
+                --certificate-oidc-issuer="https://token.actions.githubusercontent.com"; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 5 ]; then
+              echo "Cosign signing attempt $attempt failed; retrying in $((attempt * 10)) seconds."
+              sleep $((attempt * 10))
+            fi
+          done
+          exit 1
 
   gitops-promotion:
     name: "GitOps: Update Kustomize & Create PR"
     needs: [detect-changes, build-and-push]
-    if: needs.detect-changes.outputs.matrix_targets != '[]'
+    if: needs.detect-changes.outputs.gitops_promotion == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ap-southeast-1
-
-      - name: Fetch Secrets from AWS
-        uses: aws-actions/aws-secretsmanager-get-secrets@v2
-        with:
-          secret-ids: |
-            SECRETS, mlops/github-actions-secrets
-          parse-json-secrets: true
 
       - name: Install yq
         run: |
@@ -184,34 +217,39 @@ jobs:
           REG="registry.mlops-nids-nt114.id.vn/mlops-paas"
           SHA="${{ github.sha }}"
           
-          # 1. Update kustomization.yaml (web, django, consumer)
-          cd k8s/apps/production
-          
+          # 1. Promote each independently reconciled workload.
           if [ "${{ needs.detect-changes.outputs.frontend }}" == "true" ]; then
-            kustomize edit set image mlops-paas-web=$REG/mlops-paas-web:$SHA
+            (cd k8s/apps/overlays/production/web && kustomize edit set image mlops-paas-web=$REG/mlops-paas-web:$SHA)
           fi
           
           if [ "${{ needs.detect-changes.outputs.control_plane }}" == "true" ]; then
-            kustomize edit set image mlops-paas-django=$REG/mlops-paas-django:$SHA
+            (cd k8s/apps/overlays/production/control-plane && kustomize edit set image mlops-paas-control-plane=$REG/mlops-paas-control-plane:$SHA)
           fi
           
           if [ "${{ needs.detect-changes.outputs.consumer }}" == "true" ]; then
-            kustomize edit set image mlops-paas-consumer=$REG/mlops-paas-consumer:$SHA
+            (cd k8s/apps/overlays/production/consumer && kustomize edit set image mlops-paas-consumer=$REG/mlops-paas-consumer:$SHA)
           fi
-          cd ../../../
+
+          if [ "${{ needs.detect-changes.outputs.model_server }}" == "true" ]; then
+            (cd k8s/apps/overlays/production/model-server && kustomize edit set image mlops-paas-model-server=$REG/mlops-paas-model-server:$SHA)
+          fi
+          
+          if [ "${{ needs.detect-changes.outputs.mlflow }}" == "true" ]; then
+            (cd k8s/platform/mlflow && kustomize edit set image mlops-paas-mlflow=$REG/mlops-paas-mlflow:$SHA)
+          fi
           
           # 2. Update Argo Workflow Templates (packager and evidently)
           if [ "${{ needs.detect-changes.outputs.packager }}" == "true" ]; then
-            yq e -i '(.spec.templates[] | select(.name == "build-model") | .container.image) = "'$REG'/mlops-paas-model-packager:'$SHA'"' k8s/argo-workflows/build-workflowtemplate.yaml
+            yq e -i '(.spec.templates[] | select(.name == "prepare-package" or .name == "notify-success") | .container.image) = "'$REG'/mlops-paas-model-packager:'$SHA'"' k8s/argo/workflows/build-workflowtemplate.yaml
           fi
-          
+
           if [ "${{ needs.detect-changes.outputs.evidently }}" == "true" ]; then
-            yq e -i '(.spec.templates[] | select(.name == "run-evidently") | .container.image) = "'$REG'/mlops-paas-evidently:'$SHA'"' k8s/argo-workflows/evidently-workflowtemplate.yaml
+            yq e -i '(.spec.templates[] | select(.name == "run-evidently") | .container.image) = "'$REG'/mlops-paas-evidently:'$SHA'"' k8s/argo/workflows/evidently-workflowtemplate.yaml
           fi
 
           if [ "${{ needs.detect-changes.outputs.training_runner }}" == "true" ]; then
-            yq e -i '(.spec.templates[] | select(.name == "cpu-pytorch-job") | .resource.manifest) |= sub("image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:[^\\n]+", "image: '$REG'/mlops-paas-training-runner:'$SHA'")' k8s/argo-workflows/training-workflowtemplate.yaml
-            yq e -i '(.spec.templates[] | select(.name == "gpu-pytorch-job") | .resource.manifest) |= sub("image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:[^\\n]+", "image: '$REG'/mlops-paas-training-runner:'$SHA'")' k8s/argo-workflows/training-workflowtemplate.yaml
+            yq e -i '(.spec.templates[] | select(.name == "cpu-pytorch-job") | .resource.manifest) |= sub("image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:[^\\n]+", "image: '$REG'/mlops-paas-training-runner:'$SHA'")' k8s/argo/workflows/training-workflowtemplate.yaml
+            yq e -i '(.spec.templates[] | select(.name == "gpu-pytorch-job") | .resource.manifest) |= sub("image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:[^\\n]+", "image: '$REG'/mlops-paas-training-runner:'$SHA'")' k8s/argo/workflows/training-workflowtemplate.yaml
           fi
 
       - name: Generate Summary Table
@@ -225,8 +263,10 @@ jobs:
           CONSUMER_TAG="no change"
           PACKAGER_TAG="no change"
           EVIDENTLY_TAG="no change"
+          MLFLOW_TAG="no change"
           MODEL_SERVER_TAG="no change"
-          BENTO_MODEL_SERVER_TAG="no change"
+          MACHINE_LEARNING_SERVING_TAG="no change"
+          DEEP_LEARNING_SERVING_TAG="no change"
           TRAINING_RUNNER_TAG="no change"
           
           if [ "${{ needs.detect-changes.outputs.frontend }}" == "true" ]; then
@@ -234,7 +274,7 @@ jobs:
           fi
           
           if [ "${{ needs.detect-changes.outputs.control_plane }}" == "true" ]; then
-            DJANGO_TAG="$REG/mlops-paas-django:$SHA"
+            DJANGO_TAG="$REG/mlops-paas-control-plane:$SHA"
           fi
           
           if [ "${{ needs.detect-changes.outputs.consumer }}" == "true" ]; then
@@ -244,17 +284,25 @@ jobs:
           if [ "${{ needs.detect-changes.outputs.packager }}" == "true" ]; then
             PACKAGER_TAG="$REG/mlops-paas-model-packager:$SHA"
           fi
-          
+
           if [ "${{ needs.detect-changes.outputs.evidently }}" == "true" ]; then
             EVIDENTLY_TAG="$REG/mlops-paas-evidently:$SHA"
+          fi
+
+          if [ "${{ needs.detect-changes.outputs.mlflow }}" == "true" ]; then
+            MLFLOW_TAG="$REG/mlops-paas-mlflow:$SHA"
           fi
 
           if [ "${{ needs.detect-changes.outputs.model_server }}" == "true" ]; then
             MODEL_SERVER_TAG="$REG/mlops-paas-model-server:$SHA"
           fi
 
-          if [ "${{ needs.detect-changes.outputs.bento_model_server }}" == "true" ]; then
-            BENTO_MODEL_SERVER_TAG="$REG/bento-model-server:$SHA"
+          if [ "${{ needs.detect-changes.outputs.machine_learning_serving }}" == "true" ]; then
+            MACHINE_LEARNING_SERVING_TAG="$REG/machine-learning-serving:$SHA"
+          fi
+
+          if [ "${{ needs.detect-changes.outputs.deep_learning_serving }}" == "true" ]; then
+            DEEP_LEARNING_SERVING_TAG="$REG/deep-learning-serving:$SHA"
           fi
 
           if [ "${{ needs.detect-changes.outputs.training_runner }}" == "true" ]; then
@@ -263,17 +311,19 @@ jobs:
           
           EOF_DELIM=$(openssl rand -hex 8)
           
-          RAW_SUMMARY="### Production Promotion Summary
-          | Service | Image Tag |
-          | :--- | :--- |
-          | **Frontend Web** (\`mlops-paas-web\`) | \`$WEB_TAG\` |
-          | **Control Plane** (\`mlops-paas-django\`) | \`$DJANGO_TAG\` |
-          | **Redpanda Consumer** (\`mlops-paas-consumer\`) | \`$CONSUMER_TAG\` |
-          | **Model Packager** (\`mlops-paas-model-packager\`) | \`$PACKAGER_TAG\` |
-          | **Evidently Drift** (\`mlops-paas-evidently\`) | \`$EVIDENTLY_TAG\` |
-          | **Model Server** (\`mlops-paas-model-server\`) | \`$MODEL_SERVER_TAG\` |
-          | **Bento Model Server** (\`bento-model-server\`) | \`$BENTO_MODEL_SERVER_TAG\` |
-          | **Training Runner** (\`mlops-paas-training-runner\`) | \`$TRAINING_RUNNER_TAG\` |"
+          RAW_SUMMARY="### Delivery Summary
+          | Component | Image Tag | Delivery |
+          | :--- | :--- | :--- |
+          | **Frontend Web** (\`mlops-paas-web\`) | \`$WEB_TAG\` | GitOps promotion |
+          | **Control Plane** (\`mlops-paas-control-plane\`) | \`$DJANGO_TAG\` | GitOps promotion |
+          | **Redpanda Consumer** (\`mlops-paas-consumer\`) | \`$CONSUMER_TAG\` | GitOps promotion |
+          | **Model Packager** (\`mlops-paas-model-packager\`) | \`$PACKAGER_TAG\` | GitOps promotion |
+          | **Evidently Drift** (\`mlops-paas-evidently\`) | \`$EVIDENTLY_TAG\` | GitOps promotion |
+          | **MLflow Tracking Server** (\`mlops-paas-mlflow\`) | \`$MLFLOW_TAG\` | GitOps promotion |
+          | **Model Server** (\`mlops-paas-model-server\`) | \`$MODEL_SERVER_TAG\` | GitOps promotion |
+          | **Machine Learning Serving Base** (\`machine-learning-serving\`) | \`$MACHINE_LEARNING_SERVING_TAG\` | Registry base image |
+          | **Deep Learning Serving Base** (\`deep-learning-serving\`) | \`$DEEP_LEARNING_SERVING_TAG\` | Registry base image |
+          | **Training Runner** (\`mlops-paas-training-runner\`) | \`$TRAINING_RUNNER_TAG\` | GitOps promotion |"
           
           SUMMARY_CONTENT=$(echo "$RAW_SUMMARY" | sed 's/^ *//')
           

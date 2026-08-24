@@ -1,2 +1,5 @@
 ---
-k3s_server_args: "--write-kubeconfig-mode=644 --node-label workload-type=control-plane"
+k3s_node_labels:
+  - workload-type=control-plane
+k3s_node_taints:
+  - node-role.kubernetes.io/control-plane=true:NoSchedule

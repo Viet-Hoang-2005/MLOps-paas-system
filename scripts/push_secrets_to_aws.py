@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-"""
-Script đẩy biến môi trường từ .env lên AWS Secrets Manager cho MLOps PaaS.
-Sử dụng boto3 để cập nhật vào 3 kho Secrets:
-  1. mlops/aws-secrets
-  2. mlops/github-actions-secrets
-  3. mlops/production-secrets
-"""
-
 import json
 import os
 import sys
@@ -88,8 +79,6 @@ def main():
         "GITHUB_TOKEN",
         "HARBOR_GITHUB_USERNAME",
         "HARBOR_GITHUB_PASSWORD",
-        "COSIGN_PASSWORD",
-        "COSIGN_PRIVATE_KEY",
     ]
     production_keys = [
         "DB_USER",
@@ -103,6 +92,7 @@ def main():
         "JWT_PRIVATE_KEY",
         "JWT_PUBLIC_KEY",
         "CONTROL_PLANE_WEBHOOK_SECRET",
+        "ARGO_EVENTS_WEBHOOK_TOKEN",
         "GOOGLE_OAUTH2_CLIENT_ID",
         "GITHUB_OAUTH2_CLIENT_ID",
         "GITHUB_OAUTH2_CLIENT_SECRET",
@@ -143,12 +133,9 @@ def main():
             continue
         update_or_create_secret(client, secret_name, payload)
         
-        # In ra 3 ký tự đầu của các secret để kiểm tra
         print(f"-> Successfully pushed {len(payload)} keys to {secret_name}:")
-        for k, v in payload.items():
-            val_str = str(v) if v is not None else ""
-            preview = val_str[:3] + "..." if len(val_str) > 3 else val_str
-            print(f"     * {k}: {preview}")
+        for key in payload:
+            print(f"     * {key}")
 
     print("\nSuccess! All configuration is ready on AWS Secrets Manager.")
 

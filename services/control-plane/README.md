@@ -1,79 +1,69 @@
-# Control Plane — Django Backend
+# Django Control Plane
 
-Control Plane là **bộ não trung tâm** của nền tảng AI PaaS. Chịu trách nhiệm quản lý định danh người dùng, điều phối toàn bộ vòng đời mô hình (Upload → Build → Deploy → Train → Monitor), và đóng vai trò **Identity Provider** bằng JWT RS256.
+The control plane is a domain-oriented Django modular monolith. It owns identity,
+model workspaces, immutable registry versions, training, builds, deployments,
+drift monitoring, API keys, audit events, and asynchronous orchestration.
 
----
+## Layout
 
-## Vai Trò
-
-- **Xác thực & Phân quyền**: Đăng ký/đăng nhập, OAuth2 (GitHub/Google), API Keys, JWT RS256 Asymmetric (Private Key ký — Public Key verify tại Model Endpoint).
-- **Model Registry**: Quản lý metadata mô hình (upload, trạng thái build/deploy, phiên bản), proxy MLflow API với tenant isolation.
-- **Điều phối Argo Workflows**: Khi người dùng thao tác trên Dashboard, Control Plane gửi Webhook tới Argo Events để kích hoạt:
-  - `build-model-job` — Đóng gói mô hình thành Docker Image (Kaniko/Docker).
-  - `deploy-model-job` — Tạo Deployment + Service + Traefik IngressRoute.
-  - `delete-model-job` — Xóa tài nguyên K8s và Image trên Harbor.
-  - `training-job` — Tạo Kubeflow PyTorchJob.
-  - `cancel-training-job` — Xóa PyTorchJob đang chạy.
-  - `evidently-job` — Chạy phân tích Data Drift.
-- **Log Streaming**: Ghi log build/train vào Redis; Frontend HTTP Polling mỗi 3 giây.
-- **S3 Storage**: Lưu model artifacts, training data, sinh presigned URL cho Evidently.
-
----
-
-## Cấu Trúc Thư Mục
-
-```
-src/
-├── authentication/   # User, Tenant, API Keys, JWT, OAuth2 (GitHub/Google), ModelAPI CRUD
-├── registry/         # Model lifecycle: upload, build/deploy webhook handlers, MLflow proxy, Harbor sync
-├── training/         # TrainingJob CRUD, ArgoTrainingAdapter, LocalTrainingAdapter, log streaming
-├── drift/            # DriftJob CRUD, Evidently webhook handlers, drift report URLs
-├── realtime/         # WebSocket/Redis log streaming utilities
-├── integrations/     # S3 utilities, Hashids encoding, ZIP helpers
-└── core/             # Django settings, URL routing, WSGI/ASGI config
+```text
+control-plane/
+|-- manage.py
+|-- pyproject.toml
+|-- requirements.txt
+`-- src/
+    |-- config/                 # Settings, root URLs, ASGI/WSGI, Celery
+    |-- common/                 # API policy, middleware, logging, metrics
+    |-- infrastructure/         # S3, Docker, Argo, Harbor, HTTP, Redpanda
+    `-- apps/
+        |-- auth/               # CustomUser, profile, JWT, OAuth, OTP
+        |-- access/             # Project-scoped API keys
+        |-- catalog/            # ModelProject and mutable workspace assets
+        |-- registry/           # Immutable versions, artifacts, aliases
+        |-- training/           # Jobs, events, outputs, snapshots
+        |-- deployment/         # Build, Deployment, Endpoint
+        |-- drift/              # DriftMonitor and DriftRun
+        `-- observability/      # Health, metrics, outbox, model telemetry
 ```
 
----
+Each domain exposes HTTP endpoints through `api/`, writes through `services/`,
+and reads through tenant-scoped `selectors.py`. API modules must not call Docker,
+S3, Argo, Harbor, Redis, or external HTTP clients directly.
 
-## Công nghệ
+## Local Development
 
-| Thành phần | Công nghệ |
-|---|---|
-| Framework | Django 4.x + Django REST Framework |
-| Database | PostgreSQL (schema: `control_plane`) |
-| Cache / Log Buffer | Redis |
-| Storage | AWS S3 (boto3) |
-| Container Registry | Harbor (Robot Account API) |
-| Async | Daphne (ASGI) + Django Channels |
-| Auth | `djangorestframework-simplejwt` (RS256), `python-social-auth` |
-
----
-
-## Biến Môi Trường Quan Trọng
-
-| Biến | Mô tả |
-|---|---|
-| `BUILD_STRATEGY` | `docker` (local) hoặc `argo` (production K3s) |
-| `TRAINING_BACKEND` | `local` (docker-compose) hoặc `kubeflow` (K3s) |
-| `ARGO_EVENTS_WEBHOOK_URL` | Endpoint của Argo Events EventSource |
-| `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` | Cặp RSA key cho Asymmetric JWT |
-| `CONTROL_PLANE_WEBHOOK_SECRET` | HMAC secret xác thực internal webhook callbacks |
-| `AWS_BUCKET_NAME` | S3 bucket lưu artifacts |
-| `HARBOR_REGISTRY_URL` | URL của Harbor Private Registry |
-
----
-
-## Chạy Local
+From the repository root:
 
 ```bash
-# Với docker-compose từ thư mục gốc
-docker compose up control-plane
-
-# Chạy migrations
-docker compose exec control-plane python manage.py migrate
-
-# Tạo superuser
-docker compose exec control-plane python manage.py createsuperuser
+docker compose up --build control-plane control-plane-worker
 ```
 
-API Docs: http://localhost:8000/docs hoặc http://localhost:8000/api/
+Without Docker:
+
+```bash
+cd services/control-plane
+python -m pip install -r requirements.txt
+python manage.py migrate --settings=config.settings.local
+python manage.py runserver --settings=config.settings.local
+celery -A config worker --loglevel=INFO
+```
+
+Quality gates:
+
+```bash
+python -m ruff check .
+python -m pytest
+python manage.py check --settings=config.settings.test
+python manage.py makemigrations --check --dry-run --settings=config.settings.test
+```
+
+Health endpoints are `/health/live`, `/health/ready`, and `/health/metrics`.
+The public API intentionally has no version prefix. See
+[`docs/control-plane/api-catalog.md`](../../docs/control-plane/api-catalog.md).
+
+## Cutover
+
+This schema is a hard cut and does not migrate legacy control-plane data. The
+guarded reset and cleanup procedure is documented in
+[`docs/control-plane/runbook.md`](../../docs/control-plane/runbook.md). Never run
+the cleanup commands against an environment that must preserve artifacts.

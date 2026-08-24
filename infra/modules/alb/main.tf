@@ -33,6 +33,7 @@ resource "aws_lb" "api_alb" {
   load_balancer_type = "application"
   security_groups    = [var.lb_sg_id]
   subnets            = var.public_subnet_ids
+  idle_timeout       = var.idle_timeout_seconds
 }
 
 # Listener HTTPS (Cổng 443)

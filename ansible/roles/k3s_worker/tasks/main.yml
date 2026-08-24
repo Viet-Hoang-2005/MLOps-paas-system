@@ -1,21 +1,104 @@
 ---
-- name: Check if K3s agent service exists
-  stat:
-    path: /usr/local/bin/k3s
-  register: k3s_bin
+- name: Request an IMDSv2 token
+  ansible.builtin.uri:
+    url: http://169.254.169.254/latest/api/token
+    method: PUT
+    headers:
+      X-aws-ec2-metadata-token-ttl-seconds: "300"
+    return_content: true
+    timeout: 5
+  register: imds_token
+  no_log: true
 
-- name: Install K3s Agent
+- name: Read the worker instance ID from IMDSv2
+  ansible.builtin.uri:
+    url: http://169.254.169.254/latest/meta-data/instance-id
+    headers:
+      X-aws-ec2-metadata-token: "{{ imds_token.content }}"
+    return_content: true
+    timeout: 5
+  register: imds_instance_id
+
+- name: Read the worker availability zone from IMDSv2
+  ansible.builtin.uri:
+    url: http://169.254.169.254/latest/meta-data/placement/availability-zone
+    headers:
+      X-aws-ec2-metadata-token: "{{ imds_token.content }}"
+    return_content: true
+    timeout: 5
+  register: imds_availability_zone
+
+- name: Create the K3s agent configuration directory
   become: true
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Render the protected K3s agent configuration
+  become: true
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart K3s agent
+
+- name: Read the installed K3s version
+  ansible.builtin.command: /usr/local/bin/k3s --version
+  register: installed_k3s_agent_version
+  changed_when: false
+  failed_when: false
+
+- name: Download the official K3s installer
+  become: true
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: /usr/local/src/install-k3s.sh
+    owner: root
+    group: root
+    mode: "0700"
+  when: k3s_version not in installed_k3s_agent_version.stdout
+
+- name: Install the pinned K3s agent
+  become: true
+  ansible.builtin.command: /usr/local/src/install-k3s.sh
   environment:
-    K3S_URL: "https://{{ hostvars[groups['master'][0]]['private_ip'] }}:6443"
-    K3S_TOKEN: "{{ hostvars[groups['master'][0]]['k3s_node_token'] }}"
-  shell: |
-    curl -sfL https://get.k3s.io | sh -s - agent {{ k3s_agent_args }}
-  when: not k3s_bin.stat.exists
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
+    INSTALL_K3S_EXEC: agent
+  when: k3s_version not in installed_k3s_agent_version.stdout
+  changed_when: true
+  no_log: true
+  notify: Restart K3s agent
 
-- name: Ensure k3s-agent service is running and enabled
+- name: Flush K3s agent handlers before readiness checks
+  ansible.builtin.meta: flush_handlers
+
+- name: Ensure the K3s agent is enabled and running
   become: true
-  systemd:
+  ansible.builtin.systemd_service:
     name: k3s-agent
-    state: started
     enabled: true
+    state: started
+
+- name: Read systemd service state after K3s agent installation
+  ansible.builtin.service_facts:
+
+- name: Confirm the K3s agent systemd unit is active
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.services['k3s-agent.service'].state == 'running'
+      - ansible_facts.services['k3s-agent.service'].status == 'enabled'
+    fail_msg: The K3s agent systemd unit is not running and enabled.
+
+- name: Confirm the K3s agent journal is readable
+  become: true
+  ansible.builtin.command: journalctl --unit k3s-agent --lines 50 --no-pager
+  register: k3s_agent_journal
+  changed_when: false
+  failed_when: k3s_agent_journal.rc != 0
+  no_log: true

@@ -114,10 +114,31 @@ resource "aws_iam_role_policy_attachment" "karpenter_node_s3_attach" {
   policy_arn = aws_iam_policy.worker_s3_policy.arn
 }
 
-resource "aws_iam_role_policy_attachment" "karpenter_node_secrets_attach" {
+data "aws_iam_policy_document" "karpenter_node_token_secret_policy_doc" {
+  count = var.enable_karpenter ? 1 : 0
+
+  statement {
+    sid    = "ReadK3sAgentToken"
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:DescribeSecret"
+    ]
+    resources = [var.karpenter_k3s_token_secret_arn]
+  }
+}
+
+resource "aws_iam_policy" "karpenter_node_token_secret_policy" {
+  count       = var.enable_karpenter ? 1 : 0
+  name        = "mlops-karpenter-node-token-secret-policy"
+  description = "Allow Karpenter nodes to read only the K3s agent join token"
+  policy      = data.aws_iam_policy_document.karpenter_node_token_secret_policy_doc[0].json
+}
+
+resource "aws_iam_role_policy_attachment" "karpenter_node_token_secret_attach" {
   count      = var.enable_karpenter ? 1 : 0
   role       = aws_iam_role.karpenter_node_role[0].name
-  policy_arn = aws_iam_policy.worker_secrets_policy.arn
+  policy_arn = aws_iam_policy.karpenter_node_token_secret_policy[0].arn
 }
 
 resource "aws_iam_role_policy_attachment" "karpenter_node_ebs_csi_attach" {
@@ -387,7 +408,7 @@ resource "aws_cloudwatch_event_target" "karpenter_interruption_queue" {
 # GITHUB ACTIONS OIDC
 # Tạo OIDC Provider cho GitHub
 resource "aws_iam_openid_connect_provider" "github_actions" {
-  count           = var.enable_github_actions_iam ? 1 : 0
+  count           = var.enable_github_oidc ? 1 : 0
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = ["1c58a3a8518e8759bf075b76b750d4f2df264fcd", "6938fd4d98bab03faadb97b34396831e3780aea1"]
@@ -395,7 +416,7 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 
 # Tạo IAM Role cho GitHub Actions
 data "aws_iam_policy_document" "github_actions_assume_role" {
-  count = var.enable_github_actions_iam ? 1 : 0
+  count = var.enable_github_oidc ? 1 : 0
 
   statement {
     effect  = "Allow"
@@ -416,20 +437,20 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       # Giới hạn chỉ Repository này mới được quyền dùng Role
-      values = ["repo:Viet-Hoang-2005/MLOps-nids-system:*"]
+      values = ["repo:Viet-Hoang-2005/MLOps-paas-system:*"]
     }
   }
 }
 
 resource "aws_iam_role" "github_actions_role" {
-  count              = var.enable_github_actions_iam ? 1 : 0
+  count              = var.enable_github_oidc ? 1 : 0
   name               = "mlops-github-actions-role"
   assume_role_policy = data.aws_iam_policy_document.github_actions_assume_role[0].json
 }
 
 # Cấp quyền đọc Secret và S3 cho Role của GitHub Actions
 data "aws_iam_policy_document" "github_actions_policy" {
-  count = var.enable_github_actions_iam ? 1 : 0
+  count = var.enable_github_oidc ? 1 : 0
 
   statement {
     effect = "Allow"
@@ -458,7 +479,7 @@ data "aws_iam_policy_document" "github_actions_policy" {
 }
 
 resource "aws_iam_role_policy" "github_actions_policy_attach" {
-  count  = var.enable_github_actions_iam ? 1 : 0
+  count  = var.enable_github_oidc ? 1 : 0
   name   = "mlops-github-actions-policy"
   role   = aws_iam_role.github_actions_role[0].id
   policy = data.aws_iam_policy_document.github_actions_policy[0].json

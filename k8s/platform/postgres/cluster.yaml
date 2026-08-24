@@ -1,0 +1,58 @@
+# postgres-cluster.yaml: CloudNativePG Cluster
+#   mlops-paas-postgres-rw -> Primary (dùng cho INSERT/UPDATE)
+#   mlops-paas-postgres-ro -> Load-balanced Primary + Standby (dùng cho SELECT)
+#   mlops-paas-postgres-r  -> Tất cả instances
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: mlops-paas-postgres
+  annotations:
+    description: "CloudNativePG cluster for MLflow metadata and PaaS baseline data storage"
+spec:
+  # Chạy 2 instances để đảm bảo tính sẵn sàng cao (High Availability)
+  # Node 1: Primary (RW), Node 2: Standby (RO)
+  instances: 2
+  enableSuperuserAccess: true
+  imageName: ghcr.io/cloudnative-pg/postgresql:15
+
+  # Khởi tạo database và application owner
+  bootstrap:
+    initdb:
+      database: mlops_paas_db
+      owner: postgres
+      secret:
+        name: postgres-bootstrap-secret
+      postInitApplicationSQL:
+        - "CREATE SCHEMA IF NOT EXISTS control_plane;"
+        - "CREATE SCHEMA IF NOT EXISTS mlflow;"
+
+  # Cấu hình Storage cho mỗi instance
+  storage:
+    storageClass: ebs-gp3
+    size: 10Gi
+
+  # Khi mở rộng lại nhiều instance, anti-affinity giúp tách các pod ra khác node.
+  affinity:
+    nodeSelector:
+      workload-type: worker
+    enablePodAntiAffinity: true
+    podAntiAffinityType: preferred
+    topologyKey: kubernetes.io/hostname
+
+  # Tuning PostgreSQL parameters cho MLflow workload
+  postgresql:
+    parameters:
+      shared_buffers: "256MB"
+      effective_cache_size: "768MB"
+      work_mem: "32MB"
+      maintenance_work_mem: "256MB"
+      max_connections: "200"
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"

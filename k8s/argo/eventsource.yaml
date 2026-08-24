@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: webhook-eventsource
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: argo-eventsource-sa
+  webhook:
+    build:
+      port: "12000"
+      endpoint: /build
+      method: POST
+      maxPayloadSize: 262144
+      authSecret: &webhookAuth
+        name: argo-events-webhook-server
+        key: token
+    deploy:
+      port: "12000"
+      endpoint: /deploy
+      method: POST
+      maxPayloadSize: 262144
+      authSecret: *webhookAuth
+    delete:
+      port: "12000"
+      endpoint: /delete
+      method: POST
+      maxPayloadSize: 262144
+      authSecret: *webhookAuth
+    drift:
+      port: "12000"
+      endpoint: /drift
+      method: POST
+      maxPayloadSize: 262144
+      authSecret: *webhookAuth
+    train:
+      port: "12000"
+      endpoint: /train
+      method: POST
+      maxPayloadSize: 262144
+      authSecret: *webhookAuth
+    cancel-train:
+      port: "12000"
+      endpoint: /cancel-train
+      method: POST
+      maxPayloadSize: 262144
+      authSecret: *webhookAuth
