@@ -92,6 +92,12 @@ spec:
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
         env:
+          - name: LOG_FORMAT
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_FORMAT}
+          - name: LOG_SUMMARY_INTERVAL_SECONDS
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_SUMMARY_INTERVAL_SECONDS}
           - {name: BUILD_ENGINE, value: kaniko}
           - {name: BUILD_WORKSPACE_DIR, value: /workspace}
           - {name: TASK_TYPE, value: "{{inputs.parameters.task_type}}"}
@@ -141,6 +147,12 @@ spec:
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
         env:
+          - name: LOG_FORMAT
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_FORMAT}
+          - name: LOG_SUMMARY_INTERVAL_SECONDS
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_SUMMARY_INTERVAL_SECONDS}
           - {name: TASK_TYPE, value: NOTIFY_BUILD}
           - {name: BUILD_WORKSPACE_DIR, value: /workspace}
           - {name: BUILD_ID, value: "{{inputs.parameters.build_id}}"}

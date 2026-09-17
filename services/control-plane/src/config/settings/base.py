@@ -34,9 +34,12 @@ INSTALLED_APPS = [
     "apps.deployment.apps.DeploymentConfig",
     "apps.drift.apps.DriftConfig",
     "apps.observability.apps.ObservabilityConfig",
+    "apps.production.apps.ProductionConfig",
+    "apps.ct.apps.ContinuousTrainingConfig",
 ]
 
 MIDDLEWARE = [
+    "common.middleware.RequestContextMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -44,7 +47,6 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "common.middleware.RequestContextMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -93,8 +95,8 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-JWT_PRIVATE_KEY = env("JWT_PRIVATE_KEY", "")
-JWT_PUBLIC_KEY = env("JWT_PUBLIC_KEY", "")
+JWT_PRIVATE_KEY = env("JWT_PRIVATE_KEY", "").replace("\\n", "\n")
+JWT_PUBLIC_KEY = env("JWT_PUBLIC_KEY", "").replace("\\n", "\n")
 JWT_ALGORITHM = "RS256" if JWT_PRIVATE_KEY and JWT_PUBLIC_KEY else "HS256"
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
@@ -146,7 +148,7 @@ if EXECUTION_BACKEND not in {"docker", "argo"}:
 
 
 def execution_backend_override(name):
-    value = str(env(name, "") or EXECUTION_BACKEND).strip().lower()
+    value = (env(name, "") or EXECUTION_BACKEND).strip().lower()
     if value not in {"docker", "argo"}:
         raise ImproperlyConfigured(f"{name} must be either 'docker' or 'argo'")
     return value
@@ -172,7 +174,7 @@ TRAINING_GPU_ENABLED = str(env("TRAINING_GPU_ENABLED", "true" if TRAINING_BACKEN
 TRAINING_GPU_COUNTS = tuple(
     int(value)
     for value in env_list("TRAINING_GPU_COUNTS", "1")
-    if str(value).strip().isdigit() and int(value) > 0
+    if value.strip().isdigit() and int(value) > 0
 )
 ARGO_BUILD_WEBHOOK_URL = env("ARGO_BUILD_WEBHOOK_URL", "")
 ARGO_TRAINING_WEBHOOK_URL = env("ARGO_TRAINING_WEBHOOK_URL", "")
@@ -211,10 +213,6 @@ GITHUB_OAUTH2_CLIENT_ID = env("GITHUB_OAUTH2_CLIENT_ID", "")
 GITHUB_OAUTH2_CLIENT_SECRET = env("GITHUB_OAUTH2_CLIENT_SECRET", "")
 GITHUB_OAUTH_REDIRECT_URI = env("GITHUB_OAUTH_REDIRECT_URI", "http://localhost:5173/oauth/github/callback")
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {"json": {"()": "common.logging.JsonFormatter"}},
-    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "json"}},
-    "root": {"handlers": ["console"], "level": env("LOG_LEVEL", "INFO")},
-}
+LOGGING_CONFIG = "common.logging.configure_logging"
+LOGGING = {"version": 1}
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False

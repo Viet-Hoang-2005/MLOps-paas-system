@@ -72,7 +72,7 @@ LEGACY_SHARED_SECRET_TARGETS = {
 EXTERNAL_SECRET_OWNERS = {
     "k8s/apps/overlays/production/control-plane": {
         ("mlops-control-plane", "control-plane-api-secret"),
-        ("mlops-control-plane", "control-plane-worker-secret"),
+        ("mlops-control-plane", "celery-worker-secret"),
     },
     "k8s/apps/overlays/production/consumer": {("mlops-consumer", "consumer-secret")},
     "k8s/apps/overlays/production/model-server": {("mlops-model-server", "model-server-secret")},

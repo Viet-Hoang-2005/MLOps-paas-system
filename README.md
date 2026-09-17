@@ -30,7 +30,7 @@
 
 ## 1. Tổng quan ⭐
 
-Hệ thống này là một **nền tảng AI Platform-as-a-Service MLOps phục vụ đa mô hình ML/DL**, tự động hóa từ đóng gói mô hình, triển khai dịch vụ suy luận động, quản lý phiên bản, giám sát drift đến huấn luyện mô hình. Nền tảng core chạy trên K3s; Kubeflow Training Operator và Karpenter là phase mở rộng tùy chọn, chỉ được bật sau khi core platform ổn định.
+Hệ thống này là một **nền tảng AI Platform-as-a-Service MLOps phục vụ đa mô hình ML/DL**, tự động hóa từ đóng gói mô hình, triển khai dịch vụ suy luận động, quản lý phiên bản, giám sát drift đến huấn luyện mô hình.
 
 ---
 
@@ -55,35 +55,17 @@ Hệ thống này là một **nền tảng AI Platform-as-a-Service MLOps phục
 
 ## 3. Kiến trúc Hệ thống 🏛️
 
-```text
-React Dashboard / API Client
-        │
-        ▼
-Django DRF modular monolith
-        │  service + transaction.on_commit
-        ▼
-Celery task ──► Docker backend (local)
-        └─────► Argo webhook (production) ──► Kaniko / Kubeflow / Evidently
-
-S3: workspace, snapshots, version artifacts, reports
-PostgreSQL: domain state             Redis: Celery + runtime logs
-MLflow: experiment tracking          Redpanda: inference events/outbox
-Traefik ──► model-server gateway ──► version-specific model worker
-```
-
-Control Plane là modular monolith theo capability: `auth`, `access`, `catalog`, `registry`, `training`, `deployment`, `drift` và `observability`. API chỉ nhận UUID public; integer primary key là chi tiết nội bộ. Cross-domain read đi qua selector, cross-domain write đi qua service.
-
 **1. Quy trình Đóng gói & Triển khai Mô hình (Build & Deploy Workflow)**
 
-![Build and Deploy Workflow](paper/assets/build-deploy-workflow-dark.png)
+![Build and Deploy Workflow](docs/paper/assets/build-deploy-workflow-dark.png)
 
 **2. Quy trình Huấn luyện & Điều phối Tài nguyên (Training Workflow)**
 
-![Training Workflow](paper/assets/training-workflow-dark.png)
+![Training Workflow](docs/paper/assets/training-workflow-dark.png)
 
 **3. Quy trình Giám sát & Phát hiện Độ lệch Dữ liệu (Data Drift Workflow)**
 
-![Data Drift Workflow](paper/assets/data-drift-workflow-dark.png)
+![Data Drift Workflow](docs/paper/assets/data-drift-workflow-dark.png)
 
 > 💡 **Tài liệu Kỹ thuật Chuyên sâu:** Xem giải thích chi tiết về luồng dữ liệu, sơ đồ tuần tự (Sequence Diagrams), cơ chế bảo mật Zero-Trust và lược đồ cơ sở dữ liệu tại [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -160,7 +142,7 @@ MLOps-paas-system/
 │   │   └── repositories/                     # Public Helm/OCI repository descriptors
 │   ├── cluster/                              # Namespace, StorageClass, SecretStore, policy và capacity
 │   ├── addons/                               # Upstream controller/CRD/driver adapter
-  │   ├── platform/                             # Data, registry, MLflow, observability, Cloudflare và routing dùng chung
+│   │   ├── platform/                             # Data, registry, MLflow, observability, Cloudflare và routing dùng chung
 │   ├── argo/                                 # Argo Events/Workflows, templates và RBAC
 │   ├── apps/
 │   │   ├── base/                             # Manifest dùng chung cho bốn workload
@@ -214,9 +196,6 @@ MLOps-paas-system/
 ├── docker-compose.yml                        # Môi trường Local Development hoàn chỉnh
 └── .env.example                              # Template biến môi trường chuẩn
 ```
-
-Production không dùng Kubernetes `default` cho workload hay runtime: mỗi owner
-chạy trong namespace `mlops-*`; `user-jobs` vẫn chỉ dành cho PyTorchJob tenant.
 
 ---
 
@@ -286,12 +265,6 @@ Production được triển khai theo ba lớp ownership rõ ràng:
 - **Terraform** quản lý VPC, EC2, ALB, IAM, ACM, S3, Secrets Manager và private DNS cho K3s API.
 - **Ansible** chuẩn bị Ubuntu, cài K3s, publish K3s agent token và bootstrap Argo CD.
 - **Argo CD** cài core/training operators và quản lý toàn bộ Kubernetes resource của Karpenter, gồm `EC2NodeClass` và `NodePool`.
-
-Core platform dùng một K3s server và hai static worker. Server chạy embedded etcd, secrets encryption và snapshot định kỳ; đây vẫn là **single control-plane**, chưa phải HA. Bộ policy tổng quát trong `k8s/security` vẫn được chủ động hoãn, nhưng các NetworkPolicy tối thiểu bảo vệ Argo EventSource/EventBus nằm trong `k8s/argo` và được production GitOps reconcile.
-
-Sau `platform-core`, root Application để Argo CD reconcile core add-ons, cluster configuration và shared platform services theo lifecycle wave. Ansible chỉ chạy smoke verification trong phase `platform-training`. Dù các training add-on được cài, tenant training vẫn đóng: `TRAINING_ENABLED=false`, API submit trả HTTP 503 và UI không hiển thị thao tác submit/GPU.
-
-Ở production, Celery giữ lifecycle state trong PostgreSQL và dispatch side effect sau transaction commit. Build, deployment và drift đi qua Argo Events/Workflows. Sáu webhook nội bộ dùng bearer token riêng, EventBus dùng token authentication, NetworkPolicy chỉ cho Control Plane worker gọi EventSource và mỗi Workflow chạy bằng service account tối thiểu theo chức năng. Training controllers có thể được cài nhưng tenant training vẫn chỉ được mở sau một rollout cô lập workload riêng.
 
 #### Bước 1: Khởi tạo hạ tầng AWS bằng Terraform
 
@@ -365,7 +338,7 @@ cp .env.example .env
 ```bash
 cd ..
 
-# Dùng virtual environment riêng để không sửa Python hệ thống của WSL.
+# Dùng virtual environment riêng để không sửa Python hệ thống
 python3 -m venv .venv-secrets
 source .venv-secrets/bin/activate
 python -m pip install boto3 python-dotenv
@@ -384,7 +357,7 @@ deactivate
 `ARGO_EVENTS_WEBHOOK_TOKEN` phải là token ngẫu nhiên tối thiểu 32 ký tự và
 không được tái sử dụng `CONTROL_PLANE_WEBHOOK_SECRET`. Khi rotate, cập nhật
 `mlops/production-secrets`, chờ `control-plane-api-secret-sync`,
-`control-plane-worker-secret-sync` và `argo-events-webhook-server-sync` Ready,
+`celery-worker-secret-sync` và `argo-events-webhook-server-sync` Ready,
 rồi rolling restart Control Plane API/worker và EventSource; xác minh token mới
 hoạt động trước khi kết thúc cửa sổ rotation.
 
@@ -582,7 +555,7 @@ Tenant training cố ý chưa được mở trong production: không gọi submi
 
 ### Giai đoạn 6: Kiểm tra Hệ thống Giám sát (Observability)
 
-1. Truy cập Grafana: `https://grafana.mlops-nids-nt114.id.vn` (hoặc `http://localhost:3000` ở local).
+1. Truy cập Grafana: `https://grafana.mlops-nids-nt114.id.vn`
 2. Kiểm tra các Dashboard chuyên biệt:
    - **MLOps PaaS Model Serving**: Theo dõi Throughput (RPS), Latency (P95/P99), và HTTP Error Rate của từng model pod.
    - **Kafka / Redpanda**: Monitoring Consumer lag và tốc độ xử lý message.

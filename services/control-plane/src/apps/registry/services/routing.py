@@ -34,6 +34,7 @@ def predict_version(*, version, payload, http=None):
         "success": True,
         "endpoint_url": endpoint.public_url,
         "status_code": response.status_code,
+        "prediction_id": body.get("prediction_id") if isinstance(body, dict) else None,
         "prediction": body.get("prediction") if isinstance(body, dict) else None,
         "confidence": body.get("confidence") if isinstance(body, dict) else None,
         "response": body,

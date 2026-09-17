@@ -3,7 +3,7 @@ import subprocess
 import threading
 import pytest
 
-from src import runner
+from src import application as runner
 from unittest.mock import Mock
 
 def test_read_int_file(tmp_path):

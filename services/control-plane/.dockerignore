@@ -11,3 +11,4 @@ __pycache__
 staticfiles
 htmlcov
 .coverage
+tests/

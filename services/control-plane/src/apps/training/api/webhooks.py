@@ -1,3 +1,4 @@
+from common.logging import record_transition
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -6,7 +7,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.training.models import TrainingJob, TrainingJobEvent, TrainingOutput
+from apps.observability.services.lifecycle import has_event, record_training_event
+from apps.training.models import TrainingJob, TrainingOutput
 from apps.training.services.capabilities import capability_for_token
 from apps.training.services.logs import append_training_log
 from apps.training.services.storage_scope import validate_training_uri
@@ -46,7 +48,7 @@ class TrainingJobWebhookEndpoint(APIView):
             )
             if not capability:
                 return Response({"detail": "Invalid training reporter capability."}, status=status.HTTP_403_FORBIDDEN)
-            if key and TrainingJobEvent.objects.filter(job=job, idempotency_key=key).exists():
+            if has_event(aggregate_type="training_job", aggregate_id=job.public_id, idempotency_key=key):
                 return Response({"status": job.status, "duplicate": True})
             if capability.consumed_at:
                 return Response(
@@ -78,12 +80,16 @@ class TrainingJobWebhookEndpoint(APIView):
             capability.consumed_at = timezone.now()
             capability.save(update_fields=["consumed_at"])
             job.save(update_fields=["status", "completed_at", "runtime_seconds", "error_message", "updated_at"])
-            TrainingJobEvent.objects.create(
+            record_training_event(
                 job=job,
                 event_type="trusted_reporter",
                 message=f"Training status changed to {job.status}.",
                 metadata={"workflow_status": str(request.data.get("workflow_status", ""))},
                 idempotency_key=key,
+            )
+            record_transition(
+                job, job.status, source="webhook",
+                reason="Training reporter confirmed failure" if job.status == "failed" else None,
             )
         append_training_log(job.public_id, f"[SYSTEM] Training reached terminal status: {job.status}.")
         return Response({"status": job.status})
@@ -115,9 +121,7 @@ class TrainingCancellationWebhookEndpoint(APIView):
                     {"detail": "Invalid cancellation reporter capability."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
-            if key and TrainingJobEvent.objects.filter(
-                job=job, idempotency_key=key
-            ).exists():
+            if has_event(aggregate_type="training_job", aggregate_id=job.public_id, idempotency_key=key):
                 return Response({"status": job.status, "duplicate": True})
             if capability.consumed_at:
                 return Response(
@@ -135,7 +139,7 @@ class TrainingCancellationWebhookEndpoint(APIView):
             if not succeeded:
                 job.deletion_error = "Kubernetes training cancellation workflow failed."
                 job.save(update_fields=["deletion_error", "updated_at"])
-            TrainingJobEvent.objects.create(
+            record_training_event(
                 job=job,
                 event_type="cancellation_confirmed" if succeeded else "cancellation_failed",
                 message=(
@@ -148,6 +152,11 @@ class TrainingCancellationWebhookEndpoint(APIView):
             )
         if succeeded:
             confirm_training_cancellation(str(job.public_id))
+        else:
+            record_transition(
+                job, job.status, phase="cancellation_failed", source="webhook",
+                reason="Cancellation reporter confirmed failure",
+            )
         return Response(
             {
                 "status": "cancelled" if succeeded else "cancelling",

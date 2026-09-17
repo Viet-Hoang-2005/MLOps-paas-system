@@ -23,6 +23,17 @@ Keep Build, project, model version, training job, deployment, monitor, and run U
 
 Redis log streams are keyed by resource type and UUID and support cursor polling. They are transient presentation state; PostgreSQL status remains authoritative.
 
+Application-owned container logs use service-owned `src/logging_utils.py`
+(`src/common/logging_utils.py` in Control Plane), using only the standard library
+and either a concise single-line console format (default) or one-line JSON when
+`LOG_FORMAT=json`. No cross-service imports or shared logging
+installation are required. Keep the contract aligned through local tests. Default INFO; high-frequency activity
+is summarized per process every 60 seconds. Emit lifecycle transitions after commit,
+distinguish dispatch from completion, and keep request/resource IDs separate. Use
+`RuntimeLog` for sanitized job detail with container fallback if its sink is absent
+or fails. Preserve metric/EOF protocols and never infer lifecycle state from tenant
+output. See `docs/backend-logging.md` for the complete logging contract.
+
 ## Configuration
 
 Secrets enter trusted services through environment/Secret resources. Tenant jobs receive explicit minimal values. Inspect `.env.example`, Compose, Kubernetes ConfigMaps/Secrets, workflow templates, and tests together before adding a variable.

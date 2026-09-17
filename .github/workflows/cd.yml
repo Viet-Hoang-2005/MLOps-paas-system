@@ -72,7 +72,7 @@ jobs:
       - name: Generate Dynamic Matrix
         id: matrix
         run: |
-          python3 -c '
+          python3 - <<'PY'
           import os, json
           manual_component = "${{ inputs.component || '' }}"
           is_manual = "${{ github.event_name }}" == "workflow_dispatch"
@@ -91,16 +91,16 @@ jobs:
               "training_runner": selected("training_runner") if is_manual else "${{ steps.filter.outputs.training_runner }}" == "true",
           }
           configs = {
-              "frontend": {"name": "Frontend Web", "id": "frontend", "context": "web", "image": "mlops-paas-web"},
-              "control_plane": {"name": "Control Plane", "id": "control_plane", "context": "services/control-plane", "image": "mlops-paas-control-plane"},
-              "consumer": {"name": "Redpanda Consumer", "id": "consumer", "context": "services/consumer", "image": "mlops-paas-consumer"},
-              "packager": {"name": "Model Packager", "id": "packager", "context": "services/model-packager", "image": "mlops-paas-model-packager"},
-              "evidently": {"name": "Evidently Drift", "id": "evidently", "context": "services/evidently", "image": "mlops-paas-evidently"},
-              "mlflow": {"name": "MLflow Tracking Server", "id": "mlflow", "context": "services/mlflow", "image": "mlops-paas-mlflow"},
-              "model_server": {"name": "Model Server", "id": "model_server", "context": "services/model-server", "image": "mlops-paas-model-server"},
-              "machine_learning_serving": {"name": "Machine Learning Serving Base Image", "id": "machine_learning_serving", "context": "services/machine-learning-serving", "image": "machine-learning-serving"},
-              "deep_learning_serving": {"name": "Deep Learning Serving Base Image", "id": "deep_learning_serving", "context": "services/deep-learning-serving", "image": "deep-learning-serving"},
-              "training_runner": {"name": "Training Runner", "id": "training_runner", "context": "services/training-runner", "image": "mlops-paas-training-runner"}
+              "frontend": {"name": "Frontend Web", "id": "frontend", "context": "web", "dockerfile": "web/Dockerfile", "image": "mlops-paas-web"},
+              "control_plane": {"name": "Control Plane", "id": "control_plane", "context": "services/control-plane", "dockerfile": "services/control-plane/Dockerfile", "image": "mlops-paas-control-plane"},
+              "consumer": {"name": "Redpanda Consumer", "id": "consumer", "context": "services/consumer", "dockerfile": "services/consumer/Dockerfile", "image": "mlops-paas-consumer"},
+              "packager": {"name": "Model Packager", "id": "packager", "context": "services/model-packager", "dockerfile": "services/model-packager/Dockerfile", "image": "mlops-paas-model-packager"},
+              "evidently": {"name": "Evidently Drift", "id": "evidently", "context": "services/evidently", "dockerfile": "services/evidently/Dockerfile", "image": "mlops-paas-evidently"},
+              "mlflow": {"name": "MLflow Tracking Server", "id": "mlflow", "context": "services/mlflow", "dockerfile": "services/mlflow/Dockerfile", "image": "mlops-paas-mlflow"},
+              "model_server": {"name": "Model Server", "id": "model_server", "context": "services/model-server", "dockerfile": "services/model-server/Dockerfile", "image": "mlops-paas-model-server"},
+              "machine_learning_serving": {"name": "Machine Learning Serving Base Image", "id": "machine_learning_serving", "context": "services/machine-learning-serving", "dockerfile": "services/machine-learning-serving/Dockerfile", "image": "machine-learning-serving"},
+              "deep_learning_serving": {"name": "Deep Learning Serving Base Image", "id": "deep_learning_serving", "context": "services/deep-learning-serving", "dockerfile": "services/deep-learning-serving/Dockerfile", "image": "deep-learning-serving"},
+              "training_runner": {"name": "Training Runner", "id": "training_runner", "context": "services/training-runner", "dockerfile": "services/training-runner/Dockerfile", "image": "mlops-paas-training-runner"}
           }
           targets = [configs[k] for k, v in changed.items() if v]
           gitops_components = {
@@ -111,7 +111,7 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"targets={json.dumps(targets)}\n")
               f.write(f"gitops_promotion={'true' if gitops_promotion else 'false'}\n")
-          '
+          PY
 
   build-and-push:
     name: "Build & Push (${{ matrix.target.name }})"
@@ -157,6 +157,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.target.context }}
+          file: ${{ matrix.target.dockerfile }}
           push: true
           provenance: false
           tags: |

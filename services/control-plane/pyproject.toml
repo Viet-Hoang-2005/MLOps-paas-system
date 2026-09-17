@@ -28,3 +28,6 @@ exclude = "migrations"
 
 [tool.django-stubs]
 django_settings_module = "config.settings.test"
+
+[tool.pyrefly.errors]
+missing-attribute = "ignore"

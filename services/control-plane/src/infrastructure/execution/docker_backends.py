@@ -3,6 +3,7 @@ import os
 import time
 
 import docker
+import docker.errors
 from apps.deployment.models import Endpoint
 from apps.training.services.capabilities import issue_capability
 from apps.training.services.storage_scope import validate_training_uri
@@ -15,6 +16,14 @@ from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import build_prefix, drift_run_prefix
 
 from .image_references import build_image_tag, image_repository, immutable_image_reference
+
+
+def _logging_environment():
+    # Forward formatting and summary controls; each child logs at INFO.
+    return {
+        "LOG_FORMAT": os.environ.get("LOG_FORMAT") or "console",
+        "LOG_SUMMARY_INTERVAL_SECONDS": os.environ.get("LOG_SUMMARY_INTERVAL_SECONDS") or "60",
+    }
 
 
 def _wait_and_cleanup(container):
@@ -52,6 +61,7 @@ class DockerBuildBackend:
         webhook = f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/builds/{build.public_id}/"
         task_type = "TEST_ZIP" if build.artifact_format == "mlflow_zip" else "BUILD"
         environment = {
+            **_logging_environment(),
             "TASK_TYPE": task_type,
             "BUILD_ID": str(build.public_id),
             "PROJECT_ID": str(project.public_id),
@@ -106,6 +116,7 @@ class DockerTrainingBackend:
         validate_training_uri(job, self.storage.bucket, "output", job.output_uri)
         output_upload_capability = issue_capability(job, "output_upload")
         environment = {
+            **_logging_environment(),
             "S3_SOURCE_URI": self.storage.presigned_get(
                 job.code_snapshot_uri, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS
             ),
@@ -123,6 +134,7 @@ class DockerTrainingBackend:
             "REQUIREMENTS_TEXT": base64.b64encode(job.requirements_text.encode()).decode()
             if job.requirements_text
             else "",
+            "REDIS_URL": settings.REDIS_URL,
         }
         container = self.docker.run(
             image="mlops-paas-training-runner:latest",
@@ -132,10 +144,36 @@ class DockerTrainingBackend:
         )
         job.external_job_id = container.id
         job.save(update_fields=["external_job_id", "updated_at"])
-        status_code, logs = _wait_and_cleanup(container)
-        if status_code:
-            raise RuntimeError(logs[-12000:])
-        return logs
+        return {"dispatched": True, "container_id": container.id}
+
+    def poll(self, job):
+        if not job.external_job_id:
+            return {"status": "failed", "error": "No container ID registered."}
+        try:
+            container = self.docker.client.containers.get(job.external_job_id)
+            container.reload()
+            state = container.attrs.get("State", {})
+            status = state.get("Status", "").lower()
+            if status in {"running", "created", "restarting"}:
+                return {"status": "running"}
+            exit_code = state.get("ExitCode", 0)
+            logs = container.logs(stdout=True, stderr=True).decode("utf-8", errors="replace")
+            try:
+                container.remove(force=True)
+            except docker.errors.NotFound:
+                pass
+            if exit_code == 0:
+                return {"status": "completed", "logs": logs, "exit_code": 0}
+            return {
+                "status": "failed",
+                "error": logs[-12000:],
+                "logs": logs,
+                "exit_code": exit_code,
+            }
+        except docker.errors.NotFound:
+            return {"status": "not_found"}
+        except Exception as exc:
+            return {"status": "error", "error": str(exc)}
 
     def cancel(self, job):
         if getattr(job, "started_at", None) and not job.external_job_id:
@@ -188,6 +226,7 @@ class DockerDeploymentBackend:
             image=image,
             name=container_name,
             environment={
+                **_logging_environment(),
                 "PROJECT_ID": str(project.public_id),
                 "MODEL_VERSION_ID": str(deployment.version.public_id),
                 "MODEL_VERSION": deployment.version.version,
@@ -273,6 +312,7 @@ class DockerDriftBackend:
         }
         source = monitor.version.artifacts.filter(kind__in=("source", "training_output")).first()
         environment = {
+            **_logging_environment(),
             "JOB_ID": str(drift_run.public_id),
             "TENANT_ID": project.owner.tenant_id,
             "PROJECT_ID": str(project.public_id),
@@ -297,6 +337,7 @@ class DockerDriftBackend:
             "DB_PASSWORD": os.environ.get("DB_PASSWORD", ""),
             "DB_NAME": os.environ.get("DB_NAME", "mlops_paas_db"),
             "DB_PORT": os.environ.get("DB_PORT", "5432"),
+            "DB_SCHEMA": settings.DB_SCHEMA,
         }
         container = self.docker.run(
             image="mlops-paas-evidently",
@@ -309,7 +350,46 @@ class DockerDriftBackend:
         drift_run.report_json_uri = uris["report.json"]
         drift_run.summary_uri = uris["summary.json"]
         drift_run.save(update_fields=["external_run_id", "report_html_uri", "report_json_uri", "summary_uri"])
-        status_code, logs = _wait_and_cleanup(container)
-        if status_code:
-            raise RuntimeError(logs[-12000:])
-        return logs
+        return {"dispatched": True, "container_id": container.id}
+
+    def poll(self, drift_run):
+        if not drift_run.external_run_id:
+            return {"status": "failed", "error": "No container ID registered."}
+        try:
+            container = self.docker.client.containers.get(drift_run.external_run_id)
+            container.reload()
+            state = container.attrs.get("State", {})
+            status = state.get("Status", "").lower()
+            if status in {"running", "created", "restarting"}:
+                return {"status": "running"}
+            exit_code = state.get("ExitCode", 0)
+            logs = container.logs(stdout=True, stderr=True).decode("utf-8", errors="replace")
+            try:
+                container.remove(force=True)
+            except docker.errors.NotFound:
+                pass
+            if exit_code == 0:
+                return {"status": "completed", "logs": logs, "exit_code": 0}
+            return {
+                "status": "failed",
+                "error": logs[-12000:],
+                "logs": logs,
+                "exit_code": exit_code,
+            }
+        except docker.errors.NotFound:
+            return {"status": "not_found"}
+        except Exception as exc:
+            return {"status": "error", "error": str(exc)}
+
+    def cancel(self, drift_run):
+        if drift_run.external_run_id:
+            try:
+                container = self.docker.client.containers.get(drift_run.external_run_id)
+                try:
+                    container.kill()
+                except Exception:
+                    pass
+                container.remove(force=True)
+            except docker.errors.NotFound:
+                pass
+        return {"dispatched": False, "confirmed": True}

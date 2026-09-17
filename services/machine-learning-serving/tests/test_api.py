@@ -4,7 +4,7 @@ import pytest
 
 from unittest.mock import Mock
 from fastapi import HTTPException
-from src import index
+from src import api as index
 
 
 @pytest.mark.asyncio

@@ -8,7 +8,7 @@ from django.utils import timezone
 
 def avatar_path(instance, filename):
     user = getattr(instance, "user", instance)
-    return f"users/{user.tenant_id}/avatar/{filename}" # type: ignore[attr-defined]
+    return f"users/{user.tenant_id}/avatar/{filename}"
 
 
 class CustomUserManager(BaseUserManager):

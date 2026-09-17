@@ -1,4 +1,5 @@
 from celery import shared_task
+from common.logging import record_transition
 
 from apps.catalog.models import ModelProject
 
@@ -20,6 +21,7 @@ def execute_project_deletion(self, project_id):
         mark_project_deletion_failed(project, exc)
         raise
     if result.get("dispatched"):
+        record_transition(project, "deleting", phase="deletion_dispatched")
         return "deleting"
     finalize_project_deletion(project)
     return "deleted"

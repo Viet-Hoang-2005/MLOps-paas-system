@@ -130,6 +130,8 @@ spec:
                             cpu: "{{inputs.parameters.vcpu}}"
                             memory: "{{inputs.parameters.memory}}Mi"
                         env:
+                          - {name: LOG_FORMAT, value: "console"}
+                          - {name: LOG_SUMMARY_INTERVAL_SECONDS, value: "60"}
                           - {name: S3_SOURCE_URI, value: {{=toJson(inputs.parameters.s3_source_uri)}}}
                           - {name: S3_TRAINING_DATA_URI, value: {{=toJson(inputs.parameters.s3_training_data_uri)}}}
                           - {name: S3_OUTPUT_UPLOAD_URL, value: {{=toJson(inputs.parameters.output_upload_url)}}}
@@ -212,6 +214,8 @@ spec:
                             memory: "{{inputs.parameters.memory}}Mi"
                             nvidia.com/gpu: "{{inputs.parameters.accelerator_count}}"
                         env:
+                          - {name: LOG_FORMAT, value: "console"}
+                          - {name: LOG_SUMMARY_INTERVAL_SECONDS, value: "60"}
                           - {name: S3_SOURCE_URI, value: {{=toJson(inputs.parameters.s3_source_uri)}}}
                           - {name: S3_TRAINING_DATA_URI, value: {{=toJson(inputs.parameters.s3_training_data_uri)}}}
                           - {name: S3_OUTPUT_UPLOAD_URL, value: {{=toJson(inputs.parameters.output_upload_url)}}}

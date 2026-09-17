@@ -5,6 +5,10 @@ import mlflow.pyfunc
 from pathlib import Path
 from typing import Any, Dict
 from fastapi import HTTPException
+from src.logging_utils import Summary, get_logger, log_event
+
+logger = get_logger(__name__)
+load_summary = Summary(logger, "model_load_summary")
 
 MODEL_CACHE_DIR = os.environ.get("MODEL_CACHE_DIR", "/tmp/mlops_paas_models")
 MODEL_CACHE: Dict[str, Dict[str, Any]] = {}
@@ -61,7 +65,7 @@ def load_model_from_uri(model_version_id: str, model_uri: str, version_marker: s
                             label_mapping = {i: v for i, v in enumerate(label_mapping)}
                     break
                 except Exception as e:
-                    print(f"Failed to load mapping file {mapping_file}: {e}")
+                    log_event(logger, "WARNING", "label_mapping_load_failed", "Label mapping could not be loaded", error_type=type(e).__name__)
 
         if not label_mapping:
             for ext, loader, mode in [(".json", json.load, "r"), (".pkl", pickle.load, "rb")]:
@@ -77,6 +81,7 @@ def load_model_from_uri(model_version_id: str, model_uri: str, version_marker: s
                         pass
 
     except Exception as exc:
+        load_summary.failure("load", "Model artifact load failed", error_type=type(exc).__name__)
         raise HTTPException(status_code=503, detail=f"Unable to load model artifact: {exc}")
 
     try:
@@ -104,7 +109,7 @@ def load_model_from_uri(model_version_id: str, model_uri: str, version_marker: s
             elif hasattr(raw_model, "feature_names"):
                 expected_features = raw_model.feature_names
     except Exception as e:
-        print(f"Failed to apply XGBClassifier workaround or extract feature names: {e}")
+        log_event(logger, "WARNING", "model_metadata_resolution_failed", "Model compatibility metadata could not be resolved", error_type=type(e).__name__)
 
     MODEL_CACHE[model_version_id] = {
         "model": pyfunc_model,
@@ -112,6 +117,8 @@ def load_model_from_uri(model_version_id: str, model_uri: str, version_marker: s
         "label_mapping": label_mapping,
         "version_marker": version_marker,
     }
+    load_summary.recovery("load")
+    log_event(logger, "INFO", "model_loaded", "Model artifact loaded")
     return MODEL_CACHE[model_version_id]
 
 def load_model_for_record(model_record: Dict[str, Any]) -> Dict[str, Any]:

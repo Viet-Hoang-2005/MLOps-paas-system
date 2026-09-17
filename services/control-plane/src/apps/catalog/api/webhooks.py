@@ -1,4 +1,5 @@
 from common.api.permissions import HasInternalWebhookSecret
+from common.logging import record_transition
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -27,6 +28,7 @@ class ProjectDeletionWebhookEndpoint(APIView):
         incoming = str(request.data.get("status", "")).lower()
         if incoming in {"success", "succeeded", "completed", "deleted"}:
             complete_project_deletion.delay(str(project.public_id))
+            record_transition(project, "deleting", phase="completion_enqueued", source="webhook")
             return Response({"status": "deleting", "completion_enqueued": True})
 
         error = request.data.get("error_message") or request.data.get("error") or "Model cleanup failed."

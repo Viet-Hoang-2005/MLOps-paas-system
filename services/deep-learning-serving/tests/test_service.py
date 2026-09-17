@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from unittest.mock import Mock
-from src import index
+from src import service as index
 
 
 def make_service(monkeypatch, model):

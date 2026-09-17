@@ -1,64 +1,5 @@
 services:
-  # 1. PostgreSQL Database (mô phỏng CloudNativePG local)
-  postgres:
-    image: postgres:15-alpine
-    container_name: mlops_paas_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
-    ports:
-      - "5432:5432"
-    volumes:
-      - mlops_paas_pgdata:/var/lib/postgresql/data
-    networks:
-      - mlops_paas_network
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  # 1.1 Init Container để tạo schema cho Control Plane và MLflow
-  schema-init:
-    image: postgres:15-alpine
-    container_name: mlops_paas_schema_init
-    restart: "no"
-    environment:
-      PGPASSWORD: ${DB_PASSWORD}
-    command: >
-      sh -c "until pg_isready -h postgres -U ${DB_USER} -d ${DB_NAME}; do sleep 2; done;
-      psql -h postgres -U ${DB_USER} -d ${DB_NAME} -v ON_ERROR_STOP=1
-      -c 'CREATE SCHEMA IF NOT EXISTS ${DB_SCHEMA:-control_plane}; CREATE SCHEMA IF NOT EXISTS mlflow;'"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    tmpfs:
-      - /var/lib/postgresql/data
-    networks:
-      - mlops_paas_network
-
-  # 1.2 pgAdmin 4 (PostgreSQL Web GUI)
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: mlops_paas_pgadmin
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
-    ports:
-      - "5050:80"
-    volumes:
-      - pgadmin-data:/var/lib/pgadmin
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - mlops_paas_network
-
-  # 2. Django Control Plane
+  # 1. Django Control Plane
   control-plane:
     build:
       context: ./services/control-plane
@@ -70,6 +11,8 @@ services:
       - "8000:8000"
     environment:
       PYTHONUNBUFFERED: 1
+      LOG_FORMAT: ${LOG_FORMAT:-console}
+      LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
       PYTHONPATH: /app/src
       DJANGO_SETTINGS_MODULE: config.settings.local
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-local-dev-change-me}
@@ -126,7 +69,7 @@ services:
     volumes:
       - ./services/control-plane:/app
       - /var/run/docker.sock:/var/run/docker.sock
-    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && daphne -b 0.0.0.0 -p 8000 config.asgi:application"
+    command: sh -c "python manage.py migrate --verbosity 0 && python manage.py collectstatic --noinput --verbosity 0 && exec daphne --verbosity 0 -b 0.0.0.0 -p 8000 config.asgi:application"
     depends_on:
       postgres:
         condition: service_healthy
@@ -139,13 +82,17 @@ services:
     networks:
       - mlops_paas_network
 
-  # 2.1 Celery Worker for Django Control Plane
-  control-plane-worker:
-    image: mlops-paas-control-plane
-    container_name: mlops_paas_control_plane_worker
+  # 1.1 Celery Worker for Django Control Plane
+  celery-worker:
+    build:
+      context: ./services/control-plane
+      dockerfile: Dockerfile
+    container_name: mlops_paas_celery_worker
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: 1
+      LOG_FORMAT: ${LOG_FORMAT:-console}
+      LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
       PYTHONPATH: /app/src
       DJANGO_SETTINGS_MODULE: config.settings.local
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-local-dev-change-me}
@@ -187,7 +134,7 @@ services:
     volumes:
       - ./services/control-plane:/app
       - /var/run/docker.sock:/var/run/docker.sock
-    command: celery -A config worker --loglevel=INFO --concurrency=2
+    command: celery -A config worker --concurrency=2
     depends_on:
       control-plane:
         condition: service_started
@@ -196,7 +143,7 @@ services:
     networks:
       - mlops_paas_network
 
-  # 3. Model Server API Gateway
+  # 2. Model Server API Gateway
   model-server:
     build:
       context: ./services/model-server
@@ -208,6 +155,8 @@ services:
       - "5001:5000"
     environment:
       PYTHONUNBUFFERED: 1
+      LOG_FORMAT: ${LOG_FORMAT:-console}
+      LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
       DB_HOST_RO: postgres
       DB_PORT: 5432
       DB_USER: ${DB_USER}
@@ -234,32 +183,49 @@ services:
         condition: service_started
     networks:
       - mlops_paas_network
+    volumes:
+      - ./services/model-server:/app
 
-  # 3.1 Machine Learning Serving Engine (Base Image)
+  # 2.1 Machine Learning Serving Engine (Base Image)
   machine-learning-serving:
     build:
       context: ./services/machine-learning-serving
       dockerfile: Dockerfile
     image: mlops-paas-machine-learning-serving:latest
     container_name: mlops_paas_machine_learning_serving
+    environment:
+      LOG_FORMAT: ${LOG_FORMAT:-console}
+      LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
     restart: "no"
-    command: ["echo", "Base Image mlops-paas-machine-learning-serving:latest built successfully. Ready for Pre-built Image Packaging..."]
+    command:
+      - python
+      - -c
+      - >-
+        from src.logging_utils import configure, log_event;
+        log_event(configure('machine-learning-serving'), 'INFO', 'image.ready', 'Runtime image ready for dynamic execution')
     networks:
       - mlops_paas_network
 
-  # 3.2 Deep Learning Serving Engine (Base Image)
+  # 2.2 Deep Learning Serving Engine (Base Image)
   deep-learning-serving:
     build:
       context: ./services/deep-learning-serving
       dockerfile: Dockerfile
     image: mlops-paas-deep-learning-serving:latest
     container_name: mlops_paas_deep_learning_serving
+    environment:
+      LOG_FORMAT: ${LOG_FORMAT:-console}
     restart: "no"
-    command: ["echo", "Base Image mlops-paas-deep-learning-serving:latest built successfully. Ready for Pre-built Image Packaging..."]
+    command:
+      - python
+      - -c
+      - >-
+        from src.logging_utils import configure, log_event;
+        log_event(configure('deep-learning-serving'), 'INFO', 'image.ready', 'Runtime image ready for dynamic execution')
     networks:
       - mlops_paas_network
 
-  # 3.3 Traefik API Gateway for Model Server
+  # 2.3 Traefik API Gateway for Model Server
   traefik:
     image: traefik:latest
     container_name: mlops_paas_traefik
@@ -277,7 +243,7 @@ services:
     networks:
       - mlops_paas_network
 
-  # 4. Model Package (Image Builder)
+  # 3. Model Package (Image Builder)
   model-packager:
     build:
       context: ./services/model-packager
@@ -285,13 +251,19 @@ services:
     image: mlops-paas-model-packager
     container_name: mlops_paas_model_packager
     restart: "no"
-    command: ["echo", "Model Packager Image Built Successfully. Waiting for dynamic execution..."]
+    command:
+      - python
+      - -c
+      - >-
+        from src.logging_utils import configure, log_event;
+        log_event(configure('model-packager'), 'INFO', 'image.ready', 'Runtime image ready for dynamic execution')
     environment:
       PYTHONUNBUFFERED: 1
+      LOG_FORMAT: ${LOG_FORMAT:-console}
     networks:
       - mlops_paas_network
 
-  # 5. Evidently Drift Monitor (Image Builder)
+  # 4. Evidently Drift Monitor (Image Builder)
   evidently:
     build:
       context: ./services/evidently
@@ -299,13 +271,78 @@ services:
     image: mlops-paas-evidently
     container_name: mlops_paas_evidently
     restart: "no"
-    command: ["echo", "Evidently Drift Monitor Image Built Successfully. Waiting for dynamic execution..."]
+    command:
+      - python
+      - -c
+      - >-
+        from src.logging_utils import configure, log_event;
+        log_event(configure('evidently'), 'INFO', 'image.ready', 'Runtime image ready for dynamic execution')
     environment:
       PYTHONUNBUFFERED: 1
+      LOG_FORMAT: ${LOG_FORMAT:-console}
     networks:
       - mlops_paas_network
 
-  # 6. Redpanda Kafka Broker
+  # 5. Training Runner (Image Builder)
+  training-runner:
+    build:
+      context: ./services/training-runner
+      dockerfile: Dockerfile
+    image: mlops-paas-training-runner:latest
+    restart: "no"
+    command:
+      - python
+      - -c
+      - >-
+        from src.logging_utils import configure, log_event;
+        log_event(configure('training-runner'), 'INFO', 'image.ready', 'Runtime image ready for dynamic execution')
+    environment:
+      LOG_FORMAT: ${LOG_FORMAT:-console}
+    networks:
+      - mlops_paas_network
+
+  # 6. PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mlops_paas_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - mlops_paas_pgdata:/var/lib/postgresql/data
+    networks:
+      - mlops_paas_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # 6.1 Init Container để tạo schema cho Control Plane và MLflow
+  schema-init:
+    image: postgres:15-alpine
+    container_name: mlops_paas_schema_init
+    restart: "no"
+    environment:
+      PGPASSWORD: ${DB_PASSWORD}
+    command: >
+      sh -c "until pg_isready -h postgres -U ${DB_USER} -d ${DB_NAME}; do sleep 2; done;
+      psql -h postgres -U ${DB_USER} -d ${DB_NAME} -v ON_ERROR_STOP=1
+      -c 'CREATE SCHEMA IF NOT EXISTS ${DB_SCHEMA:-control_plane}; CREATE SCHEMA IF NOT EXISTS mlflow;'"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks:
+      - mlops_paas_network
+
+  # 7. Redpanda Kafka Broker
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:latest
     container_name: mlops_paas_redpanda
@@ -328,7 +365,7 @@ services:
     networks:
       - mlops_paas_network
 
-  # 6.1 Redpanda Init Kafka Topic
+  # 7.1 Redpanda Init Kafka Topic
   redpanda-init:
     image: docker.redpanda.com/redpandadata/redpanda:latest
     container_name: mlops_paas_redpanda_init
@@ -350,10 +387,12 @@ services:
     depends_on:
       redpanda:
         condition: service_started
+    tmpfs:
+      - /var/lib/redpanda/data
     networks:
       - mlops_paas_network
 
-  # 6.2 Kafka Consumer
+  # 7.2 Redpanda Consumer
   consumer:
     build:
       context: ./services/consumer
@@ -363,12 +402,15 @@ services:
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: 1
+      LOG_FORMAT: ${LOG_FORMAT:-console}
+      LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
       DB_HOST_RW: postgres
       DB_HOST_RO: postgres
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME}
+      DB_SCHEMA: ${DB_SCHEMA:-control_plane}
       REDPANDA_BROKERS: redpanda:9092
       KAFKA_TOPIC: ${KAFKA_TOPIC:-mlops_paas_production_data}
       KAFKA_TOPIC_RETRY_SECONDS: ${KAFKA_TOPIC_RETRY_SECONDS:-5}
@@ -396,30 +438,19 @@ services:
     networks:
       - mlops_paas_network
 
-  # 6.3 Redpanda Console UI
-  redpanda-console:
-    image: docker.redpanda.com/redpandadata/console:latest
-    container_name: mlops_paas_redpanda_console
-    ports:
-      - "8081:8080"
-    environment:
-      KAFKA_BROKERS: redpanda:9092
-    depends_on:
-      - redpanda
-    networks:
-      - mlops_paas_network
-
-  # 7. Redis
+  # 8. Redis
   redis:
     image: redis:7-alpine
     container_name: mlops_paas_redis
     restart: unless-stopped
     ports:
       - "6379:6379"
+    tmpfs:
+      - /data
     networks:
       - mlops_paas_network
 
-  # 8. MLflow Tracking Server
+  # 9. MLflow Tracking Server
   mlflow:
     build:
       context: ./services/mlflow
@@ -466,5 +497,3 @@ volumes:
     name: ${POSTGRES_VOLUME_NAME:-mlops_paas_pgdata}
   redpanda_data:
     name: mlops_paas_redpanda_data
-  pgadmin-data:
-    name: mlops_paas_pgadmin_data

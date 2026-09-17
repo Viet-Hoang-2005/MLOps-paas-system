@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 
 from apps.deployment.models import Build
 from apps.deployment.services.builds import request_training_build
+from apps.observability.services.lifecycle import events_for_aggregate
 from apps.training.selectors import job_for_user, jobs_for_user
 from apps.training.services.jobs import (
     cancel_job,
@@ -88,7 +89,11 @@ class TrainingJobCancelEndpoint(APIView):
 class TrainingJobEventsEndpoint(APIView):
     def get(self, request, job_id):
         job = job_for_user(request.user, job_id)
-        return Response(TrainingJobEventSerializer(job.events.all(), many=True).data)
+        return Response(
+            TrainingJobEventSerializer(
+                events_for_aggregate(aggregate_type="training_job", aggregate_id=job.public_id), many=True
+            ).data
+        )
 
 
 class TrainingJobLogsEndpoint(APIView):

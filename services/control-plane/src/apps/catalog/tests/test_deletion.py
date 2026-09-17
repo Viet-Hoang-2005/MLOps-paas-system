@@ -23,7 +23,7 @@ class FakeStorage:
 def test_delete_endpoint_marks_the_entire_project_deleting_and_enqueues_cleanup(
     django_capture_on_commit_callbacks, monkeypatch
 ):
-    owner = get_user_model().objects.create_user("delete-owner@example.com", "password123") # type: ignore[attr-defined]
+    owner = get_user_model().objects.create_user("delete-owner@example.com", "password123") 
     project = ModelProject.objects.create(owner=owner, name="Delete me")
     queued = []
     monkeypatch.setattr(
@@ -46,7 +46,7 @@ def test_delete_endpoint_marks_the_entire_project_deleting_and_enqueues_cleanup(
 
 @pytest.mark.django_db
 def test_cleanup_manifest_includes_all_project_build_images_and_runtime_names():
-    owner = get_user_model().objects.create_user("manifest-owner@example.com", "password123") # type: ignore[attr-defined]
+    owner = get_user_model().objects.create_user("manifest-owner@example.com", "password123") 
     project = ModelProject.objects.create(owner=owner, name="All image history")
     first = ModelVersion.objects.create(project=project, version="1")
     second = ModelVersion.objects.create(project=project, version="2")
@@ -75,7 +75,7 @@ def test_cleanup_manifest_includes_all_project_build_images_and_runtime_names():
 
 @pytest.mark.django_db
 def test_finalization_deletes_project_s3_prefix_and_archives_database_rows():
-    owner = get_user_model().objects.create_user("finalize-owner@example.com", "password123") # type: ignore[attr-defined]
+    owner = get_user_model().objects.create_user("finalize-owner@example.com", "password123") 
     project = ModelProject.objects.create(owner=owner, name="Finalize me", deletion_state="deleting", is_active=False)
     version = ModelVersion.objects.create(project=project, version="1")
     build = Build.objects.create(
@@ -114,7 +114,7 @@ def test_local_cleanup_uses_docker_sdk_without_a_model_cleaner_container():
 
     class Images:
         def remove(self, image, force, noprune):
-            removed.append(("image", image, force, noprune)) # type: ignore[attr-defined]
+            removed.append(("image", image, force, noprune)) 
 
     client = SimpleNamespace(containers=Containers(), images=Images())
     backend = DockerProjectCleanupBackend(docker_client=SimpleNamespace(client=client))

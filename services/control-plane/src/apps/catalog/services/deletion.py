@@ -1,3 +1,4 @@
+from common.logging import record_transition
 from django.db import transaction
 from django.utils import timezone
 from infrastructure.execution.cleanup_backends import project_cleanup_backend
@@ -8,6 +9,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Deployment, Endpoint
+from apps.deployment.services.cache import invalidate_model_server_cache
 
 
 def request_project_deletion(project):
@@ -50,7 +52,7 @@ def project_cleanup_manifest(project):
     )
     container_names = sorted(
         {
-            getattr(deployment, "endpoint", None).runtime_name # type: ignore[attr-defined]
+            getattr(deployment, "endpoint", None).runtime_name
             if getattr(deployment, "endpoint", None) and deployment.endpoint.runtime_name
             else f"deploy-{deployment.build.public_id}"
             for deployment in deployments
@@ -83,6 +85,8 @@ def finalize_project_deletion(project, *, storage=None):
             stopped_at=timezone.now(),
         )
         Endpoint.objects.filter(deployment__version__project=project).update(health_status="stopped")
+        for version_id in project.versions.values_list("public_id", flat=True):
+            invalidate_model_server_cache(str(version_id))
         project.deletion_state = "deleted"
         project.deletion_error = ""
         project.deletion_task_id = ""
@@ -98,6 +102,7 @@ def finalize_project_deletion(project, *, storage=None):
                 "updated_at",
             ]
         )
+        record_transition(project, "deleted")
     return project
 
 
@@ -105,4 +110,9 @@ def mark_project_deletion_failed(project, error):
     project.deletion_state = "delete_failed"
     project.deletion_error = str(error)[:12000]
     project.save(update_fields=["deletion_state", "deletion_error", "updated_at"])
+    record_transition(
+        project, "delete_failed", reason="Project cleanup failed",
+        error_type=type(error).__name__ if isinstance(error, Exception) else None,
+        exc_info=(type(error), error, error.__traceback__) if isinstance(error, Exception) else None,
+    )
     return project

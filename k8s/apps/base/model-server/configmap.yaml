@@ -5,6 +5,8 @@ metadata:
   labels:
     app: mlops-paas-model-server
 data:
+  LOG_FORMAT: "console"
+  LOG_SUMMARY_INTERVAL_SECONDS: "60"
   DB_HOST_RO: "mlops-paas-postgres-ro.mlops-postgres.svc.cluster.local"
   DB_PORT: "5432"
   DB_NAME: "mlops_paas_db"

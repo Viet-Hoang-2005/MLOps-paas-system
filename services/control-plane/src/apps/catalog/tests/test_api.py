@@ -11,8 +11,8 @@ from apps.registry.models import ModelVersion
 
 @pytest.mark.django_db
 def test_project_api_uses_uuid_and_tenant_scope():
-    owner = get_user_model().objects.create_user("owner@example.com", "password123") # type: ignore[attr-defined]
-    stranger = get_user_model().objects.create_user("stranger@example.com", "password123") # type: ignore[attr-defined]
+    owner = get_user_model().objects.create_user("owner@example.com", "password123")
+    stranger = get_user_model().objects.create_user("stranger@example.com", "password123") 
     project = ModelProject.objects.create(owner=owner, name="NIDS")
     client = APIClient()
     client.force_authenticate(stranger)
@@ -27,7 +27,7 @@ def test_project_api_uses_uuid_and_tenant_scope():
 
 @pytest.mark.django_db
 def test_duplicate_project_name_returns_conflict_with_clear_message():
-    owner = get_user_model().objects.create_user("duplicate-owner@example.com", "password123") # type: ignore[attr-defined]
+    owner = get_user_model().objects.create_user("duplicate-owner@example.com", "password123") 
     ModelProject.objects.create(owner=owner, name="NIDS")
     client = APIClient()
     client.force_authenticate(owner)
@@ -45,7 +45,7 @@ def test_duplicate_project_name_returns_conflict_with_clear_message():
 
 @pytest.mark.django_db
 def test_project_list_returns_metadata_image_ready_and_deployed_lifecycle_statuses():
-    owner = get_user_model().objects.create_user("lifecycle-owner@example.com", "password123") # type: ignore[attr-defined]
+    owner = get_user_model().objects.create_user("lifecycle-owner@example.com", "password123") 
     metadata_project = ModelProject.objects.create(owner=owner, name="Metadata only")
     image_project = ModelProject.objects.create(owner=owner, name="Image ready")
     deployed_project = ModelProject.objects.create(owner=owner, name="Deployed")
@@ -77,7 +77,7 @@ def test_project_list_returns_metadata_image_ready_and_deployed_lifecycle_status
 
 @pytest.mark.django_db
 def test_project_list_returns_latest_active_endpoint_for_the_owner():
-    owner = get_user_model().objects.create_user("endpoint-owner@example.com", "password123") # type: ignore[attr-defined]
+    owner = get_user_model().objects.create_user("endpoint-owner@example.com", "password123") 
     project = ModelProject.objects.create(owner=owner, name="NIDS")
     version = ModelVersion.objects.create(project=project, version="1")
     build = Build.objects.create(project=project, version=version, flavor="xgboost", status="ready")

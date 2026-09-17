@@ -36,7 +36,7 @@ class Command(BaseCommand):
             "endpoint-",
         )
         for container in DockerClient().client.containers.list(all=True):
-            if container.name.startswith(prefixes): # type: ignore[attr-defined]
+            if container.name.startswith(prefixes): 
                 container.remove(force=True)
         if options["include_harbor"]:
             harbor = HarborClient()

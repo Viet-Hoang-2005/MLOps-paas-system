@@ -6,7 +6,7 @@ import types
 import zipfile
 import pytest
 
-from src import runner
+from src import application as runner
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -19,17 +19,17 @@ def test_require_env(monkeypatch):
 
 
 def test_redis_logging_is_optional_and_failure_safe(monkeypatch):
-    assert runner.log_to_redis("ignored") is None
+    assert runner.log_to_redis("ignored") is False
     client = Mock()
     module = types.SimpleNamespace(from_url=Mock(return_value=client))
-    monkeypatch.setitem(sys.modules, "redis", module)
+    monkeypatch.setattr(runner, "redis", module)
     monkeypatch.setenv("TRAINING_JOB_ID", "job-1")
     monkeypatch.setenv("REDIS_URL", "redis://redis.test:6379/1")
-    runner.log_to_redis("hello")
+    assert runner.log_to_redis("hello") is True
     client.rpush.assert_called_once_with("training_logs:job-1", "hello")
     client.expire.assert_called_once()
     module.from_url.side_effect = RuntimeError("offline")
-    assert runner.log_to_redis("safe") is None
+    assert runner.log_to_redis("safe") is False
 
 
 def test_download_presigned_url(monkeypatch, tmp_path):
@@ -90,18 +90,18 @@ def test_safe_extract_zip_rejects_symlink(tmp_path):
         runner.safe_extract_zip(archive, tmp_path / "source")
 
 
-def test_install_requirements_noop_success_and_failure(monkeypatch, tmp_path, runner_workspace, capsys):
+def test_install_requirements_noop_success_and_failure(monkeypatch, tmp_path, runner_workspace):
     missing = tmp_path / "missing.txt"
     runner.install_requirements(missing)
     run = Mock(return_value=subprocess.CompletedProcess([], 0, "installed\n", "warning\n"))
-    redis_log = Mock()
+    runtime_log = Mock()
     monkeypatch.setattr(runner.subprocess, "run", run)
-    monkeypatch.setattr(runner, "log_to_redis", redis_log)
+    monkeypatch.setattr(runner, "runtime_log", runtime_log)
     requirements = tmp_path / "requirements.txt"
     requirements.write_text("pytest", encoding="utf-8")
     runner.install_requirements(requirements)
-    assert "installed" in capsys.readouterr().out
-    assert redis_log.call_count >= 2
+    runtime_log.detail.assert_any_call("installed")
+    runtime_log.detail.assert_any_call("warning")
     run.return_value = subprocess.CompletedProcess([], 2, "", "bad")
     with pytest.raises(RuntimeError, match="exit code 2"):
         runner.install_requirements(requirements)

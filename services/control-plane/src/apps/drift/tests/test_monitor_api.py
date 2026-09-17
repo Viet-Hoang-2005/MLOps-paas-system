@@ -8,7 +8,7 @@ from apps.registry.models import ModelVersion
 
 
 def _monitor_fixture(email="drift-monitor@example.com"):
-    owner = get_user_model().objects.create_user(email, "password123")  # type: ignore[attr-defined]
+    owner = get_user_model().objects.create_user(email, "password123")  
     project = ModelProject.objects.create(owner=owner, name="NIDS")
     version = ModelVersion.objects.create(project=project, version="1")
     asset = WorkspaceAsset.objects.create(
@@ -107,7 +107,7 @@ def test_existing_monitor_can_be_updated_without_conflicting_with_itself():
 @pytest.mark.django_db
 def test_completed_run_report_url_is_tenant_scoped_and_presigned(monkeypatch):
     owner, _project, version, asset = _monitor_fixture("drift-report-owner@example.com")
-    other = get_user_model().objects.create_user("drift-report-other@example.com", "password123")  # type: ignore[attr-defined]
+    other = get_user_model().objects.create_user("drift-report-other@example.com", "password123")  
     monitor = DriftMonitor.objects.create(version=version, reference_asset=asset, name="default")
     run = DriftRun.objects.create(
         monitor=monitor,

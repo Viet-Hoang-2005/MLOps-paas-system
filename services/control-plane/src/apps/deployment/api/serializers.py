@@ -84,11 +84,30 @@ class BuildInputAssetSerializer(serializers.ModelSerializer):
         fields = ("id", "kind", "name", "checksum", "size_bytes", "content_type", "purged_at")
 
 
+class PresignedUploadUrlSerializer(serializers.Serializer):
+    flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"))
+    artifact_format = serializers.ChoiceField(choices=ARTIFACT_FORMATS, default="raw")
+    filename = serializers.CharField(max_length=255)
+    content_type = serializers.CharField(max_length=120, required=False, default="application/octet-stream")
+
+    def validate(self, attrs):
+        validate_source_artifact(
+            filename=attrs["filename"],
+            flavor=attrs["flavor"],
+            artifact_format=attrs["artifact_format"],
+        )
+        return attrs
+
+
 class ManualBuildCreateSerializer(serializers.Serializer):
     flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"))
     artifact_format = serializers.ChoiceField(choices=ARTIFACT_FORMATS, default="raw")
     requirements_text = serializers.CharField(required=False, allow_blank=True, default="")
-    source_artifact = serializers.FileField()
+    source_artifact = serializers.FileField(required=False, allow_null=True)
+    source_artifact_uri = serializers.CharField(required=False, allow_blank=True)
+    source_artifact_name = serializers.CharField(required=False, allow_blank=True)
+    source_artifact_size = serializers.IntegerField(required=False, min_value=0)
+    source_artifact_checksum = serializers.CharField(required=False, allow_blank=True)
     label_mapping_file = serializers.FileField(required=False)
     metrics_file = serializers.FileField(required=False)
     params_file = serializers.FileField(required=False)
@@ -97,8 +116,20 @@ class ManualBuildCreateSerializer(serializers.Serializer):
     input_schema_file = serializers.FileField(required=False)
 
     def validate(self, attrs):
+        has_file = bool(attrs.get("source_artifact"))
+        has_uri = bool(attrs.get("source_artifact_uri"))
+        if not has_file and not has_uri:
+            raise serializers.ValidationError(
+                {"source_artifact": "Provide either source_artifact file or source_artifact_uri."}
+            )
+
+        filename = attrs["source_artifact"].name if has_file else attrs.get("source_artifact_name", "")
+        if not filename and has_uri:
+            filename = attrs["source_artifact_uri"].rstrip("/").split("/")[-1]
+            attrs["source_artifact_name"] = filename
+
         validate_source_artifact(
-            filename=attrs["source_artifact"].name,
+            filename=filename,
             flavor=attrs["flavor"],
             artifact_format=attrs["artifact_format"],
         )

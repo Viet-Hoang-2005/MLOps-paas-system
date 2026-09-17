@@ -1,8 +1,10 @@
+from common.logging import runtime_line
 from django.db import transaction
 from infrastructure.execution import deployment_backend
 from rest_framework.exceptions import ValidationError
 
 from apps.deployment.models import Deployment
+from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.tasks import execute_deployment, stop_deployment
 
 
@@ -22,9 +24,11 @@ def _enqueue(deployment):
 
 
 def request_stop(deployment):
+    invalidate_model_server_cache(str(deployment.version.public_id))
     transaction.on_commit(lambda: stop_deployment.delay(str(deployment.public_id)))
     return deployment
 
 
 def endpoint_logs(endpoint):
-    return deployment_backend(endpoint.deployment.backend).logs(endpoint.deployment)
+    output = deployment_backend(endpoint.deployment.backend).logs(endpoint.deployment)
+    return "\n".join(runtime_line(line) for line in output.splitlines())

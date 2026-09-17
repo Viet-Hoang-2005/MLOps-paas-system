@@ -1,0 +1,17 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "charliermarsh.ruff",
+    "ms-toolsai.jupyter",
+    "ms-azuretools.vscode-docker",
+    "redhat.vscode-yaml",
+    "ms-kubernetes-tools.vscode-kubernetes-tools",
+    "hashicorp.terraform",
+    "redhat.ansible",
+    "dbaeumer.vscode-eslint",
+    "bradlc.vscode-tailwindcss",
+    "james-yu.latex-workshop",
+    "github.vscode-github-actions"
+  ]
+}

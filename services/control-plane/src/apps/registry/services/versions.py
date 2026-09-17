@@ -6,7 +6,8 @@ from infrastructure.storage.paths import build_prefix, version_prefix
 from rest_framework.exceptions import ValidationError
 
 from apps.observability.services.outbox import enqueue_event
-from apps.registry.models import ModelArtifact, ModelMetric, ModelVersion, RegistryEvent
+from apps.observability.services.lifecycle import record_registry_event
+from apps.registry.models import ModelArtifact, ModelMetric, ModelVersion
 
 BUILD_INPUT_ARTIFACT_KINDS = {
     "source_artifact": "source",
@@ -101,7 +102,7 @@ def register_successful_build(
                 )
             project.next_version_number = version_number + 1
             project.save(update_fields=["next_version_number", "updated_at"])
-            RegistryEvent.objects.create(
+            record_registry_event(
                 version=version,
                 actor=project.owner,
                 event_type="registered",
@@ -159,7 +160,7 @@ def set_alias(*, project, actor, name, version):
     if version.project_id != project.id:
         raise ValidationError({"version": "The version belongs to another project."})
     alias, _ = RegistryAlias.objects.update_or_create(project=project, name=name, defaults={"version": version})
-    RegistryEvent.objects.create(version=version, actor=actor, event_type="alias_updated", to_state=name)
+    record_registry_event(version=version, actor=actor, event_type="alias_updated", to_state=name)
     enqueue_event(
         topic="registry.events",
         aggregate_type="model_project",

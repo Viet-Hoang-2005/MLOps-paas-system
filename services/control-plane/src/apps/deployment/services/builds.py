@@ -38,9 +38,40 @@ def request_build(version, backend):
     return build
 
 
+import uuid
+
+
+def create_build_presigned_url(*, project, validated_data, storage=None):
+    storage = storage or S3Storage()
+    filename = Path(validated_data["filename"]).name
+    content_type = validated_data.get("content_type") or "application/octet-stream"
+    draft_id = uuid.uuid4()
+    input_prefix = build_input_prefix(
+        project.owner.tenant_id,
+        project.public_id,
+        draft_id,
+        "source_artifact",
+    )
+    key = f"{input_prefix}{filename}"
+    s3_uri = f"s3://{storage.bucket}/{key}"
+    upload_url = storage.presigned_put(s3_uri, expires_in=1800, content_type=content_type)
+    return {
+        "upload_url": upload_url,
+        "s3_uri": s3_uri,
+        "key": key,
+        "filename": filename,
+        "draft_build_id": str(draft_id),
+        "expires_in": 1800,
+    }
+
+
 def request_manual_build(*, project, validated_data, backend, storage=None):
     storage = storage or S3Storage()
     data = dict(validated_data)
+    source_artifact_uri = data.pop("source_artifact_uri", "")
+    source_artifact_name = data.pop("source_artifact_name", "")
+    source_artifact_size = data.pop("source_artifact_size", None)
+    source_artifact_checksum = data.pop("source_artifact_checksum", "")
     files = {field: data.pop(field, None) for field in BUILD_FILE_FIELDS}
     build = None
     try:
@@ -53,8 +84,62 @@ def request_manual_build(*, project, validated_data, backend, storage=None):
                 backend=backend,
                 status="pending",
             )
+            # 1. Handle source artifact (either uploaded file or direct S3 URI)
+            if files.get("source_artifact"):
+                uploaded = files.pop("source_artifact")
+                filename = Path(uploaded.name).name
+                input_prefix = build_input_prefix(
+                    project.owner.tenant_id,
+                    project.public_id,
+                    build.public_id,
+                    "source_artifact",
+                )
+                key = f"{input_prefix}{filename}"
+                stored = storage.put(key, uploaded, uploaded.content_type or "application/octet-stream")
+                BuildInputAsset.objects.create(
+                    build=build,
+                    kind="source_artifact",
+                    name=filename,
+                    s3_uri=stored.uri,
+                    checksum=stored.checksum,
+                    size_bytes=stored.size_bytes,
+                    content_type=stored.content_type,
+                )
+            elif source_artifact_uri:
+                bucket, key = storage.parse_uri(source_artifact_uri)
+                if bucket != storage.bucket:
+                    raise ValidationError({"source_artifact_uri": "Source artifact must belong to storage bucket."})
+                expected_scope = f"users/{project.owner.tenant_id}/models/{project.public_id}/"
+                if not key.startswith(expected_scope):
+                    raise ValidationError({"source_artifact_uri": "Cross-tenant or cross-project artifact access prohibited."})
+
+                actual_size = source_artifact_size or 0
+                actual_checksum = source_artifact_checksum or ""
+                actual_content_type = "application/octet-stream"
+                try:
+                    head_resp = storage.client.head_object(Bucket=bucket, Key=key)
+                    actual_size = head_resp.get("ContentLength", actual_size)
+                    actual_content_type = head_resp.get("ContentType", actual_content_type)
+                    actual_checksum = head_resp.get("Metadata", {}).get("sha256", actual_checksum)
+                except Exception:
+                    pass
+
+                filename = source_artifact_name or Path(key).name
+                BuildInputAsset.objects.create(
+                    build=build,
+                    kind="source_artifact",
+                    name=filename,
+                    s3_uri=source_artifact_uri,
+                    checksum=actual_checksum,
+                    size_bytes=actual_size,
+                    content_type=actual_content_type,
+                )
+
+            # 2. Handle any remaining auxiliary files (metrics, params, label_mapping, etc.)
             for field, kind in BUILD_FILE_FIELDS.items():
-                uploaded = files[field]
+                if field == "source_artifact":
+                    continue
+                uploaded = files.get(field)
                 if uploaded is None:
                     continue
                 filename = Path(uploaded.name).name
@@ -75,6 +160,7 @@ def request_manual_build(*, project, validated_data, backend, storage=None):
                     size_bytes=stored.size_bytes,
                     content_type=stored.content_type,
                 )
+
             build.status = "queued"
             build.save(update_fields=["status", "updated_at"])
             transaction.on_commit(lambda: _enqueue(build))

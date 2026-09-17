@@ -1,7 +1,8 @@
 from rest_framework import serializers
 
 from apps.catalog.models import ModelProject
-from apps.training.models import TrainingJob, TrainingJobEvent, TrainingOutput
+from apps.observability.models import LifecycleEvent
+from apps.training.models import TrainingJob, TrainingOutput
 
 
 class TrainingOutputSerializer(serializers.ModelSerializer):
@@ -26,7 +27,7 @@ class TrainingJobEventSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="public_id", read_only=True)
 
     class Meta:
-        model = TrainingJobEvent
+        model = LifecycleEvent
         fields = ("id", "event_type", "message", "metadata", "created_at")
 
 

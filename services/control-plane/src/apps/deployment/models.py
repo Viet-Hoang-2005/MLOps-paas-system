@@ -31,6 +31,8 @@ class Build(models.Model):
     image_uri = models.CharField(max_length=1024, blank=True)
     image_digest = models.CharField(max_length=255, blank=True)
     package_uri = models.CharField(max_length=1024, blank=True)
+    log_uri = models.CharField(max_length=1024, blank=True)
+    log_tail = models.TextField(blank=True)
     logs = models.TextField(blank=True)
     error_message = models.TextField(blank=True)
     started_at = models.DateTimeField(null=True, blank=True)

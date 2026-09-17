@@ -38,7 +38,7 @@ class ModelVersionDetailEndpoint(generics.RetrieveAPIView):
         return (
             ModelVersion.objects.filter(project__owner=self.request.user)
             .select_related("project", "source_job")
-            .prefetch_related("artifacts", "metrics", "events")
+            .prefetch_related("artifacts", "metrics")
         )
 
 

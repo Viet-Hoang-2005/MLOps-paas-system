@@ -9,8 +9,12 @@ from apps.catalog.selectors import project_for_user
 from apps.catalog.services.deletion import request_project_deletion
 from apps.catalog.services.project_metadata import save_project_metadata
 from apps.catalog.services.workspace import save_workspace_file
-from apps.deployment.api.serializers import BuildSerializer, ManualBuildCreateSerializer
-from apps.deployment.services.builds import request_manual_build
+from apps.deployment.api.serializers import (
+    BuildSerializer,
+    ManualBuildCreateSerializer,
+    PresignedUploadUrlSerializer,
+)
+from apps.deployment.services.builds import create_build_presigned_url, request_manual_build
 
 from .serializers import (
     ModelProjectSerializer,
@@ -107,3 +111,15 @@ class ProjectBuildEndpoint(APIView):
             backend=settings.BUILD_BACKEND,
         )
         return Response(BuildSerializer(build).data, status=status.HTTP_201_CREATED)
+
+
+class ProjectBuildUploadUrlEndpoint(APIView):
+    def post(self, request, project_id):
+        project = project_for_user(request.user, project_id)
+        serializer = PresignedUploadUrlSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = create_build_presigned_url(
+            project=project,
+            validated_data=serializer.validated_data,
+        )
+        return Response(result, status=status.HTTP_200_OK)

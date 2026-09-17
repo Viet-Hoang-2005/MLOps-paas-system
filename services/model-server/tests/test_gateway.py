@@ -6,7 +6,7 @@ import pytest
 
 from unittest.mock import AsyncMock, Mock
 from fastapi import BackgroundTasks, HTTPException
-from src import index
+from src import api as index, database
 
 
 class FakeResponse:
@@ -168,11 +168,19 @@ def test_serving_engine_is_derived_from_version_flavor():
 def test_send_to_redpanda_payload_and_failure(monkeypatch):
     producer = Mock()
     monkeypatch.setattr(index, "kafka_producer", producer)
-    index.send_to_redpanda("t", "p", "v", {"x": 1}, "safe")
+    index.send_to_redpanda(
+        "t", "p", "v", {"x": 1}, "safe",
+        prediction_id="pred-123", confidence=91.0, latency_ms=12.5, status_code=200, request_id="req-1"
+    )
     value = json.loads(producer.produce.call_args.kwargs["value"])
     assert value["tenant_id"] == "t" and value["prediction"] == "safe"
     assert value["project_id"] == "p" and value["model_version_id"] == "v"
-    uuid.UUID(value["id"])
+    assert value["id"] == "pred-123"
+    assert value["prediction_id"] == "pred-123"
+    assert value["confidence"] == 91.0
+    assert value["latency_ms"] == 12.5
+    assert value["status_code"] == 200
+    assert value["request_id"] == "req-1"
     producer.produce.side_effect = RuntimeError("down")
     index.send_to_redpanda("t", "p", "v", {}, None)
 
@@ -204,7 +212,10 @@ async def test_predict_proxy_success_and_background_event(monkeypatch):
     })))
     tasks = BackgroundTasks()
     response = await index.predict("v", Mock(), index.InferenceRequest(features={"x": 1}), tasks, {"model_record": record})
-    assert json.loads(response.body)["prediction"] == "attack"
+    body = json.loads(response.body)
+    assert body["prediction"] == "attack"
+    assert "prediction_id" in body
+    uuid.UUID(body["prediction_id"])
     assert len(tasks.tasks) == 1
 
 
@@ -233,3 +244,65 @@ def test_runtime_factories_fail_closed(monkeypatch):
     monkeypatch.setattr(index, "Producer", Mock(side_effect=RuntimeError("no")))
     assert index.create_redis_client() is None
     assert index.create_kafka_producer() is None
+
+
+def test_invalidate_model_version_cache():
+    fake_redis = Mock()
+    fake_redis.delete.return_value = 1
+    assert database.invalidate_model_version_cache("v123", fake_redis) is True
+    fake_redis.delete.assert_called_once_with("model-version:v123")
+    assert database.invalidate_model_version_cache("", fake_redis) is False
+    assert database.invalidate_model_version_cache("v123", None) is False
+
+
+@pytest.mark.asyncio
+async def test_predict_network_error_evicts_cache_and_returns_409_if_stopped(monkeypatch):
+    record = {
+        "id": "v-stopped",
+        "project_id": "proj",
+        "tenant_id": "t",
+        "flavor": "sklearn",
+        "endpoint_container_name": "worker-stopped",
+        "deployment_status": "healthy",
+    }
+    monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
+    fake_redis = Mock()
+    monkeypatch.setattr(index, "redis_client", fake_redis)
+
+    request_error = httpx.RequestError("Connection refused", request=Mock())
+    monkeypatch.setattr(index.httpx, "AsyncClient", lambda **kw: FakeAsyncClient(post=request_error))
+
+    stopped_db_record = {
+        "id": "v-stopped",
+        "project_id": "proj",
+        "tenant_id": "t",
+        "flavor": "sklearn",
+        "endpoint_container_name": None,
+        "deployment_status": "stopped",
+    }
+    monkeypatch.setattr(index, "_fetch_model_version_from_db", lambda vid: stopped_db_record)
+
+    with pytest.raises(HTTPException) as exc:
+        await index.predict(
+            "v-stopped",
+            Mock(),
+            index.InferenceRequest(features={}),
+            BackgroundTasks(),
+            {"model_record": record},
+        )
+
+    fake_redis.delete.assert_called_with("model-version:v-stopped")
+    assert exc.value.status_code == 409
+    assert "stopped" in exc.value.detail.lower()
+
+
+def test_resolve_worker_url_rejects_stopped_deployment(monkeypatch):
+    monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
+    stopped_record = {
+        "flavor": "sklearn",
+        "endpoint_container_name": None,
+        "deployment_status": "stopped",
+    }
+    with pytest.raises(HTTPException) as exc:
+        index.resolve_worker_url(stopped_record, "/predict")
+    assert exc.value.status_code == 409

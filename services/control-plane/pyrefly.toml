@@ -1,0 +1,4 @@
+# Pyrefly configuration specifically for Django Control Plane
+
+[errors]
+missing-attribute = "ignore"

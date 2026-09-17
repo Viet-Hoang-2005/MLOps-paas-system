@@ -29,6 +29,18 @@ class TrainingJob(models.Model):
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     project = models.ForeignKey("catalog.ModelProject", on_delete=models.CASCADE, related_name="training_jobs")
     retry_of = models.ForeignKey("self", on_delete=models.SET_NULL, related_name="retries", null=True, blank=True)
+    trigger_kind = models.CharField(
+        max_length=32,
+        choices=(("manual", "Manual"), ("retry", "Retry"), ("maintenance", "Maintenance")),
+        default="manual",
+    )
+    baseline_version = models.ForeignKey(
+        "registry.ModelVersion", on_delete=models.SET_NULL, related_name="baseline_training_jobs", null=True, blank=True
+    )
+    dataset_snapshot = models.ForeignKey(
+        "ct.DatasetSnapshot", on_delete=models.SET_NULL, related_name="training_jobs", null=True, blank=True
+    )
+    recipe_version = models.CharField(max_length=80, blank=True)
     name = models.CharField(max_length=160)
     model_flavor = models.CharField(max_length=40, choices=MODEL_FLAVORS)
     entry_point = models.CharField(max_length=512, default="train.py")
@@ -75,29 +87,6 @@ class TrainingJob(models.Model):
         started = self.started_at or self.created_at or self.completed_at
         self.runtime_seconds = max(0, int((self.completed_at - started).total_seconds()))
         self.status = status
-
-
-class TrainingJobEvent(models.Model):
-    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    job = models.ForeignKey(TrainingJob, on_delete=models.CASCADE, related_name="events")
-    event_type = models.CharField(max_length=40)
-    message = models.CharField(max_length=1000)
-    metadata = models.JSONField(default=dict, blank=True)
-    idempotency_key = models.CharField(max_length=255, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["created_at"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["job", "idempotency_key"],
-                condition=~models.Q(idempotency_key=""),
-                name="training_event_idempotency_unique",
-            )
-        ]
-
-    def __str__(self):
-        return f"{self.job.public_id}: {self.event_type}"
 
 
 class TrainingJobCapability(models.Model):

@@ -1,5 +1,6 @@
 import os
 
+import common.celery_logging  # noqa: F401
 import common.metrics  # noqa: F401
 from celery import Celery
 

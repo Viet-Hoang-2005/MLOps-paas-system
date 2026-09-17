@@ -1,7 +1,8 @@
 import sys
 import pytest
+from unittest.mock import Mock
 
-from src import runner
+from src import application as runner
 from pathlib import Path
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +30,8 @@ def runner_workspace(tmp_path, monkeypatch):
 
 @pytest.fixture(autouse=True)
 def clean_runtime_env(monkeypatch):
+    # Production configuration replaces root handlers; preserve pytest capture.
+    monkeypatch.setattr(runner, "configure", Mock())
     names = (
         "S3_SOURCE_URI",
         "S3_TRAINING_DATA_URI",

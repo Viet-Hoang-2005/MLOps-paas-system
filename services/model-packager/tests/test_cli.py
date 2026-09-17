@@ -1,13 +1,14 @@
 import io
 import json
 import logging
+import subprocess
 import tarfile
 import zipfile
 import pytest
 
 from types import SimpleNamespace
 from unittest.mock import Mock
-from src import cli
+from src import tasks as cli
 
 class StreamResponse:
     def __init__(self, chunks=None, status_code=200, text=""):
@@ -270,7 +271,7 @@ def configure_zip_task(monkeypatch, tmp_path, kaniko=False):
             archive.writestr("model/requirements.txt", "numpy==1.26.4\n")
 
     monkeypatch.setattr(cli, "download_presigned_file", download)
-    monkeypatch.setattr(cli.subprocess, "run", Mock())
+    monkeypatch.setattr(cli.subprocess, "run", Mock(return_value=subprocess.CompletedProcess([], 0, "", "")))
     monkeypatch.setattr(cli.mlflow.pyfunc, "load_model", Mock(return_value=object()))
 
 

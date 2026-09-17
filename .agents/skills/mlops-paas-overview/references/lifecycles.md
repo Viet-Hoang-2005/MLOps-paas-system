@@ -23,12 +23,12 @@
 2. Traefik routes to model-server and rewrites to its version endpoint.
 3. model-server verifies access, resolves the active worker, and proxies input.
 4. After successful inference it publishes a tenant/project/version-scoped event.
-5. Consumer persists production data for monitoring.
+5. Consumer persists minimal inference telemetry and successful production-data samples atomically.
 
 ## Drift
 
 1. A monitor binds a reference dataset and threshold to a model version.
-2. Consumer production records or a manual action trigger a DriftRun.
+2. Consumer production-data samples or a manual action trigger a DriftRun.
 3. Evidently loads reference and production data, creates HTML/JSON/summary reports, and uploads them to S3.
 4. An authenticated callback updates PostgreSQL; the UI requests a presigned report URL.
 

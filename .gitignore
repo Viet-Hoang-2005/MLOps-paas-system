@@ -5,7 +5,8 @@
 env/
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/extensions.json
 .idea/
 .codex/
 *.swp

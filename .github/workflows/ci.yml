@@ -68,7 +68,7 @@ jobs:
       - name: Generate Dynamic Matrix
         id: matrix
         run: |
-          python3 -c '
+          python3 - <<'PY'
           import os, json
           is_manual = "${{ github.event_name }}" == "workflow_dispatch"
           is_ci_workflow_change = "${{ steps.filter.outputs.ci_workflow }}" == "true"
@@ -85,15 +85,15 @@ jobs:
               "training_runner": "${{ steps.filter.outputs.training_runner }}" == "true" or is_ci_workflow_change or is_manual,
           }
           configs = {
-              "frontend": {"name": "Frontend Web", "id": "frontend", "context": "web", "image": "mlops-paas-web"},
-              "control_plane": {"name": "Control Plane", "id": "control_plane", "context": "services/control-plane", "image": "mlops-paas-control-plane"},
-              "consumer": {"name": "Redpanda Consumer", "id": "consumer", "context": "services/consumer", "image": "mlops-paas-consumer"},
-              "packager": {"name": "Model Packager", "id": "packager", "context": "services/model-packager", "image": "mlops-paas-model-packager"},
-              "evidently": {"name": "Evidently Drift", "id": "evidently", "context": "services/evidently", "image": "mlops-paas-evidently"},
-              "model_server": {"name": "Model Server", "id": "model_server", "context": "services/model-server", "image": "mlops-paas-model-server"},
-              "machine_learning_serving": {"name": "Machine Learning Serving", "id": "machine_learning_serving", "context": "services/machine-learning-serving", "image": "mlops-paas-machine-learning-serving"},
-              "deep_learning_serving": {"name": "Deep Learning Serving", "id": "deep_learning_serving", "context": "services/deep-learning-serving", "image": "mlops-paas-deep-learning-serving"},
-              "training_runner": {"name": "Training Runner", "id": "training_runner", "context": "services/training-runner", "image": "mlops-paas-training-runner"}
+              "frontend": {"name": "Frontend Web", "id": "frontend", "context": "web", "dockerfile": "web/Dockerfile", "image": "mlops-paas-web"},
+              "control_plane": {"name": "Control Plane", "id": "control_plane", "context": "services/control-plane", "dockerfile": "services/control-plane/Dockerfile", "image": "mlops-paas-control-plane"},
+              "consumer": {"name": "Redpanda Consumer", "id": "consumer", "context": "services/consumer", "dockerfile": "services/consumer/Dockerfile", "image": "mlops-paas-consumer"},
+              "packager": {"name": "Model Packager", "id": "packager", "context": "services/model-packager", "dockerfile": "services/model-packager/Dockerfile", "image": "mlops-paas-model-packager"},
+              "evidently": {"name": "Evidently Drift", "id": "evidently", "context": "services/evidently", "dockerfile": "services/evidently/Dockerfile", "image": "mlops-paas-evidently"},
+              "model_server": {"name": "Model Server", "id": "model_server", "context": "services/model-server", "dockerfile": "services/model-server/Dockerfile", "image": "mlops-paas-model-server"},
+              "machine_learning_serving": {"name": "Machine Learning Serving", "id": "machine_learning_serving", "context": "services/machine-learning-serving", "dockerfile": "services/machine-learning-serving/Dockerfile", "image": "mlops-paas-machine-learning-serving"},
+              "deep_learning_serving": {"name": "Deep Learning Serving", "id": "deep_learning_serving", "context": "services/deep-learning-serving", "dockerfile": "services/deep-learning-serving/Dockerfile", "image": "mlops-paas-deep-learning-serving"},
+              "training_runner": {"name": "Training Runner", "id": "training_runner", "context": "services/training-runner", "dockerfile": "services/training-runner/Dockerfile", "image": "mlops-paas-training-runner"}
           }
           targets = [configs[k] for k, v in changed.items() if v]
           unit_keys = ["control_plane", "consumer", "packager", "evidently", "model_server", "machine_learning_serving", "deep_learning_serving", "training_runner"]
@@ -101,7 +101,7 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"targets={json.dumps(targets)}\n")
               f.write(f"unit_test_targets={json.dumps(unit_test_targets)}\n")
-          '
+          PY
 
   secret-scan:
     name: "Secret Scan (GitLeaks)"
@@ -439,6 +439,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.target.context }}
+          file: ${{ matrix.target.dockerfile }}
           push: false
           load: true
           tags: ${{ matrix.target.image }}:test

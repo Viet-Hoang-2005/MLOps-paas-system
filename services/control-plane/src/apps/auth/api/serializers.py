@@ -11,8 +11,8 @@ from apps.auth.models import CustomUser, UserAvatar
 
 class _KeyIdTokenMixin:
     def __str__(self):
-        backend = self.get_token_backend()  # type: ignore[attr-defined]
-        payload = self.payload.copy()  # type: ignore[attr-defined]
+        backend = self.get_token_backend()
+        payload = self.payload.copy()
         if backend.audience is not None:
             payload["aud"] = backend.audience
         if backend.issuer is not None:
@@ -80,7 +80,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
         fields = ("email", "password", "full_name")
 
     def create(self, validated_data):
-        return get_user_model().objects.create_user(**validated_data) # type: ignore[attr-defined]
+        return get_user_model().objects.create_user(**validated_data)
 
 
 class AvatarSerializer(serializers.ModelSerializer):

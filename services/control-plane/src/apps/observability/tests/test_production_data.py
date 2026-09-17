@@ -1,73 +1,33 @@
-from unittest.mock import Mock
-
 import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.observability import selectors
+from apps.production.models import PredictionRecord
 
 
-class Cursor:
-    def __init__(self, rows):
-        self.rows = rows
-        self.execute = Mock()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-    def fetchall(self):
-        return self.rows
-
-
-def test_latest_production_data_scopes_query_and_applies_optional_limit():
-    project = Mock(public_id="project-uuid", owner=Mock(tenant_id="tenant-uuid"))
-    cursor = Cursor(
-        [
-            (
-                "event-1",
-                "project-uuid",
-                "version-uuid",
-                None,
-                '{"feature": 1}',
-                "safe",
-            )
-        ]
+@pytest.mark.django_db
+def test_latest_production_data_returns_stable_frontend_fields():
+    owner = get_user_model().objects.create_user("prediction-owner@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Prediction model")
+    version = project.versions.create(version="1")
+    PredictionRecord.objects.create(
+        project=project, model_version=version, observed_at="2026-01-01T00:00:00Z",
+        features={"feature": 1}, prediction="safe",
     )
-    connection = Mock(vendor="postgresql")
-    connection.introspection.table_names.return_value = ["paas_production_logs"]
-    connection.cursor.return_value = cursor
 
-    results = selectors.latest_production_data(project, limit=100, db_connection=connection)
+    results = selectors.latest_production_data(project, limit=1)
 
+    assert list(results[0]) == ["id", "project_id", "model_version_id", "timestamp", "features", "prediction"]
     assert results[0]["features"] == {"feature": 1}
-    sql, params = cursor.execute.call_args.args
-    assert 'FROM "public"."paas_production_logs"' in sql
-    assert "LIMIT %s" in sql
-    assert params == ["tenant-uuid", "project-uuid", 100]
-
-    selectors.latest_production_data(project, db_connection=connection)
-    sql, params = cursor.execute.call_args.args
-    assert "LIMIT %s" not in sql
-    assert params == ["tenant-uuid", "project-uuid"]
-
-
-def test_latest_production_data_returns_empty_when_consumer_table_is_missing():
-    project = Mock(public_id="project-uuid", owner=Mock(tenant_id="tenant-uuid"))
-    connection = Mock(vendor="postgresql")
-    connection.introspection.table_names.return_value = []
-
-    assert selectors.latest_production_data(project, db_connection=connection) == []
-    connection.cursor.assert_not_called()
+    assert results[0]["project_id"] == str(project.public_id)
 
 
 @pytest.mark.django_db
 def test_production_data_endpoint_requires_project_owner_and_validates_limit(monkeypatch):
-    owner = get_user_model().objects.create_user("production-owner@example.com", "password123")  # type: ignore[attr-defined]
-    stranger = get_user_model().objects.create_user("production-stranger@example.com", "password123")  # type: ignore[attr-defined]
+    owner = get_user_model().objects.create_user("production-owner@example.com", "password123")  
+    stranger = get_user_model().objects.create_user("production-stranger@example.com", "password123")  
     project = ModelProject.objects.create(owner=owner, name="Production model")
     captured = []
 

@@ -87,6 +87,8 @@ spec:
                     ports:
                       - containerPort: {{inputs.parameters.target_port}}
                     env:
+                      - {name: LOG_FORMAT, value: "console"}
+                      - {name: LOG_SUMMARY_INTERVAL_SECONDS, value: "60"}
                       - {name: PROJECT_ID, value: {{=toJson(inputs.parameters.project_id)}}}
                       - {name: MODEL_VERSION_ID, value: {{=toJson(inputs.parameters.model_version_id)}}}
                       - {name: MODEL_VERSION, value: {{=toJson(inputs.parameters.version)}}}

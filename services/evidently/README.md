@@ -37,7 +37,12 @@ Argo Workflows kích hoạt evidently-workflowtemplate
 
 ```
 src/
-└── main.py   # Main script: load data, run Evidently, upload S3, send webhook
+├── main.py         # Process entrypoint and exit-code handling
+├── application.py  # Orchestration of one drift run
+├── config.py       # Runtime validation
+├── data.py         # Reference/production data acquisition and normalization
+├── analysis.py     # Evidently column-mapping helpers
+└── reporting.py    # Result callback delivery
 ```
 
 ---

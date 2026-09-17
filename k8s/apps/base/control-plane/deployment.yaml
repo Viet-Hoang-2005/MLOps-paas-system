@@ -92,7 +92,7 @@ spec:
           imagePullPolicy: IfNotPresent
           command: ["sh", "-c"]
           args:
-            - "gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120 --graceful-timeout 30 --access-logfile -"
+            - "gunicorn config.wsgi:application --config python:common.gunicorn_conf --bind 0.0.0.0:8000 --workers 3 --timeout 120 --graceful-timeout 30"
           ports:
             - containerPort: 8000
           env:

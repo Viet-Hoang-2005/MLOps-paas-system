@@ -60,12 +60,12 @@ def validate(context: ValidationContext) -> list[str]:
         if workflow_spec.get("serviceAccountName"):
             errors.append("Sensor trigger must not override a WorkflowTemplate service account")
     policies = {(resource.get("metadata") or {}).get("name") for resource in execution if resource.get("kind") == "NetworkPolicy"}
-    required_policies = {"allow-control-plane-worker-to-argo-events-webhook", "isolate-argo-events-eventbus"}
+    required_policies = {"allow-celery-worker-to-argo-events-webhook", "isolate-argo-events-eventbus"}
     if not required_policies <= policies:
         errors.append("execution Application must render EventSource and EventBus NetworkPolicies")
-    webhook_policy = find_resource(execution, "NetworkPolicy", "allow-control-plane-worker-to-argo-events-webhook")
+    webhook_policy = find_resource(execution, "NetworkPolicy", "allow-celery-worker-to-argo-events-webhook")
     if ((webhook_policy.get("spec") or {}).get("ingress") or []) != [{
-        "from": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "mlops-control-plane"}}, "podSelector": {"matchLabels": {"app": "mlops-paas-control-plane-worker"}}}],
+        "from": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "mlops-control-plane"}}, "podSelector": {"matchLabels": {"app": "mlops-paas-celery-worker"}}}],
         "ports": [{"protocol": "TCP", "port": 12000}],
     }]:
         errors.append("EventSource NetworkPolicy must allow only the mlops-control-plane worker on TCP 12000")
@@ -75,7 +75,7 @@ def validate(context: ValidationContext) -> list[str]:
     }
     if ("argo-events", "argo-events-webhook-server") not in targets:
         errors.append("Argo Events server bearer-token Secret must be synchronized by External Secrets")
-    for deployment_name, expected_secret in {"mlops-paas-control-plane": "control-plane-api-secret", "mlops-paas-control-plane-worker": "control-plane-worker-secret"}.items():
+    for deployment_name, expected_secret in {"mlops-paas-control-plane": "control-plane-api-secret", "mlops-paas-celery-worker": "celery-worker-secret"}.items():
         deployment = find_resource(control_plane, "Deployment", deployment_name)
         pod_spec = (((deployment.get("spec") or {}).get("template") or {}).get("spec") or {})
         if pod_spec.get("automountServiceAccountToken") is not False or pod_spec.get("serviceAccountName"):

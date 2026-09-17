@@ -82,8 +82,14 @@ Sau training, Runner tự động tạo:
 
 ```
 services/training-runner/
-├── runner.py          # Main: download S3, cài requirements, chạy script, package, upload
-└── train_runner.py    # Entry point: được chạy bởi Kubeflow PyTorchJob command
+└── src/
+    ├── main.py         # Process entrypoint and exit-code handling
+    ├── application.py  # Orchestrates one training job
+    ├── config.py       # Required runtime configuration
+    ├── io.py           # Presigned transfer, archive and requirements handling
+    ├── metadata.py     # Metrics, insights, manifest and MLflow metadata helpers
+    ├── resources.py    # cgroup resource sampling primitives
+    └── execution.py    # Metric protocol and model archive handling
 ```
 
 ---
@@ -104,7 +110,7 @@ services/training-runner/
 ## Build Local
 
 ```bash
-docker build -t mlops-paas-training-runner ./services/training-runner
+docker build -f services/training-runner/Dockerfile -t mlops-paas-training-runner ./services/training-runner
 ```
 
 ---

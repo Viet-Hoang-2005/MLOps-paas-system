@@ -4,6 +4,8 @@ metadata:
   name: mlops-paas-execution-config
   namespace: mlops-execution
 data:
+  LOG_FORMAT: "console"
+  LOG_SUMMARY_INTERVAL_SECONDS: "60"
   AWS_DEFAULT_REGION: "ap-southeast-1"
   AWS_BUCKET_NAME: "mlops-paas-artifacts"
   DB_HOST_RO: "mlops-paas-postgres-ro.mlops-postgres.svc.cluster.local"

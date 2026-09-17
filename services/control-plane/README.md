@@ -35,7 +35,7 @@ S3, Argo, Harbor, Redis, or external HTTP clients directly.
 From the repository root:
 
 ```bash
-docker compose up --build control-plane control-plane-worker
+docker compose up --build control-plane celery-worker
 ```
 
 Without Docker:
@@ -45,7 +45,7 @@ cd services/control-plane
 python -m pip install -r requirements.txt
 python manage.py migrate --settings=config.settings.local
 python manage.py runserver --settings=config.settings.local
-celery -A config worker --loglevel=INFO
+celery -A config worker
 ```
 
 Quality gates:

@@ -1,4 +1,5 @@
 import docker
+import docker.errors
 from django.conf import settings
 
 from infrastructure.argo import ArgoWebhookClient

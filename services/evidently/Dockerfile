@@ -10,11 +10,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --prefix=/install -r requirements.txt
 
 FROM python:3.10-slim
 
 WORKDIR /app
+
+ENV LOG_FORMAT=console \
+    LOG_SUMMARY_INTERVAL_SECONDS=60
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1

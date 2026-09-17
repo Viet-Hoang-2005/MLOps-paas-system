@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 
+from common.logging import runtime_line
 from django.conf import settings
 from django.utils import timezone
 from redis import Redis
@@ -9,7 +10,7 @@ LOG_TTL_SECONDS = 3600
 
 
 def _decode_logs(lines: Sequence[bytes | str]) -> list[str]:
-    return [line.decode("utf-8", errors="replace") if isinstance(line, bytes) else str(line) for line in lines]
+    return [runtime_line(line) for line in lines]
 
 
 def build_logs(build, offset: int) -> tuple[list[str], int]:
@@ -30,7 +31,7 @@ def build_logs(build, offset: int) -> tuple[list[str], int]:
         pass
 
     persisted = build.logs.splitlines()
-    return persisted[offset:], len(persisted)
+    return _decode_logs(persisted[offset:]), len(persisted)
 
 
 def deployment_logs(deployment, offset: int) -> tuple[list[str], int]:
@@ -63,5 +64,5 @@ def append_deployment_log(deployment, message: str) -> None:
 
 def _push_runtime_log(redis, key: str, message: str) -> None:
     timestamp = timezone.now().strftime("%H:%M:%S")
-    redis.rpush(key, f"[{timestamp}] INFO {message}")
+    redis.rpush(key, f"[{timestamp}] INFO {runtime_line(message)}")
     redis.expire(key, LOG_TTL_SECONDS)

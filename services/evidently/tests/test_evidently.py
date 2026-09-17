@@ -7,7 +7,7 @@ import pytest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
-from src import main
+from src import application as main
 
 
 class Context:
@@ -187,16 +187,90 @@ def test_run_drift_analysis_summary(monkeypatch):
     monkeypatch.setattr(main, "TENANT_ID", "t")
     monkeypatch.setattr(main, "PROJECT_ID", "p")
     monkeypatch.setattr(main, "MODEL_VERSION_ID", "v")
-    monkeypatch.setattr(main, "DRIFT_THRESHOLD", 0.6)
+    monkeypatch.setattr(main, "DRIFT_THRESHOLD", 0.4)
     frame = pd.DataFrame({"a": [1.0], "b": [2.0]})
     summary = main.run_drift_analysis(frame, frame.copy(), main.ColumnMapping())
     assert summary["dataset_drift"] is True
     assert summary["drifted_feature_names"] == ["a"]
+    assert summary["share_drifted_features"] == 0.5
 
 
 def test_run_drift_analysis_requires_common_columns():
     with pytest.raises(ValueError, match="No common columns"):
         main.run_drift_analysis(pd.DataFrame({"a": [1]}), pd.DataFrame({"b": [1]}), main.ColumnMapping())
+
+
+def test_run_drift_analysis_detects_missing_features_and_alerts(monkeypatch):
+    result = {"metrics": [
+        {"result": {"dataset_drift": False, "share_of_drifted_columns": 0.0, "number_of_drifted_columns": 0}},
+        {"result": {"drift_by_columns": {"a": {"drift_detected": False}}}},
+    ]}
+
+    class FakeReport:
+        def __init__(self, metrics):
+            self.metrics = metrics
+
+        def run(self, **kwargs):
+            self.kwargs = kwargs
+
+        def as_dict(self):
+            return result
+
+    monkeypatch.setattr(main, "Report", FakeReport)
+    monkeypatch.setattr(main, "save_drift_report", lambda *a: {})
+    monkeypatch.setattr(main, "TENANT_ID", "t")
+    monkeypatch.setattr(main, "PROJECT_ID", "p")
+    monkeypatch.setattr(main, "MODEL_VERSION_ID", "v")
+    monkeypatch.setattr(main, "DRIFT_THRESHOLD", 0.6)
+
+    # reference has a, b, c. production is missing b and c, and has extra feature x.
+    ref = pd.DataFrame({"a": [1.0, 2.0], "b": [10.0, 20.0], "c": [100.0, 200.0]})
+    prod = pd.DataFrame({"a": [1.0, 2.0], "x": [99.0, 99.0]})
+
+    summary = main.run_drift_analysis(ref, prod, main.ColumnMapping())
+
+    assert summary["missing_features"] == ["b", "c"]
+    assert summary["extra_features"] == ["x"]
+    assert "b" in summary["drifted_feature_names"]
+    assert "c" in summary["drifted_feature_names"]
+    assert summary["data_quality"]["status"] == "alert"
+    assert summary["data_quality"]["has_schema_mismatch"] is True
+    assert summary["dataset_drift"] is True
+    assert summary["number_of_features"] == 3  # 3 expected features
+    assert summary["number_of_drifted_features"] == 2  # b and c are missing
+
+
+def test_run_drift_analysis_detects_high_null_features(monkeypatch):
+    result = {"metrics": [
+        {"result": {"dataset_drift": False, "share_of_drifted_columns": 0.0, "number_of_drifted_columns": 0}},
+        {"result": {"drift_by_columns": {"a": {"drift_detected": False}, "b": {"drift_detected": False}}}},
+    ]}
+
+    class FakeReport:
+        def __init__(self, metrics):
+            pass
+
+        def run(self, **kwargs):
+            pass
+
+        def as_dict(self):
+            return result
+
+    monkeypatch.setattr(main, "Report", FakeReport)
+    monkeypatch.setattr(main, "save_drift_report", lambda *a: {})
+    monkeypatch.setattr(main, "TENANT_ID", "t")
+    monkeypatch.setattr(main, "PROJECT_ID", "p")
+    monkeypatch.setattr(main, "MODEL_VERSION_ID", "v")
+    monkeypatch.setattr(main, "DRIFT_THRESHOLD", 0.6)
+
+    ref = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [1.0, 2.0, 3.0, 4.0]})
+    # In prod, column b has 50% null values (2 out of 4 rows)
+    prod = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [1.0, None, None, 4.0]})
+
+    summary = main.run_drift_analysis(ref, prod, main.ColumnMapping())
+    high_nulls = [x["feature"] for x in summary["data_quality"]["high_null_features"]]
+    assert "b" in high_nulls
+    assert summary["data_quality"]["status"] == "warning"
 
 
 def test_save_report_without_upload(monkeypatch, tmp_path):

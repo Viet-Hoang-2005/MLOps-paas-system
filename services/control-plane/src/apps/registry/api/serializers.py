@@ -1,6 +1,8 @@
 from rest_framework import serializers
 
-from apps.registry.models import ModelArtifact, ModelMetric, ModelVersion, RegistryAlias, RegistryEvent
+from apps.observability.models import LifecycleEvent
+from apps.observability.services.lifecycle import events_for_aggregate
+from apps.registry.models import ModelArtifact, ModelMetric, ModelVersion, RegistryAlias
 from apps.training.models import TrainingJob
 
 
@@ -73,7 +75,9 @@ class ModelVersionSerializer(serializers.ModelSerializer):
         )
 
     def get_events(self, instance):
-        return RegistryEventSerializer(instance.events.all(), many=True).data
+        return RegistryEventSerializer(
+            events_for_aggregate(aggregate_type="model_version", aggregate_id=instance.public_id), many=True
+        ).data
 
 
 class RegistryAliasSerializer(serializers.ModelSerializer):
@@ -106,5 +110,5 @@ class RegistryEventSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="public_id", read_only=True)
 
     class Meta:
-        model = RegistryEvent
+        model = LifecycleEvent
         fields = ("id", "event_type", "from_state", "to_state", "metadata", "created_at")

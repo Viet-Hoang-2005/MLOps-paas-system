@@ -25,6 +25,18 @@ const mergeClassNames = extendTailwindMerge({
           ],
         },
       ],
+      'rounded': [
+        {
+          'rounded': [
+            'compact',
+            'surface',
+            'control',
+            'overlay',
+            'full',
+            'none'
+          ],
+        },
+      ],
       'text-color': [
         {
           'text-color': [

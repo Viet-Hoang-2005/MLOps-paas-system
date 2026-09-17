@@ -9,6 +9,11 @@ class DriftMonitor(models.Model):
     reference_asset = models.ForeignKey(
         "catalog.WorkspaceAsset", on_delete=models.PROTECT, related_name="drift_monitors"
     )
+    reference_snapshot = models.ForeignKey(
+        "ct.DatasetSnapshot", on_delete=models.SET_NULL, related_name="drift_monitors", null=True, blank=True
+    )
+    detector_version = models.CharField(max_length=80, blank=True)
+    detector_config = models.JSONField(default=dict, blank=True)
     name = models.CharField(max_length=160)
     trigger_threshold = models.PositiveIntegerField(default=1000)
     last_automatic_trigger_count = models.PositiveBigIntegerField(default=0)
@@ -37,6 +42,10 @@ class DriftRun(models.Model):
     report_html_uri = models.CharField(max_length=1024, blank=True)
     report_json_uri = models.CharField(max_length=1024, blank=True)
     summary_uri = models.CharField(max_length=1024, blank=True)
+    evidence_window = models.ForeignKey(
+        "ct.EvidenceWindow", on_delete=models.SET_NULL, related_name="linked_drift_runs", null=True, blank=True
+    )
+    report_manifest_uri = models.CharField(max_length=1024, blank=True)
     drift_score = models.FloatField(null=True, blank=True)
     has_drift = models.BooleanField(null=True)
     summary = models.JSONField(default=dict, blank=True)

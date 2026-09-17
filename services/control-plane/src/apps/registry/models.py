@@ -77,12 +77,20 @@ class ModelArtifact(models.Model):
 
 
 class ModelMetric(models.Model):
+    DATASET_ROLES = (
+        ("training", "Training"),
+        ("calibration", "Calibration"),
+        ("reference", "Reference"),
+        ("gate", "Gate"),
+        ("historical_holdout", "Historical holdout"),
+    )
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     version = models.ForeignKey(ModelVersion, on_delete=models.CASCADE, related_name="metrics")
     name = models.CharField(max_length=160)
     value = models.FloatField()
     step = models.IntegerField(null=True, blank=True)
     timestamp = models.DateTimeField(null=True, blank=True)
+    dataset_role = models.CharField(max_length=32, choices=DATASET_ROLES, default="training")
     metadata = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
@@ -101,20 +109,3 @@ class RegistryAlias(models.Model):
 
     def __str__(self):
         return f"{self.project.name}:{self.name} -> {self.version.version}"
-
-
-class RegistryEvent(models.Model):
-    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    version = models.ForeignKey(ModelVersion, on_delete=models.CASCADE, related_name="events")
-    actor = models.ForeignKey("identity.CustomUser", on_delete=models.SET_NULL, null=True, blank=True)
-    event_type = models.CharField(max_length=60)
-    from_state = models.CharField(max_length=80, blank=True)
-    to_state = models.CharField(max_length=80, blank=True)
-    metadata = models.JSONField(default=dict, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"{self.version}: {self.event_type}"

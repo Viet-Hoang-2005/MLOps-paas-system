@@ -1,0 +1,153 @@
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\input{glyphtounicode}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.65in}
+\addtolength{\textheight}{1.3in}
+
+\urlstyle{same}
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+\titleformat{\section}{
+  \vspace{-5pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-6pt}]
+
+\pdfgentounicode=1
+
+\newcommand{\resumeItem}[1]{
+  \item\small{{#1 \vspace{-2pt}}}
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{p{0.78\textwidth}@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}[leftmargin=0.18in]}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+\begin{document}
+
+%----------HEADING----------
+\begin{center}
+    \textbf{\Huge \scshape Tran Nguyen Viet Hoang} \\ \vspace{1pt}
+    \small (+84)828552878 $|$
+    \href{mailto:tnvhoang2005@gmail.com}{tnvhoang2005@gmail.com} $|$
+    \href{https://github.com/Viet-Hoang-2005}{github.com/Viet-Hoang-2005} $|$
+    \href{https://www.linkedin.com/in/tnvhoang2005/}{linkedin.com/in/tnvhoang2005}
+\end{center}
+
+%-----------SUMMARY-----------
+\section{Summary}
+\begin{itemize}[leftmargin=0.15in, label={}]
+  \small{\item{Final-year Computer Networks student at UIT-VNU seeking a \textbf{DevOps Intern} role. Hands-on experience building cloud-native systems with Kubernetes, Terraform, CI/CD pipelines, and MLOps at scale.
+}}
+\end{itemize}
+
+%-----------EDUCATION-----------
+\section{Education}
+\resumeSubHeadingListStart
+  \resumeSubheading
+    {University of Information Technology, VNU-HCM}{Ho Chi Minh City, Vietnam}
+    {B.Eng. in Computer Networks and Data Communications}{2023 -- Expected 2027}
+  \resumeItemListStart
+    \resumeItem{GPA: 8.75/10.00}
+  \resumeItemListEnd
+\resumeSubHeadingListEnd
+
+%-----------AWARDS-----------
+\section{Awards}
+\resumeSubHeadingListStart
+  \resumeProjectHeading
+    {\parbox[t]{0.79\textwidth}{\textbf{Encouragement Scholarship for Academic Excellence}}}{}
+  \resumeItemListStart
+    \resumeItem{Semester 1, 2023 -- 2024}
+    \resumeItem{Semester 1, 2024 -- 2025}
+    \resumeItem{Semester 2, 2024 -- 2025}
+  \resumeItemListEnd
+\resumeSubHeadingListEnd
+
+%-----------PROJECTS-----------
+\section{Projects}
+\resumeSubHeadingListStart
+
+\resumeProjectHeading
+{\textbf{MLOps PaaS System} $|$ \href{https://github.com/Viet-Hoang-2005/mlops-paas-system}{GitHub} $|$ \emph{Django, FastAPI, Redpanda, PostgreSQL, Docker, Kubernetes, AWS, Argo Workflows, MLflow, Kubeflow, BentoML}}
+{3/2026 -- Present}
+\resumeItemListStart
+\resumeItem{Built a multi-tenant MLOps PaaS automating model training, versioned deployment, and drift monitoring for XGBoost, PyTorch, and TensorFlow, orchestrated by a Django REST control plane and Argo Workflows.}
+\resumeItem{Dynamically served ML/DL models as isolated per-version pods via FastAPI + MLflow (ML) and BentoML (DL); achieved \textasciitilde100 concurrent users with p95 latency $\leq$ 100\,ms and throughput $\geq$ 50\,req/s.}
+\resumeItem{Streamed live predictions through Redpanda into an Evidently AI drift monitor; scaled the consumer via KEDA and triggered automated retraining workflows on detected drift.}
+\resumeItem{Orchestrated distributed model training with Kubeflow Training Operator (PyTorchJob); provisioned GPU/CPU nodes on-demand via Karpenter auto-scaling and delivered zero-downtime updates through rolling HPA.}
+\resumeItemListEnd
+
+\resumeProjectHeading
+{\textbf{SageLMS} $|$ \href{https://github.com/daithang59/sagelms}{GitHub} $|$ \emph{Spring Boot, FastAPI, LangChain, Redis, PostgreSQL, Docker, Kubernetes, GCP, GitHub Actions, FluxCD, Kyverno, Grafana \& Prometheus}}
+{4/2026 -- 6/2026}
+\resumeItemListStart
+\resumeItem{Designed a DevSecOps microservices LMS (Spring Boot gateway/auth/course + FastAPI LangChain AI tutor) on GKE with FluxCD GitOps and Kyverno admission policies enforcing supply-chain security end-to-end.}
+\resumeItem{Automated shift-left CI on every PR: secret scanning (Gitleaks), unit tests (JUnit/pytest/Vitest), Dockerfile linting (Hadolint), Trivy vulnerability scans, IaC validation (Checkov), and SonarCloud quality gates.}
+\resumeItem{Built CD pipeline that builds, Trivy-scans, signs (Cosign), and attests CycloneDX SBOM per image; Kyverno enforces digest-pinned, Harbor-trusted, non-root pods leveraging GCP Workload Identity for passwordless authentication.}
+\resumeItemListEnd
+
+\resumeSubHeadingListEnd
+
+%-----------RESEARCH-----------
+\section{Research}
+\resumeSubHeadingListStart
+  \resumeProjectHeading
+    {\parbox[t]{0.79\textwidth}{\textbf{\href{https://csonet-conf.github.io/csonet26/index.html}{CSoNet 2026: A Drift-Aware MLOps Framework for Multi-Model Serving: A Network Intrusion Detection Case Study}}}}{Preview}
+  \resumeItemListStart
+    \resumeItem{First author; proposed a cloud-native MLOps framework with decoupled control/data planes for multi-model lifecycle management; drift-triggered retraining on CIC-IDS2017 recovered Macro-F1 from 0.13--0.46 to 0.98--1.00 ($\Delta$+0.54--+0.87).}
+  \resumeItemListEnd
+\resumeSubHeadingListEnd
+
+%-----------TECHNICAL SKILLS-----------
+\section{Technical Skills}
+\begin{itemize}[leftmargin=0.15in, label={}]
+  \small{\item{
+    \textbf{Cloud \& Infrastructure:} AWS, GCP, Terraform, Ansible, Linux \\
+    \textbf{Containers \& Orchestration:} Docker, Kubernetes, EKS, GKE, Helm, Argo Workflows \\
+    \textbf{CI/CD \& GitOps:} Git, GitHub, GitHub Actions, Argo CD, Flux CD \\
+    \textbf{Observability:} Prometheus, Grafana, Zabbix \\
+    \textbf{MLOps:} MLflow, Kubeflow, BentoML, Evidently AI \\
+    \textbf{Frameworks \& Databases:} ReactJS, Django, FastAPI, PostgreSQL, Redis, Redpanda/Kafka \\
+    \textbf{Languages:} Python, TypeScript, Bash, SQL
+  }}
+\end{itemize}
+
+\end{document}

@@ -209,6 +209,8 @@ export interface ModelEndpointLogsResponse {
 
 export interface ModelPredictionResponse {
   success: boolean;
+  prediction_id?: string;
+  id?: string;
   prediction: unknown;
   confidence: number | null;
   tenant_id: ResourceId;

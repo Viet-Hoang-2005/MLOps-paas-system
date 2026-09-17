@@ -32,7 +32,8 @@ class RecordingDockerClient:
 
 
 @pytest.mark.django_db
-def test_local_deployment_uses_embedded_model_artifact_and_becomes_healthy():
+def test_local_deployment_uses_embedded_model_artifact_and_becomes_healthy(monkeypatch):
+    monkeypatch.setenv("LOG_SUMMARY_INTERVAL_SECONDS", "15")
     owner = get_user_model().objects.create_user("runtime-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="runtime model")
     version = ModelVersion.objects.create(project=project, version="1", flavor="xgboost")
@@ -55,6 +56,7 @@ def test_local_deployment_uses_embedded_model_artifact_and_becomes_healthy():
         "MODEL_VERSION": "1",
         "MODEL_URI": "/app/model_artifact",
         "TENANT_ID": owner.tenant_id,
+        "LOG_SUMMARY_INTERVAL_SECONDS": "15",
     }
     assert docker.kwargs["image"] == "sha256:local-image-id"
     assert endpoint.internal_url == f"http://deploy-{build.public_id}:5001"

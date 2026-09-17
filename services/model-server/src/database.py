@@ -5,6 +5,9 @@ import re
 from typing import Any, Dict
 from urllib.parse import quote_plus
 from sqlalchemy import create_engine, text
+from src.logging_utils import Summary, get_logger
+
+cache_summary = Summary(get_logger(__name__), "registry_cache_summary")
 
 MODEL_RECORD_CACHE_TTL = int(os.environ.get("MODEL_RECORD_CACHE_TTL_SECONDS", "30"))
 
@@ -94,6 +97,20 @@ def get_model_version_record(version_id: str, redis_client=None):
         except Exception:
             pass
     return record
+
+
+def invalidate_model_version_cache(version_id: str, redis_client=None) -> bool:
+    """Invalidate the cached model version record in Redis."""
+    if redis_client is None or not version_id:
+        return False
+    try:
+        cache_key = f"model-version:{version_id}"
+        deleted = redis_client.delete(cache_key)
+        cache_summary.recovery("invalidate")
+        return bool(deleted)
+    except Exception as exc:
+        cache_summary.failure("invalidate", "Model registry cache invalidation failed", error_type=type(exc).__name__)
+        return False
 
 
 def verify_project_api_key(raw_key: str, project_pk: int):

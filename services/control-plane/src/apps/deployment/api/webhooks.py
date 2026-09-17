@@ -1,4 +1,5 @@
 from common.api.permissions import HasInternalWebhookSecret
+from common.logging import record_transition
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -75,6 +76,10 @@ class BuildWebhookEndpoint(APIView):
             transaction.on_commit(
                 lambda: cleanup_failed_build_artifacts.delay(str(build.public_id), bool(build.image_uri))
             )
+        record_transition(
+            build, build.status, source="webhook",
+            reason="Build reporter confirmed failure" if build.status == "failed" else None,
+        )
         return Response({
             "status": build.status,
             "version_id": str(build.version.public_id) if build.version_id else None,

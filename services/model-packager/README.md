@@ -43,8 +43,12 @@ Step 3: model-packager (TASK_TYPE=NOTIFY_BUILD)
 
 ```
 src/
-├── cli.py    # Entry point: BUILD, NOTIFY_BUILD task logic; Docker build; Kaniko context generation; S3 helpers; Redis log
-└── core/     # Utilities: load_model, save_mlflow_model, make_zip, parse_requirements, build_preview_tree
+├── main.py         # Process entrypoint and exit-code handling
+├── tasks.py        # BUILD, TEST_ZIP and NOTIFY_BUILD workflows
+├── config.py       # Environment-backed image naming
+├── io.py           # Presigned transfer, safe extraction and webhook delivery
+├── image_build.py  # Docker build context and image publication
+└── core.py         # Model loading, MLflow packaging and preview utilities
 ```
 
 ---

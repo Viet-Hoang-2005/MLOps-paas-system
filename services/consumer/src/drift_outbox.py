@@ -2,9 +2,15 @@
 
 import os
 import threading
+import time
 
 import requests
 from sqlalchemy.exc import SQLAlchemyError
+from src.logging_utils import Summary, get_logger, log_event
+
+logger = get_logger(__name__)
+delivery_summary = Summary(logger, "drift_signal_delivery_summary")
+database_summary = Summary(logger, "drift_outbox_database_summary")
 
 from src.database import (
     claim_automatic_drift_signals,
@@ -67,37 +73,46 @@ def deliver(signal: dict) -> tuple[bool, str]:
 
 def drain_once() -> int:
     delivered = 0
+    failed = False
     for event in claim_automatic_drift_signals(OUTBOX_BATCH_SIZE, OUTBOX_LEASE_SECONDS):
+        started = time.perf_counter()
         success, error = deliver(event)
         if success:
             mark_automatic_drift_signal_published(event["id"])
             delivered += 1
+            delivery_summary.record(duration_ms=(time.perf_counter() - started) * 1000, published=1)
             continue
 
         delay = retry_delay(event["attempts"])
         reschedule_automatic_drift_signal(event["id"], event["attempts"], error, delay)
-        print(
-            f"Automatic drift signal {event['id']} was not delivered; "
-            f"retrying in {delay}s ({error})."
-        )
+        failed = True
+        delivery_summary.record(success=False, duration_ms=(time.perf_counter() - started) * 1000)
+        delivery_summary.failure("delivery", "Automatic drift signal delivery failed; retry scheduled", retry_seconds=delay, attempt=event["attempts"])
+    if delivered and not failed:
+        delivery_summary.recovery("delivery")
     return delivered
 
 
 def run_dispatcher(stop_event: threading.Event) -> None:
     """Drain the outbox until shutdown; unexpected errors terminate supervision."""
-    print("Automatic drift outbox dispatcher started.")
+    log_event(logger, "INFO", "drift_dispatcher_started", "Automatic drift dispatcher started")
+    try:
+        _dispatch_until_stopped(stop_event)
+    finally:
+        delivery_summary.close()
+        database_summary.close()
+
+
+def _dispatch_until_stopped(stop_event: threading.Event) -> None:
     while not stop_event.is_set():
         try:
             delivered = drain_once()
+            database_summary.recovery("database")
         except SQLAlchemyError as exc:
-            print(
-                "Automatic drift outbox database operation failed; "
-                f"retrying in {OUTBOX_POLL_SECONDS}s ({exc.__class__.__name__})."
-            )
+            database_summary.failure("database", "Drift outbox database operation failed", error_type=type(exc).__name__, retry_seconds=OUTBOX_POLL_SECONDS)
             stop_event.wait(OUTBOX_POLL_SECONDS)
             continue
 
         if delivered:
-            print(f"Delivered {delivered} automatic drift signal(s).")
             continue
         stop_event.wait(OUTBOX_POLL_SECONDS)

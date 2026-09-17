@@ -1,12 +1,13 @@
 from collections.abc import Sequence
 
+from common.logging import runtime_line
 from django.conf import settings
 from redis import Redis
 from redis.exceptions import RedisError
 
 
 def _decode_logs(lines: Sequence[bytes | str]) -> list[str]:
-    return [line.decode("utf-8", errors="replace") if isinstance(line, bytes) else str(line) for line in lines]
+    return [runtime_line(line) for line in lines]
 
 
 def drift_run_logs(run, offset: int) -> tuple[list[str], int]:

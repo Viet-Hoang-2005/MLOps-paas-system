@@ -1,6 +1,7 @@
 """Infrastructure adapter for removing a build image from its execution registry."""
 
 import docker
+import docker.errors
 
 from infrastructure.docker import DockerClient
 from infrastructure.harbor import HarborClient

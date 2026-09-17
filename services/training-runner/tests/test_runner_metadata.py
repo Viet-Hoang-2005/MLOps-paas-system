@@ -1,6 +1,6 @@
 import json
 import pytest
-from src import runner
+from src import application as runner
 
 
 def test_training_artifacts_require_presigned_http_urls():

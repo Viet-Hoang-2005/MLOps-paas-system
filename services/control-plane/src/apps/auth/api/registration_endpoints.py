@@ -55,7 +55,7 @@ class CompleteRegistrationEndpoint(APIView):
         password = str(request.data.get("password", ""))
         if len(password) < 8:
             raise serializers.ValidationError({"password": "Password must contain at least 8 characters."})
-        user = get_user_model().objects.create_user( # type: ignore[attr-defined]
+        user = get_user_model().objects.create_user(
             email=payload["email"],
             password=password,
             full_name=str(request.data.get("full_name", "")),

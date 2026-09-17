@@ -1,7 +1,7 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Popover from '@radix-ui/react-popover';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, Check, ChevronDown, Laptop, LogOut, Menu, Moon, Plus, Search, Settings, Sun, UserCircle, X } from 'lucide-react';
+import { Bell, Check, ChevronDown, ChevronUp, Laptop, LogOut, Menu, Moon, Plus, Search, Settings, Sun, UserCircle, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -48,9 +48,14 @@ export default function Header({ onOpenNavigation }: { onOpenNavigation: () => v
 
   return (
     <header className="relative z-30 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-3 md:px-4 xl:px-5">
-      <button type="button" onClick={onOpenNavigation} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-surface text-color-muted-foreground hover:bg-muted hover:text-color-foreground md:hidden" aria-label={t('actions.openNavigation')}>
-        <Menu className="h-5 w-5" />
-      </button>
+      <Button
+        size="icon"
+        variant="ghost"
+        icon={<Menu className="h-5 w-5" />}
+        onClick={onOpenNavigation}
+        className="md:hidden"
+        aria-label={t('actions.openNavigation')}
+      />
 
       <button type="button" onClick={() => navigate('/dashboard/home/models')} className="hidden min-w-40 shrink-0 items-center gap-3 rounded-surface focus-visible:ring-2 focus-visible:ring-ring sm:flex xl:min-w-48">
         <img src={MLdriftLogo} alt="" className="h-7 w-7" />
@@ -60,13 +65,23 @@ export default function Header({ onOpenNavigation }: { onOpenNavigation: () => v
       <div className="mx-3 min-w-0 flex-1 sm:max-w-md lg:absolute lg:left-1/2 lg:top-1/2 lg:w-[min(420px,42vw)] lg:-translate-x-1/2 lg:-translate-y-1/2">
         <Popover.Root open={modelMenuOpen} onOpenChange={setModelMenuOpen}>
           <Popover.Trigger asChild>
-            <button type="button" className="flex h-10 w-full items-center justify-between gap-3 rounded-surface border border-border bg-surface px-4 text-left text-style-body-strong text-color-foreground shadow-sm transition-colors hover:border-input focus-visible:ring-2 focus-visible:ring-ring" aria-label={t('modelSelector.label')}>
+            <Button
+              variant="secondary"
+              size="md"
+              fullWidth
+              className="justify-between rounded-surface px-4 text-left text-style-body-strong shadow-sm"
+              aria-label={t('modelSelector.label')}
+            >
               <span className="truncate">{selectedModel?.name || t('modelSelector.empty')}</span>
-              <ChevronDown className="h-4 w-4 shrink-0 text-color-muted-foreground" />
-            </button>
+              {modelMenuOpen ? (
+                <ChevronUp className="h-4 w-4 shrink-0 text-color-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 shrink-0 text-color-muted-foreground" />
+              )}
+            </Button>
           </Popover.Trigger>
           <Popover.Portal>
-            <Popover.Content align="center" sideOffset={8} className="z-50 w-[min(92vw,26.25rem)] rounded-surface border border-border bg-surface p-2 shadow-(--shadow-overlay) animate-fade-in">
+            <Popover.Content align="start" sideOffset={8} className="z-50 w-(--radix-popover-trigger-width) rounded-surface border border-border bg-surface p-2 shadow-(--shadow-overlay) animate-fade-in">
               <div className="relative mb-2">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-color-muted-foreground" />
                 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('modelSelector.search')} className="h-10 w-full rounded-surface border border-input bg-surface pl-9 pr-9 text-style-body text-color-foreground outline-none focus:border-primary" autoFocus />
@@ -95,9 +110,13 @@ export default function Header({ onOpenNavigation }: { onOpenNavigation: () => v
 
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
-            <button type="button" className="flex h-10 w-10 items-center justify-center rounded-surface border border-border bg-surface text-color-muted-foreground hover:text-color-foreground" aria-label={t('theme.current', { mode })} title={t('theme.current', { mode })}>
-              {resolvedTheme === 'dark' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-            </button>
+            <Button
+              size="icon"
+              variant="secondary"
+              icon={resolvedTheme === 'dark' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+              aria-label={t('theme.current', { mode })}
+              title={t('theme.current', { mode })}
+            />
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content align="end" sideOffset={8} className="z-50 min-w-44 rounded-surface border border-border bg-surface p-1.5 shadow-(--shadow-overlay) animate-fade-in">
@@ -114,9 +133,21 @@ export default function Header({ onOpenNavigation }: { onOpenNavigation: () => v
 
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
-            <button type="button" className="ml-2 flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary text-style-body-strong text-color-primary-foreground ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label={t('userMenu.open')}>
-              {profile?.avatar ? <img src={profile.avatar} alt="" className="h-full w-full object-cover" /> : initials || <UserCircle className="h-5 w-5" />}
-            </button>
+            <Button
+              size="icon"
+              variant="secondary"
+              className="group relative ml-2 overflow-hidden rounded-full border border-border bg-surface text-style-body-strong text-color-primary-foreground shadow-sm"
+              aria-label={t('userMenu.open')}
+            >
+              {profile?.avatar ? (
+                <img src={profile.avatar} alt="" className="h-full w-full rounded-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center rounded-full bg-primary">
+                  {initials || <UserCircle className="h-5 w-5" />}
+                </div>
+              )}
+              <div className="pointer-events-none absolute inset-0 rounded-full bg-surface-hover opacity-0 transition-opacity group-hover:opacity-40 group-active:opacity-60" />
+            </Button>
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content align="end" sideOffset={8} className="z-50 w-56 rounded-surface border border-border bg-surface p-2 shadow-(--shadow-overlay) animate-fade-in">

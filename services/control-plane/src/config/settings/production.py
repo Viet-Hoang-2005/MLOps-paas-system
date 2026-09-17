@@ -4,8 +4,8 @@ from django.core.exceptions import ImproperlyConfigured
 from .base import *
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", required=True)
-JWT_PRIVATE_KEY = env("JWT_PRIVATE_KEY", required=True)
-JWT_PUBLIC_KEY = env("JWT_PUBLIC_KEY", required=True)
+JWT_PRIVATE_KEY = env("JWT_PRIVATE_KEY", required=True).replace("\\n", "\n")
+JWT_PUBLIC_KEY = env("JWT_PUBLIC_KEY", required=True).replace("\\n", "\n")
 CONTROL_PLANE_WEBHOOK_SECRET = env("CONTROL_PLANE_WEBHOOK_SECRET", required=True)
 if len(CONTROL_PLANE_WEBHOOK_SECRET) < 32:
     raise ImproperlyConfigured("CONTROL_PLANE_WEBHOOK_SECRET must contain at least 32 characters")

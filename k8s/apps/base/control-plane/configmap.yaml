@@ -5,6 +5,8 @@ metadata:
   labels:
     app: mlops-paas-control-plane
 data:
+  LOG_FORMAT: "console"
+  LOG_SUMMARY_INTERVAL_SECONDS: "60"
   PYTHONUNBUFFERED: "1"
   PYTHONPATH: "/app/src"
   DJANGO_SETTINGS_MODULE: "config.settings.production"
@@ -47,4 +49,3 @@ data:
   MLFLOW_TRACKING_URI: "http://mlflow-server.mlflow-server.svc.cluster.local:5000"
   MLFLOW_TRACKING_REQUIRED: "true"
   PROMETHEUS_INTERNAL_URL: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
-

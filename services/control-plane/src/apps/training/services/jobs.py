@@ -7,7 +7,8 @@ from django.db import transaction
 from django.utils import timezone
 from infrastructure.storage import S3Storage
 
-from apps.training.models import TrainingJob, TrainingJobEvent
+from apps.observability.services.lifecycle import record_training_event
+from apps.training.models import TrainingJob
 from apps.training.services.storage_scope import expected_training_uris, validate_training_uri
 from apps.training.tasks import (
     cancel_training_job,
@@ -49,7 +50,7 @@ def create_job(*, project, validated_data):
         )
     else:
         _snapshot_data(project, draft, storage)
-    TrainingJobEvent.objects.create(job=draft, event_type="created", message="Training job created.")
+    record_training_event(job=draft, event_type="created", message="Training job created.")
     return draft
 
 
@@ -99,7 +100,7 @@ def cancel_job(job):
         job.status = "cancelling"
         job.deletion_error = ""
         job.save(update_fields=["status", "deletion_error", "updated_at"])
-        TrainingJobEvent.objects.create(
+        record_training_event(
             job=job,
             event_type="cancellation_requested",
             message="Training cancellation requested.",
@@ -137,7 +138,7 @@ def request_job_deletion(job):
                 "updated_at",
             ]
         )
-        TrainingJobEvent.objects.create(job=job, event_type=event_type, message=message)
+        record_training_event(job=job, event_type=event_type, message=message)
         transaction.on_commit(lambda: task.delay(str(job.public_id)))
     return job
 
@@ -161,7 +162,7 @@ def request_output_purge(job):
             raise Conflict("Training output is being used by an active model build.")
         job.outputs_purged_at = timezone.now()
         job.save(update_fields=["outputs_purged_at", "updated_at"])
-        TrainingJobEvent.objects.create(
+        record_training_event(
             job=job,
             event_type="outputs_purge_requested",
             message="Training output deletion requested.",
