@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   completePasswordChange,
   deleteAccount,
@@ -10,43 +10,50 @@ import {
   updateProfile,
   updateProfileAvatar,
   verifyPasswordChangeOTP,
-} from '@/features/settings/api/profileApi';
-import { getApiErrorMessage } from '@/shared/api/errors';
-import { settingsQueryKeys } from '@/features/settings/queryKeys';
-import { toast } from '@/shared/components/toastStore';
-import type { PasswordModalStep, ProfileFormValues, UpdateProfileRequest, UserProfile } from '@/features/settings/types';
-import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useTranslation } from 'react-i18next';
+} from "@/features/settings/api/profileApi";
+import { getApiErrorMessage } from "@/shared/api/errors";
+import { settingsQueryKeys } from "@/features/settings/queryKeys";
+import { toast } from "@/shared/components/toastStore";
+import type {
+  PasswordModalStep,
+  ProfileFormValues,
+  UpdateProfileRequest,
+  UserProfile,
+} from "@/features/settings/types";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useTranslation } from "react-i18next";
 
 export const emptyProfileForm: ProfileFormValues = {
-  fullName: '',
-  description: '',
-  pronouns: '',
-  company: '',
-  fieldOfWork: '',
-  country: '',
+  fullName: "",
+  description: "",
+  pronouns: "",
+  company: "",
+  fieldOfWork: "",
+  country: "",
 };
 
 const profileToForm = (profile: UserProfile): ProfileFormValues => ({
-  fullName: profile.full_name || '',
-  description: profile.description || '',
-  pronouns: profile.pronouns || '',
-  company: profile.company || '',
-  fieldOfWork: profile.field_of_work || '',
-  country: profile.country || '',
+  fullName: profile.full_name || "",
+  description: profile.description || "",
+  pronouns: profile.pronouns || "",
+  company: profile.company || "",
+  fieldOfWork: profile.field_of_work || "",
+  country: profile.country || "",
 });
 
 export function useProfileSettings() {
   const { logout } = useAuth();
-  const { t } = useTranslation('settings');
+  const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
-  const [draftFormValues, setDraftFormValues] = useState<ProfileFormValues>(emptyProfileForm);
+  const [draftFormValues, setDraftFormValues] =
+    useState<ProfileFormValues>(emptyProfileForm);
   const [editingProfile, setEditingProfile] = useState(false);
-  const [passwordModalStep, setPasswordModalStep] = useState<PasswordModalStep>('closed');
-  const [otpCode, setOtpCode] = useState('');
-  const [passwordChangeToken, setPasswordChangeToken] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordModalStep, setPasswordModalStep] =
+    useState<PasswordModalStep>("closed");
+  const [otpCode, setOtpCode] = useState("");
+  const [passwordChangeToken, setPasswordChangeToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordActionLoading, setPasswordActionLoading] = useState(false);
   const [passwordSendConfirmOpen, setPasswordSendConfirmOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -70,7 +77,9 @@ export function useProfileSettings() {
 
   useEffect(() => {
     if (profileQuery.isError) {
-      toast.error(getApiErrorMessage(profileQuery.error, t('profilePage.loadFailed')));
+      toast.error(
+        getApiErrorMessage(profileQuery.error, t("profilePage.loadFailed")),
+      );
     }
   }, [profileQuery.error, profileQuery.isError, t]);
 
@@ -90,13 +99,16 @@ export function useProfileSettings() {
         : null;
 
       if (updatedProfile) {
-        queryClient.setQueryData<UserProfile>(settingsQueryKeys.profile(), updatedProfile);
+        queryClient.setQueryData<UserProfile>(
+          settingsQueryKeys.profile(),
+          updatedProfile,
+        );
       }
       setEditingProfile(false);
-      toast.success(t('profilePage.updateSuccess'));
+      toast.success(t("profilePage.updateSuccess"));
     },
     onError: (error) => {
-      toast.error(getApiErrorMessage(error, t('profilePage.updateFailed')));
+      toast.error(getApiErrorMessage(error, t("profilePage.updateFailed")));
     },
   });
 
@@ -104,13 +116,23 @@ export function useProfileSettings() {
     mutationFn: updateProfileAvatar,
     onSuccess: async (_response, variables) => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: settingsQueryKeys.profile() }),
-        queryClient.invalidateQueries({ queryKey: settingsQueryKeys.avatars() }),
+        queryClient.invalidateQueries({
+          queryKey: settingsQueryKeys.profile(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: settingsQueryKeys.avatars(),
+        }),
       ]);
-      toast.success(variables.remove_avatar ? t('profilePage.avatarRemoved') : t('profilePage.avatarUpdated'));
+      toast.success(
+        variables.remove_avatar
+          ? t("profilePage.avatarRemoved")
+          : t("profilePage.avatarUpdated"),
+      );
     },
     onError: (error) => {
-      toast.error(getApiErrorMessage(error, t('profilePage.avatarUpdateFailed')));
+      toast.error(
+        getApiErrorMessage(error, t("profilePage.avatarUpdateFailed")),
+      );
     },
   });
 
@@ -118,22 +140,33 @@ export function useProfileSettings() {
     mutationFn: selectProfileAvatar,
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: settingsQueryKeys.profile() }),
-        queryClient.invalidateQueries({ queryKey: settingsQueryKeys.avatars() }),
+        queryClient.invalidateQueries({
+          queryKey: settingsQueryKeys.profile(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: settingsQueryKeys.avatars(),
+        }),
       ]);
-      toast.success(t('profilePage.avatarSelected'));
+      toast.success(t("profilePage.avatarSelected"));
     },
     onError: (error) => {
-      toast.error(getApiErrorMessage(error, t('profilePage.avatarSelectFailed')));
+      toast.error(
+        getApiErrorMessage(error, t("profilePage.avatarSelectFailed")),
+      );
     },
   });
 
   const profileChanged = useMemo(
-    () => editingProfile && JSON.stringify(draftFormValues) !== JSON.stringify(profileFormValues),
+    () =>
+      editingProfile &&
+      JSON.stringify(draftFormValues) !== JSON.stringify(profileFormValues),
     [draftFormValues, editingProfile, profileFormValues],
   );
 
-  const updateProfileField = (field: keyof ProfileFormValues, value: string) => {
+  const updateProfileField = (
+    field: keyof ProfileFormValues,
+    value: string,
+  ) => {
     setDraftFormValues((current) => ({ ...current, [field]: value }));
   };
 
@@ -174,17 +207,17 @@ export function useProfileSettings() {
 
   const openPasswordOTPModal = async () => {
     setPasswordSendConfirmOpen(false);
-    setPasswordModalStep('otp');
-    setOtpCode('');
-    setPasswordChangeToken('');
-    setNewPassword('');
-    setConfirmPassword('');
+    setPasswordModalStep("otp");
+    setOtpCode("");
+    setPasswordChangeToken("");
+    setNewPassword("");
+    setConfirmPassword("");
     setPasswordActionLoading(true);
     try {
       await requestPasswordChangeOTP();
-      toast.success(t('profilePage.otpSent'));
+      toast.success(t("profilePage.otpSent"));
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t('profilePage.otpSendFailed')));
+      toast.error(getApiErrorMessage(error, t("profilePage.otpSendFailed")));
     } finally {
       setPasswordActionLoading(false);
     }
@@ -192,7 +225,7 @@ export function useProfileSettings() {
 
   const handleVerifyPasswordOTP = async () => {
     if (otpCode.trim().length !== 6) {
-      toast.warning(t('profilePage.otpInvalidFormat'));
+      toast.warning(t("profilePage.otpInvalidFormat"));
       return;
     }
 
@@ -200,10 +233,10 @@ export function useProfileSettings() {
     try {
       const response = await verifyPasswordChangeOTP(otpCode.trim());
       setPasswordChangeToken(response.password_change_token);
-      setPasswordModalStep('password');
-      toast.success(t('profilePage.otpVerified'));
+      setPasswordModalStep("password");
+      toast.success(t("profilePage.otpVerified"));
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t('profilePage.otpInvalid')));
+      toast.error(getApiErrorMessage(error, t("profilePage.otpInvalid")));
     } finally {
       setPasswordActionLoading(false);
     }
@@ -211,22 +244,24 @@ export function useProfileSettings() {
 
   const handleCompletePasswordChange = async () => {
     if (newPassword.length < 8) {
-      toast.warning(t('profilePage.passwordTooShort'));
+      toast.warning(t("profilePage.passwordTooShort"));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      toast.warning(t('profilePage.passwordMismatch'));
+      toast.warning(t("profilePage.passwordMismatch"));
       return;
     }
 
     setPasswordActionLoading(true);
     try {
       await completePasswordChange(passwordChangeToken, newPassword);
-      toast.success(t('profilePage.passwordChanged'));
-      setPasswordModalStep('closed');
+      toast.success(t("profilePage.passwordChanged"));
+      setPasswordModalStep("closed");
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t('profilePage.passwordChangeFailed')));
+      toast.error(
+        getApiErrorMessage(error, t("profilePage.passwordChangeFailed")),
+      );
     } finally {
       setPasswordActionLoading(false);
     }
@@ -236,11 +271,13 @@ export function useProfileSettings() {
     setDeleteLoading(true);
     try {
       await deleteAccount();
-      toast.success(t('profilePage.accountDeleted'));
+      toast.success(t("profilePage.accountDeleted"));
       queryClient.clear();
       logout();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t('profilePage.accountDeleteFailed')));
+      toast.error(
+        getApiErrorMessage(error, t("profilePage.accountDeleteFailed")),
+      );
     } finally {
       setDeleteLoading(false);
     }

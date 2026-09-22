@@ -311,7 +311,8 @@ export function ModelDeploymentCard({
               className="truncate font-mono text-style-code-sm text-color-foreground bg-muted rounded-compact px-2 py-1 border border-border w-fit max-w-full"
               title={model.endpoint_container_name || ""}
             >
-              {model.endpoint_container_name || t("statuses.notAvailable", { ns: "common" })}
+              {model.endpoint_container_name ||
+                t("statuses.notAvailable", { ns: "common" })}
             </span>
           </div>
           <div className="flex flex-col justify-end">
@@ -537,9 +538,7 @@ function TrackerStep({ label, state }: { label: string; state: string }) {
       >
         {icon}
       </div>
-      <span
-        className={`text-style-caption uppercase text-center ${textClass}`}
-      >
+      <span className={`text-style-caption uppercase text-center ${textClass}`}>
         {label}
       </span>
     </div>

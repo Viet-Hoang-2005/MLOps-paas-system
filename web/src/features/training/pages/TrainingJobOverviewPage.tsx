@@ -13,7 +13,10 @@ import { MetadataRow } from "@/features/training/components/TrainingOverviewSect
 import { useTrainingJobDetailContext } from "@/features/training/trainingJobDetailContext";
 import { computeElapsed, formatDuration } from "@/shared/lib/formatDuration";
 import { PageBody } from "@/shared/components/PageBody";
-import { ProgressLine, type ProgressLineStep } from "@/shared/components/ProgressLine";
+import {
+  ProgressLine,
+  type ProgressLineStep,
+} from "@/shared/components/ProgressLine";
 
 export default function TrainingJobOverviewPage() {
   const { t } = useTranslation("training");
@@ -158,20 +161,37 @@ export default function TrainingJobOverviewPage() {
         title={
           <div className="flex items-center gap-2">
             <Info className="h-5 w-5" />
-            <h3 className="text-style-heading">{t("detail.overview.metadataTitle")}</h3>
+            <h3 className="text-style-heading">
+              {t("detail.overview.metadataTitle")}
+            </h3>
           </div>
         }
       >
         <div className="grid grid-cols-1 gap-x-8 gap-y-6 p-6 md:grid-cols-2">
-          <MetadataRow label={t("detail.overview.internalJobId")} value={String(job.id)} />
+          <MetadataRow
+            label={t("detail.overview.internalJobId")}
+            value={String(job.id)}
+          />
           <MetadataRow
             label={t("detail.overview.externalJobId")}
             value={job.external_job_id || job.sagemaker_job_name || "-"}
           />
-          <MetadataRow label={t("detail.overview.modelName")} value={job.name} />
-          <MetadataRow label={t("detail.overview.modelVersion")} value={job.model_version} />
-          <MetadataRow label={t("detail.overview.backend")} value={job.backend || t("statuses.unknown", { ns: "common" })} />
-          <MetadataRow label={t("detail.overview.status")} value={statusLabels[job.status]} />
+          <MetadataRow
+            label={t("detail.overview.modelName")}
+            value={job.name}
+          />
+          <MetadataRow
+            label={t("detail.overview.modelVersion")}
+            value={job.model_version}
+          />
+          <MetadataRow
+            label={t("detail.overview.backend")}
+            value={job.backend || t("statuses.unknown", { ns: "common" })}
+          />
+          <MetadataRow
+            label={t("detail.overview.status")}
+            value={statusLabels[job.status]}
+          />
           <MetadataRow
             label={t("detail.overview.createdAt")}
             value={new Date(job.created_at).toLocaleString()}

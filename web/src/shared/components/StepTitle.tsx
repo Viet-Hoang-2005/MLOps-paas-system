@@ -1,4 +1,4 @@
-import type { ElementType } from 'react';
+import type { ElementType } from "react";
 
 export interface StepTitleProps {
   title: string;
@@ -7,7 +7,12 @@ export interface StepTitleProps {
   icon?: ElementType;
 }
 
-export function StepTitle({ title, subtitle, description, icon: Icon }: StepTitleProps) {
+export function StepTitle({
+  title,
+  subtitle,
+  description,
+  icon: Icon,
+}: StepTitleProps) {
   const text = subtitle || description;
   return (
     <div className="mb-4">
@@ -15,7 +20,11 @@ export function StepTitle({ title, subtitle, description, icon: Icon }: StepTitl
         {Icon && <Icon className="w-5 h-5 text-color-muted-foreground" />}
         {title}
       </h2>
-      {text && <p className="mt-1 text-style-body text-color-muted-foreground">{text}</p>}
+      {text && (
+        <p className="mt-1 text-style-body text-color-muted-foreground">
+          {text}
+        </p>
+      )}
     </div>
   );
 }

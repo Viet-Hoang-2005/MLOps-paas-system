@@ -17,7 +17,9 @@ export function FileDropzone({
       <span className="max-w-full truncate text-style-body-strong text-color-foreground">
         {title}
       </span>
-      <span className="mt-1 text-style-caption text-color-muted-foreground">{subtitle}</span>
+      <span className="mt-1 text-style-caption text-color-muted-foreground">
+        {subtitle}
+      </span>
       <input
         type="file"
         accept={accept}

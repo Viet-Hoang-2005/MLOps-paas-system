@@ -34,7 +34,7 @@ const configProps = new Set([
 const brands = new Set([
   "ML",
   "drift",
-  "MLdrift",
+  "AdaptML",
   "Google",
   "GitHub",
   "MLflow",

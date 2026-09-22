@@ -216,17 +216,25 @@ export default function ProfileSettingPage() {
                 <ReadOnlyRow
                   icon={<Mail className="h-4 w-4" />}
                   label={t("profilePage.email")}
-                  value={profile?.email || t("statuses.unknown", { ns: "common" })}
+                  value={
+                    profile?.email || t("statuses.unknown", { ns: "common" })
+                  }
                 />
                 <ReadOnlyRow
                   icon={<Fingerprint className="h-4 w-4" />}
                   label={t("profilePage.tenantId")}
-                  value={profile?.tenant_id || t("statuses.unknown", { ns: "common" })}
+                  value={
+                    profile?.tenant_id ||
+                    t("statuses.unknown", { ns: "common" })
+                  }
                 />
                 <ReadOnlyRow
                   icon={<ShieldCheck className="h-4 w-4" />}
                   label={t("profilePage.provider")}
-                  value={profile?.auth_provider || t("statuses.unknown", { ns: "common" })}
+                  value={
+                    profile?.auth_provider ||
+                    t("statuses.unknown", { ns: "common" })
+                  }
                 />
                 <ReadOnlyRow
                   icon={<CalendarDays className="h-4 w-4" />}
@@ -284,7 +292,9 @@ export default function ProfileSettingPage() {
               <Input
                 id="profile-full-name"
                 label={t("fullName")}
-                icon={<UserRound className="h-4 w-4 text-color-muted-foreground" />}
+                icon={
+                  <UserRound className="h-4 w-4 text-color-muted-foreground" />
+                }
                 placeholder={t("profilePage.fullNamePlaceholder")}
                 value={formValues.fullName}
                 disabled={loading}
@@ -312,11 +322,21 @@ export default function ProfileSettingPage() {
                       }
                       className="h-14 w-full appearance-none rounded-control border border-border bg-surface pl-10 pr-10 text-style-body font-normal text-color-foreground outline-none transition-colors duration-200 hover:border-primary focus:border-primary disabled:bg-muted disabled:text-color-muted-foreground"
                     >
-                      <option value="">{t("profilePage.pronounUnspecified")}</option>
-                      <option value="he/him">{t("profilePage.pronounHe")}</option>
-                      <option value="she/her">{t("profilePage.pronounShe")}</option>
-                      <option value="they/them">{t("profilePage.pronounThey")}</option>
-                      <option value="other">{t("profilePage.pronounOther")}</option>
+                      <option value="">
+                        {t("profilePage.pronounUnspecified")}
+                      </option>
+                      <option value="he/him">
+                        {t("profilePage.pronounHe")}
+                      </option>
+                      <option value="she/her">
+                        {t("profilePage.pronounShe")}
+                      </option>
+                      <option value="they/them">
+                        {t("profilePage.pronounThey")}
+                      </option>
+                      <option value="other">
+                        {t("profilePage.pronounOther")}
+                      </option>
                     </select>
                     <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-color-muted-foreground" />
                   </div>
@@ -325,8 +345,12 @@ export default function ProfileSettingPage() {
                 <Input
                   id="profile-pronouns"
                   label={t("pronouns")}
-                  icon={<Tags className="h-4 w-4 text-color-muted-foreground" />}
-                  value={formValues.pronouns || t("profilePage.pronounUnspecified")}
+                  icon={
+                    <Tags className="h-4 w-4 text-color-muted-foreground" />
+                  }
+                  value={
+                    formValues.pronouns || t("profilePage.pronounUnspecified")
+                  }
                   disabled={loading}
                   readOnly
                   tabIndex={-1}
@@ -339,7 +363,9 @@ export default function ProfileSettingPage() {
               <Input
                 id="profile-company"
                 label={t("company")}
-                icon={<Building2 className="h-4 w-4 text-color-muted-foreground" />}
+                icon={
+                  <Building2 className="h-4 w-4 text-color-muted-foreground" />
+                }
                 placeholder={t("profilePage.companyPlaceholder")}
                 value={formValues.company}
                 disabled={loading}
@@ -555,9 +581,7 @@ export default function ProfileSettingPage() {
         loading={avatarSaving}
         onClose={closeCropModal}
         onConfirm={confirmAvatarCrop}
-        onError={() =>
-          toast.error(t("profilePage.cropFailed"))
-        }
+        onError={() => toast.error(t("profilePage.cropFailed"))}
       />
     </div>
   );

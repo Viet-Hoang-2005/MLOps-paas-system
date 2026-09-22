@@ -85,8 +85,8 @@ export interface ProfileFormValues {
   country: string;
 }
 
-export type PasswordModalStep = 'closed' | 'otp' | 'password';
-export type KeyModalMode = 'create' | 'edit';
+export type PasswordModalStep = "closed" | "otp" | "password";
+export type KeyModalMode = "create" | "edit";
 
 export interface APIKeyFormValues {
   name: string;

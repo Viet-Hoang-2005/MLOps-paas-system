@@ -45,12 +45,7 @@ export function PromoteVersionModal({
       }
       onSuccess();
     } catch (error) {
-      toast.error(
-        getApiErrorMessage(
-          error,
-          t("promoteDialog.failed"),
-        ),
-      );
+      toast.error(getApiErrorMessage(error, t("promoteDialog.failed")));
       setLoading(false);
     }
   };
@@ -70,9 +65,7 @@ export function PromoteVersionModal({
 
           <div className="flex gap-3 rounded-surface border border-info-border bg-info-subtle p-4 text-color-info shadow-sm">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-color-info" />
-            <p className="text-style-body">
-              {t("promoteDialog.description")}
-            </p>
+            <p className="text-style-body">{t("promoteDialog.description")}</p>
           </div>
 
           <div className="mt-6 flex flex-col gap-3 text-style-body bg-muted p-4 rounded-surface border border-border">
@@ -88,7 +81,9 @@ export function PromoteVersionModal({
                 className="rounded-control border border-border bg-surface px-3 py-2 text-style-body-strong text-color-foreground outline-none focus:border-success focus:ring-2 focus:ring-success-border"
                 disabled={loading}
               >
-                <option value="production">{t("promoteDialog.production")}</option>
+                <option value="production">
+                  {t("promoteDialog.production")}
+                </option>
                 <option value="latest">{t("promoteDialog.latest")}</option>
                 <option value="champion">{t("promoteDialog.champion")}</option>
               </select>

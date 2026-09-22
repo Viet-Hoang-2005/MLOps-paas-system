@@ -1,7 +1,7 @@
-import { useTranslation } from 'react-i18next';
-import { Switch } from '@/shared/components/Switch';
+import { useTranslation } from "react-i18next";
+import { Switch } from "@/shared/components/Switch";
 
-export type TrainingStatusFilter = 'pending' | 'success' | 'failed' | 'all';
+export type TrainingStatusFilter = "pending" | "success" | "failed" | "all";
 
 export function TrainingJobStatusFilter({
   value,
@@ -10,12 +10,12 @@ export function TrainingJobStatusFilter({
   value: TrainingStatusFilter;
   onChange: (value: TrainingStatusFilter) => void;
 }) {
-  const { t } = useTranslation('training');
+  const { t } = useTranslation("training");
   const options = [
-    { title: t('statusFilter.all'), value: 'all' as const },
-    { title: t('statusFilter.pending'), value: 'pending' as const },
-    { title: t('statusFilter.success'), value: 'success' as const },
-    { title: t('statusFilter.failed'), value: 'failed' as const },
+    { title: t("statusFilter.all"), value: "all" as const },
+    { title: t("statusFilter.pending"), value: "pending" as const },
+    { title: t("statusFilter.success"), value: "success" as const },
+    { title: t("statusFilter.failed"), value: "failed" as const },
   ];
 
   return (
@@ -24,7 +24,7 @@ export function TrainingJobStatusFilter({
       onChange={onChange}
       options={options}
       size="md"
-      ariaLabel={t('statusFilter.label')}
+      ariaLabel={t("statusFilter.label")}
     />
   );
 }

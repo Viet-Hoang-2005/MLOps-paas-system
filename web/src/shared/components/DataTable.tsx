@@ -111,7 +111,10 @@ export function DataTable<T>({
               ))
             ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="transition-colors hover:bg-surface-hover">
+                <tr
+                  key={row.id}
+                  className="transition-colors hover:bg-surface-hover"
+                >
                   {row.getVisibleCells().map((cell) => (
                     <td
                       key={cell.id}

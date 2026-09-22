@@ -1,4 +1,4 @@
-import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
 export interface ZipEntryInfo {
   name: string;
@@ -19,7 +19,8 @@ interface ZipFileContent {
   data: Uint8Array;
 }
 
-const normalizeZipPath = (value: string) => value.replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\/+/, '');
+const normalizeZipPath = (value: string) =>
+  value.replace(/\\/g, "/").replace(/^\.\//, "").replace(/^\/+/, "");
 
 const readZipEntries = async (file: File) => {
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -36,7 +37,7 @@ export const inspectZipFile = async (file: File): Promise<ZipInspection> => {
       uncompressedSize: data.byteLength,
       compressionMethod: 0,
       localHeaderOffset: 0,
-      isDirectory: normalizedName.endsWith('/'),
+      isDirectory: normalizedName.endsWith("/"),
     };
   });
 
@@ -49,7 +50,9 @@ export const inspectZipFile = async (file: File): Promise<ZipInspection> => {
 export const readZipEntryText = async (file: File, entryName: string) => {
   const normalizedEntryName = normalizeZipPath(entryName);
   const unzipped = await readZipEntries(file);
-  const match = Object.entries(unzipped).find(([name]) => normalizeZipPath(name) === normalizedEntryName);
+  const match = Object.entries(unzipped).find(
+    ([name]) => normalizeZipPath(name) === normalizedEntryName,
+  );
   if (!match) {
     throw new Error(`Entry point ${entryName} was not found in source.zip.`);
   }
@@ -57,31 +60,44 @@ export const readZipEntryText = async (file: File, entryName: string) => {
   return strFromU8(match[1]);
 };
 
-export const buildStoredZip = (files: ZipFileContent[], filename = 'source.zip') => {
+export const buildStoredZip = (
+  files: ZipFileContent[],
+  filename = "source.zip",
+) => {
   const zipInput = files.reduce<Record<string, Uint8Array>>((current, file) => {
     current[normalizeZipPath(file.name)] = file.data;
     return current;
   }, {});
   const zipped = zipSync(zipInput, { level: 0 });
-  return new File([zipped.buffer as ArrayBuffer], filename, { type: 'application/zip' });
+  return new File([zipped.buffer as ArrayBuffer], filename, {
+    type: "application/zip",
+  });
 };
 
-export const rebuildZipWithEditedEntry = async (file: File, entryName: string, text: string) => {
+export const rebuildZipWithEditedEntry = async (
+  file: File,
+  entryName: string,
+  text: string,
+) => {
   const normalizedEntryName = normalizeZipPath(entryName);
   const unzipped = await readZipEntries(file);
-  const match = Object.keys(unzipped).find((name) => normalizeZipPath(name) === normalizedEntryName);
+  const match = Object.keys(unzipped).find(
+    (name) => normalizeZipPath(name) === normalizedEntryName,
+  );
   if (!match) {
     throw new Error(`Cannot rebuild zip: ${entryName} was not found.`);
   }
 
   unzipped[match] = strToU8(text);
   const zipped = zipSync(unzipped, { level: 0 });
-  return new File([zipped.buffer as ArrayBuffer], file.name || 'source.zip', { type: 'application/zip' });
+  return new File([zipped.buffer as ArrayBuffer], file.name || "source.zip", {
+    type: "application/zip",
+  });
 };
 
 export const downloadFile = (file: File) => {
   const url = URL.createObjectURL(file);
-  const anchor = document.createElement('a');
+  const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = file.name;
   anchor.click();

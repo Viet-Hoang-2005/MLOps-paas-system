@@ -1,7 +1,13 @@
-import { Cpu, FileCode2, FileText } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Outlet, useBlocker, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Cpu, FileCode2, FileText } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  Outlet,
+  useBlocker,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 
 import {
   createModelProject,
@@ -10,14 +16,14 @@ import {
   listReferenceFiles,
   listSourceCodeFiles,
   updateModelProject,
-} from '@/features/catalog/api/catalogApi';
-import type { ModelProject } from '@/features/catalog/types';
+} from "@/features/catalog/api/catalogApi";
+import type { ModelProject } from "@/features/catalog/types";
 import {
   cancelTrainingJob,
   createTrainingJob,
   getTrainingJob,
   getTrainingRuntimeCapabilities,
-} from '@/features/training/api/trainingApi';
+} from "@/features/training/api/trainingApi";
 import type {
   CreateTrainingJobContext,
   TrainingExecutionForm,
@@ -26,94 +32,116 @@ import type {
   TrainingSourceForm,
   TrainingStep,
   TrainingTransitionState,
-} from '@/features/training/trainingFlowContext';
-import type { TrainingJob, TrainingRuntimeCapabilities } from '@/features/training/types';
-import { getApiErrorMessage } from '@/shared/api/errors';
-import { ConfirmModal } from '@/shared/components/ConfirmModal';
-import { LineSteps } from '@/shared/components/LineSteps';
-import { PageHeader } from '@/shared/components/PageHeader';
-import { toast } from '@/shared/components/toastStore';
+} from "@/features/training/trainingFlowContext";
+import type {
+  TrainingJob,
+  TrainingRuntimeCapabilities,
+} from "@/features/training/types";
+import { getApiErrorMessage } from "@/shared/api/errors";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { LineSteps } from "@/shared/components/LineSteps";
+import { PageHeader } from "@/shared/components/PageHeader";
+import { toast } from "@/shared/components/toastStore";
 
-const trainingPath = '/dashboard/model-training';
+const trainingPath = "/dashboard/model-training";
 const createPath = `${trainingPath}/create`;
 
-const emptyMetadata: TrainingMetadataForm = { name: '', description: '', access_mode: 'private' };
+const emptyMetadata: TrainingMetadataForm = {
+  name: "",
+  description: "",
+  access_mode: "private",
+};
 const emptySource: TrainingSourceForm = {
-  model_flavor: 'sklearn',
-  entry_point: '',
-  requirements_text: '',
+  model_flavor: "sklearn",
+  entry_point: "",
+  requirements_text: "",
 };
 const emptyExecution: TrainingExecutionForm = {
   vcpu: 2,
   memory_mb: 4096,
   max_runtime_seconds: 3600,
-  accelerator_type: 'none',
+  accelerator_type: "none",
   accelerator_count: 0,
 };
 
-const metadataFingerprint = (form: TrainingMetadataForm) => JSON.stringify({
-  name: form.name.trim(),
-  description: form.description,
-  access_mode: form.access_mode,
-});
-const sourceFingerprint = (form: TrainingSourceForm) => JSON.stringify({
-  model_flavor: form.model_flavor,
-  entry_point: form.entry_point.trim(),
-  requirements_text: form.requirements_text,
-});
+const metadataFingerprint = (form: TrainingMetadataForm) =>
+  JSON.stringify({
+    name: form.name.trim(),
+    description: form.description,
+    access_mode: form.access_mode,
+  });
+const sourceFingerprint = (form: TrainingSourceForm) =>
+  JSON.stringify({
+    model_flavor: form.model_flavor,
+    entry_point: form.entry_point.trim(),
+    requirements_text: form.requirements_text,
+  });
 
 export default function CreateTrainingJobPage() {
-  const { t } = useTranslation('training');
+  const { t } = useTranslation("training");
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const requestedModelId = searchParams.get('modelId');
-  const requestedJobId = searchParams.get('jobId');
-  const [mode, setModeState] = useState<TrainingModelMode>('new');
+  const requestedModelId = searchParams.get("modelId");
+  const requestedJobId = searchParams.get("jobId");
+  const [mode, setModeState] = useState<TrainingModelMode>("new");
   const [projects, setProjects] = useState<ModelProject[]>([]);
   const [project, setProject] = useState<ModelProject | null>(null);
   const [metadataForm, setMetadataForm] = useState(emptyMetadata);
   const [sourceForm, setSourceForm] = useState(emptySource);
   const [executionForm, setExecutionForm] = useState(emptyExecution);
   const [job, setJob] = useState<TrainingJob | null>(null);
-  const [capabilities, setCapabilities] = useState<TrainingRuntimeCapabilities | null>(null);
-  const [transitionState, setTransitionState] = useState<TrainingTransitionState>('idle');
-  const [metadataBaseline, setMetadataBaseline] = useState(metadataFingerprint(emptyMetadata));
-  const [sourceBaseline, setSourceBaseline] = useState(sourceFingerprint(emptySource));
+  const [capabilities, setCapabilities] =
+    useState<TrainingRuntimeCapabilities | null>(null);
+  const [transitionState, setTransitionState] =
+    useState<TrainingTransitionState>("idle");
+  const [metadataBaseline, setMetadataBaseline] = useState(
+    metadataFingerprint(emptyMetadata),
+  );
+  const [sourceBaseline, setSourceBaseline] = useState(
+    sourceFingerprint(emptySource),
+  );
   const [codeDirty, setCodeDirty] = useState(false);
   const [dataDirty, setDataDirty] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [exitRequested, setExitRequested] = useState(false);
   const allowExit = useRef(false);
 
-  const currentStep: TrainingStep = location.pathname.endsWith('/execution')
+  const currentStep: TrainingStep = location.pathname.endsWith("/execution")
     ? 3
-    : location.pathname.endsWith('/source')
+    : location.pathname.endsWith("/source")
       ? 2
       : 1;
   const metadataDirty = metadataFingerprint(metadataForm) !== metadataBaseline;
-  const sourceDirty = codeDirty || dataDirty || sourceFingerprint(sourceForm) !== sourceBaseline;
+  const sourceDirty =
+    codeDirty || dataDirty || sourceFingerprint(sourceForm) !== sourceBaseline;
   const hasUnsavedChanges = metadataDirty || sourceDirty;
 
-  const routeFor = useCallback((
-    step: TrainingStep,
-    projectId: string | null | undefined = project?.id,
-    jobId: string | null | undefined = job?.id,
-  ) => {
-    const route = step === 1 ? 'metadata' : step === 2 ? 'source' : 'execution';
-    const params = new URLSearchParams();
-    if (projectId) params.set('modelId', projectId);
-    if (step === 3 && jobId) params.set('jobId', jobId);
-    const query = params.toString();
-    return `${createPath}/${route}${query ? `?${query}` : ''}`;
-  }, [job?.id, project?.id]);
+  const routeFor = useCallback(
+    (
+      step: TrainingStep,
+      projectId: string | null | undefined = project?.id,
+      jobId: string | null | undefined = job?.id,
+    ) => {
+      const route =
+        step === 1 ? "metadata" : step === 2 ? "source" : "execution";
+      const params = new URLSearchParams();
+      if (projectId) params.set("modelId", projectId);
+      if (step === 3 && jobId) params.set("jobId", jobId);
+      const query = params.toString();
+      return `${createPath}/${route}${query ? `?${query}` : ""}`;
+    },
+    [job?.id, project?.id],
+  );
 
   useEffect(() => {
     void Promise.all([listModelProjects(), getTrainingRuntimeCapabilities()])
       .then(([projectResponse, runtime]) => {
         setProjects(projectResponse.models);
         setCapabilities(runtime);
-        const firstProfile = runtime.cpu_profiles.find((item) => item.id === 'medium') ?? runtime.cpu_profiles[0];
+        const firstProfile =
+          runtime.cpu_profiles.find((item) => item.id === "medium") ??
+          runtime.cpu_profiles[0];
         if (firstProfile) {
           setExecutionForm((current) => ({
             ...current,
@@ -122,12 +150,17 @@ export default function CreateTrainingJobPage() {
           }));
         }
       })
-      .catch((error) => toast.error(getApiErrorMessage(error, t('createFlow.messages.loadFailed'))));
+      .catch((error) =>
+        toast.error(
+          getApiErrorMessage(error, t("createFlow.messages.loadFailed")),
+        ),
+      );
   }, [t]);
 
   useEffect(() => {
     if (!requestedModelId) {
-      if (currentStep !== 1) navigate(routeFor(1, null, null), { replace: true });
+      if (currentStep !== 1)
+        navigate(routeFor(1, null, null), { replace: true });
       return;
     }
     let active = true;
@@ -135,16 +168,24 @@ export default function CreateTrainingJobPage() {
       .then((result) => {
         if (!active) return;
         setProject(result);
-        setModeState('existing');
-        const next = { name: result.name, description: result.description, access_mode: result.access_mode };
+        setModeState("existing");
+        const next = {
+          name: result.name,
+          description: result.description,
+          access_mode: result.access_mode,
+        };
         setMetadataForm(next);
         setMetadataBaseline(metadataFingerprint(next));
       })
       .catch((error) => {
-        toast.error(getApiErrorMessage(error, t('createFlow.messages.projectLoadFailed')));
+        toast.error(
+          getApiErrorMessage(error, t("createFlow.messages.projectLoadFailed")),
+        );
         navigate(routeFor(1, null, null), { replace: true });
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [currentStep, navigate, requestedModelId, routeFor, t]);
 
   useEffect(() => {
@@ -153,11 +194,18 @@ export default function CreateTrainingJobPage() {
     getTrainingJob(requestedJobId)
       .then((result) => {
         if (!active) return;
-        if (requestedModelId && result.project_id !== requestedModelId) throw new Error('Training job project mismatch.');
+        if (requestedModelId && result.project_id !== requestedModelId)
+          throw new Error("Training job project mismatch.");
         setJob(result);
       })
-      .catch((error) => toast.error(getApiErrorMessage(error, t('createFlow.messages.jobLoadFailed'))));
-    return () => { active = false; };
+      .catch((error) =>
+        toast.error(
+          getApiErrorMessage(error, t("createFlow.messages.jobLoadFailed")),
+        ),
+      );
+    return () => {
+      active = false;
+    };
   }, [requestedJobId, requestedModelId, t]);
 
   useEffect(() => {
@@ -165,16 +213,17 @@ export default function CreateTrainingJobPage() {
       if (!hasUnsavedChanges) return;
       event.preventDefault();
     };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
   }, [hasUnsavedChanges]);
 
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => (
-    !allowExit.current
-    && hasUnsavedChanges
-    && currentLocation.pathname.startsWith(createPath)
-    && !nextLocation.pathname.startsWith(createPath)
-  ));
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      !allowExit.current &&
+      hasUnsavedChanges &&
+      currentLocation.pathname.startsWith(createPath) &&
+      !nextLocation.pathname.startsWith(createPath),
+  );
 
   const selectProject = (projectId: string) => {
     const selected = projects.find((item) => item.id === projectId) ?? null;
@@ -185,7 +234,11 @@ export default function CreateTrainingJobPage() {
     setCodeDirty(false);
     setDataDirty(false);
     if (!selected) return;
-    const next = { name: selected.name, description: selected.description, access_mode: selected.access_mode };
+    const next = {
+      name: selected.name,
+      description: selected.description,
+      access_mode: selected.access_mode,
+    };
     setMetadataForm(next);
     setMetadataBaseline(metadataFingerprint(next));
     navigate(routeFor(1, selected.id, undefined), { replace: true });
@@ -194,7 +247,7 @@ export default function CreateTrainingJobPage() {
   const setMode = (nextMode: TrainingModelMode) => {
     setModeState(nextMode);
     setJob(null);
-    if (nextMode === 'new') {
+    if (nextMode === "new") {
       setProject(null);
       setSourceForm(emptySource);
       setSourceBaseline(sourceFingerprint(emptySource));
@@ -208,19 +261,25 @@ export default function CreateTrainingJobPage() {
 
   const continueFromMetadata = useCallback(async () => {
     if (!metadataForm.name.trim()) {
-      toast.warning(t('createFlow.messages.nameRequired'));
-      document.getElementById('training-model-name')?.focus();
+      toast.warning(t("createFlow.messages.nameRequired"));
+      document.getElementById("training-model-name")?.focus();
       return;
     }
-    setTransitionState('saving-metadata');
+    setTransitionState("saving-metadata");
     try {
       let nextProject = project;
       if (!project) {
         nextProject = await createModelProject(metadataForm);
-        setProjects((current) => nextProject ? [...current, nextProject] : current);
+        setProjects((current) =>
+          nextProject ? [...current, nextProject] : current,
+        );
       } else if (metadataDirty) {
         nextProject = await updateModelProject(project.id, metadataForm);
-        setProjects((current) => current.map((item) => item.id === nextProject?.id ? nextProject : item));
+        setProjects((current) =>
+          current.map((item) =>
+            item.id === nextProject?.id ? nextProject : item,
+          ),
+        );
       }
       if (!nextProject) return;
       setProject(nextProject);
@@ -233,54 +292,69 @@ export default function CreateTrainingJobPage() {
       setMetadataBaseline(metadataFingerprint(persisted));
       navigate(routeFor(2, nextProject.id, undefined));
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t('createFlow.messages.metadataSaveFailed')));
+      toast.error(
+        getApiErrorMessage(error, t("createFlow.messages.metadataSaveFailed")),
+      );
     } finally {
-      setTransitionState('idle');
+      setTransitionState("idle");
     }
   }, [metadataDirty, metadataForm, navigate, project, routeFor, t]);
 
-  const continueFromSource = useCallback(async (saveEditors: Array<() => Promise<boolean>>) => {
-    if (!project) {
-      toast.warning(t('createFlow.messages.metadataRequired'));
-      navigate(routeFor(1));
-      return;
-    }
-    setTransitionState('saving-source');
-    try {
-      const saved = await Promise.all(saveEditors.map((save) => save()));
-      if (saved.some((value) => !value)) return;
-      const [codeFiles, dataFiles] = await Promise.all([
-        listSourceCodeFiles(project.id),
-        listReferenceFiles(project.id),
-      ]);
-      const missing = [];
-      if (!codeFiles.length) missing.push(t('createFlow.source.sourceCode'));
-      if (!dataFiles.length) missing.push(t('createFlow.source.referenceData'));
-      const selectedEntryPoint = sourceForm.entry_point.trim();
-      if (!selectedEntryPoint || !codeFiles.some((file) => file.relative_path === selectedEntryPoint)) {
-        missing.push(t('createFlow.source.entryPoint'));
-      }
-      if (missing.length) {
-        toast.warning(t('createFlow.messages.sourceRequired', { fields: missing.join(', ') }));
+  const continueFromSource = useCallback(
+    async (saveEditors: Array<() => Promise<boolean>>) => {
+      if (!project) {
+        toast.warning(t("createFlow.messages.metadataRequired"));
+        navigate(routeFor(1));
         return;
       }
-      setCodeDirty(false);
-      setDataDirty(false);
-      setSourceBaseline(sourceFingerprint(sourceForm));
-      navigate(routeFor(3, project.id, undefined));
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, t('createFlow.messages.sourceSaveFailed')));
-    } finally {
-      setTransitionState('idle');
-    }
-  }, [navigate, project, routeFor, sourceForm, t]);
+      setTransitionState("saving-source");
+      try {
+        const saved = await Promise.all(saveEditors.map((save) => save()));
+        if (saved.some((value) => !value)) return;
+        const [codeFiles, dataFiles] = await Promise.all([
+          listSourceCodeFiles(project.id),
+          listReferenceFiles(project.id),
+        ]);
+        const missing = [];
+        if (!codeFiles.length) missing.push(t("createFlow.source.sourceCode"));
+        if (!dataFiles.length)
+          missing.push(t("createFlow.source.referenceData"));
+        const selectedEntryPoint = sourceForm.entry_point.trim();
+        if (
+          !selectedEntryPoint ||
+          !codeFiles.some((file) => file.relative_path === selectedEntryPoint)
+        ) {
+          missing.push(t("createFlow.source.entryPoint"));
+        }
+        if (missing.length) {
+          toast.warning(
+            t("createFlow.messages.sourceRequired", {
+              fields: missing.join(", "),
+            }),
+          );
+          return;
+        }
+        setCodeDirty(false);
+        setDataDirty(false);
+        setSourceBaseline(sourceFingerprint(sourceForm));
+        navigate(routeFor(3, project.id, undefined));
+      } catch (error) {
+        toast.error(
+          getApiErrorMessage(error, t("createFlow.messages.sourceSaveFailed")),
+        );
+      } finally {
+        setTransitionState("idle");
+      }
+    },
+    [navigate, project, routeFor, sourceForm, t],
+  );
 
   const startTraining = useCallback(async () => {
     if (!project) {
-      toast.warning(t('createFlow.messages.metadataRequired'));
+      toast.warning(t("createFlow.messages.metadataRequired"));
       return;
     }
-    setTransitionState('starting-training');
+    setTransitionState("starting-training");
     try {
       const nextJob = await createTrainingJob({
         name: `${project.name} training`,
@@ -298,11 +372,13 @@ export default function CreateTrainingJobPage() {
       });
       setJob(nextJob);
       navigate(routeFor(3, project.id, nextJob.id), { replace: true });
-      toast.success(t('createFlow.messages.trainingStarted'));
+      toast.success(t("createFlow.messages.trainingStarted"));
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t('createFlow.messages.trainingStartFailed')));
+      toast.error(
+        getApiErrorMessage(error, t("createFlow.messages.trainingStartFailed")),
+      );
     } finally {
-      setTransitionState('idle');
+      setTransitionState("idle");
     }
   }, [executionForm, navigate, project, routeFor, sourceForm, t]);
 
@@ -312,50 +388,67 @@ export default function CreateTrainingJobPage() {
   }, [job]);
 
   const cancelTraining = useCallback(async () => {
-    if (!job || !['pending', 'queued', 'uploading', 'running'].includes(job.status)) return;
+    if (
+      !job ||
+      !["pending", "queued", "uploading", "running"].includes(job.status)
+    )
+      return;
     setJob(await cancelTrainingJob(job.id));
   }, [job]);
 
   const finishTraining = () => {
     if (!job) {
-      toast.warning(t('createFlow.messages.runFirst'));
+      toast.warning(t("createFlow.messages.runFirst"));
       return;
     }
-    if (!['completed', 'failed', 'cancelled'].includes(job.status)) {
-      toast.warning(t('createFlow.messages.trainingStillRunning'));
+    if (!["completed", "failed", "cancelled"].includes(job.status)) {
+      toast.warning(t("createFlow.messages.trainingStillRunning"));
       return;
     }
     allowExit.current = true;
     navigate(`${trainingPath}/jobs/${job.id}/details/overview`);
   };
 
-  const goToStep = useCallback(async (step: TrainingStep) => {
-    if (transitionState !== 'idle' || step === currentStep) return;
-    if (step === 1) {
-      navigate(routeFor(1));
-      return;
-    }
-    if (step === 2) {
-      if (!project || metadataDirty) await continueFromMetadata();
-      else navigate(routeFor(2));
-      return;
-    }
-    if (!project || metadataDirty) {
-      await continueFromMetadata();
-      toast.warning(t('createFlow.messages.completeSource'));
-      return;
-    }
-    const [codeFiles, dataFiles] = await Promise.all([
-      listSourceCodeFiles(project.id),
-      listReferenceFiles(project.id),
-    ]);
-    if (!codeFiles.length || !dataFiles.length || sourceDirty) {
-      toast.warning(t('createFlow.messages.completeSource'));
-      navigate(routeFor(2));
-      return;
-    }
-    navigate(routeFor(3));
-  }, [continueFromMetadata, currentStep, metadataDirty, navigate, project, routeFor, sourceDirty, t, transitionState]);
+  const goToStep = useCallback(
+    async (step: TrainingStep) => {
+      if (transitionState !== "idle" || step === currentStep) return;
+      if (step === 1) {
+        navigate(routeFor(1));
+        return;
+      }
+      if (step === 2) {
+        if (!project || metadataDirty) await continueFromMetadata();
+        else navigate(routeFor(2));
+        return;
+      }
+      if (!project || metadataDirty) {
+        await continueFromMetadata();
+        toast.warning(t("createFlow.messages.completeSource"));
+        return;
+      }
+      const [codeFiles, dataFiles] = await Promise.all([
+        listSourceCodeFiles(project.id),
+        listReferenceFiles(project.id),
+      ]);
+      if (!codeFiles.length || !dataFiles.length || sourceDirty) {
+        toast.warning(t("createFlow.messages.completeSource"));
+        navigate(routeFor(2));
+        return;
+      }
+      navigate(routeFor(3));
+    },
+    [
+      continueFromMetadata,
+      currentStep,
+      metadataDirty,
+      navigate,
+      project,
+      routeFor,
+      sourceDirty,
+      t,
+      transitionState,
+    ],
+  );
 
   const requestExit = () => {
     if (hasUnsavedChanges) {
@@ -381,10 +474,14 @@ export default function CreateTrainingJobPage() {
     transitionState,
     setMode,
     selectProject,
-    setMetadataField: (field, value) => setMetadataForm((current) => ({ ...current, [field]: value })),
-    setSourceField: (field, value) => setSourceForm((current) => ({ ...current, [field]: value })),
-    setExecutionField: (field, value) => setExecutionForm((current) => ({ ...current, [field]: value })),
-    setEditorDirty: (kind, dirty) => kind === 'code' ? setCodeDirty(dirty) : setDataDirty(dirty),
+    setMetadataField: (field, value) =>
+      setMetadataForm((current) => ({ ...current, [field]: value })),
+    setSourceField: (field, value) =>
+      setSourceForm((current) => ({ ...current, [field]: value })),
+    setExecutionField: (field, value) =>
+      setExecutionForm((current) => ({ ...current, [field]: value })),
+    setEditorDirty: (kind, dirty) =>
+      kind === "code" ? setCodeDirty(dirty) : setDataDirty(dirty),
     continueFromMetadata,
     continueFromSource,
     startTraining,
@@ -396,36 +493,36 @@ export default function CreateTrainingJobPage() {
   };
 
   const steps = [
-    { id: 1, label: t('createFlow.steps.metadata'), icon: FileText },
-    { id: 2, label: t('createFlow.steps.source'), icon: FileCode2 },
-    { id: 3, label: t('createFlow.steps.execution'), icon: Cpu },
+    { id: 1, label: t("createFlow.steps.metadata"), icon: FileText },
+    { id: 2, label: t("createFlow.steps.source"), icon: FileCode2 },
+    { id: 3, label: t("createFlow.steps.execution"), icon: Cpu },
   ];
 
   return (
     <section className="space-y-6">
       <ConfirmModal
-        open={discardOpen || blocker.state === 'blocked'}
-        title={t('createFlow.discard.title')}
-        description={t('createFlow.discard.description')}
-        confirmText={t('createFlow.discard.confirm')}
+        open={discardOpen || blocker.state === "blocked"}
+        title={t("createFlow.discard.title")}
+        description={t("createFlow.discard.description")}
+        confirmText={t("createFlow.discard.confirm")}
         tone="danger"
         onConfirm={() => {
           allowExit.current = true;
           setDiscardOpen(false);
-          if (blocker.state === 'blocked') blocker.proceed();
+          if (blocker.state === "blocked") blocker.proceed();
           else if (exitRequested) navigate(trainingPath, { replace: true });
         }}
         onCancel={() => {
           setDiscardOpen(false);
           setExitRequested(false);
-          if (blocker.state === 'blocked') blocker.reset();
+          if (blocker.state === "blocked") blocker.reset();
         }}
       />
-      <PageHeader title={t('createFlow.title')} />
+      <PageHeader title={t("createFlow.title")} />
       <LineSteps
         steps={steps}
         currentStep={currentStep}
-        isTransitioning={transitionState !== 'idle'}
+        isTransitioning={transitionState !== "idle"}
         onStepChange={(step) => void goToStep(step as TrainingStep)}
       />
       <Outlet context={context} />

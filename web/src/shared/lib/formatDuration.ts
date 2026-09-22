@@ -12,9 +12,9 @@
  *   null   -> "-"
  */
 export function formatDuration(seconds: number | null | undefined): string {
-  if (seconds == null || seconds < 0) return '-';
+  if (seconds == null || seconds < 0) return "-";
   const s = Math.round(seconds);
-  if (s === 0) return '-';
+  if (s === 0) return "-";
   const hrs = Math.floor(s / 3600);
   const mins = Math.floor((s % 3600) / 60);
   const secs = s % 60;
@@ -27,7 +27,10 @@ export function formatDuration(seconds: number | null | undefined): string {
  * Compute elapsed seconds between two ISO timestamps, or from startIso to now.
  * Returns null if startIso is missing.
  */
-export function computeElapsed(startIso: string | null | undefined, endIso?: string | null): number | null {
+export function computeElapsed(
+  startIso: string | null | undefined,
+  endIso?: string | null,
+): number | null {
   if (!startIso) return null;
   const start = new Date(startIso).getTime();
   const end = endIso ? new Date(endIso).getTime() : Date.now();

@@ -122,11 +122,7 @@ export function TerminalViewer({
 }
 
 type TerminalActionTone =
-  | "default"
-  | "start"
-  | "warning"
-  | "danger"
-  | "success";
+  "default" | "start" | "warning" | "danger" | "success";
 
 export interface TerminalActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   tone?: TerminalActionTone;

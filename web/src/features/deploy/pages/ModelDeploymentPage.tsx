@@ -36,7 +36,9 @@ export function ModelDeploymentPage({
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <p className="text-style-body-strong text-color-muted-foreground">{t("deployment.flavor")}</p>
+          <p className="text-style-body-strong text-color-muted-foreground">
+            {t("deployment.flavor")}
+          </p>
           <p className="mt-1 text-style-body-lg text-color-foreground capitalize">
             {model.flavor || "-"}
           </p>
@@ -45,7 +47,9 @@ export function ModelDeploymentPage({
           <p className="text-style-body-strong text-color-muted-foreground">
             {t("deployment.packageFile")}
           </p>
-          <p className="mt-1 text-style-body-lg text-color-foreground break-all">{zipFile}</p>
+          <p className="mt-1 text-style-body-lg text-color-foreground break-all">
+            {zipFile}
+          </p>
         </div>
         {model.package_preview_tree?.length ? (
           <div className="md:col-span-2">

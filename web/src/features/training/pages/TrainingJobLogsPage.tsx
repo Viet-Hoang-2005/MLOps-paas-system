@@ -25,7 +25,9 @@ export default function TrainingJobLogsPage() {
         <div className="flex items-start gap-3 rounded-surface border border-danger/20 bg-danger-subtle p-4 text-style-body-strong text-color-danger">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-color-danger" />
           <div>
-            <p className="mb-1 font-bold text-color-danger">{t("detail.logsPage.stopReason")}</p>
+            <p className="mb-1 font-bold text-color-danger">
+              {t("detail.logsPage.stopReason")}
+            </p>
             <p>{job.stop_reason}</p>
           </div>
         </div>
@@ -65,7 +67,9 @@ export default function TrainingJobLogsPage() {
         title={
           <div className="flex items-center gap-2">
             <History className="h-5 w-5" />
-            <h3 className="text-style-heading">{t("detail.logsPage.events")}</h3>
+            <h3 className="text-style-heading">
+              {t("detail.logsPage.events")}
+            </h3>
           </div>
         }
         className="mt-8"

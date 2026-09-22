@@ -11,7 +11,7 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { startGitHubOAuth } from "@/features/auth/lib/oauth";
 import { toast } from "@/shared/components/toastStore";
 import { useForm } from "@/features/auth/hooks/useForm";
-import MLdriftLogo from "@/assets/icons/MLdrift.png";
+import AdaptMLLogo from "@/assets/icons/AdaptML.png";
 
 export default function LoginPage() {
   const { t } = useTranslation("auth");
@@ -47,7 +47,7 @@ export default function LoginPage() {
   return (
     <AuthCard>
       <div className="rounded-surface flex items-center justify-center mx-auto mb-2">
-        <img src={MLdriftLogo} alt="MLdrift" className="w-8 h-8" />
+        <img src={AdaptMLLogo} alt="AdaptML" className="w-8 h-8" />
       </div>
 
       <h2 className="mb-1 text-center text-style-page-title font-bold text-color-foreground">

@@ -1,4 +1,4 @@
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext } from "react-router-dom";
 
 import type {
   Build,
@@ -6,10 +6,11 @@ import type {
   Deployment,
   ModelProject,
   ProjectMetadataForm,
-} from '@/features/catalog/types';
+} from "@/features/catalog/types";
 
 export type UploadStep = 1 | 2 | 3;
-export type UploadTransitionState = 'idle' | 'saving-metadata' | 'starting-build' | 'starting-deployment';
+export type UploadTransitionState =
+  "idle" | "saving-metadata" | "starting-build" | "starting-deployment";
 
 export interface UploadModelContext {
   project: ModelProject | null;
@@ -20,8 +21,14 @@ export interface UploadModelContext {
   metadataDirty: boolean;
   buildInputsDirty: boolean;
   transitionState: UploadTransitionState;
-  setMetadataField: <K extends keyof ProjectMetadataForm>(field: K, value: ProjectMetadataForm[K]) => void;
-  setBuildField: <K extends keyof BuildInputForm>(field: K, value: BuildInputForm[K]) => void;
+  setMetadataField: <K extends keyof ProjectMetadataForm>(
+    field: K,
+    value: ProjectMetadataForm[K],
+  ) => void;
+  setBuildField: <K extends keyof BuildInputForm>(
+    field: K,
+    value: BuildInputForm[K],
+  ) => void;
   continueFromMetadata: () => Promise<void>;
   startBuild: () => Promise<void>;
   continueFromBuild: () => void;

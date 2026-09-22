@@ -9,11 +9,7 @@ import type {
 } from "@/features/training/types";
 
 export type TrainingJobDetailSection =
-  | "overview"
-  | "logs"
-  | "metrics"
-  | "artifacts"
-  | "config";
+  "overview" | "logs" | "metrics" | "artifacts" | "config";
 
 export interface TrainingJobDetailContextValue {
   job: TrainingJob;

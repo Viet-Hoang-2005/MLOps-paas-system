@@ -41,9 +41,7 @@ function TrackerStep({ label, state }: { label: string; state: string }) {
       >
         {icon}
       </div>
-      <span
-        className={`text-center text-style-caption uppercase ${textClass}`}
-      >
+      <span className={`text-center text-style-caption uppercase ${textClass}`}>
         {label}
       </span>
     </div>

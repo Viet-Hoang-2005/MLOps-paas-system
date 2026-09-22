@@ -1,10 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
-import { deployQueryKeys } from '@/features/deploy/queryKeys';
-import { TerminalViewer } from '@/shared/components/TerminalViewer';
+import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { deployQueryKeys } from "@/features/deploy/queryKeys";
+import { TerminalViewer } from "@/shared/components/TerminalViewer";
 
 export function BuildLogsPanel({ modelId }: { modelId: string }) {
-  const { t } = useTranslation('deploy');
+  const { t } = useTranslation("deploy");
 
   const { data } = useQuery<{ logs: string[]; updated_at: string }>({
     queryKey: deployQueryKeys.logs(modelId),
@@ -18,8 +18,8 @@ export function BuildLogsPanel({ modelId }: { modelId: string }) {
   return (
     <div className="mt-4">
       <TerminalViewer
-        title={t('lifecycle.buildLogs')}
-        placeholder={t('lifecycle.waitingLogs')}
+        title={t("lifecycle.buildLogs")}
+        placeholder={t("lifecycle.waitingLogs")}
         logs={logs}
       />
     </div>

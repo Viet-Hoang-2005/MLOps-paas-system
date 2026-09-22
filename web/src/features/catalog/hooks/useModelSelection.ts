@@ -1,5 +1,5 @@
-import { createContext, useContext } from 'react';
-import type { ModelProject } from '@/features/catalog/types';
+import { createContext, useContext } from "react";
+import type { ModelProject } from "@/features/catalog/types";
 
 export type DashboardModel = ModelProject;
 
@@ -10,12 +10,16 @@ export interface ModelSelectionContextValue {
   loading: boolean;
 }
 
-export const ModelSelectionContext = createContext<ModelSelectionContextValue | undefined>(undefined);
+export const ModelSelectionContext = createContext<
+  ModelSelectionContextValue | undefined
+>(undefined);
 
 export function useModelSelection() {
   const context = useContext(ModelSelectionContext);
   if (!context) {
-    throw new Error('useModelSelection must be used inside ModelSelectionProvider.');
+    throw new Error(
+      "useModelSelection must be used inside ModelSelectionProvider.",
+    );
   }
   return context;
 }

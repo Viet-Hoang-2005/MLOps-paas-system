@@ -23,8 +23,14 @@ export default function TrainingJobConfigPage() {
               label={t("detail.config.backend")}
               value={job.backend || t("statuses.unknown", { ns: "common" })}
             />
-            <MetadataRow label={t("detail.config.vcpu")} value={String(job.vcpu)} />
-            <MetadataRow label={t("detail.config.memory")} value={String(job.memory)} />
+            <MetadataRow
+              label={t("detail.config.vcpu")}
+              value={String(job.vcpu)}
+            />
+            <MetadataRow
+              label={t("detail.config.memory")}
+              value={String(job.memory)}
+            />
             <MetadataRow
               label={t("detail.config.maxRuntime")}
               value={String(job.max_runtime_seconds)}

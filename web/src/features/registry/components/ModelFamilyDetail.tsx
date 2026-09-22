@@ -186,7 +186,9 @@ export function ModelFamilyDetail({
                       <Layers
                         className={classNames(
                           "h-4 w-4",
-                          isSelected ? "text-color-primary" : "text-color-muted-foreground",
+                          isSelected
+                            ? "text-color-primary"
+                            : "text-color-muted-foreground",
                         )}
                       />
                       <span className="font-mono font-semibold">

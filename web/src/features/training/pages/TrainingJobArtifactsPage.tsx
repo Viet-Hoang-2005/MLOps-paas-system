@@ -1,5 +1,13 @@
 import { useEffect, useRef } from "react";
-import { Clipboard, Database, Download, FileArchive, FileCode2, Rocket, Trash2 } from "lucide-react";
+import {
+  Clipboard,
+  Database,
+  Download,
+  FileArchive,
+  FileCode2,
+  Rocket,
+  Trash2,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -85,7 +93,9 @@ export default function TrainingJobArtifactsPage() {
           <div className="flex w-full flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <FileArchive className="h-5 w-5" />
-              <h3 className="text-style-heading">{t("detail.artifactPage.title")}</h3>
+              <h3 className="text-style-heading">
+                {t("detail.artifactPage.title")}
+              </h3>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -149,7 +159,7 @@ export default function TrainingJobArtifactsPage() {
         editorType="code"
         currentEntryPoint={job.entry_point}
       />
-      
+
       <SourceEditor
         modelId={job.project_id}
         fileType="data_file"

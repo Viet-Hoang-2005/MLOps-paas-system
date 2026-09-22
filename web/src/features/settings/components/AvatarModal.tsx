@@ -33,7 +33,9 @@ export function AvatarModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay px-4">
       <div className="w-full max-w-lg rounded-surface border border-border bg-surface shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-2">
-          <h2 className="text-style-section-title font-bold text-color-foreground">{t("avatar")}</h2>
+          <h2 className="text-style-section-title font-bold text-color-foreground">
+            {t("avatar")}
+          </h2>
           <button
             type="button"
             onClick={onClose}
