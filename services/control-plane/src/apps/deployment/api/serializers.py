@@ -61,9 +61,7 @@ class BuildSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_source_job_id(instance):
-        return instance.source_job_reference or (
-            instance.source_job.public_id if instance.source_job_id else None
-        )
+        return instance.source_job_reference or (instance.source_job.public_id if instance.source_job_id else None)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -134,10 +132,18 @@ class ManualBuildCreateSerializer(serializers.Serializer):
             artifact_format=attrs["artifact_format"],
         )
         if attrs["artifact_format"] == "mlflow_zip":
-            extras = [field for field in (
-                "label_mapping_file", "metrics_file", "params_file", "model_insights_file",
-                "feature_importance_file", "input_schema_file",
-            ) if attrs.get(field)]
+            extras = [
+                field
+                for field in (
+                    "label_mapping_file",
+                    "metrics_file",
+                    "params_file",
+                    "model_insights_file",
+                    "feature_importance_file",
+                    "input_schema_file",
+                )
+                if attrs.get(field)
+            ]
             if extras:
                 raise serializers.ValidationError(
                     {field: "Include this file inside the model package ZIP instead." for field in extras}

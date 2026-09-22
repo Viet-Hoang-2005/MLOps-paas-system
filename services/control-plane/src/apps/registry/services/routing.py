@@ -1,8 +1,8 @@
-from infrastructure.http import HttpClient
 from rest_framework.exceptions import NotFound, ValidationError
 
 from apps.deployment.models import Endpoint
 from apps.registry.models import RegistryAlias
+from infrastructure.http import HttpClient
 
 
 def predict_alias(*, project, alias_name, payload, http=None):

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def invalidate_model_server_cache(version_public_id: Optional[str]) -> bool:
     """Invalidate the model-server routing cache in Redis (database 1).
-    
+
     This ensures that when a deployment becomes healthy, is stopped, or fails,
     the gateway (model-server) immediately clears its cached routing record
     rather than waiting for the 30-second TTL to expire.

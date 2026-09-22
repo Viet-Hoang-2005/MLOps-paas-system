@@ -5,10 +5,10 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
-from infrastructure.http import HttpClient
 from rest_framework.exceptions import AuthenticationFailed, ValidationError
 
 from apps.auth.models import UserAvatar
+from infrastructure.http import HttpClient
 
 logger = logging.getLogger(__name__)
 

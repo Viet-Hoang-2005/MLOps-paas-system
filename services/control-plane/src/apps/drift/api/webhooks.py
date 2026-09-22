@@ -1,5 +1,3 @@
-from common.api.permissions import HasInternalWebhookSecret
-from common.logging import record_transition
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
@@ -8,6 +6,8 @@ from rest_framework.views import APIView
 
 from apps.drift.models import DriftRun
 from apps.drift.services.automatic import request_automatic_drift_runs
+from common.api.permissions import HasInternalWebhookSecret
+from common.logging import record_transition
 
 
 class AutomaticDriftSignalSerializer(serializers.Serializer):
@@ -39,10 +39,14 @@ class DriftRunWebhookEndpoint(APIView):
             run.error_message = ""
             run.save(update_fields=["summary", "drift_score", "has_drift", "status", "completed_at", "error_message"])
             record_transition(
-                run, "completed", phase="summary_updated" if already_completed else None, source="webhook",
+                run,
+                "completed",
+                phase="summary_updated" if already_completed else None,
+                source="webhook",
             )
             if run.has_drift:
                 from apps.drift.tasks import handle_drift_detected
+
                 transaction.on_commit(lambda: handle_drift_detected.delay(str(run.public_id)))
         return Response({"status": run.status})
 

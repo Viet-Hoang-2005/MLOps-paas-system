@@ -1,8 +1,8 @@
-from common.api.exceptions import Conflict
-from infrastructure.storage import S3Storage
 from rest_framework import serializers
 
 from apps.catalog.models import ModelProject, WorkspaceAsset
+from common.api.exceptions import Conflict
+from infrastructure.storage import S3Storage
 
 
 class ModelProjectSerializer(serializers.ModelSerializer):

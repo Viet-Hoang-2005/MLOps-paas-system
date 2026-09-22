@@ -1,13 +1,13 @@
 from django.db import transaction
+from rest_framework.exceptions import ValidationError
+
+from apps.observability.services.lifecycle import record_registry_event
+from apps.observability.services.outbox import enqueue_event
+from apps.registry.models import ModelArtifact, ModelMetric, ModelVersion
 from infrastructure.execution.image_references import repository_from_reference
 from infrastructure.execution.image_registry import image_registry_for
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import build_prefix, version_prefix
-from rest_framework.exceptions import ValidationError
-
-from apps.observability.services.outbox import enqueue_event
-from apps.observability.services.lifecycle import record_registry_event
-from apps.registry.models import ModelArtifact, ModelMetric, ModelVersion
 
 BUILD_INPUT_ARTIFACT_KINDS = {
     "source_artifact": "source",
@@ -37,12 +37,7 @@ def register_successful_build(
     storage = storage or S3Storage()
     image_registry = image_registry or image_registry_for(build)
     with transaction.atomic():
-        build = (
-            type(build)
-            .objects.select_for_update()
-            .select_related("project", "project__owner")
-            .get(pk=build.pk)
-        )
+        build = type(build).objects.select_for_update().select_related("project", "project__owner").get(pk=build.pk)
         project = type(build.project).objects.select_for_update().get(pk=build.project_id)
         if build.version_id is None:
             version_number = project.next_version_number

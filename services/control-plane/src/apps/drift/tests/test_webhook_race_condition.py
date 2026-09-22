@@ -1,5 +1,6 @@
-from unittest.mock import Mock
 import json
+from unittest.mock import Mock
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
@@ -97,14 +98,21 @@ class DriftWebhookRaceConditionTests(TestCase):
         fake_s3_client.get_object.return_value = {
             "Body": Mock(read=lambda: json.dumps({"drift_score": 0.33, "has_drift": False}).encode("utf-8"))
         }
-        storage_instance = type("Storage", (), {
-            "parse_uri": lambda self, uri: ("test-bucket", "prefix/summary.json"),
-            "client": fake_s3_client,
-        })()
+        storage_instance = type(
+            "Storage",
+            (),
+            {
+                "parse_uri": lambda self, uri: ("test-bucket", "prefix/summary.json"),
+                "client": fake_s3_client,
+            },
+        )()
 
         from unittest.mock import patch
-        with patch("apps.drift.tasks.drift_backend", return_value=fake_backend), \
-             patch("apps.drift.tasks.S3Storage", return_value=storage_instance):
+
+        with (
+            patch("apps.drift.tasks.drift_backend", return_value=fake_backend),
+            patch("apps.drift.tasks.S3Storage", return_value=storage_instance),
+        ):
             result = execute_drift_run(str(run.public_id))
             self.assertEqual(result, "completed")
 

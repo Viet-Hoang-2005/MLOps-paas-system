@@ -4,10 +4,6 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-from common import celery_logging, gunicorn_conf
-from common import logging as app_logging
-from common.logging_utils import bind_context, current_context, reset_context
-from common.middleware import RequestContextMiddleware, request_id_context
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.http import HttpResponse
@@ -23,6 +19,10 @@ from apps.drift.services import logs as drift_logs
 from apps.training.models import TrainingJob
 from apps.training.services import logs as training_logs
 from apps.training.tasks import execute_training_job
+from common import celery_logging, gunicorn_conf
+from common import logging as app_logging
+from common.logging_utils import bind_context, current_context, reset_context
+from common.middleware import RequestContextMiddleware, request_id_context
 
 
 @pytest.mark.parametrize("status", [200, 403, 500])
@@ -71,20 +71,14 @@ def test_successful_probes_do_not_create_access_log(path, caplog):
 
 def test_successful_request_emits_info_access_log_without_summary(caplog):
     request = RequestFactory().get("/api/models/version-1/predict/?token=never-log-this")
-    request.resolver_match = ResolverMatch(
-        lambda req: HttpResponse(), (), {}, route="api/models/{version_id}/predict/"
-    )
+    request.resolver_match = ResolverMatch(lambda req: HttpResponse(), (), {}, route="api/models/{version_id}/predict/")
     middleware = RequestContextMiddleware(lambda req: HttpResponse())
 
     with caplog.at_level(logging.INFO):
         response = middleware(request)
 
     assert response.status_code == 200
-    access_logs = [
-        record
-        for record in caplog.records
-        if getattr(record, "event", "") == "http.request.finished"
-    ]
+    access_logs = [record for record in caplog.records if getattr(record, "event", "") == "http.request.finished"]
     assert len(access_logs) == 1
     assert access_logs[0].method == "GET"
     assert access_logs[0].route == "api/models/{version_id}/predict/"
@@ -151,6 +145,7 @@ def test_publish_propagates_only_bounded_correlation():
 def test_retry_signal_emits_one_safe_warning_with_context(caplog):
     from celery.exceptions import Retry
     from celery.signals import task_retry
+
     from common.logging_utils import JsonFormatter
 
     task = Mock()

@@ -3,9 +3,21 @@
 from apps.observability.models import LifecycleEvent
 
 
-def record_event(*, project, aggregate_type, aggregate_id, event_type, message="", actor=None,
-                 from_state="", to_state="", metadata=None, idempotency_key="", correlation_id=None,
-                 maintenance_id=None):
+def record_event(
+    *,
+    project,
+    aggregate_type,
+    aggregate_id,
+    event_type,
+    message="",
+    actor=None,
+    from_state="",
+    to_state="",
+    metadata=None,
+    idempotency_key="",
+    correlation_id=None,
+    maintenance_id=None,
+):
     return LifecycleEvent.objects.create(
         project=project,
         aggregate_type=aggregate_type,
@@ -23,13 +35,18 @@ def record_event(*, project, aggregate_type, aggregate_id, event_type, message="
 
 
 def has_event(*, aggregate_type, aggregate_id, idempotency_key):
-    return bool(idempotency_key) and LifecycleEvent.objects.filter(
-        aggregate_type=aggregate_type, aggregate_id=aggregate_id, idempotency_key=idempotency_key
-    ).exists()
+    return (
+        bool(idempotency_key)
+        and LifecycleEvent.objects.filter(
+            aggregate_type=aggregate_type, aggregate_id=aggregate_id, idempotency_key=idempotency_key
+        ).exists()
+    )
 
 
 def events_for_aggregate(*, aggregate_type, aggregate_id):
-    return LifecycleEvent.objects.filter(aggregate_type=aggregate_type, aggregate_id=aggregate_id).order_by("created_at")
+    return LifecycleEvent.objects.filter(aggregate_type=aggregate_type, aggregate_id=aggregate_id).order_by(
+        "created_at"
+    )
 
 
 def record_training_event(*, job, event_type, message, metadata=None, idempotency_key=""):

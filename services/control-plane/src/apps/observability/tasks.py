@@ -1,4 +1,5 @@
 from celery import shared_task
+
 from infrastructure.redpanda import RedpandaProducer
 
 

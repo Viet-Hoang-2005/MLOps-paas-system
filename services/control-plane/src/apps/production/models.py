@@ -8,7 +8,9 @@ class PredictionRecord(models.Model):
 
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     project = models.ForeignKey("catalog.ModelProject", on_delete=models.CASCADE, related_name="prediction_records")
-    model_version = models.ForeignKey("registry.ModelVersion", on_delete=models.CASCADE, related_name="prediction_records")
+    model_version = models.ForeignKey(
+        "registry.ModelVersion", on_delete=models.CASCADE, related_name="prediction_records"
+    )
     observed_at = models.DateTimeField()
     features = models.JSONField(default=dict)
     prediction = models.TextField(blank=True)

@@ -1,10 +1,11 @@
 from collections.abc import Sequence
 
-from common.logging import runtime_line
 from django.conf import settings
 from django.utils import timezone
 from redis import Redis
 from redis.exceptions import RedisError
+
+from common.logging import runtime_line
 
 LOG_TTL_SECONDS = 3600
 

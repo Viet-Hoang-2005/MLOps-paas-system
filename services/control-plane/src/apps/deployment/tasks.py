@@ -1,33 +1,29 @@
 import logging
 
 from celery import shared_task
-from common.logging import failure_reported, record_transition
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from infrastructure.execution import build_backend, deployment_backend
-from infrastructure.execution.image_cleanup import BuildImageCleaner
-from infrastructure.execution.image_references import temporary_image_reference
-from infrastructure.storage import S3Storage
-from infrastructure.storage.paths import build_prefix
 
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.services.logs import append_deployment_log, reset_deployment_logs
 from apps.observability.services.outbox import enqueue_event
 from apps.registry.services.versions import register_successful_build
+from common.logging import failure_reported, record_transition
+from infrastructure.execution import build_backend, deployment_backend
+from infrastructure.execution.image_cleanup import BuildImageCleaner
+from infrastructure.execution.image_references import temporary_image_reference
+from infrastructure.storage import S3Storage
+from infrastructure.storage.paths import build_prefix
 
 logger = logging.getLogger(__name__)
 
 
 def _mark_deployment_healthy(deployment):
     Deployment = type(deployment)
-    Deployment.objects.filter(pk=deployment.pk).update(
-        status="healthy", deployed_at=timezone.now(), error_message=""
-    )
-    Endpoint.objects.filter(deployment=deployment).update(
-        health_status="healthy", last_checked_at=timezone.now()
-    )
+    Deployment.objects.filter(pk=deployment.pk).update(status="healthy", deployed_at=timezone.now(), error_message="")
+    Endpoint.objects.filter(deployment=deployment).update(health_status="healthy", last_checked_at=timezone.now())
     invalidate_model_server_cache(str(deployment.version.public_id))
     append_deployment_log(deployment, "Endpoint passed health checks; deployment is healthy.")
     record_transition(deployment, "healthy")
@@ -43,11 +39,7 @@ def _mark_deployment_healthy(deployment):
 @shared_task(bind=True)
 def execute_build(self, build_id):
     with transaction.atomic():
-        build = (
-            Build.objects.select_for_update()
-            .select_related("project", "project__owner")
-            .get(public_id=build_id)
-        )
+        build = Build.objects.select_for_update().select_related("project", "project__owner").get(public_id=build_id)
         if build.status in {"ready", "cancelled"}:
             return build.status
         if build.project.deletion_state != "active":
@@ -71,7 +63,11 @@ def execute_build(self, build_id):
         )
         if not already_failed:
             record_transition(
-                build, "failed", reason="Build backend execution failed", error_type=type(exc).__name__, exc_info=True,
+                build,
+                "failed",
+                reason="Build backend execution failed",
+                error_type=type(exc).__name__,
+                exc_info=True,
             )
         else:
             # A trusted callback already recorded this failure while the backend ran.
@@ -107,12 +103,12 @@ def cancel_build(self, build_id):
     return "cancelled"
 
 
-@shared_task(
-    bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, max_retries=5
-)
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, max_retries=5)
 def cleanup_failed_build_artifacts(self, build_id, delete_image=False):
-    build = Build.objects.select_related("project", "project__owner").prefetch_related("input_assets").get(
-        public_id=build_id
+    build = (
+        Build.objects.select_related("project", "project__owner")
+        .prefetch_related("input_assets")
+        .get(public_id=build_id)
     )
     if build.status == "ready":
         return "retained"
@@ -159,7 +155,10 @@ def execute_deployment(self, deployment_id):
         invalidate_model_server_cache(str(deployment.version.public_id))
         Deployment.objects.filter(pk=deployment.pk).update(status="failed", error_message=str(exc)[:12000])
         record_transition(
-            deployment, "failed", reason="Deployment backend execution failed", error_type=type(exc).__name__,
+            deployment,
+            "failed",
+            reason="Deployment backend execution failed",
+            error_type=type(exc).__name__,
             exc_info=True,
         )
         append_deployment_log(deployment, f"Deployment failed: {exc}")

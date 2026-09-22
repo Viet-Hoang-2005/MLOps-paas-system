@@ -6,7 +6,7 @@ testpaths = ["src/apps"]
 [tool.ruff]
 line-length = 120
 target-version = "py310"
-exclude = ["**/migrations/*.py"]
+exclude = ["**/migrations/*.py", "*.md", "**/*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "DJ"]

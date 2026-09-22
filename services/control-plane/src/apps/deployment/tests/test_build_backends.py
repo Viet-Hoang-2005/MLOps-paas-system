@@ -2,11 +2,11 @@ from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
-from infrastructure.execution.argo_backends import ArgoBuildBackend
-from infrastructure.execution.docker_backends import DockerBuildBackend
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, BuildInputAsset
+from infrastructure.execution.argo_backends import ArgoBuildBackend
+from infrastructure.execution.docker_backends import DockerBuildBackend
 
 
 class RecordingStorage:

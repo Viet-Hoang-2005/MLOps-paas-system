@@ -3,11 +3,11 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from infrastructure.storage.s3 import StoredObject
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, BuildInputAsset
+from infrastructure.storage.s3 import StoredObject
 
 
 class FakeStorage:

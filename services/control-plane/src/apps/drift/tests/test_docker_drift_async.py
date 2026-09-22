@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
@@ -41,9 +42,7 @@ class DockerDriftAsyncTests(TestCase):
 
     def test_docker_drift_run_dispatches_without_blocking(self):
         fake_container = SimpleNamespace(id="drift-container-123")
-        docker_client = SimpleNamespace(
-            run=Mock(return_value=fake_container)
-        )
+        docker_client = SimpleNamespace(run=Mock(return_value=fake_container))
         storage = SimpleNamespace(
             bucket="bucket",
             presigned_get=Mock(return_value="https://s3.test/presigned-get"),
@@ -114,8 +113,10 @@ class DockerDriftAsyncTests(TestCase):
         fake_backend.run.return_value = {"dispatched": True, "container_id": "c123"}
         fake_backend.poll = Mock()
 
-        with patch("apps.drift.tasks.drift_backend", return_value=fake_backend), \
-             patch("apps.drift.tasks.poll_drift_run_status.apply_async") as mock_apply_async:
+        with (
+            patch("apps.drift.tasks.drift_backend", return_value=fake_backend),
+            patch("apps.drift.tasks.poll_drift_run_status.apply_async") as mock_apply_async,
+        ):
             status = execute_drift_run(str(self.drift_run.public_id))
 
         self.assertEqual(status, "running")
@@ -133,9 +134,11 @@ class DockerDriftAsyncTests(TestCase):
         fake_backend = Mock()
         fake_backend.poll.return_value = {"status": "completed", "logs": "Done", "exit_code": 0}
 
-        with patch("apps.drift.tasks.drift_backend", return_value=fake_backend), \
-             patch("apps.drift.tasks.handle_drift_detected.delay") as mock_ct_delay, \
-             self.captureOnCommitCallbacks(execute=True):
+        with (
+            patch("apps.drift.tasks.drift_backend", return_value=fake_backend),
+            patch("apps.drift.tasks.handle_drift_detected.delay") as mock_ct_delay,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             result = poll_drift_run_status(str(self.drift_run.public_id))
 
         self.assertEqual(result, "completed")
@@ -178,8 +181,10 @@ class DriftWebhookContinuousTrainingHookTests(TestCase):
                 "share_of_drifted_columns": 0.55,
             }
         }
-        with patch("apps.drift.tasks.handle_drift_detected.delay") as mock_ct_delay, \
-             self.captureOnCommitCallbacks(execute=True):
+        with (
+            patch("apps.drift.tasks.handle_drift_detected.delay") as mock_ct_delay,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             response = self.client.post(
                 f"/internal/webhooks/drift-runs/{self.drift_run.public_id}/",
                 payload,

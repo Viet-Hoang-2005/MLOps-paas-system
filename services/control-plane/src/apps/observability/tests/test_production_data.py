@@ -13,8 +13,11 @@ def test_latest_production_data_returns_stable_frontend_fields():
     project = ModelProject.objects.create(owner=owner, name="Prediction model")
     version = project.versions.create(version="1")
     PredictionRecord.objects.create(
-        project=project, model_version=version, observed_at="2026-01-01T00:00:00Z",
-        features={"feature": 1}, prediction="safe",
+        project=project,
+        model_version=version,
+        observed_at="2026-01-01T00:00:00Z",
+        features={"feature": 1},
+        prediction="safe",
     )
 
     results = selectors.latest_production_data(project, limit=1)
@@ -26,8 +29,8 @@ def test_latest_production_data_returns_stable_frontend_fields():
 
 @pytest.mark.django_db
 def test_production_data_endpoint_requires_project_owner_and_validates_limit(monkeypatch):
-    owner = get_user_model().objects.create_user("production-owner@example.com", "password123")  
-    stranger = get_user_model().objects.create_user("production-stranger@example.com", "password123")  
+    owner = get_user_model().objects.create_user("production-owner@example.com", "password123")
+    stranger = get_user_model().objects.create_user("production-stranger@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="Production model")
     captured = []
 

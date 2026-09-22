@@ -1,12 +1,12 @@
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
-from apps.deployment.models import Build, BuildInputAsset
-from infrastructure.storage.s3 import StoredObject
+from apps.deployment.models import Build
 
 
 class FakeStorage:
@@ -14,7 +14,13 @@ class FakeStorage:
         self.bucket = bucket
         self.client = SimpleNamespace(
             generate_presigned_url=Mock(return_value="https://s3.test/presigned-put-url"),
-            head_object=Mock(return_value={"ContentLength": 1024, "ContentType": "application/octet-stream", "Metadata": {"sha256": "fake-hash"}}),
+            head_object=Mock(
+                return_value={
+                    "ContentLength": 1024,
+                    "ContentType": "application/octet-stream",
+                    "Metadata": {"sha256": "fake-hash"},
+                }
+            ),
         )
 
     def presigned_put(self, uri, expires_in=900, content_type=None):
@@ -107,9 +113,11 @@ class PresignedBuildUploadTests(TestCase):
             "source_artifact_size": 2048,
         }
 
-        with patch("apps.deployment.services.builds.S3Storage", return_value=fake_storage), \
-             patch("apps.deployment.services.builds.execute_build.delay", return_value=SimpleNamespace(id="task-123")), \
-             self.captureOnCommitCallbacks(execute=True):
+        with (
+            patch("apps.deployment.services.builds.S3Storage", return_value=fake_storage),
+            patch("apps.deployment.services.builds.execute_build.delay", return_value=SimpleNamespace(id="task-123")),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             response = self.client.post(
                 f"/api/models/{self.project.public_id}/builds/",
                 payload,
@@ -132,7 +140,9 @@ class PresignedBuildUploadTests(TestCase):
         fake_storage = FakeStorage()
 
         # Malicious URI pointing to another tenant's path
-        malicious_uri = "s3://test-bucket/users/other-tenant/models/other-proj/builds/abc/inputs/source_artifact/model.pkl"
+        malicious_uri = (
+            "s3://test-bucket/users/other-tenant/models/other-proj/builds/abc/inputs/source_artifact/model.pkl"
+        )
         payload = {
             "flavor": "sklearn",
             "artifact_format": "raw",

@@ -2,6 +2,7 @@ import os
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
+
 from infrastructure.docker import DockerClient
 from infrastructure.harbor import HarborClient
 from infrastructure.storage import S3Storage
@@ -23,7 +24,7 @@ class Command(BaseCommand):
         enabled = os.environ.get("ALLOW_RESOURCE_CLEANUP") == "YES"
         if not (confirmed and enabled):
             raise CommandError(
-                "Refusing cleanup. Set ALLOW_RESOURCE_CLEANUP=YES and pass " "--confirm DELETE-LEGACY-RESOURCES."
+                "Refusing cleanup. Set ALLOW_RESOURCE_CLEANUP=YES and pass --confirm DELETE-LEGACY-RESOURCES."
             )
         S3Storage().delete_prefix("users/")
         prefixes = (
@@ -36,7 +37,7 @@ class Command(BaseCommand):
             "endpoint-",
         )
         for container in DockerClient().client.containers.list(all=True):
-            if container.name.startswith(prefixes): 
+            if container.name.startswith(prefixes):
                 container.remove(force=True)
         if options["include_harbor"]:
             harbor = HarborClient()

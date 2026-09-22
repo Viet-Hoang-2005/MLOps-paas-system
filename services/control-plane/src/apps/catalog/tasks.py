@@ -1,7 +1,7 @@
 from celery import shared_task
-from common.logging import record_transition
 
 from apps.catalog.models import ModelProject
+from common.logging import record_transition
 
 
 @shared_task(bind=True)

@@ -1,9 +1,10 @@
 import json
 
 from celery import shared_task
-from common.logging import record_transition
 from django.db import transaction
 from django.utils import timezone
+
+from common.logging import record_transition
 from infrastructure.execution import drift_backend
 from infrastructure.storage import S3Storage
 
@@ -40,7 +41,11 @@ def execute_drift_run(self, run_id):
             status="failed", error_message=str(exc)[:12000], completed_at=timezone.now()
         )
         record_transition(
-            run, "failed", reason="Drift backend execution failed", error_type=type(exc).__name__, exc_info=True,
+            run,
+            "failed",
+            reason="Drift backend execution failed",
+            error_type=type(exc).__name__,
+            exc_info=True,
         )
         raise
     if isinstance(result, dict) and result.get("dispatched"):

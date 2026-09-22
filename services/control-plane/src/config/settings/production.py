@@ -1,5 +1,6 @@
-from common.env import env, env_bool, env_int
 from django.core.exceptions import ImproperlyConfigured
+
+from common.env import env, env_bool, env_int
 
 from .base import *
 

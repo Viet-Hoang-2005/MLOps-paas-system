@@ -1,4 +1,3 @@
-from common.metrics import shared_celery_metrics
 from django.conf import settings
 from django.db import connections
 from django.http import HttpResponse, JsonResponse
@@ -11,6 +10,7 @@ from rest_framework.views import APIView
 from apps.catalog.selectors import project_for_user
 from apps.observability.selectors import latest_production_data
 from apps.observability.services.models import model_observability
+from common.metrics import shared_celery_metrics
 
 from .serializers import ProductionDataQuerySerializer
 

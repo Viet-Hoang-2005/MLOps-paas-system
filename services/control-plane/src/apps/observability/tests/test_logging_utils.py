@@ -16,8 +16,8 @@ from common.logging_utils import (
     configure,
     current_context,
     formatter_for,
-    log_format,
     log_event,
+    log_format,
     request_id,
     reset_context,
     sanitize,
@@ -66,9 +66,7 @@ class LoggingTests(unittest.TestCase):
             duration_ms=12.5,
         )
         line = self.output.getvalue()
-        self.assertIn(
-            "GET api/models/{version_id}/predict/; HTTP 200; duration=12.5ms", line
-        )
+        self.assertIn("GET api/models/{version_id}/predict/; HTTP 200; duration=12.5ms", line)
         self.assertEqual(len(line.splitlines()), 1)
 
     def test_json_format_keeps_metadata_and_numeric_fields(self):

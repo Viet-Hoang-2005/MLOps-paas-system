@@ -2,7 +2,9 @@
 import os
 import sys
 from pathlib import Path
+
 from django.core.management import execute_from_command_line
+
 
 def main():
     service_root = Path(__file__).resolve().parent

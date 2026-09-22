@@ -1,9 +1,9 @@
-from common.api.exceptions import Conflict
 from rest_framework import serializers
 
 from apps.catalog.models import WorkspaceAsset
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.registry.models import ModelVersion
+from common.api.exceptions import Conflict
 
 
 class DriftRunSerializer(serializers.ModelSerializer):
@@ -84,5 +84,5 @@ class DriftMonitorSerializer(serializers.ModelSerializer):
         if self.instance:
             duplicate = duplicate.exclude(pk=self.instance.pk)
         if duplicate.exists():
-            raise Conflict(f'A drift monitor named {name} already exists for model version {version.version}.')
+            raise Conflict(f"A drift monitor named {name} already exists for model version {version.version}.")
         return attrs

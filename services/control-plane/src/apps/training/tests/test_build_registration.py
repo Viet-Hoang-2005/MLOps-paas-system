@@ -1,9 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
-from common.api.exceptions import Conflict
 from django.contrib.auth import get_user_model
-from infrastructure.storage.s3 import StoredObject
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
@@ -14,6 +12,8 @@ from apps.registry.models import ModelMetric, ModelVersion
 from apps.registry.services.versions import register_successful_build
 from apps.training.models import TrainingJob, TrainingOutput
 from apps.training.services import jobs as job_service
+from common.api.exceptions import Conflict
+from infrastructure.storage.s3 import StoredObject
 
 
 class FakeStorage:

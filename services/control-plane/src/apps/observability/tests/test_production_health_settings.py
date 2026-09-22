@@ -32,4 +32,3 @@ def test_kubelet_health_request_is_not_redirected_before_host_validation():
     response = middleware(request)
 
     assert response.status_code == 200
-

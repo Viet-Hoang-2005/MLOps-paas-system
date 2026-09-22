@@ -1,8 +1,6 @@
-from common.logging import record_transition
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from infrastructure.storage import S3Storage
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,6 +10,8 @@ from apps.training.models import TrainingJob, TrainingOutput
 from apps.training.services.capabilities import capability_for_token
 from apps.training.services.logs import append_training_log
 from apps.training.services.storage_scope import validate_training_uri
+from common.logging import record_transition
+from infrastructure.storage import S3Storage
 
 
 def _bearer_token(request):
@@ -88,7 +88,9 @@ class TrainingJobWebhookEndpoint(APIView):
                 idempotency_key=key,
             )
             record_transition(
-                job, job.status, source="webhook",
+                job,
+                job.status,
+                source="webhook",
                 reason="Training reporter confirmed failure" if job.status == "failed" else None,
             )
         append_training_log(job.public_id, f"[SYSTEM] Training reached terminal status: {job.status}.")
@@ -102,9 +104,7 @@ class TrainingCancellationWebhookEndpoint(APIView):
     def post(self, request, job_id):
         from apps.training.tasks import confirm_training_cancellation
 
-        key = request.headers.get("Idempotency-Key") or str(
-            request.data.get("idempotency_key", "")
-        )
+        key = request.headers.get("Idempotency-Key") or str(request.data.get("idempotency_key", ""))
         workflow_status = str(request.data.get("workflow_status", "")).lower()
         with transaction.atomic():
             try:
@@ -154,7 +154,10 @@ class TrainingCancellationWebhookEndpoint(APIView):
             confirm_training_cancellation(str(job.public_id))
         else:
             record_transition(
-                job, job.status, phase="cancellation_failed", source="webhook",
+                job,
+                job.status,
+                phase="cancellation_failed",
+                source="webhook",
                 reason="Cancellation reporter confirmed failure",
             )
         return Response(

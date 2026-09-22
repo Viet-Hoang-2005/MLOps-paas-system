@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from common.api.exceptions import Conflict
 from django.db import IntegrityError, transaction
-from infrastructure.storage import S3Storage
 
 from apps.catalog.models import ModelProject
 from apps.catalog.services.workspace import save_workspace_file
+from common.api.exceptions import Conflict
+from infrastructure.storage import S3Storage
 
 
 def _replace_attachment(*, project, kind, uploaded_file, storage):

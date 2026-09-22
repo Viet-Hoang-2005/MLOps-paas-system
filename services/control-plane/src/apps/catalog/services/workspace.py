@@ -1,8 +1,8 @@
 from django.db import transaction
-from infrastructure.storage import S3Storage
-from infrastructure.storage.paths import workspace_prefix
 
 from apps.catalog.models import WorkspaceAsset
+from infrastructure.storage import S3Storage
+from infrastructure.storage.paths import workspace_prefix
 
 
 def save_workspace_file(*, project, kind, relative_path, uploaded_file, storage=None):
