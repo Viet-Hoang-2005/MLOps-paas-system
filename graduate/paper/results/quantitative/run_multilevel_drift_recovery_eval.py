@@ -15,10 +15,15 @@ Usage:
 """
 
 from __future__ import annotations
-import argparse, hashlib, json, sys, warnings
+
+import argparse
+import hashlib
+import json
+import sys
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 sys.dont_write_bytecode = True
 import numpy as np
@@ -230,7 +235,7 @@ def main():
         ("S3", "WebAttacks", data_dir / "drift_webattacks.csv"),
     ]
 
-    all_data: Dict[str, Dict] = {}
+    all_data: dict[str, dict] = {}
     future_hash_union: set = set()
     for sid, family, path in attack_sources:
         atk = filter_label(load_csv(path, args.max_window_rows, seed), "ATTACK")
@@ -254,7 +259,7 @@ def main():
 
     ref_X_drift = prep_X(filter_label(ref_raw, "BENIGN"), cols, medians)
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for sid, family, path in attack_sources:
         d = all_data[sid]
         trigger_atk = d["trigger_atk"]

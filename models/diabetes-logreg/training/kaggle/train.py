@@ -24,7 +24,6 @@ Diabetes readmission workload:
 import argparse
 import hashlib
 import json
-import os
 import platform
 import sys
 import tarfile

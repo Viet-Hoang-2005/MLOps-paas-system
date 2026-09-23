@@ -1,7 +1,8 @@
 import os
+
 import boto3
-from sagemaker.sklearn.estimator import SKLearn
 from sagemaker.session import Session
+from sagemaker.sklearn.estimator import SKLearn
 
 
 def get_required_env(name):

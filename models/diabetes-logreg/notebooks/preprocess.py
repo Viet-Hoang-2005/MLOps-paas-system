@@ -1,6 +1,7 @@
-import pandas as pd
-from pathlib import Path
 import os
+from pathlib import Path
+
+import pandas as pd
 
 data_path = Path(f"{os.getcwd()}/data")
 
@@ -51,7 +52,6 @@ def main():
     df.loc[:, "medical_specialty"] = df["medical_specialty"].apply(
         lambda x: x if x in specialties else "Other"
     )
-    #
     df.loc[:, "primary_diagnosis"] = df["primary_diagnosis"].replace(
         regex={
             "[7][1-3][0-9]": "Musculoskeltal Issues",

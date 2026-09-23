@@ -1,4 +1,3 @@
-# coding=utf-8
 #
 # The copyright of this file belongs to Feedzai. The file cannot be
 # reproduced in whole or in part, stored in a retrieval system,
@@ -7,13 +6,12 @@
 #
 # (c) 2022 Feedzai, Strictly Confidential
 
-import numpy as np
-import pandas as pd
 import warnings
 
-from scipy.stats import multivariate_normal as mvn
+import numpy as np
+import pandas as pd
 from scipy.optimize import fsolve
-from typing import Tuple
+from scipy.stats import multivariate_normal as mvn
 
 
 class TypeIIIBiasSampler:
@@ -25,9 +23,9 @@ class TypeIIIBiasSampler:
         recall_second_group: float,
         fpr_first_group: float = 0.05,
         fpr_second_group: float = 0.05,
-        protected_attribute_values: Tuple[str, str] = None,
+        protected_attribute_values: tuple[str, str] = None,
         seed: int = 42,
-        feature_names: Tuple[str, str] = ("x1", "x2"),
+        feature_names: tuple[str, str] = ("x1", "x2"),
     ):
         self.label_col = label_col
         self.protected_attribute = protected_attribute
@@ -76,8 +74,8 @@ class TypeIIIBiasSampler:
 
         return data
 
-    def _calculate_multivariate_normals(self) -> Tuple[mvn, mvn, mvn]:
-        def get_mean(var: Tuple[float, float]) -> Tuple[float, float]:
+    def _calculate_multivariate_normals(self) -> tuple[mvn, mvn, mvn]:
+        def get_mean(var: tuple[float, float]) -> tuple[float, float]:
             intercept, new_mean = var
             new_dist = mvn(mean=[new_mean, 0], cov=cov_matrix)
 

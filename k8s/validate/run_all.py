@@ -11,7 +11,6 @@ from .validate_resource_ownership import validate as validate_resource_ownership
 from .validate_secrets import validate as validate_secrets
 from .validate_supply_chain import validate as validate_supply_chain
 
-
 VALIDATORS = (
     ("application-contract", validate_application_contract),
     ("resource-ownership", validate_resource_ownership),

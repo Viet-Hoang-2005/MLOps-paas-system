@@ -11,6 +11,7 @@ from contextvars import copy_context
 from datetime import datetime, timezone
 from pathlib import Path
 
+import mlflow
 import redis
 import requests
 from src import config, execution, io, metadata, resources
@@ -22,8 +23,6 @@ from src.logging_utils import (
     reset_context,
     sanitize,
 )
-
-import mlflow
 
 WORKSPACE = Path("/workspace")
 SOURCE_DIR = WORKSPACE / "source"

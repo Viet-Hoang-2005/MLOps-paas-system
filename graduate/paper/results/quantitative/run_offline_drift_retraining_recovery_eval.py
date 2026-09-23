@@ -13,14 +13,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import pickle
 import sys
 import warnings
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any
 
 sys.dont_write_bytecode = True
 
@@ -82,10 +82,10 @@ class PreparedDataset:
     df: pd.DataFrame
     X: pd.DataFrame
     y: np.ndarray
-    y_labels: List[str]
-    row_hashes: List[str]
-    raw_label_counts: Dict[str, int]
-    binary_label_counts: Dict[str, int]
+    y_labels: list[str]
+    row_hashes: list[str]
+    raw_label_counts: dict[str, int]
+    binary_label_counts: dict[str, int]
 
     @property
     def row_hash_set(self) -> set[str]:
@@ -158,11 +158,11 @@ def normalize_label(value: Any) -> str:
     return "BENIGN" if text in BENIGN_ALIASES else "ATTACK"
 
 
-def load_csv(path: Path, max_rows: int, seed: int) -> Tuple[pd.DataFrame, int, bool]:
+def load_csv(path: Path, max_rows: int, seed: int) -> tuple[pd.DataFrame, int, bool]:
     if not path.exists():
         raise FileNotFoundError(f"Missing dataset: {path}")
     df = pd.read_csv(path)
-    raw_rows = int(len(df))
+    raw_rows = len(df)
     if max_rows > 0 and len(df) > max_rows:
         df = (
             df.sample(n=max_rows, random_state=seed).sort_index().reset_index(drop=True)
@@ -171,7 +171,7 @@ def load_csv(path: Path, max_rows: int, seed: int) -> Tuple[pd.DataFrame, int, b
     return df.reset_index(drop=True), raw_rows, False
 
 
-def feature_columns(df: pd.DataFrame, dataset_name: str) -> List[str]:
+def feature_columns(df: pd.DataFrame, dataset_name: str) -> list[str]:
     if LABEL_COL not in df.columns:
         raise ValueError(
             f"{dataset_name} does not contain required label column '{LABEL_COL}'"
@@ -200,7 +200,7 @@ def apply_medians(X: pd.DataFrame, medians: pd.Series) -> pd.DataFrame:
     return X.fillna(medians).fillna(0.0)
 
 
-def row_hash_list(df: pd.DataFrame, cols: Sequence[str]) -> List[str]:
+def row_hash_list(df: pd.DataFrame, cols: Sequence[str]) -> list[str]:
     normalized = coerce_features(df, cols)
     normalized["__binary_label__"] = [
         normalize_label(value) for value in df[LABEL_COL].tolist()
@@ -220,7 +220,7 @@ def with_row_hash(df: pd.DataFrame, cols: Sequence[str]) -> pd.DataFrame:
 
 def drop_duplicate_hashes(
     df: pd.DataFrame, cols: Sequence[str]
-) -> Tuple[pd.DataFrame, int]:
+) -> tuple[pd.DataFrame, int]:
     hashed = with_row_hash(df, cols)
     before = len(hashed)
     deduped = (
@@ -248,7 +248,7 @@ def split_benign_pool(
     seed: int,
     ref_fraction: float,
     retrain_fraction: float,
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, Dict[str, Any]]:
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     benign = filter_by_binary_label(reference_df, "BENIGN")
     benign, dropped = drop_duplicate_hashes(benign, cols)
     benign = shuffled(benign, seed)
@@ -266,11 +266,11 @@ def split_benign_pool(
     eval_benign = benign.iloc[n_ref + n_retrain :].reset_index(drop=True)
     summary = {
         "source": "data/reference_data.csv BENIGN rows",
-        "unique_benign_rows": int(len(benign)),
+        "unique_benign_rows": len(benign),
         "dropped_duplicate_rows": dropped,
-        "reference_rows": int(len(reference_benign)),
-        "retraining_rows": int(len(retrain_benign)),
-        "evaluation_holdout_rows": int(len(eval_benign)),
+        "reference_rows": len(reference_benign),
+        "retraining_rows": len(retrain_benign),
+        "evaluation_holdout_rows": len(eval_benign),
         "reference_fraction_requested": ref_fraction,
         "retraining_fraction_requested": retrain_fraction,
     }
@@ -279,7 +279,7 @@ def split_benign_pool(
 
 def split_attack_source(
     df: pd.DataFrame, cols: Sequence[str], seed: int, trigger_fraction: float
-) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
+) -> tuple[pd.DataFrame, pd.DataFrame, int]:
     attack = filter_by_binary_label(df, "ATTACK")
     attack, dropped = drop_duplicate_hashes(attack, cols)
     attack = shuffled(attack, seed)
@@ -294,7 +294,7 @@ def split_attack_source(
 
 def decontaminate_against(
     df: pd.DataFrame, cols: Sequence[str], blocked_hashes: set[str]
-) -> Tuple[pd.DataFrame, int]:
+) -> tuple[pd.DataFrame, int]:
     hashes = row_hash_list(df, cols)
     keep = [row_hash not in blocked_hashes for row_hash in hashes]
     removed = int(len(keep) - sum(keep))
@@ -352,7 +352,7 @@ def evaluate(
     model_name: str,
     scenario: str,
     attack_family: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     pred = np.asarray(model.predict(dataset.X), dtype=np.int64)
     report = classification_report(
         dataset.y,
@@ -407,10 +407,10 @@ def compute_drift(
     drift_threshold: float,
     scenario: str,
     attack_family: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     method = "ks_2samp" if ks_2samp is not None else "psi_fallback"
-    feature_results: Dict[str, Dict[str, Any]] = {}
-    drifted_features: List[str] = []
+    feature_results: dict[str, dict[str, Any]] = {}
+    drifted_features: list[str] = []
     for feature in reference.X.columns:
         ref_values = reference.X[feature].to_numpy(dtype=float)
         cur_values = current.X[feature].to_numpy(dtype=float)
@@ -446,13 +446,13 @@ def compute_drift(
             }
         if drifted:
             drifted_features.append(feature)
-    total = int(len(reference.X.columns))
+    total = len(reference.X.columns)
     drift_share = len(drifted_features) / total if total else 0.0
     return {
         "Scenario": scenario,
         "Attack family": attack_family,
         "method": method,
-        "drifted_feature_count": int(len(drifted_features)),
+        "drifted_feature_count": len(drifted_features),
         "total_features": total,
         "drift_share": float(drift_share),
         "dataset_drift": bool(drift_share >= drift_threshold),
@@ -462,7 +462,7 @@ def compute_drift(
     }
 
 
-def metric_row(metrics: Dict[str, Any]) -> Dict[str, Any]:
+def metric_row(metrics: dict[str, Any]) -> dict[str, Any]:
     return {
         "Scenario": metrics["Scenario"],
         "Attack family": metrics["Attack family"],
@@ -474,8 +474,8 @@ def metric_row(metrics: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def per_class_rows(metrics: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def per_class_rows(metrics: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     for item in metrics:
         for class_name, values in item["per_class"].items():
             rows.append(
@@ -502,15 +502,15 @@ def composition(dataset: PreparedDataset) -> str:
 
 def overlap_report(
     training: PreparedDataset, evaluation: PreparedDataset, trigger: PreparedDataset
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     train_hashes = training.row_hash_set
     eval_hashes = evaluation.row_hash_set
     trigger_hashes = trigger.row_hash_set
     train_eval = train_hashes.intersection(eval_hashes)
     trigger_eval = trigger_hashes.intersection(eval_hashes)
     return {
-        "m1_training_vs_future_holdout_unique_overlap": int(len(train_eval)),
-        "trigger_window_vs_future_holdout_unique_overlap": int(len(trigger_eval)),
+        "m1_training_vs_future_holdout_unique_overlap": len(train_eval),
+        "trigger_window_vs_future_holdout_unique_overlap": len(trigger_eval),
         "m1_training_rows_overlapping_future_holdout": int(
             sum(1 for row_hash in training.row_hashes if row_hash in eval_hashes)
         ),
@@ -524,7 +524,7 @@ def overlap_report(
     }
 
 
-def inspect_pickle_model(path: Path) -> Dict[str, Any]:
+def inspect_pickle_model(path: Path) -> dict[str, Any]:
     info = {
         "path": str(path),
         "exists": path.exists(),
@@ -542,17 +542,17 @@ def inspect_pickle_model(path: Path) -> Dict[str, Any]:
         info["loaded"] = True
         info["type"] = f"{type(model).__module__}.{type(model).__name__}"
         if hasattr(model, "n_features_in_"):
-            info["n_features_in_"] = int(getattr(model, "n_features_in_"))
+            info["n_features_in_"] = int(model.n_features_in_)
         if hasattr(model, "classes_"):
             info["classes_"] = [
-                str(value) for value in list(getattr(model, "classes_"))
+                str(value) for value in list(model.classes_)
             ]
     except Exception as exc:
         info["load_error"] = repr(exc)
     return info
 
 
-def make_readme(command: str, config: Dict[str, Any], comparison: pd.DataFrame) -> str:
+def make_readme(command: str, config: dict[str, Any], comparison: pd.DataFrame) -> str:
     rows = []
     for _, row in comparison.iterrows():
         rows.append(
@@ -653,9 +653,9 @@ def main() -> int:
         ("S3", "WebAttacks", data_dir / "drift_webattacks.csv"),
     ]
 
-    scenarios: List[ScenarioData] = []
+    scenarios: list[ScenarioData] = []
     future_hash_union: set[str] = set()
-    source_summaries: Dict[str, Any] = {}
+    source_summaries: dict[str, Any] = {}
     for index, (scenario_id, attack_family, path) in enumerate(attack_sources):
         attack_raw, raw_rows, sampled = load_csv(
             path, args.max_window_rows, seed + index + 10
@@ -678,10 +678,10 @@ def main() -> int:
                 attack_source=rel(path, root),
                 trigger_df=trigger_df,
                 future_df=future_df,
-                trigger_attack_rows=int(len(attack_trigger)),
-                future_attack_rows=int(len(attack_future)),
-                trigger_benign_rows=int(len(retrain_benign)),
-                future_benign_rows=int(len(eval_benign)),
+                trigger_attack_rows=len(attack_trigger),
+                future_attack_rows=len(attack_future),
+                trigger_benign_rows=len(retrain_benign),
+                future_benign_rows=len(eval_benign),
                 dropped_duplicate_attack_rows=dropped_attack_dupes,
                 trigger_fraction_requested=args.attack_trigger_fraction,
             )
@@ -691,13 +691,13 @@ def main() -> int:
             "attack_family": attack_family,
             "attack_source": rel(path, root),
             "raw_rows": raw_rows,
-            "sampled_rows": int(len(attack_raw)),
+            "sampled_rows": len(attack_raw),
             "sampling_applied": sampled,
             "dropped_duplicate_attack_rows": dropped_attack_dupes,
-            "trigger_attack_rows": int(len(attack_trigger)),
-            "future_attack_rows": int(len(attack_future)),
-            "trigger_benign_rows": int(len(retrain_benign)),
-            "future_benign_rows": int(len(eval_benign)),
+            "trigger_attack_rows": len(attack_trigger),
+            "future_attack_rows": len(attack_future),
+            "trigger_benign_rows": len(retrain_benign),
+            "future_benign_rows": len(eval_benign),
         }
 
     train_m0_clean, removed_m0_future_overlap = decontaminate_against(
@@ -740,14 +740,14 @@ def main() -> int:
     reference_dataset = reference_for_drift
     model_m0 = train_model(m0_train.X, m0_train.y, seed, "M0-fixed-XGB")
 
-    fixed_metrics: List[Dict[str, Any]] = []
-    retrained_metrics: List[Dict[str, Any]] = []
-    comparison_rows: List[Dict[str, Any]] = []
-    drift_rows: List[Dict[str, Any]] = []
-    per_scenario_config: Dict[str, Any] = {}
-    drift_details: Dict[str, Any] = {}
-    confusion_matrices: Dict[str, Any] = {}
-    leakage_reports: Dict[str, Any] = {}
+    fixed_metrics: list[dict[str, Any]] = []
+    retrained_metrics: list[dict[str, Any]] = []
+    comparison_rows: list[dict[str, Any]] = []
+    drift_rows: list[dict[str, Any]] = []
+    per_scenario_config: dict[str, Any] = {}
+    drift_details: dict[str, Any] = {}
+    confusion_matrices: dict[str, Any] = {}
+    leakage_reports: dict[str, Any] = {}
 
     for index, scenario in enumerate(scenarios):
         future_hashes = set(row_hash_list(scenario.future_df, expected_features))
@@ -954,16 +954,16 @@ def main() -> int:
         "train_m0": {
             "path": "data/train_2_classes.csv",
             "raw_rows": train_m0_raw_rows,
-            "sampled_rows": int(len(train_m0_raw)),
+            "sampled_rows": len(train_m0_raw),
             "sampling_applied": train_m0_sampled,
             "removed_rows_overlapping_any_future_holdout": removed_m0_future_overlap,
-            "final_training_rows": int(len(train_m0_clean)),
+            "final_training_rows": len(train_m0_clean),
             "binary_label_counts": m0_train.binary_label_counts,
         },
         "reference_data": {
             "path": "data/reference_data.csv",
             "raw_rows": reference_raw_rows,
-            "sampled_rows": int(len(reference_raw)),
+            "sampled_rows": len(reference_raw),
             "sampling_applied": reference_sampled,
             "benign_split": benign_summary,
         },

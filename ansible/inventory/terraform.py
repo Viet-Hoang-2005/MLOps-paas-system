@@ -6,7 +6,6 @@ import os
 import subprocess
 import sys
 
-
 REQUIRED_OUTPUTS = (
     "master_public_ip",
     "master_private_ip",

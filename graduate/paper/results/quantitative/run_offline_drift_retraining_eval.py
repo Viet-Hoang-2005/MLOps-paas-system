@@ -11,14 +11,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import pickle
 import sys
 import warnings
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -76,8 +76,8 @@ class RawDataset:
     sampled_rows: int
     sampling_applied: bool
     removed_overlap_rows: int
-    feature_columns: List[str]
-    row_hash_list: List[str]
+    feature_columns: list[str]
+    row_hash_list: list[str]
     df: pd.DataFrame
 
     @property
@@ -95,13 +95,13 @@ class PreparedDataset:
     sampled_rows: int
     sampling_applied: bool
     removed_overlap_rows: int
-    raw_label_counts: Dict[str, int]
-    binary_label_counts: Dict[str, int]
-    feature_columns: List[str]
-    row_hash_list: List[str]
+    raw_label_counts: dict[str, int]
+    binary_label_counts: dict[str, int]
+    feature_columns: list[str]
+    row_hash_list: list[str]
     X: pd.DataFrame
     y: np.ndarray
-    y_labels: List[str]
+    y_labels: list[str]
 
     @property
     def row_hashes(self) -> set[str]:
@@ -149,7 +149,7 @@ def normalize_label(value: Any) -> str:
     return "BENIGN" if text in BENIGN_ALIASES else "ATTACK"
 
 
-def sample_df(df: pd.DataFrame, max_rows: int, seed: int) -> Tuple[pd.DataFrame, bool]:
+def sample_df(df: pd.DataFrame, max_rows: int, seed: int) -> tuple[pd.DataFrame, bool]:
     if max_rows <= 0 or len(df) <= max_rows:
         return df.copy().reset_index(drop=True), False
     sampled = (
@@ -158,7 +158,7 @@ def sample_df(df: pd.DataFrame, max_rows: int, seed: int) -> Tuple[pd.DataFrame,
     return sampled, True
 
 
-def detect_feature_columns(df: pd.DataFrame, dataset_name: str) -> List[str]:
+def detect_feature_columns(df: pd.DataFrame, dataset_name: str) -> list[str]:
     if LABEL_COL not in df.columns:
         raise ValueError(
             f"{dataset_name} does not contain required label column '{LABEL_COL}'"
@@ -179,7 +179,7 @@ def apply_medians(X: pd.DataFrame, medians: pd.Series) -> pd.DataFrame:
     return X.fillna(medians).fillna(0.0)
 
 
-def row_hash_list(df: pd.DataFrame, feature_columns: Sequence[str]) -> List[str]:
+def row_hash_list(df: pd.DataFrame, feature_columns: Sequence[str]) -> list[str]:
     """Return ordered row hashes over numeric features plus binary label.
 
     The binary label is used intentionally because the experiment evaluates a
@@ -199,12 +199,12 @@ def row_hash_list(df: pd.DataFrame, feature_columns: Sequence[str]) -> List[str]
 
 
 def load_raw_dataset(
-    spec: DatasetSpec, expected_features: Optional[List[str]], seed: int
+    spec: DatasetSpec, expected_features: list[str] | None, seed: int
 ) -> RawDataset:
     if not spec.path.exists():
         raise FileNotFoundError(f"Missing dataset: {spec.path}")
     df = pd.read_csv(spec.path)
-    raw_rows = int(len(df))
+    raw_rows = len(df)
     df, sampled = sample_df(df, spec.max_rows, seed)
     feature_columns = detect_feature_columns(df, spec.key)
     if expected_features is not None and feature_columns != expected_features:
@@ -220,7 +220,7 @@ def load_raw_dataset(
         path=spec.path,
         role=spec.role,
         raw_rows=raw_rows,
-        sampled_rows=int(len(df)),
+        sampled_rows=len(df),
         sampling_applied=sampled,
         removed_overlap_rows=0,
         feature_columns=feature_columns,
@@ -246,7 +246,7 @@ def decontaminate_training_raw(train: RawDataset, eval_hashes: set[str]) -> RawD
         path=train.path,
         role=train.role + " (decontaminated against evaluation windows)",
         raw_rows=train.raw_rows,
-        sampled_rows=int(len(clean_df)),
+        sampled_rows=len(clean_df),
         sampling_applied=train.sampling_applied,
         removed_overlap_rows=removed,
         feature_columns=train.feature_columns,
@@ -310,7 +310,7 @@ def train_model(X: pd.DataFrame, y: np.ndarray, seed: int, name: str) -> XGBClas
 
 def evaluate_model(
     model: XGBClassifier, dataset: PreparedDataset, model_name: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     y_pred = np.asarray(model.predict(dataset.X), dtype=np.int64)
     report = classification_report(
         dataset.y,
@@ -364,9 +364,9 @@ def compute_drift(
     current: PreparedDataset,
     pvalue_threshold: float,
     drift_threshold: float,
-) -> Dict[str, Any]:
-    drifted_features: List[str] = []
-    feature_results: Dict[str, Dict[str, Any]] = {}
+) -> dict[str, Any]:
+    drifted_features: list[str] = []
+    feature_results: dict[str, dict[str, Any]] = {}
     method = "ks_2samp" if ks_2samp is not None else "psi_fallback"
 
     for feature in reference.feature_columns:
@@ -412,7 +412,7 @@ def compute_drift(
         "Dataset": current.path.name,
         "method": method,
         "total_features": int(total_features),
-        "drifted_feature_count": int(len(drifted_features)),
+        "drifted_feature_count": len(drifted_features),
         "drift_share": float(drift_share),
         "dataset_drift": bool(drift_share >= drift_threshold),
         "drift_threshold": drift_threshold,
@@ -421,7 +421,7 @@ def compute_drift(
     }
 
 
-def inspect_label_json(path: Path) -> Optional[List[str]]:
+def inspect_label_json(path: Path) -> list[str] | None:
     if not path.exists():
         return None
     try:
@@ -438,8 +438,8 @@ def inspect_label_json(path: Path) -> Optional[List[str]]:
     return None
 
 
-def inspect_pickle_model(path: Path) -> Dict[str, Any]:
-    info: Dict[str, Any] = {
+def inspect_pickle_model(path: Path) -> dict[str, Any]:
+    info: dict[str, Any] = {
         "path": str(path),
         "exists": path.exists(),
         "loaded": False,
@@ -456,20 +456,20 @@ def inspect_pickle_model(path: Path) -> Dict[str, Any]:
         info["loaded"] = True
         info["type"] = f"{type(model).__module__}.{type(model).__name__}"
         if hasattr(model, "n_features_in_"):
-            info["n_features_in_"] = int(getattr(model, "n_features_in_"))
+            info["n_features_in_"] = int(model.n_features_in_)
         elif hasattr(model, "get_booster"):
             try:
                 info["n_features_in_"] = int(model.get_booster().num_features())
             except Exception:
                 pass
         if hasattr(model, "classes_"):
-            info["classes_"] = [str(item) for item in list(getattr(model, "classes_"))]
+            info["classes_"] = [str(item) for item in list(model.classes_)]
     except Exception as exc:
         info["load_error"] = repr(exc)
     return info
 
 
-def inspect_existing_models(root: Path, expected_feature_count: int) -> Dict[str, Any]:
+def inspect_existing_models(root: Path, expected_feature_count: int) -> dict[str, Any]:
     candidates = {
         "v1": {
             "model_path": root / "models" / "v1" / "xgb_nids_model_v1.pkl",
@@ -499,7 +499,7 @@ def inspect_existing_models(root: Path, expected_feature_count: int) -> Dict[str
             / "MLmodel",
         },
     }
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "note": "Existing artifacts are inspected for compatibility only; this experiment trains fresh M0/M1 models by default.",
         "expected_feature_count": int(expected_feature_count),
         "artifacts": {},
@@ -541,7 +541,7 @@ def inspect_existing_models(root: Path, expected_feature_count: int) -> Dict[str
     return result
 
 
-def dataset_summary(datasets: Dict[str, PreparedDataset], root: Path) -> Dict[str, Any]:
+def dataset_summary(datasets: dict[str, PreparedDataset], root: Path) -> dict[str, Any]:
     return {
         key: {
             "path": rel(ds.path, root),
@@ -562,9 +562,9 @@ def dataset_summary(datasets: Dict[str, PreparedDataset], root: Path) -> Dict[st
 
 
 def leakage_checks(
-    training_sets: Dict[str, PreparedDataset], eval_sets: Dict[str, PreparedDataset]
-) -> Dict[str, Any]:
-    checks: Dict[str, Any] = {}
+    training_sets: dict[str, PreparedDataset], eval_sets: dict[str, PreparedDataset]
+) -> dict[str, Any]:
+    checks: dict[str, Any] = {}
     any_overlap = False
     for train_name, train_ds in training_sets.items():
         for eval_name, eval_ds in eval_sets.items():
@@ -581,7 +581,7 @@ def leakage_checks(
             checks[f"{train_name}_vs_{eval_name}"] = {
                 "train_dataset": train_ds.path.name,
                 "eval_dataset": eval_ds.path.name,
-                "unique_overlap_count": int(len(unique_overlap)),
+                "unique_overlap_count": len(unique_overlap),
                 "overlapping_training_rows": int(overlapping_train_rows),
                 "overlapping_eval_rows": int(overlapping_eval_rows),
                 "train_rows": train_ds.sampled_rows,
@@ -600,7 +600,7 @@ def leakage_checks(
     }
 
 
-def metric_row(metrics: Dict[str, Any]) -> Dict[str, Any]:
+def metric_row(metrics: dict[str, Any]) -> dict[str, Any]:
     return {
         "Window": metrics["Window"],
         "Dataset": metrics["Dataset"],
@@ -611,8 +611,8 @@ def metric_row(metrics: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def per_class_rows(metrics_list: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def per_class_rows(metrics_list: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     for metrics in metrics_list:
         for class_name, values in metrics["per_class"].items():
             rows.append(
@@ -639,9 +639,9 @@ def data_composition(dataset: PreparedDataset) -> str:
 def make_readme(
     command: str,
     args: argparse.Namespace,
-    summaries: Dict[str, Any],
+    summaries: dict[str, Any],
     drift_method: str,
-    leakage: Dict[str, Any],
+    leakage: dict[str, Any],
     comparison_df: pd.DataFrame,
 ) -> str:
     files_used = "\n".join(
@@ -803,7 +803,7 @@ def main() -> int:
     first_raw = pd.read_csv(specs[0].path)
     expected_features = detect_feature_columns(first_raw, specs[0].key)
 
-    raw_datasets: Dict[str, RawDataset] = {}
+    raw_datasets: dict[str, RawDataset] = {}
     for spec in specs:
         if spec.key == "w5" and not spec.path.exists():
             continue
@@ -843,7 +843,7 @@ def main() -> int:
         datasets["train_m1"].X, datasets["train_m1"].y, seed, "M1-challenger-XGB"
     )
 
-    drift_results: Dict[str, Any] = {}
+    drift_results: dict[str, Any] = {}
     first_drift_seen = False
     for key in eval_keys:
         drift = compute_drift(
@@ -874,7 +874,7 @@ def main() -> int:
         for key in eval_keys
     }
 
-    framework_active_metrics: Dict[str, Dict[str, Any]] = {}
+    framework_active_metrics: dict[str, dict[str, Any]] = {}
     retrained_model_active = False
     for key in eval_keys:
         framework_active_metrics[key] = (
@@ -888,8 +888,8 @@ def main() -> int:
         [metric_row(challenger_metrics[key]) for key in eval_keys]
     )
 
-    comparison_rows: List[Dict[str, Any]] = []
-    drift_window_rows: List[Dict[str, Any]] = []
+    comparison_rows: list[dict[str, Any]] = []
+    drift_window_rows: list[dict[str, Any]] = []
     for key in eval_keys:
         ds = datasets[key]
         drift = drift_results[key]

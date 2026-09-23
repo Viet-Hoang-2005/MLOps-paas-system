@@ -36,9 +36,7 @@ from src.logging_utils import (
     log_event,
     reset_context,
 )
-from src.logging_utils import (
-    request_id as validated_request_id,
-)
+from src.logging_utils import request_id as validated_request_id
 from src.routing import resolve_worker_url
 from src.schemas import InferenceRequest
 

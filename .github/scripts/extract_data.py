@@ -1,6 +1,7 @@
 # extract_data.py: Script trích xuất dữ liệu cho tập Train, Test và Data Drift từ bộ CICIDS2017
-import pandas as pd
 import os
+
+import pandas as pd
 
 
 def prep_paas_dynamic_data(file_path, output_dir):

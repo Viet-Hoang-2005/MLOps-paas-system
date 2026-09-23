@@ -1,6 +1,5 @@
 """Unit tests for Kaggle Diabetes Logistic Regression training script and artifact generation."""
 
-import hashlib
 import importlib.util
 import json
 import sys
@@ -11,8 +10,6 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-
-import pytest
 
 try:
     import mlflow

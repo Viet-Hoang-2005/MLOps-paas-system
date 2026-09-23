@@ -19,18 +19,17 @@ import argparse
 import copy
 import hashlib
 import json
-import os
 import platform
 import sys
 import tarfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import joblib
 import numpy as np
 import pandas as pd
+import torch
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
@@ -43,9 +42,7 @@ from sklearn.metrics import (
 )
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder, StandardScaler
-
-import torch
-import torch.nn as nn
+from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 CATEGORICAL_COLUMNS = [

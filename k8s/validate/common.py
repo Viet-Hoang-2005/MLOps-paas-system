@@ -5,13 +5,12 @@ from __future__ import annotations
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterator
 
 import yaml
-
 
 REPOSITORY_URL = "https://github.com/Viet-Hoang-2005/MLOps-paas-system.git"
 PLATFORM_IMAGE_PATTERN = "registry.mlops-nids-nt114.id.vn/mlops-paas/*"

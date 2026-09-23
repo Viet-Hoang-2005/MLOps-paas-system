@@ -1,7 +1,6 @@
 import sys
 from pkgutil import iter_modules
 
-
 packages = ["jupyter", "fairlearn", "seaborn", "numpy", "pandas", "model-card-toolkit"]
 
 assert sys.version_info.major >= 3 and sys.version_info.minor >= 7, (

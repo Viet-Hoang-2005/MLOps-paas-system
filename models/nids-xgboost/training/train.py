@@ -336,7 +336,7 @@ def main() -> None:
 
     label_encoder = LabelEncoder()
     y = label_encoder.fit_transform(y_raw)
-    num_classes = int(len(label_encoder.classes_))
+    num_classes = len(label_encoder.classes_)
     log(f"Classes ({num_classes}): {label_encoder.classes_.tolist()}")
 
     # Stratified split mirrors the legacy 80/20 holdout; we keep a validation
@@ -395,7 +395,7 @@ def main() -> None:
         json.dump(
             {
                 **metrics,
-                "samples": int(len(df)),
+                "samples": len(df),
                 "num_classes": num_classes,
             },
             handle,
@@ -436,7 +436,7 @@ def main() -> None:
                     {"name": name, "value": value} for name, value in top_importances
                 ],
                 "label_classes": label_classes,
-                "sample_count": int(len(df)),
+                "sample_count": len(df),
                 "model_type": algorithm,
                 "warnings": warnings_list,
             },

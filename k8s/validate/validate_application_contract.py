@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from .common import (
     PRODUCTION_NAMESPACES,
     REPOSITORY_URL,
@@ -14,7 +12,6 @@ from .common import (
     run_standalone,
     yaml_documents,
 )
-
 
 EXPECTED_SYNC_OPTIONS = {
     "ApplyOutOfSyncOnly=true",

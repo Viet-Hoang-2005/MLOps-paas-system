@@ -1,4 +1,3 @@
-# coding=utf-8
 #
 # The copyright of this file belongs to Feedzai. The file cannot be
 # reproduced in whole or in part, stored in a retrieval system,
@@ -8,13 +7,14 @@
 # (c) 2022 Feedzai, Strictly Confidential
 
 import logging
-
+from collections.abc import Iterable
 from copy import deepcopy
-from optuna.samplers import RandomSampler
-from optuna.trial import FixedTrial, BaseTrial
-from optuna.distributions import BaseDistribution
+from typing import Any
+
 from optuna import distributions
-from typing import Iterable, Optional, Any
+from optuna.distributions import BaseDistribution
+from optuna.samplers import RandomSampler
+from optuna.trial import BaseTrial, FixedTrial
 
 
 class RandomValueTrial(FixedTrial):
@@ -25,8 +25,8 @@ class RandomValueTrial(FixedTrial):
     def __init__(
         self,
         number: int = 0,
-        seed: Optional[int] = None,
-        sampler: Optional[RandomSampler] = None,
+        seed: int | None = None,
+        sampler: RandomSampler | None = None,
     ):
         assert not (seed and sampler), (
             f"Must provide at most one of (seed={seed}, sampler={sampler})"

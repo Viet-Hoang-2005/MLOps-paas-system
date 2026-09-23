@@ -63,7 +63,7 @@ def main():
     }
     data = json.dumps(payload).encode("utf-8")
 
-    auth_raw = f"{harbor_user}:{harbor_pass}".encode("utf-8")
+    auth_raw = f"{harbor_user}:{harbor_pass}".encode()
     auth_b64 = base64.b64encode(auth_raw).decode("ascii")
 
     headers = {"Content-Type": "application/json", "Authorization": f"Basic {auth_b64}"}
