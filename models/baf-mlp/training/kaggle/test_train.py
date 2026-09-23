@@ -29,7 +29,9 @@ def load_modules():
         sys.path.insert(0, str(packager_root))
 
     packager_tasks_path = packager_root / "src" / "tasks.py"
-    spec_packager = importlib.util.spec_from_file_location("model_packager_tasks", packager_tasks_path)
+    spec_packager = importlib.util.spec_from_file_location(
+        "model_packager_tasks", packager_tasks_path
+    )
     model_packager_tasks = importlib.util.module_from_spec(spec_packager)
     spec_packager.loader.exec_module(model_packager_tasks)
 
@@ -58,10 +60,14 @@ def create_synthetic_baf_csv(file_path: Path, num_rows_per_month: int = 50) -> P
                 "velocity_4w": float(rng.uniform(0.0, 10000.0)),
                 "bank_branch_count_8w": int(rng.randint(0, 100)),
                 "date_of_birth_distinct_emails_4w": int(rng.randint(0, 20)),
-                "employment_status": str(rng.choice(["CA", "CB", "CC", "CD", "CE", "CF", "CG"])),
+                "employment_status": str(
+                    rng.choice(["CA", "CB", "CC", "CD", "CE", "CF", "CG"])
+                ),
                 "credit_risk_score": int(rng.randint(50, 300)),
                 "email_is_free": int(rng.choice([0, 1])),
-                "housing_status": str(rng.choice(["BA", "BB", "BC", "BD", "BE", "BF", "BG"])),
+                "housing_status": str(
+                    rng.choice(["BA", "BB", "BC", "BD", "BE", "BF", "BG"])
+                ),
                 "phone_home_valid": int(rng.choice([0, 1])),
                 "phone_mobile_valid": int(rng.choice([0, 1])),
                 "bank_months_count": int(rng.choice([-1, 5, 12, 36])),
@@ -70,7 +76,9 @@ def create_synthetic_baf_csv(file_path: Path, num_rows_per_month: int = 50) -> P
                 "foreign_request": int(rng.choice([0, 1])),
                 "source": str(rng.choice(["INTERNET", "TELEAPP"])),
                 "session_length_in_minutes": float(rng.uniform(1.0, 60.0)),
-                "device_os": str(rng.choice(["windows", "linux", "macintosh", "x11", "other"])),
+                "device_os": str(
+                    rng.choice(["windows", "linux", "macintosh", "x11", "other"])
+                ),
                 "keep_alive_session": int(rng.choice([0, 1])),
                 "device_distinct_emails_8w": int(rng.randint(0, 5)),
                 "device_fraud_count": 0,
@@ -93,18 +101,30 @@ def run_pipeline_verification(tmp_path: Path) -> None:
 
     test_args = [
         "train.py",
-        "--data-path", str(csv_path),
-        "--output-dir", str(output_dir),
-        "--device", "cpu",
-        "--seed", "42",
-        "--batch-size", "32",
-        "--epochs", "2",
-        "--patience", "2",
-        "--hidden-dim-1", "32",
-        "--hidden-dim-2", "16",
-        "--train-months", "0,1,2,3",
-        "--val-months", "4",
-        "--ref-months", "5",
+        "--data-path",
+        str(csv_path),
+        "--output-dir",
+        str(output_dir),
+        "--device",
+        "cpu",
+        "--seed",
+        "42",
+        "--batch-size",
+        "32",
+        "--epochs",
+        "2",
+        "--patience",
+        "2",
+        "--hidden-dim-1",
+        "32",
+        "--hidden-dim-2",
+        "16",
+        "--train-months",
+        "0,1,2,3",
+        "--val-months",
+        "4",
+        "--ref-months",
+        "5",
     ]
     old_argv = sys.argv
     sys.argv = test_args
@@ -129,14 +149,18 @@ def run_pipeline_verification(tmp_path: Path) -> None:
         assert file_path.exists(), f"Expected artifact {file_name} missing from output!"
 
     # 1. Verify model.pt is loadable with standard torch.load without custom class
-    loaded_model = torch.load(output_dir / "model.pt", map_location="cpu", weights_only=False)
+    loaded_model = torch.load(
+        output_dir / "model.pt", map_location="cpu", weights_only=False
+    )
     assert isinstance(loaded_model, torch.nn.Sequential)
 
     # 2. Verify preprocessor.joblib can transform new raw records
     preprocessor = joblib.load(output_dir / "preprocessor.joblib")
     test_df = pd.read_csv(csv_path, nrows=10)
     feature_cols = [c for c in test_df.columns if c not in ("fraud_bool", "month")]
-    transformed_features = preprocessor.transform(test_df[feature_cols]).astype(np.float32)
+    transformed_features = preprocessor.transform(test_df[feature_cols]).astype(
+        np.float32
+    )
     assert transformed_features.shape[0] == 10
     assert transformed_features.shape[1] == 30
 
@@ -171,12 +195,19 @@ def run_pipeline_verification(tmp_path: Path) -> None:
     with tarfile.open(output_dir / "model.tar.gz", "r:gz") as tar:
         tar.extractall(extract_dir)
 
-    discovered_model = model_packager_tasks.find_supported_model_file(extract_dir, flavor="pytorch")
+    discovered_model = model_packager_tasks.find_supported_model_file(
+        extract_dir, flavor="pytorch"
+    )
     assert discovered_model.name == "model.pt"
-    print("\n[SUCCESS] All BAF MLP training pipeline and artifact verification tests passed!")
+    print(
+        "\n[SUCCESS] All BAF MLP training pipeline and artifact verification tests passed!"
+    )
 
 
-@pytest.mark.skipif(not TORCH_AVAILABLE, reason="PyTorch DLL unavailable on host OS (supported in Docker / Kaggle)")
+@pytest.mark.skipif(
+    not TORCH_AVAILABLE,
+    reason="PyTorch DLL unavailable on host OS (supported in Docker / Kaggle)",
+)
 def test_baf_train_pipeline_and_artifact_generation(tmp_path):
     """Pytest entrypoint to verify end-to-end BAF MLP training and artifact packaging."""
     run_pipeline_verification(tmp_path)

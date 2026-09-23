@@ -3,17 +3,20 @@ import boto3
 from sagemaker.sklearn.estimator import SKLearn
 from sagemaker.session import Session
 
+
 def get_required_env(name):
     value = os.environ.get(name, "").strip()
     if not value or value.lower() in {"none", "null"}:
         raise RuntimeError(f"Missing required environment variable: {name}")
     return value
 
+
 def get_bool_env(name, default=False):
     value = os.environ.get(name)
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
 
 def main():
     # Khởi tạo các biến môi trường cấu hình từ GitHub Actions
@@ -30,7 +33,9 @@ def main():
     instance_type = os.environ.get("SAGEMAKER_INSTANCE_TYPE", "ml.m5.large")
     max_run = int(os.environ.get("SAGEMAKER_MAX_RUN", "3600"))
     max_wait = int(os.environ.get("SAGEMAKER_MAX_WAIT", "7200"))
-    output_prefix = os.environ.get("SAGEMAKER_OUTPUT_PREFIX", "tenants").strip().strip("/")
+    output_prefix = (
+        os.environ.get("SAGEMAKER_OUTPUT_PREFIX", "tenants").strip().strip("/")
+    )
     framework_version = os.environ.get("SAGEMAKER_SKLEARN_FRAMEWORK_VERSION", "1.2-1")
     py_version = os.environ.get("SAGEMAKER_PY_VERSION", "py3")
     use_spot = get_bool_env("SAGEMAKER_USE_SPOT", True)
@@ -48,12 +53,12 @@ def main():
         "MLFLOW_TRACKING_URI": mlflow_uri,
         "MLFLOW_TRACKING_USERNAME": mlflow_user,
         "MLFLOW_TRACKING_PASSWORD": mlflow_pass,
-        "MLFLOW_MODEL_NAME": mlflow_model_name
+        "MLFLOW_MODEL_NAME": mlflow_model_name,
     }
 
     print(f"Triggering SageMaker Training Job for {model_version}...")
     output_path = f"s3://{bucket}/{output_prefix}/sagemaker-output/{model_version}/"
-    
+
     # Sử dụng SKLearn framework base image, hỗ trợ tự động cài requirements.txt
     estimator = SKLearn(
         entry_point="train.py",
@@ -69,7 +74,7 @@ def main():
         base_job_name=f"mlops-paas-{model_version.replace('.', '-')}",
         use_spot_instances=use_spot,
         max_run=max_run,
-        max_wait=max_wait
+        max_wait=max_wait,
     )
 
     # Đường dẫn thư mục chứa dữ liệu trên S3
@@ -79,9 +84,10 @@ def main():
 
     # Bắt đầu Training Job (wait=False để GitHub Actions kết thúc ngay lập tức, Job chạy ngầm trên AWS)
     estimator.fit({"train": training_data_uri}, wait=False)
-    
+
     print("Training Job launched successfully in the background!")
     print(f"Job Name: {estimator.latest_training_job.name}")
+
 
 if __name__ == "__main__":
     main()

@@ -140,9 +140,13 @@ def preprocess_uci_diabetes_data(raw_df: pd.DataFrame) -> pd.DataFrame:
     # 4. Age normalization
     if "age" in df.columns:
         df["age"] = df["age"].replace({"?": ""})
-        df["age"] = df["age"].replace(["[0-10)", "[10-20)", "[20-30)"], "30 years or younger")
+        df["age"] = df["age"].replace(
+            ["[0-10)", "[10-20)", "[20-30)"], "30 years or younger"
+        )
         df["age"] = df["age"].replace(["[30-40)", "[40-50)", "[50-60)"], "30-60 years")
-        df["age"] = df["age"].replace(["[60-70)", "[70-80)", "[80-90)", "[90-100)"], "Over 60 years")
+        df["age"] = df["age"].replace(
+            ["[60-70)", "[70-80)", "[80-90)", "[90-100)"], "Over 60 years"
+        )
 
     # 5. Admission source id
     if "admission_source_id" in df.columns:
@@ -198,14 +202,30 @@ def preprocess_uci_diabetes_data(raw_df: pd.DataFrame) -> pd.DataFrame:
         )
 
     # 9. Payer code / Insurance features
-    payer_col = df["payer_code"] if "payer_code" in df.columns else pd.Series(["Unknown"] * len(df))
+    payer_col = (
+        df["payer_code"]
+        if "payer_code" in df.columns
+        else pd.Series(["Unknown"] * len(df))
+    )
     df["medicare"] = (payer_col == "MC").astype(int)
     df["medicaid"] = (payer_col == "MD").astype(int)
 
     # 10. Visit history indicators
-    num_emerg = df["number_emergency"] if "number_emergency" in df.columns else pd.Series([0] * len(df))
-    num_inpat = df["number_inpatient"] if "number_inpatient" in df.columns else pd.Series([0] * len(df))
-    num_outpat = df["number_outpatient"] if "number_outpatient" in df.columns else pd.Series([0] * len(df))
+    num_emerg = (
+        df["number_emergency"]
+        if "number_emergency" in df.columns
+        else pd.Series([0] * len(df))
+    )
+    num_inpat = (
+        df["number_inpatient"]
+        if "number_inpatient" in df.columns
+        else pd.Series([0] * len(df))
+    )
+    num_outpat = (
+        df["number_outpatient"]
+        if "number_outpatient" in df.columns
+        else pd.Series([0] * len(df))
+    )
 
     df["had_emergency"] = (num_emerg > 0).astype(int)
     df["had_inpatient_days"] = (num_inpat > 0).astype(int)
@@ -272,7 +292,9 @@ def build_pipeline(
     )
 
 
-def compute_classification_metrics(y_true: np.ndarray, y_probs: np.ndarray, threshold: float = 0.5) -> dict[str, float]:
+def compute_classification_metrics(
+    y_true: np.ndarray, y_probs: np.ndarray, threshold: float = 0.5
+) -> dict[str, float]:
     """Compute standard classification and calibration metrics."""
     y_pred = (y_probs >= threshold).astype(int)
 
@@ -362,9 +384,13 @@ def compute_fairness_report_for_partition(
         if recalls:
             disparities["recall_difference"] = round(max(recalls) - min(recalls), 5)
         if fnrs:
-            disparities["false_negative_rate_difference"] = round(max(fnrs) - min(fnrs), 5)
+            disparities["false_negative_rate_difference"] = round(
+                max(fnrs) - min(fnrs), 5
+            )
         if precisions:
-            disparities["precision_difference"] = round(max(precisions) - min(precisions), 5)
+            disparities["precision_difference"] = round(
+                max(precisions) - min(precisions), 5
+            )
 
         return {
             "subgroups": subgroup_metrics,
@@ -376,7 +402,9 @@ def compute_fairness_report_for_partition(
         "base_rate": round(float(np.mean(y_true)), 5),
         "selection_rate": round(float(np.mean(y_pred)), 5),
         "recall": round(float(recall_score(y_true, y_pred, zero_division=0)), 5),
-        "false_negative_rate": round(float(1.0 - recall_score(y_true, y_pred, zero_division=0)), 5),
+        "false_negative_rate": round(
+            float(1.0 - recall_score(y_true, y_pred, zero_division=0)), 5
+        ),
         "precision": round(float(precision_score(y_true, y_pred, zero_division=0)), 5),
     }
 
@@ -387,7 +415,9 @@ def compute_fairness_report_for_partition(
     }
 
 
-def extract_model_insights(pipeline: Pipeline, numeric_cols: list[str], categorical_cols: list[str]) -> dict[str, Any]:
+def extract_model_insights(
+    pipeline: Pipeline, numeric_cols: list[str], categorical_cols: list[str]
+) -> dict[str, Any]:
     """Extract model feature coefficients, odds ratios, and top clinical risk factors."""
     preprocessor = pipeline.named_steps["preprocessor"]
     classifier = pipeline.named_steps["classifier"]
@@ -422,7 +452,9 @@ def extract_model_insights(pipeline: Pipeline, numeric_cols: list[str], categori
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train baseline Diabetes Readmission Logistic Regression.")
+    parser = argparse.ArgumentParser(
+        description="Train baseline Diabetes Readmission Logistic Regression."
+    )
     parser.add_argument(
         "--data-path",
         type=str,
@@ -435,14 +467,36 @@ def main():
         default="/kaggle/working/diabetes-logreg-artifact",
         help="Output directory for generated model artifacts.",
     )
-    parser.add_argument("--seed", type=int, default=445, help="Random seed for reproducibility.")
-    parser.add_argument("--max-iter", type=int, default=2000, help="Maximum solver iterations.")
-    parser.add_argument("--n-splits", type=int, default=10, help="Number of StratifiedGroupKFold splits.")
-    parser.add_argument("--train-folds", type=str, default="0,1,2,3,4,5", help="Folds for training.")
-    parser.add_argument("--val-folds", type=str, default="6,7", help="Folds for validation.")
-    parser.add_argument("--ref-folds", type=str, default="8", help="Folds for reference baseline.")
-    parser.add_argument("--ct-folds", type=str, default="9", help="Folds reserved for Continuous Training.")
-    parser.add_argument("--threshold", type=float, default=0.5, help="Deployment decision threshold.")
+    parser.add_argument(
+        "--seed", type=int, default=445, help="Random seed for reproducibility."
+    )
+    parser.add_argument(
+        "--max-iter", type=int, default=2000, help="Maximum solver iterations."
+    )
+    parser.add_argument(
+        "--n-splits",
+        type=int,
+        default=10,
+        help="Number of StratifiedGroupKFold splits.",
+    )
+    parser.add_argument(
+        "--train-folds", type=str, default="0,1,2,3,4,5", help="Folds for training."
+    )
+    parser.add_argument(
+        "--val-folds", type=str, default="6,7", help="Folds for validation."
+    )
+    parser.add_argument(
+        "--ref-folds", type=str, default="8", help="Folds for reference baseline."
+    )
+    parser.add_argument(
+        "--ct-folds",
+        type=str,
+        default="9",
+        help="Folds reserved for Continuous Training.",
+    )
+    parser.add_argument(
+        "--threshold", type=float, default=0.5, help="Deployment decision threshold."
+    )
     parser.add_argument(
         "--class-weight",
         type=str,
@@ -463,14 +517,18 @@ def main():
     ref_folds = parse_int_list(args.ref_folds)
     ct_folds = parse_int_list(args.ct_folds)
 
-    print(f"[Config] Train folds: {train_folds} | Val folds: {val_folds} | Ref folds: {ref_folds}")
+    print(
+        f"[Config] Train folds: {train_folds} | Val folds: {val_folds} | Ref folds: {ref_folds}"
+    )
     print(f"[Config] Reserved for Continuous Training replay: {ct_folds}")
 
     # Ensure reserved folds are not used in training
     used_folds = set(train_folds + val_folds + ref_folds)
     for reserved in ct_folds:
         if reserved in used_folds:
-            raise ValueError(f"Fold {reserved} is reserved for CT replay and cannot be in training/evaluation!")
+            raise ValueError(
+                f"Fold {reserved} is reserved for CT replay and cannot be in training/evaluation!"
+            )
 
     if not data_path.exists():
         raise FileNotFoundError(f"Dataset not found at: {data_path}")
@@ -482,13 +540,21 @@ def main():
     # Standardize data
     print("[Preprocessing] Applying Fairlearn domain transformations...")
     df = preprocess_uci_diabetes_data(raw_df)
-    print(f"[Schema] Records after filtering: {len(df):,} ({df[TARGET_COLUMN].sum():,} readmitted <30 days)")
+    print(
+        f"[Schema] Records after filtering: {len(df):,} ({df[TARGET_COLUMN].sum():,} readmitted <30 days)"
+    )
 
     # StratifiedGroupKFold partitioning by patient_nbr
-    print(f"[Split] Applying StratifiedGroupKFold(n_splits={args.n_splits}) grouped by '{PATIENT_ID_COLUMN}'...")
-    sgkf = StratifiedGroupKFold(n_splits=args.n_splits, shuffle=True, random_state=args.seed)
+    print(
+        f"[Split] Applying StratifiedGroupKFold(n_splits={args.n_splits}) grouped by '{PATIENT_ID_COLUMN}'..."
+    )
+    sgkf = StratifiedGroupKFold(
+        n_splits=args.n_splits, shuffle=True, random_state=args.seed
+    )
     df["fold"] = -1
-    for fold_idx, (_, test_idx) in enumerate(sgkf.split(df, df[TARGET_COLUMN], groups=df[PATIENT_ID_COLUMN])):
+    for fold_idx, (_, test_idx) in enumerate(
+        sgkf.split(df, df[TARGET_COLUMN], groups=df[PATIENT_ID_COLUMN])
+    ):
         df.iloc[test_idx, df.columns.get_loc("fold")] = fold_idx
 
     # Partition DataFrames
@@ -503,12 +569,24 @@ def main():
     ref_pts = set(df_ref[PATIENT_ID_COLUMN])
     ct_pts = set(df_ct[PATIENT_ID_COLUMN])
 
-    assert len(train_pts.intersection(val_pts)) == 0, "Patient leakage detected between train and val!"
-    assert len(train_pts.intersection(ref_pts)) == 0, "Patient leakage detected between train and ref!"
-    assert len(train_pts.intersection(ct_pts)) == 0, "Patient leakage detected between train and CT!"
-    assert len(val_pts.intersection(ref_pts)) == 0, "Patient leakage detected between val and ref!"
-    assert len(val_pts.intersection(ct_pts)) == 0, "Patient leakage detected between val and CT!"
-    assert len(ref_pts.intersection(ct_pts)) == 0, "Patient leakage detected between ref and CT!"
+    assert len(train_pts.intersection(val_pts)) == 0, (
+        "Patient leakage detected between train and val!"
+    )
+    assert len(train_pts.intersection(ref_pts)) == 0, (
+        "Patient leakage detected between train and ref!"
+    )
+    assert len(train_pts.intersection(ct_pts)) == 0, (
+        "Patient leakage detected between train and CT!"
+    )
+    assert len(val_pts.intersection(ref_pts)) == 0, (
+        "Patient leakage detected between val and ref!"
+    )
+    assert len(val_pts.intersection(ct_pts)) == 0, (
+        "Patient leakage detected between val and CT!"
+    )
+    assert len(ref_pts.intersection(ct_pts)) == 0, (
+        "Patient leakage detected between ref and CT!"
+    )
 
     print(
         f"[Split] Train rows: {len(df_train):,} ({len(train_pts):,} patients, pos: {df_train[TARGET_COLUMN].sum():,}, rate: {df_train[TARGET_COLUMN].mean():.4f})"
@@ -524,7 +602,9 @@ def main():
     )
 
     feature_cols = NUMERIC_FEATURES + CATEGORICAL_FEATURES
-    print(f"[Features] Total model features: {len(feature_cols)} ({len(NUMERIC_FEATURES)} numeric, {len(CATEGORICAL_FEATURES)} categorical)")
+    print(
+        f"[Features] Total model features: {len(feature_cols)} ({len(NUMERIC_FEATURES)} numeric, {len(CATEGORICAL_FEATURES)} categorical)"
+    )
 
     X_train = df_train[feature_cols]
     y_train = df_train[TARGET_COLUMN].values
@@ -537,8 +617,16 @@ def main():
 
     # Build and fit pipeline
     class_weight_val = args.class_weight if args.class_weight != "none" else None
-    print(f"[Training] Fitting LogisticRegression pipeline (max_iter={args.max_iter}, seed={args.seed}, class_weight={class_weight_val})...")
-    pipeline = build_pipeline(NUMERIC_FEATURES, CATEGORICAL_FEATURES, args.max_iter, args.seed, class_weight_val)
+    print(
+        f"[Training] Fitting LogisticRegression pipeline (max_iter={args.max_iter}, seed={args.seed}, class_weight={class_weight_val})..."
+    )
+    pipeline = build_pipeline(
+        NUMERIC_FEATURES,
+        CATEGORICAL_FEATURES,
+        args.max_iter,
+        args.seed,
+        class_weight_val,
+    )
     pipeline.fit(X_train, y_train)
     print("[Training] Model fitted successfully!")
 
@@ -553,8 +641,12 @@ def main():
     print(f"[Metrics] Reference (Fold {args.ref_folds}): {ref_metrics}")
 
     # Fairness report
-    val_fairness = compute_fairness_report_for_partition(df_val, y_val, val_probs, args.threshold)
-    ref_fairness = compute_fairness_report_for_partition(df_ref, y_ref, ref_probs, args.threshold)
+    val_fairness = compute_fairness_report_for_partition(
+        df_val, y_val, val_probs, args.threshold
+    )
+    ref_fairness = compute_fairness_report_for_partition(
+        df_ref, y_ref, ref_probs, args.threshold
+    )
     fairness_payload = {
         "assessment_description": "Subgroup performance and disparity report across race and gender.",
         "mitigation_applied": False,
@@ -564,7 +656,9 @@ def main():
     }
 
     # Model insights
-    insights_payload = extract_model_insights(pipeline, NUMERIC_FEATURES, CATEGORICAL_FEATURES)
+    insights_payload = extract_model_insights(
+        pipeline, NUMERIC_FEATURES, CATEGORICAL_FEATURES
+    )
 
     # 1. Save model.joblib
     model_joblib_path = output_dir / "model.joblib"
@@ -653,7 +747,9 @@ def main():
         "continuous_training_replay_samples": len(df_ct),
         "continuous_training_replay_unique_patients": len(ct_pts),
         "continuous_training_replay_positive_count": int(df_ct[TARGET_COLUMN].sum()),
-        "continuous_training_replay_positive_rate": round(float(df_ct[TARGET_COLUMN].mean()), 6),
+        "continuous_training_replay_positive_rate": round(
+            float(df_ct[TARGET_COLUMN].mean()), 6
+        ),
         "no_patient_overlap_verified": True,
     }
     split_path = output_dir / "split_manifest.json"
@@ -707,6 +803,7 @@ def main():
         }
 
     import sklearn
+
     manifest_payload = {
         "created_at": datetime.now(timezone.utc).isoformat(),
         "files": file_manifests,
@@ -725,7 +822,9 @@ def main():
     # 11. Create model.tar.gz archive
     archive_path = output_dir / "model.tar.gz"
     all_artifact_files = files_to_index + ["artifact_manifest.json"]
-    print(f"[Archive] Creating {archive_path} containing {len(all_artifact_files)} files...")
+    print(
+        f"[Archive] Creating {archive_path} containing {len(all_artifact_files)} files..."
+    )
     with tarfile.open(archive_path, "w:gz") as tar:
         for file_name in all_artifact_files:
             file_to_add = output_dir / file_name
@@ -733,7 +832,9 @@ def main():
 
     archive_sha256 = compute_sha256(archive_path)
     archive_size_mb = archive_path.stat().st_size / (1024 * 1024)
-    print(f"[Done] model.tar.gz successfully generated: {archive_size_mb:.2f} MB (SHA256: {archive_sha256})")
+    print(
+        f"[Done] model.tar.gz successfully generated: {archive_size_mb:.2f} MB (SHA256: {archive_sha256})"
+    )
 
     # Print METRIC_JSON line for MLOps Training Runner callback
     protocol_metrics = {

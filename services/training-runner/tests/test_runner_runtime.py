@@ -1,10 +1,11 @@
 import io
 import subprocess
 import threading
-import pytest
-
-from src import application as runner
 from unittest.mock import Mock
+
+import pytest
+from src import application as runner
+
 
 def test_read_int_file(tmp_path):
     value = tmp_path / "value"
@@ -47,7 +48,9 @@ def test_metric_emitter_emits_one_sample(monkeypatch):
     monkeypatch.setattr(runner.time, "monotonic", lambda: next(times))
     monkeypatch.setattr(runner, "_read_cgroup_memory", lambda: (10.0, 20.0, 50.0))
     monkeypatch.setattr(runner, "_read_gpu_metrics", lambda: {"gpu_available": False})
-    monkeypatch.setattr(runner, "metric_log", lambda payload: (payloads.append(payload), stop.set()))
+    monkeypatch.setattr(
+        runner, "metric_log", lambda payload: (payloads.append(payload), stop.set())
+    )
     thread = runner.start_metric_emitter(stop, interval_seconds=0)
     thread.join(timeout=1)
     assert payloads[0]["cpu_percent"] == 50.0
@@ -69,7 +72,9 @@ def test_run_training_validates_entry_point(runner_workspace):
         runner.run_training("missing.py", "v1")
 
 
-def test_run_training_streams_output_and_sets_environment(monkeypatch, runner_workspace):
+def test_run_training_streams_output_and_sets_environment(
+    monkeypatch, runner_workspace
+):
     source_dir = runner_workspace["SOURCE_DIR"]
     (source_dir / "train.py").write_text("pass", encoding="utf-8")
     captured = {}
@@ -115,7 +120,11 @@ def test_main_orchestrates_success(monkeypatch, runner_workspace):
     monkeypatch.setattr(runner, "download_presigned_url", downloads)
     monkeypatch.setattr(runner, "safe_extract_zip", extract)
     monkeypatch.setattr(runner, "install_requirements", install)
-    monkeypatch.setattr(runner, "run_training", Mock(return_value=subprocess.CompletedProcess([], 0, "ok", "")))
+    monkeypatch.setattr(
+        runner,
+        "run_training",
+        Mock(return_value=subprocess.CompletedProcess([], 0, "ok", "")),
+    )
     monkeypatch.setattr(runner, "write_mlops_bundle", bundle)
     monkeypatch.setattr(runner, "create_model_archive", archive)
     request_upload_url = Mock(return_value="https://example.test/output")
@@ -123,7 +132,9 @@ def test_main_orchestrates_success(monkeypatch, runner_workspace):
     monkeypatch.setattr(runner, "upload_presigned_url", upload)
     runner.main()
     assert downloads.call_count == 2
-    assert (runner.SOURCE_DIR / "requirements.txt").read_text(encoding="utf-8") == "pytest==8.2.2"
+    assert (runner.SOURCE_DIR / "requirements.txt").read_text(
+        encoding="utf-8"
+    ) == "pytest==8.2.2"
     extract.assert_called_once()
     install.assert_called_once()
     bundle.assert_called_once_with(
@@ -142,18 +153,26 @@ def test_main_orchestrates_success(monkeypatch, runner_workspace):
     upload.assert_called_once()
 
 
-def test_main_writes_plain_requirements_and_stops_after_failed_training(monkeypatch, runner_workspace):
+def test_main_writes_plain_requirements_and_stops_after_failed_training(
+    monkeypatch, runner_workspace
+):
     _main_env(monkeypatch)
     monkeypatch.setenv("REQUIREMENTS_TEXT", "numpy pandas")
     monkeypatch.setattr(runner, "download_presigned_url", Mock())
     monkeypatch.setattr(runner, "safe_extract_zip", Mock())
     monkeypatch.setattr(runner, "install_requirements", Mock())
-    monkeypatch.setattr(runner, "run_training", Mock(return_value=subprocess.CompletedProcess([], 7, "", "bad")))
+    monkeypatch.setattr(
+        runner,
+        "run_training",
+        Mock(return_value=subprocess.CompletedProcess([], 7, "", "bad")),
+    )
     bundle = Mock()
     monkeypatch.setattr(runner, "write_mlops_bundle", bundle)
     monkeypatch.setattr(runner, "create_model_archive", Mock())
     with pytest.raises(RuntimeError, match="exit code 7"):
         runner.main()
-    assert (runner.SOURCE_DIR / "requirements.txt").read_text(encoding="utf-8") == "numpy\npandas"
+    assert (runner.SOURCE_DIR / "requirements.txt").read_text(
+        encoding="utf-8"
+    ) == "numpy\npandas"
     assert bundle.call_args.kwargs["status"] == "failed"
     runner.create_model_archive.assert_not_called()

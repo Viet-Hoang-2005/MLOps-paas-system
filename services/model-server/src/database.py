@@ -2,8 +2,9 @@ import hashlib
 import json
 import os
 import re
-from typing import Any, Dict
+from typing import Any
 from urllib.parse import quote_plus
+
 from sqlalchemy import create_engine, text
 from src.logging_utils import Summary, get_logger
 
@@ -28,9 +29,13 @@ def build_control_plane_database_url():
 
 
 CONTROL_PLANE_DATABASE_URL = build_control_plane_database_url()
-CONTROL_PLANE_DB_SCHEMA = os.environ.get("CONTROL_PLANE_DB_SCHEMA") or os.environ.get("DB_SCHEMA", "control_plane")
+CONTROL_PLANE_DB_SCHEMA = os.environ.get("CONTROL_PLANE_DB_SCHEMA") or os.environ.get(
+    "DB_SCHEMA", "control_plane"
+)
 if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", CONTROL_PLANE_DB_SCHEMA):
-    raise RuntimeError("CONTROL_PLANE_DB_SCHEMA must be a simple PostgreSQL identifier.")
+    raise RuntimeError(
+        "CONTROL_PLANE_DB_SCHEMA must be a simple PostgreSQL identifier."
+    )
 
 model_registry_engine = (
     create_engine(
@@ -43,7 +48,7 @@ model_registry_engine = (
 )
 
 
-def _fetch_model_version_from_db(version_id: str) -> Dict[str, Any] | None:
+def _fetch_model_version_from_db(version_id: str) -> dict[str, Any] | None:
     if model_registry_engine is None:
         raise RuntimeError("Model registry database is unavailable.")
     query = text("""
@@ -78,7 +83,14 @@ def _fetch_model_version_from_db(version_id: str) -> Dict[str, Any] | None:
         row = connection.execute(query, {"version_id": version_id}).mappings().first()
     if not row:
         return None
-    return {key: value.isoformat() if hasattr(value, "isoformat") else str(value) if key in {"id", "project_id"} else value for key, value in dict(row).items()}
+    return {
+        key: value.isoformat()
+        if hasattr(value, "isoformat")
+        else str(value)
+        if key in {"id", "project_id"}
+        else value
+        for key, value in dict(row).items()
+    }
 
 
 def get_model_version_record(version_id: str, redis_client=None):
@@ -109,7 +121,11 @@ def invalidate_model_version_cache(version_id: str, redis_client=None) -> bool:
         cache_summary.recovery("invalidate")
         return bool(deleted)
     except Exception as exc:
-        cache_summary.failure("invalidate", "Model registry cache invalidation failed", error_type=type(exc).__name__)
+        cache_summary.failure(
+            "invalidate",
+            "Model registry cache invalidation failed",
+            error_type=type(exc).__name__,
+        )
         return False
 
 
@@ -129,12 +145,16 @@ def verify_project_api_key(raw_key: str, project_pk: int):
         LIMIT 1
     """)
     with model_registry_engine.connect() as connection:
-        row = connection.execute(
-            query,
-            {
-                "prefix": raw_key[:16],
-                "digest": hashlib.sha256(raw_key.encode()).hexdigest(),
-                "project_pk": project_pk,
-            },
-        ).mappings().first()
+        row = (
+            connection.execute(
+                query,
+                {
+                    "prefix": raw_key[:16],
+                    "digest": hashlib.sha256(raw_key.encode()).hexdigest(),
+                    "project_pk": project_pk,
+                },
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else None

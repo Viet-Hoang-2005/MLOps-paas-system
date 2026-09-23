@@ -1,17 +1,16 @@
 """Consumer persistence for Django-owned production and outbox tables."""
 
+import json
 import os
 import re
 import time
 import uuid
-import json
 from urllib.parse import quote_plus
 
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import QueuePool
-
 from src.logging_utils import Summary, get_logger, log_event
 
 logger = get_logger(__name__)
@@ -48,10 +47,23 @@ def create_engine_safe(host: str, label: str):
             pool_pre_ping=True,
             pool_recycle=1800,
         )
-        log_event(logger, "INFO", "database_engine_initialized", "Database engine initialized", operation=label)
+        log_event(
+            logger,
+            "INFO",
+            "database_engine_initialized",
+            "Database engine initialized",
+            operation=label,
+        )
         return engine
     except Exception as exc:
-        log_event(logger, "ERROR", "database_engine_failed", "Database engine initialization failed", operation=label, error_type=type(exc).__name__)
+        log_event(
+            logger,
+            "ERROR",
+            "database_engine_failed",
+            "Database engine initialization failed",
+            operation=label,
+            error_type=type(exc).__name__,
+        )
         return None
 
 
@@ -66,29 +78,45 @@ def init_db():
     with engine_rw.connect() as conn:
         tables = conn.execute(
             text("SELECT to_regclass(:prediction), to_regclass(:outbox)"),
-            {"prediction": f"{DB_SCHEMA}.production_predictionrecord", "outbox": f"{DB_SCHEMA}.observability_eventoutbox"},
+            {
+                "prediction": f"{DB_SCHEMA}.production_predictionrecord",
+                "outbox": f"{DB_SCHEMA}.observability_eventoutbox",
+            },
         ).one()
     if not all(tables):
-        raise RuntimeError("Control Plane migrations have not created production/outbox tables yet.")
-    log_event(logger, "INFO", "database_schema_ready", "Migration-owned database schema is ready")
+        raise RuntimeError(
+            "Control Plane migrations have not created production/outbox tables yet."
+        )
+    log_event(
+        logger,
+        "INFO",
+        "database_schema_ready",
+        "Migration-owned database schema is ready",
+    )
 
 
 def _records(frame: pd.DataFrame) -> list[dict]:
     records = []
     for row in frame.to_dict("records"):
-        if not row.get("public_id") or not row.get("project_id") or not row.get("model_version_id"):
+        if (
+            not row.get("public_id")
+            or not row.get("project_id")
+            or not row.get("model_version_id")
+        ):
             continue
-        records.append({
-            "public_id": str(row["public_id"]),
-            "project_id": str(row["project_id"]),
-            "model_version_id": str(row["model_version_id"]),
-            "observed_at": row.get("observed_at"),
-            "features": json.dumps(row.get("features") or {}),
-            "prediction": str(row.get("prediction") or ""),
-            "confidence": row.get("confidence"),
-            "latency_ms": row.get("latency_ms"),
-            "request_id": str(row.get("request_id") or ""),
-        })
+        records.append(
+            {
+                "public_id": str(row["public_id"]),
+                "project_id": str(row["project_id"]),
+                "model_version_id": str(row["model_version_id"]),
+                "observed_at": row.get("observed_at"),
+                "features": json.dumps(row.get("features") or {}),
+                "prediction": str(row.get("prediction") or ""),
+                "confidence": row.get("confidence"),
+                "latency_ms": row.get("latency_ms"),
+                "request_id": str(row.get("request_id") or ""),
+            }
+        )
     return records
 
 
@@ -126,18 +154,24 @@ def _signals(signals: list[dict[str, str]]) -> list[dict]:
             "public_id": str(uuid.uuid4()),
             "idempotency_key": signal["idempotency_key"],
             "model_version_id": signal["model_version_id"],
-            "payload": '{"model_version_id": "' + signal["model_version_id"].replace('"', "") + '"}',
+            "payload": '{"model_version_id": "'
+            + signal["model_version_id"].replace('"', "")
+            + '"}',
         }
         for signal in signals
     ]
 
 
-def save_prediction_records_and_automatic_drift_signals(predictions: pd.DataFrame, signals: list[dict[str, str]]) -> bool:
+def save_prediction_records_and_automatic_drift_signals(
+    predictions: pd.DataFrame, signals: list[dict[str, str]]
+) -> bool:
     """Write validated prediction rows and webhook outbox rows in one transaction."""
     started = time.perf_counter()
     if engine_rw is None:
         persistence_summary.record(success=False)
-        persistence_summary.failure("write", "Database engine unavailable for persistence")
+        persistence_summary.failure(
+            "write", "Database engine unavailable for persistence"
+        )
         return False
     try:
         records = _records(predictions)
@@ -149,16 +183,31 @@ def save_prediction_records_and_automatic_drift_signals(predictions: pd.DataFram
                     if result.rowcount:
                         inserted_versions.add(record["model_version_id"])
             outbox_rows = _signals(
-                [signal for signal in signals if signal["model_version_id"] in inserted_versions]
+                [
+                    signal
+                    for signal in signals
+                    if signal["model_version_id"] in inserted_versions
+                ]
             )
             if outbox_rows:
                 conn.execute(OUTBOX_INSERT, outbox_rows)
-        persistence_summary.record(duration_ms=(time.perf_counter() - started) * 1000, records=len(records), production_samples=len(records), batches=1)
+        persistence_summary.record(
+            duration_ms=(time.perf_counter() - started) * 1000,
+            records=len(records),
+            production_samples=len(records),
+            batches=1,
+        )
         persistence_summary.recovery("write")
         return True
     except Exception as exc:
-        persistence_summary.record(success=False, duration_ms=(time.perf_counter() - started) * 1000)
-        persistence_summary.failure("write", "Prediction and automatic-drift transaction failed", error_type=type(exc).__name__)
+        persistence_summary.record(
+            success=False, duration_ms=(time.perf_counter() - started) * 1000
+        )
+        persistence_summary.failure(
+            "write",
+            "Prediction and automatic-drift transaction failed",
+            error_type=type(exc).__name__,
+        )
         return False
 
 
@@ -167,7 +216,8 @@ def claim_automatic_drift_signals(limit: int, lease_seconds: int) -> list[dict]:
     if engine_rw is None:
         return []
     with engine_rw.begin() as conn:
-        rows = conn.execute(text(f"""
+        rows = conn.execute(
+            text(f"""
             WITH candidates AS (
                 SELECT id FROM {OUTBOX_TABLE}
                 WHERE delivery_kind = 'webhook' AND destination = 'automatic_drift'
@@ -179,23 +229,43 @@ def claim_automatic_drift_signals(limit: int, lease_seconds: int) -> list[dict]:
                 locked_until = NOW() + (:lease_seconds * INTERVAL '1 second')
             FROM candidates WHERE event.id = candidates.id
             RETURNING event.id, event.idempotency_key, event.payload, event.attempts
-        """), {"limit": limit, "lease_seconds": lease_seconds}).mappings()
-        return [dict(row) | {"model_version_id": dict(row)["payload"]["model_version_id"]} for row in rows]
+        """),
+            {"limit": limit, "lease_seconds": lease_seconds},
+        ).mappings()
+        return [
+            dict(row) | {"model_version_id": dict(row)["payload"]["model_version_id"]}
+            for row in rows
+        ]
 
 
 def mark_automatic_drift_signal_published(event_id: int) -> None:
     if engine_rw is None:
         return
     with engine_rw.begin() as conn:
-        conn.execute(text(f"UPDATE {OUTBOX_TABLE} SET published_at = NOW(), locked_until = NULL, last_error = '' WHERE id = :event_id AND published_at IS NULL"), {"event_id": event_id})
+        conn.execute(
+            text(
+                f"UPDATE {OUTBOX_TABLE} SET published_at = NOW(), locked_until = NULL, last_error = '' WHERE id = :event_id AND published_at IS NULL"
+            ),
+            {"event_id": event_id},
+        )
 
 
-def reschedule_automatic_drift_signal(event_id: int, attempts: int, error: str, delay_seconds: int) -> None:
+def reschedule_automatic_drift_signal(
+    event_id: int, attempts: int, error: str, delay_seconds: int
+) -> None:
     if engine_rw is None:
         return
     with engine_rw.begin() as conn:
-        conn.execute(text(f"""
+        conn.execute(
+            text(f"""
             UPDATE {OUTBOX_TABLE} SET available_at = NOW() + (:delay_seconds * INTERVAL '1 second'),
                 locked_until = NULL, last_error = :error
             WHERE id = :event_id AND published_at IS NULL AND attempts = :attempts
-        """), {"event_id": event_id, "attempts": attempts, "delay_seconds": delay_seconds, "error": error[:1000]})
+        """),
+            {
+                "event_id": event_id,
+                "attempts": attempts,
+                "delay_seconds": delay_seconds,
+                "error": error[:1000],
+            },
+        )

@@ -1,24 +1,29 @@
-import os
-import logging
-from contextvars import copy_context
-from src.logging_utils import RuntimeLog, bind_context, configure, get_logger, reset_context, sanitize
-import hashlib
+import base64
 import json
+import logging
+import os
 import shutil
 import subprocess
 import sys
-import tarfile
 import threading
 import time
-import redis
-import base64
-import mlflow
-import requests
-import zipfile
+from contextvars import copy_context
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse
+
+import redis
+import requests
 from src import config, execution, io, metadata, resources
+from src.logging_utils import (
+    RuntimeLog,
+    bind_context,
+    configure,
+    get_logger,
+    reset_context,
+    sanitize,
+)
+
+import mlflow
 
 WORKSPACE = Path("/workspace")
 SOURCE_DIR = WORKSPACE / "source"
@@ -76,7 +81,9 @@ def warn(warnings: list[dict], code: str, message: str, **extra) -> None:
 
 def write_json(path: Path, payload) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
 
 
 def safe_json_value(value):
@@ -87,7 +94,9 @@ def is_number(value) -> bool:
     return metadata.is_number(value)
 
 
-def parse_metric_events(stdout_text: str, warnings: list[dict]) -> tuple[list[dict], dict]:
+def parse_metric_events(
+    stdout_text: str, warnings: list[dict]
+) -> tuple[list[dict], dict]:
     events: list[dict] = []
     metrics: dict = {}
 
@@ -133,10 +142,19 @@ def read_json_object(path: Path, label: str, warnings: list[dict]) -> dict:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        warn(warnings, f"invalid_{label}_json", f"{label}.json could not be parsed and was ignored.", error=str(exc))
+        warn(
+            warnings,
+            f"invalid_{label}_json",
+            f"{label}.json could not be parsed and was ignored.",
+            error=str(exc),
+        )
         return {}
     if not isinstance(payload, dict):
-        warn(warnings, f"invalid_{label}_shape", f"{label}.json must contain a JSON object.")
+        warn(
+            warnings,
+            f"invalid_{label}_shape",
+            f"{label}.json must contain a JSON object.",
+        )
         return {}
     return safe_json_value(payload)
 
@@ -168,10 +186,15 @@ def normalize_model_insights(payload: dict, default_kind: str = "") -> dict:
         coefficients = payload.get("coefficients")
         if isinstance(feature_importance, dict):
             kind = "feature_importance"
-            raw_items = [{"name": name, "value": value} for name, value in feature_importance.items()]
+            raw_items = [
+                {"name": name, "value": value}
+                for name, value in feature_importance.items()
+            ]
         elif isinstance(coefficients, dict):
             kind = "coefficients"
-            raw_items = [{"name": name, "value": value} for name, value in coefficients.items()]
+            raw_items = [
+                {"name": name, "value": value} for name, value in coefficients.items()
+            ]
         else:
             raw_items = []
 
@@ -195,7 +218,9 @@ def normalize_model_insights(payload: dict, default_kind: str = "") -> dict:
             normalized["class_name"] = str(class_name)
         items.append(normalized)
 
-    items = sorted(items, key=lambda entry: entry["abs_value"], reverse=True)[:MAX_MODEL_INSIGHT_ITEMS]
+    items = sorted(items, key=lambda entry: entry["abs_value"], reverse=True)[
+        :MAX_MODEL_INSIGHT_ITEMS
+    ]
     for rank, item in enumerate(items, start=1):
         item["rank"] = rank
 
@@ -224,11 +249,20 @@ def read_model_insights(output_dir: Path, warnings: list[dict]) -> dict:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            warn(warnings, "invalid_model_insights_json", f"{filename} could not be parsed and was ignored.", error=str(exc))
+            warn(
+                warnings,
+                "invalid_model_insights_json",
+                f"{filename} could not be parsed and was ignored.",
+                error=str(exc),
+            )
             return {}
         insights = normalize_model_insights(payload, default_kind)
         if not insights:
-            warn(warnings, "invalid_model_insights_shape", f"{filename} did not contain supported model insight items.")
+            warn(
+                warnings,
+                "invalid_model_insights_shape",
+                f"{filename} did not contain supported model insight items.",
+            )
             return {}
         return insights
     return {}
@@ -236,7 +270,10 @@ def read_model_insights(output_dir: Path, warnings: list[dict]) -> dict:
 
 def artifact_kind(relative_path: Path) -> str:
     return metadata.artifact_kind(
-        relative_path, MODEL_FILE_EXTENSIONS, CHECKPOINT_EXTENSIONS, METADATA_EXTENSIONS,
+        relative_path,
+        MODEL_FILE_EXTENSIONS,
+        CHECKPOINT_EXTENSIONS,
+        METADATA_EXTENSIONS,
     )
 
 
@@ -295,12 +332,16 @@ def log_to_mlflow(
             exp_name = f"tenant-{tenant_id}" if tenant_id else "default-tenant"
         artifact_root = os.environ.get("MLFLOW_ARTIFACT_ROOT", "").strip()
         if not artifact_root:
-            raise RuntimeError("MLFLOW_ARTIFACT_ROOT is required for job-scoped MLflow artifacts")
+            raise RuntimeError(
+                "MLFLOW_ARTIFACT_ROOT is required for job-scoped MLflow artifacts"
+            )
         artifact_proxy_root = mlflow_proxy_artifact_uri(artifact_root)
         try:
             exp = mlflow.get_experiment_by_name(exp_name)
             if not exp:
-                mlflow.create_experiment(exp_name, artifact_location=artifact_proxy_root)
+                mlflow.create_experiment(
+                    exp_name, artifact_location=artifact_proxy_root
+                )
         except Exception:
             pass
         mlflow.set_experiment(exp_name)
@@ -336,12 +377,22 @@ def log_to_mlflow(
                 try:
                     mlflow.log_artifacts(str(model_dir), artifact_path="model")
                 except Exception as exc:
-                    runtime_log.event(logging.WARNING, "training_mlflow_artifacts_failed",
-                                      "Could not log training artifacts to MLflow", reason=sanitize(str(exc)))
-        log("Successfully logged training job parameters, metrics, and artifacts to MLflow")
+                    runtime_log.event(
+                        logging.WARNING,
+                        "training_mlflow_artifacts_failed",
+                        "Could not log training artifacts to MLflow",
+                        reason=sanitize(str(exc)),
+                    )
+        log(
+            "Successfully logged training job parameters, metrics, and artifacts to MLflow"
+        )
     except Exception as exc:
-        runtime_log.event(logging.WARNING, "training_mlflow_failed",
-                          "MLflow logging encountered an error", reason=sanitize(str(exc)))
+        runtime_log.event(
+            logging.WARNING,
+            "training_mlflow_failed",
+            "MLflow logging encountered an error",
+            reason=sanitize(str(exc)),
+        )
 
 
 def mlflow_proxy_artifact_uri(artifact_root: str) -> str:
@@ -363,9 +414,14 @@ def write_mlops_bundle(
     mlops_dir.mkdir(parents=True, exist_ok=True)
 
     metric_events, stdout_metrics = parse_metric_events(stdout_text, warnings)
-    file_metrics_payload = read_json_object(OUTPUT_DIR / "metrics.json", "metrics", warnings)
+    file_metrics_payload = read_json_object(
+        OUTPUT_DIR / "metrics.json", "metrics", warnings
+    )
     params_payload = read_json_object(OUTPUT_DIR / "params.json", "params", warnings)
-    metrics = {**stdout_metrics, **split_numeric_metrics(file_metrics_payload, warnings, "metrics.json")}
+    metrics = {
+        **stdout_metrics,
+        **split_numeric_metrics(file_metrics_payload, warnings, "metrics.json"),
+    }
     params = safe_json_value(params_payload)
     model_insights = read_model_insights(OUTPUT_DIR, warnings)
 
@@ -432,8 +488,12 @@ def safe_extract_zip(zip_path: Path, destination: Path) -> None:
 
 def install_requirements(requirements_path: Path) -> None:
     io.install_requirements(
-        requirements_path, subprocess_module=subprocess, python_executable=sys.executable,
-        source_dir=SOURCE_DIR, detail=runtime_log.detail, log=log,
+        requirements_path,
+        subprocess_module=subprocess,
+        python_executable=sys.executable,
+        source_dir=SOURCE_DIR,
+        detail=runtime_log.detail,
+        log=log,
     )
 
 
@@ -462,7 +522,9 @@ def _read_cgroup_cpu_limit() -> float:
     cpu_max = Path("/sys/fs/cgroup/cpu.max")
     if cpu_max.exists():
         try:
-            quota_raw, period_raw = cpu_max.read_text(encoding="utf-8").strip().split(maxsplit=1)
+            quota_raw, period_raw = (
+                cpu_max.read_text(encoding="utf-8").strip().split(maxsplit=1)
+            )
             if quota_raw != "max":
                 quota = int(quota_raw)
                 period = int(period_raw)
@@ -533,7 +595,11 @@ def _read_gpu_metrics() -> dict:
         if len(parts) != 3:
             continue
         try:
-            gpu_percent, memory_used, memory_total = (float(parts[0]), float(parts[1]), float(parts[2]))
+            gpu_percent, memory_used, memory_total = (
+                float(parts[0]),
+                float(parts[1]),
+                float(parts[2]),
+            )
         except ValueError:
             continue
         gpu_rows.append((gpu_percent, memory_used, memory_total))
@@ -555,11 +621,15 @@ def _read_gpu_metrics() -> dict:
         "gpu_percent": round(gpu_percent, 2),
         "gpu_memory_used_mb": round(memory_used, 2),
         "gpu_memory_total_mb": round(memory_total, 2),
-        "gpu_memory_percent": round((memory_used / memory_total) * 100, 2) if memory_total else None,
+        "gpu_memory_percent": round((memory_used / memory_total) * 100, 2)
+        if memory_total
+        else None,
     }
 
 
-def start_metric_emitter(stop_event: threading.Event, interval_seconds: int = 5) -> threading.Thread:
+def start_metric_emitter(
+    stop_event: threading.Event, interval_seconds: int = 5
+) -> threading.Thread:
     def emit_loop() -> None:
         cpu_limit = _read_cgroup_cpu_limit()
         previous_usage = _read_cgroup_cpu_usage_seconds()
@@ -569,8 +639,20 @@ def start_metric_emitter(stop_event: threading.Event, interval_seconds: int = 5)
             now = time.monotonic()
             current_usage = _read_cgroup_cpu_usage_seconds()
             cpu_percent = None
-            if previous_usage is not None and current_usage is not None and now > previous_time:
-                cpu_percent = round(((current_usage - previous_usage) / (now - previous_time) / cpu_limit) * 100, 2)
+            if (
+                previous_usage is not None
+                and current_usage is not None
+                and now > previous_time
+            ):
+                cpu_percent = round(
+                    (
+                        (current_usage - previous_usage)
+                        / (now - previous_time)
+                        / cpu_limit
+                    )
+                    * 100,
+                    2,
+                )
                 cpu_percent = max(0.0, min(cpu_percent, 100.0))
             previous_usage = current_usage
             previous_time = now
@@ -589,7 +671,12 @@ def start_metric_emitter(stop_event: threading.Event, interval_seconds: int = 5)
             )
             stop_event.wait(interval_seconds)
 
-    thread = threading.Thread(target=copy_context().run, args=(emit_loop,), name="training-metrics", daemon=True)
+    thread = threading.Thread(
+        target=copy_context().run,
+        args=(emit_loop,),
+        name="training-metrics",
+        daemon=True,
+    )
     thread.start()
     return thread
 
@@ -709,7 +796,9 @@ def _run() -> None:
     requirements_text = os.environ.get("REQUIREMENTS_TEXT", "").strip()
     if requirements_text:
         try:
-            decoded = base64.b64decode(requirements_text.encode("utf-8")).decode("utf-8")
+            decoded = base64.b64decode(requirements_text.encode("utf-8")).decode(
+                "utf-8"
+            )
             if any(c.isalpha() for c in decoded):
                 requirements_text = decoded
         except Exception:
@@ -731,7 +820,9 @@ def _run() -> None:
         stderr_text=result.stderr or "",
     )
     if result.returncode != 0:
-        raise RuntimeError(f"Training entry point failed with exit code {result.returncode}")
+        raise RuntimeError(
+            f"Training entry point failed with exit code {result.returncode}"
+        )
     create_model_archive(model_archive_path)
     upload_presigned_url(
         model_archive_path,
@@ -742,17 +833,33 @@ def _run() -> None:
 def main() -> None:
     started = time.monotonic()
     configure("training-runner")
-    tokens = bind_context(training_job_id=os.environ.get("TRAINING_JOB_ID"),
-                          tenant_id=os.environ.get("TENANT_ID"))
+    tokens = bind_context(
+        training_job_id=os.environ.get("TRAINING_JOB_ID"),
+        tenant_id=os.environ.get("TENANT_ID"),
+    )
     try:
-        runtime_log.event(logging.INFO, "training_execution_started", "Training runner execution started", duration_ms=0)
+        runtime_log.event(
+            logging.INFO,
+            "training_execution_started",
+            "Training runner execution started",
+            duration_ms=0,
+        )
         _run()
-        runtime_log.event(logging.INFO, "training_execution_succeeded", "Training runner execution completed",
-                          duration_ms=round((time.monotonic() - started) * 1000, 3))
+        runtime_log.event(
+            logging.INFO,
+            "training_execution_succeeded",
+            "Training runner execution completed",
+            duration_ms=round((time.monotonic() - started) * 1000, 3),
+        )
     except Exception as exc:
-        runtime_log.event(logging.ERROR, "training_execution_failed", "Training runner execution failed",
-                          reason=sanitize(str(exc)), exc_info=True,
-                          duration_ms=round((time.monotonic() - started) * 1000, 3))
+        runtime_log.event(
+            logging.ERROR,
+            "training_execution_failed",
+            "Training runner execution failed",
+            reason=sanitize(str(exc)),
+            exc_info=True,
+            duration_ms=round((time.monotonic() - started) * 1000, 3),
+        )
         raise
     finally:
         reset_context(tokens)

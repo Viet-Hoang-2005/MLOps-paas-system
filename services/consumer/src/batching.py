@@ -3,10 +3,16 @@
 import pandas as pd
 from src.models import KafkaRecord
 
-
 PREDICTION_RECORD_COLUMNS = (
-    "public_id", "project_id", "model_version_id", "observed_at", "features",
-    "prediction", "confidence", "latency_ms", "request_id",
+    "public_id",
+    "project_id",
+    "model_version_id",
+    "observed_at",
+    "features",
+    "prediction",
+    "confidence",
+    "latency_ms",
+    "request_id",
 )
 
 
@@ -58,7 +64,8 @@ def build_automatic_drift_signals(
     model_version_ids = {
         str(record.payload["model_version_id"])
         for record in records
-        if is_production_sample(record.payload) and record.payload.get("model_version_id")
+        if is_production_sample(record.payload)
+        and record.payload.get("model_version_id")
     }
     batch_key = f"{first.topic}:{first.partition}:{first.offset}:{last.offset}"
     return [

@@ -15,7 +15,8 @@ from scipy.stats import multivariate_normal as mvn
 from scipy.optimize import fsolve
 from typing import Tuple
 
-class TypeIIIBiasSampler():
+
+class TypeIIIBiasSampler:
     def __init__(
         self,
         label_col: str,
@@ -55,14 +56,18 @@ class TypeIIIBiasSampler():
         data[self.feature_names] = 1
 
         # Conditions for filtering dataframe.
-        a_pos = ((data[self.protected_attribute] == self.pro_attr_values[0]) &
-                 (data[self.label_col] == 1))
-        b_pos = ((data[self.protected_attribute] == self.pro_attr_values[1]) &
-                 (data[self.label_col] == 1))
-        a_neg = ((data[self.protected_attribute] == self.pro_attr_values[0]) &
-                 (data[self.label_col] == 0))
-        b_neg = ((data[self.protected_attribute] == self.pro_attr_values[1]) &
-                 (data[self.label_col] == 0))
+        a_pos = (data[self.protected_attribute] == self.pro_attr_values[0]) & (
+            data[self.label_col] == 1
+        )
+        b_pos = (data[self.protected_attribute] == self.pro_attr_values[1]) & (
+            data[self.label_col] == 1
+        )
+        a_neg = (data[self.protected_attribute] == self.pro_attr_values[0]) & (
+            data[self.label_col] == 0
+        )
+        b_neg = (data[self.protected_attribute] == self.pro_attr_values[1]) & (
+            data[self.label_col] == 0
+        )
 
         data.loc[a_pos, self.feature_names] = self.mvn_group_1.rvs(data[a_pos].shape[0])
         data.loc[b_pos, self.feature_names] = self.mvn_group_2.rvs(data[b_pos].shape[0])
@@ -101,4 +106,3 @@ class TypeIIIBiasSampler():
             distributions.append(mvn(mean=rotated_mean, cov=cov_matrix, seed=self.seed))
 
         return mvn_negative, distributions[0], distributions[1]
-    

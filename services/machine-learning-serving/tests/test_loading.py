@@ -1,8 +1,8 @@
 import json
-import pytest
-
 from types import SimpleNamespace
 from unittest.mock import Mock
+
+import pytest
 from fastapi import HTTPException
 from src import loading
 
@@ -32,7 +32,9 @@ def test_resolve_mlflow_model_dir_root_nested_and_missing(tmp_path):
 def test_load_model_cache_and_signature(monkeypatch, tmp_path):
     (tmp_path / "MLmodel").write_text("x")
     inputs = [SimpleNamespace(name="a"), SimpleNamespace(name="b")]
-    model = SimpleNamespace(metadata=SimpleNamespace(signature=SimpleNamespace(inputs=inputs)))
+    model = SimpleNamespace(
+        metadata=SimpleNamespace(signature=SimpleNamespace(inputs=inputs))
+    )
     load = Mock(return_value=model)
     monkeypatch.setattr(loading.mlflow.pyfunc, "load_model", load)
     monkeypatch.setattr(loading, "download_model_artifact", lambda *_: tmp_path)
@@ -63,7 +65,9 @@ def test_load_model_empty_uri_and_loader_failure(monkeypatch, tmp_path):
     with pytest.raises(HTTPException) as exc:
         loading.load_model_from_uri("m", "")
     assert exc.value.status_code == 503
-    monkeypatch.setattr(loading, "download_model_artifact", Mock(side_effect=RuntimeError("missing")))
+    monkeypatch.setattr(
+        loading, "download_model_artifact", Mock(side_effect=RuntimeError("missing"))
+    )
     with pytest.raises(HTTPException, match="Unable to load"):
         loading.load_model_from_uri("m", "uri")
 

@@ -78,18 +78,28 @@ def resolve_config() -> dict:
     parser = argparse.ArgumentParser(
         description="AWS Batch-compatible NIDS XGBoost trainer (no MLflow)."
     )
-    parser.add_argument("--train-csv", default=None, help="Path to a training CSV file.")
+    parser.add_argument(
+        "--train-csv", default=None, help="Path to a training CSV file."
+    )
     parser.add_argument(
         "--train-dir",
         default=None,
         help="Directory containing training CSV(s); first *.csv is used.",
     )
-    parser.add_argument("--model-dir", default=None, help="Output dir for model artifacts.")
-    parser.add_argument("--output-dir", default=None, help="Output dir for metadata files.")
-    parser.add_argument("--model-version", default=None, help="Logical model version label.")
+    parser.add_argument(
+        "--model-dir", default=None, help="Output dir for model artifacts."
+    )
+    parser.add_argument(
+        "--output-dir", default=None, help="Output dir for metadata files."
+    )
+    parser.add_argument(
+        "--model-version", default=None, help="Logical model version label."
+    )
     args = parser.parse_args()
 
-    train_dir = args.train_dir or os.environ.get("SM_CHANNEL_TRAIN", "/opt/ml/input/data/train")
+    train_dir = args.train_dir or os.environ.get(
+        "SM_CHANNEL_TRAIN", "/opt/ml/input/data/train"
+    )
     model_dir = args.model_dir or os.environ.get("SM_MODEL_DIR", "/opt/ml/model")
     # SM_OUTPUT_DIR is set by the runner; SageMaker also exposes
     # SM_OUTPUT_DATA_DIR. Fall back to the model dir so metadata is never lost.
@@ -129,7 +139,9 @@ def find_training_csv(train_csv: str | None, train_dir: str) -> str:
         if name.lower().endswith(".csv")
     )
     if not csv_files:
-        raise FileNotFoundError(f"No CSV files found in training directory: {train_dir}")
+        raise FileNotFoundError(
+            f"No CSV files found in training directory: {train_dir}"
+        )
     # The AWS Batch runner mounts the dataset as ``train.csv``; prefer it.
     for candidate in csv_files:
         if os.path.basename(candidate).lower() == "train.csv":
@@ -230,7 +242,11 @@ def build_estimator(num_classes: int, y_train: np.ndarray):
     sample_weight = None
 
     # Debug/test override: force the fallback path without breaking XGBoost.
-    if os.environ.get("NIDS_FORCE_RF_FALLBACK", "").strip().lower() in {"1", "true", "yes"}:
+    if os.environ.get("NIDS_FORCE_RF_FALLBACK", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }:
         warning = (
             "XGBoost skipped via NIDS_FORCE_RF_FALLBACK override; "
             "RandomForestClassifier fallback was used."
@@ -283,10 +299,7 @@ def compute_feature_importances(model, feature_names: list[str]) -> dict[str, fl
     importances = getattr(model, "feature_importances_", None)
     if importances is None:
         return {}
-    return {
-        str(name): float(value)
-        for name, value in zip(feature_names, importances)
-    }
+    return {str(name): float(value) for name, value in zip(feature_names, importances)}
 
 
 def main() -> None:
@@ -333,8 +346,8 @@ def main() -> None:
         X, y, test_size=0.2, random_state=RANDOM_STATE, stratify=stratify
     )
 
-    model, algorithm, sample_weight, hyperparameters, fallback_warning = build_estimator(
-        num_classes, y_train
+    model, algorithm, sample_weight, hyperparameters, fallback_warning = (
+        build_estimator(num_classes, y_train)
     )
     log(f"Training estimator: {algorithm}")
     if fallback_warning:
@@ -350,10 +363,16 @@ def main() -> None:
     metrics = {
         "accuracy": round(float(accuracy_score(y_test, y_pred)), 4),
         "precision": round(
-            float(precision_score(y_test, y_pred, average=average_method, zero_division=0)), 4
+            float(
+                precision_score(y_test, y_pred, average=average_method, zero_division=0)
+            ),
+            4,
         ),
         "recall": round(
-            float(recall_score(y_test, y_pred, average=average_method, zero_division=0)), 4
+            float(
+                recall_score(y_test, y_pred, average=average_method, zero_division=0)
+            ),
+            4,
         ),
         "f1_score": round(
             float(f1_score(y_test, y_pred, average=average_method, zero_division=0)), 4
@@ -413,7 +432,9 @@ def main() -> None:
                 "kind": "feature_importance",
                 "source": "nids_xgb_no_mlflow",
                 "feature_count": len(feature_names),
-                "items": [{"name": name, "value": value} for name, value in top_importances],
+                "items": [
+                    {"name": name, "value": value} for name, value in top_importances
+                ],
                 "label_classes": label_classes,
                 "sample_count": int(len(df)),
                 "model_type": algorithm,
@@ -435,7 +456,9 @@ def main() -> None:
     # Single machine-parseable metric line for the AWS Batch runner.
     print("METRIC_JSON:" + json.dumps(metrics, separators=(",", ":")), flush=True)
 
-    log(f"Training completed at {datetime.now(timezone.utc).isoformat()} for {model_version}.")
+    log(
+        f"Training completed at {datetime.now(timezone.utc).isoformat()} for {model_version}."
+    )
 
 
 if __name__ == "__main__":

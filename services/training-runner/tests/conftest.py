@@ -1,14 +1,15 @@
 import sys
-import pytest
+from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
 from src import application as runner
-from pathlib import Path
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = SERVICE_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
+
 
 @pytest.fixture
 def runner_workspace(tmp_path, monkeypatch):

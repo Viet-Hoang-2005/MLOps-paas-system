@@ -18,8 +18,9 @@ def is_number(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def artifact_kind(relative_path, model_extensions, checkpoint_extensions,
-                  metadata_extensions) -> str:
+def artifact_kind(
+    relative_path, model_extensions, checkpoint_extensions, metadata_extensions
+) -> str:
     name = relative_path.name
     suffix = relative_path.suffix.lower()
     if name == "MLmodel" or suffix in model_extensions:

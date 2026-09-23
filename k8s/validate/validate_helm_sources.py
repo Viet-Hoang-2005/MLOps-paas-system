@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
-from .common import ValidationContext, application_name, application_sources, run_standalone
+from .common import (
+    ValidationContext,
+    application_name,
+    application_sources,
+    run_standalone,
+)
 
 
 def validate(context: ValidationContext) -> list[str]:
     errors: list[str] = []
-    helm_apps = [application for application in context.applications if any(source.get("chart") for source in application_sources(application))]
+    helm_apps = [
+        application
+        for application in context.applications
+        if any(source.get("chart") for source in application_sources(application))
+    ]
     if not helm_apps:
         return ["GitOps must define direct Helm Applications for upstream add-ons"]
     for application in helm_apps:

@@ -96,7 +96,9 @@ def parse_month_list(months_str: str) -> list[int]:
     return [int(item.strip()) for item in months_str.split(",") if item.strip()]
 
 
-def build_preprocessor(numeric_cols: list[str], categorical_cols: list[str]) -> ColumnTransformer:
+def build_preprocessor(
+    numeric_cols: list[str], categorical_cols: list[str]
+) -> ColumnTransformer:
     """Build sklearn ColumnTransformer for tabular preprocessing."""
     numeric_pipe = Pipeline(
         steps=[
@@ -108,7 +110,10 @@ def build_preprocessor(numeric_cols: list[str], categorical_cols: list[str]) -> 
     categorical_pipe = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="constant", fill_value="missing")),
-            ("encoder", OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)),
+            (
+                "encoder",
+                OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
+            ),
         ]
     )
 
@@ -122,9 +127,11 @@ def build_preprocessor(numeric_cols: list[str], categorical_cols: list[str]) -> 
     return preprocessor
 
 
-def build_mlp_model(input_dim: int, hidden_dim_1: int, hidden_dim_2: int, dropout: float) -> nn.Sequential:
+def build_mlp_model(
+    input_dim: int, hidden_dim_1: int, hidden_dim_2: int, dropout: float
+) -> nn.Sequential:
     """Construct pure nn.Sequential MLP.
-    
+
     Using standard built-in PyTorch modules ensures torch.save/torch.load
     unpickles cleanly in Model Packager without requiring custom class code.
     """
@@ -173,7 +180,9 @@ def evaluate_model(
     return avg_loss, y_probs, y_true
 
 
-def find_optimal_threshold(y_true: np.ndarray, y_probs: np.ndarray) -> tuple[float, float]:
+def find_optimal_threshold(
+    y_true: np.ndarray, y_probs: np.ndarray
+) -> tuple[float, float]:
     """Search for the decision threshold that maximizes F1 score on validation set."""
     best_thresh = 0.5
     best_f1 = -1.0
@@ -186,7 +195,9 @@ def find_optimal_threshold(y_true: np.ndarray, y_probs: np.ndarray) -> tuple[flo
     return round(best_thresh, 4), round(best_f1, 6)
 
 
-def compute_metrics(y_true: np.ndarray, y_probs: np.ndarray, threshold: float) -> dict[str, float]:
+def compute_metrics(
+    y_true: np.ndarray, y_probs: np.ndarray, threshold: float
+) -> dict[str, float]:
     """Compute comprehensive classification and calibration metrics."""
     preds = (y_probs >= threshold).astype(int)
     pr_auc = float(average_precision_score(y_true, y_probs))
@@ -212,7 +223,9 @@ def compute_metrics(y_true: np.ndarray, y_probs: np.ndarray, threshold: float) -
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train baseline BAF PyTorch MLP on Kaggle.")
+    parser = argparse.ArgumentParser(
+        description="Train baseline BAF PyTorch MLP on Kaggle."
+    )
     parser.add_argument(
         "--data-path",
         type=str,
@@ -225,19 +238,40 @@ def main():
         default="/kaggle/working/baf-mlp-artifact",
         help="Output directory for artifacts.",
     )
-    parser.add_argument("--device", type=str, default="auto", help="Execution device ('auto', 'cuda', 'cpu').")
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="auto",
+        help="Execution device ('auto', 'cuda', 'cpu').",
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     parser.add_argument("--batch-size", type=int, default=2048, help="Batch size.")
     parser.add_argument("--epochs", type=int, default=20, help="Maximum epochs.")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate.")
-    parser.add_argument("--weight-decay", type=float, default=1e-4, help="AdamW weight decay.")
-    parser.add_argument("--patience", type=int, default=5, help="Early stopping patience.")
-    parser.add_argument("--hidden-dim-1", type=int, default=128, help="First hidden layer dimension.")
-    parser.add_argument("--hidden-dim-2", type=int, default=64, help="Second hidden layer dimension.")
-    parser.add_argument("--dropout", type=float, default=0.2, help="Dropout probability.")
-    parser.add_argument("--train-months", type=str, default="0,1,2,3", help="Training months.")
-    parser.add_argument("--val-months", type=str, default="4", help="Validation months.")
-    parser.add_argument("--ref-months", type=str, default="5", help="Reference manifest months.")
+    parser.add_argument(
+        "--weight-decay", type=float, default=1e-4, help="AdamW weight decay."
+    )
+    parser.add_argument(
+        "--patience", type=int, default=5, help="Early stopping patience."
+    )
+    parser.add_argument(
+        "--hidden-dim-1", type=int, default=128, help="First hidden layer dimension."
+    )
+    parser.add_argument(
+        "--hidden-dim-2", type=int, default=64, help="Second hidden layer dimension."
+    )
+    parser.add_argument(
+        "--dropout", type=float, default=0.2, help="Dropout probability."
+    )
+    parser.add_argument(
+        "--train-months", type=str, default="0,1,2,3", help="Training months."
+    )
+    parser.add_argument(
+        "--val-months", type=str, default="4", help="Validation months."
+    )
+    parser.add_argument(
+        "--ref-months", type=str, default="5", help="Reference manifest months."
+    )
     args = parser.parse_args()
 
     set_seed(args.seed)
@@ -251,14 +285,18 @@ def main():
     val_months = parse_month_list(args.val_months)
     ref_months = parse_month_list(args.ref_months)
 
-    print(f"[Config] Train months: {train_months} | Val months: {val_months} | Ref months: {ref_months}")
+    print(
+        f"[Config] Train months: {train_months} | Val months: {val_months} | Ref months: {ref_months}"
+    )
     print(f"[Config] Reserved for Continuous Training replay: {RESERVED_CT_MONTHS}")
 
     # Check that reserved months are strictly excluded
     used_months = set(train_months + val_months + ref_months)
     for reserved in RESERVED_CT_MONTHS:
         if reserved in used_months:
-            raise ValueError(f"Month {reserved} is strictly reserved for CT replay and cannot be used in baseline training!")
+            raise ValueError(
+                f"Month {reserved} is strictly reserved for CT replay and cannot be used in baseline training!"
+            )
 
     if not data_path.exists():
         raise FileNotFoundError(f"Dataset not found at: {data_path}")
@@ -272,11 +310,19 @@ def main():
     if SPLIT_COLUMN not in df.columns:
         raise ValueError(f"Temporal column '{SPLIT_COLUMN}' not found in {data_path}.")
 
-    feature_cols = [col for col in df.columns if col not in (TARGET_COLUMN, SPLIT_COLUMN)]
-    cat_cols = [col for col in feature_cols if col in CATEGORICAL_COLUMNS or df[col].dtype == "object"]
+    feature_cols = [
+        col for col in df.columns if col not in (TARGET_COLUMN, SPLIT_COLUMN)
+    ]
+    cat_cols = [
+        col
+        for col in feature_cols
+        if col in CATEGORICAL_COLUMNS or df[col].dtype == "object"
+    ]
     num_cols = [col for col in feature_cols if col not in cat_cols]
 
-    print(f"[Schema] Total features: {len(feature_cols)} ({len(num_cols)} numeric, {len(cat_cols)} categorical)")
+    print(
+        f"[Schema] Total features: {len(feature_cols)} ({len(num_cols)} numeric, {len(cat_cols)} categorical)"
+    )
 
     train_mask = df[SPLIT_COLUMN].isin(train_months)
     val_mask = df[SPLIT_COLUMN].isin(val_months)
@@ -286,14 +332,22 @@ def main():
     df_val = df[val_mask]
     df_ref = df[ref_mask]
 
-    print(f"[Split] Train rows: {len(df_train)} (fraud: {df_train[TARGET_COLUMN].sum()}, rate: {df_train[TARGET_COLUMN].mean():.4f})")
-    print(f"[Split] Val rows:   {len(df_val)} (fraud: {df_val[TARGET_COLUMN].sum()}, rate: {df_val[TARGET_COLUMN].mean():.4f})")
-    print(f"[Split] Ref rows:   {len(df_ref)} (fraud: {df_ref[TARGET_COLUMN].sum()}, rate: {df_ref[TARGET_COLUMN].mean():.4f})")
+    print(
+        f"[Split] Train rows: {len(df_train)} (fraud: {df_train[TARGET_COLUMN].sum()}, rate: {df_train[TARGET_COLUMN].mean():.4f})"
+    )
+    print(
+        f"[Split] Val rows:   {len(df_val)} (fraud: {df_val[TARGET_COLUMN].sum()}, rate: {df_val[TARGET_COLUMN].mean():.4f})"
+    )
+    print(
+        f"[Split] Ref rows:   {len(df_ref)} (fraud: {df_ref[TARGET_COLUMN].sum()}, rate: {df_ref[TARGET_COLUMN].mean():.4f})"
+    )
 
     # Fit Preprocessing ONLY on training data
     print("[Preprocessing] Fitting ColumnTransformer strictly on training partition...")
     preprocessor = build_preprocessor(num_cols, cat_cols)
-    X_train_trans = preprocessor.fit_transform(df_train[feature_cols]).astype(np.float32)
+    X_train_trans = preprocessor.fit_transform(df_train[feature_cols]).astype(
+        np.float32
+    )
     y_train = df_train[TARGET_COLUMN].values.astype(np.float32)
 
     X_val_trans = preprocessor.transform(df_val[feature_cols]).astype(np.float32)
@@ -306,9 +360,15 @@ def main():
     print(f"[Features] Transformed feature matrix width: {input_dim}")
 
     # Construct Datasets and Loaders
-    train_dataset = TensorDataset(torch.from_numpy(X_train_trans), torch.from_numpy(y_train).unsqueeze(1))
-    val_dataset = TensorDataset(torch.from_numpy(X_val_trans), torch.from_numpy(y_val).unsqueeze(1))
-    ref_dataset = TensorDataset(torch.from_numpy(X_ref_trans), torch.from_numpy(y_ref).unsqueeze(1))
+    train_dataset = TensorDataset(
+        torch.from_numpy(X_train_trans), torch.from_numpy(y_train).unsqueeze(1)
+    )
+    val_dataset = TensorDataset(
+        torch.from_numpy(X_val_trans), torch.from_numpy(y_val).unsqueeze(1)
+    )
+    ref_dataset = TensorDataset(
+        torch.from_numpy(X_ref_trans), torch.from_numpy(y_ref).unsqueeze(1)
+    )
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size * 2, shuffle=False)
@@ -319,14 +379,22 @@ def main():
     neg_count = len(y_train) - pos_count
     pos_weight_val = neg_count / max(pos_count, 1)
     pos_weight = torch.tensor([pos_weight_val], dtype=torch.float32).to(device)
-    print(f"[Loss] Extreme imbalance weighting: pos_weight = {pos_weight_val:.2f} (positive cases: {pos_count})")
+    print(
+        f"[Loss] Extreme imbalance weighting: pos_weight = {pos_weight_val:.2f} (positive cases: {pos_count})"
+    )
 
     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-    model = build_mlp_model(input_dim, args.hidden_dim_1, args.hidden_dim_2, args.dropout).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    model = build_mlp_model(
+        input_dim, args.hidden_dim_1, args.hidden_dim_2, args.dropout
+    ).to(device)
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
 
     # Training Loop
-    print(f"[Training] Starting training for up to {args.epochs} epochs with patience {args.patience}...")
+    print(
+        f"[Training] Starting training for up to {args.epochs} epochs with patience {args.patience}..."
+    )
     best_val_pr_auc = -1.0
     best_weights = copy.deepcopy(model.state_dict())
     patience_counter = 0
@@ -352,7 +420,9 @@ def main():
             train_samples += batch_size
 
         epoch_train_loss = train_loss / max(train_samples, 1)
-        val_loss, val_probs, val_true = evaluate_model(model, val_loader, criterion, device)
+        val_loss, val_probs, val_true = evaluate_model(
+            model, val_loader, criterion, device
+        )
         val_pr_auc = average_precision_score(val_true, val_probs)
 
         print(
@@ -375,11 +445,15 @@ def main():
             best_val_pr_auc = float(val_pr_auc)
             best_weights = copy.deepcopy(model.state_dict())
             patience_counter = 0
-            print(f"  --> [Saved] Best model improved to PR-AUC = {best_val_pr_auc:.5f}")
+            print(
+                f"  --> [Saved] Best model improved to PR-AUC = {best_val_pr_auc:.5f}"
+            )
         else:
             patience_counter += 1
             if patience_counter >= args.patience:
-                print(f"[Early Stopping] Patience of {args.patience} reached at epoch {epoch}.")
+                print(
+                    f"[Early Stopping] Patience of {args.patience} reached at epoch {epoch}."
+                )
                 break
 
     # Restore best weights and move model and criterion to CPU for deployment and evaluation
@@ -389,15 +463,21 @@ def main():
     criterion.to(torch.device("cpu"))
 
     # Threshold optimization on Validation (Month 4)
-    _, val_probs, val_true = evaluate_model(model, val_loader, criterion, torch.device("cpu"))
+    _, val_probs, val_true = evaluate_model(
+        model, val_loader, criterion, torch.device("cpu")
+    )
     best_threshold, best_f1 = find_optimal_threshold(val_true, val_probs)
-    print(f"[Threshold] Optimized threshold on Month 4: {best_threshold:.4f} (Validation F1: {best_f1:.5f})")
+    print(
+        f"[Threshold] Optimized threshold on Month 4: {best_threshold:.4f} (Validation F1: {best_f1:.5f})"
+    )
 
     val_metrics = compute_metrics(val_true, val_probs, best_threshold)
     print(f"[Metrics] Validation (Month 4): {val_metrics}")
 
     # Evaluation on Reference (Month 5)
-    _, ref_probs, ref_true = evaluate_model(model, ref_loader, criterion, torch.device("cpu"))
+    _, ref_probs, ref_true = evaluate_model(
+        model, ref_loader, criterion, torch.device("cpu")
+    )
     ref_metrics = compute_metrics(ref_true, ref_probs, best_threshold)
     print(f"[Metrics] Reference (Month 5): {ref_metrics}")
 
@@ -516,7 +596,9 @@ def main():
     # 8. Create model.tar.gz archive
     archive_path = output_dir / "model.tar.gz"
     all_artifact_files = files_to_index + ["artifact_manifest.json"]
-    print(f"[Archive] Creating {archive_path} containing {len(all_artifact_files)} files...")
+    print(
+        f"[Archive] Creating {archive_path} containing {len(all_artifact_files)} files..."
+    )
     with tarfile.open(archive_path, "w:gz") as tar:
         for file_name in all_artifact_files:
             file_to_add = output_dir / file_name
@@ -524,7 +606,9 @@ def main():
 
     archive_sha256 = compute_sha256(archive_path)
     archive_size_mb = archive_path.stat().st_size / (1024 * 1024)
-    print(f"[Done] model.tar.gz successfully generated: {archive_size_mb:.2f} MB (SHA256: {archive_sha256})")
+    print(
+        f"[Done] model.tar.gz successfully generated: {archive_size_mb:.2f} MB (SHA256: {archive_sha256})"
+    )
 
     # Print METRIC_JSON protocol line for MLOps Training Runner
     protocol_metrics = {

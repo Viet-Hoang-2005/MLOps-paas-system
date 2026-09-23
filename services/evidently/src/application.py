@@ -1,29 +1,34 @@
 # main.py: Phát hiện Data Drift (Sử dụng Evidently 0.4.15 Stable)
-import os
-import sys
 import json
 import logging
-from src.logging_utils import RuntimeLog, bind_context, configure, get_logger, log_event, reset_context, sanitize
-import mlflow
-import zipfile
-import shutil
+import os
 import tempfile
 import time
-from pathlib import Path
-from urllib.parse import urlparse
-
-import requests
-import redis
-import pandas as pd
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 from datetime import datetime, timezone
-from evidently.report import Report
+from pathlib import Path
+
+import pandas as pd
+import redis
+import requests
+from dotenv import load_dotenv
 from evidently.metric_preset import DataDriftPreset
 from evidently.pipeline.column_mapping import ColumnMapping
+from evidently.report import Report
+from requests.adapters import HTTPAdapter
+from sqlalchemy import create_engine, text
 from src import analysis, config, data, reporting
+from src.logging_utils import (
+    RuntimeLog,
+    bind_context,
+    configure,
+    get_logger,
+    log_event,
+    reset_context,
+    sanitize,
+)
+from urllib3.util.retry import Retry
+
+import mlflow
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(dotenv_path=os.path.join(ROOT_DIR, ".env"))
@@ -42,7 +47,9 @@ MODEL_NAME = os.getenv("MODEL_NAME", PROJECT_ID)
 REFERENCE_DATA_URL = os.getenv("REFERENCE_DATA_URL")
 MODEL_URI = os.getenv("MODEL_URI", f"models:/{MODEL_NAME}/Production")
 CONTROL_PLANE_WEBHOOK_URL = os.getenv("CONTROL_PLANE_WEBHOOK_URL", "")
-CONTROL_PLANE_WEBHOOK_SECRET = os.getenv("CONTROL_PLANE_WEBHOOK_SECRET", "super-secret-key")
+CONTROL_PLANE_WEBHOOK_SECRET = os.getenv(
+    "CONTROL_PLANE_WEBHOOK_SECRET", "super-secret-key"
+)
 HTML_S3_URI = os.getenv("HTML_S3_URI", "")
 REPORT_JSON_S3_URI = os.getenv("REPORT_JSON_S3_URI", "")
 SUMMARY_JSON_S3_URI = os.getenv("SUMMARY_JSON_S3_URI", "")
@@ -96,38 +103,61 @@ def setup_logger(run_id: str):
         try:
             writer = RedisLogHandler(REDIS_URL, run_id).write
         except Exception as exc:
-            log_event(logger, logging.WARNING, "runtime_log_unavailable",
-                      "Could not connect to Redis for drift log streaming", reason=sanitize(str(exc)))
+            log_event(
+                logger,
+                logging.WARNING,
+                "runtime_log_unavailable",
+                "Could not connect to Redis for drift log streaming",
+                reason=sanitize(str(exc)),
+            )
     runtime_log = RuntimeLog(logger, writer=writer)
     return logger
+
 
 def validate_runtime_config():
     config.validate(DRIFT_THRESHOLD, TENANT_ID, PROJECT_ID, MODEL_VERSION_ID)
 
+
 # 1. Tải Reference Data
 def load_reference_data():
     return data.load_reference_data(
-        REFERENCE_DATA_URL, MODEL_VERSION_ID, TEMP_ROOT, requests, pd, runtime_log.detail,
+        REFERENCE_DATA_URL,
+        MODEL_VERSION_ID,
+        TEMP_ROOT,
+        requests,
+        pd,
+        runtime_log.detail,
     )
+
 
 # 2. Truy vấn dữ liệu Production Data
 def load_production_data():
     return data.load_production_data(
         connection_url=f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST_RO}:{DB_PORT}/{DB_NAME}",
-        model_version_id=MODEL_VERSION_ID, max_samples=MAX_SAMPLES, min_samples=MIN_SAMPLES,
-        create_engine=create_engine, sql_text=text, pandas_module=pd, detail=runtime_log.detail, db_schema=DB_SCHEMA,
+        model_version_id=MODEL_VERSION_ID,
+        max_samples=MAX_SAMPLES,
+        min_samples=MIN_SAMPLES,
+        create_engine=create_engine,
+        sql_text=text,
+        pandas_module=pd,
+        detail=runtime_log.detail,
+        db_schema=DB_SCHEMA,
     )
+
 
 # Hàm hỗ trợ tải model trên S3
 def resolve_model_dir(model_uri):
     return data.resolve_model_dir(
-        model_uri, temp_root=TEMP_ROOT, model_version_id=MODEL_VERSION_ID,
+        model_uri,
+        temp_root=TEMP_ROOT,
+        model_version_id=MODEL_VERSION_ID,
         requests_module=requests,
     )
 
 
 def safe_extract_zip(zip_path, destination):
     return data.safe_extract_zip(zip_path, destination)
+
 
 # 3. Trích xuất column mapping từ MLFlow
 def get_column_mapping(reference_df, production_df):
@@ -153,30 +183,60 @@ def get_column_mapping(reference_df, production_df):
                     column_mapping.numerical_features = num_cols
                     column_mapping.categorical_features = cat_cols
                     has_signature = True
-                    runtime_log.detail(f"-> MLflow Signature: {len(num_cols)} numerical, {len(cat_cols)} categorical.")
+                    runtime_log.detail(
+                        f"-> MLflow Signature: {len(num_cols)} numerical, {len(cat_cols)} categorical."
+                    )
         except Exception as e:
-            runtime_log.event(logging.WARNING, "model_signature_unavailable", "MLflow signature extraction failed", reason=sanitize(str(e)))
+            runtime_log.event(
+                logging.WARNING,
+                "model_signature_unavailable",
+                "MLflow signature extraction failed",
+                reason=sanitize(str(e)),
+            )
 
     # Fallback: Auto-infer feature types from actual DataFrame structure
     if not has_signature:
-        runtime_log.detail("-> Fallback: Auto-infer feature types from actual DataFrame structure...")
+        runtime_log.detail(
+            "-> Fallback: Auto-infer feature types from actual DataFrame structure..."
+        )
         ignore_cols = {
-            "prediction", "target", "Target", "label", "Label", "class", "Class",
-            "timestamp", "model_version_id", "project_id", "tenant_id",
+            "prediction",
+            "target",
+            "Target",
+            "label",
+            "Label",
+            "class",
+            "Class",
+            "timestamp",
+            "model_version_id",
+            "project_id",
+            "tenant_id",
         }
         feature_cols = [c for c in production_df.columns if c not in ignore_cols]
-        num_cols = production_df[feature_cols].select_dtypes(include=["int64", "float64", "int32", "float32"]).columns.tolist()
-        cat_cols = production_df[feature_cols].select_dtypes(include=["object", "category", "bool"]).columns.tolist()
+        num_cols = (
+            production_df[feature_cols]
+            .select_dtypes(include=["int64", "float64", "int32", "float32"])
+            .columns.tolist()
+        )
+        cat_cols = (
+            production_df[feature_cols]
+            .select_dtypes(include=["object", "category", "bool"])
+            .columns.tolist()
+        )
         column_mapping.numerical_features = num_cols
         column_mapping.categorical_features = cat_cols
-        runtime_log.detail(f"Column: {len(num_cols)} numerical, {len(cat_cols)} categorical.")
+        runtime_log.detail(
+            f"Column: {len(num_cols)} numerical, {len(cat_cols)} categorical."
+        )
 
     if "prediction" in production_df.columns:
         if "prediction" not in reference_df.columns:
             for cand in ["target", "Target", "label", "Label", "class", "Class"]:
                 if cand in reference_df.columns:
                     reference_df["prediction"] = reference_df[cand].values
-                    runtime_log.detail(f"Mapped column '{cand}' of Reference to 'prediction'.")
+                    runtime_log.detail(
+                        f"Mapped column '{cand}' of Reference to 'prediction'."
+                    )
                     break
         if "prediction" in reference_df.columns:
             column_mapping.prediction = "prediction"
@@ -188,24 +248,47 @@ def get_column_mapping(reference_df, production_df):
 
     return column_mapping
 
+
 # 4. Lọc column mapping
 def filter_column_mapping(column_mapping, common_cols):
     return analysis.filter_column_mapping(column_mapping, common_cols, ColumnMapping)
 
+
 # 5. Phân tích Data drift & Data Quality (Evidently 0.4.15)
 def run_drift_analysis(reference_df, production_df, column_mapping):
-    runtime_log.detail("[4/4] Running Evidently AI Data Drift & Data Quality analysis...")
+    runtime_log.detail(
+        "[4/4] Running Evidently AI Data Drift & Data Quality analysis..."
+    )
 
     ignore_cols = {
-        "prediction", "target", "Target", "label", "Label", "class", "Class",
-        "timestamp", "created_at", "prediction_id", "id", "model_version_id",
-        "project_id", "tenant_id", "endpoint_url", "request_id", "status_code",
-        "latency_ms", "confidence", "raw_payload",
+        "prediction",
+        "target",
+        "Target",
+        "label",
+        "Label",
+        "class",
+        "Class",
+        "timestamp",
+        "created_at",
+        "prediction_id",
+        "id",
+        "model_version_id",
+        "project_id",
+        "tenant_id",
+        "endpoint_url",
+        "request_id",
+        "status_code",
+        "latency_ms",
+        "confidence",
+        "raw_payload",
     }
 
     # 1. Xác định tập đặc trưng kỳ vọng từ Reference Data / Column Mapping
     if column_mapping.numerical_features or column_mapping.categorical_features:
-        expected_features = set((column_mapping.numerical_features or []) + (column_mapping.categorical_features or []))
+        expected_features = set(
+            (column_mapping.numerical_features or [])
+            + (column_mapping.categorical_features or [])
+        )
     else:
         expected_features = set(c for c in reference_df.columns if c not in ignore_cols)
 
@@ -216,14 +299,23 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
     extra_features = sorted(list(production_features - set(reference_df.columns)))
 
     if missing_features:
-        runtime_log.event(logging.WARNING, "drift_missing_features", "Production data is missing expected features", count=len(missing_features))
+        runtime_log.event(
+            logging.WARNING,
+            "drift_missing_features",
+            "Production data is missing expected features",
+            count=len(missing_features),
+        )
     if extra_features:
-        runtime_log.detail(f"Production data contains {len(extra_features)} extra features")
+        runtime_log.detail(
+            f"Production data contains {len(extra_features)} extra features"
+        )
 
     # 3. Lấy các cột chung để chạy kiểm định thống kê Evidently
     common_cols = [col for col in reference_df.columns if col in production_df.columns]
     if len(common_cols) == 0:
-        raise ValueError("No common columns found between reference and production datasets.")
+        raise ValueError(
+            "No common columns found between reference and production datasets."
+        )
 
     # 4. Kiểm tra tỷ lệ giá trị null bất thường trên các cột chung
     high_null_features = []
@@ -231,10 +323,17 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
         if col not in ignore_cols and col in production_df.columns:
             null_rate = float(production_df[col].isnull().mean())
             if null_rate >= 0.20:
-                high_null_features.append({"feature": col, "null_rate": round(null_rate, 4)})
+                high_null_features.append(
+                    {"feature": col, "null_rate": round(null_rate, 4)}
+                )
 
     if high_null_features:
-        runtime_log.event(logging.WARNING, "drift_high_null_features", "High null rates detected", count=len(high_null_features))
+        runtime_log.event(
+            logging.WARNING,
+            "drift_high_null_features",
+            "High null rates detected",
+            count=len(high_null_features),
+        )
 
     ref_clean = reference_df[common_cols]
     prod_clean = production_df[common_cols]
@@ -243,38 +342,56 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
     try:
         report = Report(metrics=[DataDriftPreset(drift_share=DRIFT_THRESHOLD)])
     except TypeError:
-        runtime_log.event(logging.WARNING, "drift_threshold_compatibility", "Evidently DataDriftPreset does not accept drift_share. Applying threshold in summary only.")
+        runtime_log.event(
+            logging.WARNING,
+            "drift_threshold_compatibility",
+            "Evidently DataDriftPreset does not accept drift_share. Applying threshold in summary only.",
+        )
         report = Report(metrics=[DataDriftPreset()])
-    report.run(reference_data=ref_clean, current_data=prod_clean, column_mapping=filtered_mapping)
+    report.run(
+        reference_data=ref_clean,
+        current_data=prod_clean,
+        column_mapping=filtered_mapping,
+    )
 
     result_dict = report.as_dict()
     dataset_drift_metrics = {}
     data_drift_table = {}
 
-    for item in result_dict.get('metrics', []):
-        result_data = item.get('result', {})
-        if 'dataset_drift' in result_data and 'share_of_drifted_columns' in result_data:
+    for item in result_dict.get("metrics", []):
+        result_data = item.get("result", {})
+        if "dataset_drift" in result_data and "share_of_drifted_columns" in result_data:
             dataset_drift_metrics = result_data
-        if 'drift_by_columns' in result_data:
+        if "drift_by_columns" in result_data:
             data_drift_table = result_data
 
-    drift_by_columns = data_drift_table.get('drift_by_columns', {})
+    drift_by_columns = data_drift_table.get("drift_by_columns", {})
     stat_drifted_feature_names = []
     for col_name, col_data in drift_by_columns.items():
-        if col_data.get('drift_detected', False):
+        if col_data.get("drift_detected", False):
             stat_drifted_feature_names.append(col_name)
 
     # 5. Tổng hợp độ trôi dạt tổng thể (Statistical Drift + Missing Features)
-    all_drifted_features = sorted(list(set(stat_drifted_feature_names) | set(missing_features)))
-    total_expected_count = len(expected_features) if expected_features else len(common_cols)
+    all_drifted_features = sorted(
+        list(set(stat_drifted_feature_names) | set(missing_features))
+    )
+    total_expected_count = (
+        len(expected_features) if expected_features else len(common_cols)
+    )
     total_drifted_count = len(all_drifted_features)
-    effective_drift_share = (total_drifted_count / total_expected_count) if total_expected_count > 0 else 0.0
+    effective_drift_share = (
+        (total_drifted_count / total_expected_count)
+        if total_expected_count > 0
+        else 0.0
+    )
 
     has_schema_mismatch = len(missing_features) > 0
     dataset_drift = (effective_drift_share >= DRIFT_THRESHOLD) or has_schema_mismatch
 
     data_quality = {
-        "status": "alert" if has_schema_mismatch else ("warning" if high_null_features else "healthy"),
+        "status": "alert"
+        if has_schema_mismatch
+        else ("warning" if high_null_features else "healthy"),
         "has_schema_mismatch": has_schema_mismatch,
         "missing_features": missing_features,
         "missing_features_count": len(missing_features),
@@ -305,25 +422,36 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
     summary["report_artifacts"] = save_drift_report(report, result_dict, summary)
 
     runtime_log.event(
-        logging.INFO, "drift_analysis_summary",
-        (f"Data drift analysis completed: drift={dataset_drift}, "
-         f"share={effective_drift_share:.2%}, features={total_drifted_count}/{total_expected_count}, "
-         f"quality={data_quality['status']}"),
-        drift_detected=dataset_drift, drift_share=round(effective_drift_share, 4),
-        features_count=total_expected_count, count=total_drifted_count,
-        reference_samples=len(reference_df), production_samples=len(production_df),
+        logging.INFO,
+        "drift_analysis_summary",
+        (
+            f"Data drift analysis completed: drift={dataset_drift}, "
+            f"share={effective_drift_share:.2%}, features={total_drifted_count}/{total_expected_count}, "
+            f"quality={data_quality['status']}"
+        ),
+        drift_detected=dataset_drift,
+        drift_share=round(effective_drift_share, 4),
+        features_count=total_expected_count,
+        count=total_drifted_count,
+        reference_samples=len(reference_df),
+        production_samples=len(production_df),
         status=data_quality["status"],
-        reason=(f"threshold={DRIFT_THRESHOLD}; common={len(common_cols)}; "
-                f"missing={len(missing_features)}; extra={len(extra_features)}; "
-                f"high_null={len(high_null_features)}"),
+        reason=(
+            f"threshold={DRIFT_THRESHOLD}; common={len(common_cols)}; "
+            f"missing={len(missing_features)}; extra={len(extra_features)}; "
+            f"high_null={len(high_null_features)}"
+        ),
     )
 
     return summary
 
+
 # 6. Lưu báo cáo drift
 def save_drift_report(report, result_dict, summary):
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    report_dir = str(TEMP_ROOT / "drift_reports" / str(TENANT_ID) / str(MODEL_NAME) / run_id)
+    report_dir = str(
+        TEMP_ROOT / "drift_reports" / str(TENANT_ID) / str(MODEL_NAME) / run_id
+    )
     os.makedirs(report_dir, exist_ok=True)
 
     html_path = os.path.join(report_dir, "report.html")
@@ -343,7 +471,11 @@ def save_drift_report(report, result_dict, summary):
     }
 
     if not HTML_UPLOAD_URL:
-        runtime_log.event(logging.WARNING, "drift_report_upload_skipped", "Upload URLs not provided. Skipping upload.")
+        runtime_log.event(
+            logging.WARNING,
+            "drift_report_upload_skipped",
+            "Upload URLs not provided. Skipping upload.",
+        )
         return artifacts
 
     uploads = [
@@ -357,33 +489,53 @@ def save_drift_report(report, result_dict, summary):
         if upload_url:
             try:
                 with open(local_path, "rb") as f:
-                    resp = requests.put(upload_url, data=f, headers={"Content-Type": content_type})
+                    resp = requests.put(
+                        upload_url, data=f, headers={"Content-Type": content_type}
+                    )
                     resp.raise_for_status()
                 uploaded_count += 1
             except Exception as e:
-                runtime_log.event(logging.ERROR, "drift_report_upload_failed", "Failed to upload drift report", reason=sanitize(str(e)))
+                runtime_log.event(
+                    logging.ERROR,
+                    "drift_report_upload_failed",
+                    "Failed to upload drift report",
+                    reason=sanitize(str(e)),
+                )
 
-    artifacts.update({
-        "s3_report_prefix": "",
-        "html_s3_uri": HTML_S3_URI,
-        "report_json_s3_uri": REPORT_JSON_S3_URI,
-        "summary_json_s3_uri": SUMMARY_JSON_S3_URI,
-        "html_url": HTML_PUBLIC_URL,
-    })
-    runtime_log.detail(f"Drift report upload attempts finished: {uploaded_count}/{len(uploads)} files uploaded.")
+    artifacts.update(
+        {
+            "s3_report_prefix": "",
+            "html_s3_uri": HTML_S3_URI,
+            "report_json_s3_uri": REPORT_JSON_S3_URI,
+            "summary_json_s3_uri": SUMMARY_JSON_S3_URI,
+            "html_url": HTML_PUBLIC_URL,
+        }
+    )
+    runtime_log.detail(
+        f"Drift report upload attempts finished: {uploaded_count}/{len(uploads)} files uploaded."
+    )
 
     summary_with_artifacts = {**summary, "report_artifacts": artifacts}
     with open(summary_json_path, "w", encoding="utf-8") as fp:
         json.dump(summary_with_artifacts, fp, ensure_ascii=False, indent=2, default=str)
-    
+
     # Refresh summary.json on S3
     if SUMMARY_JSON_UPLOAD_URL:
         try:
             with open(summary_json_path, "rb") as f:
-                resp = requests.put(SUMMARY_JSON_UPLOAD_URL, data=f, headers={"Content-Type": "application/json"})
+                resp = requests.put(
+                    SUMMARY_JSON_UPLOAD_URL,
+                    data=f,
+                    headers={"Content-Type": "application/json"},
+                )
                 resp.raise_for_status()
         except Exception as e:
-            runtime_log.event(logging.ERROR, "drift_summary_upload_failed", "Failed to refresh summary report", reason=sanitize(str(e)))
+            runtime_log.event(
+                logging.ERROR,
+                "drift_summary_upload_failed",
+                "Failed to refresh summary report",
+                reason=sanitize(str(e)),
+            )
 
     return artifacts
 
@@ -396,11 +548,18 @@ def trigger_django_webhook(drift_summary):
         runtime_log.event(logging.ERROR, "drift_callback_failed", message, **fields)
 
     reporting.trigger_webhook(
-        requests_module=requests, retry_factory=Retry, adapter_factory=HTTPAdapter,
-        webhook_url=CONTROL_PLANE_WEBHOOK_URL, webhook_secret=CONTROL_PLANE_WEBHOOK_SECRET,
-        tenant_id=TENANT_ID, project_id=PROJECT_ID, model_version_id=MODEL_VERSION_ID,
-        drift_summary=drift_summary, threshold=DRIFT_THRESHOLD,
-        detail=runtime_log.detail, on_error=on_error,
+        requests_module=requests,
+        retry_factory=Retry,
+        adapter_factory=HTTPAdapter,
+        webhook_url=CONTROL_PLANE_WEBHOOK_URL,
+        webhook_secret=CONTROL_PLANE_WEBHOOK_SECRET,
+        tenant_id=TENANT_ID,
+        project_id=PROJECT_ID,
+        model_version_id=MODEL_VERSION_ID,
+        drift_summary=drift_summary,
+        threshold=DRIFT_THRESHOLD,
+        detail=runtime_log.detail,
+        on_error=on_error,
     )
 
 
@@ -408,34 +567,61 @@ def _run():
     try:
         validate_runtime_config()
     except ValueError as exc:
-        runtime_log.event(logging.ERROR, "drift_config_invalid", "Invalid drift runtime configuration", reason=sanitize(str(exc)))
+        runtime_log.event(
+            logging.ERROR,
+            "drift_config_invalid",
+            "Invalid drift runtime configuration",
+            reason=sanitize(str(exc)),
+        )
         return 1
 
     try:
         production_df = load_production_data()
     except Exception as e:
-        runtime_log.event(logging.ERROR, "drift_production_data_failed", "Failed to load production data", reason=sanitize(str(e)), exc_info=True)
+        runtime_log.event(
+            logging.ERROR,
+            "drift_production_data_failed",
+            "Failed to load production data",
+            reason=sanitize(str(e)),
+            exc_info=True,
+        )
         return 1
 
     if len(production_df) < MIN_SAMPLES:
-        runtime_log.event(logging.INFO, "drift_analysis_skipped", "Insufficient production samples",
-                          samples=len(production_df), reason=f"minimum_samples={MIN_SAMPLES}")
+        runtime_log.event(
+            logging.INFO,
+            "drift_analysis_skipped",
+            "Insufficient production samples",
+            samples=len(production_df),
+            reason=f"minimum_samples={MIN_SAMPLES}",
+        )
         return 0
 
     try:
         reference_df = load_reference_data()
     except Exception as e:
-        runtime_log.event(logging.WARNING, "drift_reference_fallback", "Reference data unavailable. Generating baseline from oldest 50% of production data", reason=sanitize(str(e)))
+        runtime_log.event(
+            logging.WARNING,
+            "drift_reference_fallback",
+            "Reference data unavailable. Generating baseline from oldest 50% of production data",
+            reason=sanitize(str(e)),
+        )
         half_idx = len(production_df) // 2
         reference_df = production_df.iloc[half_idx:].copy()
-        production_df = production_df.iloc[:half_idx].copy()  
+        production_df = production_df.iloc[:half_idx].copy()
 
     column_mapping = get_column_mapping(reference_df, production_df)
 
     try:
         drift_summary = run_drift_analysis(reference_df, production_df, column_mapping)
     except Exception as e:
-        runtime_log.event(logging.ERROR, "drift_analysis_failed", "Drift analysis failed", reason=sanitize(str(e)), exc_info=True)
+        runtime_log.event(
+            logging.ERROR,
+            "drift_analysis_failed",
+            "Drift analysis failed",
+            reason=sanitize(str(e)),
+            exc_info=True,
+        )
         return 1
 
     trigger_django_webhook(drift_summary)
@@ -445,20 +631,37 @@ def _run():
 def main():
     started = time.monotonic()
     setup_logger(DRIFT_RUN_ID)
-    tokens = bind_context(drift_run_id=DRIFT_RUN_ID, project_id=PROJECT_ID,
-                          model_version_id=MODEL_VERSION_ID, tenant_id=TENANT_ID)
+    tokens = bind_context(
+        drift_run_id=DRIFT_RUN_ID,
+        project_id=PROJECT_ID,
+        model_version_id=MODEL_VERSION_ID,
+        tenant_id=TENANT_ID,
+    )
     try:
-        runtime_log.event(logging.INFO, "drift_execution_started", "Drift runner execution started", duration_ms=0)
+        runtime_log.event(
+            logging.INFO,
+            "drift_execution_started",
+            "Drift runner execution started",
+            duration_ms=0,
+        )
         result = _run()
         runtime_log.event(
-            logging.INFO, "drift.execution.exited", "Drift runner exited", exit_code=result,
+            logging.INFO,
+            "drift.execution.exited",
+            "Drift runner exited",
+            exit_code=result,
             duration_ms=round((time.monotonic() - started) * 1000, 3),
         )
         return result
     except Exception as exc:
-        runtime_log.event(logging.ERROR, "drift_execution_failed", "Drift runner execution failed",
-                          reason=sanitize(str(exc)), exc_info=True,
-                          duration_ms=round((time.monotonic() - started) * 1000, 3))
+        runtime_log.event(
+            logging.ERROR,
+            "drift_execution_failed",
+            "Drift runner execution failed",
+            reason=sanitize(str(exc)),
+            exc_info=True,
+            duration_ms=round((time.monotonic() - started) * 1000, 3),
+        )
         raise
     finally:
         reset_context(tokens)

@@ -36,7 +36,9 @@ def _prediction_confidence(model: Any, frame: pd.DataFrame) -> float | None:
     return None
 
 
-def run_inference(loaded_model: dict[str, Any], features: dict[str, Any]) -> tuple[Any, float | None]:
+def run_inference(
+    loaded_model: dict[str, Any], features: dict[str, Any]
+) -> tuple[Any, float | None]:
     model = loaded_model["model"]
     expected_features = loaded_model.get("expected_features")
     if expected_features:

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Build an Ansible inventory from the repository Terraform outputs."""
+
 import json
 import os
 import subprocess
@@ -13,6 +14,7 @@ REQUIRED_OUTPUTS = (
     "vpc_id",
     "ec2_key_pair_name",
 )
+
 
 def fail(message):
     sys.stderr.write(f"Ansible inventory error: {message}\n")
@@ -31,8 +33,10 @@ def output_value(outputs, name):
 
 def get_tf_output():
     # infra directory is ../../infra relative to this file
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    infra_dir = os.path.join(base_dir, 'infra')
+    base_dir = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
+    infra_dir = os.path.join(base_dir, "infra")
     try:
         out = subprocess.check_output(
             ["terraform", "output", "-json"], cwd=infra_dir, stderr=subprocess.PIPE
@@ -45,6 +49,7 @@ def get_tf_output():
         fail(f"terraform output failed: {detail or exc}")
     except json.JSONDecodeError as exc:
         fail(f"terraform output returned invalid JSON: {exc}")
+
 
 def main():
     tf_data = get_tf_output()
@@ -64,18 +69,28 @@ def main():
             "Terraform output 'worker_private_ips' must contain exactly two "
             f"static workers; received {len(worker_ips)}."
         )
-    karpenter_node_instance_profile = tf_data.get('karpenter_node_instance_profile_name', {}).get('value')
-    karpenter_interruption_queue = tf_data.get('karpenter_interruption_queue_name', {}).get('value')
-    karpenter_controller_policy = tf_data.get('karpenter_controller_policy_arn', {}).get('value')
-    karpenter_k3s_api_hostname = tf_data.get('karpenter_k3s_api_hostname', {}).get('value')
-    karpenter_k3s_api_endpoint = tf_data.get('karpenter_k3s_api_endpoint', {}).get('value')
-    karpenter_k3s_token_secret_arn = tf_data.get('karpenter_k3s_token_secret_arn', {}).get('value')
+    karpenter_node_instance_profile = tf_data.get(
+        "karpenter_node_instance_profile_name", {}
+    ).get("value")
+    karpenter_interruption_queue = tf_data.get(
+        "karpenter_interruption_queue_name", {}
+    ).get("value")
+    karpenter_controller_policy = tf_data.get(
+        "karpenter_controller_policy_arn", {}
+    ).get("value")
+    karpenter_k3s_api_hostname = tf_data.get("karpenter_k3s_api_hostname", {}).get(
+        "value"
+    )
+    karpenter_k3s_api_endpoint = tf_data.get("karpenter_k3s_api_endpoint", {}).get(
+        "value"
+    )
+    karpenter_k3s_token_secret_arn = tf_data.get(
+        "karpenter_k3s_token_secret_arn", {}
+    ).get("value")
     alb_target_group_arn = tf_data.get("alb_target_group_arn", {}).get("value")
 
     inventory = {
-        "_meta": {
-            "hostvars": {}
-        },
+        "_meta": {"hostvars": {}},
         "all": {
             "children": ["master", "workers"],
             "vars": {
@@ -84,12 +99,8 @@ def main():
                 "terraform_alb_target_group_arn": alb_target_group_arn or "",
             },
         },
-        "master": {
-            "hosts": []
-        },
-        "workers": {
-            "hosts": []
-        }
+        "master": {"hosts": []},
+        "workers": {"hosts": []},
     }
 
     if master_ip:
@@ -99,21 +110,29 @@ def main():
             "ansible_host": master_ip,
             "private_ip": master_private_ip,
             "k3s_node_name": master_host,
-            "terraform_karpenter_node_instance_profile_name": karpenter_node_instance_profile or "",
-            "terraform_karpenter_interruption_queue_name": karpenter_interruption_queue or "",
-            "terraform_karpenter_controller_policy_arn": karpenter_controller_policy or "",
+            "terraform_karpenter_node_instance_profile_name": karpenter_node_instance_profile
+            or "",
+            "terraform_karpenter_interruption_queue_name": karpenter_interruption_queue
+            or "",
+            "terraform_karpenter_controller_policy_arn": karpenter_controller_policy
+            or "",
             "terraform_karpenter_k3s_api_hostname": karpenter_k3s_api_hostname or "",
             "terraform_karpenter_k3s_api_endpoint": karpenter_k3s_api_endpoint or "",
-            "terraform_karpenter_k3s_token_secret_arn": karpenter_k3s_token_secret_arn or "",
+            "terraform_karpenter_k3s_token_secret_arn": karpenter_k3s_token_secret_arn
+            or "",
         }
         if karpenter_node_instance_profile:
-            inventory["_meta"]["hostvars"][master_host]["karpenter_node_instance_profile_name"] = karpenter_node_instance_profile
+            inventory["_meta"]["hostvars"][master_host][
+                "karpenter_node_instance_profile_name"
+            ] = karpenter_node_instance_profile
         if karpenter_interruption_queue:
-            inventory["_meta"]["hostvars"][master_host]["karpenter_interruption_queue_name"] = karpenter_interruption_queue
+            inventory["_meta"]["hostvars"][master_host][
+                "karpenter_interruption_queue_name"
+            ] = karpenter_interruption_queue
 
     if worker_ips and isinstance(worker_ips, list):
         for idx, w_ip in enumerate(worker_ips):
-            worker_host = f"worker-node-{idx+1}"
+            worker_host = f"worker-node-{idx + 1}"
             inventory["workers"]["hosts"].append(worker_host)
             host_vars = {
                 "ansible_host": w_ip,
@@ -122,16 +141,17 @@ def main():
             }
             if master_ip:
                 host_vars["ansible_ssh_common_args"] = (
-                    "-o ProxyCommand=\"ssh -i ~/.ssh/aws_key "
+                    '-o ProxyCommand="ssh -i ~/.ssh/aws_key '
                     "-o IdentitiesOnly=yes "
                     "-o StrictHostKeyChecking=accept-new "
-                    f"-W %h:%p ubuntu@{master_ip}\" "
+                    f'-W %h:%p ubuntu@{master_ip}" '
                     "-o StrictHostKeyChecking=accept-new"
                 )
             inventory["_meta"]["hostvars"][worker_host] = host_vars
 
     # Output inventory in JSON format
     print(json.dumps(inventory, indent=2))
+
 
 if __name__ == "__main__":
     main()

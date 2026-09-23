@@ -28,7 +28,12 @@ import numpy as np
 import pandas as pd
 
 try:
-    from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score
+    from sklearn.metrics import (
+        accuracy_score,
+        classification_report,
+        confusion_matrix,
+        f1_score,
+    )
 except ImportError as exc:  # pragma: no cover
     raise SystemExit(
         "Missing required dependency scikit-learn. Install it with: "
@@ -88,8 +93,14 @@ class PreparedDataset:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run offline drift/retraining recovery evaluation.")
-    parser.add_argument("--binary", action="store_true", help="Run required BENIGN-vs-ATTACK experiment.")
+    parser = argparse.ArgumentParser(
+        description="Run offline drift/retraining recovery evaluation."
+    )
+    parser.add_argument(
+        "--binary",
+        action="store_true",
+        help="Run required BENIGN-vs-ATTACK experiment.",
+    )
     parser.add_argument("--drift-threshold", type=float, default=0.5)
     parser.add_argument("--pvalue-threshold", type=float, default=0.05)
     parser.add_argument("--random-seed", type=int, default=42)
@@ -153,23 +164,31 @@ def load_csv(path: Path, max_rows: int, seed: int) -> Tuple[pd.DataFrame, int, b
     df = pd.read_csv(path)
     raw_rows = int(len(df))
     if max_rows > 0 and len(df) > max_rows:
-        df = df.sample(n=max_rows, random_state=seed).sort_index().reset_index(drop=True)
+        df = (
+            df.sample(n=max_rows, random_state=seed).sort_index().reset_index(drop=True)
+        )
         return df, raw_rows, True
     return df.reset_index(drop=True), raw_rows, False
 
 
 def feature_columns(df: pd.DataFrame, dataset_name: str) -> List[str]:
     if LABEL_COL not in df.columns:
-        raise ValueError(f"{dataset_name} does not contain required label column '{LABEL_COL}'")
+        raise ValueError(
+            f"{dataset_name} does not contain required label column '{LABEL_COL}'"
+        )
     return [column for column in df.columns if column != LABEL_COL]
 
 
-def validate_features(df: pd.DataFrame, expected: Sequence[str], dataset_name: str) -> None:
+def validate_features(
+    df: pd.DataFrame, expected: Sequence[str], dataset_name: str
+) -> None:
     current = feature_columns(df, dataset_name)
     if list(current) != list(expected):
         missing = sorted(set(expected) - set(current))
         extra = sorted(set(current) - set(expected))
-        raise ValueError(f"Feature schema mismatch for {dataset_name}: missing={missing[:10]}, extra={extra[:10]}")
+        raise ValueError(
+            f"Feature schema mismatch for {dataset_name}: missing={missing[:10]}, extra={extra[:10]}"
+        )
 
 
 def coerce_features(df: pd.DataFrame, cols: Sequence[str]) -> pd.DataFrame:
@@ -183,9 +202,14 @@ def apply_medians(X: pd.DataFrame, medians: pd.Series) -> pd.DataFrame:
 
 def row_hash_list(df: pd.DataFrame, cols: Sequence[str]) -> List[str]:
     normalized = coerce_features(df, cols)
-    normalized["__binary_label__"] = [normalize_label(value) for value in df[LABEL_COL].tolist()]
+    normalized["__binary_label__"] = [
+        normalize_label(value) for value in df[LABEL_COL].tolist()
+    ]
     hashed = pd.util.hash_pandas_object(normalized, index=False).astype("uint64")
-    return [hashlib.sha256(str(int(value)).encode("utf-8")).hexdigest() for value in hashed.to_numpy()]
+    return [
+        hashlib.sha256(str(int(value)).encode("utf-8")).hexdigest()
+        for value in hashed.to_numpy()
+    ]
 
 
 def with_row_hash(df: pd.DataFrame, cols: Sequence[str]) -> pd.DataFrame:
@@ -194,10 +218,16 @@ def with_row_hash(df: pd.DataFrame, cols: Sequence[str]) -> pd.DataFrame:
     return out
 
 
-def drop_duplicate_hashes(df: pd.DataFrame, cols: Sequence[str]) -> Tuple[pd.DataFrame, int]:
+def drop_duplicate_hashes(
+    df: pd.DataFrame, cols: Sequence[str]
+) -> Tuple[pd.DataFrame, int]:
     hashed = with_row_hash(df, cols)
     before = len(hashed)
-    deduped = hashed.drop_duplicates("__row_hash__", keep="first").drop(columns=["__row_hash__"]).reset_index(drop=True)
+    deduped = (
+        hashed.drop_duplicates("__row_hash__", keep="first")
+        .drop(columns=["__row_hash__"])
+        .reset_index(drop=True)
+    )
     return deduped, int(before - len(deduped))
 
 
@@ -212,20 +242,28 @@ def shuffled(df: pd.DataFrame, seed: int) -> pd.DataFrame:
     return df.sample(frac=1.0, random_state=seed).reset_index(drop=True)
 
 
-def split_benign_pool(reference_df: pd.DataFrame, cols: Sequence[str], seed: int, ref_fraction: float, retrain_fraction: float) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, Dict[str, Any]]:
+def split_benign_pool(
+    reference_df: pd.DataFrame,
+    cols: Sequence[str],
+    seed: int,
+    ref_fraction: float,
+    retrain_fraction: float,
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, Dict[str, Any]]:
     benign = filter_by_binary_label(reference_df, "BENIGN")
     benign, dropped = drop_duplicate_hashes(benign, cols)
     benign = shuffled(benign, seed)
     if len(benign) < 30:
-        raise ValueError("Not enough BENIGN rows in reference_data.csv to create reference/retraining/evaluation splits")
+        raise ValueError(
+            "Not enough BENIGN rows in reference_data.csv to create reference/retraining/evaluation splits"
+        )
     n_ref = max(1, int(len(benign) * ref_fraction))
     n_retrain = max(1, int(len(benign) * retrain_fraction))
     if n_ref + n_retrain >= len(benign):
         n_ref = max(1, len(benign) // 2)
         n_retrain = max(1, (len(benign) - n_ref) // 2)
     reference_benign = benign.iloc[:n_ref].reset_index(drop=True)
-    retrain_benign = benign.iloc[n_ref:n_ref + n_retrain].reset_index(drop=True)
-    eval_benign = benign.iloc[n_ref + n_retrain:].reset_index(drop=True)
+    retrain_benign = benign.iloc[n_ref : n_ref + n_retrain].reset_index(drop=True)
+    eval_benign = benign.iloc[n_ref + n_retrain :].reset_index(drop=True)
     summary = {
         "source": "data/reference_data.csv BENIGN rows",
         "unique_benign_rows": int(len(benign)),
@@ -239,7 +277,9 @@ def split_benign_pool(reference_df: pd.DataFrame, cols: Sequence[str], seed: int
     return reference_benign, retrain_benign, eval_benign, summary
 
 
-def split_attack_source(df: pd.DataFrame, cols: Sequence[str], seed: int, trigger_fraction: float) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
+def split_attack_source(
+    df: pd.DataFrame, cols: Sequence[str], seed: int, trigger_fraction: float
+) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
     attack = filter_by_binary_label(df, "ATTACK")
     attack, dropped = drop_duplicate_hashes(attack, cols)
     attack = shuffled(attack, seed)
@@ -252,19 +292,25 @@ def split_attack_source(df: pd.DataFrame, cols: Sequence[str], seed: int, trigge
     return trigger, future, dropped
 
 
-def decontaminate_against(df: pd.DataFrame, cols: Sequence[str], blocked_hashes: set[str]) -> Tuple[pd.DataFrame, int]:
+def decontaminate_against(
+    df: pd.DataFrame, cols: Sequence[str], blocked_hashes: set[str]
+) -> Tuple[pd.DataFrame, int]:
     hashes = row_hash_list(df, cols)
     keep = [row_hash not in blocked_hashes for row_hash in hashes]
     removed = int(len(keep) - sum(keep))
     return df.loc[keep].reset_index(drop=True), removed
 
 
-def prepare_dataset(name: str, df: pd.DataFrame, cols: Sequence[str], medians: pd.Series) -> PreparedDataset:
+def prepare_dataset(
+    name: str, df: pd.DataFrame, cols: Sequence[str], medians: pd.Series
+) -> PreparedDataset:
     X = apply_medians(coerce_features(df, cols), medians)
     y_labels = [normalize_label(value) for value in df[LABEL_COL].tolist()]
     y = np.array([CLASS_TO_ID[label] for label in y_labels], dtype=np.int64)
     raw_counts = df[LABEL_COL].astype(str).value_counts(dropna=False).to_dict()
-    binary_counts = pd.Series(y_labels).value_counts().reindex(CLASS_NAMES, fill_value=0).to_dict()
+    binary_counts = (
+        pd.Series(y_labels).value_counts().reindex(CLASS_NAMES, fill_value=0).to_dict()
+    )
     return PreparedDataset(
         name=name,
         df=df.reset_index(drop=True),
@@ -300,7 +346,13 @@ def train_model(X: pd.DataFrame, y: np.ndarray, seed: int, name: str) -> XGBClas
     return model
 
 
-def evaluate(model: XGBClassifier, dataset: PreparedDataset, model_name: str, scenario: str, attack_family: str) -> Dict[str, Any]:
+def evaluate(
+    model: XGBClassifier,
+    dataset: PreparedDataset,
+    model_name: str,
+    scenario: str,
+    attack_family: str,
+) -> Dict[str, Any]:
     pred = np.asarray(model.predict(dataset.X), dtype=np.int64)
     report = classification_report(
         dataset.y,
@@ -317,7 +369,9 @@ def evaluate(model: XGBClassifier, dataset: PreparedDataset, model_name: str, sc
         "Model": model_name,
         "Accuracy": float(accuracy_score(dataset.y, pred)),
         "Macro-F1": float(f1_score(dataset.y, pred, average="macro", zero_division=0)),
-        "Weighted-F1": float(f1_score(dataset.y, pred, average="weighted", zero_division=0)),
+        "Weighted-F1": float(
+            f1_score(dataset.y, pred, average="weighted", zero_division=0)
+        ),
         "per_class": {
             label: {
                 "precision": float(report[label]["precision"]),
@@ -346,7 +400,14 @@ def psi_score(reference: np.ndarray, current: np.ndarray, bins: int = 10) -> flo
     return float(np.sum((cur_pct - ref_pct) * np.log(cur_pct / ref_pct)))
 
 
-def compute_drift(reference: PreparedDataset, current: PreparedDataset, pvalue_threshold: float, drift_threshold: float, scenario: str, attack_family: str) -> Dict[str, Any]:
+def compute_drift(
+    reference: PreparedDataset,
+    current: PreparedDataset,
+    pvalue_threshold: float,
+    drift_threshold: float,
+    scenario: str,
+    attack_family: str,
+) -> Dict[str, Any]:
     method = "ks_2samp" if ks_2samp is not None else "psi_fallback"
     feature_results: Dict[str, Dict[str, Any]] = {}
     drifted_features: List[str] = []
@@ -361,7 +422,9 @@ def compute_drift(reference: PreparedDataset, current: PreparedDataset, pvalue_t
                 pvalue = 1.0
                 drifted = False
             else:
-                result = ks_2samp(ref_values, cur_values, alternative="two-sided", mode="auto")
+                result = ks_2samp(
+                    ref_values, cur_values, alternative="two-sided", mode="auto"
+                )
                 statistic = float(result.statistic)
                 pvalue = float(result.pvalue)
                 drifted = bool(pvalue < pvalue_threshold)
@@ -375,7 +438,12 @@ def compute_drift(reference: PreparedDataset, current: PreparedDataset, pvalue_t
         else:
             score = psi_score(ref_values, cur_values)
             drifted = bool(score >= 0.2)
-            feature_results[feature] = {"method": method, "psi": score, "threshold": 0.2, "drifted": drifted}
+            feature_results[feature] = {
+                "method": method,
+                "psi": score,
+                "threshold": 0.2,
+                "drifted": drifted,
+            }
         if drifted:
             drifted_features.append(feature)
     total = int(len(reference.X.columns))
@@ -432,7 +500,9 @@ def composition(dataset: PreparedDataset) -> str:
     return f"BENIGN={benign}, ATTACK={attack}"
 
 
-def overlap_report(training: PreparedDataset, evaluation: PreparedDataset, trigger: PreparedDataset) -> Dict[str, Any]:
+def overlap_report(
+    training: PreparedDataset, evaluation: PreparedDataset, trigger: PreparedDataset
+) -> Dict[str, Any]:
     train_hashes = training.row_hash_set
     eval_hashes = evaluation.row_hash_set
     trigger_hashes = trigger.row_hash_set
@@ -441,15 +511,29 @@ def overlap_report(training: PreparedDataset, evaluation: PreparedDataset, trigg
     return {
         "m1_training_vs_future_holdout_unique_overlap": int(len(train_eval)),
         "trigger_window_vs_future_holdout_unique_overlap": int(len(trigger_eval)),
-        "m1_training_rows_overlapping_future_holdout": int(sum(1 for row_hash in training.row_hashes if row_hash in eval_hashes)),
-        "future_holdout_rows_overlapping_m1_training": int(sum(1 for row_hash in evaluation.row_hashes if row_hash in train_hashes)),
-        "trigger_rows_overlapping_future_holdout": int(sum(1 for row_hash in trigger.row_hashes if row_hash in eval_hashes)),
+        "m1_training_rows_overlapping_future_holdout": int(
+            sum(1 for row_hash in training.row_hashes if row_hash in eval_hashes)
+        ),
+        "future_holdout_rows_overlapping_m1_training": int(
+            sum(1 for row_hash in evaluation.row_hashes if row_hash in train_hashes)
+        ),
+        "trigger_rows_overlapping_future_holdout": int(
+            sum(1 for row_hash in trigger.row_hashes if row_hash in eval_hashes)
+        ),
         "leakage_safe": not train_eval and not trigger_eval,
     }
 
 
 def inspect_pickle_model(path: Path) -> Dict[str, Any]:
-    info = {"path": str(path), "exists": path.exists(), "loaded": False, "type": None, "n_features_in_": None, "classes_": None, "load_error": None}
+    info = {
+        "path": str(path),
+        "exists": path.exists(),
+        "loaded": False,
+        "type": None,
+        "n_features_in_": None,
+        "classes_": None,
+        "load_error": None,
+    }
     if not path.exists():
         return info
     try:
@@ -460,7 +544,9 @@ def inspect_pickle_model(path: Path) -> Dict[str, Any]:
         if hasattr(model, "n_features_in_"):
             info["n_features_in_"] = int(getattr(model, "n_features_in_"))
         if hasattr(model, "classes_"):
-            info["classes_"] = [str(value) for value in list(getattr(model, "classes_"))]
+            info["classes_"] = [
+                str(value) for value in list(getattr(model, "classes_"))
+            ]
     except Exception as exc:
         info["load_error"] = repr(exc)
     return info
@@ -498,11 +584,11 @@ M0 is trained from `data/train_2_classes.csv`. M1 is trained only with data avai
 
 ## Drift method
 
-Drift is computed with `{config['drift_method']}` over the validated 52 numeric features. Feature drift threshold is `p < {config['pvalue_threshold']}` for KS tests. Dataset drift is true when `drift_share >= {config['drift_threshold']}`.
+Drift is computed with `{config["drift_method"]}` over the validated 52 numeric features. Feature drift threshold is `p < {config["pvalue_threshold"]}` for KS tests. Dataset drift is true when `drift_share >= {config["drift_threshold"]}`.
 
 ## Leakage check result
 
-All scenarios report zero M1-training/future-holdout and trigger/future-holdout row-hash overlap after split: `{config['all_scenarios_leakage_safe']}`.
+All scenarios report zero M1-training/future-holdout and trigger/future-holdout row-hash overlap after split: `{config["all_scenarios_leakage_safe"]}`.
 
 ## Summary results
 
@@ -529,9 +615,13 @@ Use `recovery_fixed_vs_retrained_comparison.csv` for a concise recovery table. D
 def main() -> int:
     args = parse_args()
     if not args.binary:
-        raise SystemExit("This script currently supports only the required --binary experiment.")
+        raise SystemExit(
+            "This script currently supports only the required --binary experiment."
+        )
     if args.max_train_rows <= 0 or args.max_window_rows <= 0:
-        raise SystemExit("--max-train-rows and --max-window-rows must be positive integers")
+        raise SystemExit(
+            "--max-train-rows and --max-window-rows must be positive integers"
+        )
 
     root = repo_root()
     out_dir = output_dir()
@@ -540,8 +630,12 @@ def main() -> int:
     seed = args.random_seed
 
     data_dir = root / "data"
-    train_m0_raw, train_m0_raw_rows, train_m0_sampled = load_csv(data_dir / "train_2_classes.csv", args.max_train_rows, seed)
-    reference_raw, reference_raw_rows, reference_sampled = load_csv(data_dir / "reference_data.csv", args.max_window_rows, seed)
+    train_m0_raw, train_m0_raw_rows, train_m0_sampled = load_csv(
+        data_dir / "train_2_classes.csv", args.max_train_rows, seed
+    )
+    reference_raw, reference_raw_rows, reference_sampled = load_csv(
+        data_dir / "reference_data.csv", args.max_window_rows, seed
+    )
     expected_features = feature_columns(train_m0_raw, "train_2_classes.csv")
     validate_features(reference_raw, expected_features, "reference_data.csv")
 
@@ -563,7 +657,9 @@ def main() -> int:
     future_hash_union: set[str] = set()
     source_summaries: Dict[str, Any] = {}
     for index, (scenario_id, attack_family, path) in enumerate(attack_sources):
-        attack_raw, raw_rows, sampled = load_csv(path, args.max_window_rows, seed + index + 10)
+        attack_raw, raw_rows, sampled = load_csv(
+            path, args.max_window_rows, seed + index + 10
+        )
         validate_features(attack_raw, expected_features, path.name)
         attack_trigger, attack_future, dropped_attack_dupes = split_attack_source(
             attack_raw,
@@ -604,9 +700,17 @@ def main() -> int:
             "future_benign_rows": int(len(eval_benign)),
         }
 
-    train_m0_clean, removed_m0_future_overlap = decontaminate_against(train_m0_raw, expected_features, future_hash_union)
-    medians = coerce_features(train_m0_clean, expected_features).median(numeric_only=True).fillna(0.0)
-    m0_train = prepare_dataset("M0 training", train_m0_clean, expected_features, medians)
+    train_m0_clean, removed_m0_future_overlap = decontaminate_against(
+        train_m0_raw, expected_features, future_hash_union
+    )
+    medians = (
+        coerce_features(train_m0_clean, expected_features)
+        .median(numeric_only=True)
+        .fillna(0.0)
+    )
+    m0_train = prepare_dataset(
+        "M0 training", train_m0_clean, expected_features, medians
+    )
 
     # Choose reference baseline for drift computation.
     # --use-mixed-reference-for-drift: use the full reference_data.csv (BENIGN + known attacks
@@ -622,9 +726,16 @@ def main() -> int:
             expected_features,
             medians,
         )
-        print("[drift] Using full mixed reference_data.csv as drift baseline (--use-mixed-reference-for-drift).")
+        print(
+            "[drift] Using full mixed reference_data.csv as drift baseline (--use-mixed-reference-for-drift)."
+        )
     else:
-        reference_for_drift = prepare_dataset("W0 reference baseline (BENIGN only)", reference_benign, expected_features, medians)
+        reference_for_drift = prepare_dataset(
+            "W0 reference baseline (BENIGN only)",
+            reference_benign,
+            expected_features,
+            medians,
+        )
 
     reference_dataset = reference_for_drift
     model_m0 = train_model(m0_train.X, m0_train.y, seed, "M0-fixed-XGB")
@@ -640,13 +751,31 @@ def main() -> int:
 
     for index, scenario in enumerate(scenarios):
         future_hashes = set(row_hash_list(scenario.future_df, expected_features))
-        attack_trigger_clean, removed_attack_trigger = decontaminate_against(scenario.trigger_df, expected_features, future_hashes)
-        m1_train_df = pd.concat([train_m0_clean, attack_trigger_clean], ignore_index=True)
-        m1_train_df, removed_m1_future_overlap = decontaminate_against(m1_train_df, expected_features, future_hashes)
+        attack_trigger_clean, removed_attack_trigger = decontaminate_against(
+            scenario.trigger_df, expected_features, future_hashes
+        )
+        m1_train_df = pd.concat(
+            [train_m0_clean, attack_trigger_clean], ignore_index=True
+        )
+        m1_train_df, removed_m1_future_overlap = decontaminate_against(
+            m1_train_df, expected_features, future_hashes
+        )
 
-        m1_train = prepare_dataset(f"{scenario.scenario} M1 training", m1_train_df, expected_features, medians)
-        trigger_dataset = prepare_dataset(f"{scenario.scenario} trigger/retraining window", attack_trigger_clean, expected_features, medians)
-        future_dataset = prepare_dataset(f"{scenario.scenario} future holdout", scenario.future_df, expected_features, medians)
+        m1_train = prepare_dataset(
+            f"{scenario.scenario} M1 training", m1_train_df, expected_features, medians
+        )
+        trigger_dataset = prepare_dataset(
+            f"{scenario.scenario} trigger/retraining window",
+            attack_trigger_clean,
+            expected_features,
+            medians,
+        )
+        future_dataset = prepare_dataset(
+            f"{scenario.scenario} future holdout",
+            scenario.future_df,
+            expected_features,
+            medians,
+        )
 
         # Build a realistic drift window for drift computation by mixing BENIGN rows
         # from the reference pool into the trigger attack window. This prevents
@@ -657,21 +786,32 @@ def main() -> int:
             n_attack_trigger = len(attack_trigger_clean)
             # Number of BENIGN rows to inject so they form drift_benign_mix of the window
             n_benign_inject = min(
-                int(round(n_attack_trigger * drift_benign_mix / max(1.0 - drift_benign_mix, 1e-9))),
+                int(
+                    round(
+                        n_attack_trigger
+                        * drift_benign_mix
+                        / max(1.0 - drift_benign_mix, 1e-9)
+                    )
+                ),
                 len(reference_benign),
             )
             if n_benign_inject > 0:
                 benign_inject = reference_benign.sample(
                     n=n_benign_inject, random_state=seed + index + 700, replace=False
                 ).reset_index(drop=True)
-                drift_window_df = pd.concat([attack_trigger_clean, benign_inject], ignore_index=True)
+                drift_window_df = pd.concat(
+                    [attack_trigger_clean, benign_inject], ignore_index=True
+                )
                 drift_window_df = shuffled(drift_window_df, seed + index + 800)
             else:
                 drift_window_df = attack_trigger_clean
         else:
             drift_window_df = attack_trigger_clean
         drift_window_dataset = prepare_dataset(
-            f"{scenario.scenario} drift detection window (mixed)", drift_window_df, expected_features, medians
+            f"{scenario.scenario} drift detection window (mixed)",
+            drift_window_df,
+            expected_features,
+            medians,
         )
 
         drift = compute_drift(
@@ -682,13 +822,34 @@ def main() -> int:
             scenario.scenario,
             scenario.attack_family,
         )
-        action = "drift alert; review-driven retraining triggered" if drift["dataset_drift"] else "no drift alert; fixed model retained"
+        action = (
+            "drift alert; review-driven retraining triggered"
+            if drift["dataset_drift"]
+            else "no drift alert; fixed model retained"
+        )
         drift["action"] = action
         drift_details[scenario.scenario] = drift
 
-        model_m1 = train_model(m1_train.X, m1_train.y, seed + index + 500, f"{scenario.scenario}-M1-retrained-XGB")
-        fixed = evaluate(model_m0, future_dataset, "M0-fixed-XGB", scenario.scenario, scenario.attack_family)
-        retrained = evaluate(model_m1, future_dataset, f"{scenario.scenario}-M1-retrained-XGB", scenario.scenario, scenario.attack_family)
+        model_m1 = train_model(
+            m1_train.X,
+            m1_train.y,
+            seed + index + 500,
+            f"{scenario.scenario}-M1-retrained-XGB",
+        )
+        fixed = evaluate(
+            model_m0,
+            future_dataset,
+            "M0-fixed-XGB",
+            scenario.scenario,
+            scenario.attack_family,
+        )
+        retrained = evaluate(
+            model_m1,
+            future_dataset,
+            f"{scenario.scenario}-M1-retrained-XGB",
+            scenario.scenario,
+            scenario.attack_family,
+        )
         fixed_metrics.append(fixed)
         retrained_metrics.append(retrained)
 
@@ -700,7 +861,8 @@ def main() -> int:
                 "Scenario": scenario.scenario,
                 "Attack family": scenario.attack_family,
                 "Trigger dataset": scenario.attack_source + " trigger/retraining split",
-                "Future holdout dataset": scenario.attack_source + " future holdout split + BENIGN holdout",
+                "Future holdout dataset": scenario.attack_source
+                + " future holdout split + BENIGN holdout",
                 "Future holdout composition": composition(future_dataset),
                 "Drifted features": drift["drifted_feature_count"],
                 "Total features": drift["total_features"],
@@ -723,11 +885,19 @@ def main() -> int:
                 "Scenario": scenario.scenario,
                 "Attack family": scenario.attack_family,
                 "Trigger rows": trigger_dataset.df.shape[0],
-                "Trigger BENIGN count": int(trigger_dataset.binary_label_counts.get("BENIGN", 0)),
-                "Trigger ATTACK count": int(trigger_dataset.binary_label_counts.get("ATTACK", 0)),
+                "Trigger BENIGN count": int(
+                    trigger_dataset.binary_label_counts.get("BENIGN", 0)
+                ),
+                "Trigger ATTACK count": int(
+                    trigger_dataset.binary_label_counts.get("ATTACK", 0)
+                ),
                 "Future holdout rows": future_dataset.df.shape[0],
-                "Future BENIGN count": int(future_dataset.binary_label_counts.get("BENIGN", 0)),
-                "Future ATTACK count": int(future_dataset.binary_label_counts.get("ATTACK", 0)),
+                "Future BENIGN count": int(
+                    future_dataset.binary_label_counts.get("BENIGN", 0)
+                ),
+                "Future ATTACK count": int(
+                    future_dataset.binary_label_counts.get("ATTACK", 0)
+                ),
                 "Drifted features": drift["drifted_feature_count"],
                 "Total features": drift["total_features"],
                 "Drift share": drift["drift_share"],
@@ -766,7 +936,9 @@ def main() -> int:
     drift_df = pd.DataFrame(drift_rows)
     per_class_df = pd.DataFrame(per_class_rows(fixed_metrics + retrained_metrics))
 
-    all_leakage_safe = all(report["leakage_safe"] for report in leakage_reports.values())
+    all_leakage_safe = all(
+        report["leakage_safe"] for report in leakage_reports.values()
+    )
     recovery_summary = {
         row["Scenario"]: {
             "attack_family": row["Attack family"],
@@ -798,7 +970,11 @@ def main() -> int:
         "scenarios": source_summaries,
     }
 
-    drift_method = next(iter(drift_details.values()))["method"] if drift_details else "not_computed"
+    drift_method = (
+        next(iter(drift_details.values()))["method"]
+        if drift_details
+        else "not_computed"
+    )
     config = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "command": command,
@@ -835,17 +1011,35 @@ def main() -> int:
         "f1_recovery_summary": recovery_summary,
         "per_scenario_config": per_scenario_config,
         "existing_model_artifact_inspection": {
-            "v1": inspect_pickle_model(root / "models" / "v1" / "xgb_nids_model_v1.pkl"),
-            "v2": inspect_pickle_model(root / "models" / "v2" / "xgb_nids_model_v2.pkl"),
+            "v1": inspect_pickle_model(
+                root / "models" / "v1" / "xgb_nids_model_v1.pkl"
+            ),
+            "v2": inspect_pickle_model(
+                root / "models" / "v2" / "xgb_nids_model_v2.pkl"
+            ),
             "used_for_recovery_experiment": False,
         },
     }
 
-    fixed_df.to_csv(out_dir / "recovery_fixed_model_metrics.csv", index=False, float_format="%.6f")
-    retrained_df.to_csv(out_dir / "recovery_retrained_model_metrics.csv", index=False, float_format="%.6f")
-    comparison_df.to_csv(out_dir / "recovery_fixed_vs_retrained_comparison.csv", index=False, float_format="%.6f")
-    drift_df.to_csv(out_dir / "recovery_drift_windows.csv", index=False, float_format="%.6f")
-    per_class_df.to_csv(out_dir / "recovery_per_class_metrics.csv", index=False, float_format="%.6f")
+    fixed_df.to_csv(
+        out_dir / "recovery_fixed_model_metrics.csv", index=False, float_format="%.6f"
+    )
+    retrained_df.to_csv(
+        out_dir / "recovery_retrained_model_metrics.csv",
+        index=False,
+        float_format="%.6f",
+    )
+    comparison_df.to_csv(
+        out_dir / "recovery_fixed_vs_retrained_comparison.csv",
+        index=False,
+        float_format="%.6f",
+    )
+    drift_df.to_csv(
+        out_dir / "recovery_drift_windows.csv", index=False, float_format="%.6f"
+    )
+    per_class_df.to_csv(
+        out_dir / "recovery_per_class_metrics.csv", index=False, float_format="%.6f"
+    )
     write_json(out_dir / "recovery_dataset_summary.json", dataset_summary)
     write_json(out_dir / "recovery_experiment_config.json", config)
     write_json(out_dir / "recovery_confusion_matrices.json", confusion_matrices)

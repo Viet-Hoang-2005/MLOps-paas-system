@@ -25,6 +25,4 @@ def validate_source_artifact(*, filename, flavor, artifact_format):
     allowed = RAW_MODEL_EXTENSIONS[flavor]
     if extension not in allowed:
         formats = ", ".join(sorted(allowed))
-        raise ValidationError(
-            {"source_artifact": f"{flavor.title()} raw models require one of: {formats}."}
-        )
+        raise ValidationError({"source_artifact": f"{flavor.title()} raw models require one of: {formats}."})

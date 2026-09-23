@@ -6,7 +6,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
 from src.inference import run_inference
 from src.loading import MODEL_CACHE, load_model_from_uri, load_summary
 from src.logging_utils import RequestLoggingMiddleware, configure
@@ -90,12 +89,21 @@ async def model_health():
 
 @app.post("/predict")
 async def predict(payload: InferenceRequest):
-    model_version_id = str(payload.model_version_id) if payload.model_version_id else os.environ.get("MODEL_VERSION_ID")
+    model_version_id = (
+        str(payload.model_version_id)
+        if payload.model_version_id
+        else os.environ.get("MODEL_VERSION_ID")
+    )
     if not model_version_id or model_version_id == "unknown":
-        raise HTTPException(status_code=400, detail="Missing model_version_id in request or environment.")
+        raise HTTPException(
+            status_code=400,
+            detail="Missing model_version_id in request or environment.",
+        )
     model_uri = os.environ.get("MODEL_URI", "")
     if not model_uri:
-        raise HTTPException(status_code=503, detail="MODEL_URI environment variable is empty.")
+        raise HTTPException(
+            status_code=503, detail="MODEL_URI environment variable is empty."
+        )
 
     loaded_model = load_model_from_uri(
         model_version_id,

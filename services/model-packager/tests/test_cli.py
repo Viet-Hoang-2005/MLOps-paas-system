@@ -4,11 +4,12 @@ import logging
 import subprocess
 import tarfile
 import zipfile
-import pytest
-
 from types import SimpleNamespace
 from unittest.mock import Mock
+
+import pytest
 from src import tasks as cli
+
 
 class StreamResponse:
     def __init__(self, chunks=None, status_code=200, text=""):
@@ -31,7 +32,9 @@ class StreamResponse:
 
 
 def test_presigned_download_and_upload(monkeypatch, tmp_path):
-    monkeypatch.setattr(cli.requests, "get", lambda *a, **k: StreamResponse([b"a", b"b"]))
+    monkeypatch.setattr(
+        cli.requests, "get", lambda *a, **k: StreamResponse([b"a", b"b"])
+    )
     destination = tmp_path / "artifact.bin"
     cli.download_presigned_file("http://get", destination)
     assert destination.read_bytes() == b"ab"
@@ -106,8 +109,14 @@ def test_find_model_files_pytorch_and_flavor_resolution(tmp_path):
     assert cli.find_supported_model_file(torch_dir, flavor="pytorch").name == "model.pt"
 
     (torch_dir / "model.pt").unlink()
-    assert cli.find_supported_model_file(torch_dir, flavor="pytorch").name == "baf_model.pt"
-    assert cli.find_supported_model_file(torch_dir, flavor="sklearn").name == "preprocessor.pkl"
+    assert (
+        cli.find_supported_model_file(torch_dir, flavor="pytorch").name
+        == "baf_model.pt"
+    )
+    assert (
+        cli.find_supported_model_file(torch_dir, flavor="sklearn").name
+        == "preprocessor.pkl"
+    )
 
     (torch_dir / "baf_model.pt").unlink()
     with pytest.raises(ValueError, match="no .pt, .pth file was found for pytorch"):
@@ -146,10 +155,13 @@ def test_configured_image_reference_uses_project_repository_and_build_tag(monkey
     assert cli.configured_image_reference() == "image-project-uuid:build-build-uuid"
 
 
-@pytest.mark.parametrize("builder,base_fragment", [
-    (cli.build_custom_image, "machine-learning-serving"),
-    (cli.build_bento_image, "deep-learning-serving"),
-])
+@pytest.mark.parametrize(
+    "builder,base_fragment",
+    [
+        (cli.build_custom_image, "machine-learning-serving"),
+        (cli.build_bento_image, "deep-learning-serving"),
+    ],
+)
 def test_docker_builders(monkeypatch, tmp_path, builder, base_fragment):
     client = fake_docker_client()
     monkeypatch.setattr(cli.docker, "from_env", lambda: client)
@@ -180,11 +192,15 @@ def test_docker_builder_raises_build_error(monkeypatch, tmp_path):
 
 def test_parse_conda_pip_requirements(tmp_path):
     conda = tmp_path / "conda.yaml"
-    conda.write_text("dependencies:\n  - python=3.10\n  - pip:\n      - numpy==1\n      - pandas\n")
+    conda.write_text(
+        "dependencies:\n  - python=3.10\n  - pip:\n      - numpy==1\n      - pandas\n"
+    )
     assert cli.parse_conda_pip_requirements(conda) == ["numpy==1", "pandas"]
 
 
-def configure_build(monkeypatch, tmp_path, flavor="sklearn", source_type="manual_upload"):
+def configure_build(
+    monkeypatch, tmp_path, flavor="sklearn", source_type="manual_upload"
+):
     monkeypatch.setenv("FLAVOR", flavor)
     monkeypatch.setenv("SOURCE_TYPE", source_type)
     monkeypatch.setenv("SOURCE_DOWNLOAD_URL", "http://source")
@@ -213,7 +229,9 @@ def stub_package_helpers(monkeypatch):
 def test_read_training_summaries_from_mlops_bundle(tmp_path):
     mlops_dir = tmp_path / "nested" / "_mlops"
     mlops_dir.mkdir(parents=True)
-    (mlops_dir / "metrics.json").write_text(json.dumps({"accuracy": 0.97}), encoding="utf-8")
+    (mlops_dir / "metrics.json").write_text(
+        json.dumps({"accuracy": 0.97}), encoding="utf-8"
+    )
     (mlops_dir / "params.json").write_text(json.dumps({"epochs": 10}), encoding="utf-8")
     (mlops_dir / "model_insights.json").write_text("not-json", encoding="utf-8")
 
@@ -227,10 +245,13 @@ def test_read_training_summaries_from_mlops_bundle(tmp_path):
     }
 
 
-@pytest.mark.parametrize("flavor,base", [
-    ("sklearn", "machine-learning-serving"),
-    ("pytorch", "deep-learning-serving"),
-])
+@pytest.mark.parametrize(
+    "flavor,base",
+    [
+        ("sklearn", "machine-learning-serving"),
+        ("pytorch", "deep-learning-serving"),
+    ],
+)
 def test_run_build_task_prepares_kaniko_context(monkeypatch, tmp_path, flavor, base):
     configure_build(monkeypatch, tmp_path, flavor)
     monkeypatch.setenv("BUILD_ENGINE", "kaniko")
@@ -283,7 +304,12 @@ def test_run_build_task_training_job_pytorch(monkeypatch, tmp_path):
 
 
 def test_run_build_task_validates_environment(monkeypatch):
-    for name in ("FLAVOR", "SOURCE_DOWNLOAD_URL", "SOURCE_ARTIFACT_NAME", "OUTPUT_UPLOAD_URL"):
+    for name in (
+        "FLAVOR",
+        "SOURCE_DOWNLOAD_URL",
+        "SOURCE_ARTIFACT_NAME",
+        "OUTPUT_UPLOAD_URL",
+    ):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("SOURCE_TYPE", "manual_upload")
     with pytest.raises(ValueError, match="Missing required"):
@@ -317,7 +343,11 @@ def configure_zip_task(monkeypatch, tmp_path, kaniko=False):
             archive.writestr("model/requirements.txt", "numpy==1.26.4\n")
 
     monkeypatch.setattr(cli, "download_presigned_file", download)
-    monkeypatch.setattr(cli.subprocess, "run", Mock(return_value=subprocess.CompletedProcess([], 0, "", "")))
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        Mock(return_value=subprocess.CompletedProcess([], 0, "", "")),
+    )
     monkeypatch.setattr(cli.mlflow.pyfunc, "load_model", Mock(return_value=object()))
 
 

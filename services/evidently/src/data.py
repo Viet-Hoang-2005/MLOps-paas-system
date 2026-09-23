@@ -9,8 +9,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 
-def load_reference_data(reference_url, model_version_id, temp_root, requests_module,
-                        pandas_module, detail):
+def load_reference_data(
+    reference_url, model_version_id, temp_root, requests_module, pandas_module, detail
+):
     if not reference_url:
         raise ValueError("REFERENCE_DATA_URL is not provided")
 
@@ -28,15 +29,27 @@ def load_reference_data(reference_url, model_version_id, temp_root, requests_mod
     else:
         local_filename = reference_url
 
-    frame = (pandas_module.read_csv(local_filename) if local_filename.endswith(".csv")
-             else pandas_module.read_parquet(local_filename))
+    frame = (
+        pandas_module.read_csv(local_filename)
+        if local_filename.endswith(".csv")
+        else pandas_module.read_parquet(local_filename)
+    )
     detail(f"-> Reference data loaded: {len(frame)} rows")
     return frame
 
 
-def load_production_data(*, connection_url, model_version_id, max_samples,
-                         min_samples, create_engine, sql_text, pandas_module, detail,
-                         db_schema="control_plane"):
+def load_production_data(
+    *,
+    connection_url,
+    model_version_id,
+    max_samples,
+    min_samples,
+    create_engine,
+    sql_text,
+    pandas_module,
+    detail,
+    db_schema="control_plane",
+):
     detail(f"[1/4] Fetching Production Logs for Model Version ID: {model_version_id}")
     engine = create_engine(connection_url)
     if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", db_schema):
@@ -52,11 +65,14 @@ def load_production_data(*, connection_url, model_version_id, max_samples,
     """)
     with engine.connect() as connection:
         raw_frame = pandas_module.read_sql(
-            query, connection,
+            query,
+            connection,
             params={"model_version_id": str(model_version_id), "lim": max_samples},
         )
     if len(raw_frame) < min_samples:
-        detail(f"Skipping Drift Analysis: Not enough production samples ({len(raw_frame)} < {min_samples})")
+        detail(
+            f"Skipping Drift Analysis: Not enough production samples ({len(raw_frame)} < {min_samples})"
+        )
         return pandas_module.DataFrame()
     if "features" not in raw_frame.columns:
         return pandas_module.DataFrame()
@@ -67,7 +83,9 @@ def load_production_data(*, connection_url, model_version_id, max_samples,
     production_frame = pandas_module.json_normalize(features)
     if "prediction" in raw_frame.columns:
         production_frame["prediction"] = raw_frame["prediction"].values
-    detail(f"-> Production data loaded and JSON normalized: {len(production_frame)} rows")
+    detail(
+        f"-> Production data loaded and JSON normalized: {len(production_frame)} rows"
+    )
     return production_frame
 
 

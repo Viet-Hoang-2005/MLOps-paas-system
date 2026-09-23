@@ -1,16 +1,18 @@
 import pickle
 import sys
 import zipfile
-import pytest
-
-from types import ModuleType
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock
+
+import pytest
 from src import core
 
 
 def test_parse_requirements():
-    assert core.parse_requirements("# comment\nnumpy==1\n\n pandas ") == ["numpy==1", "pandas"]
+    assert core.parse_requirements("# comment\nnumpy==1\n\n pandas ") == [
+        "numpy==1",
+        "pandas",
+    ]
     assert core.parse_requirements("\n# only") is None
 
 
@@ -40,9 +42,13 @@ def test_load_model_dispatch(monkeypatch, tmp_path, flavor, suffix, loader_name)
         booster = Mock()
         monkeypatch.setattr(core, "xgb", SimpleNamespace(Booster=lambda: booster))
     elif loader_name == "torch":
-        monkeypatch.setattr(core, "torch", SimpleNamespace(load=lambda *a, **k: "model"))
+        monkeypatch.setattr(
+            core, "torch", SimpleNamespace(load=lambda *a, **k: "model")
+        )
     else:
-        fake_tf = SimpleNamespace(keras=SimpleNamespace(models=SimpleNamespace(load_model=lambda _: "model")))
+        fake_tf = SimpleNamespace(
+            keras=SimpleNamespace(models=SimpleNamespace(load_model=lambda _: "model"))
+        )
         monkeypatch.setattr(core, "tf", fake_tf)
     result = core.load_model(path, flavor)
     assert result == "model" or loader_name == "xgb"
@@ -59,6 +65,7 @@ def test_load_model_rejects_invalid_extension_and_flavor(tmp_path):
 
 def test_save_mlflow_dispatch_sklearn(monkeypatch, tmp_path):
     import mlflow.sklearn
+
     mock = Mock()
     monkeypatch.setattr(mlflow.sklearn, "save_model", mock)
     core.save_mlflow_model("model", "sklearn", tmp_path / "out", ["numpy"])
@@ -67,6 +74,7 @@ def test_save_mlflow_dispatch_sklearn(monkeypatch, tmp_path):
 
 def test_save_mlflow_keras_falls_back_to_tensorflow(monkeypatch, tmp_path):
     import mlflow
+
     fake_keras = ModuleType("mlflow.keras")
     fake_keras.save_model = Mock(side_effect=AttributeError())
     fake_tensorflow = ModuleType("mlflow.tensorflow")

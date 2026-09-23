@@ -9,7 +9,9 @@ def image_reference(environment, build_id: str = "") -> str:
     if not repository:
         repository = f"image-{project_id}"
         harbor_url = environment.get("HARBOR_REGISTRY_URL", "").strip().rstrip("/")
-        harbor_project = environment.get("HARBOR_USER_PROJECT", "user-images").strip().strip("/")
+        harbor_project = (
+            environment.get("HARBOR_USER_PROJECT", "user-images").strip().strip("/")
+        )
         if harbor_url:
             repository = f"{harbor_url}/{harbor_project}/{repository}"
     return f"{repository}:{tag}"

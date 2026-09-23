@@ -37,7 +37,9 @@ def safe_extract_tar(archive_path, destination):
             if not resolved.is_relative_to(destination_root):
                 raise ValueError("Training artifact contains an unsafe path.")
             if member.islnk() or member.issym():
-                raise ValueError("Training artifact contains links, which are not supported.")
+                raise ValueError(
+                    "Training artifact contains links, which are not supported."
+                )
         archive.extractall(destination)
 
 
@@ -55,6 +57,8 @@ def safe_extract_zip(archive_path, destination):
 def post_webhook(webhook_url, payload, requests_module, headers):
     if not webhook_url:
         return
-    response = requests_module.post(webhook_url, json=payload, headers=headers, timeout=10)
+    response = requests_module.post(
+        webhook_url, json=payload, headers=headers, timeout=10
+    )
     if response.status_code >= 400:
         raise RuntimeError(f"Build webhook failed with HTTP {response.status_code}")

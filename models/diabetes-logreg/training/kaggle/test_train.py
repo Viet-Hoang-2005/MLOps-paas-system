@@ -18,6 +18,7 @@ try:
     import mlflow
     import mlflow.pyfunc
     import mlflow.sklearn
+
     MLFLOW_AVAILABLE = True
 except ImportError:
     MLFLOW_AVAILABLE = False
@@ -36,12 +37,16 @@ def load_modules():
         sys.path.insert(0, str(packager_root))
 
     packager_tasks_path = packager_root / "src" / "tasks.py"
-    spec_tasks = importlib.util.spec_from_file_location("model_packager_tasks", packager_tasks_path)
+    spec_tasks = importlib.util.spec_from_file_location(
+        "model_packager_tasks", packager_tasks_path
+    )
     model_packager_tasks = importlib.util.module_from_spec(spec_tasks)
     spec_tasks.loader.exec_module(model_packager_tasks)
 
     packager_core_path = packager_root / "src" / "core.py"
-    spec_core = importlib.util.spec_from_file_location("model_packager_core", packager_core_path)
+    spec_core = importlib.util.spec_from_file_location(
+        "model_packager_core", packager_core_path
+    )
     model_packager_core = importlib.util.module_from_spec(spec_core)
     spec_core.loader.exec_module(model_packager_core)
 
@@ -56,9 +61,28 @@ def create_synthetic_diabetes_csv(output_path: Path, num_patients: int = 120) ->
 
     races = ["Caucasian", "AfricanAmerican", "Asian", "Hispanic", "Other", "?"]
     genders = ["Female", "Male", "Unknown/Invalid"]
-    ages = ["[0-10)", "[10-20)", "[20-30)", "[30-40)", "[40-50)", "[50-60)", "[60-70)", "[70-80)", "[80-90)", "[90-100)"]
+    ages = [
+        "[0-10)",
+        "[10-20)",
+        "[20-30)",
+        "[30-40)",
+        "[40-50)",
+        "[50-60)",
+        "[60-70)",
+        "[70-80)",
+        "[80-90)",
+        "[90-100)",
+    ]
     admission_sources = [1, 2, 7, 4, 17, 20]
-    specialties = ["InternalMedicine", "Emergency/Trauma", "Family/GeneralPractice", "Cardiology", "Surgery", "?", "Pediatrics"]
+    specialties = [
+        "InternalMedicine",
+        "Emergency/Trauma",
+        "Family/GeneralPractice",
+        "Cardiology",
+        "Surgery",
+        "?",
+        "Pediatrics",
+    ]
     diagnoses = ["250.01", "250.4", "715.9", "486", "599.0", "786.5", "414.0", "V58.61"]
     readmit_options = ["NO", ">30", "<30"]
 
@@ -75,58 +99,60 @@ def create_synthetic_diabetes_csv(output_path: Path, num_patients: int = 120) ->
             encounter_counter += 1
             readmit_val = np.random.choice(readmit_options, p=[0.55, 0.33, 0.12])
 
-            records.append({
-                "encounter_id": encounter_counter,
-                "patient_nbr": patient_id,
-                "race": patient_race,
-                "gender": patient_gender,
-                "age": np.random.choice(ages),
-                "weight": "?",
-                "admission_type_id": np.random.choice([1, 2, 3]),
-                "discharge_disposition_id": np.random.choice([1, 2, 3, 6]),
-                "admission_source_id": np.random.choice(admission_sources),
-                "time_in_hospital": np.random.randint(1, 14),
-                "payer_code": np.random.choice(["MC", "MD", "BC", "SP", "?"]),
-                "medical_specialty": np.random.choice(specialties),
-                "num_lab_procedures": np.random.randint(1, 100),
-                "num_procedures": np.random.randint(0, 6),
-                "num_medications": np.random.randint(1, 40),
-                "number_outpatient": np.random.randint(0, 5),
-                "number_emergency": np.random.randint(0, 3),
-                "number_inpatient": np.random.randint(0, 4),
-                "diag_1": np.random.choice(diagnoses),
-                "diag_2": "250.0",
-                "diag_3": "401.9",
-                "number_diagnoses": np.random.randint(1, 10),
-                "max_glu_serum": np.random.choice(["None", "Norm", ">200", ">300"]),
-                "A1Cresult": np.random.choice(["None", "Norm", ">7", ">8"]),
-                "metformin": np.random.choice(["No", "Steady"]),
-                "repaglinide": "No",
-                "nateglinide": "No",
-                "chlorpropamide": "No",
-                "glimepiride": "No",
-                "acetohexamide": "No",
-                "glipizide": "No",
-                "glyburide": "No",
-                "tolbutamide": "No",
-                "pioglitazone": "No",
-                "rosiglitazone": "No",
-                "acarbose": "No",
-                "miglitol": "No",
-                "troglitazone": "No",
-                "tolazamide": "No",
-                "examide": "No",
-                "citoglipton": "No",
-                "insulin": np.random.choice(["No", "Steady", "Up", "Down"]),
-                "glyburide-metformin": "No",
-                "glipizide-metformin": "No",
-                "glimepiride-pioglitazone": "No",
-                "metformin-rosiglitazone": "No",
-                "metformin-pioglitazone": "No",
-                "change": np.random.choice(["Ch", "No"]),
-                "diabetesMed": np.random.choice(["Yes", "No"]),
-                "readmitted": readmit_val,
-            })
+            records.append(
+                {
+                    "encounter_id": encounter_counter,
+                    "patient_nbr": patient_id,
+                    "race": patient_race,
+                    "gender": patient_gender,
+                    "age": np.random.choice(ages),
+                    "weight": "?",
+                    "admission_type_id": np.random.choice([1, 2, 3]),
+                    "discharge_disposition_id": np.random.choice([1, 2, 3, 6]),
+                    "admission_source_id": np.random.choice(admission_sources),
+                    "time_in_hospital": np.random.randint(1, 14),
+                    "payer_code": np.random.choice(["MC", "MD", "BC", "SP", "?"]),
+                    "medical_specialty": np.random.choice(specialties),
+                    "num_lab_procedures": np.random.randint(1, 100),
+                    "num_procedures": np.random.randint(0, 6),
+                    "num_medications": np.random.randint(1, 40),
+                    "number_outpatient": np.random.randint(0, 5),
+                    "number_emergency": np.random.randint(0, 3),
+                    "number_inpatient": np.random.randint(0, 4),
+                    "diag_1": np.random.choice(diagnoses),
+                    "diag_2": "250.0",
+                    "diag_3": "401.9",
+                    "number_diagnoses": np.random.randint(1, 10),
+                    "max_glu_serum": np.random.choice(["None", "Norm", ">200", ">300"]),
+                    "A1Cresult": np.random.choice(["None", "Norm", ">7", ">8"]),
+                    "metformin": np.random.choice(["No", "Steady"]),
+                    "repaglinide": "No",
+                    "nateglinide": "No",
+                    "chlorpropamide": "No",
+                    "glimepiride": "No",
+                    "acetohexamide": "No",
+                    "glipizide": "No",
+                    "glyburide": "No",
+                    "tolbutamide": "No",
+                    "pioglitazone": "No",
+                    "rosiglitazone": "No",
+                    "acarbose": "No",
+                    "miglitol": "No",
+                    "troglitazone": "No",
+                    "tolazamide": "No",
+                    "examide": "No",
+                    "citoglipton": "No",
+                    "insulin": np.random.choice(["No", "Steady", "Up", "Down"]),
+                    "glyburide-metformin": "No",
+                    "glipizide-metformin": "No",
+                    "glimepiride-pioglitazone": "No",
+                    "metformin-rosiglitazone": "No",
+                    "metformin-pioglitazone": "No",
+                    "change": np.random.choice(["Ch", "No"]),
+                    "diabetesMed": np.random.choice(["Yes", "No"]),
+                    "readmitted": readmit_val,
+                }
+            )
 
     df = pd.DataFrame(records)
     df.to_csv(output_path, index=False)
@@ -146,11 +172,16 @@ def run_pipeline_verification(tmp_path: Path):
     try:
         sys.argv = [
             "train.py",
-            "--data-path", str(csv_path),
-            "--output-dir", str(output_dir),
-            "--seed", "445",
-            "--max-iter", "100",
-            "--threshold", "0.5",
+            "--data-path",
+            str(csv_path),
+            "--output-dir",
+            str(output_dir),
+            "--seed",
+            "445",
+            "--max-iter",
+            "100",
+            "--threshold",
+            "0.5",
         ]
         diabetes_train.main()
     finally:
@@ -230,28 +261,32 @@ def run_pipeline_verification(tmp_path: Path):
 
     # 8. Load fitted pipeline and test single clinical record inference with unseen categories
     pipeline = joblib.load(output_dir / "model.joblib")
-    clinical_record = pd.DataFrame([{
-        "time_in_hospital": 4,
-        "num_lab_procedures": 45,
-        "num_procedures": 1,
-        "num_medications": 15,
-        "number_diagnoses": 8,
-        "gender": "Female",
-        "age": "Over 60 years",
-        "admission_source_id": "Emergency",
-        "medical_specialty": "UnseenExoticSpecialty",  # Unseen category to test OHE ignore
-        "primary_diagnosis": "Diabetes",
-        "max_glu_serum": "None",
-        "A1Cresult": ">8",
-        "insulin": "Steady",
-        "change": "Ch",
-        "diabetesMed": "Yes",
-        "medicare": 1,
-        "medicaid": 0,
-        "had_emergency": 0,
-        "had_inpatient_days": 1,
-        "had_outpatient_days": 0,
-    }])
+    clinical_record = pd.DataFrame(
+        [
+            {
+                "time_in_hospital": 4,
+                "num_lab_procedures": 45,
+                "num_procedures": 1,
+                "num_medications": 15,
+                "number_diagnoses": 8,
+                "gender": "Female",
+                "age": "Over 60 years",
+                "admission_source_id": "Emergency",
+                "medical_specialty": "UnseenExoticSpecialty",  # Unseen category to test OHE ignore
+                "primary_diagnosis": "Diabetes",
+                "max_glu_serum": "None",
+                "A1Cresult": ">8",
+                "insulin": "Steady",
+                "change": "Ch",
+                "diabetesMed": "Yes",
+                "medicare": 1,
+                "medicaid": 0,
+                "had_emergency": 0,
+                "had_inpatient_days": 1,
+                "had_outpatient_days": 0,
+            }
+        ]
+    )
 
     pred = pipeline.predict(clinical_record)
     proba = pipeline.predict_proba(clinical_record)
@@ -265,12 +300,16 @@ def run_pipeline_verification(tmp_path: Path):
     with tarfile.open(output_dir / "model.tar.gz", "r:gz") as tar:
         tar.extractall(extract_dir)
 
-    discovered_model = model_packager_tasks.find_supported_model_file(extract_dir, flavor="sklearn")
+    discovered_model = model_packager_tasks.find_supported_model_file(
+        extract_dir, flavor="sklearn"
+    )
     assert discovered_model.name == "model.joblib"
 
     # 10. Test MLflow packaging round-trip if MLflow is available
     if MLFLOW_AVAILABLE:
-        loaded_model = model_packager_core.load_model(discovered_model, flavor="sklearn")
+        loaded_model = model_packager_core.load_model(
+            discovered_model, flavor="sklearn"
+        )
         mlflow_output = tmp_path / "mlflow_export"
         mlflow.sklearn.save_model(sk_model=loaded_model, path=str(mlflow_output))
         pyfunc_model = mlflow.pyfunc.load_model(str(mlflow_output))

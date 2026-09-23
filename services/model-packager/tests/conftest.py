@@ -3,6 +3,7 @@ from types import ModuleType
 from unittest.mock import Mock
 
 import pytest
+
 import mlflow
 
 # These tests exercise packaging/dispatch, not ML framework initialization.

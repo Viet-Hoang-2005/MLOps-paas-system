@@ -1,8 +1,8 @@
 import json
+from unittest.mock import Mock
+
 import numpy as np
 import pytest
-
-from unittest.mock import Mock
 from fastapi import HTTPException
 from src import api as index
 
@@ -24,7 +24,9 @@ async def test_model_health_states(monkeypatch):
     monkeypatch.setenv("MODEL_URI", "/model")
     monkeypatch.setattr(index, "load_model_from_uri", lambda *_: {"model": object()})
     assert (await index.model_health())["model_loaded"]
-    monkeypatch.setattr(index, "load_model_from_uri", Mock(side_effect=RuntimeError("bad")))
+    monkeypatch.setattr(
+        index, "load_model_from_uri", Mock(side_effect=RuntimeError("bad"))
+    )
     assert "bad" in (await index.model_health())["error"]
 
 
@@ -53,11 +55,15 @@ async def test_predict_reorders_features_maps_label_and_confidence(monkeypatch):
     monkeypatch.setenv("MODEL_VERSION_ID", "m")
     monkeypatch.setenv("MODEL_URI", "/model")
     monkeypatch.setenv("TENANT_ID", "tenant")
-    monkeypatch.setattr(index, "load_model_from_uri", lambda *_: {
-        "model": model,
-        "expected_features": ["b", "a"],
-        "label_mapping": {1: "attack"},
-    })
+    monkeypatch.setattr(
+        index,
+        "load_model_from_uri",
+        lambda *_: {
+            "model": model,
+            "expected_features": ["b", "a"],
+            "label_mapping": {1: "attack"},
+        },
+    )
     response = await index.predict(index.InferenceRequest(features={"a": 1, "b": 2}))
     body = json.loads(response.body)
     assert body["prediction"] == "attack"
@@ -69,9 +75,11 @@ async def test_predict_reorders_features_maps_label_and_confidence(monkeypatch):
 async def test_predict_missing_expected_feature(monkeypatch):
     monkeypatch.setenv("MODEL_VERSION_ID", "m")
     monkeypatch.setenv("MODEL_URI", "/model")
-    monkeypatch.setattr(index, "load_model_from_uri", lambda *_: {
-        "model": Mock(), "expected_features": ["a", "b"]
-    })
+    monkeypatch.setattr(
+        index,
+        "load_model_from_uri",
+        lambda *_: {"model": Mock(), "expected_features": ["a", "b"]},
+    )
     with pytest.raises(HTTPException) as exc:
         await index.predict(index.InferenceRequest(features={"a": 1}))
     assert exc.value.status_code == 400

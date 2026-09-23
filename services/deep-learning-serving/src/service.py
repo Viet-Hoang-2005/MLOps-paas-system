@@ -5,7 +5,6 @@ from typing import Any
 
 import bentoml
 import mlflow.pyfunc
-
 from src.inference import run_inference
 from src.loading import download_model_artifact, resolve_mlflow_model_dir
 from src.logging_utils import (
@@ -21,8 +20,7 @@ logger = get_logger(__name__)
 
 def _keep_bentoml_operational_log(record):
     return not (
-        record.msg == "Exception on %s [%s]"
-        and current_context().get("request_id")
+        record.msg == "Exception on %s [%s]" and current_context().get("request_id")
     )
 
 

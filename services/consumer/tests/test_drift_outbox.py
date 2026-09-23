@@ -3,7 +3,6 @@ from unittest.mock import Mock
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
-
 from src import drift_outbox as dispatcher
 
 
@@ -17,7 +16,9 @@ def test_deliver_posts_internal_idempotent_signal(monkeypatch):
     post = Mock(return_value=SimpleNamespace(status_code=202))
     monkeypatch.setattr(dispatcher.requests, "post", post)
 
-    assert dispatcher.deliver({"model_version_id": "version-1", "idempotency_key": "signal-1"}) == (True, "")
+    assert dispatcher.deliver(
+        {"model_version_id": "version-1", "idempotency_key": "signal-1"}
+    ) == (True, "")
     post.assert_called_once_with(
         "http://control-plane/internal/webhooks/automatic-drift/",
         headers={
@@ -32,7 +33,9 @@ def test_deliver_posts_internal_idempotent_signal(monkeypatch):
 
 def test_deliver_rejects_missing_configuration(monkeypatch):
     monkeypatch.setattr(dispatcher, "CONTROL_PLANE_AUTOMATIC_DRIFT_WEBHOOK_URL", "")
-    assert dispatcher.deliver({"model_version_id": "version-1", "idempotency_key": "signal-1"}) == (
+    assert dispatcher.deliver(
+        {"model_version_id": "version-1", "idempotency_key": "signal-1"}
+    ) == (
         False,
         "CONTROL_PLANE_AUTOMATIC_DRIFT_WEBHOOK_URL is not configured",
     )
@@ -40,11 +43,27 @@ def test_deliver_rejects_missing_configuration(monkeypatch):
 
 def test_drain_marks_only_successful_signal_published(monkeypatch):
     signals = [
-        {"id": 1, "model_version_id": "version-1", "idempotency_key": "signal-1", "attempts": 1},
-        {"id": 2, "model_version_id": "version-2", "idempotency_key": "signal-2", "attempts": 2},
+        {
+            "id": 1,
+            "model_version_id": "version-1",
+            "idempotency_key": "signal-1",
+            "attempts": 1,
+        },
+        {
+            "id": 2,
+            "model_version_id": "version-2",
+            "idempotency_key": "signal-2",
+            "attempts": 2,
+        },
     ]
-    monkeypatch.setattr(dispatcher, "claim_automatic_drift_signals", lambda *_args: signals)
-    monkeypatch.setattr(dispatcher, "deliver", Mock(side_effect=[(True, ""), (False, "control plane unavailable")]))
+    monkeypatch.setattr(
+        dispatcher, "claim_automatic_drift_signals", lambda *_args: signals
+    )
+    monkeypatch.setattr(
+        dispatcher,
+        "deliver",
+        Mock(side_effect=[(True, ""), (False, "control plane unavailable")]),
+    )
     published = Mock()
     reschedule = Mock()
     monkeypatch.setattr(dispatcher, "mark_automatic_drift_signal_published", published)
@@ -81,7 +100,9 @@ def test_dispatcher_retries_expected_database_errors(monkeypatch):
 def test_dispatcher_does_not_hide_unexpected_errors(monkeypatch):
     stop_event = Mock()
     stop_event.is_set.return_value = False
-    monkeypatch.setattr(dispatcher, "drain_once", Mock(side_effect=RuntimeError("programming error")))
+    monkeypatch.setattr(
+        dispatcher, "drain_once", Mock(side_effect=RuntimeError("programming error"))
+    )
 
     with pytest.raises(RuntimeError, match="programming error"):
         dispatcher.run_dispatcher(stop_event)

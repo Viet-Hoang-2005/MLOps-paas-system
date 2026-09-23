@@ -75,7 +75,9 @@ EXTERNAL_SECRET_OWNERS = {
         ("mlops-control-plane", "celery-worker-secret"),
     },
     "k8s/apps/overlays/production/consumer": {("mlops-consumer", "consumer-secret")},
-    "k8s/apps/overlays/production/model-server": {("mlops-model-server", "model-server-secret")},
+    "k8s/apps/overlays/production/model-server": {
+        ("mlops-model-server", "model-server-secret")
+    },
     "k8s/platform/postgres": {("mlops-postgres", "postgres-bootstrap-secret")},
     "k8s/platform/mlflow": {("mlflow-server", "mlflow-secret")},
     "k8s/platform/cloudflare": {("cloudflare", "tunnel-token")},
@@ -106,7 +108,11 @@ KubernetesLoader.add_constructor("tag:yaml.org,2002:value", _construct_value)
 
 
 def yaml_documents(content: str) -> list[dict]:
-    return [document for document in yaml.load_all(content, Loader=KubernetesLoader) if document]
+    return [
+        document
+        for document in yaml.load_all(content, Loader=KubernetesLoader)
+        if document
+    ]
 
 
 def identity(resource: dict) -> tuple[str, str, str, str]:
@@ -144,7 +150,9 @@ def application_name(application: dict) -> str:
     return (application.get("metadata") or {}).get("name", "")
 
 
-def command_error(command: list[str], result: subprocess.CalledProcessError) -> RenderError:
+def command_error(
+    command: list[str], result: subprocess.CalledProcessError
+) -> RenderError:
     output = (result.stderr or result.stdout or "").strip()
     return RenderError(f"{' '.join(command)} failed: {output or result}")
 
@@ -186,7 +194,9 @@ class ValidationContext:
         self._kustomize_cache[path] = resources
         return resources
 
-    def render_helm(self, application: dict, *, include_crds: bool = False) -> list[dict]:
+    def render_helm(
+        self, application: dict, *, include_crds: bool = False
+    ) -> list[dict]:
         name = application_name(application)
         cache_key = (name, include_crds)
         if cache_key in self._helm_cache:
@@ -237,7 +247,9 @@ class ValidationContext:
                 encoding="utf-8",
             )
         except FileNotFoundError as error:
-            raise RenderError("helm is required to validate direct Helm Applications") from error
+            raise RenderError(
+                "helm is required to validate direct Helm Applications"
+            ) from error
         except subprocess.CalledProcessError as error:
             raise command_error(command, error) from error
         finally:
@@ -257,12 +269,16 @@ class ValidationContext:
     def applications(self) -> list[dict]:
         if self._applications is None:
             self._applications = [
-                resource for resource in self.root_resources if resource.get("kind") == "Application"
+                resource
+                for resource in self.root_resources
+                if resource.get("kind") == "Application"
             ]
         return self._applications
 
     def application(self, name: str) -> dict:
-        return next((app for app in self.applications if application_name(app) == name), {})
+        return next(
+            (app for app in self.applications if application_name(app) == name), {}
+        )
 
     def kubeconform(self, resources: list[dict], label: str) -> list[str]:
         if not shutil.which("kubeconform"):
@@ -272,13 +288,22 @@ class ValidationContext:
         ) as handle:
             yaml.safe_dump_all(resources, handle, sort_keys=False)
             manifest_path = Path(handle.name)
-        command = ["kubeconform", "-ignore-missing-schemas", "-summary", str(manifest_path)]
+        command = [
+            "kubeconform",
+            "-ignore-missing-schemas",
+            "-summary",
+            str(manifest_path),
+        ]
         try:
-            result = subprocess.run(command, check=False, capture_output=True, text=True, encoding="utf-8")
+            result = subprocess.run(
+                command, check=False, capture_output=True, text=True, encoding="utf-8"
+            )
         finally:
             manifest_path.unlink(missing_ok=True)
         if result.returncode:
-            return [f"{label}: kubeconform failed: {(result.stderr or result.stdout).strip()}"]
+            return [
+                f"{label}: kubeconform failed: {(result.stderr or result.stdout).strip()}"
+            ]
         return []
 
 
@@ -294,7 +319,9 @@ def prepared_context(repo_root: Path | None = None) -> Iterator[ValidationContex
     source_root = repo_root or repository_root()
     legacy_paths = [path for path in LEGACY_K8S_PATHS if (source_root / path).exists()]
     if legacy_paths:
-        raise RenderError(f"legacy Kubernetes paths still exist: {', '.join(legacy_paths)}")
+        raise RenderError(
+            f"legacy Kubernetes paths still exist: {', '.join(legacy_paths)}"
+        )
     with tempfile.TemporaryDirectory(prefix="mlops-gitops-") as temporary_directory:
         render_root = Path(temporary_directory)
         shutil.copytree(source_root / "k8s", render_root / "k8s")

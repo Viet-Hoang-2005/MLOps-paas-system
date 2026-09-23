@@ -1,32 +1,45 @@
-import json
 import os
 import time
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any
 
 import httpx
 import jwt
 import redis
 from confluent_kafka import Producer
-from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request, Security
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Request,
+    Security,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
 from jwt.algorithms import RSAAlgorithm
 from prometheus_client import Counter, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
-from pydantic import BaseModel
-from src.logging_utils import (
-    Summary, bind_context, configure, current_context, get_logger, log_event,
-    request_id as validated_request_id, reset_context,
-)
-from src.logging_utils import RequestLoggingMiddleware
 from src import auth as auth_service
 from src.events import publish_inference_event
 from src.inference import parse_worker_prediction
-from src.routing import resolve_worker_url, serving_engine_for_flavor
+from src.logging_utils import (
+    RequestLoggingMiddleware,
+    Summary,
+    bind_context,
+    configure,
+    current_context,
+    get_logger,
+    log_event,
+    reset_context,
+)
+from src.logging_utils import (
+    request_id as validated_request_id,
+)
+from src.routing import resolve_worker_url
 from src.schemas import InferenceRequest
 
 logger = get_logger(__name__)
@@ -42,7 +55,9 @@ from src.database import (
     verify_project_api_key,
 )
 
-JWKS_URL = os.environ.get("JWKS_URL", "http://control-plane:8000/api/auth/.well-known/jwks.json")
+JWKS_URL = os.environ.get(
+    "JWKS_URL", "http://control-plane:8000/api/auth/.well-known/jwks.json"
+)
 REDPANDA_BROKERS = os.environ.get("REDPANDA_BROKERS", "redpanda:9092")
 KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "mlops_paas_production_data")
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/1")
@@ -55,21 +70,40 @@ def create_redis_client():
         log_event(logger, "INFO", "redis_connected", "Redis connection established")
         return client
     except Exception as exc:
-        log_event(logger, "ERROR", "redis_connection_failed", "Redis connection failed", error_type=type(exc).__name__)
+        log_event(
+            logger,
+            "ERROR",
+            "redis_connection_failed",
+            "Redis connection failed",
+            error_type=type(exc).__name__,
+        )
         return None
 
 
 def create_kafka_producer():
     try:
-        producer = Producer({
-            "bootstrap.servers": REDPANDA_BROKERS,
-            "client.id": "central-model-server",
-            "linger.ms": 5,
-        })
-        log_event(logger, "INFO", "producer_initialized", "Inference event producer initialized")
+        producer = Producer(
+            {
+                "bootstrap.servers": REDPANDA_BROKERS,
+                "client.id": "central-model-server",
+                "linger.ms": 5,
+            }
+        )
+        log_event(
+            logger,
+            "INFO",
+            "producer_initialized",
+            "Inference event producer initialized",
+        )
         return producer
     except Exception as exc:
-        log_event(logger, "ERROR", "producer_initialization_failed", "Inference event producer initialization failed", error_type=type(exc).__name__)
+        log_event(
+            logger,
+            "ERROR",
+            "producer_initialization_failed",
+            "Inference event producer initialization failed",
+            error_type=type(exc).__name__,
+        )
         return None
 
 
@@ -93,6 +127,7 @@ async def lifespan(app: FastAPI):
             publication_summary.close()
             jwks_summary.close()
             cache_summary.close()
+
 
 app = FastAPI(
     title="AI PaaS Model Server Gateway",
@@ -124,8 +159,9 @@ paas_latency_histogram = Histogram(
 
 Instrumentator().instrument(app).expose(app)
 
-JWKS_CACHE: Dict[str, Any] = {}
+JWKS_CACHE: dict[str, Any] = {}
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
 
 async def get_public_key(kid: str):
     return await auth_service.fetch_public_key(
@@ -192,12 +228,15 @@ async def health_check():
         "model_registry_connected": model_registry_engine is not None,
     }
 
+
 @app.get("/models/{version_id}/health")
-async def model_health(version_id: str, token_payload: dict = Depends(verify_model_access)):
+async def model_health(
+    version_id: str, token_payload: dict = Depends(verify_model_access)
+):
     model_record = token_payload["model_record"]
     worker_url = resolve_worker_url(model_record, "/health")
     resolved_model_version_id = str(model_record.get("id", version_id))
-    
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(worker_url)
@@ -205,14 +244,25 @@ async def model_health(version_id: str, token_payload: dict = Depends(verify_mod
                 return response.json()
             return JSONResponse(
                 status_code=response.status_code,
-                content={"status": "unhealthy", "message": f"Worker health returned HTTP {response.status_code}", "detail": response.text}
+                content={
+                    "status": "unhealthy",
+                    "message": f"Worker health returned HTTP {response.status_code}",
+                    "detail": response.text,
+                },
             )
     except Exception as exc:
-        invalidate_model_version_cache(resolved_model_version_id, redis_client=redis_client)
+        invalidate_model_version_cache(
+            resolved_model_version_id, redis_client=redis_client
+        )
         return JSONResponse(
             status_code=503,
-            content={"status": "unhealthy", "model_loaded": False, "error": f"Cannot reach worker pod: {exc}"}
+            content={
+                "status": "unhealthy",
+                "model_loaded": False,
+                "error": f"Cannot reach worker pod: {exc}",
+            },
         )
+
 
 @app.post("/models/{version_id}/predict")
 async def predict(
@@ -223,9 +273,13 @@ async def predict(
     token_payload: dict = Depends(verify_model_access),
 ):
     model_record = token_payload["model_record"]
-    raw_request_id = request.headers.get("x-request-id") if hasattr(request, "headers") else None
+    raw_request_id = (
+        request.headers.get("x-request-id") if hasattr(request, "headers") else None
+    )
     context = {
-        "request_id": validated_request_id(current_context().get("request_id") or raw_request_id),
+        "request_id": validated_request_id(
+            current_context().get("request_id") or raw_request_id
+        ),
         "tenant_id": str(model_record["tenant_id"]),
         "project_id": str(model_record["project_id"]),
         "model_version_id": str(model_record["id"]),
@@ -236,7 +290,9 @@ async def predict(
         request.scope.setdefault("state", {})["mlops_log_context"] = context
     token = bind_context(**context)
     try:
-        return await _predict(version_id, request, payload, background_tasks, token_payload)
+        return await _predict(
+            version_id, request, payload, background_tasks, token_payload
+        )
     finally:
         reset_context(token)
 
@@ -264,9 +320,11 @@ async def _predict(
                 "features": features_dict,
                 "model_version_id": resolved_model_version_id,
             }
-            response = await client.post(worker_url, json=worker_payload, headers={"X-Request-ID": request_id})
+            response = await client.post(
+                worker_url, json=worker_payload, headers={"X-Request-ID": request_id}
+            )
             latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
-            
+
             if response.status_code != 200:
                 paas_predictions_counter.labels(
                     tenant_id=tenant_id,
@@ -278,8 +336,10 @@ async def _predict(
                     error_detail = response.json()
                 except Exception:
                     error_detail = response.text
-                return JSONResponse(status_code=response.status_code, content=error_detail)
-                
+                return JSONResponse(
+                    status_code=response.status_code, content=error_detail
+                )
+
             prediction_result, confidence, engine = parse_worker_prediction(
                 response.json(),
                 model_record.get("flavor"),
@@ -327,7 +387,9 @@ async def _predict(
             status="error_503",
         ).inc()
         # Reactive invalidation: evict stale routing cache immediately
-        invalidate_model_version_cache(resolved_model_version_id, redis_client=redis_client)
+        invalidate_model_version_cache(
+            resolved_model_version_id, redis_client=redis_client
+        )
 
         fresh_record = None
         try:

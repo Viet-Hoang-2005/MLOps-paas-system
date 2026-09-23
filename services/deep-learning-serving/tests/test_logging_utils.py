@@ -78,7 +78,14 @@ class LoggingTests(unittest.TestCase):
         logger.addHandler(handler)
         token = bind_context(request_id="request-1", project_id="project-1")
         try:
-            log_event(logger, "WARNING", "job.retrying", "Job retry scheduled", attempt=2, duration_ms=12)
+            log_event(
+                logger,
+                "WARNING",
+                "job.retrying",
+                "Job retry scheduled",
+                attempt=2,
+                duration_ms=12,
+            )
         finally:
             reset_context(token)
         payload = json.loads(output.getvalue())
@@ -143,9 +150,7 @@ class LoggingTests(unittest.TestCase):
                 "src.logging_utils.time.monotonic", return_value=time.monotonic() + 120
             ):
                 summary.failure("another-server", "Server failed", level="ERROR")
-            self.assertEqual(
-                self.output.getvalue().count("Server failed"), before + 1
-            )
+            self.assertEqual(self.output.getvalue().count("Server failed"), before + 1)
             self.assertLessEqual(len(summary.last_error), 66)
         finally:
             summary.close()
@@ -203,9 +208,7 @@ class LoggingTests(unittest.TestCase):
         self.assertIn("9 repeated errors suppressed", self.output.getvalue())
         summary.recovery("database")
         summary.recovery("database")
-        self.assertEqual(
-            self.output.getvalue().count("Ingestion summary recovered"), 1
-        )
+        self.assertEqual(self.output.getvalue().count("Ingestion summary recovered"), 1)
         summary.close()
         summary.close()
 
@@ -272,17 +275,33 @@ class LoggingTests(unittest.TestCase):
 
         async def run():
             await middleware(
-                {"type": "http", "path": "/health", "method": "GET", "route": health_route},
+                {
+                    "type": "http",
+                    "path": "/health",
+                    "method": "GET",
+                    "route": health_route,
+                },
                 noop,
                 noop,
             )
             await middleware(
-                {"type": "http", "path": "/health", "method": "GET", "route": health_route, "test_status": 500},
+                {
+                    "type": "http",
+                    "path": "/health",
+                    "method": "GET",
+                    "route": health_route,
+                    "test_status": 500,
+                },
                 noop,
                 noop,
             )
             await middleware(
-                {"type": "http", "path": "/predict", "method": "GET", "route": predict_route},
+                {
+                    "type": "http",
+                    "path": "/predict",
+                    "method": "GET",
+                    "route": predict_route,
+                },
                 noop,
                 noop,
             )

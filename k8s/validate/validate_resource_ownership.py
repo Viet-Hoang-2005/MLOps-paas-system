@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from .common import REPOSITORY_URL, ValidationContext, application_name, application_sources, identity, run_standalone
+from .common import (
+    REPOSITORY_URL,
+    ValidationContext,
+    application_name,
+    application_sources,
+    identity,
+    run_standalone,
+)
 
 
 def validate(context: ValidationContext) -> list[str]:
@@ -22,7 +29,9 @@ def validate(context: ValidationContext) -> list[str]:
             for resource in resources:
                 key = identity(resource)
                 if not all((key[0], key[1], key[3])):
-                    errors.append(f"{name} renders a resource without a complete identity: {key}")
+                    errors.append(
+                        f"{name} renders a resource without a complete identity: {key}"
+                    )
                     continue
                 resource_count += 1
                 previous = owners.get(key)
@@ -31,7 +40,9 @@ def validate(context: ValidationContext) -> list[str]:
                 else:
                     owners[key] = name
     if not errors:
-        print(f"Validated {len(context.applications)} Argo CD Applications and {resource_count} rendered resources.")
+        print(
+            f"Validated {len(context.applications)} Argo CD Applications and {resource_count} rendered resources."
+        )
     return errors
 
 
