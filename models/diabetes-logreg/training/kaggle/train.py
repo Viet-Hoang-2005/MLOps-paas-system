@@ -781,7 +781,17 @@ def main():
     req_path = output_dir / "requirements.txt"
     req_path.write_text(PINNED_REQUIREMENTS, encoding="utf-8")
 
-    # 10. Save artifact_manifest.json
+    # 10. Save reference_data.parquet for drift monitoring baseline
+    ref_filename = "reference_data.parquet"
+    ref_path = output_dir / ref_filename
+    try:
+        df_ref.to_parquet(ref_path, index=False)
+    except Exception:
+        ref_filename = "reference_data.csv"
+        ref_path = output_dir / ref_filename
+        df_ref.to_csv(ref_path, index=False)
+
+    # 11. Save artifact_manifest.json
     files_to_index = [
         "model.joblib",
         "label_mapping.json",
@@ -792,6 +802,7 @@ def main():
         "model_insights.json",
         "training_config.json",
         "requirements.txt",
+        ref_filename,
     ]
     file_manifests = {}
     for name in files_to_index:

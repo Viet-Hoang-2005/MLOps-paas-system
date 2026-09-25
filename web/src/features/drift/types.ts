@@ -19,8 +19,7 @@ export interface DriftMonitoringJob {
   id: ResourceId;
   project_id: ResourceId;
   version_id: ResourceId;
-  reference_asset_id: ResourceId;
-  reference_asset_name: string;
+  reference_snapshot_id?: ResourceId;
   name: string;
   trigger_threshold: number;
   backend: string;
@@ -30,19 +29,10 @@ export interface DriftMonitoringJob {
   updated_at: string;
 }
 
-export interface WorkspaceDataFile {
-  id: ResourceId;
-  relative_path: string;
-  s3_uri: string;
-  download_url: string;
-  size_bytes: number;
-  updated_at: string;
-}
-
 export interface DriftMonitorInput {
   project_id: ResourceId;
+  version_id: ResourceId;
   trigger_threshold: number;
-  reference_data_s3_path: string;
 }
 
 export interface ProductionDataRecord {

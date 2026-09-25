@@ -1,12 +1,14 @@
-from rest_framework import generics
+from django.conf import settings
+from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.catalog.selectors import project_for_user
+from apps.deployment.api.serializers import BuildSerializer
 from apps.registry.models import ModelVersion, RegistryAlias
 from apps.registry.selectors import version_for_user
 from apps.registry.services.routing import predict_alias, predict_version
-from apps.registry.services.versions import set_alias
+from apps.registry.services.versions import request_version_rebuild
 
 from .serializers import ModelVersionSerializer, RegistryAliasSerializer
 
@@ -43,7 +45,7 @@ class ModelVersionDetailEndpoint(generics.RetrieveAPIView):
         )
 
 
-class ProjectAliasListCreateEndpoint(generics.ListCreateAPIView):
+class ProjectAliasListCreateEndpoint(generics.ListAPIView):
     serializer_class = RegistryAliasSerializer
 
     def project(self):
@@ -56,15 +58,6 @@ class ProjectAliasListCreateEndpoint(generics.ListCreateAPIView):
 
     def get_serializer_context(self):
         return {**super().get_serializer_context(), "project": self.project()}
-
-    def perform_create(self, serializer):
-        serializer.instance = set_alias(
-            project=self.project(),
-            actor=self.request.user,
-            name=serializer.validated_data["name"],
-            version=serializer.validated_data["version"],
-        )
-
 
 class AliasPredictionEndpoint(APIView):
     def post(self, request, project_id, alias_name):
@@ -82,3 +75,15 @@ class VersionSmokeTestEndpoint(APIView):
     def post(self, request, version_id):
         version = version_for_user(request.user, version_id)
         return Response(predict_version(version=version, payload=request.data))
+
+
+class ModelVersionRebuildEndpoint(APIView):
+    def post(self, request, version_id):
+        version = version_for_user(request.user, version_id)
+        backend = request.data.get("backend") or getattr(settings, "BUILD_BACKEND", "docker")
+        build = request_version_rebuild(
+            version=version,
+            actor=request.user,
+            backend=backend,
+        )
+        return Response(BuildSerializer(build).data, status=status.HTTP_201_CREATED)

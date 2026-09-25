@@ -31,6 +31,8 @@ services:
       REDIS_URL: redis://redis:6379/1
       EMAIL_HOST_USER: ${EMAIL_HOST_USER}
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       GOOGLE_OAUTH2_CLIENT_ID: ${GOOGLE_OAUTH2_CLIENT_ID}
       GITHUB_OAUTH2_CLIENT_ID: ${GITHUB_OAUTH2_CLIENT_ID}
       GITHUB_OAUTH2_CLIENT_SECRET: ${GITHUB_OAUTH2_CLIENT_SECRET}
@@ -79,6 +81,33 @@ services:
         condition: service_started
       model-packager:
         condition: service_started
+    networks:
+      - mlops_paas_network
+
+  control-plane-test:
+    profiles: ["test"]
+    build:
+      context: ./services/control-plane
+      dockerfile: Dockerfile.test
+    environment:
+      PYTHONPATH: /app/src
+      DJANGO_SETTINGS_MODULE: config.settings.local
+      DB_HOST_RW: postgres
+      DB_HOST_RO: postgres
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_SCHEMA: ${DB_SCHEMA:-control_plane}
+      REDIS_URL: redis://redis:6379/1
+    volumes:
+      - ./services/control-plane:/app
+    command: ["pytest", "src/apps", "src/infrastructure", "-q"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      schema-init:
+        condition: service_completed_successfully
     networks:
       - mlops_paas_network
 

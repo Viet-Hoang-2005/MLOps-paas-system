@@ -5,6 +5,7 @@ import React from "react";
 
 export interface PageHeaderProps {
   title: string;
+  description?: string;
   backLink?: {
     to: string;
     label: string;
@@ -15,6 +16,7 @@ export interface PageHeaderProps {
 
 export function PageHeader({
   title,
+  description,
   backLink,
   tabs,
   children,
@@ -34,6 +36,7 @@ export function PageHeader({
           </Link>
         )}
         <h1 className="text-style-page-title text-color-foreground">{title}</h1>
+        {description && <p className="mt-1 max-w-3xl text-style-body text-color-muted-foreground">{description}</p>}
       </div>
 
       {tabs && <PageTabs tabs={tabs} />}

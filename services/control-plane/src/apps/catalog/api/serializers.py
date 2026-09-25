@@ -1,17 +1,14 @@
 from rest_framework import serializers
 
-from apps.catalog.models import ModelProject, WorkspaceAsset
+from apps.catalog.models import ModelProject
 from common.api.exceptions import Conflict
-from infrastructure.storage import S3Storage
 
 
 class ModelProjectSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="public_id", read_only=True)
     flavor = serializers.SerializerMethodField()
-    lifecycle_status = serializers.SerializerMethodField()
     active_endpoint = serializers.SerializerMethodField()
-    source_code = serializers.SerializerMethodField()
-    reference_data = serializers.SerializerMethodField()
+    workflow_status = serializers.SerializerMethodField()
 
     class Meta:
         model = ModelProject
@@ -20,9 +17,9 @@ class ModelProjectSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "access_mode",
+            "task_domain",
             "flavor",
-            "source_code",
-            "reference_data",
+            "workflow_status",
             "lifecycle_status",
             "active_endpoint",
             "is_active",
@@ -56,14 +53,6 @@ class ModelProjectSerializer(serializers.ModelSerializer):
         version = instance.versions.order_by("-registered_at").first()
         return version.flavor if version else ""
 
-    def get_lifecycle_status(self, instance):
-        """Return the current user-facing lifecycle state for the management list."""
-        if instance.versions.filter(deployments__status__in={"pending", "deploying", "healthy", "unhealthy"}).exists():
-            return "deployed"
-        if instance.builds.filter(status="ready").exists():
-            return "image_ready"
-        return "metadata"
-
     def get_active_endpoint(self, instance):
         """Return the newest non-terminal deployment endpoint for this project."""
         deployments = (
@@ -95,61 +84,105 @@ class ModelProjectSerializer(serializers.ModelSerializer):
             }
         return None
 
-    def _asset_summary(self, instance, kind):
-        asset = instance.workspace_assets.filter(kind=kind).order_by("-updated_at").first()
-        return ProjectAssetSummarySerializer(asset).data if asset else None
-
-    def get_source_code(self, instance):
-        return self._asset_summary(instance, "code")
-
-    def get_reference_data(self, instance):
-        return self._asset_summary(instance, "data")
-
-
-class WorkspaceAssetSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(source="public_id", read_only=True)
-    download_url = serializers.SerializerMethodField()
-
-    class Meta:
-        model = WorkspaceAsset
-        fields = (
-            "id",
-            "kind",
-            "relative_path",
-            "s3_uri",
-            "download_url",
-            "checksum",
-            "size_bytes",
-            "content_type",
-            "created_at",
-            "updated_at",
-        )
-        read_only_fields = ("kind", "s3_uri", "checksum", "size_bytes", "content_type", "created_at", "updated_at")
-
-    def get_download_url(self, instance):
-        return S3Storage().presigned_get(instance.s3_uri, 900)
-
-
-class WorkspaceUploadSerializer(serializers.Serializer):
-    file = serializers.FileField()
-    relative_path = serializers.CharField(max_length=512)
-
-
-class ProjectAssetSummarySerializer(serializers.ModelSerializer):
-    name = serializers.CharField(source="relative_path", read_only=True)
-    download_url = serializers.SerializerMethodField()
-
-    class Meta:
-        model = WorkspaceAsset
-        fields = ("name", "download_url", "checksum", "size_bytes", "content_type")
-
-    def get_download_url(self, instance):
-        return S3Storage().presigned_get(instance.s3_uri, 900)
+    def get_workflow_status(self, instance):
+        from apps.registry.models import RegistryAlias
+        draft = getattr(instance, "draft", None)
+        if draft and draft.can_build():
+            pass
+        elif not instance.versions.exists():
+            return "setup"
+        if RegistryAlias.objects.filter(project=instance, name="production", version__deployments__status="healthy",
+                                        version__deployments__endpoint__health_status="healthy").exists():
+            return "deployed"
+        return "image_ready" if instance.versions.filter(artifacts__kind="image").exists() else "setup"
 
 
 class ProjectMetadataWriteSerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=160)
-    description = serializers.CharField(required=False, allow_blank=True, default="")
-    access_mode = serializers.ChoiceField(choices=ModelProject.ACCESS_MODES, default="private")
-    source_code_file = serializers.FileField(required=False)
-    reference_data_file = serializers.FileField(required=False)
+    name = serializers.CharField(max_length=160, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    access_mode = serializers.ChoiceField(choices=ModelProject.ACCESS_MODES, required=False)
+    task_domain = serializers.ChoiceField(choices=ModelProject.TASK_DOMAINS, required=False)
+
+
+class DraftAssetSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="public_id", read_only=True)
+    kind = serializers.CharField()
+    name = serializers.CharField()
+    download_url = serializers.SerializerMethodField()
+    checksum = serializers.CharField(allow_blank=True)
+    size_bytes = serializers.IntegerField()
+    content_type = serializers.CharField(allow_blank=True)
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+
+    @staticmethod
+    def get_download_url(instance):
+        from infrastructure.storage import S3Storage
+        return S3Storage().presigned_get(instance.s3_uri, 900)
+
+
+class ModelDraftSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="public_id", read_only=True)
+    flavor = serializers.CharField(allow_blank=True)
+    artifact_format = serializers.CharField()
+    requirements_snapshot = serializers.CharField(allow_blank=True)
+    revision = serializers.IntegerField()
+    saved_revision = serializers.IntegerField()
+    status = serializers.CharField()
+    locked_by_build_id = serializers.SerializerMethodField()
+    saved_at = serializers.DateTimeField(allow_null=True)
+    saved_snapshot_id = serializers.UUIDField(source="saved_snapshot.public_id", allow_null=True)
+    is_dirty = serializers.BooleanField()
+    has_mandatory_assets = serializers.SerializerMethodField()
+    can_build = serializers.SerializerMethodField()
+    assets = DraftAssetSerializer(many=True, read_only=True)
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+
+    def get_locked_by_build_id(self, instance):
+        return str(instance.locked_by_build.public_id) if instance.locked_by_build else None
+
+    def get_has_mandatory_assets(self, instance):
+        if hasattr(instance, "has_mandatory_assets"):
+            is_callable = callable(instance.has_mandatory_assets)
+            return instance.has_mandatory_assets() if is_callable else instance.has_mandatory_assets
+        return False
+
+    def get_can_build(self, instance):
+        if hasattr(instance, "can_build"):
+            return instance.can_build() if callable(instance.can_build) else instance.can_build
+        return False
+
+
+class ModelDraftUpdateSerializer(serializers.Serializer):
+    expected_revision = serializers.IntegerField(min_value=0)
+    flavor = serializers.CharField(max_length=80, required=False, allow_blank=True)
+    artifact_format = serializers.ChoiceField(choices=["raw", "archive"], required=False)
+    requirements_snapshot = serializers.CharField(required=False, allow_blank=True)
+
+
+class DraftSaveSerializer(serializers.Serializer):
+    expected_revision = serializers.IntegerField(min_value=0)
+
+
+class DraftAssetUploadUrlSerializer(serializers.Serializer):
+    kind = serializers.CharField(max_length=40)
+    filename = serializers.CharField(max_length=255)
+    size_bytes = serializers.IntegerField(min_value=0, required=False, default=0)
+    checksum = serializers.CharField(max_length=128, required=False, allow_blank=True, default="")
+    content_type = serializers.CharField(
+        max_length=160, required=False, allow_blank=True, default="application/octet-stream"
+    )
+
+
+class DraftAssetCompleteSerializer(serializers.Serializer):
+    upload_id = serializers.UUIDField()
+
+
+class DraftBuildSerializer(serializers.Serializer):
+    backend = serializers.CharField(max_length=30, required=False, default="docker")
+
+
+class DraftLoadVersionSerializer(serializers.Serializer):
+    version_id = serializers.UUIDField()
+    confirm = serializers.BooleanField(required=False, default=False)

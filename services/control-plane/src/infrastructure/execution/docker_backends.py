@@ -15,7 +15,7 @@ from infrastructure.http import HttpClient
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import build_prefix, drift_run_prefix
 
-from .image_references import build_image_tag, image_repository, immutable_image_reference
+from .image_references import build_image_tag, image_repository, immutable_version_image_reference
 
 
 def _logging_environment():
@@ -44,10 +44,10 @@ class DockerBuildBackend:
 
     def run(self, build):
         project = build.project
-        source = build.input_assets.filter(kind__in=("source_artifact", "training_output")).first()
+        source = build.input_assets.filter(kind="model").first()
         if source is None and build.version_id:
             source = (
-                build.version.artifacts.filter(kind__in=("source", "training_output")).order_by("-created_at").first()
+                build.version.artifacts.filter(kind="model").order_by("-created_at").first()
             )
         if not source:
             raise RuntimeError("The build has no source artifact.")
@@ -212,8 +212,8 @@ class DockerDeploymentBackend:
 
     def deploy(self, deployment):
         project = deployment.version.project
-        image = immutable_image_reference(deployment.build)
-        container_name = f"deploy-{deployment.build.public_id}"
+        image = immutable_version_image_reference(deployment.version)
+        container_name = f"deploy-{deployment.public_id}"
         target_port = 5002 if deployment.version.flavor in {"pytorch", "tensorflow"} else 5001
         internal_url = f"http://{container_name}:{target_port}"
         public_path = f"/{project.owner.tenant_id}/models/{project.public_id}/{deployment.version.public_id}"
@@ -308,7 +308,13 @@ class DockerDriftBackend:
             name: f"s3://{self.storage.bucket}/{prefix}{name}"
             for name in ("report.html", "report.json", "summary.json")
         }
-        source = monitor.version.artifacts.filter(kind__in=("source", "training_output")).first()
+        source = monitor.version.artifacts.filter(kind="model").first()
+        ref_s3_uri = ""
+        if monitor.reference_snapshot and monitor.reference_snapshot.manifest_uri:
+            ref_s3_uri = monitor.reference_snapshot.manifest_uri
+        elif monitor.version.reference_snapshot and monitor.version.reference_snapshot.manifest_uri:
+            ref_s3_uri = monitor.version.reference_snapshot.manifest_uri
+
         environment = {
             **_logging_environment(),
             "JOB_ID": str(drift_run.public_id),
@@ -317,7 +323,7 @@ class DockerDriftBackend:
             "MODEL_VERSION_ID": str(monitor.version.public_id),
             "MODEL_NAME": project.name,
             "MODEL_URI": source.uri if source else "",
-            "REFERENCE_DATA_URL": self.storage.presigned_get(monitor.reference_asset.s3_uri, 7200),
+            "REFERENCE_DATA_URL": self.storage.presigned_get(ref_s3_uri, 7200) if ref_s3_uri else "",
             "HTML_S3_URI": uris["report.html"],
             "REPORT_JSON_S3_URI": uris["report.json"],
             "SUMMARY_JSON_S3_URI": uris["summary.json"],

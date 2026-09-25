@@ -19,10 +19,10 @@
 ## Control Plane domains
 
 - `auth` and `access`: identity, OAuth, JWT/JWKS, API keys, authorization.
-- `catalog`: model projects, workspace assets, deletion lifecycle.
-- `registry`: versions, artifacts, metrics, insights, stages.
+- `catalog`: model projects, revisioned Drafts and uploads, deletion lifecycle.
+- `registry`: immutable versions, artifacts, metrics, insights, deployment aliases.
 - `training`: jobs, snapshots, outputs, capabilities, cancellation.
-- `deployment`: builds, deployments, endpoints, execution tasks.
+- `deployment`: Draft/training/Evolution builds, target deployments, endpoints, execution tasks.
 - `drift`: monitor configuration, runs, production-data access, reports.
 - `observability`: health, metrics, audit and runtime visibility.
 

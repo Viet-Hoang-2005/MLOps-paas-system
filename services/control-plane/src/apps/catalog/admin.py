@@ -1,6 +1,5 @@
 from django.contrib import admin
 
-from .models import ModelProject, WorkspaceAsset
+from .models import ModelProject
 
 admin.site.register(ModelProject)
-admin.site.register(WorkspaceAsset)

@@ -1,4 +1,16 @@
 export const trainingEn = {
+  workflow: {
+    projectRequired: "Create a Model Project before starting a training job.",
+    inputsRequired: "Upload a source ZIP and training dataset for this job.",
+    inputsTitle: "Training inputs",
+    inputsDescription: "Each job receives its own immutable source and training dataset snapshot.",
+    framework: "Model framework",
+    tensorflow: "TensorFlow / Keras",
+    sourceZip: "Training source ZIP *",
+    dataset: "Training dataset *",
+    entryPoint: "Training entry point",
+    requirements: "Requirements",
+  },
   title: "Model Training",
   create: "Create training job",
   empty: "Create a training job to track runtime progress and artifacts.",

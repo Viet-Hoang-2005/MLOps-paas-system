@@ -25,6 +25,7 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { DataTable } from "@/shared/components/DataTable";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { toast } from "@/shared/components/toastStore";
+import { projectPaths } from "@/app/router/paths";
 
 const ACTIVE_STATUSES: TrainingJobStatus[] = [
   "pending",
@@ -196,7 +197,7 @@ export default function TrainingModelPage() {
             className="text-left font-medium hover:text-color-primary transition-colors focus:outline-none"
             onClick={() =>
               navigate(
-                `/dashboard/model-training/jobs/${row.original.id}/details/overview`,
+                `${projectPaths.trainingJob(row.original.project_id, row.original.id)}/details/overview`,
               )
             }
           >
@@ -296,7 +297,7 @@ export default function TrainingModelPage() {
                 disabled={deleting}
                 onClick={() =>
                   navigate(
-                    `/dashboard/model-training/jobs/${job.id}/details/overview`,
+                    `${projectPaths.trainingJob(job.project_id, job.id)}/details/overview`,
                   )
                 }
               />
@@ -423,7 +424,7 @@ export default function TrainingModelPage() {
         <Button
           size="md"
           icon={<Rocket className="h-4 w-4" />}
-          onClick={() => navigate("/dashboard/model-training/create/metadata")}
+          onClick={() => selectedModel && navigate(`${projectPaths.training(selectedModel.id)}/create/metadata`)}
         >
           {t("newJob")}
         </Button>

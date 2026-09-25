@@ -54,7 +54,7 @@ def project_cleanup_manifest(project):
         {
             getattr(deployment, "endpoint", None).runtime_name
             if getattr(deployment, "endpoint", None) and deployment.endpoint.runtime_name
-            else f"deploy-{deployment.build.public_id}"
+            else f"deploy-{deployment.public_id}"
             for deployment in deployments
         }
     )

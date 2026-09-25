@@ -42,11 +42,13 @@ class S3Storage:
             "get_object", Params={"Bucket": bucket, "Key": key}, ExpiresIn=expires_in
         )
 
-    def presigned_put(self, uri, expires_in=900, content_type=None):
+    def presigned_put(self, uri, expires_in=900, content_type=None, metadata=None):
         bucket, key = self.parse_uri(uri)
         params = {"Bucket": bucket, "Key": key}
         if content_type:
             params["ContentType"] = content_type
+        if metadata:
+            params["Metadata"] = metadata
         return self.client.generate_presigned_url("put_object", Params=params, ExpiresIn=expires_in)
 
     def delete_prefix(self, prefix):
@@ -59,6 +61,10 @@ class S3Storage:
     def delete(self, uri):
         bucket, key = self.parse_uri(uri)
         self.client.delete_object(Bucket=bucket, Key=key)
+
+    def head(self, uri):
+        bucket, key = self.parse_uri(uri)
+        return self.client.head_object(Bucket=bucket, Key=key)
 
     def copy(self, source_uri, destination_key):
         source_bucket, source_key = self.parse_uri(source_uri)

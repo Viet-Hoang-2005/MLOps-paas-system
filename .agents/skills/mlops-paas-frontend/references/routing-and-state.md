@@ -10,10 +10,11 @@
 
 ## Current coordinated workflows
 
-- Upload: Metadata → Build Model → Deploy Model.
+- Project workspace: Overview Present/Draft, Deployment, Evolution and Monitoring routes carry `projectId`; the selected Evolution version is carried by its URL.
+- New Model: project metadata and required model/reference assets are saved into Draft before navigating to Overview.
 - Training creation: Metadata → Source → Execution.
 - Training detail: overview, logs, metrics, artifacts, and config nested routes.
-- Registry/version detail and drift report routes load the exact UUID in the URL.
+- Version detail and drift report routes load the exact UUID in the URL.
 
 ## Navigation rules
 
@@ -21,3 +22,4 @@
 - Dirty local files/forms use SPA blocking plus a confirmation modal; `beforeunload` covers refresh/close.
 - Direct URLs missing required IDs must route to the earliest recoverable step.
 - Do not use component-local tab state when the route represents the tab.
+- Do not reintroduce removed management, model-training, model-evolution, or drift-monitoring legacy routes.

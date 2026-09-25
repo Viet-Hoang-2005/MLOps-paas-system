@@ -82,7 +82,6 @@ def test_delete_is_blocked_by_active_model_build():
     Build.objects.create(
         project=job.project,
         source_job=job,
-        source_job_reference=job.public_id,
         flavor="sklearn",
         status="building",
     )
@@ -99,16 +98,11 @@ def test_delete_is_blocked_by_active_model_build():
 @pytest.mark.django_db
 def test_hard_delete_preserves_registered_version_and_ready_image(monkeypatch):
     _, job = training_job()
-    version = ModelVersion.objects.create(
-        project=job.project,
-        source_job=job,
-        source_job_reference=job.public_id,
-        version="1",
-    )
+    from apps.registry.tests.factories import create_model_version
+    version = create_model_version(job.project, source_job=job, version="1")
     build = Build.objects.create(
         project=job.project,
         source_job=job,
-        source_job_reference=job.public_id,
         version=version,
         flavor="sklearn",
         status="ready",

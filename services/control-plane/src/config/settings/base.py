@@ -85,6 +85,8 @@ DATABASES = {
 
 AUTH_USER_MODEL = "identity.CustomUser"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+ADMIN_EMAIL = env("ADMIN_EMAIL", env("BOOTSTRAP_ADMIN_EMAIL", "")).strip()
+ADMIN_PASSWORD = env("ADMIN_PASSWORD", env("BOOTSTRAP_ADMIN_PASSWORD", ""))
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},

@@ -4,7 +4,6 @@ from django.db import models
 
 
 class ModelVersion(models.Model):
-    STAGES = (("none", "None"), ("staging", "Staging"), ("production", "Production"), ("archived", "Archived"))
     DEPLOYABILITY = (
         ("unknown", "Unknown"),
         ("deployable", "Deployable"),
@@ -21,12 +20,16 @@ class ModelVersion(models.Model):
     version = models.CharField(max_length=80)
     requirements_snapshot = models.TextField(blank=True)
     flavor = models.CharField(max_length=80, blank=True)
-    stage = models.CharField(max_length=20, choices=STAGES, default="none")
     deployability = models.CharField(max_length=30, choices=DEPLOYABILITY, default="unknown")
     deployability_reason = models.TextField(blank=True)
     metrics_summary = models.JSONField(default=dict, blank=True)
     params_summary = models.JSONField(default=dict, blank=True)
     insights_summary = models.JSONField(default=dict, blank=True)
+    reference_snapshot = models.ForeignKey(
+        "ct.DatasetSnapshot",
+        on_delete=models.PROTECT,
+        related_name="model_versions",
+    )
     registered_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -40,14 +43,20 @@ class ModelVersion(models.Model):
             ),
         ]
 
+    def save(self, *args, **kwargs):
+        if self.source_job_id and not self.source_job_reference:
+            self.source_job_reference = self.source_job.public_id
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.project.name}@{self.version}"
 
 
 class ModelArtifact(models.Model):
     KINDS = (
-        ("source", "Source"),
-        ("training_output", "Training Output"),
+        ("model", "Model"),
+        ("reference_data", "Reference Data"),
+        ("source_code", "Source Code"),
         ("package", "Package"),
         ("label_mapping", "Label Mapping"),
         ("mlflow", "MLflow"),
@@ -57,6 +66,7 @@ class ModelArtifact(models.Model):
         ("model_insights", "Model Insights"),
         ("feature_importance", "Feature Importance"),
         ("input_schema", "Input Schema"),
+        ("data_contract", "Data Contract"),
     )
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     version = models.ForeignKey(ModelVersion, on_delete=models.CASCADE, related_name="artifacts")

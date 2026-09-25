@@ -2,30 +2,25 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
-from apps.catalog.models import ModelProject, WorkspaceAsset
+from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.registry.models import ModelVersion
+from apps.drift.tests.helpers import create_version_with_reference_snapshot
 
 
 def _monitor_fixture(email="drift-monitor@example.com"):
     owner = get_user_model().objects.create_user(email, "password123")
     project = ModelProject.objects.create(owner=owner, name="NIDS")
-    version = ModelVersion.objects.create(project=project, version="1")
-    asset = WorkspaceAsset.objects.create(
-        project=project,
-        kind="data",
-        relative_path="reference.csv",
-        s3_uri="s3://bucket/reference.csv",
-    )
-    return owner, project, version, asset
+    version = create_version_with_reference_snapshot(project)
+    return owner, project, version, version.reference_snapshot
 
 
 @pytest.mark.django_db
 def test_monitor_api_returns_the_frontend_drift_contract():
-    owner, project, version, asset = _monitor_fixture()
+    owner, project, version, snapshot = _monitor_fixture()
     monitor = DriftMonitor.objects.create(
         version=version,
-        reference_asset=asset,
+        reference_snapshot=snapshot,
         name="default",
         trigger_threshold=1000,
     )
@@ -46,8 +41,7 @@ def test_monitor_api_returns_the_frontend_drift_contract():
     payload = response.data["results"][0]
     assert payload["project_id"] == str(project.public_id)
     assert payload["is_active"] is True
-    assert payload["reference_asset_id"] == str(asset.public_id)
-    assert payload["reference_asset_name"] == "reference.csv"
+    assert payload["reference_snapshot_id"] == str(snapshot.public_id)
     assert payload["runs"][0]["id"] == str(run.public_id)
     assert payload["runs"][0]["report_html_uri"] == "s3://bucket/report.html"
     assert payload["runs"][0]["has_drift"] is True
@@ -55,8 +49,8 @@ def test_monitor_api_returns_the_frontend_drift_contract():
 
 @pytest.mark.django_db
 def test_duplicate_monitor_returns_conflict_with_clear_message():
-    owner, _project, version, asset = _monitor_fixture("drift-duplicate@example.com")
-    DriftMonitor.objects.create(version=version, reference_asset=asset, name="default")
+    owner, _project, version, snapshot = _monitor_fixture("drift-duplicate@example.com")
+    DriftMonitor.objects.create(version=version, reference_snapshot=snapshot, name="default")
     client = APIClient()
     client.force_authenticate(owner)
 
@@ -64,7 +58,6 @@ def test_duplicate_monitor_returns_conflict_with_clear_message():
         "/api/drift-monitors/",
         {
             "version": str(version.public_id),
-            "reference_asset": str(asset.public_id),
             "name": "default",
             "trigger_threshold": 2000,
         },
@@ -82,8 +75,8 @@ def test_duplicate_monitor_returns_conflict_with_clear_message():
 
 @pytest.mark.django_db
 def test_existing_monitor_can_be_updated_without_conflicting_with_itself():
-    owner, _project, version, asset = _monitor_fixture("drift-update@example.com")
-    monitor = DriftMonitor.objects.create(version=version, reference_asset=asset, name="default")
+    owner, _project, version, snapshot = _monitor_fixture("drift-update@example.com")
+    monitor = DriftMonitor.objects.create(version=version, reference_snapshot=snapshot, name="default")
     client = APIClient()
     client.force_authenticate(owner)
 
@@ -91,7 +84,6 @@ def test_existing_monitor_can_be_updated_without_conflicting_with_itself():
         f"/api/drift-monitors/{monitor.public_id}/",
         {
             "version": str(version.public_id),
-            "reference_asset": str(asset.public_id),
             "name": "default",
             "trigger_threshold": 5000,
             "is_active": True,
@@ -106,9 +98,9 @@ def test_existing_monitor_can_be_updated_without_conflicting_with_itself():
 
 @pytest.mark.django_db
 def test_completed_run_report_url_is_tenant_scoped_and_presigned(monkeypatch):
-    owner, _project, version, asset = _monitor_fixture("drift-report-owner@example.com")
+    owner, _project, version, snapshot = _monitor_fixture("drift-report-owner@example.com")
     other = get_user_model().objects.create_user("drift-report-other@example.com", "password123")
-    monitor = DriftMonitor.objects.create(version=version, reference_asset=asset, name="default")
+    monitor = DriftMonitor.objects.create(version=version, reference_snapshot=snapshot, name="default")
     run = DriftRun.objects.create(
         monitor=monitor,
         idempotency_key="report-url",
@@ -133,8 +125,8 @@ def test_completed_run_report_url_is_tenant_scoped_and_presigned(monkeypatch):
 
 @pytest.mark.django_db
 def test_report_url_is_unavailable_before_run_completes():
-    owner, _project, version, asset = _monitor_fixture("drift-report-pending@example.com")
-    monitor = DriftMonitor.objects.create(version=version, reference_asset=asset, name="default")
+    owner, _project, version, snapshot = _monitor_fixture("drift-report-pending@example.com")
+    monitor = DriftMonitor.objects.create(version=version, reference_snapshot=snapshot, name="default")
     run = DriftRun.objects.create(
         monitor=monitor,
         idempotency_key="report-pending",

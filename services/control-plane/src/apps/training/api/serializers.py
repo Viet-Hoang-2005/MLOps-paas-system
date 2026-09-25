@@ -38,8 +38,8 @@ class TrainingJobSerializer(serializers.ModelSerializer):
         slug_field="public_id", queryset=ModelProject.objects.none(), write_only=True
     )
     outputs = TrainingOutputSerializer(many=True, read_only=True)
-    source_zip = serializers.FileField(write_only=True, required=False)
-    training_data = serializers.FileField(write_only=True, required=False)
+    source_zip = serializers.FileField(write_only=True, required=True)
+    training_data = serializers.FileField(write_only=True, required=True)
     output_available = serializers.SerializerMethodField()
     registration_build = serializers.SerializerMethodField()
     model_status = serializers.SerializerMethodField()

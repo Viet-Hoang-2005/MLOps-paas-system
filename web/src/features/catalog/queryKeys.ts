@@ -8,4 +8,6 @@ export const catalogQueryKeys = {
     [...catalogQueryKeys.project(id), "source-files"] as const,
   referenceFiles: (id: string) =>
     [...catalogQueryKeys.project(id), "reference-files"] as const,
+  overview: (id: string) =>
+    [...catalogQueryKeys.project(id), "overview"] as const,
 };

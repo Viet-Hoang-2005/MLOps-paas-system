@@ -54,3 +54,12 @@ def immutable_image_reference(build):
     if build.backend == "argo":
         return f"{repository_from_reference(build.image_uri)}@{build.image_digest}"
     return build.image_digest
+
+
+def immutable_version_image_reference(version):
+    artifact = version.artifacts.filter(kind="image").first()
+    if not artifact:
+        raise ValueError("Model version has no registered image artifact.")
+    if artifact.metadata.get("identity_kind") == "oci_manifest_digest":
+        return f"{repository_from_reference(artifact.uri)}@{artifact.checksum}"
+    return artifact.checksum or artifact.uri

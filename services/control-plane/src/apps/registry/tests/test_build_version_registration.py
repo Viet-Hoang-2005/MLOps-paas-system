@@ -1,7 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
 
-from apps.catalog.models import ModelProject
+from apps.catalog.models import DraftRevisionAsset, ModelDraftRevision, ModelProject
 from apps.deployment.models import Build, BuildInputAsset
 from apps.registry.models import ModelArtifact, ModelVersion
 from apps.registry.services.versions import register_successful_build
@@ -28,17 +28,37 @@ class FakeImageRegistry:
 
 
 def build_for(project, name="model.pkl"):
+    draft = project.current_draft
+    number = (draft.saved_snapshot.number if draft.saved_snapshot_id else 0) + 1
+    revision = ModelDraftRevision.objects.create(draft=draft, number=number)
+    DraftRevisionAsset.objects.create(
+        revision=revision, kind="model", name=name, uri=f"s3://bucket/{project.public_id}/{name}"
+    )
+    DraftRevisionAsset.objects.create(
+        revision=revision, kind="reference_data", name="reference.csv", uri=f"s3://bucket/{project.public_id}/reference.csv"
+    )
+    draft.saved_snapshot = revision
+    draft.revision = number
+    draft.saved_revision = number
+    draft.save(update_fields=["saved_snapshot", "saved_revision"])
     build = Build.objects.create(
         project=project,
+        source_draft_revision=revision,
         flavor="sklearn",
         requirements_snapshot="numpy==1.26.4",
         status="building",
     )
     BuildInputAsset.objects.create(
         build=build,
-        kind="source_artifact",
+        kind="model",
         name=name,
         s3_uri=f"s3://bucket/{build.public_id}/{name}",
+    )
+    BuildInputAsset.objects.create(
+        build=build,
+        kind="reference_data",
+        name="reference.csv",
+        s3_uri=f"s3://bucket/{project.public_id}/reference.csv",
     )
     return build
 
@@ -69,7 +89,7 @@ def test_successful_manual_build_registers_one_version_and_is_idempotent(django_
     assert ModelVersion.objects.filter(project=project).count() == 1
     version = ModelVersion.objects.get(project=project)
     assert version.version == "1"
-    assert version.artifacts.get(kind="source").name == "model.pkl"
+    assert version.artifacts.get(kind="model").name == "model.pkl"
     assert ModelArtifact.objects.get(version=version, kind="image").checksum == "sha256:first"
 
 

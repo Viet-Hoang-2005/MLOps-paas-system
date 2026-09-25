@@ -1,5 +1,5 @@
-from django.conf import settings
 from rest_framework import generics, status
+from django.conf import settings
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,23 +12,18 @@ from apps.deployment.selectors import (
     endpoint_for_user,
     endpoints_for_user,
 )
-from apps.deployment.services.builds import request_build, request_cancel
+from apps.deployment.services.builds import request_cancel
 from apps.deployment.services.deployments import endpoint_logs, request_deployment, request_stop
 from apps.deployment.services.logs import build_logs, deployment_logs
 
 from .serializers import BuildSerializer, DeploymentSerializer, EndpointSerializer
 
 
-class BuildListCreateEndpoint(generics.ListCreateAPIView):
+class BuildListCreateEndpoint(generics.ListAPIView):
     serializer_class = BuildSerializer
 
     def get_queryset(self):
         return builds_for_user(self.request.user)
-
-    def perform_create(self, serializer):
-        version = serializer.validated_data["version"]
-        serializer.instance = request_build(version, settings.BUILD_BACKEND)
-
 
 class BuildDetailEndpoint(generics.RetrieveAPIView):
     serializer_class = BuildSerializer
@@ -74,8 +69,9 @@ class DeploymentListCreateEndpoint(generics.ListCreateAPIView):
         return deployments_for_user(self.request.user)
 
     def perform_create(self, serializer):
-        build = serializer.validated_data["build"]
-        serializer.instance = request_deployment(build, settings.DEPLOYMENT_BACKEND)
+        version = serializer.validated_data["version"]
+        target = serializer.validated_data["target"]
+        serializer.instance = request_deployment(version, target, settings.DEPLOYMENT_BACKEND)
 
 
 class DeploymentDetailEndpoint(generics.RetrieveAPIView):

@@ -29,16 +29,17 @@ import {
   useRunDriftMonitoringJob,
   type DriftMonitoringResult,
 } from "@/features/drift/hooks/useDriftMonitoring";
+import { projectPaths } from "@/app/router/paths";
 
 const DRIFT_TERMINAL_STATUSES = ["completed", "failed", "cancelled"] as const;
 
 export default function DriftMonitoringPage() {
   const { t, i18n } = useTranslation("drift");
-  const { modelId } = useParams<{ modelId: string }>();
+  const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
 
   const { data: jobs, isLoading: isLoadingJobs } =
-    useDriftMonitoringJobs(modelId);
+    useDriftMonitoringJobs(projectId);
   const activeJob = jobs?.find((job) => job.is_active);
 
   const {
@@ -71,13 +72,13 @@ export default function DriftMonitoringPage() {
   }, [refetchResults, stream.status]);
 
   const handleRunNow = async () => {
-    if (!modelId || !activeJob) return;
-    const run = await runJob({ id: activeJob.id, project_id: modelId });
+    if (!projectId || !activeJob) return;
+    const run = await runJob({ id: activeJob.id, project_id: projectId });
     setActiveRunId(run.id);
   };
 
   const handleViewReport = (runId: string) => {
-    navigate(`/dashboard/drift-monitoring/${modelId}/report/${runId}`);
+    navigate(`${projectPaths.monitoring(projectId!)}/report/${runId}`);
   };
 
   if (isLoadingJobs) {
@@ -96,7 +97,7 @@ export default function DriftMonitoringPage() {
             <Button
               size="md"
               onClick={() =>
-                navigate(`/dashboard/drift-monitoring/${modelId}/new`)
+                navigate(`${projectPaths.monitoring(projectId!)}/configure`)
               }
             >
               {t("createMonitoring")}
@@ -175,7 +176,7 @@ export default function DriftMonitoringPage() {
                 title={t("edit")}
                 icon={<Settings className="h-5 w-5" />}
                 onClick={() =>
-                  navigate(`/dashboard/drift-monitoring/${modelId}/edit`)
+                  navigate(`${projectPaths.monitoring(projectId!)}/configure`)
                 }
               />
               <Button
@@ -210,7 +211,7 @@ export default function DriftMonitoringPage() {
             />
             <CardSummary
               label={t("referencePath")}
-              value={activeJob.reference_asset_name || t("none")}
+              value={`Version ${activeJob.version_id}`}
             />
           </div>
         </div>
@@ -247,7 +248,7 @@ export default function DriftMonitoringPage() {
         tone="danger"
         loading={isDeleting}
         onConfirm={() => {
-          deleteJob({ id: activeJob.id, project_id: modelId! });
+          deleteJob({ id: activeJob.id, project_id: projectId! });
           setIsDeleteModalOpen(false);
         }}
         onCancel={() => setIsDeleteModalOpen(false)}

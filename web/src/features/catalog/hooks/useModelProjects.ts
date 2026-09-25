@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   createModelProject,
   deleteModelProject,
+  getProjectOverview,
   listModelProjects,
   updateModelProject,
 } from "@/features/catalog/api/catalogApi";
@@ -11,11 +12,22 @@ import { getApiErrorMessage } from "@/shared/api/errors";
 import { catalogQueryKeys } from "@/features/catalog/queryKeys";
 import { toast } from "@/shared/components/toastStore";
 import type { ModelProjectFormValues } from "@/features/catalog/types";
+import { routes } from "@/app/router/paths";
 
 export function useModelProjects() {
   return useQuery({
     queryKey: catalogQueryKeys.projects(),
     queryFn: listModelProjects,
+  });
+}
+
+export function useProjectOverview(projectId: string | undefined) {
+  return useQuery({
+    queryKey: projectId
+      ? catalogQueryKeys.overview(projectId)
+      : ["catalog", "overview", "none"],
+    queryFn: () => getProjectOverview(projectId!),
+    enabled: Boolean(projectId),
   });
 }
 
@@ -60,7 +72,7 @@ export function useModelProjectMutations() {
     onSuccess: async () => {
       await invalidateModels();
       toast.success(t("messages.deleteStarted"));
-      navigate("/dashboard/management");
+      navigate(routes.projects);
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, t("messages.deleteFailed")));

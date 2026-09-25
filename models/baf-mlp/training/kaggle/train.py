@@ -558,7 +558,17 @@ def main():
     split_path = output_dir / "split_manifest.json"
     split_path.write_text(json.dumps(split_payload, indent=2), encoding="utf-8")
 
-    # 7. Save artifact_manifest.json
+    # 7. Save reference_data.parquet for drift monitoring baseline
+    ref_filename = "reference_data.parquet"
+    ref_path = output_dir / ref_filename
+    try:
+        df_ref.to_parquet(ref_path, index=False)
+    except Exception:
+        ref_filename = "reference_data.csv"
+        ref_path = output_dir / ref_filename
+        df_ref.to_csv(ref_path, index=False)
+
+    # 8. Save artifact_manifest.json
     files_to_index = [
         "model.pt",
         "preprocessor.joblib",
@@ -566,6 +576,7 @@ def main():
         "data_contract.json",
         "metrics.json",
         "split_manifest.json",
+        ref_filename,
     ]
     file_manifests = {}
     for name in files_to_index:

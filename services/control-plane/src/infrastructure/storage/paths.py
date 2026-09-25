@@ -9,22 +9,30 @@ def project_prefix(tenant_id, project_id):
     return f"users/{_clean(tenant_id)}/models/{_clean(project_id)}"
 
 
-def workspace_prefix(tenant_id, project_id, kind):
-    if kind not in {"code", "data"}:
-        raise ValueError("Workspace kind must be code or data")
-    return f"{project_prefix(tenant_id, project_id)}/{kind}/"
+def draft_prefix(tenant_id, project_id, draft_id):
+    return f"{project_prefix(tenant_id, project_id)}/draft/{_clean(draft_id)}/"
+
+
+def draft_asset_key(tenant_id, project_id, draft_id, kind, filename):
+    return f"{draft_prefix(tenant_id, project_id, draft_id)}assets/{_clean(kind)}/{_clean(filename)}"
+
+
+def dataset_snapshot_prefix(tenant_id, project_id, snapshot_id):
+    return f"{project_prefix(tenant_id, project_id)}/datasets/{_clean(snapshot_id)}/"
 
 
 def build_input_prefix(tenant_id, project_id, build_id, kind):
     if kind not in {
-        "source_artifact",
-        "training_output",
         "label_mapping",
         "metrics",
         "params",
         "model_insights",
         "feature_importance",
         "input_schema",
+        "model",
+        "reference_data",
+        "source_code",
+        "data_contract",
     }:
         raise ValueError("Unsupported build input kind")
     return f"{project_prefix(tenant_id, project_id)}/builds/{_clean(build_id)}/inputs/{kind}/"

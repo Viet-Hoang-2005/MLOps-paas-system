@@ -291,7 +291,7 @@ export default function ModelTestingPage() {
           "info",
           t("testingPage.selectedModel", {
             name: selectedModel.name,
-            version: selectedModel.version || "v1",
+            version: selectedModel.active_endpoint?.version_id.slice(0, 8) || "—",
           }),
         ),
         makeLog(

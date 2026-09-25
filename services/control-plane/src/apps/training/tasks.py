@@ -80,10 +80,8 @@ def execute_training_job(self, job_id):
         job.mark_finished("completed")
         job.tracking = {**job.tracking, "logs_tail": str(result)[-6000:]}
         job.save(update_fields=["status", "completed_at", "runtime_seconds", "tracking", "updated_at"])
-        job.outputs.update_or_create(
-            relative_path="model.tar.gz",
-            defaults={"kind": "model", "s3_uri": job.output_uri, "content_type": "application/gzip"},
-        )
+        from .services.jobs import register_training_completed_outputs
+        register_training_completed_outputs(job)
         record_training_event(job=job, event_type="completed", message="Training execution completed.")
         record_transition(job, "completed")
     for line in str(result).splitlines()[-500:]:

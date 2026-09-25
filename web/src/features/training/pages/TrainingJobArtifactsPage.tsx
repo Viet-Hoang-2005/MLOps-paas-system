@@ -1,22 +1,20 @@
 import { useEffect, useRef } from "react";
 import {
   Clipboard,
-  Database,
   Download,
   FileArchive,
-  FileCode2,
   Rocket,
   Trash2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { SourceEditor } from "@/features/catalog/components/SourceEditor";
 import { useTrainingJobDetailContext } from "@/features/training/trainingJobDetailContext";
 import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
 import { Button } from "@/shared/components/Button";
 import { PageBody } from "@/shared/components/PageBody";
 import { TerminalViewer } from "@/shared/components/TerminalViewer";
+import { projectPaths } from "@/app/router/paths";
 
 const BUILD_TERMINAL_STATUSES = ["ready", "failed", "cancelled"] as const;
 
@@ -53,7 +51,7 @@ export default function TrainingJobArtifactsPage() {
             <Button
               icon={<Rocket className="h-4 w-4" />}
               onClick={() =>
-                navigate(`/dashboard/model-evolution/${job.project_id}`)
+                navigate(projectPaths.evolution(job.project_id))
               }
             >
               {t("detail.registry.open")}
@@ -150,24 +148,6 @@ export default function TrainingJobArtifactsPage() {
         </div>
       </PageBody>
 
-      <SourceEditor
-        modelId={job.project_id}
-        fileType="code_file"
-        title={t("createFlow.source.sourceCode")}
-        icon={<FileCode2 className="h-4 w-4" />}
-        accept=".zip,.py,.json,.yaml,.yml"
-        editorType="code"
-        currentEntryPoint={job.entry_point}
-      />
-
-      <SourceEditor
-        modelId={job.project_id}
-        fileType="data_file"
-        title={t("createFlow.source.referenceData")}
-        icon={<Database className="h-4 w-4" />}
-        accept=".zip,.csv,.parquet"
-        editorType="csv"
-      />
     </div>
   );
 }

@@ -5,7 +5,8 @@ from django.contrib.auth import get_user_model
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment
-from apps.registry.models import ModelVersion
+from apps.registry.models import ModelArtifact
+from apps.registry.tests.factories import create_model_version
 from infrastructure.execution.docker_backends import DockerDeploymentBackend
 
 
@@ -24,7 +25,7 @@ class HealthyHttpClient:
 
 class RecordingDockerClient:
     def __init__(self):
-        self.kwargs = None
+        self.kwargs = {}
 
     def run(self, **kwargs):
         self.kwargs = kwargs
@@ -36,21 +37,30 @@ def test_local_deployment_uses_embedded_model_artifact_and_becomes_healthy(monke
     monkeypatch.setenv("LOG_SUMMARY_INTERVAL_SECONDS", "15")
     owner = get_user_model().objects.create_user("runtime-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="runtime model")
-    version = ModelVersion.objects.create(project=project, version="1", flavor="xgboost")
+    version = create_model_version(project, flavor="xgboost")
+    ModelArtifact.objects.create(
+        version=version,
+        kind="image",
+        name="model",
+        uri=f"image-{project.public_id}:v1",
+        checksum="sha256:local-image-id",
+    )
     build = Build.objects.create(
         project=project,
         version=version,
+        source_version=version,
         flavor="xgboost",
         status="ready",
         image_uri=f"image-{project.public_id}:v1",
         image_digest="sha256:local-image-id",
     )
-    deployment = Deployment.objects.create(version=version, build=build, status="deploying")
+    deployment = Deployment.objects.create(project=project, version=version, build=build, target="production", status="deploying")
     docker = RecordingDockerClient()
 
     endpoint = DockerDeploymentBackend(docker_client=docker, http=HealthyHttpClient()).deploy(deployment)
 
     assert docker.kwargs["environment"] == {
+        "LOG_FORMAT": "console",
         "PROJECT_ID": str(project.public_id),
         "MODEL_VERSION_ID": str(version.public_id),
         "MODEL_VERSION": "1",
@@ -59,7 +69,7 @@ def test_local_deployment_uses_embedded_model_artifact_and_becomes_healthy(monke
         "LOG_SUMMARY_INTERVAL_SECONDS": "15",
     }
     assert docker.kwargs["image"] == "sha256:local-image-id"
-    assert endpoint.internal_url == f"http://deploy-{build.public_id}:5001"
+    assert endpoint.internal_url == f"http://deploy-{deployment.public_id}:5001"
     assert endpoint.health_status == "healthy"
 
 

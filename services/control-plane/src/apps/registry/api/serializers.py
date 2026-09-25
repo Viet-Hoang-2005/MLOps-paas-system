@@ -3,7 +3,6 @@ from rest_framework import serializers
 from apps.observability.models import LifecycleEvent
 from apps.observability.services.lifecycle import events_for_aggregate
 from apps.registry.models import ModelArtifact, ModelMetric, ModelVersion, RegistryAlias
-from apps.training.models import TrainingJob
 
 
 class ModelArtifactSerializer(serializers.ModelSerializer):
@@ -18,13 +17,10 @@ class ModelVersionSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="public_id", read_only=True)
     project_id = serializers.UUIDField(source="project.public_id", read_only=True)
     source_job_id = serializers.SerializerMethodField()
-    source_job = serializers.SlugRelatedField(
-        slug_field="public_id", queryset=TrainingJob.objects.none(), required=False, allow_null=True, write_only=True
-    )
-    source_artifact = serializers.FileField(write_only=True, required=False)
     artifacts = ModelArtifactSerializer(many=True, read_only=True)
     metrics = serializers.SerializerMethodField()
     events = serializers.SerializerMethodField()
+    aliases = serializers.SerializerMethodField()
 
     class Meta:
         model = ModelVersion
@@ -32,12 +28,10 @@ class ModelVersionSerializer(serializers.ModelSerializer):
             "id",
             "project_id",
             "version",
-            "source_job",
             "source_job_id",
-            "source_artifact",
             "requirements_snapshot",
             "flavor",
-            "stage",
+            "aliases",
             "deployability",
             "deployability_reason",
             "metrics_summary",
@@ -60,10 +54,6 @@ class ModelVersionSerializer(serializers.ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = self.context.get("request")
-        project = self.context.get("project")
-        if request and project:
-            self.fields["source_job"].queryset = TrainingJob.objects.filter(project=project, status="completed")
 
     def get_metrics(self, instance):
         return ModelMetricSerializer(instance.metrics.all(), many=True).data
@@ -76,6 +66,10 @@ class ModelVersionSerializer(serializers.ModelSerializer):
         return RegistryEventSerializer(
             events_for_aggregate(aggregate_type="model_version", aggregate_id=instance.public_id), many=True
         ).data
+
+    @staticmethod
+    def get_aliases(instance):
+        return list(instance.aliases.order_by("name").values_list("name", flat=True))
 
 
 class RegistryAliasSerializer(serializers.ModelSerializer):

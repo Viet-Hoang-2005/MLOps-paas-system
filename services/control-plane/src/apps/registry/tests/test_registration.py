@@ -8,6 +8,7 @@ from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.registry.models import ModelVersion, RegistryAlias
 from apps.registry.services.routing import predict_alias, predict_version
+from apps.registry.tests.factories import create_model_version
 
 
 @pytest.mark.django_db
@@ -36,7 +37,7 @@ def test_version_smoke_test_is_tenant_scoped(monkeypatch):
     owner = get_user_model().objects.create_user("smoke-owner@example.com", "password123")
     other = get_user_model().objects.create_user("smoke-other@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="Smoke")
-    version = ModelVersion.objects.create(project=project, version="1")
+    version = create_model_version(project)
     client = APIClient()
     url = f"/api/registry/versions/{version.public_id}/smoke-test/"
 
@@ -77,9 +78,9 @@ class FakeHttpClient:
 def routable_version(db):
     user = get_user_model().objects.create_user("route-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="Routable")
-    version = ModelVersion.objects.create(project=project, version="1")
-    build = Build.objects.create(project=project, version=version, flavor="sklearn", status="ready")
-    deployment = Deployment.objects.create(version=version, build=build, status="healthy")
+    version = create_model_version(project)
+    build = Build.objects.create(project=project, version=version, source_version=version, flavor="sklearn", status="ready")
+    deployment = Deployment.objects.create(project=project, version=version, build=build, target="production", status="healthy")
     Endpoint.objects.create(
         deployment=deployment,
         public_url="https://models.example/predict",

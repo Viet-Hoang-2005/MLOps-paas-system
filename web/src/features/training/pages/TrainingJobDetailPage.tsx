@@ -46,6 +46,7 @@ import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { PageTabs } from "@/shared/components/PageTabs";
 import { toast } from "@/shared/components/toastStore";
+import { projectPaths } from "@/app/router/paths";
 
 const ACTIVE_STATUSES: TrainingJobStatus[] = [
   "pending",
@@ -65,7 +66,7 @@ const AUTO_SYNC_INTERVAL_MS = 3000;
 
 export default function TrainingJobDetailPage() {
   const { t } = useTranslation("training");
-  const { jobId } = useParams<{ jobId: string }>();
+  const { jobId, projectId } = useParams<{ jobId: string; projectId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -213,7 +214,7 @@ export default function TrainingJobDetailPage() {
       await queryClient.invalidateQueries({
         queryKey: trainingQueryKeys.jobs(),
       });
-      navigate("/dashboard/model-training");
+      navigate(projectPaths.training(projectId!));
     },
     onError: (error) =>
       toast.error(getApiErrorMessage(error, t("delete.failed"))),
@@ -315,7 +316,7 @@ export default function TrainingJobDetailPage() {
           {t("detail.notFoundDescription")}
         </p>
         <Button
-          onClick={() => navigate("/dashboard/model-training")}
+          onClick={() => navigate(projectPaths.training(projectId!))}
           variant="secondary"
           className="mt-2"
         >
@@ -364,7 +365,7 @@ export default function TrainingJobDetailPage() {
     <section className="flex w-full flex-1 flex-col space-y-6">
       <button
         type="button"
-        onClick={() => navigate("/dashboard/model-training")}
+        onClick={() => navigate(projectPaths.training(projectId!))}
         className="group mb-6 flex items-center gap-2 text-style-body-strong text-color-muted-foreground transition-colors hover:text-color-foreground"
       >
         <ArrowLeft className="h-4 w-4 transition-all group-hover:-translate-x-0.5" />
@@ -471,7 +472,7 @@ export default function TrainingJobDetailPage() {
             isActive: activeSection === tab.id,
             onClick: () =>
               navigate(
-                `/dashboard/model-training/jobs/${job.id}/details/${tab.id}`,
+                `${projectPaths.trainingJob(projectId!, job.id)}/details/${tab.id}`,
               ),
           }))}
         />

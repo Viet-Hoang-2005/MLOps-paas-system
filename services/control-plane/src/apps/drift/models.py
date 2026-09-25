@@ -6,11 +6,8 @@ from django.db import models
 class DriftMonitor(models.Model):
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     version = models.ForeignKey("registry.ModelVersion", on_delete=models.CASCADE, related_name="drift_monitors")
-    reference_asset = models.ForeignKey(
-        "catalog.WorkspaceAsset", on_delete=models.PROTECT, related_name="drift_monitors"
-    )
     reference_snapshot = models.ForeignKey(
-        "ct.DatasetSnapshot", on_delete=models.SET_NULL, related_name="drift_monitors", null=True, blank=True
+        "ct.DatasetSnapshot", on_delete=models.PROTECT, related_name="drift_monitors"
     )
     detector_version = models.CharField(max_length=80, blank=True)
     detector_config = models.JSONField(default=dict, blank=True)

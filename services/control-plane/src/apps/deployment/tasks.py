@@ -10,6 +10,7 @@ from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.services.logs import append_deployment_log, reset_deployment_logs
 from apps.observability.services.outbox import enqueue_event
 from apps.registry.services.versions import register_successful_build
+from apps.registry.services.versions import set_alias
 from common.logging import failure_reported, record_transition
 from infrastructure.execution import build_backend, deployment_backend
 from infrastructure.execution.image_cleanup import BuildImageCleaner
@@ -20,10 +21,39 @@ from infrastructure.storage.paths import build_prefix
 logger = logging.getLogger(__name__)
 
 
+def _fail_build(build, exc):
+    already_failed = Build.objects.filter(pk=build.pk, status="failed").exists()
+    Build.objects.filter(pk=build.pk).update(status="failed", error_message=str(exc)[:12000], completed_at=timezone.now())
+    if not already_failed:
+        record_transition(build, "failed", reason="Build or version registration failed", error_type=type(exc).__name__, exc_info=True)
+    else:
+        failure_reported.set(True)
+    if build.source_draft_revision_id:
+        from apps.catalog.models import ModelDraft
+        ModelDraft.objects.filter(locked_by_build=build).update(locked_by_build=None, status="ready")
+    cleanup_failed_build_artifacts.delay(str(build.public_id), False)
+
+
 def _mark_deployment_healthy(deployment):
-    Deployment = type(deployment)
-    Deployment.objects.filter(pk=deployment.pk).update(status="healthy", deployed_at=timezone.now(), error_message="")
-    Endpoint.objects.filter(deployment=deployment).update(health_status="healthy", last_checked_at=timezone.now())
+    from apps.catalog.models import ModelProject
+
+    with transaction.atomic():
+        ModelProject.objects.select_for_update().get(pk=deployment.project_id)
+        locked = Deployment.objects.select_for_update().get(pk=deployment.pk)
+        if locked.status in {"failed", "stopped", "unhealthy"}:
+            return
+        locked.status = "healthy"
+        locked.deployed_at = timezone.now()
+        locked.error_message = ""
+        locked.save(update_fields=["status", "deployed_at", "error_message", "updated_at"])
+        Endpoint.objects.filter(deployment=locked).update(health_status="healthy", last_checked_at=timezone.now())
+        set_alias(
+            project=locked.project,
+            actor=locked.project.owner,
+            name=locked.target,
+            version=locked.version,
+        )
+        deployment = locked
     invalidate_model_server_cache(str(deployment.version.public_id))
     append_deployment_log(deployment, "Endpoint passed health checks; deployment is healthy.")
     record_transition(deployment, "healthy")
@@ -57,22 +87,7 @@ def execute_build(self, build_id):
     try:
         result = build_backend(build.backend).run(build)
     except Exception as exc:
-        already_failed = Build.objects.filter(pk=build.pk, status="failed").exists()
-        Build.objects.filter(pk=build.pk).update(
-            status="failed", error_message=str(exc)[:12000], completed_at=timezone.now()
-        )
-        if not already_failed:
-            record_transition(
-                build,
-                "failed",
-                reason="Build backend execution failed",
-                error_type=type(exc).__name__,
-                exc_info=True,
-            )
-        else:
-            # A trusted callback already recorded this failure while the backend ran.
-            failure_reported.set(True)
-        cleanup_failed_build_artifacts.delay(str(build.public_id), False)
+        _fail_build(build, exc)
         raise
     if isinstance(result, dict) and result.get("dispatched"):
         record_transition(build, "building", phase="dispatched")
@@ -86,7 +101,11 @@ def execute_build(self, build_id):
             registry=settings.HARBOR_REGISTRY_URL if build.backend == "argo" else "",
             registry_project=settings.HARBOR_USER_PROJECT,
         )
-        build = register_successful_build(build=build, image_uri=image_uri, image_digest=build.image_digest)
+        try:
+            build = register_successful_build(build=build, image_uri=image_uri, image_digest=build.image_digest)
+        except Exception as exc:
+            _fail_build(build, exc)
+            raise
     Build.objects.filter(pk=build.pk).update(logs=str(result)[-20000:], completed_at=timezone.now())
     if registered_locally:
         record_transition(build, "ready")
@@ -99,6 +118,11 @@ def cancel_build(self, build_id):
     build_backend(build.backend).cancel(build)
     Build.objects.filter(pk=build.pk).update(status="cancelled", completed_at=timezone.now())
     record_transition(build, "cancelled")
+    if hasattr(build.project, "draft") and build.project.draft.locked_by_build_id == build.id:
+        draft = build.project.draft
+        draft.locked_by_build = None
+        draft.status = "ready" if draft.can_build() else "editing"
+        draft.save(update_fields=["locked_by_build", "status", "updated_at"])
     cleanup_failed_build_artifacts.delay(str(build.public_id), bool(build.image_uri))
     return "cancelled"
 
@@ -117,6 +141,13 @@ def cleanup_failed_build_artifacts(self, build_id, delete_image=False):
     storage = S3Storage()
     storage.delete_prefix(build_prefix(build.project.owner.tenant_id, build.project.public_id, build.public_id))
     build.input_assets.update(s3_uri="", purged_at=timezone.now())
+
+    if hasattr(build.project, "draft") and build.project.draft.locked_by_build_id == build.id:
+        draft = build.project.draft
+        draft.locked_by_build = None
+        draft.status = "ready" if draft.can_build() else "editing"
+        draft.save(update_fields=["locked_by_build", "status", "updated_at"])
+
     return "purged"
 
 

@@ -3,6 +3,7 @@ from django.urls import path
 from .endpoints import (
     AliasPredictionEndpoint,
     ModelVersionDetailEndpoint,
+    ModelVersionRebuildEndpoint,
     ProjectAliasListCreateEndpoint,
     ProjectVersionListCreateEndpoint,
     VersionSmokeTestEndpoint,
@@ -11,6 +12,7 @@ from .endpoints import (
 urlpatterns = [
     path("models/<uuid:project_id>/versions/", ProjectVersionListCreateEndpoint.as_view(), name="project-versions"),
     path("versions/<uuid:version_id>/", ModelVersionDetailEndpoint.as_view(), name="version-detail"),
+    path("versions/<uuid:version_id>/rebuild/", ModelVersionRebuildEndpoint.as_view(), name="version-rebuild"),
     path("versions/<uuid:version_id>/smoke-test/", VersionSmokeTestEndpoint.as_view(), name="version-smoke-test"),
     path("models/<uuid:project_id>/aliases/", ProjectAliasListCreateEndpoint.as_view(), name="project-aliases"),
     path(

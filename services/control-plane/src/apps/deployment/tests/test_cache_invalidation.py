@@ -8,7 +8,7 @@ from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services import cache as cache_service
 from apps.deployment.tasks import _mark_deployment_healthy, stop_deployment
-from apps.registry.models import ModelVersion
+from apps.registry.tests.factories import create_model_version
 
 
 class FakeRedisClient:
@@ -41,9 +41,9 @@ class CacheInvalidationTests(TestCase):
     def test_mark_deployment_healthy_invalidates_cache(self):
         owner = get_user_model().objects.create_user("healthy-owner@example.com", "password123")
         project = ModelProject.objects.create(owner=owner, name="healthy project")
-        version = ModelVersion.objects.create(project=project, version="1")
-        build = Build.objects.create(project=project, version=version, flavor="sklearn", status="ready")
-        deployment = Deployment.objects.create(version=version, build=build, backend="docker", status="deploying")
+        version = create_model_version(project)
+        build = Build.objects.create(project=project, version=version, source_version=version, flavor="sklearn", status="ready")
+        deployment = Deployment.objects.create(project=project, version=version, build=build, target="production", backend="docker", status="deploying")
         Endpoint.objects.create(deployment=deployment, runtime_name="runtime-test", health_status="deploying")
 
         invalidated_ids = []
@@ -60,9 +60,9 @@ class CacheInvalidationTests(TestCase):
     def test_stop_deployment_invalidates_cache(self):
         owner = get_user_model().objects.create_user("stop-owner@example.com", "password123")
         project = ModelProject.objects.create(owner=owner, name="stop project")
-        version = ModelVersion.objects.create(project=project, version="1")
-        build = Build.objects.create(project=project, version=version, flavor="sklearn", status="ready")
-        deployment = Deployment.objects.create(version=version, build=build, backend="docker", status="healthy")
+        version = create_model_version(project)
+        build = Build.objects.create(project=project, version=version, source_version=version, flavor="sklearn", status="ready")
+        deployment = Deployment.objects.create(project=project, version=version, build=build, target="staging", backend="docker", status="healthy")
 
         invalidated_ids = []
         fake_backend = Mock()

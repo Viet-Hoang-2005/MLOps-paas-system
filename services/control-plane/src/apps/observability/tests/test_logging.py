@@ -19,6 +19,7 @@ from apps.drift.services import logs as drift_logs
 from apps.training.models import TrainingJob
 from apps.training.services import logs as training_logs
 from apps.training.tasks import execute_training_job
+from apps.registry.tests.factories import create_model_version
 from common import celery_logging, gunicorn_conf
 from common import logging as app_logging
 from common.logging_utils import bind_context, current_context, reset_context
@@ -142,7 +143,7 @@ def test_publish_propagates_only_bounded_correlation():
         reset_context(token)
 
 
-def test_retry_signal_emits_one_safe_warning_with_context(caplog):
+def test_retry_signal_emits_one_safe_warning_with_context(caplog, monkeypatch):
     from celery.exceptions import Retry
     from celery.signals import task_retry
 
@@ -215,8 +216,19 @@ def project(db):
     return ModelProject.objects.create(owner=owner, name="logging")
 
 
+def _build(project, **fields):
+    version = create_model_version(project)
+    return Build.objects.create(
+        project=project,
+        version=version,
+        source_version=version,
+        flavor="sklearn",
+        **fields,
+    )
+
+
 def test_build_dispatch_is_not_completion(project, monkeypatch, django_capture_on_commit_callbacks):
-    build = Build.objects.create(project=project, status="queued", backend="argo", flavor="sklearn")
+    build = _build(project, status="queued", backend="argo")
     monkeypatch.setattr(
         "apps.deployment.tasks.build_backend", lambda _: SimpleNamespace(run=lambda _: {"dispatched": True})
     )
@@ -252,7 +264,7 @@ def test_build_webhook_replay_logs_only_first_transition(
     project, settings, monkeypatch, django_capture_on_commit_callbacks
 ):
     settings.CONTROL_PLANE_WEBHOOK_SECRET = "test-callback-secret"
-    build = Build.objects.create(project=project, status="building", flavor="sklearn")
+    build = _build(project, status="building")
     monkeypatch.setattr("apps.deployment.api.webhooks.cleanup_failed_build_artifacts.delay", Mock())
     emitted = Mock()
     monkeypatch.setattr(app_logging, "log_event", emitted)
@@ -388,7 +400,7 @@ def test_http_failures_are_not_suppressed_after_success(caplog):
 
 
 def test_build_task_does_not_repeat_callback_ready(project, monkeypatch, django_capture_on_commit_callbacks):
-    build = Build.objects.create(project=project, status="queued", flavor="sklearn")
+    build = _build(project, status="queued")
 
     def callback_then_return(resource):
         Build.objects.filter(pk=resource.pk).update(status="ready")
@@ -412,14 +424,15 @@ def test_django_converted_exception_retains_diagnostic_and_cleans_up(settings, m
         raise RuntimeError("token=private-view-error")
 
     settings.ROOT_URLCONF = type("LoggingTestUrls", (), {"urlpatterns": [path("broken/", broken_view)]})
-    summary = Mock()
-    monkeypatch.setattr("common.middleware.Summary", lambda *_: summary)
+    emitted = Mock()
+    monkeypatch.setattr("common.middleware.log_event", emitted)
     client = APIClient()
     client.raise_request_exception = False
     response = client.get("/broken/")
     assert response.status_code == 500
-    summary.failure.assert_called_once()
-    fields = summary.failure.call_args.kwargs
+    assert emitted.call_count == 1
+    assert emitted.call_args.args[2] == "http.request.failed"
+    fields = emitted.call_args.kwargs
     assert fields["error_type"] == "RuntimeError"
     assert fields["exc_info"][0] is RuntimeError
     assert fields["exc_info"][2] is not None

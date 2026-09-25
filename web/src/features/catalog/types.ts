@@ -1,43 +1,16 @@
 import type { ResourceId } from "@/shared/types";
-import type {
-  RegistryDeployabilityStatus,
-  RegistryModelInsightsSummary,
-  RegistryStage,
-} from "@/features/registry/types";
 
 export type ModelAccessMode = "private" | "public";
-export type ModelProjectStatus =
-  | "registered"
-  | "ready"
-  | "uploading"
-  | "deploying"
-  | "deployed"
-  | "unhealthy"
-  | "deploy_failed"
-  | "stopped"
-  | "archived"
-  | "error"
-  | "disabled";
-export type ModelBuildStatus =
-  | "not_started"
-  | "pending"
-  | "queued"
-  | "building"
-  | "ready"
-  | "failed"
-  | "cancelled"
-  | "error";
-export type ModelEndpointStatus =
-  | "not_deployed"
-  | "deploying"
-  | "healthy"
-  | "unhealthy"
-  | "deploy_failed"
-  | "stopped";
 export type ModelFlavor = "sklearn" | "xgboost" | "pytorch" | "tensorflow";
-export type ModelArtifactFormat = "raw" | "mlflow_zip";
-export type ModelSourceType = "manual_upload" | "training_job";
-export type ModelLifecycleStatus = "metadata" | "image_ready" | "deployed";
+export type ModelArtifactFormat = "raw" | "archive";
+export type RegistryDeployabilityStatus = "unknown" | "deployable" | "track_only" | "invalid";
+export interface RegistryModelInsightsSummary {
+  schema_version?: string;
+  kind?: "feature_importance" | "coefficients" | string;
+  source?: string;
+  feature_count?: number;
+  items?: Array<{ name: string; value: number; abs_value?: number; class_name?: string; rank?: number }>;
+}
 export type ModelDeletionState =
   "active" | "deleting" | "deleted" | "delete_failed";
 
@@ -61,41 +34,11 @@ export interface ModelProject {
   deletion_state?: ModelDeletionState;
   deletion_error?: string;
   deleted_at?: string | null;
-  version?: string;
-  source_type?: ModelSourceType;
-  source_training_job?: ResourceId | null;
-  source_artifact_uri?: string;
-  model_uri?: string;
   endpoint_url?: string;
   active_endpoint?: ActiveModelEndpoint | null;
-  health_url?: string;
-  status?: ModelProjectStatus;
-  error_message?: string;
-  endpoint_status?: ModelEndpointStatus;
-  endpoint_error?: string;
-  endpoint_last_checked_at?: string | null;
-  endpoint_container_name?: string;
-  endpoint_image_name?: string;
-  endpoint_public_path?: string;
-  endpoint_internal_path?: string;
-  source_artifact?: string;
   flavor?: ModelFlavor | "";
-  package_manifest?: Record<string, unknown>;
-  package_preview_tree?: string[];
-  build_status?: ModelBuildStatus;
-  lifecycle_status?: ModelLifecycleStatus;
-  build_id?: ResourceId;
-  build_error?: string;
-  deployment_id?: ResourceId;
-  metrics_summary?: Record<string, unknown>;
-  params_summary?: Record<string, unknown>;
-  model_insights_summary?: RegistryModelInsightsSummary;
-  has_model_insights?: boolean;
-  metadata_warnings?: string[];
-  source_code_file?: string | null;
-  reference_data_file?: string | null;
-  source_code?: ProjectAssetSummary | null;
-  reference_data?: ProjectAssetSummary | null;
+  workflow_status?: "setup" | "image_ready" | "deployed";
+  lifecycle_status?: "active" | "archived" | "deleted";
   created_at: string;
   updated_at: string;
 }
@@ -111,19 +54,23 @@ export interface ModelVersion {
   source_job_id: ResourceId | null;
   requirements_snapshot: string;
   flavor: ModelFlavor | "";
-  stage: RegistryStage;
+  aliases: string[];
   deployability: RegistryDeployabilityStatus;
   deployability_reason: string;
   metrics_summary: Record<string, unknown>;
   params_summary: Record<string, unknown>;
   insights_summary: RegistryModelInsightsSummary;
-  artifacts: Array<{ id: ResourceId; kind: string; name: string; uri: string }>;
+  artifacts: Array<{ id: ResourceId; kind: string; name: string; uri: string; checksum?: string }>;
   registered_at: string;
 }
 
 export interface Build {
   id: ResourceId;
   project_id: ResourceId;
+  source_kind: "draft" | "model_version" | "training_job";
+  source_draft_revision_id: ResourceId | null;
+  source_version_id: ResourceId | null;
+  source_job_id: ResourceId | null;
   version_id: ResourceId | null;
   version_number: string | null;
   flavor: ModelFlavor;
@@ -141,8 +88,10 @@ export interface Build {
 
 export interface Deployment {
   id: ResourceId;
+  project_id: ResourceId;
   version_id: ResourceId;
-  build_id: ResourceId;
+  build_id: ResourceId | null;
+  target: "staging" | "production";
   backend: "docker" | "argo";
   status:
     "pending" | "deploying" | "healthy" | "unhealthy" | "failed" | "stopped";
@@ -162,46 +111,20 @@ export interface ModelProjectFormValues {
   name: string;
   description: string;
   access_mode: ModelAccessMode;
-  version?: string;
-  artifact?: File | null;
-  source_code_file?: File | null;
-  reference_data_file?: File | null;
-}
-
-export interface ProjectAssetSummary {
-  name: string;
-  download_url: string;
-  checksum: string;
-  size_bytes: number;
-  content_type: string;
+  task_domain?: string;
 }
 
 export interface ProjectMetadataForm {
   name: string;
   description: string;
   access_mode: ModelAccessMode;
-  source_code_file: File | null;
-  reference_data_file: File | null;
 }
-
-export interface BuildInputForm {
-  source_artifact: File | null;
-  artifact_format: ModelArtifactFormat;
-  label_mapping_file?: File | null;
-  metrics_file?: File | null;
-  params_file?: File | null;
-  model_insights_file?: File | null;
-  feature_importance_file?: File | null;
-  input_schema_file?: File | null;
-  flavor: ModelFlavor;
-  requirements_text: string;
-  requirements_file?: File | null;
-}
-
-export type ModelBuildFormValues = ProjectMetadataForm & BuildInputForm;
 
 export type ModelBuildInputAssetKind =
-  | "source_artifact"
+  | "model"
+  | "reference_data"
+  | "source_code"
+  | "data_contract"
   | "label_mapping"
   | "metrics"
   | "params"
@@ -233,4 +156,77 @@ export interface ModelPredictionResponse {
   confidence: number | null;
   tenant_id: ResourceId;
   model_version_id: ResourceId;
+}
+
+export interface ReferenceSnapshotOverview {
+  id: ResourceId;
+  role: string;
+  manifest_uri: string;
+  manifest_checksum: string;
+  schema_checksum: string;
+  row_count: number;
+}
+
+export interface PresentOverview {
+  has_production: boolean;
+  is_live: boolean;
+  version: string | null;
+  version_id: ResourceId | null;
+  image_uri: string;
+  endpoint_url: string | null;
+  health_status: string | null;
+  reference_snapshot: ReferenceSnapshotOverview | null;
+  metrics: Record<string, number | unknown>;
+}
+
+export interface DraftAssetOverview {
+  id: ResourceId;
+  kind: string;
+  name: string;
+  size_bytes: number;
+  checksum: string;
+  content_type: string;
+  download_url: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DraftOverview {
+  id: ResourceId;
+  status: "editing" | "saving" | "ready" | "locked" | string;
+  revision: number;
+  saved_revision: number;
+  flavor: string;
+  artifact_format: string;
+  requirements_snapshot: string;
+  locked_by_build_id: ResourceId | null;
+  saved_at: string | null;
+  saved_snapshot_id: ResourceId | null;
+  is_dirty: boolean;
+  has_mandatory_assets: boolean;
+  can_build: boolean;
+  assets: DraftAssetOverview[];
+}
+
+export interface CandidateVersionOverview {
+  id: ResourceId;
+  version: string;
+  registered_at: string;
+  aliases: string[];
+}
+
+export interface ModelProjectOverviewResponse {
+  project: {
+    id: ResourceId;
+    name: string;
+    description: string;
+    task_domain: string;
+    access_mode: ModelAccessMode;
+    lifecycle_status: string;
+    created_at: string;
+    updated_at: string;
+  };
+  present: PresentOverview;
+  draft: DraftOverview;
+  candidate_versions: CandidateVersionOverview[];
 }

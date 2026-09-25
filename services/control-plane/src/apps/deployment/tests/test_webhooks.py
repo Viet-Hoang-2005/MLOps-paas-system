@@ -9,7 +9,8 @@ from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment
 from apps.deployment.services import builds as build_service
 from apps.deployment.services import deployments as deployment_service
-from apps.registry.models import ModelVersion
+from apps.registry.models import ModelArtifact
+from apps.registry.tests.factories import create_model_version
 from infrastructure.execution import factory
 from infrastructure.execution.argo_backends import ArgoDeploymentBackend
 
@@ -19,8 +20,8 @@ from infrastructure.execution.argo_backends import ArgoDeploymentBackend
 def test_build_webhook_is_idempotent(monkeypatch):
     user = get_user_model().objects.create_user("owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="project")
-    version = ModelVersion.objects.create(project=project, version="1")
-    build = Build.objects.create(project=project, version=version, flavor="sklearn", status="building")
+    version = create_model_version(project)
+    build = Build.objects.create(project=project, source_version=version, flavor="sklearn", status="building")
     registry = SimpleNamespace(promote=lambda **_kwargs: (f"image-{project.public_id}:v1", "sha256:local-image-id"))
     monkeypatch.setattr("apps.registry.services.versions.image_registry_for", lambda _build: registry)
     client = APIClient()
@@ -49,8 +50,8 @@ def test_build_cancel_is_tenant_scoped(django_capture_on_commit_callbacks, monke
     owner = get_user_model().objects.create_user("owner-cancel@example.com", "password123")
     other = get_user_model().objects.create_user("other@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="cancel project")
-    version = ModelVersion.objects.create(project=project, version="1")
-    build = Build.objects.create(project=project, version=version, flavor="sklearn", status="building")
+    version = create_model_version(project)
+    build = Build.objects.create(project=project, source_version=version, flavor="sklearn", status="building")
     enqueued = []
     monkeypatch.setattr(build_service.cancel_build, "delay", lambda build_id: enqueued.append(build_id))
     client = APIClient()
@@ -71,11 +72,12 @@ def test_build_cancel_is_tenant_scoped(django_capture_on_commit_callbacks, monke
 
 
 @pytest.mark.django_db
-def test_deployment_accepts_only_ready_registered_build(django_capture_on_commit_callbacks, monkeypatch):
+def test_deployment_accepts_only_ready_version_with_immutable_image(django_capture_on_commit_callbacks, monkeypatch):
     owner = get_user_model().objects.create_user("deploy-build-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="deploy build")
-    version = ModelVersion.objects.create(project=project, version="1")
-    build = Build.objects.create(project=project, version=version, flavor="sklearn", status="ready")
+    version = create_model_version(project)
+    ModelArtifact.objects.create(version=version, kind="image", name="image", uri="registry/image@sha256:abc")
+    build = Build.objects.create(project=project, version=version, source_version=version, flavor="sklearn", status="ready")
     enqueued = []
 
     def enqueue(deployment_id):
@@ -86,13 +88,12 @@ def test_deployment_accepts_only_ready_registered_build(django_capture_on_commit
     client = APIClient()
     client.force_authenticate(owner)
     with django_capture_on_commit_callbacks(execute=True):
-        deployed = client.post("/api/deployments/", {"build": str(build.public_id)}, format="json")
+        deployed = client.post("/api/deployments/", {"version": str(version.public_id), "target": "production"}, format="json")
 
     assert deployed.status_code == 201
     assert enqueued == [str(deployed.data["id"])]
 
-    pending = Build.objects.create(project=project, flavor="sklearn", status="building")
-    rejected = client.post("/api/deployments/", {"build": str(pending.public_id)}, format="json")
+    rejected = client.post("/api/deployments/", {"version": str(version.public_id), "target": "production"}, format="json")
     assert rejected.status_code == 400
 
 
@@ -127,16 +128,25 @@ def test_deployment_backend_does_not_follow_build_backend(monkeypatch):
 def test_argo_deployment_persists_the_dedicated_runtime_namespace():
     user = get_user_model().objects.create_user("runtime-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="runtime project")
-    version = ModelVersion.objects.create(project=project, version="1", flavor="sklearn")
+    version = create_model_version(project, flavor="sklearn")
+    ModelArtifact.objects.create(
+        version=version,
+        kind="image",
+        name="container",
+        uri=f"registry.example/user-images/image-{project.public_id}:build",
+        checksum="sha256:" + "a" * 64,
+        metadata={"identity_kind": "oci_manifest_digest"},
+    )
     build = Build.objects.create(
         project=project,
         version=version,
+        source_version=version,
         flavor="sklearn",
         backend="argo",
         image_uri=f"registry.example/user-images/image-{project.public_id}:build",
         image_digest="sha256:" + "a" * 64,
     )
-    deployment = Deployment.objects.create(version=version, build=build, backend="argo")
+    deployment = Deployment.objects.create(project=project, version=version, build=build, target="staging", backend="argo")
     dispatched = []
     backend = ArgoDeploymentBackend(
         client=SimpleNamespace(trigger=lambda url, payload: dispatched.append((url, payload)))
@@ -145,5 +155,5 @@ def test_argo_deployment_persists_the_dedicated_runtime_namespace():
     endpoint = backend.deploy(deployment)
 
     assert endpoint.runtime_namespace == "mlops-model-runtimes"
-    assert endpoint.internal_url == f"http://deploy-{build.public_id}-svc.mlops-model-runtimes.svc.cluster.local:5001"
-    assert dispatched[0][1]["container_name"] == f"deploy-{build.public_id}"
+    assert endpoint.internal_url == f"http://deploy-{deployment.public_id}-svc.mlops-model-runtimes.svc.cluster.local:5001"
+    assert dispatched[0][1]["container_name"] == f"deploy-{deployment.public_id}"

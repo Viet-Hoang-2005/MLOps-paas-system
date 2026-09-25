@@ -111,7 +111,13 @@ class TrainingJobCapability(models.Model):
 
 
 class TrainingOutput(models.Model):
-    KINDS = (("model", "Model"), ("metric", "Metric"), ("insight", "Insight"), ("file", "File"))
+    KINDS = (
+        ("model", "Model"),
+        ("reference_data", "Reference Data"),
+        ("metric", "Metric"),
+        ("insight", "Insight"),
+        ("file", "File"),
+    )
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     job = models.ForeignKey(TrainingJob, on_delete=models.CASCADE, related_name="outputs")
     kind = models.CharField(max_length=30, choices=KINDS, default="file")

@@ -56,6 +56,15 @@ def completed_job(email="training-build@example.com"):
         size_bytes=42,
         content_type="application/gzip",
     )
+    TrainingOutput.objects.create(
+        job=job,
+        kind="reference_data",
+        relative_path="reference_data.parquet",
+        s3_uri="s3://bucket/reference_data.parquet",
+        checksum="ref-checksum",
+        size_bytes=100,
+        content_type="application/octet-stream",
+    )
     return job
 
 
@@ -80,7 +89,9 @@ def test_training_build_reuses_active_attempt_and_snapshots_output(monkeypatch, 
     assert first.source_job == job
     assert first.flavor == "xgboost"
     assert first.requirements_snapshot == "xgboost==2.0.3"
-    assert first.input_assets.get().kind == "training_output"
+    assert first.input_assets.count() == 2
+    assert first.input_assets.filter(kind="model", name="model.tar.gz").exists()
+    assert first.input_assets.filter(kind="reference_data", name="reference_data.parquet").exists()
     assert queued == [str(first.public_id)]
 
 
@@ -94,23 +105,40 @@ def test_training_build_requires_completed_output():
 
 
 @pytest.mark.django_db
+def test_training_output_mandatory_reference():
+    job = completed_job("training-no-ref@example.com")
+    job.outputs.filter(kind="reference_data").delete()
+
+    with pytest.raises(ValidationError, match="no reference_data output"):
+        build_service.request_training_build(job=job, backend="docker", storage=FakeStorage())
+
+
+@pytest.mark.django_db
 def test_successful_training_build_creates_one_version_with_summaries():
     job = completed_job("training-register@example.com")
     build = Build.objects.create(
         project=job.project,
         source_job=job,
         flavor=job.model_flavor,
-        artifact_format="training_output",
+        artifact_format="raw",
         requirements_snapshot=job.requirements_text,
         status="building",
     )
     output = job.outputs.get(kind="model")
     build.input_assets.create(
-        kind="training_output",
+        kind="model",
         name=output.relative_path,
         s3_uri=output.s3_uri,
         checksum=output.checksum,
         size_bytes=output.size_bytes,
+    )
+    ref_output = job.outputs.get(kind="reference_data")
+    build.input_assets.create(
+        kind="reference_data",
+        name=ref_output.relative_path,
+        s3_uri=ref_output.s3_uri,
+        checksum=ref_output.checksum,
+        size_bytes=ref_output.size_bytes,
     )
     storage = FakeStorage()
 
@@ -137,7 +165,61 @@ def test_successful_training_build_creates_one_version_with_summaries():
     assert first.version.source_job == job
     assert first.version.version == "1"
     assert first.version.params_summary == {"max_depth": 8}
+    assert first.version.reference_snapshot is not None
+    assert first.version.reference_snapshot.role == "reference"
     assert ModelMetric.objects.get(version=first.version, name="accuracy").value == 0.98
+
+
+@pytest.mark.django_db
+def test_training_build_does_not_mutate_draft():
+    job = completed_job("training-draft-isolate@example.com")
+    project = job.project
+    draft = project.current_draft
+    draft.flavor = "pytorch"
+    draft.requirements_snapshot = "torch==2.0.0"
+    draft.revision = 5
+    draft.status = "draft"
+    draft.save()
+
+    build = Build.objects.create(
+        project=project,
+        source_job=job,
+        flavor=job.model_flavor,
+        artifact_format="raw",
+        requirements_snapshot=job.requirements_text,
+        status="building",
+    )
+    output = job.outputs.get(kind="model")
+    build.input_assets.create(
+        kind="model",
+        name=output.relative_path,
+        s3_uri=output.s3_uri,
+        checksum=output.checksum,
+        size_bytes=output.size_bytes,
+    )
+    ref_output = job.outputs.get(kind="reference_data")
+    build.input_assets.create(
+        kind="reference_data",
+        name=ref_output.relative_path,
+        s3_uri=ref_output.s3_uri,
+        checksum=ref_output.checksum,
+        size_bytes=ref_output.size_bytes,
+    )
+
+    storage = FakeStorage()
+    register_successful_build(
+        build=build,
+        image_uri=f"image-{project.public_id}:build-{build.public_id}",
+        image_digest="sha256:training",
+        storage=storage,
+        image_registry=FakeImageRegistry(),
+    )
+
+    draft.refresh_from_db()
+    assert draft.flavor == "pytorch"
+    assert draft.requirements_snapshot == "torch==2.0.0"
+    assert draft.revision == 5
+    assert draft.status == "draft"
 
 
 @pytest.mark.django_db

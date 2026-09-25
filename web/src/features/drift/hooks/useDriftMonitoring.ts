@@ -7,10 +7,8 @@ import {
   listDriftMonitoringJobs,
   listDriftMonitoringResults,
   listProductionData,
-  listReferenceFiles,
   runDriftMonitoringJob,
   updateDriftMonitoringJob,
-  uploadReferenceData,
 } from "@/features/drift/api/driftApi";
 import { driftQueryKeys } from "@/features/drift/queryKeys";
 import { useTranslation } from "react-i18next";
@@ -92,30 +90,5 @@ export function useProductionData(modelId?: string) {
     queryKey: driftQueryKeys.productionData(modelId ?? ""),
     queryFn: () => listProductionData(modelId!, 100),
     enabled: Boolean(modelId),
-  });
-}
-
-export function useReferenceFiles(modelId?: string) {
-  return useQuery({
-    queryKey: driftQueryKeys.referenceFiles(modelId ?? ""),
-    queryFn: async () =>
-      (await listReferenceFiles(modelId!)).map((file) => ({
-        key: file.relative_path,
-        size: file.size_bytes,
-        last_modified: file.updated_at,
-      })),
-    enabled: Boolean(modelId),
-  });
-}
-
-export function useUploadReferenceData() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ modelId, file }: { modelId: string; file: File }) =>
-      uploadReferenceData(modelId, file),
-    onSuccess: (_, variables) =>
-      queryClient.invalidateQueries({
-        queryKey: driftQueryKeys.referenceFiles(variables.modelId),
-      }),
   });
 }

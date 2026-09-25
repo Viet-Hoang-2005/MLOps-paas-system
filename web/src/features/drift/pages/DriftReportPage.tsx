@@ -9,9 +9,10 @@ import { getDriftReportDownloadUrl } from "@/features/drift/api/driftApi";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { toast } from "@/shared/components/toastStore";
 import { useTranslation } from "react-i18next";
+import { projectPaths } from "@/app/router/paths";
 
 export default function DriftReportPage() {
-  const { modelId, runId } = useParams<{ modelId: string; runId: string }>();
+  const { projectId, runId } = useParams<{ projectId: string; runId: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation("drift");
 
@@ -21,7 +22,7 @@ export default function DriftReportPage() {
   useEffect(() => {
     if (!runId) {
       toast.error(t("reportPage.missingRun"));
-      navigate(`/dashboard/drift-monitoring/${modelId}`);
+      navigate(projectPaths.monitoring(projectId!));
       return;
     }
 
@@ -34,7 +35,7 @@ export default function DriftReportPage() {
         toast.error(getApiErrorMessage(err, t("reportPage.urlFailed")));
         setLoading(false);
       });
-  }, [runId, modelId, navigate, t]);
+  }, [runId, projectId, navigate, t]);
 
   const handleDownload = async () => {
     if (!reportUrl) return;
@@ -44,7 +45,7 @@ export default function DriftReportPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `drift-report-${modelId}.html`;
+      a.download = `drift-report-${projectId}.html`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -62,7 +63,7 @@ export default function DriftReportPage() {
       <PageHeader
         title={t("reportPage.title")}
         backLink={{
-          to: `/dashboard/drift-monitoring/${modelId}`,
+          to: projectPaths.monitoring(projectId!),
           label: t("reportPage.back"),
         }}
       >

@@ -46,7 +46,14 @@ def test_label_budget_cannot_hold_or_spend_beyond_quota():
 def test_only_one_active_maintenance_run_is_allowed_per_project():
     owner = get_user_model().objects.create_user("run@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="CT run")
-    champion = project.versions.create(version="1")
+    champion_snapshot = DatasetSnapshot.objects.create(
+        project=project,
+        role="reference",
+        manifest_uri="s3://bucket/champion-reference.csv",
+        manifest_checksum="m",
+        schema_checksum="s",
+    )
+    champion = project.versions.create(version="1", reference_snapshot=champion_snapshot)
     policy = MaintenancePolicy.objects.create(
         project=project, version=1, policy_kind="b0", checksum="a", is_active=True
     )

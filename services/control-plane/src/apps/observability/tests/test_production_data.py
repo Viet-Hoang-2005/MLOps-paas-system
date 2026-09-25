@@ -5,13 +5,14 @@ from rest_framework.test import APIClient
 from apps.catalog.models import ModelProject
 from apps.observability import selectors
 from apps.production.models import PredictionRecord
+from apps.registry.tests.factories import create_model_version
 
 
 @pytest.mark.django_db
 def test_latest_production_data_returns_stable_frontend_fields():
     owner = get_user_model().objects.create_user("prediction-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="Prediction model")
-    version = project.versions.create(version="1")
+    version = create_model_version(project)
     PredictionRecord.objects.create(
         project=project,
         model_version=version,

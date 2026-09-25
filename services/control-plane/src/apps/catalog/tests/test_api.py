@@ -5,8 +5,17 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
+from apps.ct.models import DatasetSnapshot
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.registry.models import ModelVersion
+from apps.registry.models import ModelArtifact, RegistryAlias
+
+
+def _version(project, number):
+    snapshot = DatasetSnapshot.objects.create(
+        project=project, role="reference", manifest_uri=f"s3://bucket/{number}/ref.csv", manifest_checksum="m", schema_checksum="s"
+    )
+    return ModelVersion.objects.create(project=project, version=str(number), reference_snapshot=snapshot)
 
 
 @pytest.mark.django_db
@@ -50,26 +59,31 @@ def test_project_list_returns_metadata_image_ready_and_deployed_lifecycle_status
     image_project = ModelProject.objects.create(owner=owner, name="Image ready")
     deployed_project = ModelProject.objects.create(owner=owner, name="Deployed")
 
-    image_version = ModelVersion.objects.create(project=image_project, version="1")
-    Build.objects.create(project=image_project, version=image_version, flavor="sklearn", status="ready")
+    image_version = _version(image_project, 1)
+    ModelArtifact.objects.create(version=image_version, kind="image", name="container", uri="image:one")
+    Build.objects.create(project=image_project, version=image_version, source_version=image_version, flavor="sklearn", status="ready")
 
-    deployed_version = ModelVersion.objects.create(project=deployed_project, version="1")
+    deployed_version = _version(deployed_project, 1)
+    ModelArtifact.objects.create(version=deployed_version, kind="image", name="container", uri="image:two")
     deployed_build = Build.objects.create(
         project=deployed_project,
         version=deployed_version,
+        source_version=deployed_version,
         flavor="sklearn",
         status="ready",
     )
-    Deployment.objects.create(version=deployed_version, build=deployed_build, status="healthy")
+    deployment = Deployment.objects.create(project=deployed_project, version=deployed_version, build=deployed_build, target="production", status="healthy")
+    Endpoint.objects.create(deployment=deployment, public_url="http://model/health", health_status="healthy")
+    RegistryAlias.objects.create(project=deployed_project, version=deployed_version, name="production")
 
     client = APIClient()
     client.force_authenticate(owner)
     response = client.get("/api/models/")
 
     assert response.status_code == 200
-    statuses = {project["name"]: project["lifecycle_status"] for project in response.data["results"]}
+    statuses = {project["name"]: project["workflow_status"] for project in response.data["results"]}
     assert statuses == {
-        metadata_project.name: "metadata",
+        metadata_project.name: "setup",
         image_project.name: "image_ready",
         deployed_project.name: "deployed",
     }
@@ -79,9 +93,9 @@ def test_project_list_returns_metadata_image_ready_and_deployed_lifecycle_status
 def test_project_list_returns_latest_active_endpoint_for_the_owner():
     owner = get_user_model().objects.create_user("endpoint-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="NIDS")
-    version = ModelVersion.objects.create(project=project, version="1")
-    build = Build.objects.create(project=project, version=version, flavor="xgboost", status="ready")
-    deployment = Deployment.objects.create(version=version, build=build, status="healthy")
+    version = _version(project, 1)
+    build = Build.objects.create(project=project, version=version, source_version=version, flavor="xgboost", status="ready")
+    deployment = Deployment.objects.create(project=project, version=version, build=build, target="production", status="healthy")
     endpoint = Endpoint.objects.create(
         deployment=deployment,
         public_url="http://localhost:5002/tenant/models/project/version",

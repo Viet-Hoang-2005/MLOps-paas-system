@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Outlet,
+  useParams,
   useBlocker,
   useLocation,
   useNavigate,
@@ -10,11 +11,8 @@ import {
 } from "react-router-dom";
 
 import {
-  createModelProject,
   getModelProject,
   listModelProjects,
-  listReferenceFiles,
-  listSourceCodeFiles,
   updateModelProject,
 } from "@/features/catalog/api/catalogApi";
 import type { ModelProject } from "@/features/catalog/types";
@@ -42,9 +40,8 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { LineSteps } from "@/shared/components/LineSteps";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { toast } from "@/shared/components/toastStore";
+import { projectPaths, routes } from "@/app/router/paths";
 
-const trainingPath = "/dashboard/model-training";
-const createPath = `${trainingPath}/create`;
 
 const emptyMetadata: TrainingMetadataForm = {
   name: "",
@@ -53,8 +50,10 @@ const emptyMetadata: TrainingMetadataForm = {
 };
 const emptySource: TrainingSourceForm = {
   model_flavor: "sklearn",
-  entry_point: "",
+  entry_point: "train.py",
   requirements_text: "",
+  source_zip: null,
+  training_data: null,
 };
 const emptyExecution: TrainingExecutionForm = {
   vcpu: 2,
@@ -75,14 +74,19 @@ const sourceFingerprint = (form: TrainingSourceForm) =>
     model_flavor: form.model_flavor,
     entry_point: form.entry_point.trim(),
     requirements_text: form.requirements_text,
+    source_zip: form.source_zip ? `${form.source_zip.name}:${form.source_zip.size}:${form.source_zip.lastModified}` : "",
+    training_data: form.training_data ? `${form.training_data.name}:${form.training_data.size}:${form.training_data.lastModified}` : "",
   });
 
 export default function CreateTrainingJobPage() {
   const { t } = useTranslation("training");
   const location = useLocation();
   const navigate = useNavigate();
+  const { projectId: routeProjectId = "" } = useParams<{ projectId: string }>();
+  const trainingPath = projectPaths.training(routeProjectId);
+  const createPath = `${trainingPath}/create`;
   const [searchParams] = useSearchParams();
-  const requestedModelId = searchParams.get("modelId");
+  const requestedModelId = routeProjectId;
   const requestedJobId = searchParams.get("jobId");
   const [mode, setModeState] = useState<TrainingModelMode>("new");
   const [projects, setProjects] = useState<ModelProject[]>([]);
@@ -120,18 +124,16 @@ export default function CreateTrainingJobPage() {
   const routeFor = useCallback(
     (
       step: TrainingStep,
-      projectId: string | null | undefined = project?.id,
       jobId: string | null | undefined = job?.id,
     ) => {
       const route =
         step === 1 ? "metadata" : step === 2 ? "source" : "execution";
       const params = new URLSearchParams();
-      if (projectId) params.set("modelId", projectId);
       if (step === 3 && jobId) params.set("jobId", jobId);
       const query = params.toString();
       return `${createPath}/${route}${query ? `?${query}` : ""}`;
     },
-    [job?.id, project?.id],
+    [createPath, job?.id],
   );
 
   useEffect(() => {
@@ -160,7 +162,7 @@ export default function CreateTrainingJobPage() {
   useEffect(() => {
     if (!requestedModelId) {
       if (currentStep !== 1)
-        navigate(routeFor(1, null, null), { replace: true });
+        navigate(routeFor(1, null), { replace: true });
       return;
     }
     let active = true;
@@ -181,7 +183,7 @@ export default function CreateTrainingJobPage() {
         toast.error(
           getApiErrorMessage(error, t("createFlow.messages.projectLoadFailed")),
         );
-        navigate(routeFor(1, null, null), { replace: true });
+        navigate(routeFor(1, null), { replace: true });
       });
     return () => {
       active = false;
@@ -241,7 +243,7 @@ export default function CreateTrainingJobPage() {
     };
     setMetadataForm(next);
     setMetadataBaseline(metadataFingerprint(next));
-    navigate(routeFor(1, selected.id, undefined), { replace: true });
+    navigate(routeFor(1, null), { replace: true });
   };
 
   const setMode = (nextMode: TrainingModelMode) => {
@@ -255,7 +257,7 @@ export default function CreateTrainingJobPage() {
       setDataDirty(false);
       setMetadataForm(emptyMetadata);
       setMetadataBaseline(metadataFingerprint(emptyMetadata));
-      navigate(routeFor(1, null, null), { replace: true });
+      navigate(routeFor(1, null), { replace: true });
     }
   };
 
@@ -269,10 +271,9 @@ export default function CreateTrainingJobPage() {
     try {
       let nextProject = project;
       if (!project) {
-        nextProject = await createModelProject(metadataForm);
-        setProjects((current) =>
-          nextProject ? [...current, nextProject] : current,
-        );
+        toast.warning(t("workflow.projectRequired"));
+        navigate(routes.newProject);
+        return;
       } else if (metadataDirty) {
         nextProject = await updateModelProject(project.id, metadataForm);
         setProjects((current) =>
@@ -290,7 +291,7 @@ export default function CreateTrainingJobPage() {
       };
       setMetadataForm(persisted);
       setMetadataBaseline(metadataFingerprint(persisted));
-      navigate(routeFor(2, nextProject.id, undefined));
+      navigate(routeFor(2, null));
     } catch (error) {
       toast.error(
         getApiErrorMessage(error, t("createFlow.messages.metadataSaveFailed")),
@@ -301,7 +302,7 @@ export default function CreateTrainingJobPage() {
   }, [metadataDirty, metadataForm, navigate, project, routeFor, t]);
 
   const continueFromSource = useCallback(
-    async (saveEditors: Array<() => Promise<boolean>>) => {
+    async () => {
       if (!project) {
         toast.warning(t("createFlow.messages.metadataRequired"));
         navigate(routeFor(1));
@@ -309,35 +310,14 @@ export default function CreateTrainingJobPage() {
       }
       setTransitionState("saving-source");
       try {
-        const saved = await Promise.all(saveEditors.map((save) => save()));
-        if (saved.some((value) => !value)) return;
-        const [codeFiles, dataFiles] = await Promise.all([
-          listSourceCodeFiles(project.id),
-          listReferenceFiles(project.id),
-        ]);
-        const missing = [];
-        if (!codeFiles.length) missing.push(t("createFlow.source.sourceCode"));
-        if (!dataFiles.length)
-          missing.push(t("createFlow.source.referenceData"));
-        const selectedEntryPoint = sourceForm.entry_point.trim();
-        if (
-          !selectedEntryPoint ||
-          !codeFiles.some((file) => file.relative_path === selectedEntryPoint)
-        ) {
-          missing.push(t("createFlow.source.entryPoint"));
-        }
-        if (missing.length) {
-          toast.warning(
-            t("createFlow.messages.sourceRequired", {
-              fields: missing.join(", "),
-            }),
-          );
+        if (!sourceForm.source_zip || !sourceForm.training_data) {
+          toast.warning(t("workflow.inputsRequired"));
           return;
         }
         setCodeDirty(false);
         setDataDirty(false);
         setSourceBaseline(sourceFingerprint(sourceForm));
-        navigate(routeFor(3, project.id, undefined));
+        navigate(routeFor(3, null));
       } catch (error) {
         toast.error(
           getApiErrorMessage(error, t("createFlow.messages.sourceSaveFailed")),
@@ -367,11 +347,11 @@ export default function CreateTrainingJobPage() {
         max_runtime_seconds: executionForm.max_runtime_seconds,
         accelerator_type: executionForm.accelerator_type,
         accelerator_count: executionForm.accelerator_count,
-        source_zip: null,
-        training_data: null,
+        source_zip: sourceForm.source_zip,
+        training_data: sourceForm.training_data,
       });
       setJob(nextJob);
-      navigate(routeFor(3, project.id, nextJob.id), { replace: true });
+      navigate(routeFor(3, nextJob.id), { replace: true });
       toast.success(t("createFlow.messages.trainingStarted"));
     } catch (error) {
       toast.error(
@@ -426,11 +406,7 @@ export default function CreateTrainingJobPage() {
         toast.warning(t("createFlow.messages.completeSource"));
         return;
       }
-      const [codeFiles, dataFiles] = await Promise.all([
-        listSourceCodeFiles(project.id),
-        listReferenceFiles(project.id),
-      ]);
-      if (!codeFiles.length || !dataFiles.length || sourceDirty) {
+      if (!sourceForm.source_zip || !sourceForm.training_data || sourceDirty) {
         toast.warning(t("createFlow.messages.completeSource"));
         navigate(routeFor(2));
         return;
@@ -445,6 +421,8 @@ export default function CreateTrainingJobPage() {
       project,
       routeFor,
       sourceDirty,
+      sourceForm.source_zip,
+      sourceForm.training_data,
       t,
       transitionState,
     ],

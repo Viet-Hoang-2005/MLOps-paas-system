@@ -1,9 +1,7 @@
-from io import BytesIO
-from zipfile import ZIP_DEFLATED, ZipFile
-
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 from apps.observability.services.lifecycle import record_training_event
 from apps.training.models import TrainingJob
@@ -23,6 +21,8 @@ ACTIVE_STATUSES = {"pending", "queued", "uploading", "running", "cancelling"}
 def create_job(*, project, validated_data):
     source_zip = validated_data.pop("source_zip", None)
     training_data = validated_data.pop("training_data", None)
+    if not source_zip or not training_data:
+        raise ValidationError({"training_inputs": "Upload a source ZIP and training dataset for every job."})
     validated_data["backend"] = settings.TRAINING_BACKEND
     public_id = validated_data.pop("public_id", None)
     draft = (
@@ -38,42 +38,10 @@ def create_job(*, project, validated_data):
     draft.mlflow_artifact_uri = scoped_uris["mlflow"]
     draft.save()
     storage = S3Storage()
-    if source_zip:
-        storage.put(storage.parse_uri(draft.code_snapshot_uri)[1], source_zip, "application/zip")
-    else:
-        _snapshot_code(project, draft, storage)
-    if training_data:
-        storage.put(
-            storage.parse_uri(draft.data_snapshot_uri)[1],
-            training_data,
-            training_data.content_type or "text/csv",
-        )
-    else:
-        _snapshot_data(project, draft, storage)
+    storage.put(storage.parse_uri(draft.code_snapshot_uri)[1], source_zip, "application/zip")
+    storage.put(storage.parse_uri(draft.data_snapshot_uri)[1], training_data, training_data.content_type or "text/csv")
     record_training_event(job=draft, event_type="created", message="Training job created.")
     return draft
-
-
-def _snapshot_code(project, job, storage):
-    assets = list(project.workspace_assets.filter(kind="code"))
-    if not assets:
-        return
-    bundle = BytesIO()
-    with ZipFile(bundle, "w", ZIP_DEFLATED) as archive:
-        for asset in assets:
-            bucket, key = storage.parse_uri(asset.s3_uri)
-            body = storage.client.get_object(Bucket=bucket, Key=key)["Body"].read()
-            archive.writestr(asset.relative_path, body)
-    storage.put(storage.parse_uri(job.code_snapshot_uri)[1], bundle.getvalue(), "application/zip")
-
-
-def _snapshot_data(project, job, storage):
-    asset = project.workspace_assets.filter(kind="data").order_by("-updated_at").first()
-    if not asset:
-        return
-    bucket, key = storage.parse_uri(asset.s3_uri)
-    body = storage.client.get_object(Bucket=bucket, Key=key)["Body"].read()
-    storage.put(storage.parse_uri(job.data_snapshot_uri)[1], body, asset.content_type or "text/csv")
 
 
 def submit_job(job):
@@ -169,3 +137,75 @@ def request_output_purge(job):
         )
         transaction.on_commit(lambda: purge_training_job_outputs.delay(str(job.public_id)))
     return job
+
+
+def register_training_completed_outputs(job, storage=None):
+    """Register outputs for a completed training job, including model and reference_data."""
+    import os
+    import tarfile
+    import tempfile
+    from pathlib import Path
+
+    from apps.training.models import TrainingOutput
+
+    storage = storage or S3Storage()
+    # 1. Register main model output
+    TrainingOutput.objects.update_or_create(
+        job=job,
+        relative_path="model.tar.gz",
+        defaults={"kind": "model", "s3_uri": job.output_uri, "content_type": "application/gzip"},
+    )
+
+    # 2. Check if reference_data is already registered
+    if job.outputs.filter(kind="reference_data").exists():
+        return
+
+    # 3. Try to discover reference_data inside model.tar.gz
+    if not job.output_uri:
+        return
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp_file:
+            tmp_path = Path(tmp_file.name)
+        try:
+            storage.download_file(job.output_uri, tmp_path)
+            with tarfile.open(tmp_path, "r:*") as tar:
+                names = tar.getnames()
+                ref_name = None
+                for candidate in ("reference_data.parquet", "reference_data.csv"):
+                    if candidate in names:
+                        ref_name = candidate
+                        break
+                    for n in names:
+                        if n.endswith("/" + candidate):
+                            ref_name = n
+                            break
+                    if ref_name:
+                        break
+
+                if ref_name:
+                    member = tar.getmember(ref_name)
+                    extracted = tar.extractfile(member)
+                    if extracted:
+                        base_ref_name = Path(ref_name).name
+                        parent_prefix = job.output_uri.rsplit("/", 1)[0]
+                        ref_s3_uri = f"{parent_prefix}/{base_ref_name}"
+                        _, key = storage.parse_uri(ref_s3_uri)
+                        content_type = "application/octet-stream" if base_ref_name.endswith(".parquet") else "text/csv"
+                        stored = storage.put(key, extracted, content_type)
+                        TrainingOutput.objects.update_or_create(
+                            job=job,
+                            relative_path=base_ref_name,
+                            defaults={
+                                "kind": "reference_data",
+                                "s3_uri": stored.uri,
+                                "checksum": stored.checksum,
+                                "size_bytes": stored.size_bytes,
+                                "content_type": content_type,
+                            },
+                        )
+        finally:
+            if tmp_path.exists():
+                os.unlink(tmp_path)
+    except Exception:
+        pass

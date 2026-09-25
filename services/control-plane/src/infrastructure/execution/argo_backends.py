@@ -11,7 +11,7 @@ from infrastructure.storage.paths import build_prefix, drift_run_prefix
 from .image_references import (
     build_image_tag,
     image_repository,
-    immutable_image_reference,
+    immutable_version_image_reference,
 )
 
 
@@ -32,9 +32,9 @@ class ArgoBuildBackend(_ArgoBackend):
 
     def run(self, build):
         project = build.project
-        source = build.input_assets.filter(kind__in=("source_artifact", "training_output")).first()
+        source = build.input_assets.filter(kind="model").first()
         if source is None and build.version_id:
-            source = build.version.artifacts.filter(kind__in=("source", "training_output")).first()
+            source = build.version.artifacts.filter(kind="model").first()
         if not source:
             raise RuntimeError("The build has no source artifact.")
         source_uri = getattr(source, "s3_uri", "") or source.uri
@@ -59,8 +59,8 @@ class ArgoBuildBackend(_ArgoBackend):
                 "flavor": build.flavor,
                 "task_type": "TEST_ZIP" if build.artifact_format == "mlflow_zip" else "BUILD",
                 "requirements_text": build.requirements_snapshot,
-                "source_artifact_name": source.name,
-                "source_type": "training_job" if build.source_job_id else "manual_upload",
+                "model_artifact_name": source.name,
+                "source_type": build.source_kind,
                 "source_download_url": self.storage.presigned_get(source_uri, 14400),
                 "output_upload_url": self.storage.presigned_put(package_uri, 14400),
                 "control_plane_webhook_url": (
@@ -163,7 +163,7 @@ class ArgoDeploymentBackend(_ArgoBackend):
     def deploy(self, deployment):
         version = deployment.version
         project = version.project
-        container_name = f"deploy-{str(deployment.build.public_id).lower()}"
+        container_name = f"deploy-{str(deployment.public_id).lower()}"
         model_type = "dl" if version.flavor in {"pytorch", "tensorflow"} else "ml"
         target_port = 3000 if model_type == "dl" else 5001
         self._log(f"Submitting Argo deployment workflow for runtime {container_name}.")
@@ -174,8 +174,8 @@ class ArgoDeploymentBackend(_ArgoBackend):
                 "project_id": str(project.public_id),
                 "model_version_id": str(version.public_id),
                 "version": version.version,
-                "image_uri": immutable_image_reference(deployment.build),
-                "image_name": immutable_image_reference(deployment.build),
+                "image_uri": immutable_version_image_reference(version),
+                "image_name": immutable_version_image_reference(version),
                 "container_name": container_name,
                 "model_type": model_type,
                 "target_port": str(target_port),
@@ -183,7 +183,7 @@ class ArgoDeploymentBackend(_ArgoBackend):
                     (
                         artifact.uri
                         for artifact in version.artifacts.all()
-                        if artifact.kind in {"source", "training_output"}
+                        if artifact.kind == "model"
                     ),
                     "",
                 ),
@@ -245,6 +245,12 @@ class ArgoDriftBackend(_ArgoBackend):
             name: f"s3://{self.storage.bucket}/{prefix}{name}"
             for name in ("report.html", "report.json", "summary.json")
         }
+        ref_s3_uri = ""
+        if monitor.reference_snapshot and monitor.reference_snapshot.manifest_uri:
+            ref_s3_uri = monitor.reference_snapshot.manifest_uri
+        elif monitor.version.reference_snapshot and monitor.version.reference_snapshot.manifest_uri:
+            ref_s3_uri = monitor.version.reference_snapshot.manifest_uri
+
         return self.trigger(
             {
                 "job_id": str(drift_run.public_id),
@@ -254,7 +260,7 @@ class ArgoDriftBackend(_ArgoBackend):
                 "model_version_id": str(monitor.version.public_id),
                 "model_name": project.name,
                 "model_uri": "",
-                "reference_data_url": self.storage.presigned_get(monitor.reference_asset.s3_uri, 7200),
+                "reference_data_url": self.storage.presigned_get(ref_s3_uri, 7200) if ref_s3_uri else "",
                 "html_s3_uri": uris["report.html"],
                 "report_json_s3_uri": uris["report.json"],
                 "summary_json_s3_uri": uris["summary.json"],

@@ -99,6 +99,7 @@ def test_complete_registration_ignores_field_of_work(monkeypatch):
 
 
 @pytest.mark.django_db
+@override_settings(STORAGES={"default": {"BACKEND": "django.core.files.storage.InMemoryStorage"}})
 @override_settings(GOOGLE_OAUTH2_CLIENT_ID="test-google-client")
 def test_google_oauth_saves_provider_avatar_and_profile_exposes_provider():
     client = GoogleOAuthClient(
@@ -133,6 +134,7 @@ def test_google_oauth_saves_provider_avatar_and_profile_exposes_provider():
 
 
 @pytest.mark.django_db
+@override_settings(STORAGES={"default": {"BACKEND": "django.core.files.storage.InMemoryStorage"}})
 def test_oauth_does_not_replace_an_existing_avatar():
     user = get_user_model().objects.create_user("existing@example.com", "password123")
     user.avatar.save("custom.png", ContentFile(b"custom"), save=True)
@@ -176,6 +178,7 @@ def test_google_oauth_does_not_restore_a_removed_avatar():
 
 
 @pytest.mark.django_db
+@override_settings(STORAGES={"default": {"BACKEND": "django.core.files.storage.InMemoryStorage"}})
 def test_github_avatar_is_saved_only_when_oauth_creates_the_account():
     client = GoogleOAuthClient({}, avatar=b"github-avatar")
 
@@ -193,6 +196,7 @@ def test_github_avatar_is_saved_only_when_oauth_creates_the_account():
 
 
 @pytest.mark.django_db
+@override_settings(STORAGES={"default": {"BACKEND": "django.core.files.storage.InMemoryStorage"}})
 @override_settings(GITHUB_OAUTH2_CLIENT_ID="test-github-client", GITHUB_OAUTH2_CLIENT_SECRET="test-github-secret")
 def test_github_oauth_requests_and_saves_a_512_pixel_avatar():
     client = GitHubOAuthClient()

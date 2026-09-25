@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, BuildInputAsset
+from apps.registry.tests.factories import create_model_version
 from infrastructure.execution.argo_backends import ArgoBuildBackend
 from infrastructure.execution.docker_backends import DockerBuildBackend
 
@@ -53,10 +54,11 @@ class RecordingDocker:
 def create_build_with_input():
     owner = get_user_model().objects.create_user("build-backend@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="build backend project")
-    build = Build.objects.create(project=project, flavor="sklearn", backend="docker", status="building")
+    version = create_model_version(project)
+    build = Build.objects.create(project=project, source_version=version, flavor="sklearn", backend="docker", status="building")
     asset = BuildInputAsset.objects.create(
         build=build,
-        kind="source_artifact",
+        kind="model",
         name="model.pkl",
         s3_uri="s3://artifact-bucket/build-input/model.pkl",
     )

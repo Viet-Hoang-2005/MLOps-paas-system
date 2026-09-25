@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.observability.services.lifecycle import has_event, record_training_event
-from apps.training.models import TrainingJob, TrainingOutput
+from apps.training.models import TrainingJob
 from apps.training.services.capabilities import capability_for_token
 from apps.training.services.logs import append_training_log
 from apps.training.services.storage_scope import validate_training_uri
@@ -67,11 +67,8 @@ class TrainingJobWebhookEndpoint(APIView):
                 return Response({"status": job.status, "ignored": True})
             if status_value == "completed":
                 job.mark_finished("completed")
-                TrainingOutput.objects.update_or_create(
-                    job=job,
-                    relative_path="model.tar.gz",
-                    defaults={"kind": "model", "s3_uri": job.output_uri},
-                )
+                from apps.training.services.jobs import register_training_completed_outputs
+                register_training_completed_outputs(job)
             elif status_value == "failed":
                 job.mark_finished("failed")
                 job.error_message = "Training workflow failed."

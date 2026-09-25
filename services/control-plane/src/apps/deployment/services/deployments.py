@@ -8,12 +8,21 @@ from common.logging import runtime_line
 from infrastructure.execution import deployment_backend
 
 
-def request_deployment(build, backend):
+def request_deployment(version, target, backend):
+    from apps.catalog.models import ModelProject
+    if target not in {"staging", "production"}:
+        raise ValidationError({"target": "Choose staging or production."})
     with transaction.atomic():
-        build = type(build).objects.select_for_update().get(pk=build.pk)
-        if build.status != "ready" or build.version_id is None:
-            raise ValidationError({"build": "Only a ready build can be deployed."})
-        deployment = Deployment.objects.create(version=build.version, build=build, backend=backend, status="pending")
+        project = ModelProject.objects.select_for_update().get(pk=version.project_id)
+        version = type(version).objects.select_for_update().get(pk=version.pk)
+        if not version.artifacts.filter(kind="image").exists():
+            raise ValidationError({"version": "Only versions with an immutable image can be deployed."})
+        if Deployment.objects.filter(project=project, target=target, status__in=("pending", "deploying", "healthy")).exists():
+            raise ValidationError({"target": f"An active {target} deployment already exists for this project."})
+        build = version.builds.filter(status="ready").order_by("-created_at").first()
+        deployment = Deployment.objects.create(
+            project=project, version=version, build=build, target=target, backend=backend, status="pending"
+        )
     transaction.on_commit(lambda: _enqueue(deployment))
     return deployment
 

@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
+from apps.ct.models import DatasetSnapshot
 from apps.catalog.services.deletion import finalize_project_deletion, project_cleanup_manifest
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.registry.models import ModelVersion
@@ -17,6 +18,13 @@ class FakeStorage:
 
     def delete_prefix(self, prefix):
         self.prefixes.append(prefix)
+
+
+def _version(project, number):
+    snapshot = DatasetSnapshot.objects.create(
+        project=project, role="reference", manifest_uri=f"s3://bucket/ref-{number}", manifest_checksum="m", schema_checksum="s"
+    )
+    return ModelVersion.objects.create(project=project, version=str(number), reference_snapshot=snapshot)
 
 
 @pytest.mark.django_db
@@ -48,16 +56,16 @@ def test_delete_endpoint_marks_the_entire_project_deleting_and_enqueues_cleanup(
 def test_cleanup_manifest_includes_all_project_build_images_and_runtime_names():
     owner = get_user_model().objects.create_user("manifest-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="All image history")
-    first = ModelVersion.objects.create(project=project, version="1")
-    second = ModelVersion.objects.create(project=project, version="2")
+    first = _version(project, 1)
+    second = _version(project, 2)
     repository = f"image-{project.public_id}"
     old_build = Build.objects.create(
-        project=project, version=first, flavor="sklearn", status="ready", image_uri=f"{repository}:v1"
+        project=project, version=first, source_version=first, flavor="sklearn", status="ready", image_uri=f"{repository}:v1"
     )
     new_build = Build.objects.create(
-        project=project, version=second, flavor="sklearn", status="ready", image_uri=f"{repository}:v2"
+        project=project, version=second, source_version=second, flavor="sklearn", status="ready", image_uri=f"{repository}:v2"
     )
-    deployment = Deployment.objects.create(version=first, build=old_build, status="stopped")
+    deployment = Deployment.objects.create(project=project, version=first, build=old_build, target="production", status="stopped")
     Endpoint.objects.create(deployment=deployment, public_url="http://example.test", runtime_name="deploy-old")
 
     manifest = project_cleanup_manifest(project)
@@ -79,15 +87,16 @@ def test_cleanup_manifest_includes_all_project_build_images_and_runtime_names():
 def test_finalization_deletes_project_s3_prefix_and_archives_database_rows():
     owner = get_user_model().objects.create_user("finalize-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="Finalize me", deletion_state="deleting", is_active=False)
-    version = ModelVersion.objects.create(project=project, version="1")
+    version = _version(project, 1)
     build = Build.objects.create(
         project=project,
         version=version,
+        source_version=version,
         flavor="sklearn",
         status="ready",
         image_uri=f"image-{project.public_id}:v1",
     )
-    deployment = Deployment.objects.create(version=version, build=build, status="healthy")
+    deployment = Deployment.objects.create(project=project, version=version, build=build, target="production", status="healthy")
     endpoint = Endpoint.objects.create(
         deployment=deployment,
         public_url="http://example.test",

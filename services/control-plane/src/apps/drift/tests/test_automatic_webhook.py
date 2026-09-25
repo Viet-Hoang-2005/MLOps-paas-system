@@ -5,23 +5,18 @@ from django.contrib.auth import get_user_model
 from django.test import override_settings
 from rest_framework.test import APIClient
 
-from apps.catalog.models import ModelProject, WorkspaceAsset
+from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.registry.models import ModelVersion
+from apps.drift.tests.helpers import create_version_with_reference_snapshot
 from infrastructure.execution.argo_backends import ArgoDriftBackend
 
 
 def _monitor_fixture():
     owner = get_user_model().objects.create_user("automatic-drift@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="automatic drift")
-    version = ModelVersion.objects.create(project=project, version="1")
-    asset = WorkspaceAsset.objects.create(
-        project=project,
-        kind="data",
-        relative_path="reference.csv",
-        s3_uri="s3://bucket/reference.csv",
-    )
-    return version, asset
+    version = create_version_with_reference_snapshot(project)
+    return version, version.reference_snapshot
 
 
 @pytest.mark.django_db
@@ -30,7 +25,7 @@ def test_automatic_drift_webhook_creates_one_durable_threshold_crossing(monkeypa
     version, asset = _monitor_fixture()
     monitor = DriftMonitor.objects.create(
         version=version,
-        reference_asset=asset,
+        reference_snapshot=version.reference_snapshot,
         name="default",
         trigger_threshold=100,
     )
@@ -61,7 +56,7 @@ def test_automatic_drift_webhook_does_not_trigger_before_threshold(monkeypatch):
     version, asset = _monitor_fixture()
     monitor = DriftMonitor.objects.create(
         version=version,
-        reference_asset=asset,
+        reference_snapshot=version.reference_snapshot,
         name="default",
         trigger_threshold=100,
         last_automatic_trigger_count=50,
@@ -103,7 +98,7 @@ def test_automatic_drift_webhook_requires_secret_and_uuid():
 )
 def test_automatic_drift_run_dispatches_complete_argo_payload():
     version, asset = _monitor_fixture()
-    monitor = DriftMonitor.objects.create(version=version, reference_asset=asset, name="default")
+    monitor = DriftMonitor.objects.create(version=version, reference_snapshot=version.reference_snapshot, name="default")
     run = DriftRun.objects.create(monitor=monitor, idempotency_key="automatic-drift-argo")
     captured = {}
 
@@ -128,7 +123,7 @@ def test_automatic_drift_run_dispatches_complete_argo_payload():
     assert captured["url"] == "http://argo-events/drift"
     assert payload["job_id"] == str(run.public_id)
     assert payload["model_version_id"] == str(version.public_id)
-    assert payload["reference_data_url"] == "get:s3://bucket/reference.csv"
+    assert payload["reference_data_url"] == f"get:{version.reference_snapshot.manifest_uri}"
     assert payload["control_plane_webhook_url"] == (
         f"http://control-plane:8000/internal/webhooks/drift-runs/{run.public_id}/"
     )

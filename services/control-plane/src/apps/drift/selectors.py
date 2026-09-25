@@ -6,7 +6,7 @@ from .models import DriftMonitor, DriftRun
 def monitors_for_user(user):
     return (
         DriftMonitor.objects.filter(version__project__owner=user)
-        .select_related("version", "reference_asset")
+        .select_related("version", "reference_snapshot")
         .order_by("-created_at")
     )
 

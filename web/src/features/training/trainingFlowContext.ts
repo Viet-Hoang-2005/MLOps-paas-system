@@ -27,6 +27,8 @@ export interface TrainingSourceForm {
   entry_point: string;
   requirements_text: string;
   requirements_file?: File | null;
+  source_zip: File | null;
+  training_data: File | null;
 }
 
 export interface TrainingExecutionForm {
@@ -65,7 +67,7 @@ export interface CreateTrainingJobContext {
   ): void;
   setEditorDirty(kind: "code" | "data", dirty: boolean): void;
   continueFromMetadata(): Promise<void>;
-  continueFromSource(saveEditors: Array<() => Promise<boolean>>): Promise<void>;
+  continueFromSource(): Promise<void>;
   startTraining(): Promise<void>;
   cancelTraining(): Promise<void>;
   finishTraining(): void;

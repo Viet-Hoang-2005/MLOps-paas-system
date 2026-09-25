@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bot, Edit3, Trash2, Search, Plus, Download } from "lucide-react";
+import { Bot, Edit3, Trash2, Search, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/shared/components/Button";
@@ -16,9 +16,10 @@ import type { ModelProject } from "@/features/catalog/types";
 import EditModelModal from "@/features/deploy/components/EditModelModal";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { useTranslation } from "react-i18next";
+import { projectPaths } from "@/app/router/paths";
 
 const lifecycleBadgeVariant = {
-  metadata: "neutral",
+  setup: "neutral",
   image_ready: "primary",
   deployed: "success",
 } as const;
@@ -55,7 +56,7 @@ export default function ModelManagementPage() {
           type="button"
           className="text-left font-semibold text-color-foreground hover:text-color-primary"
           onClick={() =>
-            navigate(`/dashboard/management/model/${row.original.id}`)
+            navigate(projectPaths.overview(row.original.id))
           }
         >
           {row.original.name}
@@ -94,10 +95,10 @@ export default function ModelManagementPage() {
       ),
     },
     {
-      accessorKey: "lifecycle_status",
+      accessorKey: "workflow_status",
       header: t("columns.status"),
       cell: ({ row }) => {
-        const status = row.original.lifecycle_status ?? "metadata";
+        const status = row.original.workflow_status ?? "setup";
         const label =
           status === "image_ready"
             ? t("status.built")
@@ -124,22 +125,6 @@ export default function ModelManagementPage() {
         const record = row.original;
         return (
           <div className="flex items-center gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={t("actions.downloadModel")}
-              title={t("actions.downloadModel")}
-              icon={<Download className="h-4 w-4" />}
-              onClick={() => {
-                if (record.model_uri)
-                  window.open(
-                    record.model_uri,
-                    "_blank",
-                    "noopener,noreferrer",
-                  );
-              }}
-              disabled={!record.model_uri}
-            />
             <Button
               size="icon"
               variant="ghost"
@@ -184,7 +169,7 @@ export default function ModelManagementPage() {
           <Button
             size="md"
             onClick={() =>
-              navigate("/dashboard/management/model/upload/metadata")
+              navigate("/dashboard/projects/new")
             }
           >
             <Plus className="h-4 w-4" />
@@ -212,7 +197,7 @@ export default function ModelManagementPage() {
                   <Button
                     size="md"
                     onClick={() =>
-                      navigate("/dashboard/management/model/upload/metadata")
+                      navigate("/dashboard/projects/new")
                     }
                   >
                     {t("upload")}

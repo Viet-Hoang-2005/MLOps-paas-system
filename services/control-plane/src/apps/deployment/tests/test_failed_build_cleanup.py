@@ -2,6 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from apps.catalog.models import ModelProject
+from apps.registry.tests.factories import create_model_version
 from apps.deployment.models import Build, BuildInputAsset
 from apps.deployment.tasks import cleanup_failed_build_artifacts, execute_build
 
@@ -26,15 +27,17 @@ class FakeCleaner:
 def test_failed_build_cleanup_removes_binary_and_keeps_audit_metadata(monkeypatch):
     owner = get_user_model().objects.create_user("cleanup-failed@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="cleanup project")
+    version = create_model_version(project)
     build = Build.objects.create(
         project=project,
+        source_version=version,
         flavor="sklearn",
         status="failed",
         image_uri=f"image-{project.public_id}:build-failed",
     )
     asset = BuildInputAsset.objects.create(
         build=build,
-        kind="source_artifact",
+        kind="model",
         name="model.pkl",
         checksum="checksum",
         s3_uri="s3://bucket/input/model.pkl",
@@ -56,7 +59,8 @@ def test_failed_build_cleanup_removes_binary_and_keeps_audit_metadata(monkeypatc
 def test_ready_build_is_retained(monkeypatch):
     owner = get_user_model().objects.create_user("cleanup-ready@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="retained project")
-    build = Build.objects.create(project=project, flavor="sklearn", status="ready")
+    version = create_model_version(project)
+    build = Build.objects.create(project=project, source_version=version, flavor="sklearn", status="ready")
     monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: FakeStorage())
     assert cleanup_failed_build_artifacts.run(str(build.public_id), True) == "retained"
 
@@ -65,7 +69,8 @@ def test_ready_build_is_retained(monkeypatch):
 def test_execute_build_locks_build_without_joining_nullable_version(monkeypatch):
     owner = get_user_model().objects.create_user("execute-build@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="execute build project")
-    build = Build.objects.create(project=project, flavor="sklearn", backend="docker", status="queued")
+    version = create_model_version(project)
+    build = Build.objects.create(project=project, source_version=version, flavor="sklearn", backend="docker", status="queued")
     backend_calls = []
 
     class FakeBackend:

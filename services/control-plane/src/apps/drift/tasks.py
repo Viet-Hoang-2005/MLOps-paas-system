@@ -17,13 +17,13 @@ def execute_drift_run(self, run_id):
 
     with transaction.atomic():
         run = (
-            DriftRun.objects.select_for_update()
+            DriftRun.objects.select_for_update(of=("self",))
             .select_related(
                 "monitor",
                 "monitor__version",
                 "monitor__version__project",
                 "monitor__version__project__owner",
-                "monitor__reference_asset",
+                "monitor__reference_snapshot",
             )
             .get(public_id=run_id)
         )
