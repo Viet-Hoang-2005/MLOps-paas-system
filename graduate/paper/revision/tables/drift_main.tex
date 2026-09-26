@@ -1,0 +1,19 @@
+\begin{table}[t]
+\caption{Fixed-model results for 1,000-row windows: mean$\pm$sample SD over five seeds. Alerts use $\tau_D=0.30$; S0 alert count uses all 30 stable windows.}
+\label{tab:results}
+\centering
+\small
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lcccc@{}}
+\toprule
+Scenario & Drift share & Macro-F1 & Attack recall & Alerts \\
+\midrule
+S0 & 0.000$\pm$0.000 & 1.000$\pm$0.000 & 1.000$\pm$0.000 & 0/30 \\
+S1 (15\%) & 0.742$\pm$0.059 & 1.000$\pm$0.000 & 1.000$\pm$0.000 & 5/5 \\
+S1 (50\%) & 0.850$\pm$0.077 & 1.000$\pm$0.000 & 1.000$\pm$0.000 & 5/5 \\
+S1 (85\%) & 0.981$\pm$0.000 & 0.999$\pm$0.001 & 1.000$\pm$0.001 & 5/5 \\
+S2 (25\%) & 0.165$\pm$0.202 & 0.905$\pm$0.002 & 0.753$\pm$0.004 & 1/5 \\
+S2 (50\%) & 0.865$\pm$0.073 & 0.789$\pm$0.003 & 0.508$\pm$0.005 & 5/5 \\
+S2 (100\%) & 0.981$\pm$0.000 & 0.422$\pm$0.007 & 0.010$\pm$0.007 & 5/5 \\
+\bottomrule
+\end{tabular*}
+\end{table}

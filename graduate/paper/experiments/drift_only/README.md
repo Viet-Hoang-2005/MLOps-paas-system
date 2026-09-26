@@ -49,4 +49,6 @@ The team provided the lineage links in `config.json`. Obtain the exact local CSV
 
 ## Scope limits
 
+The [critical review dated 2026-09-27](EXPERIMENT_CRITICAL_REVIEW_VI_2026-09-27.md) adds post-hoc family-level and model-gain diagnostics without changing the frozen run. Run `python graduate/paper/experiments/drift_only/diagnose_baseline.py` once to write a new `diagnostics/run_20260927` directory (it must not exist). These diagnostics reuse the evaluation pool; they are not independent confirmatory evidence.
+
 These are controlled composition shifts in a third-party preprocessed and team-subsampled CICIDS2017 derivative. No temporal validation, concept-drift identification, retraining comparison, serving scalability, or security-isolation claim follows. Upstream feature selection used combined data; splitting afterward cannot remove that potential leakage. Exact deduplication does not establish flow/session/host independence. Stable windows have fixed class counts; alert frequency is conditional on this sampling design. KS asymptotic p-values on tied network-flow features and correlated features need cautious interpretation; BH here is a defined comparison rule, not a guarantee of dataset-level false-alert control.

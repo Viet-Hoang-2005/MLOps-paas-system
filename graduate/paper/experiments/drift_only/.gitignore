@@ -1,3 +1,4 @@
 # Keep generated scientific tables and row manifests with this experiment.
 !results/**/*.csv
+!diagnostics/**/*.csv
 __pycache__/

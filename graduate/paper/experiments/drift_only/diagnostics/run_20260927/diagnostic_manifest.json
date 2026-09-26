@@ -1,0 +1,35 @@
+{
+  "scope": "Post-hoc analysis of existing fixed model and evaluation pool; no model fit, threshold tuning, or new confirmatory test.",
+  "input_sha256": "0728925d293f433a3f7bce4509c00e1648906c59c59d8e63663e1622a226ef6c",
+  "model_sha256": "bd0a91ec11d38ccceca4950a571857f3710bc7034bb8aaf30b40295dfd15e8b5",
+  "evaluation_rows": 41972,
+  "top_gain_features": [
+    {
+      "feature": "Fwd Packet Length Max",
+      "total_gain": 202135.53125,
+      "gain_fraction": 0.40270866691716184
+    },
+    {
+      "feature": "Total Length of Fwd Packets",
+      "total_gain": 157947.171875,
+      "gain_fraction": 0.3146734996849649
+    },
+    {
+      "feature": "Bwd Packet Length Std",
+      "total_gain": 70922.6640625,
+      "gain_fraction": 0.14129713525475535
+    },
+    {
+      "feature": "Bwd Header Length",
+      "total_gain": 33451.9296875,
+      "gain_fraction": 0.06664529450588492
+    },
+    {
+      "feature": "act_data_pkt_fwd",
+      "total_gain": 26692.87890625,
+      "gain_fraction": 0.053179436658379015
+    }
+  ],
+  "recall_decomposition_all_windows_match": true,
+  "caution": "Gain is training attribution, not causal importance or proof of a shortcut. Whole-pool diagnosis is post-hoc, not an independent dataset."
+}
