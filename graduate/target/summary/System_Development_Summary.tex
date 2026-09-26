@@ -1,0 +1,57 @@
+% !TEX program = pdflatex
+\documentclass[11pt,a4paper]{article}
+\usepackage[a4paper,margin=2cm,top=2.1cm,bottom=2.1cm]{geometry}
+\usepackage[T5]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{mathptmx}
+\usepackage{microtype}
+\usepackage{booktabs,longtable,array}
+\usepackage{enumitem,xcolor,hyperref,xurl,titlesec,amsmath}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!45!black,
+  urlcolor=blue!45!black,
+  pdftitle={Tóm tắt hướng đi khóa luận Continuous Training},
+  pdfauthor={Trần Nguyễn Việt Hoàng, Bùi Ngọc Thái}
+}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.35em}
+\setlength{\emergencystretch}{2em}
+\raggedbottom
+\clubpenalty=10000
+\widowpenalty=10000
+\setlist{leftmargin=1.5em,itemsep=0.15em,topsep=0.25em,parsep=0pt}
+\titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2ex}{0.6ex}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\subsection}{0pt}{1ex}{0.4ex}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcommand{\codepath}[1]{{\small\path{#1}}}
+\newcommand{\code}[1]{{\small\texttt{#1}}}
+\newcommand{\source}[2]{\href{#1}{#2}}
+\newcommand{\statusgood}{\textcolor{green!45!black}{\textbf{Có nền}}}
+\newcommand{\statuspartial}{\textcolor{orange!65!black}{\textbf{Một phần}}}
+\newcommand{\statusmissing}{\textcolor{red!60!black}{\textbf{Chưa có}}}
+\renewcommand{\tablename}{Bảng}
+
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries Tổng quan hướng đi khóa luận}\\[0.35em]
+  {\large Continuous Training thích ứng với Data Drift dưới ngân sách gán nhãn hạn chế}\\[0.35em]
+  Đánh giá hiện trạng, case study và lộ trình phát triển hệ thống\\[0.25em]
+  {\small Cập nhật: 17/09/2026}
+\end{center}
+
+% Nội dung được chia theo chủ đề để dễ cập nhật độc lập.
+\input{sections/00_abstract}
+\input{sections/01_problem_scope}
+\input{sections/02_related_work}
+\input{sections/03_system_readiness}
+\input{sections/04_proposed_method}
+\input{sections/05_implementation}
+\input{sections/06_experiments}
+\input{sections/07_schedule}
+\input{sections/08_references}
+
+\end{document}

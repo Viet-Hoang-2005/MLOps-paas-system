@@ -15,16 +15,25 @@ const statusPresentation = (
   t: (key: string) => string,
 ) => {
   if (status === "drift_detected")
-    return { label: t("driftSummary.status.detected"), variant: "danger" as const };
+    return {
+      label: t("driftSummary.status.detected"),
+      variant: "danger" as const,
+    };
   if (status === "healthy")
-    return { label: t("driftSummary.status.healthy"), variant: "success" as const };
+    return {
+      label: t("driftSummary.status.healthy"),
+      variant: "success" as const,
+    };
   if (status === "report_unavailable")
     return {
       label: t("driftSummary.status.reportUnavailable"),
       variant: "warning" as const,
     };
   if (status === "unknown")
-    return { label: t("driftSummary.status.unknown"), variant: "neutral" as const };
+    return {
+      label: t("driftSummary.status.unknown"),
+      variant: "neutral" as const,
+    };
   return {
     label: t("driftSummary.status.notConfigured"),
     variant: "neutral" as const,

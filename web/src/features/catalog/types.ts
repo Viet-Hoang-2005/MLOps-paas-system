@@ -1,30 +1,45 @@
-import type { ResourceId } from '@/shared/types';
+import type { ResourceId } from "@/shared/types";
 import type {
   RegistryDeployabilityStatus,
   RegistryModelInsightsSummary,
   RegistryStage,
-} from '@/features/registry/types';
+} from "@/features/registry/types";
 
-export type ModelAccessMode = 'private' | 'public';
+export type ModelAccessMode = "private" | "public";
 export type ModelProjectStatus =
-  | 'registered'
-  | 'ready'
-  | 'uploading'
-  | 'deploying'
-  | 'deployed'
-  | 'unhealthy'
-  | 'deploy_failed'
-  | 'stopped'
-  | 'archived'
-  | 'error'
-  | 'disabled';
-export type ModelBuildStatus = 'not_started' | 'pending' | 'queued' | 'building' | 'ready' | 'failed' | 'cancelled' | 'error';
-export type ModelEndpointStatus = 'not_deployed' | 'deploying' | 'healthy' | 'unhealthy' | 'deploy_failed' | 'stopped';
-export type ModelFlavor = 'sklearn' | 'xgboost' | 'pytorch' | 'tensorflow';
-export type ModelArtifactFormat = 'raw' | 'mlflow_zip';
-export type ModelSourceType = 'manual_upload' | 'training_job';
-export type ModelLifecycleStatus = 'metadata' | 'image_ready' | 'deployed';
-export type ModelDeletionState = 'active' | 'deleting' | 'deleted' | 'delete_failed';
+  | "registered"
+  | "ready"
+  | "uploading"
+  | "deploying"
+  | "deployed"
+  | "unhealthy"
+  | "deploy_failed"
+  | "stopped"
+  | "archived"
+  | "error"
+  | "disabled";
+export type ModelBuildStatus =
+  | "not_started"
+  | "pending"
+  | "queued"
+  | "building"
+  | "ready"
+  | "failed"
+  | "cancelled"
+  | "error";
+export type ModelEndpointStatus =
+  | "not_deployed"
+  | "deploying"
+  | "healthy"
+  | "unhealthy"
+  | "deploy_failed"
+  | "stopped";
+export type ModelFlavor = "sklearn" | "xgboost" | "pytorch" | "tensorflow";
+export type ModelArtifactFormat = "raw" | "mlflow_zip";
+export type ModelSourceType = "manual_upload" | "training_job";
+export type ModelLifecycleStatus = "metadata" | "image_ready" | "deployed";
+export type ModelDeletionState =
+  "active" | "deleting" | "deleted" | "delete_failed";
 
 export interface ActiveModelEndpoint {
   id: ResourceId;
@@ -33,7 +48,7 @@ export interface ActiveModelEndpoint {
   url: string;
   health_url: string;
   health_status: string;
-  deployment_status: Deployment['status'];
+  deployment_status: Deployment["status"];
   last_checked_at: string | null;
 }
 
@@ -64,7 +79,7 @@ export interface ModelProject {
   endpoint_public_path?: string;
   endpoint_internal_path?: string;
   source_artifact?: string;
-  flavor?: ModelFlavor | '';
+  flavor?: ModelFlavor | "";
   package_manifest?: Record<string, unknown>;
   package_preview_tree?: string[];
   build_status?: ModelBuildStatus;
@@ -85,7 +100,9 @@ export interface ModelProject {
   updated_at: string;
 }
 
-export interface ModelProjectListResponse { models: ModelProject[] }
+export interface ModelProjectListResponse {
+  models: ModelProject[];
+}
 
 export interface ModelVersion {
   id: ResourceId;
@@ -93,7 +110,7 @@ export interface ModelVersion {
   version: string;
   source_job_id: ResourceId | null;
   requirements_snapshot: string;
-  flavor: ModelFlavor | '';
+  flavor: ModelFlavor | "";
   stage: RegistryStage;
   deployability: RegistryDeployabilityStatus;
   deployability_reason: string;
@@ -112,8 +129,8 @@ export interface Build {
   flavor: ModelFlavor;
   artifact_format: ModelArtifactFormat;
   requirements_snapshot: string;
-  backend: 'docker' | 'argo';
-  status: 'pending' | 'queued' | 'building' | 'ready' | 'failed' | 'cancelled';
+  backend: "docker" | "argo";
+  status: "pending" | "queued" | "building" | "ready" | "failed" | "cancelled";
   image_uri: string;
   image_digest: string;
   package_uri: string;
@@ -126,8 +143,9 @@ export interface Deployment {
   id: ResourceId;
   version_id: ResourceId;
   build_id: ResourceId;
-  backend: 'docker' | 'argo';
-  status: 'pending' | 'deploying' | 'healthy' | 'unhealthy' | 'failed' | 'stopped';
+  backend: "docker" | "argo";
+  status:
+    "pending" | "deploying" | "healthy" | "unhealthy" | "failed" | "stopped";
   error_message: string;
 }
 
@@ -183,13 +201,13 @@ export interface BuildInputForm {
 export type ModelBuildFormValues = ProjectMetadataForm & BuildInputForm;
 
 export type ModelBuildInputAssetKind =
-  | 'source_artifact'
-  | 'label_mapping'
-  | 'metrics'
-  | 'params'
-  | 'model_insights'
-  | 'feature_importance'
-  | 'input_schema';
+  | "source_artifact"
+  | "label_mapping"
+  | "metrics"
+  | "params"
+  | "model_insights"
+  | "feature_importance"
+  | "input_schema";
 
 export interface BuildInputAssetSummary {
   id: ResourceId;

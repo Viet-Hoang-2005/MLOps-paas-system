@@ -1,12 +1,12 @@
 from pathlib import Path
 
 from django.db import transaction
-from infrastructure.storage import S3Storage
-from infrastructure.storage.paths import build_input_prefix, build_prefix
 from rest_framework.exceptions import ValidationError
 
 from apps.deployment.models import Build, BuildInputAsset
 from apps.deployment.tasks import cancel_build, execute_build
+from infrastructure.storage import S3Storage
+from infrastructure.storage.paths import build_input_prefix, build_prefix
 
 BUILD_FILE_FIELDS = {
     "source_artifact": "source_artifact",
@@ -111,7 +111,9 @@ def request_manual_build(*, project, validated_data, backend, storage=None):
                     raise ValidationError({"source_artifact_uri": "Source artifact must belong to storage bucket."})
                 expected_scope = f"users/{project.owner.tenant_id}/models/{project.public_id}/"
                 if not key.startswith(expected_scope):
-                    raise ValidationError({"source_artifact_uri": "Cross-tenant or cross-project artifact access prohibited."})
+                    raise ValidationError(
+                        {"source_artifact_uri": "Cross-tenant or cross-project artifact access prohibited."}
+                    )
 
                 actual_size = source_artifact_size or 0
                 actual_checksum = source_artifact_checksum or ""

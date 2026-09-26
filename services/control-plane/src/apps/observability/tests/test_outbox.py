@@ -14,13 +14,21 @@ def test_kafka_claim_does_not_claim_webhook_rows():
     owner = get_user_model().objects.create_user("outbox@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="Outbox")
     enqueue_event(
-        topic="registry.events", aggregate_type="model_project", aggregate_id=project.public_id,
-        event_type="model.promoted", payload={"project_id": str(project.public_id)},
+        topic="registry.events",
+        aggregate_type="model_project",
+        aggregate_id=project.public_id,
+        event_type="model.promoted",
+        payload={"project_id": str(project.public_id)},
     )
     EventOutbox.objects.create(
-        delivery_kind="webhook", destination="automatic_drift", aggregate_type="model_version",
-        aggregate_id=uuid.uuid4(), event_type="automatic_drift.requested",
-        payload={}, idempotency_key="webhook-event", available_at=timezone.now(),
+        delivery_kind="webhook",
+        destination="automatic_drift",
+        aggregate_type="model_version",
+        aggregate_id=uuid.uuid4(),
+        event_type="automatic_drift.requested",
+        payload={},
+        idempotency_key="webhook-event",
+        available_at=timezone.now(),
     )
 
     claimed = claim_events(delivery_kind="kafka")

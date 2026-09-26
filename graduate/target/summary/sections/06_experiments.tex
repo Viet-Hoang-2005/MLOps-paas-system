@@ -1,0 +1,16 @@
+\section{Điều kiện hoàn thành và giới hạn}
+
+KLTN được xem là hoàn thành khi có một vòng CT chạy được từ production/replay đến quyết định và candidate gate trên ít nhất hai case study; có kết quả so sánh B0--B5; có bằng chứng về label cost, degradation detection, recovery và safety; và mọi quyết định đều có lineage.
+
+Các bất biến nghiệm thu gồm:
+
+\begin{itemize}
+  \item không vi phạm \(B_{verify}+B_{train}+B_{gate}\leq B_{total}\);
+  \item không tạo logical job hoặc maintenance execution trùng;
+  \item không cập nhật sai model version/champion;
+  \item candidate fail/hold/crash-loop không làm mất champion đang phục vụ;
+  \item 100\% decision có snapshot, evidence, policy, label ledger, training/build/gate trace phù hợp.
+\end{itemize}
+
+Phạm vi không bao gồm LLM, incremental learning, pseudo-labeling, causal inference, advanced HPO, multi-GPU, multi-region HA, autoscaling research hoặc fairness như một research question độc lập. Kết luận chỉ áp dụng cho hai dataset, các scenario và cấu hình thử nghiệm đã công bố; không claim policy là tối ưu cho mọi hệ thống ML.
+

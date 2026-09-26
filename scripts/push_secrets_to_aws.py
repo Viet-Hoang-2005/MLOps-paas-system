@@ -2,6 +2,7 @@ import json
 import os
 import sys
 from pathlib import Path
+
 import boto3
 from botocore.exceptions import ClientError
 from dotenv import dotenv_values
@@ -22,8 +23,9 @@ def parse_env_file(env_path: Path) -> dict:
             parsed_data[k] = v.replace("\\n", "\n")
         else:
             parsed_data[k] = v
-            
+
     return parsed_data
+
 
 def update_or_create_secret(client, secret_name: str, secret_dict: dict):
     """Cập nhật giá trị JSON vào AWS Secrets Manager, nếu chưa có thì tạo mới."""
@@ -70,10 +72,7 @@ def main():
     print(f"Read {len(env_data)} environment variables.")
 
     # Phân nhóm biến cho 3 kho Secret
-    aws_keys = [
-        "AWS_ACCESS_KEY_ID",
-        "AWS_SECRET_ACCESS_KEY"
-    ]
+    aws_keys = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
     github_keys = [
         "GITHUB_REPO",
         "GITHUB_TOKEN",
@@ -102,7 +101,9 @@ def main():
 
     aws_secrets_payload = {k: env_data[k] for k in aws_keys if k in env_data}
     github_secrets_payload = {k: env_data[k] for k in github_keys if k in env_data}
-    production_secrets_payload = {k: env_data[k] for k in production_keys if k in env_data}
+    production_secrets_payload = {
+        k: env_data[k] for k in production_keys if k in env_data
+    }
 
     # Lấy Region từ .env hoặc mặc định ap-southeast-1
     region = os.environ.get("AWS_DEFAULT_REGION") or "ap-southeast-1"
@@ -114,9 +115,13 @@ def main():
     if aws_access_key_id and aws_secret_access_key:
         client_kwargs["aws_access_key_id"] = aws_access_key_id
         client_kwargs["aws_secret_access_key"] = aws_secret_access_key
-        print("-> Using AWS credentials read directly from .env file / environment variables.")
+        print(
+            "-> Using AWS credentials read directly from .env file / environment variables."
+        )
     else:
-        print("-> No explicit AWS credentials found in .env; falling back to default AWS credential chain (~/.aws/credentials or IAM role)...")
+        print(
+            "-> No explicit AWS credentials found in .env; falling back to default AWS credential chain (~/.aws/credentials or IAM role)..."
+        )
 
     client = boto3.client(**client_kwargs)
 
@@ -132,12 +137,13 @@ def main():
             print(f"Skipping {secret_name} because it does not contain suitable data.")
             continue
         update_or_create_secret(client, secret_name, payload)
-        
+
         print(f"-> Successfully pushed {len(payload)} keys to {secret_name}:")
         for key in payload:
             print(f"     * {key}")
 
     print("\nSuccess! All configuration is ready on AWS Secrets Manager.")
+
 
 if __name__ == "__main__":
     main()

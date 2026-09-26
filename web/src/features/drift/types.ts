@@ -1,4 +1,4 @@
-import type { ResourceId } from '@/shared/types';
+import type { ResourceId } from "@/shared/types";
 
 export interface DriftMonitoringResult {
   id: ResourceId;

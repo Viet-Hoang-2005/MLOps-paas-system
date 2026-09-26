@@ -31,7 +31,9 @@ export function Placeholder({
             {selectedModel ? selectedModel.name : t("modelSelector.empty")}
           </p>
         )}
-        <h1 className="mb-3 text-style-page-title font-bold text-color-foreground">{title}</h1>
+        <h1 className="mb-3 text-style-page-title font-bold text-color-foreground">
+          {title}
+        </h1>
         <p className="max-w-lg text-style-body text-color-muted-foreground">
           {description}
         </p>

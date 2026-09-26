@@ -166,7 +166,10 @@ function trackingDescriptionKey(status?: string) {
   }
 }
 
-function endpointFriendlyHint(reasonCode: string | undefined, fallback: string): string {
+function endpointFriendlyHint(
+  reasonCode: string | undefined,
+  fallback: string,
+): string {
   if (!reasonCode) return "";
   if (
     [
@@ -181,25 +184,26 @@ function endpointFriendlyHint(reasonCode: string | undefined, fallback: string):
   return "";
 }
 
-function endpointActionMessage(result: {
-  message?: string;
-  reason_code?: string;
-  endpoint_error?: string;
-  error?: string;
-  success?: boolean;
-}, messages: {
-  notReachable: string;
-  failed: string;
-  completed: string;
-}): string {
+function endpointActionMessage(
+  result: {
+    message?: string;
+    reason_code?: string;
+    endpoint_error?: string;
+    error?: string;
+    success?: boolean;
+  },
+  messages: {
+    notReachable: string;
+    failed: string;
+    completed: string;
+  },
+): string {
   return (
     result.message ||
     endpointFriendlyHint(result.reason_code, messages.notReachable) ||
     result.endpoint_error ||
     result.error ||
-    (result.success === false
-      ? messages.failed
-      : messages.completed)
+    (result.success === false ? messages.failed : messages.completed)
   );
 }
 
@@ -327,9 +331,7 @@ export function ModelVersionDetail({
     try {
       if (action === "deploy") {
         await deployRegistryVersion(version.id);
-        setActionResult(
-          t("versionDetail.deployAccepted"),
-        );
+        setActionResult(t("versionDetail.deployAccepted"));
         toast.success(t("versionDetail.deployStarted"));
       } else {
         const result = await checkRegistryVersionHealth(version.id);
@@ -416,7 +418,9 @@ export function ModelVersionDetail({
           ? t("versionDetail.smokeJsonInvalid")
           : getApiErrorMessage(
               error,
-              error instanceof Error ? error.message : t("versionDetail.smokeFailed"),
+              error instanceof Error
+                ? error.message
+                : t("versionDetail.smokeFailed"),
             );
       setActionResult(message);
       toast.error(message);
@@ -628,8 +632,7 @@ export function ModelVersionDetail({
                       deployabilityBadge(version.deployability_status),
                     )}
                   >
-                    {version.deployability_status ||
-                      t("versionDetail.unknown")}
+                    {version.deployability_status || t("versionDetail.unknown")}
                   </span>
                 </h4>
                 <p className="text-style-body text-color-muted-foreground">
@@ -1029,7 +1032,8 @@ export function ModelVersionDetail({
                               </span>
                             </div>
                             <code className="mt-3 block break-all rounded-compact border border-border bg-surface px-3 py-2 font-mono text-style-code-sm text-color-foreground">
-                              {endpointUrl || t("versionDetail.aliasUnavailable")}
+                              {endpointUrl ||
+                                t("versionDetail.aliasUnavailable")}
                             </code>
                             {promotedAt && (
                               <p className="mt-2 text-style-caption text-color-muted-foreground">
@@ -1113,7 +1117,9 @@ export function ModelVersionDetail({
                         )}
                         <span
                           className={
-                            copied ? "text-color-success" : "text-color-foreground"
+                            copied
+                              ? "text-color-success"
+                              : "text-color-foreground"
                           }
                         >
                           {copied

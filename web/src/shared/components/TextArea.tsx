@@ -48,7 +48,8 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
           className={cn(
             minHeight,
             "w-full resize-y rounded-control border border-input bg-surface px-4 py-3 text-style-body text-color-foreground shadow-sm outline-none transition-colors placeholder:text-color-foreground-subtle hover:border-input-hover focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-disabled disabled:text-color-foreground-disabled disabled:hover:border-border",
-            error && "border-danger hover:border-danger focus:border-danger focus:ring-danger/20",
+            error &&
+              "border-danger hover:border-danger focus:border-danger focus:ring-danger/20",
             className,
           )}
           {...props}

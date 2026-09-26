@@ -1,0 +1,91 @@
+{
+  "dataset": "diabetic_data.csv",
+  "recipe_version": "fairlearn_diabetes_readmission_v1",
+  "target_column": "readmit_30_days",
+  "target_classes": [
+    0,
+    1
+  ],
+  "total_features": 20,
+  "feature_order": [
+    "time_in_hospital",
+    "num_lab_procedures",
+    "num_procedures",
+    "num_medications",
+    "number_diagnoses",
+    "gender",
+    "age",
+    "admission_source_id",
+    "medical_specialty",
+    "primary_diagnosis",
+    "max_glu_serum",
+    "A1Cresult",
+    "insulin",
+    "change",
+    "diabetesMed",
+    "medicare",
+    "medicaid",
+    "had_emergency",
+    "had_inpatient_days",
+    "had_outpatient_days"
+  ],
+  "feature_types": {
+    "time_in_hospital": "numeric",
+    "num_lab_procedures": "numeric",
+    "num_procedures": "numeric",
+    "num_medications": "numeric",
+    "number_diagnoses": "numeric",
+    "gender": "categorical",
+    "age": "categorical",
+    "admission_source_id": "categorical",
+    "medical_specialty": "categorical",
+    "primary_diagnosis": "categorical",
+    "max_glu_serum": "categorical",
+    "A1Cresult": "categorical",
+    "insulin": "categorical",
+    "change": "categorical",
+    "diabetesMed": "categorical",
+    "medicare": "categorical",
+    "medicaid": "categorical",
+    "had_emergency": "categorical",
+    "had_inpatient_days": "categorical",
+    "had_outpatient_days": "categorical"
+  },
+  "numeric_features": [
+    "time_in_hospital",
+    "num_lab_procedures",
+    "num_procedures",
+    "num_medications",
+    "number_diagnoses"
+  ],
+  "categorical_features": [
+    "gender",
+    "age",
+    "admission_source_id",
+    "medical_specialty",
+    "primary_diagnosis",
+    "max_glu_serum",
+    "A1Cresult",
+    "insulin",
+    "change",
+    "diabetesMed",
+    "medicare",
+    "medicaid",
+    "had_emergency",
+    "had_inpatient_days",
+    "had_outpatient_days"
+  ],
+  "preprocessing_strategies": {
+    "numeric": "SimpleImputer(median) -> StandardScaler",
+    "categorical": "SimpleImputer('missing') -> OneHotEncoder(handle_unknown='ignore')"
+  },
+  "excluded_features": [
+    "encounter_id",
+    "patient_nbr",
+    "race",
+    "race_all",
+    "discharge_disposition_id",
+    "readmitted",
+    "readmit_binary"
+  ]
+}

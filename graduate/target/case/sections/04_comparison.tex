@@ -1,0 +1,27 @@
+\section{So sánh và phân vai trong nghiên cứu}
+
+BAF và Diabetes không nhằm tạo hai pipeline độc lập. Chúng dùng chung Evidence Window, Drift Detector, CBPE/ATC, Verification Engine, Label Budget, Decision Policy, Training Orchestrator và Evaluation Gate; chỉ thay đổi dataset, model, feature schema và metric theo domain.
+
+\begin{longtable}{@{}L{3.6cm} L{2.1cm} L{2.1cm} L{\dimexpr\linewidth-7.8cm-6\tabcolsep\relax}@{}}
+\caption{So sánh hai workload theo mục tiêu thực nghiệm.}\label{tab:case-comparison}\\
+\toprule\textbf{Tiêu chí} & \textbf{BAF + MLP} & \textbf{Diabetes + LR} & \textbf{Vai trò}\\
+\midrule\endfirsthead
+\toprule\textbf{Tiêu chí} & \textbf{BAF + MLP} & \textbf{Diabetes + LR} & \textbf{Vai trò}\\
+\midrule\endhead
+Model family & DL/PyTorch & ML/sklearn & Kiểm tra hai nhánh artifact và serving.\\
+Temporal structure & 5/5 & 4/5 & BAF có month/variant; Diabetes có lịch sử dài.\\
+Class imbalance & 5/5 & 3/5 & BAF là rare-event stress test chính.\\
+Limited labels & 5/5 & 4/5 & BAF đo positive-label scarcity; Diabetes đo nhãn trễ.\\
+Degradation study & 5/5 & 4/5 & Cùng policy, khác đặc tính dữ liệu.\\
+Fairness analysis & 3/5 & 5/5 & Diabetes dùng subgroup analysis phụ.\\
+Khả năng tích hợp & 4/5 & 5/5 & MLP cần wrapper; Logistic Regression phù hợp nhánh sklearn.\\
+Rủi ro validity & 3/5 & 4/5 & BAF là dữ liệu sinh; Diabetes có giới hạn đại diện và nhãn proxy.\\
+Tính khả thi 4 tháng & 4/5 & 5/5 & Chạy BAF trước, sau đó xác nhận trên Diabetes.\\
+\bottomrule
+\end{longtable}
+
+BAF là \textbf{primary case} cho RQ1: policy có thể phát hiện degradation và phân bổ nhãn hiệu quả trong một stream fraud động hay không? Diabetes là \textbf{secondary case} để kiểm tra generalization sang nhãn trễ, domain y tế và model ML nhẹ hơn. Fairness chỉ được báo cáo như phân tích bổ sung, không trở thành research question mới.
+
+RQ2 không cần thêm một dataset riêng. RQ2 được đánh giá bằng fault-injection campaign chạy trên cùng hai pipeline và một fixture nhỏ có trạng thái xác định. Các lỗi cần chèn gồm reserve quota đồng thời, worker dừng sau commit, callback trễ/lặp/đảo thứ tự, training timeout, candidate crash-loop, champion thay đổi giữa các bước và gate reject. Kết quả cần kiểm tra budget, idempotency, lineage, rollback và việc champion cũ tiếp tục phục vụ.
+
+Notebook CICIDS2017 vẫn giữ vai trò system validation workload cho NIDS: kiểm tra serving, Kafka, Consumer, drift monitoring, logging và workflow end-to-end. Không dùng F1 của CICIDS để so sánh với BAF hoặc Diabetes và không dùng nó làm bằng chứng chính cho RQ1.

@@ -1,5 +1,5 @@
-import { Outlet } from 'react-router-dom';
-import { Background } from '@/features/auth/components/Background';
+import { Outlet } from "react-router-dom";
+import { Background } from "@/features/auth/components/Background";
 
 export default function AuthLayout() {
   return (

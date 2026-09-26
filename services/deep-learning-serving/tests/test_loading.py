@@ -1,6 +1,7 @@
 import pytest
 from src import loading
 
+
 def test_download_model_artifact_local_directory(tmp_path):
     assert loading.download_model_artifact("m", str(tmp_path)) == tmp_path
 

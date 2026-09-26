@@ -1,0 +1,32 @@
+\section{Đánh giá hệ thống hiện tại và phần cần bổ sung}
+
+Hệ thống hiện tại đã có nền tảng tốt để triển khai KLTN, nhưng chưa có vòng CT khép kín có kiểm chứng. Bảng dưới đây phân biệt implementation đã có, phần mới có thể kế thừa nhưng còn thiếu contract, và phần chưa tìm thấy trong các luồng rà soát.
+
+\begin{longtable}{@{}L{3.2cm} L{1.8cm} L{\dimexpr\linewidth-5cm-4\tabcolsep\relax}@{}}
+\caption{Đánh giá hiện trạng hệ thống.}\label{tab:summary-current-state}\\
+\toprule\textbf{Năng lực} & \textbf{Trạng thái} & \textbf{Đánh giá và phần cần bổ sung}\\
+\midrule\endfirsthead
+\toprule\textbf{Năng lực} & \textbf{Trạng thái} & \textbf{Đánh giá và phần cần bổ sung}\\
+\midrule\endhead
+Control Plane và registry & \statusgood & Có quản lý project, model, version, training và deployment. Cần bổ sung miền CT, policy, evidence, label request và maintenance run.\\
+Model serving và production record & \statuspartial & Có prediction và model version; cần probability chuẩn hóa, latency, snapshot bất biến và manifest hash.\\
+Consumer, Kafka và outbox & \statuspartial & Có ingest và event/outbox; cần nối automatic-drift signal với outbox chung, idempotency và reconciliation CT.\\
+Evidently và drift & \statuspartial & Có DriftMonitor/DriftRun và báo cáo; cần phân biệt drift với degradation, thêm CBPE/ATC và Evidence Window.\\
+Training và build/register & \statusgood & Có TrainingJob, output, build và registry; cần tạo dataset từ pool train đã mở nhãn, không lấy workspace latest.\\
+Champion và deployment gate & \statuspartial & Có version/alias/deploy; chưa có gate độc lập candidate--champion và rollback được kiểm chứng.\\
+Label budget và feedback & \statusmissing & Chưa có quota, reserve/commit/release, LabelRequest, Feedback và ba pool nhãn.\\
+Replay và benchmark & \statusmissing & Chưa có hidden-label replay, scenario S0--S5, baseline B0--B5 và experiment runner.\\
+AWS/K3s/Argo/\\Kubeflow & \statuspartial & Có IaC/GitOps và template training; cần hoàn thiện URL/config, smoke test và fault injection end-to-end.\\
+Observability CT & \statuspartial & Có HTTP/Celery metrics; cần dashboard budget, maintenance, decision trace, latency và recovery.\\
+\bottomrule
+\end{longtable}
+
+\subsection{Phần cần bổ sung theo lớp}
+
+\begin{itemize}
+  \item \textbf{Data contract:} xác suất \(0\)--\(1\), class mapping, threshold, calibration version, observed time, model version và snapshot manifest.
+  \item \textbf{Evidence và label:} Evidence Window, Drift/Quality Estimation, Label Request, Feedback, Label Budget Ledger và kiểm tra không trùng pool.
+  \item \textbf{Policy và orchestration:} MaintenanceRun, state machine, decision reason, deadline, attempt ID, retry, lease và reconciliation.
+  \item \textbf{Safety gate:} holdout độc lập, candidate--champion comparison, health check, promote/reject/rollback và champion protection.
+  \item \textbf{Research layer:} \code{research/replay}, \code{research/policies}, \code{research/experiments}, \code{research/metrics} và kết quả có seed/manifest.
+\end{itemize}

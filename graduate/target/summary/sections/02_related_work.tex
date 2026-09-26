@@ -1,0 +1,53 @@
+\section{Phương pháp thực hiện}
+
+\subsection{Thiết kế nghiên cứu}
+
+Mỗi dataset được chia thành các cửa sổ thời gian hoặc episode. Replay phát prediction như production nhưng giữ ground truth ở trạng thái ẩn. Policy chỉ được mở nhãn qua request hợp lệ; nhãn được tách thành verification pool, training pool và gate pool:
+
+\begin{center}
+\code{B\_verify + B\_train + B\_gate <= B\_total}
+\end{center}
+
+Verification pool dùng để ước lượng chất lượng và độ không chắc chắn. Training pool dùng để tạo candidate. Gate pool là holdout độc lập để tránh optimistic bias. Với BAF, phải theo dõi cả tổng số nhãn và số fraud label; một sample không có fraud không đủ để kết luận model an toàn.
+
+\subsection{Scenario và baseline}
+
+\begin{longtable}{@{}L{1.3cm} L{7.5cm} L{\dimexpr\linewidth-8.8cm-4\tabcolsep\relax}@{}}
+\caption{Scenario và baseline tối thiểu.}\label{tab:summary-scenarios}\\
+\toprule\textbf{Mã} & \textbf{Thiết kế} & \textbf{Mục tiêu}\\
+\midrule\endfirsthead
+\toprule\textbf{Mã} & \textbf{Thiết kế} & \textbf{Mục tiêu}\\
+\midrule\endhead
+S0 & Stable, không degradation đáng kể & Đo false retraining; kỳ vọng KEEP.\\
+S1 & Covariate shift, \(P(X)\) đổi nhưng \(P(Y|X)\) gần ổn định & Chứng minh drift không đồng nghĩa degradation.\\
+S2 & Harmful drift, phân phối đổi và performance giảm & Xác minh rồi retrain khi đủ bằng chứng.\\
+S3 & Performance hoặc calibration giảm dù input gần ổn định & Chứng minh drift-only không đủ.\\
+S4 & Hidden labels với budget hữu hạn & Đánh giá selective verification.\\
+S5 & Drift, degradation, nhãn trễ và budget constraint cùng xuất hiện & Scenario end-to-end chính.\\
+\midrule
+B0 & Static, không retrain & Mức suy giảm tự nhiên.\\
+B1 & Drift-only, drift là trigger retrain & Đối chứng cho giả định drift bằng degradation.\\
+B2 & Estimator-only, CBPE/ATC không có adaptive verification & Đo lợi ích của policy.\\
+B3 & Periodic labeling với budget cố định & Đối chứng cho lịch mở nhãn đơn giản.\\
+B4 & Proposed policy, kết hợp drift, degradation, uncertainty và budget & Phương pháp đề xuất.\\
+B5 & Full-label oracle & Upper bound tham khảo, không cùng ngân sách.\\
+\bottomrule
+\end{longtable}
+
+\subsection{Metrics và tiêu chí phân tích}
+
+Metrics model gồm precision, recall, F1, PR-AUC/AUPRC, false negative rate, false positive rate và calibration/Brier score. Metrics xác minh gồm degradation detection rate, missed degradation rate, false trigger rate và verification accuracy. Metrics CT gồm số lần retraining, unnecessary retraining rate, recovery time và time-to-retraining.
+
+Nhóm chỉ số trung tâm của đề tài là total labels consumed, verification/training/gate labels, số positive labels, label cost, cost per verified degradation và tỷ lệ chuẩn hóa \(r=B_{labels}/N_{production}\). Kết quả phải báo theo episode/block thời gian với seed, snapshot hash, policy version và khoảng bất định.
+
+\subsection{Independent Evaluation Gate}
+
+Candidate không được promote chỉ vì training hoàn tất hoặc vì estimator dự đoán chất lượng tăng. Candidate phải được đánh giá trên holdout độc lập, so sánh với champion kỳ vọng và kiểm tra health sau deploy:
+
+\begin{center}
+\code{Training -> Candidate -> Independent Holdout -> Evaluation Gate}\\
+\code{-> PROMOTE / REJECT / ROLLBACK}
+\end{center}
+
+Khi thiếu nhãn, callback trễ, schema sai, workflow timeout hoặc gate không đạt, trạng thái hợp lệ là \code{HOLD}/\code{FAILED} có lý do; champion cũ tiếp tục phục vụ.
+

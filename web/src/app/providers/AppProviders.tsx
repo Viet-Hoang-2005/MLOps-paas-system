@@ -1,9 +1,9 @@
-import { GoogleOAuthProvider } from '@react-oauth/google';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import * as Tooltip from '@radix-ui/react-tooltip';
-import { type ReactNode, useState } from 'react';
-import '@/app/i18n';
-import { ThemeProvider } from '@/app/theme/ThemeProvider';
+import { GoogleOAuthProvider } from "@react-oauth/google";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as Tooltip from "@radix-ui/react-tooltip";
+import { type ReactNode, useState } from "react";
+import "@/app/i18n";
+import { ThemeProvider } from "@/app/theme/ThemeProvider";
 
 export function AppProviders({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -23,7 +23,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ''}>
+        <GoogleOAuthProvider
+          clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ""}
+        >
           <Tooltip.Provider delayDuration={250}>{children}</Tooltip.Provider>
         </GoogleOAuthProvider>
       </QueryClientProvider>

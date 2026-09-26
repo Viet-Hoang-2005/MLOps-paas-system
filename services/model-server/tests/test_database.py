@@ -1,8 +1,9 @@
 import hashlib
 import json
-
 from unittest.mock import Mock
+
 from src import database
+
 
 class Context:
     def __init__(self, value):
@@ -22,7 +23,10 @@ def test_build_database_url_explicit_and_composed(monkeypatch):
     monkeypatch.setenv("DB_USER", "u@x")
     monkeypatch.setenv("DB_PASSWORD", "p word")
     monkeypatch.setenv("DB_HOST_RO", "db")
-    assert database.build_control_plane_database_url() == "postgresql://u%40x:p+word@db:5432/mlops_paas_db"
+    assert (
+        database.build_control_plane_database_url()
+        == "postgresql://u%40x:p+word@db:5432/mlops_paas_db"
+    )
     monkeypatch.delenv("DB_PASSWORD")
     assert database.build_control_plane_database_url() is None
 
@@ -55,7 +59,10 @@ def test_fetch_model_version_normalizes_values(monkeypatch):
     engine.connect.return_value = Context(conn)
     monkeypatch.setattr(database, "model_registry_engine", engine)
     assert database._fetch_model_version_from_db("uuid") == {
-        "id": "1", "project_id": "2", "tenant_id": "t", "version": "v1"
+        "id": "1",
+        "project_id": "2",
+        "tenant_id": "t",
+        "version": "v1",
     }
     query = str(conn.execute.call_args.args[0])
     assert "version.flavor" in query

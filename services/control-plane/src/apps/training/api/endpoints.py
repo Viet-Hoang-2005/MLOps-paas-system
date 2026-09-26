@@ -1,4 +1,3 @@
-from common.api.exceptions import ServiceUnavailable
 from django.conf import settings
 from django.db.models import Prefetch
 from rest_framework import generics, status
@@ -18,6 +17,7 @@ from apps.training.services.jobs import (
     submit_job,
 )
 from apps.training.services.logs import training_logs
+from common.api.exceptions import ServiceUnavailable
 
 from .serializers import TrainingBuildSerializer, TrainingJobEventSerializer, TrainingJobSerializer
 
@@ -155,9 +155,7 @@ class TrainingRuntimeCapabilitiesEndpoint(APIView):
             )
         accelerators = [{"type": "none", "counts": [0]}]
         if settings.TRAINING_GPU_ENABLED:
-            accelerators.append(
-                {"type": "gpu", "counts": list(settings.TRAINING_GPU_COUNTS or (1,))}
-            )
+            accelerators.append({"type": "gpu", "counts": list(settings.TRAINING_GPU_COUNTS or (1,))})
         return Response(
             {
                 "enabled": True,

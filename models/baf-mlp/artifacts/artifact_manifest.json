@@ -1,0 +1,37 @@
+{
+  "created_at": "2026-09-19T04:43:17.059472+00:00",
+  "files": {
+    "model.pt": {
+      "size_bytes": 53565,
+      "sha256": "e1097dac220126acd085bcf09349e76a23fccfda07d2cb2a29a9ddb99c741a84"
+    },
+    "preprocessor.joblib": {
+      "size_bytes": 6863,
+      "sha256": "9e62c5fd98034582cfedfdd9fea1a7fcf28446f24786ad822bd0d9aaac4b1fa0"
+    },
+    "training_config.json": {
+      "size_bytes": 2752,
+      "sha256": "78d95872e9465ec836c40fd0c4f012fddd99ba4c197eea590d34c5671ff6f7ab"
+    },
+    "data_contract.json": {
+      "size_bytes": 1901,
+      "sha256": "5c69f01ddf514161db733b63938a20188df7bc58de7d9e472af3531f799de596"
+    },
+    "metrics.json": {
+      "size_bytes": 429,
+      "sha256": "610eca3f225a6e1ad517048e17792dd707d36294286fb38c93e865118a871441"
+    },
+    "split_manifest.json": {
+      "size_bytes": 476,
+      "sha256": "7c0aef6f0b17610b14af10707a99c73333c8b3f1d4975abb6748ae84be4bea66"
+    }
+  },
+  "environment": {
+    "python_version": "3.12.13 (main, Mar  4 2026, 09:23:07) [GCC 11.4.0]",
+    "platform": "Linux-6.12.90+-x86_64-with-glibc2.35",
+    "torch_version": "2.10.0+cu128",
+    "pandas_version": "2.3.3",
+    "numpy_version": "2.0.2",
+    "joblib_version": "1.5.3"
+  }
+}

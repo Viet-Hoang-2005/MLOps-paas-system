@@ -1,0 +1,13 @@
+\begin{longtable}{@{}L{2.4cm} L{\dimexpr(\linewidth-2.4cm-4\tabcolsep)/2\relax} L{\dimexpr(\linewidth-2.4cm-4\tabcolsep)/2\relax}@{}}
+\caption{Lộ trình bốn giai đoạn.}\label{tab:summary-roadmap}\\
+\toprule\textbf{Thời gian} & \textbf{Trọng tâm} & \textbf{Đầu ra chuyển giai đoạn}\\
+\midrule\endfirsthead
+\toprule\textbf{Thời gian} & \textbf{Trọng tâm} & \textbf{Đầu ra chuyển giai đoạn}\\
+\midrule\endhead
+GĐ1\\07/09--04/10 & Chốt BAF/Diabetes, model/recipe, prediction contract, quota, state machine, gate và lineage. Smoke test MLP PyTorch và Logistic Regression trên CPU, Argo/Kubeflow, S3 và callback. & Protocol v1; một job chạy từ submit đến output/callback; pilot xác nhận ba pool đủ mẫu/lớp; chốt chi phí và cấu hình môi trường.\\
+GĐ2\\05/10--01/11 & Implement replay harness, hidden labels, snapshot/window, Label Request/Feedback/Ledger, CBPE/ATC và verification engine. & Replay deterministic; quota đồng thời, snapshot, estimator và không rò nhãn được kiểm thử local.\\
+GĐ3\\02/11--29/11 & Hoàn thiện B0--B5 và policy B4. Nối decision--training--build--gate--promote/rollback. Thêm outbox, retry, reconciliation và dashboard CT. & Một vòng CT có lineage đầy đủ; gate fail/hold giữ champion; retry/callback trùng không tạo job logic trùng hoặc chi lại ngân sách.\\
+GĐ4\\30/11--25/12 & Chạy S0--S5, ablation, fault injection và hai RQ. Phân tích chất lượng, label/compute cost, recovery và safety. Hoàn thiện báo cáo/demo. & Kết quả B0--B5 có seed/manifest, trace lỗi, cấu hình tái lập, báo cáo giới hạn và demo end-to-end.\\
+\bottomrule
+\end{longtable}
+

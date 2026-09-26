@@ -22,7 +22,9 @@ export function ApiModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay px-4">
       <div className="w-full max-w-xl rounded-surface border border-border bg-surface shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h2 className="text-style-heading font-bold text-color-foreground">{title}</h2>
+          <h2 className="text-style-heading font-bold text-color-foreground">
+            {title}
+          </h2>
           <button
             type="button"
             onClick={onClose}

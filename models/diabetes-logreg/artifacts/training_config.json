@@ -1,0 +1,15 @@
+{
+  "workload": "diabetes_readmission_logistic_regression",
+  "flavor": "sklearn",
+  "seed": 445,
+  "hyperparameters": {
+    "penalty": "l2",
+    "C": 1.0,
+    "solver": "lbfgs",
+    "class_weight": "balanced",
+    "max_iter": 2000,
+    "random_state": 445,
+    "threshold": 0.5
+  },
+  "elapsed_seconds": 51.14
+}

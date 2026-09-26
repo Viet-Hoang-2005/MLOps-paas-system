@@ -40,10 +40,12 @@ function formatDelta(value: number | null): string {
 }
 
 function winnerClass(winner: string) {
-  if (winner === "right") return "border-info-border bg-info-subtle text-color-info";
+  if (winner === "right")
+    return "border-info-border bg-info-subtle text-color-info";
   if (winner === "left")
     return "border-success-border bg-success-subtle text-color-success";
-  if (winner === "tie") return "border-border bg-surface-muted text-color-foreground";
+  if (winner === "tie")
+    return "border-border bg-surface-muted text-color-foreground";
   return "border-border bg-surface-muted text-color-foreground-subtle";
 }
 
@@ -267,11 +269,21 @@ export function VersionComparisonModal({ family, versions, onClose }: Props) {
                   <table className="min-w-full text-style-body">
                     <thead className="bg-muted text-style-caption uppercase text-color-muted-foreground">
                       <tr>
-                        <th className="px-4 py-2 text-left">{t("comparison.metric")}</th>
-                        <th className="px-4 py-2 text-right">{t("comparison.left")}</th>
-                        <th className="px-4 py-2 text-right">{t("comparison.right")}</th>
-                        <th className="px-4 py-2 text-right">{t("comparison.delta")}</th>
-                        <th className="px-4 py-2 text-left">{t("comparison.winner")}</th>
+                        <th className="px-4 py-2 text-left">
+                          {t("comparison.metric")}
+                        </th>
+                        <th className="px-4 py-2 text-right">
+                          {t("comparison.left")}
+                        </th>
+                        <th className="px-4 py-2 text-right">
+                          {t("comparison.right")}
+                        </th>
+                        <th className="px-4 py-2 text-right">
+                          {t("comparison.delta")}
+                        </th>
+                        <th className="px-4 py-2 text-left">
+                          {t("comparison.winner")}
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -337,7 +349,9 @@ export function VersionComparisonModal({ family, versions, onClose }: Props) {
                           comparison.params_diff.map((param) => (
                             <tr
                               key={param.name}
-                              className={param.changed ? "bg-warning-subtle" : ""}
+                              className={
+                                param.changed ? "bg-warning-subtle" : ""
+                              }
                             >
                               <td className="px-4 py-2 font-semibold text-color-foreground">
                                 {param.name}
@@ -384,20 +398,24 @@ export function VersionComparisonModal({ family, versions, onClose }: Props) {
                       {comparison.deployability_diff.right.reason || "-"}
                     </p>
                     <div className="border-t border-border pt-3 text-style-caption text-color-muted-foreground">
-                      <p>{t("comparison.stageDeployment", {
-                        side: t("comparison.left"),
-                        stage: comparison.deployment_diff.left_stage,
-                        deployed: comparison.deployment_diff.left_deployed
-                          ? t("comparison.yes")
-                          : t("comparison.no"),
-                      })}</p>
-                      <p>{t("comparison.stageDeployment", {
-                        side: t("comparison.right"),
-                        stage: comparison.deployment_diff.right_stage,
-                        deployed: comparison.deployment_diff.right_deployed
-                          ? t("comparison.yes")
-                          : t("comparison.no"),
-                      })}</p>
+                      <p>
+                        {t("comparison.stageDeployment", {
+                          side: t("comparison.left"),
+                          stage: comparison.deployment_diff.left_stage,
+                          deployed: comparison.deployment_diff.left_deployed
+                            ? t("comparison.yes")
+                            : t("comparison.no"),
+                        })}
+                      </p>
+                      <p>
+                        {t("comparison.stageDeployment", {
+                          side: t("comparison.right"),
+                          stage: comparison.deployment_diff.right_stage,
+                          deployed: comparison.deployment_diff.right_deployed
+                            ? t("comparison.yes")
+                            : t("comparison.no"),
+                        })}
+                      </p>
                     </div>
                   </div>
                 </div>

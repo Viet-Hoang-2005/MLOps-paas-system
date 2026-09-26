@@ -1,0 +1,98 @@
+\section{Protocol thực nghiệm đề xuất}
+
+\subsection{Experimental scenarios}
+
+Mỗi scenario dùng cùng seed, snapshot, label budget, recipe và gate giữa các policy. Replay phải giữ thứ tự thời gian, ẩn ground truth trong lúc policy quyết định và chỉ mở nhãn theo request đã được cấp phép.
+
+\begin{longtable}{@{}L{1.3cm} L{6.5cm} L{\dimexpr\linewidth-7.8cm-4\tabcolsep\relax}@{}}
+\caption{Các scenario tối thiểu.}\label{tab:scenarios}\\
+\toprule\textbf{Mã} & \textbf{Điều kiện} & \textbf{Mục tiêu/kỳ vọng}\\
+\midrule\endfirsthead
+\toprule\textbf{Mã} & \textbf{Điều kiện} & \textbf{Mục tiêu/kỳ vọng}\\
+\midrule\endhead
+S0 & Stable, không degradation đáng kể & Đo false retraining; kỳ vọng KEEP.\\
+S1 & Covariate shift: \(P(X)\) thay đổi, \(P(Y|X)\) gần ổn định & Chứng minh drift không đồng nghĩa degradation.\\
+S2 & Harmful drift: phân phối thay đổi và performance giảm & REQUEST\_LABELS, VERIFY rồi RETRAIN khi đủ bằng chứng.\\
+S3 & Performance/calibration giảm dù input gần ổn định & Chứng minh drift-only không đủ.\\
+S4 & Hidden labels với budget giới hạn & Đánh giá policy chọn và phân bổ nhãn.\\
+S5 & Drift, degradation, nhãn trễ và budget constraint cùng xuất hiện & Scenario end-to-end quan trọng nhất.\\
+\bottomrule
+\end{longtable}
+
+Với Diabetes, scenario nên thay đổi tỷ lệ nhóm, bệnh viện, recall và calibration. Với BAF, scenario nên mô phỏng thay đổi theo tháng, separability, tỷ lệ fraud, category distribution, threshold và calibration.
+
+\subsection{Baselines}
+
+\begin{longtable}{@{}L{3.5cm} L{\dimexpr\linewidth-3.5cm-2\tabcolsep\relax}@{}}
+\caption{Các baseline và policy đối chứng.}\label{tab:baselines}\\
+\toprule\textbf{Baseline} & \textbf{Cách hoạt động}\\
+\midrule\endfirsthead
+\toprule\textbf{Baseline} & \textbf{Cách hoạt động}\\
+\midrule\endhead
+B0 -- Static & Không retrain; đo mức suy giảm tự nhiên.\\
+B1 -- Drift-only & Phát hiện drift là trigger retrain ngay, dùng để kiểm tra drift \(\ne\) degradation.\\
+B2 -- Estimator-only & Dùng CBPE/ATC nhưng không có adaptive verification policy.\\
+B3 -- Periodic Labeling & Định kỳ lấy nhãn với budget cố định, không tối ưu theo bằng chứng.\\
+B4 -- Proposed Policy & Kết hợp drift, estimated degradation, uncertainty và label budget để ra quyết định.\\
+B5 -- Full-label Oracle & Có full ground truth, dùng làm upper bound/reference khi đánh giá.\\
+\bottomrule
+\end{longtable}
+
+\subsection{Metrics và label pools}
+
+Metrics chất lượng gồm precision, recall, F1, PR-AUC/AUPRC, false negative rate, false positive rate và calibration/Brier score. Metrics detection gồm degradation detection rate, missed degradation rate, false trigger rate và verification accuracy. Metrics CT gồm số lần retraining, unnecessary retraining rate, recovery time và time-to-retraining.
+
+Nhóm quan trọng nhất là label efficiency:
+
+\begin{itemize}
+  \item total labels consumed, verification labels, training labels và gate labels;
+  \item số positive/fraud labels thu được;
+  \item label cost và cost per verified degradation;
+  \item tỷ lệ chuẩn hóa \(r=B_{labels}/N_{production}\).
+\end{itemize}
+
+Ba pool phải độc lập để tránh rò rỉ:
+
+\begin{center}
+\begin{tabular}{@{}ccc@{}}
+\toprule
+\textbf{Verification} & \textbf{Training} & \textbf{Gate}\\
+\midrule
+ước lượng chất lượng & cập nhật candidate & holdout độc lập\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Hệ thống phải enforce \(\mathit{B}_{verify}+\mathit{B}_{train}+\mathit{B}_{gate}\leq\mathit{B}_{total}\). Với BAF, ngoài sample size phải ghi positive count và khoảng tin cậy; sample không có fraud label chưa đủ để kết luận model an toàn.
+
+\subsection{Independent Evaluation Gate}
+
+Luồng an toàn là:
+
+\begin{center}
+\code{Training -> Candidate -> Independent Holdout -> Evaluation Gate}\\
+\code{-> PROMOTE / REJECT -> Metrics}
+\end{center}
+
+Gate không dùng dữ liệu đã dùng cho verification, training hoặc policy tuning. Candidate chỉ được promote khi có snapshot, evidence window, training job, build, evaluator result và health record trong cùng lineage. Khi thiếu nhãn, callback trễ, schema sai hoặc gate không đạt, quyết định hợp lệ là HOLD/FAILED có lý do và champion cũ tiếp tục phục vụ.
+
+\subsection{Replay harness và kiến trúc experiment}
+
+Replay harness cần biến historical dataset thành các batch production có timestamp, prediction và hidden label; sau đó inject scenario, chạy policy, gọi training/gate và xuất metrics. Luồng tối thiểu:
+
+\begin{center}
+\code{Historical Dataset -> Temporal/Synthetic Batches -> Production Predictions}\\
+\code{-> Hidden Labels -> Scenario Injection -> Policy Decisions}\\
+\code{-> Training/Gate -> Metrics}
+\end{center}
+
+Các module nên đặt trong research layer:
+
+\begin{itemize}
+  \item \code{research/replay}: stream, scenarios, hidden labels;
+  \item \code{research/policies}: static, drift-only, estimator-only, periodic, proposed, oracle;
+  \item \code{research/experiments}: run experiment, ablation và configs;
+  \item \code{research/metrics}: quality, detection, label cost, retraining và safety.
+\end{itemize}
+
+Production platform giữ các service hiện có. Không đưa logic nghiên cứu vào model serving hoặc registry nếu không cần thiết; thay vào đó, ghi experiment ID, policy version, snapshot hash và kết quả vào lineage để có thể tái lập.

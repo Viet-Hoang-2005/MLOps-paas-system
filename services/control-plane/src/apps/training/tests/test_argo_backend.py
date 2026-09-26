@@ -1,10 +1,10 @@
 import pytest
 from django.contrib.auth import get_user_model
-from infrastructure.execution.argo_backends import ArgoTrainingBackend
 
 from apps.catalog.models import ModelProject
 from apps.training.models import TrainingJob
 from apps.training.services.storage_scope import expected_training_uris
+from infrastructure.execution.argo_backends import ArgoTrainingBackend
 
 
 class FakeArgoClient:

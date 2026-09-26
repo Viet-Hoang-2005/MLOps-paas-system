@@ -1,0 +1,21 @@
+{
+  "best_threshold": 0.89,
+  "validation_metrics": {
+    "pr_auc": 0.141106,
+    "roc_auc": 0.894466,
+    "f1": 0.219752,
+    "precision": 0.175911,
+    "recall": 0.2927,
+    "brier_score": 0.145669,
+    "threshold": 0.89
+  },
+  "reference_metrics": {
+    "pr_auc": 0.157302,
+    "roc_auc": 0.875421,
+    "f1": 0.223598,
+    "precision": 0.229963,
+    "recall": 0.217576,
+    "brier_score": 0.117823,
+    "threshold": 0.89
+  }
+}

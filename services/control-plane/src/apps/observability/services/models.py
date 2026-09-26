@@ -1,8 +1,7 @@
-from infrastructure.prometheus import PrometheusClient
-
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.drift.models import DriftRun
 from apps.training.models import TrainingJob
+from infrastructure.prometheus import PrometheusClient
 
 
 def model_observability(project, prometheus=None):
@@ -27,9 +26,7 @@ def model_observability(project, prometheus=None):
         "training": _resource(latest_training),
         "drift": _resource(latest_drift),
         "metrics": {
-            "requests": metrics_client.query(
-                f'paas_predictions_total{{project_id="{project.public_id}"}}'
-            ),
+            "requests": metrics_client.query(f'paas_predictions_total{{project_id="{project.public_id}"}}'),
             "latency": metrics_client.query(
                 f'paas_prediction_latency_seconds_count{{project_id="{project.public_id}"}}'
             ),

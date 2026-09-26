@@ -11,9 +11,7 @@ from apps.training.models import TrainingJobCapability
 def issue_capability(job, purpose, *, ttl_seconds=None):
     """Create a short-lived, opaque capability without persisting its raw value."""
     token = secrets.token_urlsafe(32)
-    expires_at = timezone.now() + timedelta(
-        seconds=ttl_seconds if ttl_seconds is not None else _ttl_seconds(job)
-    )
+    expires_at = timezone.now() + timedelta(seconds=ttl_seconds if ttl_seconds is not None else _ttl_seconds(job))
     TrainingJobCapability.objects.filter(job=job, purpose=purpose, consumed_at__isnull=True).delete()
     TrainingJobCapability.objects.create(
         job=job,

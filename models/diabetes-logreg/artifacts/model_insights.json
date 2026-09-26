@@ -1,0 +1,360 @@
+{
+  "intercept": 0.00529,
+  "total_coefficients_count": 50,
+  "top_positive_risk_factors": [
+    {
+      "feature": "had_inpatient_days_1",
+      "coefficient": 0.30829,
+      "odds_ratio": 1.3611
+    },
+    {
+      "feature": "primary_diagnosis_Diabetes",
+      "coefficient": 0.21645,
+      "odds_ratio": 1.24167
+    },
+    {
+      "feature": "had_emergency_1",
+      "coefficient": 0.16236,
+      "odds_ratio": 1.17629
+    },
+    {
+      "feature": "max_glu_serum_>300",
+      "coefficient": 0.15485,
+      "odds_ratio": 1.16748
+    },
+    {
+      "feature": "insulin_Down",
+      "coefficient": 0.1476,
+      "odds_ratio": 1.15905
+    },
+    {
+      "feature": "age_Over 60 years",
+      "coefficient": 0.14209,
+      "odds_ratio": 1.15268
+    },
+    {
+      "feature": "A1Cresult_nan",
+      "coefficient": 0.11606,
+      "odds_ratio": 1.12306
+    },
+    {
+      "feature": "number_diagnoses",
+      "coefficient": 0.0786,
+      "odds_ratio": 1.08178
+    },
+    {
+      "feature": "primary_diagnosis_Other",
+      "coefficient": 0.07546,
+      "odds_ratio": 1.07838
+    },
+    {
+      "feature": "num_medications",
+      "coefficient": 0.07511,
+      "odds_ratio": 1.07801
+    }
+  ],
+  "top_protective_factors": [
+    {
+      "feature": "had_inpatient_days_0",
+      "coefficient": -0.30304,
+      "odds_ratio": 0.73857
+    },
+    {
+      "feature": "primary_diagnosis_Respiratory Issues",
+      "coefficient": -0.19966,
+      "odds_ratio": 0.81901
+    },
+    {
+      "feature": "medical_specialty_Cardiology",
+      "coefficient": -0.18571,
+      "odds_ratio": 0.83051
+    },
+    {
+      "feature": "had_emergency_0",
+      "coefficient": -0.15711,
+      "odds_ratio": 0.85461
+    },
+    {
+      "feature": "max_glu_serum_nan",
+      "coefficient": -0.14314,
+      "odds_ratio": 0.86663
+    },
+    {
+      "feature": "insulin_No",
+      "coefficient": -0.09785,
+      "odds_ratio": 0.90679
+    },
+    {
+      "feature": "primary_diagnosis_Genitourinary Issues",
+      "coefficient": -0.09609,
+      "odds_ratio": 0.90838
+    },
+    {
+      "feature": "age_30 years or younger",
+      "coefficient": -0.09547,
+      "odds_ratio": 0.90894
+    },
+    {
+      "feature": "admission_source_id_Other",
+      "coefficient": -0.09539,
+      "odds_ratio": 0.90902
+    },
+    {
+      "feature": "num_procedures",
+      "coefficient": -0.08305,
+      "odds_ratio": 0.92031
+    }
+  ],
+  "all_coefficients": [
+    {
+      "feature": "time_in_hospital",
+      "coefficient": 0.07344,
+      "odds_ratio": 1.07621
+    },
+    {
+      "feature": "num_lab_procedures",
+      "coefficient": 0.01181,
+      "odds_ratio": 1.01188
+    },
+    {
+      "feature": "num_procedures",
+      "coefficient": -0.08305,
+      "odds_ratio": 0.92031
+    },
+    {
+      "feature": "num_medications",
+      "coefficient": 0.07511,
+      "odds_ratio": 1.07801
+    },
+    {
+      "feature": "number_diagnoses",
+      "coefficient": 0.0786,
+      "odds_ratio": 1.08178
+    },
+    {
+      "feature": "gender_Female",
+      "coefficient": 0.0001,
+      "odds_ratio": 1.0001
+    },
+    {
+      "feature": "gender_Male",
+      "coefficient": 0.00515,
+      "odds_ratio": 1.00516
+    },
+    {
+      "feature": "age_30 years or younger",
+      "coefficient": -0.09547,
+      "odds_ratio": 0.90894
+    },
+    {
+      "feature": "age_30-60 years",
+      "coefficient": -0.04136,
+      "odds_ratio": 0.95948
+    },
+    {
+      "feature": "age_Over 60 years",
+      "coefficient": 0.14209,
+      "odds_ratio": 1.15268
+    },
+    {
+      "feature": "admission_source_id_Emergency",
+      "coefficient": 0.06484,
+      "odds_ratio": 1.06699
+    },
+    {
+      "feature": "admission_source_id_Other",
+      "coefficient": -0.09539,
+      "odds_ratio": 0.90902
+    },
+    {
+      "feature": "admission_source_id_Referral",
+      "coefficient": 0.0358,
+      "odds_ratio": 1.03645
+    },
+    {
+      "feature": "medical_specialty_Cardiology",
+      "coefficient": -0.18571,
+      "odds_ratio": 0.83051
+    },
+    {
+      "feature": "medical_specialty_Emergency/Trauma",
+      "coefficient": 0.00305,
+      "odds_ratio": 1.00306
+    },
+    {
+      "feature": "medical_specialty_Family/GeneralPractice",
+      "coefficient": 0.04102,
+      "odds_ratio": 1.04188
+    },
+    {
+      "feature": "medical_specialty_InternalMedicine",
+      "coefficient": 0.04726,
+      "odds_ratio": 1.0484
+    },
+    {
+      "feature": "medical_specialty_Missing",
+      "coefficient": 0.04795,
+      "odds_ratio": 1.04912
+    },
+    {
+      "feature": "medical_specialty_Other",
+      "coefficient": 0.05168,
+      "odds_ratio": 1.05304
+    },
+    {
+      "feature": "primary_diagnosis_Diabetes",
+      "coefficient": 0.21645,
+      "odds_ratio": 1.24167
+    },
+    {
+      "feature": "primary_diagnosis_Genitourinary Issues",
+      "coefficient": -0.09609,
+      "odds_ratio": 0.90838
+    },
+    {
+      "feature": "primary_diagnosis_Musculoskeletal Issues",
+      "coefficient": 0.00909,
+      "odds_ratio": 1.00913
+    },
+    {
+      "feature": "primary_diagnosis_Other",
+      "coefficient": 0.07546,
+      "odds_ratio": 1.07838
+    },
+    {
+      "feature": "primary_diagnosis_Respiratory Issues",
+      "coefficient": -0.19966,
+      "odds_ratio": 0.81901
+    },
+    {
+      "feature": "max_glu_serum_>200",
+      "coefficient": 0.05406,
+      "odds_ratio": 1.05555
+    },
+    {
+      "feature": "max_glu_serum_>300",
+      "coefficient": 0.15485,
+      "odds_ratio": 1.16748
+    },
+    {
+      "feature": "max_glu_serum_Norm",
+      "coefficient": -0.06051,
+      "odds_ratio": 0.94128
+    },
+    {
+      "feature": "max_glu_serum_nan",
+      "coefficient": -0.14314,
+      "odds_ratio": 0.86663
+    },
+    {
+      "feature": "A1Cresult_>7",
+      "coefficient": -0.02069,
+      "odds_ratio": 0.97952
+    },
+    {
+      "feature": "A1Cresult_>8",
+      "coefficient": -0.05329,
+      "odds_ratio": 0.9481
+    },
+    {
+      "feature": "A1Cresult_Norm",
+      "coefficient": -0.03682,
+      "odds_ratio": 0.96385
+    },
+    {
+      "feature": "A1Cresult_nan",
+      "coefficient": 0.11606,
+      "odds_ratio": 1.12306
+    },
+    {
+      "feature": "insulin_Down",
+      "coefficient": 0.1476,
+      "odds_ratio": 1.15905
+    },
+    {
+      "feature": "insulin_No",
+      "coefficient": -0.09785,
+      "odds_ratio": 0.90679
+    },
+    {
+      "feature": "insulin_Steady",
+      "coefficient": -0.05879,
+      "odds_ratio": 0.9429
+    },
+    {
+      "feature": "insulin_Up",
+      "coefficient": 0.01429,
+      "odds_ratio": 1.01439
+    },
+    {
+      "feature": "change_Ch",
+      "coefficient": -0.04603,
+      "odds_ratio": 0.95502
+    },
+    {
+      "feature": "change_No",
+      "coefficient": 0.05128,
+      "odds_ratio": 1.05262
+    },
+    {
+      "feature": "diabetesMed_No",
+      "coefficient": -0.06334,
+      "odds_ratio": 0.93862
+    },
+    {
+      "feature": "diabetesMed_Yes",
+      "coefficient": 0.06859,
+      "odds_ratio": 1.071
+    },
+    {
+      "feature": "medicare_0",
+      "coefficient": 0.04878,
+      "odds_ratio": 1.04999
+    },
+    {
+      "feature": "medicare_1",
+      "coefficient": -0.04353,
+      "odds_ratio": 0.95741
+    },
+    {
+      "feature": "medicaid_0",
+      "coefficient": -0.00755,
+      "odds_ratio": 0.99247
+    },
+    {
+      "feature": "medicaid_1",
+      "coefficient": 0.01281,
+      "odds_ratio": 1.01289
+    },
+    {
+      "feature": "had_emergency_0",
+      "coefficient": -0.15711,
+      "odds_ratio": 0.85461
+    },
+    {
+      "feature": "had_emergency_1",
+      "coefficient": 0.16236,
+      "odds_ratio": 1.17629
+    },
+    {
+      "feature": "had_inpatient_days_0",
+      "coefficient": -0.30304,
+      "odds_ratio": 0.73857
+    },
+    {
+      "feature": "had_inpatient_days_1",
+      "coefficient": 0.30829,
+      "odds_ratio": 1.3611
+    },
+    {
+      "feature": "had_outpatient_days_0",
+      "coefficient": -0.03263,
+      "odds_ratio": 0.9679
+    },
+    {
+      "feature": "had_outpatient_days_1",
+      "coefficient": 0.03788,
+      "odds_ratio": 1.03861
+    }
+  ]
+}

@@ -39,10 +39,14 @@ class EventOutbox(models.Model):
 
 class LifecycleEvent(models.Model):
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    project = models.ForeignKey("catalog.ModelProject", on_delete=models.SET_NULL, null=True, blank=True, related_name="lifecycle_events")
+    project = models.ForeignKey(
+        "catalog.ModelProject", on_delete=models.SET_NULL, null=True, blank=True, related_name="lifecycle_events"
+    )
     aggregate_type = models.CharField(max_length=80)
     aggregate_id = models.UUIDField()
-    actor = models.ForeignKey("identity.CustomUser", on_delete=models.SET_NULL, null=True, blank=True, related_name="lifecycle_events")
+    actor = models.ForeignKey(
+        "identity.CustomUser", on_delete=models.SET_NULL, null=True, blank=True, related_name="lifecycle_events"
+    )
     event_type = models.CharField(max_length=60)
     from_state = models.CharField(max_length=80, blank=True)
     to_state = models.CharField(max_length=80, blank=True)

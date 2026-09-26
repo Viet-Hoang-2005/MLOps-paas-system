@@ -4,12 +4,12 @@ import time
 
 import docker
 import docker.errors
-from apps.deployment.models import Endpoint
-from apps.training.services.capabilities import issue_capability
-from apps.training.services.storage_scope import validate_training_uri
 from django.conf import settings
 from django.utils import timezone
 
+from apps.deployment.models import Endpoint
+from apps.training.services.capabilities import issue_capability
+from apps.training.services.storage_scope import validate_training_uri
 from infrastructure.docker import DockerClient
 from infrastructure.http import HttpClient
 from infrastructure.storage import S3Storage
@@ -47,9 +47,7 @@ class DockerBuildBackend:
         source = build.input_assets.filter(kind__in=("source_artifact", "training_output")).first()
         if source is None and build.version_id:
             source = (
-                build.version.artifacts.filter(kind__in=("source", "training_output"))
-                .order_by("-created_at")
-                .first()
+                build.version.artifacts.filter(kind__in=("source", "training_output")).order_by("-created_at").first()
             )
         if not source:
             raise RuntimeError("The build has no source artifact.")
@@ -327,7 +325,7 @@ class DockerDriftBackend:
             "REPORT_JSON_UPLOAD_URL": self.storage.presigned_put(uris["report.json"], 7200, "application/json"),
             "SUMMARY_JSON_UPLOAD_URL": self.storage.presigned_put(uris["summary.json"], 7200, "application/json"),
             "CONTROL_PLANE_WEBHOOK_URL": (
-                f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/" f"drift-runs/{drift_run.public_id}/"
+                f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/drift-runs/{drift_run.public_id}/"
             ),
             "CONTROL_PLANE_WEBHOOK_SECRET": settings.CONTROL_PLANE_WEBHOOK_SECRET,
             "DRIFT_RUN_ID": str(drift_run.public_id),

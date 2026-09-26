@@ -1,0 +1,39 @@
+\section{Case study phụ: Diabetes Readmission}
+
+\subsection{Dataset và workload}
+
+Notebook \source{https://github.com/fairlearn/talks/blob/main/2021_scipy_tutorial/fairness-in-AI-systems-instructors.ipynb}{Fairlearn SciPy 2021 tutorial} sử dụng dữ liệu \source{https://archive.ics.uci.edu/dataset/296/diabetes+130-us+hospitals+for+years+1999-2008}{Diabetes 130-US Hospitals for Years 1999--2008} của UCI. Dataset ghi nhận khoảng 101\,766 lần nhập viện của bệnh nhân tiểu đường trong mười năm tại 130 bệnh viện hoặc mạng lưới chăm sóc ở Hoa Kỳ, với 47 thuộc tính gốc. Mục tiêu là dự đoán việc tái nhập viện trong vòng 30 ngày.
+
+Phiên bản được dùng trong tutorial Fairlearn đã tiền xử lý thành bài toán nhị phân với 101\,766 mẫu và 24 input features. Notebook dùng \code{LogisticRegression}, \code{StandardScaler} và \code{train\_test\_split}; các metric chính gồm balanced accuracy, ROC-AUC, recall và confusion matrix.
+
+\subsection{Điểm mạnh và rủi ro}
+
+Case này phù hợp với limited-label verification vì có lịch sử dài để xây replay, chạy được trên CPU và có ý nghĩa nghiệp vụ rõ ràng. Có thể đo degradation tổng thể, sau đó mở rộng sang sai khác giữa các nhóm race, gender hoặc age bằng Fairlearn \code{MetricFrame}. Tuy nhiên, dữ liệu không phải production stream; concept drift phải được mô phỏng có kiểm soát và nhãn tái nhập viện bị trễ theo thời gian theo dõi.
+
+Fairness nên được giữ ở vai trò \textbf{secondary analysis}. Nếu đưa fairness thành research question chính, phạm vi sẽ phình ra và làm loãng đóng góp cốt lõi là xác minh degradation với ngân sách nhãn hạn chế.
+
+\subsection{Vai trò trong Continuous Training}
+
+Replay của case này nên giữ thứ tự thời gian và tạo các episode theo tháng hoặc theo bệnh viện. Hidden label chỉ được mở trong các pool đã cấp ngân sách. Evidence Window có thể theo dõi đồng thời chất lượng toàn cục và subgroup:
+
+\begin{itemize}
+  \item \textbf{Verification:} ước lượng recall, false negative rate hoặc balanced accuracy trên pool kiểm chứng.
+  \item \textbf{Training:} dùng một pool riêng để cập nhật model, không dùng lại dữ liệu đã dùng cho gate.
+  \item \textbf{Gate:} so sánh candidate với champion trên holdout độc lập; có thể ghi thêm selection rate và chênh lệch true positive rate như phân tích phụ.
+\end{itemize}
+
+\begin{longtable}{@{}L{3.4cm} L{2.2cm} L{\dimexpr\linewidth-5.6cm-4\tabcolsep\relax}@{}}
+\caption{Đánh giá vai trò của case Diabetes Readmission.}\label{tab:diabetes-evaluation}\\
+\toprule\textbf{Tiêu chí} & \textbf{Mức phù hợp} & \textbf{Nhận xét}\\
+\midrule\endfirsthead
+\toprule\textbf{Tiêu chí} & \textbf{Mức phù hợp} & \textbf{Nhận xét}\\
+\midrule\endhead
+Tabular ML & 5/5 & Logistic Regression dễ chạy CPU, giải thích và calibration.\\
+Limited labels & 4/5 & Có thể tạo hidden labels và budget pool, nhưng label gốc không đến từ stream thật.\\
+Drift simulation & 4/5 & Có lịch sử dài; cần thiết kế scenario thay đổi nhóm, bệnh viện và tỷ lệ tái nhập viện.\\
+Degradation study & 4/5 & Đo được suy giảm tổng thể và subgroup trên các cửa sổ thời gian.\\
+Fairness analysis & 5/5 & Fairlearn cung cấp metric và mitigation; chỉ dùng làm phân tích phụ.\\
+Tính khả thi 4 tháng & 5/5 & Nhẹ về compute và phù hợp làm workload tổng quát hóa.\\
+Rủi ro & Cần kiểm soát & Dữ liệu cũ, nhãn là proxy cho nhu cầu chăm sóc và không nên diễn giải như khuyến nghị y tế.\\
+\bottomrule
+\end{longtable}

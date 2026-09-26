@@ -1,0 +1,21 @@
+\section{Câu hỏi nghiên cứu}
+
+\subsection{RQ1 -- Xác minh degradation với ít nhãn}
+
+Khi model trong production có dấu hiệu suy giảm và chỉ được mở một ngân sách nhãn hữu hạn, policy nào xác minh degradation đáng tin cậy hơn các trigger đối chứng? RQ1 tập trung vào trade-off giữa detection rate, missed degradation, unnecessary retraining, label consumption và thời gian phục hồi chất lượng.
+
+\subsection{RQ2 -- An toàn và phục hồi của vòng CT}
+
+Khi worker, workflow, callback, storage hoặc evaluation gate lỗi ở các thời điểm khác nhau, hệ thống có bảo toàn ngân sách, không tạo job logic trùng, không cập nhật sai champion và tiếp tục phục vụ model cũ an toàn hay không? RQ2 kiểm tra các bất biến của vòng điều phối trên môi trường AWS/K3s, Argo Workflows và Kubeflow Training Operator.
+
+\section{Mục tiêu}
+
+\begin{enumerate}
+  \item Chuẩn hóa contract prediction có xác suất, timestamp, model version, request ID, latency và snapshot manifest.
+  \item Xây dựng replay harness deterministic với hidden labels và các scenario drift/degradation có kiểm soát.
+  \item Bổ sung Evidence Window, CBPE/ATC, Verification Engine, Label Request/Feedback và Label Budget.
+  \item Thiết kế policy trả về \code{KEEP}, \code{REQUEST\_LABELS}, \code{HOLD} hoặc \code{RETRAIN} dựa trên bằng chứng, độ không chắc chắn và ngân sách.
+  \item Nối policy với pipeline Training Job, Build/Register và Independent Evaluation Gate để promote, reject hoặc rollback candidate an toàn.
+  \item So sánh các baseline B0--B5 trên hai case study và báo cáo chất lượng, chi phí nhãn, compute, độ trễ và khả năng phục hồi.
+\end{enumerate}
+

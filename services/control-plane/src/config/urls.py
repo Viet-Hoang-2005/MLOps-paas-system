@@ -1,3 +1,6 @@
+from django.contrib import admin
+from django.urls import include, path
+
 from apps.catalog.api.webhooks import ProjectDeletionWebhookEndpoint
 from apps.deployment.api.urls import build_patterns, deployment_patterns, endpoint_patterns
 from apps.deployment.api.webhooks import BuildWebhookEndpoint
@@ -8,8 +11,6 @@ from apps.training.api.webhooks import (
     TrainingJobWebhookEndpoint,
     TrainingOutputUploadURLEndpoint,
 )
-from django.contrib import admin
-from django.urls import include, path
 
 urlpatterns = [
     path("admin/", admin.site.urls),

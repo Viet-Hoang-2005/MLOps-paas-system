@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-import docker
 
 from apps.catalog.models import ModelProject
 from apps.training.models import TrainingJob
@@ -30,9 +30,7 @@ class DockerTrainingAsyncTests(TestCase):
 
     def test_docker_training_run_dispatches_without_blocking(self):
         fake_container = SimpleNamespace(id="container-abc-123")
-        docker_client = SimpleNamespace(
-            run=Mock(return_value=fake_container)
-        )
+        docker_client = SimpleNamespace(run=Mock(return_value=fake_container))
         storage = SimpleNamespace(
             bucket="bucket",
             presigned_get=Mock(return_value="https://s3.test/presigned"),
@@ -103,8 +101,10 @@ class DockerTrainingAsyncTests(TestCase):
         fake_backend.run.return_value = {"dispatched": True, "container_id": "c123"}
         fake_backend.poll = Mock()
 
-        with patch("apps.training.tasks.training_backend", return_value=fake_backend), \
-             patch("apps.training.tasks.poll_training_job_status.apply_async") as mock_apply_async:
+        with (
+            patch("apps.training.tasks.training_backend", return_value=fake_backend),
+            patch("apps.training.tasks.poll_training_job_status.apply_async") as mock_apply_async,
+        ):
             status = execute_training_job(str(self.job.public_id))
 
         self.assertEqual(status, "running")

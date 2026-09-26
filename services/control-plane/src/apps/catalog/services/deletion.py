@@ -1,15 +1,15 @@
-from common.logging import record_transition
 from django.db import transaction
 from django.utils import timezone
-from infrastructure.execution.cleanup_backends import project_cleanup_backend
-from infrastructure.execution.image_references import temporary_image_reference
-from infrastructure.storage import S3Storage
-from infrastructure.storage.paths import project_prefix
 from rest_framework.exceptions import ValidationError
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Deployment, Endpoint
 from apps.deployment.services.cache import invalidate_model_server_cache
+from common.logging import record_transition
+from infrastructure.execution.cleanup_backends import project_cleanup_backend
+from infrastructure.execution.image_references import temporary_image_reference
+from infrastructure.storage import S3Storage
+from infrastructure.storage.paths import project_prefix
 
 
 def request_project_deletion(project):
@@ -111,7 +111,9 @@ def mark_project_deletion_failed(project, error):
     project.deletion_error = str(error)[:12000]
     project.save(update_fields=["deletion_state", "deletion_error", "updated_at"])
     record_transition(
-        project, "delete_failed", reason="Project cleanup failed",
+        project,
+        "delete_failed",
+        reason="Project cleanup failed",
         error_type=type(error).__name__ if isinstance(error, Exception) else None,
         exc_info=(type(error), error, error.__traceback__) if isinstance(error, Exception) else None,
     )

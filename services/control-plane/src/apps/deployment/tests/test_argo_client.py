@@ -1,6 +1,7 @@
 import pytest
-from common.api.exceptions import ServiceUnavailable
 from django.test import override_settings
+
+from common.api.exceptions import ServiceUnavailable
 from infrastructure.argo import ArgoWebhookClient
 
 TEST_ARGO_TOKEN = "x" * 32

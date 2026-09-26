@@ -150,7 +150,7 @@ services:
       dockerfile: Dockerfile
     image: mlops-paas-model-server
     container_name: mlops_paas_model_server
-    restart: always
+    restart: unless-stopped
     ports:
       - "5001:5000"
     environment:

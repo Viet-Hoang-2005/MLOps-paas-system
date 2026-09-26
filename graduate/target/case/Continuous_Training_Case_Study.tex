@@ -1,0 +1,53 @@
+% !TEX program = pdflatex
+\documentclass[11pt,a4paper]{article}
+\usepackage[a4paper,margin=2cm,top=2.1cm,bottom=2.1cm]{geometry}
+\usepackage[T5]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{mathptmx}
+\usepackage{microtype}
+\usepackage{booktabs,longtable,array}
+\usepackage{enumitem,xcolor,hyperref,xurl,titlesec,amsmath}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!45!black,
+  urlcolor=blue!45!black,
+  pdftitle={Đánh giá BAF và Diabetes Readmission cho Continuous Training},
+  pdfauthor={Trần Nguyễn Việt Hoàng, Bùi Ngọc Thái}
+}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.35em}
+\setlength{\emergencystretch}{2em}
+\raggedbottom
+\clubpenalty=10000
+\widowpenalty=10000
+\setlist{leftmargin=1.5em,itemsep=0.15em,topsep=0.25em,parsep=0pt}
+\titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2ex}{0.6ex}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\subsection}{0pt}{1ex}{0.4ex}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcommand{\source}[2]{\href{#1}{#2}}
+\newcommand{\code}[1]{{\small\texttt{#1}}}
+\newcommand{\partialstatus}{\textcolor{orange!65!black}{\textbf{Một phần}}}
+\newcommand{\goodstatus}{\textcolor{green!45!black}{\textbf{Phù hợp}}}
+\newcommand{\riskstatus}{\textcolor{red!60!black}{\textbf{Cần kiểm soát}}}
+\renewcommand{\tablename}{Bảng}
+
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries Đánh giá case study cho Continuous Training}\\[0.45em]
+  BAF với MLP PyTorch và Diabetes Readmission với Logistic Regression\\[0.25em]
+  {\small Cập nhật: 17/09/2026}
+\end{center}
+
+\input{sections/00_purpose}
+\input{sections/01_selection_and_integration}
+\input{sections/02_dl_fraud}
+\input{sections/03_ml_readmission}
+\input{sections/04_comparison}
+\input{sections/05_protocol}
+\input{sections/06_conclusion}
+\input{sections/07_references}
+
+\end{document}

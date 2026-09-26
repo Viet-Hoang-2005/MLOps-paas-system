@@ -1,11 +1,11 @@
 import pytest
 from django.contrib.auth import get_user_model
-from infrastructure.storage.s3 import StoredObject
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, BuildInputAsset
 from apps.registry.models import ModelArtifact, ModelVersion
 from apps.registry.services.versions import register_successful_build
+from infrastructure.storage.s3 import StoredObject
 
 
 class FakeCopyStorage:

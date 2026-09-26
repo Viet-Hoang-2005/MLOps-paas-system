@@ -1,6 +1,6 @@
-from common.api.exceptions import ServiceUnavailable
 from django.conf import settings
 
+from common.api.exceptions import ServiceUnavailable
 from infrastructure.http import HttpClient
 
 

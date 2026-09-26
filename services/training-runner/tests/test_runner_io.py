@@ -1,14 +1,14 @@
 import stat
 import subprocess
-import sys
 import tarfile
 import types
 import zipfile
-import pytest
-
-from src import application as runner
 from pathlib import Path
 from unittest.mock import Mock
+
+import pytest
+from src import application as runner
+
 
 def test_require_env(monkeypatch):
     monkeypatch.setenv("VALUE", " present ")
@@ -59,7 +59,9 @@ def test_upload_presigned_url_success(monkeypatch, tmp_path, status):
 def test_upload_presigned_url_failure(monkeypatch, tmp_path):
     source = tmp_path / "model.tar.gz"
     source.write_bytes(b"model")
-    monkeypatch.setattr("requests.put", Mock(return_value=Mock(status_code=500, text="failed")))
+    monkeypatch.setattr(
+        "requests.put", Mock(return_value=Mock(status_code=500, text="failed"))
+    )
     with pytest.raises(RuntimeError, match="HTTP status 500"):
         runner.upload_presigned_url(source, "https://example.test/upload")
 
@@ -90,10 +92,14 @@ def test_safe_extract_zip_rejects_symlink(tmp_path):
         runner.safe_extract_zip(archive, tmp_path / "source")
 
 
-def test_install_requirements_noop_success_and_failure(monkeypatch, tmp_path, runner_workspace):
+def test_install_requirements_noop_success_and_failure(
+    monkeypatch, tmp_path, runner_workspace
+):
     missing = tmp_path / "missing.txt"
     runner.install_requirements(missing)
-    run = Mock(return_value=subprocess.CompletedProcess([], 0, "installed\n", "warning\n"))
+    run = Mock(
+        return_value=subprocess.CompletedProcess([], 0, "installed\n", "warning\n")
+    )
     runtime_log = Mock()
     monkeypatch.setattr(runner.subprocess, "run", run)
     monkeypatch.setattr(runner, "runtime_log", runtime_log)
@@ -109,13 +115,22 @@ def test_install_requirements_noop_success_and_failure(monkeypatch, tmp_path, ru
 
 @pytest.mark.parametrize(
     ("name", "expected"),
-    [("MLmodel", "model"), ("model.pkl", "model"), ("weights.pt", "checkpoint"), ("info.json", "metadata"), ("run.log", "log"), ("data.bin", "other")],
+    [
+        ("MLmodel", "model"),
+        ("model.pkl", "model"),
+        ("weights.pt", "checkpoint"),
+        ("info.json", "metadata"),
+        ("run.log", "log"),
+        ("data.bin", "other"),
+    ],
 )
 def test_artifact_kind(name, expected):
     assert runner.artifact_kind(Path(name)) == expected
 
 
-def test_create_model_archive_requires_model_and_packages_metadata(runner_workspace, tmp_path):
+def test_create_model_archive_requires_model_and_packages_metadata(
+    runner_workspace, tmp_path
+):
     archive_path = tmp_path / "model.tar.gz"
     with pytest.raises(RuntimeError, match="does not contain"):
         runner.create_model_archive(archive_path)

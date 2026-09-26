@@ -3,12 +3,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
 
 export type ProgressLineState =
-  | "pending"
-  | "active"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "skipped";
+  "pending" | "active" | "completed" | "failed" | "cancelled" | "skipped";
 
 export interface ProgressLineStep {
   id: string;
@@ -21,10 +16,13 @@ export interface ProgressLineStep {
 
 const stepTone: Record<ProgressLineState, string> = {
   pending: "border-border bg-surface text-color-muted-foreground",
-  active: "border-primary bg-primary/10 text-color-primary ring-4 ring-primary/10",
+  active:
+    "border-primary bg-primary/10 text-color-primary ring-4 ring-primary/10",
   completed: "border-success bg-success/10 text-color-success",
-  failed: "border-danger bg-danger-subtle text-color-danger ring-4 ring-danger/10",
-  cancelled: "border-warning bg-warning/10 text-color-warning ring-4 ring-warning/10",
+  failed:
+    "border-danger bg-danger-subtle text-color-danger ring-4 ring-danger/10",
+  cancelled:
+    "border-warning bg-warning/10 text-color-warning ring-4 ring-warning/10",
   skipped: "border-border bg-muted text-color-muted-foreground opacity-60",
 };
 
@@ -38,7 +36,10 @@ export function ProgressLine({ steps, className }: ProgressLineProps) {
 
   return (
     <ol
-      className={cn("flex min-w-150 w-full items-start justify-between", className)}
+      className={cn(
+        "flex min-w-150 w-full items-start justify-between",
+        className,
+      )}
       aria-label={t("steps.progressLabel")}
     >
       {steps.map((step, index) => {

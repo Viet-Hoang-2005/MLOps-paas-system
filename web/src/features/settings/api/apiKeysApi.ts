@@ -1,12 +1,12 @@
-import { apiClient } from '@/shared/api/client';
-import { controlPlaneURL } from '@/shared/api/config';
+import { apiClient } from "@/shared/api/client";
+import { controlPlaneURL } from "@/shared/api/config";
 import type {
   APIKeyListResponse,
   APIKeyRecord,
   CreateAPIKeyRequest,
   CreatedAPIKeyResponse,
-} from '@/features/settings/types';
-import type { MessageResponse } from '@/shared/types';
+} from "@/features/settings/types";
+import type { MessageResponse } from "@/shared/types";
 
 interface APIKeyDTO {
   id: string;
@@ -26,36 +26,67 @@ const toRequest = (payload: CreateAPIKeyRequest) => ({
 
 const toRecord = (key: APIKeyDTO): APIKeyRecord => ({
   ...key,
-  scope: 'specific',
+  scope: "specific",
   allowed_models: key.allowed_projects,
 });
 
-const toCreated = (data: APIKeyDTO, message: string): CreatedAPIKeyResponse => ({
+const toCreated = (
+  data: APIKeyDTO,
+  message: string,
+): CreatedAPIKeyResponse => ({
   ...toRecord(data),
   message,
-  api_key: data.key ?? '',
+  api_key: data.key ?? "",
 });
 
-export const createAPIKey = async (payload: CreateAPIKeyRequest): Promise<CreatedAPIKeyResponse> =>
-  toCreated((await apiClient.post<APIKeyDTO>(controlPlaneURL('/api-keys/'), toRequest(payload))).data, 'API key created.');
+export const createAPIKey = async (
+  payload: CreateAPIKeyRequest,
+): Promise<CreatedAPIKeyResponse> =>
+  toCreated(
+    (
+      await apiClient.post<APIKeyDTO>(
+        controlPlaneURL("/api-keys/"),
+        toRequest(payload),
+      )
+    ).data,
+    "API key created.",
+  );
 
 export const listAPIKeys = async (): Promise<APIKeyListResponse> => {
-  const { data } = await apiClient.get<{ results?: APIKeyDTO[] }>(controlPlaneURL('/api-keys/'));
-  return { tenant_id: '', api_keys: (data.results ?? []).map(toRecord) };
+  const { data } = await apiClient.get<{ results?: APIKeyDTO[] }>(
+    controlPlaneURL("/api-keys/"),
+  );
+  return { tenant_id: "", api_keys: (data.results ?? []).map(toRecord) };
 };
 
 export const updateAPIKey = async (
   keyId: string,
   payload: CreateAPIKeyRequest,
 ): Promise<APIKeyRecord & MessageResponse> => ({
-  ...toRecord((await apiClient.put<APIKeyDTO>(controlPlaneURL(`/api-keys/${keyId}/`), toRequest(payload))).data),
-  message: 'API key updated.',
+  ...toRecord(
+    (
+      await apiClient.put<APIKeyDTO>(
+        controlPlaneURL(`/api-keys/${keyId}/`),
+        toRequest(payload),
+      )
+    ).data,
+  ),
+  message: "API key updated.",
 });
 
 export const deleteAPIKey = async (keyId: string): Promise<MessageResponse> => {
   await apiClient.delete(controlPlaneURL(`/api-keys/${keyId}/`));
-  return { message: 'API key revoked.' };
+  return { message: "API key revoked." };
 };
 
-export const regenerateAPIKey = async (keyId: string): Promise<CreatedAPIKeyResponse> =>
-  toCreated((await apiClient.post<APIKeyDTO>(controlPlaneURL(`/api-keys/${keyId}/regenerate/`))).data, 'API key regenerated.');
+export const regenerateAPIKey = async (
+  keyId: string,
+): Promise<CreatedAPIKeyResponse> =>
+  toCreated(
+    (
+      await apiClient.post<APIKeyDTO>(
+        controlPlaneURL(`/api-keys/${keyId}/regenerate/`),
+      )
+    ).data,
+    "API key regenerated.",
+  );

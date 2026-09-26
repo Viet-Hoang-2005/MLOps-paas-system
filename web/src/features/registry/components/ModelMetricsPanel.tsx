@@ -191,7 +191,9 @@ print("METRIC_JSON:", json.dumps({
             >
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-style-body-strong text-color-foreground capitalize">
-                  {t("metricsPanel.progression", { name: m.name.replace(/_/g, " ") })}
+                  {t("metricsPanel.progression", {
+                    name: m.name.replace(/_/g, " "),
+                  })}
                 </h4>
                 <span className="text-style-caption text-color-muted-foreground font-mono bg-muted px-2 py-1 rounded-compact">
                   {t("metricsPanel.range", {
@@ -215,8 +217,16 @@ print("METRIC_JSON:", json.dumps({
                       x2="0"
                       y2="1"
                     >
-                      <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.2" />
-                      <stop offset="100%" stopColor="var(--chart-1)" stopOpacity="0" />
+                      <stop
+                        offset="0%"
+                        stopColor="var(--chart-1)"
+                        stopOpacity="0.2"
+                      />
+                      <stop
+                        offset="100%"
+                        stopColor="var(--chart-1)"
+                        stopOpacity="0"
+                      />
                     </linearGradient>
                   </defs>
                   {/* Fill Area */}
@@ -249,8 +259,12 @@ print("METRIC_JSON:", json.dumps({
                   })}
                 </svg>
                 <div className="flex justify-between text-style-caption text-color-muted-foreground font-mono px-1">
-                  <span>{t("metricsPanel.step")} {m.chartPoints[0].step}</span>
-                  <span>{t("metricsPanel.step")} {m.latest.step}</span>
+                  <span>
+                    {t("metricsPanel.step")} {m.chartPoints[0].step}
+                  </span>
+                  <span>
+                    {t("metricsPanel.step")} {m.latest.step}
+                  </span>
                 </div>
               </div>
 
@@ -264,7 +278,9 @@ print("METRIC_JSON:", json.dumps({
                     <thead className="bg-muted text-color-muted-foreground text-style-caption uppercase font-semibold">
                       <tr>
                         <th className="px-3 py-2">{t("metricsPanel.step")}</th>
-                        <th className="px-3 py-2 text-right">{t("metricsPanel.value")}</th>
+                        <th className="px-3 py-2 text-right">
+                          {t("metricsPanel.value")}
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">

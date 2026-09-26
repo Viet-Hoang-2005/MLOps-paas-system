@@ -1,11 +1,11 @@
-from common.logging import runtime_line
 from django.db import transaction
-from infrastructure.execution import deployment_backend
 from rest_framework.exceptions import ValidationError
 
 from apps.deployment.models import Deployment
 from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.tasks import execute_deployment, stop_deployment
+from common.logging import runtime_line
+from infrastructure.execution import deployment_backend
 
 
 def request_deployment(build, backend):

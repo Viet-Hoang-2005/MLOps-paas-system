@@ -1,16 +1,18 @@
-import type { ResourceId } from '@/shared/types';
+import type { ResourceId } from "@/shared/types";
 
-export type RegistryStage = 'none' | 'candidate' | 'staging' | 'production' | 'archived';
-export type RegistrySourceType = 'manual_upload' | 'training_job' | 'imported';
-export type RegistryHistoryStatus = 'success' | 'failed' | 'running';
-export type RegistryDeployabilityStatus = 'unknown' | 'deployable' | 'track_only' | 'invalid';
-export type RoutingAliasName = 'production' | 'latest' | 'champion';
+export type RegistryStage =
+  "none" | "candidate" | "staging" | "production" | "archived";
+export type RegistrySourceType = "manual_upload" | "training_job" | "imported";
+export type RegistryHistoryStatus = "success" | "failed" | "running";
+export type RegistryDeployabilityStatus =
+  "unknown" | "deployable" | "track_only" | "invalid";
+export type RoutingAliasName = "production" | "latest" | "champion";
 
 export interface RegistryArtifactManifestItem {
   path: string;
   size_bytes?: number;
   sha256?: string;
-  kind?: 'model' | 'checkpoint' | 'metadata' | 'log' | 'other' | string;
+  kind?: "model" | "checkpoint" | "metadata" | "log" | "other" | string;
 }
 
 export interface RegistryModelInsightItem {
@@ -23,13 +25,18 @@ export interface RegistryModelInsightItem {
 
 export interface RegistryModelInsightsSummary {
   schema_version?: string;
-  kind?: 'feature_importance' | 'coefficients' | string;
+  kind?: "feature_importance" | "coefficients" | string;
   source?: string;
   feature_count?: number;
   items?: RegistryModelInsightItem[];
 }
 
-export type DriftSummaryStatus = 'not_configured' | 'healthy' | 'drift_detected' | 'report_unavailable' | 'unknown';
+export type DriftSummaryStatus =
+  | "not_configured"
+  | "healthy"
+  | "drift_detected"
+  | "report_unavailable"
+  | "unknown";
 
 export interface DriftSummary {
   configured: boolean;
@@ -176,7 +183,7 @@ export interface RegistryMetricDiff {
   delta: number | null;
   delta_percent: number | null;
   higher_is_better: boolean | null;
-  winner: 'left' | 'right' | 'tie' | 'unknown';
+  winner: "left" | "right" | "tie" | "unknown";
 }
 
 export interface RegistryParamDiff {
@@ -184,7 +191,7 @@ export interface RegistryParamDiff {
   left: unknown;
   right: unknown;
   changed: boolean;
-  only_in?: 'left' | 'right' | '';
+  only_in?: "left" | "right" | "";
 }
 
 export interface RegistryArtifactDiff {
@@ -203,9 +210,11 @@ export interface RegistryArtifactDiff {
 }
 
 export interface RegistryVersionCompareResponse {
-  family: Pick<RegistryFamily, 'id' | 'name' | 'display_name'>;
-  left: Partial<RegistryVersion> & Pick<RegistryVersion, 'id' | 'version' | 'stage'>;
-  right: Partial<RegistryVersion> & Pick<RegistryVersion, 'id' | 'version' | 'stage'>;
+  family: Pick<RegistryFamily, "id" | "name" | "display_name">;
+  left: Partial<RegistryVersion> &
+    Pick<RegistryVersion, "id" | "version" | "stage">;
+  right: Partial<RegistryVersion> &
+    Pick<RegistryVersion, "id" | "version" | "stage">;
   metrics_diff: RegistryMetricDiff[];
   params_diff: RegistryParamDiff[];
   artifact_diff: RegistryArtifactDiff;
@@ -224,8 +233,8 @@ export interface RegistryVersionCompareResponse {
     right_image_name: string;
   };
   recommendation: {
-    winner: 'left' | 'right' | 'unknown';
-    confidence: 'low' | 'medium' | 'high';
+    winner: "left" | "right" | "unknown";
+    confidence: "low" | "medium" | "high";
     reason: string;
     warnings: string[];
   };

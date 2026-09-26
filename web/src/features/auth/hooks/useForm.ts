@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from "react";
 
 type FieldValues = Record<string, string>;
 
@@ -8,10 +8,10 @@ type ValidationRules<T extends FieldValues> = Partial<
 
 /**
  * useForm – Quản lý giá trị, lỗi và trạng thái submit của form.
- * 
+ *
  * @param initialValues – Giá trị mặc định của form
  * @param validationRules – Object chứa các hàm validate cho từng field (tuỳ chọn)
- * 
+ *
  * @example
  * const { values, errors, loading, updateField, handleSubmit } = useForm(
  *   { email: '', password: '' },
@@ -27,13 +27,16 @@ export function useForm<T extends FieldValues>(
   const [loading, setLoading] = useState(false);
 
   /** Cập nhật một field */
-  const updateField = useCallback((field: keyof T, value: string) => {
-    setValues((prev) => ({ ...prev, [field]: value }));
-    // Xoá lỗi của field khi người dùng bắt đầu nhập lại
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  }, [errors]);
+  const updateField = useCallback(
+    (field: keyof T, value: string) => {
+      setValues((prev) => ({ ...prev, [field]: value }));
+      // Xoá lỗi của field khi người dùng bắt đầu nhập lại
+      if (errors[field]) {
+        setErrors((prev) => ({ ...prev, [field]: undefined }));
+      }
+    },
+    [errors],
+  );
 
   /** Chạy validate toàn bộ form, trả về true nếu hợp lệ */
   const validate = useCallback((): boolean => {
@@ -45,7 +48,7 @@ export function useForm<T extends FieldValues>(
     for (const field in validationRules) {
       const rule = validationRules[field];
       if (rule) {
-        const errorMsg = rule(values[field] ?? '', values);
+        const errorMsg = rule(values[field] ?? "", values);
         if (errorMsg) {
           newErrors[field] = errorMsg;
           isValid = false;
@@ -62,16 +65,15 @@ export function useForm<T extends FieldValues>(
    * @param submitFn – Hàm xử lý nghiệp vụ thực sự
    */
   const handleSubmit = useCallback(
-    (submitFn: (values: T) => Promise<void>) =>
-      async () => {
-        if (!validate()) return;
-        setLoading(true);
-        try {
-          await submitFn(values);
-        } finally {
-          setLoading(false);
-        }
-      },
+    (submitFn: (values: T) => Promise<void>) => async () => {
+      if (!validate()) return;
+      setLoading(true);
+      try {
+        await submitFn(values);
+      } finally {
+        setLoading(false);
+      }
+    },
     [validate, values],
   );
 
@@ -81,5 +83,13 @@ export function useForm<T extends FieldValues>(
     setErrors({});
   }, [initialValues]);
 
-  return { values, errors, loading, updateField, handleSubmit, validate, reset };
+  return {
+    values,
+    errors,
+    loading,
+    updateField,
+    handleSubmit,
+    validate,
+    reset,
+  };
 }

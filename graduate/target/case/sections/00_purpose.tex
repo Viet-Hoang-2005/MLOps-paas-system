@@ -1,0 +1,30 @@
+\section{Bối cảnh và mục tiêu đánh giá}
+
+Định hướng của KLTN là nghiên cứu cách một hệ thống MLOps xác minh model đã suy giảm trong production khi nhãn thực tế bị giới hạn. Câu hỏi trung tâm là: với một ngân sách gán nhãn cố định, hệ thống có thể phân biệt suy giảm thật với tín hiệu drift và quyết định Continuous Training an toàn như thế nào?
+
+Report này đánh giá hai workload đã chọn:
+
+\begin{enumerate}
+  \item \textbf{Primary case -- Bank Account Fraud (BAF):} bài toán deep learning trên dữ liệu tabular động, có mất cân bằng, biến phân loại và thay đổi theo thời gian; phù hợp nhất với research core.
+  \item \textbf{Secondary case -- Diabetes Readmission:} bài toán tabular machine learning ở lĩnh vực y tế, dùng để kiểm tra khả năng tổng quát sang domain và model family khác.
+\end{enumerate}
+
+BAF nhấn mạnh mất cân bằng, dữ liệu theo thời gian, feature hỗn hợp và thay đổi separability. Diabetes nhấn mạnh nhãn tái nhập viện trễ, replay theo lịch sử dài và khả năng tổng quát sang domain y tế. Hai case dùng chung framework Continuous Training, chỉ thay đổi dataset, model, feature schema, metric chất lượng và tham số scenario.
+
+Ba khái niệm cần được tách rõ trong mọi thực nghiệm:
+
+\begin{center}
+\code{Drift != Degradation != Retraining Trigger}
+\end{center}
+
+Drift chỉ cho biết phân phối đầu vào hoặc đầu ra đã thay đổi. Degradation là suy giảm chất lượng model trên dữ liệu mục tiêu. Retraining trigger là quyết định vận hành sau khi đã xem xét bằng chứng, độ không chắc chắn và ngân sách nhãn.
+
+Pipeline nghiên cứu được mô hình hóa như sau:
+
+\begin{center}
+\code{Production/Replay -> Predictions + Feedback -> Drift + Quality Estimation -> Evidence Window}\\
+\code{-> Degradation Verification -> Budget-aware CT Policy -> KEEP/REQUEST\_LABELS/HOLD/RETRAIN}\\
+\code{-> Training -> Independent Evaluation Gate -> Promote/Reject/Rollback}
+\end{center}
+
+Notebook gốc chỉ là baseline tham chiếu. Kết quả cần phân biệt thành ba lớp: kết quả notebook gốc, kết quả model sau khi đóng gói vào MLOps PaaS và kết quả của vòng Continuous Training. Chỉ lớp cuối cùng dùng để kết luận về hiệu quả của đề tài.

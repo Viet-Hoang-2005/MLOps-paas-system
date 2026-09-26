@@ -11,8 +11,8 @@ class HarborClient:
         self.http = http or HttpClient()
         registry = settings.HARBOR_REGISTRY_URL
         self.base_url = (
-            registry if registry.startswith(("http://", "https://")) else f"https://{registry}"
-        ) if registry else ""
+            (registry if registry.startswith(("http://", "https://")) else f"https://{registry}") if registry else ""
+        )
 
     @property
     def enabled(self):
@@ -123,8 +123,7 @@ class HarborClient:
             batch = response.json()
             prefix = f"{project}/"
             repositories.extend(
-                item["name"][len(prefix) :] if item["name"].startswith(prefix) else item["name"]
-                for item in batch
+                item["name"][len(prefix) :] if item["name"].startswith(prefix) else item["name"] for item in batch
             )
             if len(batch) < 100:
                 return repositories

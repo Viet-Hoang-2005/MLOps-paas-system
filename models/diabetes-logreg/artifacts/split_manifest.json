@@ -1,0 +1,41 @@
+{
+  "group_column": "patient_nbr",
+  "target_column": "readmit_30_days",
+  "total_records": 101763,
+  "total_unique_patients": 71515,
+  "train_folds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "train_samples": 61032,
+  "train_unique_patients": 42862,
+  "train_positive_count": 6797,
+  "train_positive_rate": 0.111368,
+  "validation_folds": [
+    6,
+    7
+  ],
+  "validation_samples": 20338,
+  "validation_unique_patients": 14260,
+  "validation_positive_count": 2281,
+  "validation_positive_rate": 0.112155,
+  "reference_folds": [
+    8
+  ],
+  "reference_samples": 10129,
+  "reference_unique_patients": 7196,
+  "reference_positive_count": 1100,
+  "reference_positive_rate": 0.108599,
+  "continuous_training_replay_folds": [
+    9
+  ],
+  "continuous_training_replay_samples": 10264,
+  "continuous_training_replay_unique_patients": 7197,
+  "continuous_training_replay_positive_count": 1179,
+  "continuous_training_replay_positive_rate": 0.114867,
+  "no_patient_overlap_verified": true
+}

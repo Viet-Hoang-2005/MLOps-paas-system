@@ -1,11 +1,7 @@
 export type ResourceId = string;
 
 export type SemanticTone =
-  | 'neutral'
-  | 'info'
-  | 'success'
-  | 'warning'
-  | 'danger';
+  "neutral" | "info" | "success" | "warning" | "danger";
 
 export interface MessageResponse {
   message: string;
@@ -19,18 +15,18 @@ export interface Paginated<T> {
 }
 
 export type RuntimeStatus =
-  | 'pending'
-  | 'queued'
-  | 'building'
-  | 'deploying'
-  | 'running'
-  | 'ready'
-  | 'healthy'
-  | 'completed'
-  | 'failed'
-  | 'cancelled'
-  | 'unhealthy'
-  | 'stopped'
+  | "pending"
+  | "queued"
+  | "building"
+  | "deploying"
+  | "running"
+  | "ready"
+  | "healthy"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "unhealthy"
+  | "stopped"
   | string;
 
 export interface RuntimeLogBatch {
@@ -41,7 +37,7 @@ export interface RuntimeLogBatch {
 }
 
 export type RuntimeLogSource =
-  | { kind: 'build'; id: ResourceId }
-  | { kind: 'deployment'; id: ResourceId }
-  | { kind: 'training'; id: ResourceId }
-  | { kind: 'drift'; id: ResourceId };
+  | { kind: "build"; id: ResourceId }
+  | { kind: "deployment"; id: ResourceId }
+  | { kind: "training"; id: ResourceId }
+  | { kind: "drift"; id: ResourceId };

@@ -134,19 +134,14 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             return "none"
 
         ready_builds = [
-            build
-            for build in instance.builds.all()
-            if build.status == "ready" and build.version_id is not None
+            build for build in instance.builds.all() if build.status == "ready" and build.version_id is not None
         ]
         if not ready_builds:
             return "trained"
 
         active_deployment_statuses = {"pending", "deploying", "healthy"}
         for build in ready_builds:
-            if any(
-                deployment.status in active_deployment_statuses
-                for deployment in build.version.deployments.all()
-            ):
+            if any(deployment.status in active_deployment_statuses for deployment in build.version.deployments.all()):
                 return "deployed"
         return "built"
 
@@ -171,6 +166,4 @@ class TrainingBuildSerializer(serializers.Serializer):
 
     @staticmethod
     def get_source_job_id(instance):
-        return instance.source_job_reference or (
-            instance.source_job.public_id if instance.source_job_id else None
-        )
+        return instance.source_job_reference or (instance.source_job.public_id if instance.source_job_id else None)

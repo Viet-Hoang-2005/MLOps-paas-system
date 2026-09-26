@@ -61,7 +61,14 @@ class LoggingTests(unittest.TestCase):
         logger.addHandler(handler)
         token = bind_context(request_id="request-1", project_id="project-1")
         try:
-            log_event(logger, "WARNING", "job.retrying", "Job retry scheduled", attempt=2, duration_ms=12)
+            log_event(
+                logger,
+                "WARNING",
+                "job.retrying",
+                "Job retry scheduled",
+                attempt=2,
+                duration_ms=12,
+            )
         finally:
             reset_context(token)
         payload = json.loads(output.getvalue())

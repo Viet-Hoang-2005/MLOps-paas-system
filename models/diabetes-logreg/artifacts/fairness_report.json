@@ -1,0 +1,165 @@
+{
+  "assessment_description": "Subgroup performance and disparity report across race and gender.",
+  "mitigation_applied": false,
+  "evaluation_threshold": 0.5,
+  "validation_fairness": {
+    "overall": {
+      "sample_count": 20338,
+      "base_rate": 0.11215,
+      "selection_rate": 0.38957,
+      "recall": 0.55195,
+      "false_negative_rate": 0.44805,
+      "precision": 0.1589
+    },
+    "by_race": {
+      "subgroups": {
+        "AfricanAmerican": {
+          "sample_count": 3876,
+          "base_rate": 0.11068,
+          "selection_rate": 0.40918,
+          "recall": 0.58042,
+          "false_negative_rate": 0.41958,
+          "precision": 0.157
+        },
+        "Caucasian": {
+          "sample_count": 15204,
+          "base_rate": 0.11398,
+          "selection_rate": 0.39312,
+          "recall": 0.55626,
+          "false_negative_rate": 0.44374,
+          "precision": 0.16128
+        },
+        "Other": {
+          "sample_count": 816,
+          "base_rate": 0.09804,
+          "selection_rate": 0.31127,
+          "recall": 0.4125,
+          "false_negative_rate": 0.5875,
+          "precision": 0.12992
+        },
+        "Unknown": {
+          "sample_count": 442,
+          "base_rate": 0.08824,
+          "selection_rate": 0.23982,
+          "recall": 0.33333,
+          "false_negative_rate": 0.66667,
+          "precision": 0.12264
+        }
+      },
+      "disparities": {
+        "selection_rate_difference": 0.16937,
+        "selection_rate_ratio": 0.58609,
+        "recall_difference": 0.24709,
+        "false_negative_rate_difference": 0.24709,
+        "precision_difference": 0.03864
+      }
+    },
+    "by_gender": {
+      "subgroups": {
+        "Female": {
+          "sample_count": 11002,
+          "base_rate": 0.11471,
+          "selection_rate": 0.4012,
+          "recall": 0.55705,
+          "false_negative_rate": 0.44295,
+          "precision": 0.15927
+        },
+        "Male": {
+          "sample_count": 9336,
+          "base_rate": 0.10915,
+          "selection_rate": 0.37586,
+          "recall": 0.54563,
+          "false_negative_rate": 0.45437,
+          "precision": 0.15845
+        }
+      },
+      "disparities": {
+        "selection_rate_difference": 0.02534,
+        "selection_rate_ratio": 0.93683,
+        "recall_difference": 0.01142,
+        "false_negative_rate_difference": 0.01142,
+        "precision_difference": 0.00082
+      }
+    }
+  },
+  "reference_fairness": {
+    "overall": {
+      "sample_count": 10129,
+      "base_rate": 0.1086,
+      "selection_rate": 0.38385,
+      "recall": 0.56,
+      "false_negative_rate": 0.44,
+      "precision": 0.15844
+    },
+    "by_race": {
+      "subgroups": {
+        "AfricanAmerican": {
+          "sample_count": 1845,
+          "base_rate": 0.11274,
+          "selection_rate": 0.39675,
+          "recall": 0.59615,
+          "false_negative_rate": 0.40385,
+          "precision": 0.1694
+        },
+        "Caucasian": {
+          "sample_count": 7564,
+          "base_rate": 0.10814,
+          "selection_rate": 0.38366,
+          "recall": 0.55134,
+          "false_negative_rate": 0.44866,
+          "precision": 0.15541
+        },
+        "Other": {
+          "sample_count": 467,
+          "base_rate": 0.10278,
+          "selection_rate": 0.36188,
+          "recall": 0.625,
+          "false_negative_rate": 0.375,
+          "precision": 0.17751
+        },
+        "Unknown": {
+          "sample_count": 253,
+          "base_rate": 0.10277,
+          "selection_rate": 0.33597,
+          "recall": 0.42308,
+          "false_negative_rate": 0.57692,
+          "precision": 0.12941
+        }
+      },
+      "disparities": {
+        "selection_rate_difference": 0.06078,
+        "selection_rate_ratio": 0.84681,
+        "recall_difference": 0.20192,
+        "false_negative_rate_difference": 0.20192,
+        "precision_difference": 0.0481
+      }
+    },
+    "by_gender": {
+      "subgroups": {
+        "Female": {
+          "sample_count": 5343,
+          "base_rate": 0.10575,
+          "selection_rate": 0.38331,
+          "recall": 0.55929,
+          "false_negative_rate": 0.44071,
+          "precision": 0.1543
+        },
+        "Male": {
+          "sample_count": 4786,
+          "base_rate": 0.11178,
+          "selection_rate": 0.38445,
+          "recall": 0.56075,
+          "false_negative_rate": 0.43925,
+          "precision": 0.16304
+        }
+      },
+      "disparities": {
+        "selection_rate_difference": 0.00115,
+        "selection_rate_ratio": 0.99701,
+        "recall_difference": 0.00146,
+        "false_negative_rate_difference": 0.00146,
+        "precision_difference": 0.00875
+      }
+    }
+  }
+}

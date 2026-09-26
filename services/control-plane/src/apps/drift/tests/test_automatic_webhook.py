@@ -3,12 +3,12 @@ from unittest.mock import Mock
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import override_settings
-from infrastructure.execution.argo_backends import ArgoDriftBackend
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject, WorkspaceAsset
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.registry.models import ModelVersion
+from infrastructure.execution.argo_backends import ArgoDriftBackend
 
 
 def _monitor_fixture():

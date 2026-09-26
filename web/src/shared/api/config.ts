@@ -1,7 +1,8 @@
-const normalizeApiBaseURL = (url: string) => url.replace(/\/+$/, '').replace(/\/auth$/, '');
+const normalizeApiBaseURL = (url: string) =>
+  url.replace(/\/+$/, "").replace(/\/auth$/, "");
 
 export const apiBaseURL = normalizeApiBaseURL(
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api",
 );
 
 const controlPlaneApiBaseURL = normalizeApiBaseURL(
@@ -9,4 +10,4 @@ const controlPlaneApiBaseURL = normalizeApiBaseURL(
 );
 
 export const controlPlaneURL = (path: string) =>
-  `${controlPlaneApiBaseURL.replace(/\/+$/, '')}${path}`;
+  `${controlPlaneApiBaseURL.replace(/\/+$/, "")}${path}`;

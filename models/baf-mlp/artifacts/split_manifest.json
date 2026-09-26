@@ -1,0 +1,27 @@
+{
+  "train_months": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "train_samples": 547975,
+  "train_fraud_count": 5288,
+  "train_fraud_rate": 0.00965,
+  "validation_months": [
+    4
+  ],
+  "validation_samples": 127691,
+  "validation_fraud_count": 1452,
+  "validation_fraud_rate": 0.011371,
+  "reference_months": [
+    5
+  ],
+  "reference_samples": 119323,
+  "reference_fraud_count": 1411,
+  "reference_fraud_rate": 0.011825,
+  "excluded_continuous_training_months": [
+    6,
+    7
+  ]
+}

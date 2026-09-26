@@ -1,0 +1,13 @@
+\section{Lộ trình phát triển}
+
+Lộ trình bám mốc KLTN từ 07/09/2026 đến 25/12/2026. Mỗi giai đoạn phải có artifact và tiêu chí chuyển tiếp, không chỉ có code chưa chạy end-to-end.
+
+\subsection{Việc cần làm ngay}
+
+\begin{enumerate}
+  \item Chốt hai dataset, model family, temporal split và pilot để biết budget có đủ cho verification, training và gate.
+  \item Viết prediction/evidence/label/ledger/maintenance/gate contract v1 và thống nhất ownership của từng ID.
+  \item Xác minh cấu hình training đang tắt, hoàn thiện URL training/cancel và chạy một job CPU nhỏ trước khi tích hợp CT.
+  \item Tạo research layer và issue theo phụ thuộc: probability/window \(\rightarrow\) feedback/ledger \(\rightarrow\) verification/policy \(\rightarrow\) training/gate \(\rightarrow\) recovery \(\rightarrow\) benchmark.
+\end{enumerate}
+

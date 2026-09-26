@@ -118,7 +118,11 @@ const formatPrediction = (value: unknown) => {
 
 const extractPredictionError = (
   error: unknown,
-  copy: { fallback: string; hint: (value: string) => string; received: (value: string) => string },
+  copy: {
+    fallback: string;
+    hint: (value: string) => string;
+    received: (value: string) => string;
+  },
 ) => {
   const response = (
     error as { response?: { status?: number; data?: PredictionErrorPayload } }
@@ -213,11 +217,19 @@ export default function ModelTestingPage() {
     setTestFinished(false);
     setCurrentRowIndex(0);
     setLogs([
-      makeLog("info", t("testingPage.loaded", { fileName: file.name, count: parsedRows.length })),
+      makeLog(
+        "info",
+        t("testingPage.loaded", {
+          fileName: file.name,
+          count: parsedRows.length,
+        }),
+      ),
       makeLog(
         parsedTargetColumns.length > 0 ? "warning" : "info",
         parsedTargetColumns.length > 0
-          ? t("testingPage.targetsExcluded", { columns: parsedTargetColumns.join(", ") })
+          ? t("testingPage.targetsExcluded", {
+              columns: parsedTargetColumns.join(", "),
+            })
           : t("testingPage.noTargetColumns"),
       ),
     ]);
@@ -282,7 +294,12 @@ export default function ModelTestingPage() {
             version: selectedModel.version || "v1",
           }),
         ),
-        makeLog("info", t("testingPage.endpointLog", { endpoint: selectedModel.endpoint_url })),
+        makeLog(
+          "info",
+          t("testingPage.endpointLog", {
+            endpoint: selectedModel.endpoint_url,
+          }),
+        ),
         makeLog("info", t("testingPage.running", { count: rows.length })),
       ]);
 
@@ -363,7 +380,8 @@ export default function ModelTestingPage() {
         const parsedError = extractPredictionError(error, {
           fallback: t("testingPage.predictionFailed"),
           hint: (value) => t("testingPage.hint", { hint: value }),
-          received: (value) => t("testingPage.receivedFeatures", { features: value }),
+          received: (value) =>
+            t("testingPage.receivedFeatures", { features: value }),
         });
         currentSummary.failed += 1;
         currentPredictions.push("ERROR");
@@ -460,10 +478,13 @@ export default function ModelTestingPage() {
       <PageBody className="p-6 h-full">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
           <div>
-            <h2 className="text-style-section-title font-bold text-color-foreground">{t("testingPage.title")}</h2>
+            <h2 className="text-style-section-title font-bold text-color-foreground">
+              {t("testingPage.title")}
+            </h2>
             <p className="mt-1 text-style-body text-color-muted-foreground">
               {t("testingPage.description", {
-                model: selectedModel?.name ?? t("testingPage.selectedModelFallback"),
+                model:
+                  selectedModel?.name ?? t("testingPage.selectedModelFallback"),
               })}
             </p>
           </div>
@@ -529,7 +550,9 @@ export default function ModelTestingPage() {
                   </h3>
                   <p className="mt-1 text-style-body text-color-muted-foreground">
                     {t("testingPage.runDescription", {
-                      model: selectedModel?.name ?? t("testingPage.selectedModelFallback"),
+                      model:
+                        selectedModel?.name ??
+                        t("testingPage.selectedModelFallback"),
                     })}
                   </p>
                 </div>

@@ -3,7 +3,6 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import override_settings
-from infrastructure.execution import factory
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
@@ -11,6 +10,7 @@ from apps.deployment.models import Build, Deployment
 from apps.deployment.services import builds as build_service
 from apps.deployment.services import deployments as deployment_service
 from apps.registry.models import ModelVersion
+from infrastructure.execution import factory
 from infrastructure.execution.argo_backends import ArgoDeploymentBackend
 
 
@@ -21,9 +21,7 @@ def test_build_webhook_is_idempotent(monkeypatch):
     project = ModelProject.objects.create(owner=user, name="project")
     version = ModelVersion.objects.create(project=project, version="1")
     build = Build.objects.create(project=project, version=version, flavor="sklearn", status="building")
-    registry = SimpleNamespace(
-        promote=lambda **_kwargs: (f"image-{project.public_id}:v1", "sha256:local-image-id")
-    )
+    registry = SimpleNamespace(promote=lambda **_kwargs: (f"image-{project.public_id}:v1", "sha256:local-image-id"))
     monkeypatch.setattr("apps.registry.services.versions.image_registry_for", lambda _build: registry)
     client = APIClient()
     headers = {"HTTP_X_CONTROL_PLANE_SECRET": "test-webhook-secret"}
@@ -140,7 +138,9 @@ def test_argo_deployment_persists_the_dedicated_runtime_namespace():
     )
     deployment = Deployment.objects.create(version=version, build=build, backend="argo")
     dispatched = []
-    backend = ArgoDeploymentBackend(client=SimpleNamespace(trigger=lambda url, payload: dispatched.append((url, payload))))
+    backend = ArgoDeploymentBackend(
+        client=SimpleNamespace(trigger=lambda url, payload: dispatched.append((url, payload)))
+    )
 
     endpoint = backend.deploy(deployment)
 

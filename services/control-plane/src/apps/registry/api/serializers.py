@@ -70,9 +70,7 @@ class ModelVersionSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_source_job_id(instance):
-        return instance.source_job_reference or (
-            instance.source_job.public_id if instance.source_job_id else None
-        )
+        return instance.source_job_reference or (instance.source_job.public_id if instance.source_job_id else None)
 
     def get_events(self, instance):
         return RegistryEventSerializer(

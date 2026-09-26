@@ -29,6 +29,7 @@ class ProjectVersionListCreateEndpoint(generics.ListAPIView):
     def get_serializer_context(self):
         return {**super().get_serializer_context(), "project": self.project()}
 
+
 class ModelVersionDetailEndpoint(generics.RetrieveAPIView):
     serializer_class = ModelVersionSerializer
     lookup_field = "public_id"

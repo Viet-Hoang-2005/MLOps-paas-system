@@ -33,7 +33,9 @@ services/control-plane/staticfiles/
 
 # Jupyter
 .ipynb_checkpoints/
-*.ipynb
+
+# Kaggle metadata
+kernel-metadata.json
 
 # Data
 data/
@@ -84,6 +86,7 @@ credentials.json
 coverage.xml
 htmlcov/
 .tox/
+.tmp-*/
 
 # Terraform
 *.tfstate

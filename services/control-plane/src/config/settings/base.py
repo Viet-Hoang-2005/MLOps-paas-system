@@ -1,9 +1,10 @@
 from datetime import timedelta
 from pathlib import Path
 
-from common.env import env, env_identifier, env_int, env_list
 from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
+
+from common.env import env, env_identifier, env_int, env_list
 
 SERVICE_ROOT = Path(__file__).resolve().parents[3]
 BASE_DIR = SERVICE_ROOT / "src"
@@ -172,9 +173,7 @@ TRAINING_GPU_ENABLED = str(env("TRAINING_GPU_ENABLED", "true" if TRAINING_BACKEN
     "on",
 }
 TRAINING_GPU_COUNTS = tuple(
-    int(value)
-    for value in env_list("TRAINING_GPU_COUNTS", "1")
-    if value.strip().isdigit() and int(value) > 0
+    int(value) for value in env_list("TRAINING_GPU_COUNTS", "1") if value.strip().isdigit() and int(value) > 0
 )
 ARGO_BUILD_WEBHOOK_URL = env("ARGO_BUILD_WEBHOOK_URL", "")
 ARGO_TRAINING_WEBHOOK_URL = env("ARGO_TRAINING_WEBHOOK_URL", "")

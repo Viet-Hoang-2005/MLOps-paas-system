@@ -1,5 +1,4 @@
 from django.conf import settings
-from infrastructure.storage import S3Storage
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -15,6 +14,7 @@ from apps.deployment.api.serializers import (
     PresignedUploadUrlSerializer,
 )
 from apps.deployment.services.builds import create_build_presigned_url, request_manual_build
+from infrastructure.storage import S3Storage
 
 from .serializers import (
     ModelProjectSerializer,
@@ -28,9 +28,8 @@ class ModelProjectListCreateEndpoint(generics.ListCreateAPIView):
     serializer_class = ModelProjectSerializer
 
     def get_queryset(self):
-        return (
-            ModelProject.objects.filter(owner=self.request.user, is_active=True)
-            .prefetch_related("workspace_assets", "versions__deployments__endpoint", "builds")
+        return ModelProject.objects.filter(owner=self.request.user, is_active=True).prefetch_related(
+            "workspace_assets", "versions__deployments__endpoint", "builds"
         )
 
     def create(self, request, *args, **kwargs):
@@ -46,9 +45,8 @@ class ModelProjectDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
     lookup_url_kwarg = "project_id"
 
     def get_queryset(self):
-        return (
-            ModelProject.objects.filter(owner=self.request.user, is_active=True)
-            .prefetch_related("workspace_assets", "versions__deployments__endpoint", "builds")
+        return ModelProject.objects.filter(owner=self.request.user, is_active=True).prefetch_related(
+            "workspace_assets", "versions__deployments__endpoint", "builds"
         )
 
     def update(self, request, *args, **kwargs):

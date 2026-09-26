@@ -5,9 +5,7 @@ from .models import Build, Deployment, Endpoint
 
 def builds_for_user(user):
     return (
-        Build.objects.filter(project__owner=user)
-        .select_related("project", "version")
-        .prefetch_related("input_assets")
+        Build.objects.filter(project__owner=user).select_related("project", "version").prefetch_related("input_assets")
     )
 
 

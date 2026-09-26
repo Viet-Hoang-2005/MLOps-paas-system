@@ -72,16 +72,22 @@ class EvidenceWindow(PublicModel):
     )
 
     project = models.ForeignKey("catalog.ModelProject", on_delete=models.CASCADE, related_name="evidence_windows")
-    champion = models.ForeignKey("registry.ModelVersion", on_delete=models.PROTECT, related_name="champion_evidence_windows")
+    champion = models.ForeignKey(
+        "registry.ModelVersion", on_delete=models.PROTECT, related_name="champion_evidence_windows"
+    )
     policy = models.ForeignKey("ct.MaintenancePolicy", on_delete=models.PROTECT, related_name="evidence_windows")
-    reference_snapshot = models.ForeignKey("ct.DatasetSnapshot", on_delete=models.PROTECT, related_name="reference_evidence_windows")
+    reference_snapshot = models.ForeignKey(
+        "ct.DatasetSnapshot", on_delete=models.PROTECT, related_name="reference_evidence_windows"
+    )
     ordinal = models.PositiveBigIntegerField()
     starts_at = models.DateTimeField()
     ends_at = models.DateTimeField()
     prediction_manifest_uri = models.CharField(max_length=1024, blank=True)
     prediction_manifest_checksum = models.CharField(max_length=128, blank=True)
     sample_count = models.PositiveBigIntegerField(default=0)
-    drift_run = models.ForeignKey("drift.DriftRun", on_delete=models.SET_NULL, null=True, blank=True, related_name="evidence_windows")
+    drift_run = models.ForeignKey(
+        "drift.DriftRun", on_delete=models.SET_NULL, null=True, blank=True, related_name="evidence_windows"
+    )
     estimator = models.JSONField(default=dict, blank=True)
     verification = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=32, choices=STATUSES, default="collecting")
@@ -101,7 +107,9 @@ class EvidenceWindowSample(PublicModel):
     QUALITY_STATUSES = (("unchecked", "Unchecked"), ("accepted", "Accepted"), ("rejected", "Rejected"))
 
     window = models.ForeignKey("ct.EvidenceWindow", on_delete=models.CASCADE, related_name="samples")
-    prediction = models.OneToOneField("production.PredictionRecord", on_delete=models.PROTECT, related_name="evidence_window_sample")
+    prediction = models.OneToOneField(
+        "production.PredictionRecord", on_delete=models.PROTECT, related_name="evidence_window_sample"
+    )
     pool = models.CharField(max_length=16, choices=POOLS, default="hidden")
     randomized_rank = models.PositiveBigIntegerField()
     quality_status = models.CharField(max_length=16, choices=QUALITY_STATUSES, default="unchecked")
@@ -109,7 +117,9 @@ class EvidenceWindowSample(PublicModel):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["window", "pool", "randomized_rank"], name="ct_window_pool_rank_unique")]
+        constraints = [
+            models.UniqueConstraint(fields=["window", "pool", "randomized_rank"], name="ct_window_pool_rank_unique")
+        ]
 
 
 class LabelBudget(PublicModel):
@@ -134,16 +144,47 @@ class LabelBudget(PublicModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["project", "episode_key"], name="ct_budget_project_episode_unique"),
-            models.CheckConstraint(check=Q(verify_quota__lte=F("total_quota")) & Q(train_quota__lte=F("total_quota")) & Q(gate_quota__lte=F("total_quota")), name="ct_budget_purpose_quota_valid"),
-            models.CheckConstraint(check=Q(verify_held__lte=F("verify_quota") - F("verify_used")) & Q(train_held__lte=F("train_quota") - F("train_used")) & Q(gate_held__lte=F("gate_quota") - F("gate_used")), name="ct_budget_purpose_usage_valid"),
-            models.CheckConstraint(check=Q(verify_quota__gte=F("verify_held") + F("verify_used")) & Q(train_quota__gte=F("train_held") + F("train_used")) & Q(gate_quota__gte=F("gate_held") + F("gate_used")), name="ct_budget_purpose_total_valid"),
-            models.CheckConstraint(check=Q(total_quota__gte=F("verify_held") + F("verify_used") + F("train_held") + F("train_used") + F("gate_held") + F("gate_used")), name="ct_budget_total_usage_valid"),
+            models.CheckConstraint(
+                check=Q(verify_quota__lte=F("total_quota"))
+                & Q(train_quota__lte=F("total_quota"))
+                & Q(gate_quota__lte=F("total_quota")),
+                name="ct_budget_purpose_quota_valid",
+            ),
+            models.CheckConstraint(
+                check=Q(verify_held__lte=F("verify_quota") - F("verify_used"))
+                & Q(train_held__lte=F("train_quota") - F("train_used"))
+                & Q(gate_held__lte=F("gate_quota") - F("gate_used")),
+                name="ct_budget_purpose_usage_valid",
+            ),
+            models.CheckConstraint(
+                check=Q(verify_quota__gte=F("verify_held") + F("verify_used"))
+                & Q(train_quota__gte=F("train_held") + F("train_used"))
+                & Q(gate_quota__gte=F("gate_held") + F("gate_used")),
+                name="ct_budget_purpose_total_valid",
+            ),
+            models.CheckConstraint(
+                check=Q(
+                    total_quota__gte=F("verify_held")
+                    + F("verify_used")
+                    + F("train_held")
+                    + F("train_used")
+                    + F("gate_held")
+                    + F("gate_used")
+                ),
+                name="ct_budget_total_usage_valid",
+            ),
         ]
 
 
 class LabelRequest(PublicModel):
     PURPOSES = (("verify", "Verify"), ("train", "Train"), ("gate", "Gate"))
-    STATUSES = (("pending", "Pending"), ("fulfilled", "Fulfilled"), ("rejected", "Rejected"), ("cancelled", "Cancelled"), ("expired", "Expired"))
+    STATUSES = (
+        ("pending", "Pending"),
+        ("fulfilled", "Fulfilled"),
+        ("rejected", "Rejected"),
+        ("cancelled", "Cancelled"),
+        ("expired", "Expired"),
+    )
 
     window = models.ForeignKey("ct.EvidenceWindow", on_delete=models.CASCADE, related_name="label_requests")
     budget = models.ForeignKey("ct.LabelBudget", on_delete=models.PROTECT, related_name="requests")
@@ -157,14 +198,20 @@ class LabelRequest(PublicModel):
     completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["window", "purpose", "request_round"], name="ct_request_window_purpose_round")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["window", "purpose", "request_round"], name="ct_request_window_purpose_round"
+            )
+        ]
 
 
 class LabelRequestItem(PublicModel):
     STATUSES = (("reserved", "Reserved"), ("revealed", "Revealed"), ("released", "Released"), ("rejected", "Rejected"))
 
     request = models.ForeignKey("ct.LabelRequest", on_delete=models.CASCADE, related_name="items")
-    window_sample = models.OneToOneField("ct.EvidenceWindowSample", on_delete=models.PROTECT, related_name="label_request_item")
+    window_sample = models.OneToOneField(
+        "ct.EvidenceWindowSample", on_delete=models.PROTECT, related_name="label_request_item"
+    )
     status = models.CharField(max_length=16, choices=STATUSES, default="reserved")
     unit_cost = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -189,7 +236,9 @@ class LabelLedgerEntry(PublicModel):
 
     budget = models.ForeignKey("ct.LabelBudget", on_delete=models.PROTECT, related_name="ledger_entries")
     request = models.ForeignKey("ct.LabelRequest", on_delete=models.PROTECT, related_name="ledger_entries")
-    item = models.ForeignKey("ct.LabelRequestItem", on_delete=models.SET_NULL, null=True, blank=True, related_name="ledger_entries")
+    item = models.ForeignKey(
+        "ct.LabelRequestItem", on_delete=models.SET_NULL, null=True, blank=True, related_name="ledger_entries"
+    )
     purpose = models.CharField(max_length=16, choices=PURPOSES)
     entry_type = models.CharField(max_length=16, choices=TYPES)
     units = models.PositiveIntegerField()
@@ -202,7 +251,9 @@ class MaintenanceDecision(PublicModel):
 
     window = models.ForeignKey("ct.EvidenceWindow", on_delete=models.PROTECT, related_name="decisions")
     policy = models.ForeignKey("ct.MaintenancePolicy", on_delete=models.PROTECT, related_name="decisions")
-    expected_champion = models.ForeignKey("registry.ModelVersion", on_delete=models.PROTECT, related_name="maintenance_decisions")
+    expected_champion = models.ForeignKey(
+        "registry.ModelVersion", on_delete=models.PROTECT, related_name="maintenance_decisions"
+    )
     evaluation_attempt = models.PositiveSmallIntegerField(default=1)
     action = models.CharField(max_length=24, choices=ACTIONS)
     reason_code = models.CharField(max_length=80)
@@ -211,26 +262,49 @@ class MaintenanceDecision(PublicModel):
     verify_label_count = models.PositiveIntegerField(default=0)
     train_label_count = models.PositiveIntegerField(default=0)
     gate_label_count = models.PositiveIntegerField(default=0)
-    training_job = models.ForeignKey("training.TrainingJob", on_delete=models.SET_NULL, null=True, blank=True, related_name="maintenance_decisions")
+    training_job = models.ForeignKey(
+        "training.TrainingJob", on_delete=models.SET_NULL, null=True, blank=True, related_name="maintenance_decisions"
+    )
     decided_at = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["window", "policy", "evaluation_attempt"], name="ct_decision_window_policy_attempt")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["window", "policy", "evaluation_attempt"], name="ct_decision_window_policy_attempt"
+            )
+        ]
 
 
 class MaintenanceRun(PublicModel):
     ACTIVE_STATES = ("awaiting_execution", "running", "awaiting_gate", "awaiting_update")
-    STATES = tuple((value, value.replace("_", " ").title()) for value in (*ACTIVE_STATES, "applied", "failed", "expired", "superseded"))
+    STATES = tuple(
+        (value, value.replace("_", " ").title())
+        for value in (*ACTIVE_STATES, "applied", "failed", "expired", "superseded")
+    )
 
     project = models.ForeignKey("catalog.ModelProject", on_delete=models.CASCADE, related_name="maintenance_runs")
     decision = models.OneToOneField("ct.MaintenanceDecision", on_delete=models.PROTECT, related_name="maintenance_run")
-    expected_champion = models.ForeignKey("registry.ModelVersion", on_delete=models.PROTECT, related_name="expected_maintenance_runs")
+    expected_champion = models.ForeignKey(
+        "registry.ModelVersion", on_delete=models.PROTECT, related_name="expected_maintenance_runs"
+    )
     state = models.CharField(max_length=32, choices=STATES, default="awaiting_execution")
-    dataset_snapshot = models.ForeignKey("ct.DatasetSnapshot", on_delete=models.SET_NULL, null=True, blank=True, related_name="maintenance_runs")
-    training_job = models.ForeignKey("training.TrainingJob", on_delete=models.SET_NULL, null=True, blank=True, related_name="maintenance_runs")
-    candidate = models.ForeignKey("registry.ModelVersion", on_delete=models.SET_NULL, null=True, blank=True, related_name="candidate_maintenance_runs")
-    deployment = models.ForeignKey("deployment.Deployment", on_delete=models.SET_NULL, null=True, blank=True, related_name="maintenance_runs")
+    dataset_snapshot = models.ForeignKey(
+        "ct.DatasetSnapshot", on_delete=models.SET_NULL, null=True, blank=True, related_name="maintenance_runs"
+    )
+    training_job = models.ForeignKey(
+        "training.TrainingJob", on_delete=models.SET_NULL, null=True, blank=True, related_name="maintenance_runs"
+    )
+    candidate = models.ForeignKey(
+        "registry.ModelVersion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="candidate_maintenance_runs",
+    )
+    deployment = models.ForeignKey(
+        "deployment.Deployment", on_delete=models.SET_NULL, null=True, blank=True, related_name="maintenance_runs"
+    )
     deadline_at = models.DateTimeField(null=True, blank=True)
     error_message = models.TextField(blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
@@ -248,8 +322,23 @@ class MaintenanceRun(PublicModel):
 
 
 class MaintenanceStepAttempt(PublicModel):
-    STEPS = (("snapshot", "Snapshot"), ("training", "Training"), ("build", "Build"), ("gate", "Gate"), ("update", "Update"), ("verify_runtime", "Verify runtime"))
-    STATUSES = (("pending", "Pending"), ("dispatched", "Dispatched"), ("running", "Running"), ("succeeded", "Succeeded"), ("failed", "Failed"), ("cancelled", "Cancelled"), ("unknown", "Unknown"))
+    STEPS = (
+        ("snapshot", "Snapshot"),
+        ("training", "Training"),
+        ("build", "Build"),
+        ("gate", "Gate"),
+        ("update", "Update"),
+        ("verify_runtime", "Verify runtime"),
+    )
+    STATUSES = (
+        ("pending", "Pending"),
+        ("dispatched", "Dispatched"),
+        ("running", "Running"),
+        ("succeeded", "Succeeded"),
+        ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
+        ("unknown", "Unknown"),
+    )
 
     run = models.ForeignKey("ct.MaintenanceRun", on_delete=models.CASCADE, related_name="step_attempts")
     step = models.CharField(max_length=32, choices=STEPS)
@@ -266,15 +355,28 @@ class MaintenanceStepAttempt(PublicModel):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["run", "step", "attempt_number"], name="ct_step_run_attempt_unique")]
+        constraints = [
+            models.UniqueConstraint(fields=["run", "step", "attempt_number"], name="ct_step_run_attempt_unique")
+        ]
 
 
 class EvaluationGate(PublicModel):
-    STATUSES = (("pending", "Pending"), ("running", "Running"), ("pass", "Pass"), ("fail", "Fail"), ("hold", "Hold"), ("error", "Error"))
+    STATUSES = (
+        ("pending", "Pending"),
+        ("running", "Running"),
+        ("pass", "Pass"),
+        ("fail", "Fail"),
+        ("hold", "Hold"),
+        ("error", "Error"),
+    )
 
     run = models.OneToOneField("ct.MaintenanceRun", on_delete=models.PROTECT, related_name="evaluation_gate")
-    candidate = models.ForeignKey("registry.ModelVersion", on_delete=models.PROTECT, related_name="candidate_evaluation_gates")
-    champion = models.ForeignKey("registry.ModelVersion", on_delete=models.PROTECT, related_name="champion_evaluation_gates")
+    candidate = models.ForeignKey(
+        "registry.ModelVersion", on_delete=models.PROTECT, related_name="candidate_evaluation_gates"
+    )
+    champion = models.ForeignKey(
+        "registry.ModelVersion", on_delete=models.PROTECT, related_name="champion_evaluation_gates"
+    )
     gate_snapshot = models.ForeignKey("ct.DatasetSnapshot", on_delete=models.PROTECT, related_name="evaluation_gates")
     status = models.CharField(max_length=16, choices=STATUSES, default="pending")
     metric_name = models.CharField(max_length=80, blank=True)

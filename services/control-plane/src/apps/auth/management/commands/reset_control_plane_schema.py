@@ -23,7 +23,7 @@ class Command(BaseCommand):
         enabled = os.environ.get("ALLOW_CONTROL_PLANE_RESET") == "YES"
         if not (confirmed and enabled):
             raise CommandError(
-                "Refusing reset. Set ALLOW_CONTROL_PLANE_RESET=YES and pass " "--confirm RESET-CONTROL-PLANE."
+                "Refusing reset. Set ALLOW_CONTROL_PLANE_RESET=YES and pass --confirm RESET-CONTROL-PLANE."
             )
         if connection.vendor != "postgresql":
             raise CommandError("Schema reset is supported only for PostgreSQL.")
@@ -34,5 +34,7 @@ class Command(BaseCommand):
             for table in self.LEGACY_PUBLIC_TABLES:
                 cursor.execute(f"DROP TABLE IF EXISTS public.{connection.ops.quote_name(table)} CASCADE")
         self.stdout.write(
-            self.style.SUCCESS(f"Recreated PostgreSQL schema {settings.DB_SCHEMA} and removed known legacy public tables.")
+            self.style.SUCCESS(
+                f"Recreated PostgreSQL schema {settings.DB_SCHEMA} and removed known legacy public tables."
+            )
         )

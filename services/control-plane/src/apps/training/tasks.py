@@ -1,6 +1,7 @@
 from celery import shared_task
-from common.logging import record_transition
 from django.db import transaction
+
+from common.logging import record_transition
 from infrastructure.execution import training_backend
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import (
@@ -15,6 +16,7 @@ from infrastructure.storage.paths import (
 )
 def execute_training_job(self, job_id):
     from apps.observability.services.lifecycle import record_training_event
+
     from .models import TrainingJob
     from .services.logs import append_training_log
 
@@ -30,11 +32,7 @@ def execute_training_job(self, job_id):
         record_transition(job, "running")
     append_training_log(job.public_id, "[SYSTEM] Training execution started.")
     with transaction.atomic():
-        job = (
-            TrainingJob.objects.select_for_update()
-            .select_related("project", "project__owner")
-            .get(pk=job.pk)
-        )
+        job = TrainingJob.objects.select_for_update().select_related("project", "project__owner").get(pk=job.pk)
         if job.status in {"cancelling", "cancelled"} or job.deletion_requested_at:
             should_confirm = job.status == "cancelling"
         else:
@@ -58,7 +56,11 @@ def execute_training_job(self, job_id):
                 job=job, event_type="failed", message="Training execution failed.", metadata={"error": str(exc)[:1000]}
             )
         record_transition(
-            job, "failed", reason="Training backend execution failed", error_type=type(exc).__name__, exc_info=True,
+            job,
+            "failed",
+            reason="Training backend execution failed",
+            error_type=type(exc).__name__,
+            exc_info=True,
         )
         append_training_log(job.public_id, f"[ERROR] Training failed: {exc}")
         raise
@@ -93,6 +95,7 @@ def execute_training_job(self, job_id):
 @shared_task(bind=True, max_retries=7200)
 def poll_training_job_status(self, job_id):
     from apps.observability.services.lifecycle import record_training_event
+
     from .models import TrainingJob
     from .services.logs import append_training_log
 
@@ -161,9 +164,7 @@ def poll_training_job_status(self, job_id):
             job.mark_finished("failed")
             job.error_message = f"Training container error: {result.get('error') or 'Container not found'}"
             job.save(update_fields=["status", "completed_at", "runtime_seconds", "error_message", "updated_at"])
-            record_training_event(
-                job=job, event_type="failed", message="Training runtime disappeared or errored."
-            )
+            record_training_event(job=job, event_type="failed", message="Training runtime disappeared or errored.")
             record_transition(job, "failed", reason="Training runtime disappeared or errored")
         append_training_log(job.public_id, f"[ERROR] {job.error_message}")
         return "failed"
@@ -197,8 +198,7 @@ def cancel_training_job(self, job_id):
     if isinstance(result, dict):
         if result.get("retry"):
             raise RuntimeError(
-                result.get("detail")
-                or "Training runtime is not registered yet; cancellation will be retried."
+                result.get("detail") or "Training runtime is not registered yet; cancellation will be retried."
             )
         if result.get("dispatched"):
             record_transition(job, "cancelling", phase="cancellation_dispatched")
@@ -213,6 +213,7 @@ def cancel_training_job(self, job_id):
 
 def confirm_training_cancellation(job_id):
     from apps.observability.services.lifecycle import record_training_event
+
     from .models import TrainingJob
     from .services.logs import append_training_log
 
@@ -279,9 +280,7 @@ def delete_training_job(self, job_id):
 
     try:
         disposable_builds = list(
-            job.builds.filter(status__in=("failed", "cancelled")).values_list(
-                "public_id", flat=True
-            )
+            job.builds.filter(status__in=("failed", "cancelled")).values_list("public_id", flat=True)
         )
         for build_id in disposable_builds:
             cleanup_failed_build_artifacts.run(str(build_id), True)
@@ -309,6 +308,7 @@ def delete_training_job(self, job_id):
 )
 def purge_training_job_outputs(self, job_id):
     from apps.observability.services.lifecycle import record_training_event
+
     from .models import TrainingJob
 
     job = TrainingJob.objects.select_related("project", "project__owner").get(public_id=job_id)

@@ -1,5 +1,3 @@
-from common.api.permissions import HasInternalWebhookSecret
-from common.logging import record_transition
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -7,6 +5,8 @@ from rest_framework.views import APIView
 from apps.catalog.models import ModelProject
 from apps.catalog.services.deletion import mark_project_deletion_failed
 from apps.catalog.tasks import complete_project_deletion
+from common.api.permissions import HasInternalWebhookSecret
+from common.logging import record_transition
 
 
 class ProjectDeletionWebhookEndpoint(APIView):

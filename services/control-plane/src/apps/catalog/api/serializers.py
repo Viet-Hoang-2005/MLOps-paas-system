@@ -1,8 +1,8 @@
-from common.api.exceptions import Conflict
-from infrastructure.storage import S3Storage
 from rest_framework import serializers
 
 from apps.catalog.models import ModelProject, WorkspaceAsset
+from common.api.exceptions import Conflict
+from infrastructure.storage import S3Storage
 
 
 class ModelProjectSerializer(serializers.ModelSerializer):
@@ -58,9 +58,7 @@ class ModelProjectSerializer(serializers.ModelSerializer):
 
     def get_lifecycle_status(self, instance):
         """Return the current user-facing lifecycle state for the management list."""
-        if instance.versions.filter(
-            deployments__status__in={"pending", "deploying", "healthy", "unhealthy"}
-        ).exists():
+        if instance.versions.filter(deployments__status__in={"pending", "deploying", "healthy", "unhealthy"}).exists():
             return "deployed"
         if instance.builds.filter(status="ready").exists():
             return "image_ready"

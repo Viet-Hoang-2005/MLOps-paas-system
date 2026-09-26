@@ -1,0 +1,18 @@
+{
+  "validation_pr_auc": 0.167662,
+  "validation_roc_auc": 0.627339,
+  "validation_balanced_accuracy": 0.591449,
+  "validation_f1": 0.246766,
+  "validation_precision": 0.158904,
+  "validation_recall": 0.551951,
+  "validation_brier_score": 0.237149,
+  "validation_threshold": 0.5,
+  "reference_pr_auc": 0.162319,
+  "reference_roc_auc": 0.626451,
+  "reference_balanced_accuracy": 0.598806,
+  "reference_f1": 0.246993,
+  "reference_precision": 0.158436,
+  "reference_recall": 0.56,
+  "reference_brier_score": 0.235704,
+  "reference_threshold": 0.5
+}

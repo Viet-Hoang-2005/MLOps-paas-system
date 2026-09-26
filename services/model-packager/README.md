@@ -6,7 +6,7 @@ Model Packager là container thực thi quá trình **đóng gói mô hình** �
 
 ## Vai Trò
 
-- **Chuẩn hóa Artifact**: Tải model artifact từ S3 (hoặc MLflow artifact URI), giải nén, tìm file model (`.pkl`, `.joblib`, `.xgb`), chuẩn hóa sang MLflow Pyfunc format.
+- **Chuẩn hóa Artifact**: Tải model artifact từ S3 (hoặc MLflow artifact URI), giải nén, tìm file model (`.pkl`, `.joblib`, `.xgb`, `.pt`, `.pth`, `.h5`, `.keras`), chuẩn hóa sang MLflow Pyfunc format.
 - **Sinh Dockerfile**: Tự động chọn Base Image phù hợp với `flavor`:
   - `pytorch` / `keras` / `tensorflow` → dùng `deep-learning-serving` base image với BentoML.
   - `sklearn` / `scikit-learn` / `xgboost` → dùng `machine-learning-serving` base image với FastAPI.

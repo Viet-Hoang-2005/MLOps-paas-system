@@ -31,42 +31,42 @@ def load_env_file():
                             os.environ[key] = val
             break
 
+
 def main():
     load_env_file()
 
     harbor_user = os.environ.get("HARBOR_ADMIN_USERNAME", "admin")
     harbor_pass = os.environ.get("HARBOR_ADMIN_PASSWORD")
-    harbor_url = os.environ.get("HARBOR_REGISTRY_URL", "registry.mlops-nids-nt114.id.vn")
+    harbor_url = os.environ.get(
+        "HARBOR_REGISTRY_URL", "registry.mlops-nids-nt114.id.vn"
+    )
 
     if not harbor_url.startswith("http://") and not harbor_url.startswith("https://"):
         harbor_url = f"https://{harbor_url}"
     harbor_url = harbor_url.rstrip("/")
 
     if not harbor_pass:
-        print("Error: Please set the HARBOR_ADMIN_PASSWORD environment variable.", file=sys.stderr)
+        print(
+            "Error: Please set the HARBOR_ADMIN_PASSWORD environment variable.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
-    print(f"Setting up daily Garbage Collection schedule (00:00 AM) for Harbor at: {harbor_url}")
+    print(
+        f"Setting up daily Garbage Collection schedule (00:00 AM) for Harbor at: {harbor_url}"
+    )
     endpoint = f"{harbor_url}/api/v2.0/system/gc/schedule"
 
     payload = {
-        "schedule": {
-            "type": "Daily",
-            "cron": "0 0 0 * * *"
-        },
-        "parameters": {
-            "delete_untagged": True
-        }
+        "schedule": {"type": "Daily", "cron": "0 0 0 * * *"},
+        "parameters": {"delete_untagged": True},
     }
     data = json.dumps(payload).encode("utf-8")
 
-    auth_raw = f"{harbor_user}:{harbor_pass}".encode("utf-8")
+    auth_raw = f"{harbor_user}:{harbor_pass}".encode()
     auth_b64 = base64.b64encode(auth_raw).decode("ascii")
 
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Basic {auth_b64}"
-    }
+    headers = {"Content-Type": "application/json", "Authorization": f"Basic {auth_b64}"}
 
     req = Request(endpoint, data=data, headers=headers, method="POST")
 
@@ -79,7 +79,10 @@ def main():
         with urlopen(req, context=ctx) as resp:
             print(f"Successfully set up! HTTP Code: {resp.status}")
     except HTTPError as e:
-        print(f"HTTP Error from Harbor ({e.code}): {e.read().decode('utf-8', errors='ignore')}", file=sys.stderr)
+        print(
+            f"HTTP Error from Harbor ({e.code}): {e.read().decode('utf-8', errors='ignore')}",
+            file=sys.stderr,
+        )
         sys.exit(1)
     except URLError as e:
         print(f"Error connecting to Harbor: {e.reason}", file=sys.stderr)
@@ -87,13 +90,16 @@ def main():
 
     # Truy vấn lại thông tin lịch hiện tại
     print("Current Garbage Collection schedule on the system:")
-    req_get = Request(endpoint, headers={"Authorization": f"Basic {auth_b64}"}, method="GET")
+    req_get = Request(
+        endpoint, headers={"Authorization": f"Basic {auth_b64}"}, method="GET"
+    )
     try:
         with urlopen(req_get, context=ctx) as resp:
             schedule_info = json.loads(resp.read().decode("utf-8"))
             print(json.dumps(schedule_info, indent=2, ensure_ascii=False))
     except Exception as e:
         print(f"Error reading GC schedule: {e}", file=sys.stderr)
+
 
 if __name__ == "__main__":
     main()

@@ -1,15 +1,16 @@
-import os
 import json
-import time
+import os
 import signal
 import threading
+import time
+
 from confluent_kafka import Consumer, KafkaError, TopicPartition
 from src.batching import (
     build_automatic_drift_signals,
     build_prediction_records_dataframe,
 )
-from src.models import KafkaRecord, KafkaRecordProcessingError, RetryState
 from src.logging_utils import Summary, configure, get_logger, log_event
+from src.models import KafkaRecord, KafkaRecordProcessingError, RetryState
 
 # Script execution must configure logging before importing database modules,
 # whose engine setup can emit lifecycle diagnostics.
@@ -21,18 +22,26 @@ from src.database import (
     persistence_summary,
     save_prediction_records_and_automatic_drift_signals,
 )
-from src.drift_outbox import OUTBOX_POLL_SECONDS, REQUEST_TIMEOUT_SECONDS, run_dispatcher
+from src.drift_outbox import (
+    OUTBOX_POLL_SECONDS,
+    REQUEST_TIMEOUT_SECONDS,
+    run_dispatcher,
+)
 
 logger = get_logger(__name__)
 commit_summary = Summary(logger, "offset_commit_summary")
 retry_summary = Summary(logger, "partition_retry_summary")
 broker_summary = Summary(logger, "broker_poll_summary")
 
-REDPANDA_BROKERS = os.environ.get('REDPANDA_BROKERS', 'localhost:19092')
+REDPANDA_BROKERS = os.environ.get("REDPANDA_BROKERS", "localhost:19092")
 KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "mlops_paas_production_data")
-KAFKA_TOPIC_RETRY_SECONDS = max(1, int(os.environ.get("KAFKA_TOPIC_RETRY_SECONDS", "5")))
+KAFKA_TOPIC_RETRY_SECONDS = max(
+    1, int(os.environ.get("KAFKA_TOPIC_RETRY_SECONDS", "5"))
+)
 KAFKA_BATCH_SIZE = max(1, int(os.environ.get("KAFKA_BATCH_SIZE", "500")))
-KAFKA_DB_RETRY_INITIAL_SECONDS = max(1, int(os.environ.get("KAFKA_DB_RETRY_INITIAL_SECONDS", "5")))
+KAFKA_DB_RETRY_INITIAL_SECONDS = max(
+    1, int(os.environ.get("KAFKA_DB_RETRY_INITIAL_SECONDS", "5"))
+)
 KAFKA_DB_RETRY_MAX_SECONDS = max(
     KAFKA_DB_RETRY_INITIAL_SECONDS,
     int(os.environ.get("KAFKA_DB_RETRY_MAX_SECONDS", "60")),
@@ -52,7 +61,13 @@ def _run_outbox_dispatcher(stop_event: threading.Event) -> None:
     try:
         run_dispatcher(stop_event)
     except Exception as exc:
-        log_event(logger, "ERROR", "drift_dispatcher_failed", "Automatic drift dispatcher stopped unexpectedly", error_type=type(exc).__name__)
+        log_event(
+            logger,
+            "ERROR",
+            "drift_dispatcher_failed",
+            "Automatic drift dispatcher stopped unexpectedly",
+            error_type=type(exc).__name__,
+        )
 
 
 def start_outbox_dispatcher() -> tuple[threading.Event, threading.Thread]:
@@ -71,6 +86,7 @@ def ensure_outbox_dispatcher_running(dispatcher: threading.Thread) -> None:
     if not dispatcher.is_alive():
         raise RuntimeError("Automatic drift outbox dispatcher stopped unexpectedly.")
 
+
 def _commit_batch_offset(consumer, record: KafkaRecord) -> bool:
     """Synchronously commit exactly one processed partition position."""
     next_offset = TopicPartition(record.topic, record.partition, record.offset + 1)
@@ -79,16 +95,36 @@ def _commit_batch_offset(consumer, record: KafkaRecord) -> bool:
     try:
         committed_offsets = consumer.commit(offsets=[next_offset], asynchronous=False)
     except Exception as exc:
-        commit_summary.record(success=False, duration_ms=(time.perf_counter() - started) * 1000)
-        commit_summary.failure(failure_key, "Kafka offset commit failed", error_type=type(exc).__name__, partition=record.partition, offset=record.offset + 1)
+        commit_summary.record(
+            success=False, duration_ms=(time.perf_counter() - started) * 1000
+        )
+        commit_summary.failure(
+            failure_key,
+            "Kafka offset commit failed",
+            error_type=type(exc).__name__,
+            partition=record.partition,
+            offset=record.offset + 1,
+        )
         return False
 
-    failures = [offset for offset in committed_offsets or [] if getattr(offset, "error", None)]
+    failures = [
+        offset for offset in committed_offsets or [] if getattr(offset, "error", None)
+    ]
     if failures:
-        commit_summary.record(success=False, duration_ms=(time.perf_counter() - started) * 1000)
-        commit_summary.failure(failure_key, "Kafka offset commit returned errors", partition=record.partition, offset=record.offset + 1, count=len(failures))
+        commit_summary.record(
+            success=False, duration_ms=(time.perf_counter() - started) * 1000
+        )
+        commit_summary.failure(
+            failure_key,
+            "Kafka offset commit returned errors",
+            partition=record.partition,
+            offset=record.offset + 1,
+            count=len(failures),
+        )
         return False
-    commit_summary.record(duration_ms=(time.perf_counter() - started) * 1000, committed=1)
+    commit_summary.record(
+        duration_ms=(time.perf_counter() - started) * 1000, committed=1
+    )
     commit_summary.recovery(failure_key, partition=record.partition)
     return True
 
@@ -99,7 +135,9 @@ def flush_batch(consumer, records: list[KafkaRecord]) -> bool:
         return True
     partitions = {(record.topic, record.partition) for record in records}
     if len(partitions) != 1:
-        raise ValueError("A Kafka batch must contain records from exactly one partition.")
+        raise ValueError(
+            "A Kafka batch must contain records from exactly one partition."
+        )
 
     predictions = build_prediction_records_dataframe(records)
     signals = build_automatic_drift_signals(records)
@@ -121,7 +159,9 @@ def _retry_delay(attempts: int) -> int:
     )
 
 
-def _schedule_retry(consumer, key: tuple[str, int], retries: dict[tuple[str, int], RetryState]) -> None:
+def _schedule_retry(
+    consumer, key: tuple[str, int], retries: dict[tuple[str, int], RetryState]
+) -> None:
     retry = retries.setdefault(key, RetryState())
     retry.attempts += 1
     delay = _retry_delay(retry.attempts)
@@ -129,7 +169,13 @@ def _schedule_retry(consumer, key: tuple[str, int], retries: dict[tuple[str, int
     if retry.attempts == 1:
         consumer.pause([_partition_handle(key)])
     retry_summary.record(success=False)
-    retry_summary.failure(f"{key[0]}:{key[1]}", "Partition batch retained for retry", partition=key[1], retry_seconds=delay, attempt=retry.attempts)
+    retry_summary.failure(
+        f"{key[0]}:{key[1]}",
+        "Partition batch retained for retry",
+        partition=key[1],
+        retry_seconds=delay,
+        attempt=retry.attempts,
+    )
 
 
 def flush_pending_batch(
@@ -159,11 +205,11 @@ def main():
     signal.signal(signal.SIGINT, handle_sigterm)
 
     conf = {
-        'bootstrap.servers': REDPANDA_BROKERS,
-        'group.id': 'paas-db-writer-group',
-        'auto.offset.reset': 'earliest',
-        'enable.auto.commit': False,
-        'enable.auto.offset.store': False,
+        "bootstrap.servers": REDPANDA_BROKERS,
+        "group.id": "paas-db-writer-group",
+        "auto.offset.reset": "earliest",
+        "enable.auto.commit": False,
+        "enable.auto.offset.store": False,
     }
 
     init_db()
@@ -174,7 +220,9 @@ def main():
     try:
         consumer = Consumer(conf)
         consumer.subscribe([KAFKA_TOPIC])
-        log_event(logger, "INFO", "consumer_started", "Consumer subscribed and listening")
+        log_event(
+            logger, "INFO", "consumer_started", "Consumer subscribed and listening"
+        )
 
         while RUNNING:
             ensure_outbox_dispatcher_running(dispatcher)
@@ -184,26 +232,34 @@ def main():
                     flush_pending_batch(consumer, pending_batches, retries, key)
 
             msg = consumer.poll(timeout=1.0)
-            
+
             if msg is None:
                 for key in list(pending_batches):
                     if key in retries:
                         continue
                     flush_pending_batch(consumer, pending_batches, retries, key)
                 continue
-                
+
             if msg.error():
                 if msg.error().code() == KafkaError._PARTITION_EOF:
                     continue
-                if msg.error().code() == KafkaError.UNKNOWN_TOPIC_OR_PART or msg.error().retriable():
-                    broker_summary.failure("poll", "Kafka temporarily unavailable", error_code=msg.error().code(), retry_seconds=KAFKA_TOPIC_RETRY_SECONDS)
+                if (
+                    msg.error().code() == KafkaError.UNKNOWN_TOPIC_OR_PART
+                    or msg.error().retriable()
+                ):
+                    broker_summary.failure(
+                        "poll",
+                        "Kafka temporarily unavailable",
+                        error_code=msg.error().code(),
+                        retry_seconds=KAFKA_TOPIC_RETRY_SECONDS,
+                    )
                     time.sleep(KAFKA_TOPIC_RETRY_SECONDS)
                     continue
                 raise RuntimeError(f"Kafka consumer error: {msg.error()}")
-                    
+
             broker_summary.recovery("poll")
             try:
-                val_json = msg.value().decode('utf-8')
+                val_json = msg.value().decode("utf-8")
                 row_data = json.loads(val_json)
                 record = KafkaRecord(
                     payload=row_data,
@@ -214,13 +270,13 @@ def main():
                 key = (record.topic, record.partition)
                 current_batch = pending_batches.setdefault(key, [])
                 current_batch.append(record)
-                
+
                 if key not in retries and len(current_batch) >= KAFKA_BATCH_SIZE:
                     flush_pending_batch(consumer, pending_batches, retries, key)
-                    
+
             except Exception as parse_e:
                 raise KafkaRecordProcessingError(type(parse_e).__name__) from None
-                
+
     except KeyboardInterrupt:
         log_event(logger, "INFO", "shutdown_requested", "Consumer shutdown requested")
     finally:
@@ -232,14 +288,25 @@ def main():
             dispatcher_stop.set()
             dispatcher.join(timeout=DISPATCHER_JOIN_TIMEOUT_SECONDS)
             if dispatcher.is_alive():
-                log_event(logger, "WARNING", "dispatcher_shutdown_timeout", "Drift dispatcher shutdown timed out; leased rows remain retryable")
+                log_event(
+                    logger,
+                    "WARNING",
+                    "dispatcher_shutdown_timeout",
+                    "Drift dispatcher shutdown timed out; leased rows remain retryable",
+                )
             try:
                 if consumer is not None:
                     consumer.close()
             finally:
-                for summary in (persistence_summary, commit_summary, retry_summary, broker_summary):
+                for summary in (
+                    persistence_summary,
+                    commit_summary,
+                    retry_summary,
+                    broker_summary,
+                ):
                     summary.close()
         log_event(logger, "INFO", "consumer_stopped", "Consumer cleanup finished")
+
 
 def run():
     """Process entry point with one safe diagnostic for terminal failures."""
@@ -259,6 +326,12 @@ def run():
         )
         raise SystemExit(1) from None
     except Exception as exc:
-        log_event(logger, "ERROR", "consumer_failed", "Consumer stopped after an unrecoverable error", error_type=type(exc).__name__, exc_info=True)
+        log_event(
+            logger,
+            "ERROR",
+            "consumer_failed",
+            "Consumer stopped after an unrecoverable error",
+            error_type=type(exc).__name__,
+            exc_info=True,
+        )
         raise SystemExit(1) from None
-

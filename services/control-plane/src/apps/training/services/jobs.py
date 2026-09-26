@@ -1,11 +1,9 @@
 from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from common.api.exceptions import Conflict
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from infrastructure.storage import S3Storage
 
 from apps.observability.services.lifecycle import record_training_event
 from apps.training.models import TrainingJob
@@ -16,6 +14,8 @@ from apps.training.tasks import (
     execute_training_job,
     purge_training_job_outputs,
 )
+from common.api.exceptions import Conflict
+from infrastructure.storage import S3Storage
 
 ACTIVE_STATUSES = {"pending", "queued", "uploading", "running", "cancelling"}
 

@@ -1,9 +1,10 @@
 from collections.abc import Sequence
 
-from common.logging import runtime_line
 from django.conf import settings
 from redis import Redis
 from redis.exceptions import RedisError
+
+from common.logging import runtime_line
 
 
 def _decode_logs(lines: Sequence[bytes | str]) -> list[str]:

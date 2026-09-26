@@ -3,7 +3,6 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from infrastructure.execution.docker_backends import DockerTrainingBackend
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
@@ -12,6 +11,7 @@ from apps.registry.models import ModelVersion
 from apps.training.models import TrainingJob
 from apps.training.services import jobs as job_service
 from apps.training.tasks import delete_training_job, execute_training_job
+from infrastructure.execution.docker_backends import DockerTrainingBackend
 
 
 def training_job(*, email="delete-training@example.com", status="completed"):
@@ -30,9 +30,7 @@ def training_job(*, email="delete-training@example.com", status="completed"):
 
 
 @pytest.mark.django_db
-def test_delete_active_job_marks_cancelling_and_enqueues_once(
-    monkeypatch, django_capture_on_commit_callbacks
-):
+def test_delete_active_job_marks_cancelling_and_enqueues_once(monkeypatch, django_capture_on_commit_callbacks):
     owner, job = training_job(status="running")
     client = APIClient()
     client.force_authenticate(owner)
@@ -56,9 +54,7 @@ def test_delete_active_job_marks_cancelling_and_enqueues_once(
 
 
 @pytest.mark.django_db
-def test_delete_terminal_job_enqueues_cleanup_and_tenant_isolation(
-    monkeypatch, django_capture_on_commit_callbacks
-):
+def test_delete_terminal_job_enqueues_cleanup_and_tenant_isolation(monkeypatch, django_capture_on_commit_callbacks):
     owner, job = training_job()
     stranger = get_user_model().objects.create_user("stranger@example.com", "password123")
     client = APIClient()

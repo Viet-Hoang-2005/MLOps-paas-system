@@ -51,13 +51,14 @@ export default function TrainingJobMetricsPage() {
 
   const latest = metrics.latest;
   const highCpu = latest?.cpu_percent != null && latest.cpu_percent > 85;
-  const highRam =
-    latest?.memory_percent != null && latest.memory_percent > 85;
+  const highRam = latest?.memory_percent != null && latest.memory_percent > 85;
   const memoryValue =
     latest?.memory_percent != null
       ? formatMetricPercent(latest.memory_percent)
       : latest?.memory_used_mb != null
-        ? t("detail.metricsPage.memoryUsed", { memory: formatMegabytes(latest.memory_used_mb) })
+        ? t("detail.metricsPage.memoryUsed", {
+            memory: formatMegabytes(latest.memory_used_mb),
+          })
         : "-";
   const memoryDetail =
     latest?.memory_used_mb != null && latest?.memory_limit_mb != null
@@ -65,7 +66,9 @@ export default function TrainingJobMetricsPage() {
           latest.memory_limit_mb,
         )}`
       : latest?.memory_used_mb != null
-        ? t("detail.metricsPage.memoryUsed", { memory: formatMegabytes(latest.memory_used_mb) })
+        ? t("detail.metricsPage.memoryUsed", {
+            memory: formatMegabytes(latest.memory_used_mb),
+          })
         : metrics.message || t("detail.metricsPage.waitingRunner");
   const gpuValue =
     latest?.gpu_available && latest.gpu_percent != null
@@ -121,7 +124,9 @@ export default function TrainingJobMetricsPage() {
             }
             detail={
               latest?.cpu_limit_cores
-                ? t("detail.metricsPage.cpuLimit", { count: latest.cpu_limit_cores })
+                ? t("detail.metricsPage.cpuLimit", {
+                    count: latest.cpu_limit_cores,
+                  })
                 : t("detail.metricsPage.cpuUsage")
             }
             warning={highCpu}
@@ -174,7 +179,9 @@ function MetricCell({
   return (
     <div
       className={`flex min-w-0 flex-col justify-between rounded-surface border bg-muted px-5 py-4 ${
-        warning ? "border-warning-border ring-1 ring-warning-border" : "border-border"
+        warning
+          ? "border-warning-border ring-1 ring-warning-border"
+          : "border-border"
       } ${muted ? "border-dashed opacity-50 grayscale" : ""}`}
     >
       <div>

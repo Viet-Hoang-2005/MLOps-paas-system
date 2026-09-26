@@ -26,9 +26,11 @@ def claim_events(*, delivery_kind, limit=100, lease_seconds=60, destination=None
     now = timezone.now()
     ready = Q(available_at__lte=now) & (Q(locked_until__isnull=True) | Q(locked_until__lte=now))
     with transaction.atomic():
-        queryset = EventOutbox.objects.select_for_update(skip_locked=True).filter(
-            delivery_kind=delivery_kind, published_at__isnull=True
-        ).filter(ready)
+        queryset = (
+            EventOutbox.objects.select_for_update(skip_locked=True)
+            .filter(delivery_kind=delivery_kind, published_at__isnull=True)
+            .filter(ready)
+        )
         if destination:
             queryset = queryset.filter(destination=destination)
         events = list(queryset.order_by("available_at", "created_at")[:limit])

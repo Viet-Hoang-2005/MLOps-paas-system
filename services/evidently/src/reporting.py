@@ -1,14 +1,28 @@
 """Control Plane callback delivery for drift results."""
 
 
-def trigger_webhook(*, requests_module, retry_factory, adapter_factory, webhook_url,
-                    webhook_secret, tenant_id, project_id, model_version_id,
-                    drift_summary, threshold, detail, on_error):
+def trigger_webhook(
+    *,
+    requests_module,
+    retry_factory,
+    adapter_factory,
+    webhook_url,
+    webhook_secret,
+    tenant_id,
+    project_id,
+    model_version_id,
+    drift_summary,
+    threshold,
+    detail,
+    on_error,
+):
     detail("Triggering Django Webhook...")
     session = requests_module.Session()
     retry_strategy = retry_factory(
-        total=3, backoff_factor=2,
-        status_forcelist=[429, 500, 502, 503, 504], allowed_methods=["POST"],
+        total=3,
+        backoff_factor=2,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["POST"],
     )
     adapter = adapter_factory(max_retries=retry_strategy)
     session.mount("http://", adapter)
@@ -23,7 +37,10 @@ def trigger_webhook(*, requests_module, retry_factory, adapter_factory, webhook_
     try:
         response = session.post(
             webhook_url,
-            headers={"Authorization": f"Bearer {webhook_secret}", "Content-Type": "application/json"},
+            headers={
+                "Authorization": f"Bearer {webhook_secret}",
+                "Content-Type": "application/json",
+            },
             json=payload,
             timeout=15,
         )

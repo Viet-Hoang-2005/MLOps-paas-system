@@ -87,7 +87,9 @@ export default function ApiKeyPage() {
       accessorKey: "name",
       header: t("apiKey.name"),
       cell: ({ row }) => (
-        <span className="font-medium text-color-foreground">{row.original.name}</span>
+        <span className="font-medium text-color-foreground">
+          {row.original.name}
+        </span>
       ),
     },
     {
@@ -157,40 +159,67 @@ export default function ApiKeyPage() {
                 <span className="text-color-syntax-keyword">import</span>{" "}
                 <span className="text-color-syntax-type">requests</span>
                 {"\n\n"}
-                <span className="text-color-syntax-property">API_URL</span> ={" "}
-                <span className="text-color-syntax-string">"your_api_endpoint_url"</span>
+                <span className="text-color-syntax-property">
+                  API_URL
+                </span> ={" "}
+                <span className="text-color-syntax-string">
+                  "your_api_endpoint_url"
+                </span>
                 {"\n"}
-                <span className="text-color-syntax-property">API_KEY</span> ={" "}
-                <span className="text-color-syntax-string">"your_api_key_here"</span>
+                <span className="text-color-syntax-property">
+                  API_KEY
+                </span> ={" "}
+                <span className="text-color-syntax-string">
+                  "your_api_key_here"
+                </span>
                 {"\n\n"}
-                <span className="text-color-syntax-variable">headers</span> = {"{\n"}
+                <span className="text-color-syntax-variable">
+                  headers
+                </span> = {"{\n"}
                 {"    "}
-                <span className="text-color-syntax-string">"X-API-Key"</span>:{" "}
-                <span className="text-color-syntax-property">API_KEY</span>,{"\n"}
+                <span className="text-color-syntax-string">
+                  "X-API-Key"
+                </span>:{" "}
+                <span className="text-color-syntax-property">API_KEY</span>,
+                {"\n"}
                 {"    "}
-                <span className="text-color-syntax-string">"Content-Type"</span>:{" "}
-                <span className="text-color-syntax-string">"application/json"</span>
+                <span className="text-color-syntax-string">"Content-Type"</span>
+                :{" "}
+                <span className="text-color-syntax-string">
+                  "application/json"
+                </span>
                 {"\n"}
                 {"}\n\n"}
-                <span className="text-color-syntax-variable">payload</span> = {"{\n"}
+                <span className="text-color-syntax-variable">
+                  payload
+                </span> = {"{\n"}
                 {"    "}
-                <span className="text-color-syntax-string">"features"</span>: {"{\n"}
+                <span className="text-color-syntax-string">
+                  "features"
+                </span>: {"{\n"}
                 {"        "}
-                <span className="text-color-syntax-string">"Src Port"</span>:{" "}
-                <span className="text-color-syntax-number">443</span>,{"\n"}
+                <span className="text-color-syntax-string">
+                  "Src Port"
+                </span>: <span className="text-color-syntax-number">443</span>,
+                {"\n"}
                 {"        "}
-                <span className="text-color-syntax-comment"># Add other features...</span>
+                <span className="text-color-syntax-comment">
+                  # Add other features...
+                </span>
                 {"\n"}
                 {"    }\n"}
                 {"}\n\n"}
-                <span className="text-color-syntax-variable">response</span> ={" "}
+                <span className="text-color-syntax-variable">
+                  response
+                </span> ={" "}
                 <span className="text-color-syntax-variable">requests</span>.
                 <span className="text-color-syntax-function">post</span>(
                 <span className="text-color-syntax-property">API_URL</span>,{" "}
                 <span className="text-color-syntax-variable">json</span>=
                 <span className="text-color-syntax-variable">payload</span>,{" "}
                 <span className="text-color-syntax-variable">headers</span>=
-                <span className="text-color-syntax-variable">headers</span>){"\n"}
+                <span className="text-color-syntax-variable">headers</span>)
+                {"\n"}
                 <span className="text-color-syntax-function">print</span>(
                 <span className="text-color-syntax-variable">response</span>.
                 <span className="text-color-syntax-function">json</span>())

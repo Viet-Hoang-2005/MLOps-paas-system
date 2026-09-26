@@ -1,8 +1,8 @@
+from django.conf import settings
+
 from apps.deployment.models import Endpoint
 from apps.training.services.capabilities import issue_capability
 from apps.training.services.storage_scope import validate_training_uri
-from django.conf import settings
-
 from infrastructure.argo import ArgoWebhookClient
 from infrastructure.http import HttpClient
 from infrastructure.storage import S3Storage
@@ -199,8 +199,7 @@ class ArgoDeploymentBackend(_ArgoBackend):
             defaults={
                 "public_url": public_url,
                 "internal_url": (
-                    f"http://{container_name}-svc.{settings.MODEL_RUNTIME_NAMESPACE}.svc.cluster.local:"
-                    f"{target_port}"
+                    f"http://{container_name}-svc.{settings.MODEL_RUNTIME_NAMESPACE}.svc.cluster.local:{target_port}"
                 ),
                 "runtime_name": container_name,
                 "runtime_namespace": settings.MODEL_RUNTIME_NAMESPACE,

@@ -1,0 +1,35 @@
+\section{Hai case study thực nghiệm}
+
+Hai case study được chọn để tạo ra hai điều kiện kiểm chứng khác nhau nhưng vẫn dùng chung prediction contract, replay harness, Evidence Window, label budget, policy và evaluation gate. BAF là workload chính cho RQ1; Diabetes Readmission là workload phụ để kiểm tra khả năng tổng quát của cơ chế CT sang domain y tế và model tuyến tính.
+
+\subsection{Primary case -- Bank Account Fraud (BAF) với MLP PyTorch}
+
+BAF là bộ dữ liệu tabular được giới thiệu trong bài \source{https://proceedings.neurips.cc/paper_files/paper/2022/hash/d9696563856bd350e4e7ac5e5812f23c-Abstract-Datasets_and_Benchmarks.html}{Turning the Tables: Biased, Imbalanced, Dynamic Tabular Datasets for ML Evaluation} và được cung cấp cùng \source{https://github.com/feedzai/bank-account-fraud}{repository, datasheet của Feedzai}. Dữ liệu mô phỏng quy trình mở tài khoản ngân hàng từ dữ liệu thực đã ẩn danh, có các biến phân loại và số, tỷ lệ fraud thấp, nhiều variant về bias và mức độ phân biệt giữa lớp. Trường thời gian theo tháng cho phép xây dựng replay có thứ tự và tạo các thay đổi có kiểm soát; BAF vì vậy phù hợp với bài toán phát hiện degradation dưới giới hạn nhãn.
+
+Model chính là MLP PyTorch nhỏ với hai hidden layer, chẳng hạn 128--64 nút, và một output logit. Pipeline phải lưu cùng model version toàn bộ preprocessing, mapping biến phân loại, schema, label mapping, threshold và calibration version. Preprocessing chỉ fit trên tập train; tháng dùng để chia temporal split hoặc tạo scenario, không đưa trực tiếp vào input nếu nó chỉ là chỉ báo thời gian. Loss có trọng số hoặc sampler được chọn từ train, còn threshold được cố định trên validation trước khi mở evaluation gate. Artifact \code{.pt} vì thế phải được đóng gói qua wrapper inference để Model Server tái lập đúng xác suất và schema.
+
+BAF là primary case vì policy phải đồng thời xử lý rare event, positive label scarcity, drift của tỷ lệ fraud hoặc separability, và chi phí xác minh. Metrics chính gồm PR-AUC/Average Precision, recall, precision, F1, false negative rate, false positive rate, calibration, số fraud label thu được và chi phí nhãn. Mỗi episode phải báo tổng sample, số positive, khoảng bất định và scenario; một batch không có fraud label không đủ để kết luận model an toàn.
+
+\subsection{Secondary case -- Diabetes Readmission với Logistic Regression}
+
+Notebook \source{https://github.com/fairlearn/talks/blob/main/2021_scipy_tutorial/fairness-in-AI-systems-instructors.ipynb}{Fairlearn SciPy 2021 tutorial} dùng dataset \source{https://archive.ics.uci.edu/dataset/296/diabetes+130-us+hospitals+for+years+1999-2008}{Diabetes 130-US Hospitals for Years 1999--2008} của UCI. Dataset có khoảng 101\,766 lần nhập viện tại 130 bệnh viện, 47 thuộc tính gốc và mục tiêu tái nhập viện trong 30 ngày; phiên bản tutorial có 24 input features sau tiền xử lý.
+
+Model dùng cho case phụ là \code{LogisticRegression} kết hợp \code{StandardScaler}, phù hợp với CPU, dễ giải thích và dễ giữ calibration. Replay cần bảo toàn thứ tự thời gian hoặc episode theo bệnh viện; nhãn tái nhập viện chỉ được mở sau thời gian theo dõi tương ứng. Metrics gồm balanced accuracy, ROC-AUC, recall, false negative rate, calibration/Brier score và subgroup analysis bằng Fairlearn \code{MetricFrame}. Fairness là phân tích bổ sung, còn đóng góp chính vẫn là đo degradation, label cost và khả năng phục hồi.
+
+Diabetes giúp kiểm tra liệu cùng một policy có còn hoạt động khi positive event không hiếm như BAF, nhãn đến trễ hơn và feature schema thuộc domain y tế. Kết quả của case này được dùng để đánh giá generalization, không gộp trực tiếp các metric có ý nghĩa khác nhau với BAF.
+
+\begin{longtable}{@{}L{3.4cm} L{2cm} L{2cm} L{\dimexpr\linewidth-7.4cm-6\tabcolsep\relax}@{}}
+\caption{Vai trò của hai case study.}\label{tab:summary-cases}\\
+\toprule\textbf{Tiêu chí} & \textbf{BAF + MLP} & \textbf{Diabetes + LR} & \textbf{Vai trò}\\
+\midrule\endfirsthead
+\toprule\textbf{Tiêu chí} & \textbf{BAF + MLP} & \textbf{Diabetes + LR} & \textbf{Vai trò}\\
+\midrule\endhead
+Model family & DL/MLP PyTorch & ML/Logistic Regression & Hai workload dùng chung framework.\\
+Rare-event & 5/5 & 3/5 & BAF là test chính cho positive label hiếm.\\
+Limited labels & 5/5 & 4/5 & BAF kiểm tra selective verification mạnh hơn.\\
+Drift/CT fit & 5/5 & 4/5 & BAF primary, Diabetes generalization.\\
+Fairness & 1/5 & 5/5 & Diabetes chỉ dùng subgroup analysis phụ.\\
+Tính khả thi 4 tháng & 4/5 & 5/5 & Chạy BAF trước, sau đó xác nhận trên Diabetes.\\
+\bottomrule
+\end{longtable}
+

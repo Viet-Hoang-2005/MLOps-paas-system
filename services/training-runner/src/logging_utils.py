@@ -10,7 +10,9 @@ import uuid
 from datetime import datetime, timezone
 from urllib.parse import urlsplit, urlunsplit
 
-_context: contextvars.ContextVar[dict[str, object]] = contextvars.ContextVar("mlops_log_context", default={})
+_context: contextvars.ContextVar[dict[str, object]] = contextvars.ContextVar(
+    "mlops_log_context", default={}
+)
 _service = "backend"
 _output_lock = threading.RLock()
 _SECRET_KEY = (
@@ -24,7 +26,7 @@ _SECRETS = re.compile(
 )
 _URL = re.compile(r"\b[a-zA-Z][a-zA-Z0-9+.-]{0,31}://[^\s<>\"']+")
 _SAFE_VALUE = re.compile(r"^[a-zA-Z0-9_.:/@+-]+$")
-_PROTOCOL = re.compile(r"^(\s*METRIC_JSON(?::| )\s*)(.*)$", re.S)
+_PROTOCOL = re.compile(r"^(\s*METRIC_JSON(?::| )\s*)(.*)$", re.DOTALL)
 _FIELDS = frozenset(
     {
         "request_id",
@@ -90,7 +92,7 @@ def _protocol_value(value):
     if isinstance(value, dict):
         return {
             sanitize(key): "[REDACTED]"
-            if re.search(_SECRET_KEY, key, re.I)
+            if re.search(_SECRET_KEY, key, re.IGNORECASE)
             and not (
                 isinstance(item, (int, float))
                 and re.fullmatch(
@@ -128,15 +130,17 @@ def sanitize(value, limit=2048):
         except (ValueError, RecursionError):
             return "[invalid metric protocol record]"
     for name, secret in os.environ.items():
-        if re.search(_SECRET_KEY, name, re.I) and len(secret) >= 6:
+        if re.search(_SECRET_KEY, name, re.IGNORECASE) and len(secret) >= 6:
             text = text.replace(secret, "[REDACTED]")
     text = re.sub(
         r"-----BEGIN [^-]*PRIVATE KEY-----.*?-----END [^-]*PRIVATE KEY-----",
         "[REDACTED]",
         text,
-        flags=re.S,
+        flags=re.DOTALL,
     )
-    text = re.sub(r"-----BEGIN [^-]*PRIVATE KEY-----.*", "[REDACTED]", text, flags=re.S)
+    text = re.sub(
+        r"-----BEGIN [^-]*PRIVATE KEY-----.*", "[REDACTED]", text, flags=re.DOTALL
+    )
     text = re.sub(r"(?i)\b(Bearer|Basic)\s+[A-Za-z0-9+/_.=~-]+", r"\1 [REDACTED]", text)
     text = re.sub(
         r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "[REDACTED]", text
@@ -221,7 +225,9 @@ def _record_fields(record, service):
         locations = []
         while tb is not None:
             code = tb.tb_frame.f_code
-            locations.append(f"{os.path.basename(code.co_filename)}:{tb.tb_lineno}:{code.co_name}")
+            locations.append(
+                f"{os.path.basename(code.co_filename)}:{tb.tb_lineno}:{code.co_name}"
+            )
             tb = tb.tb_next
         fields["traceback"] = " <- ".join(locations[-30:])
     return fields
@@ -245,7 +251,11 @@ def _json_value(value):
 
 def log_format():
     """Return the supported container formatter, defaulting safely to console."""
-    return "json" if os.environ.get("LOG_FORMAT", "console").strip().lower() == "json" else "console"
+    return (
+        "json"
+        if os.environ.get("LOG_FORMAT", "console").strip().lower() == "json"
+        else "console"
+    )
 
 
 class ConsoleFormatter(logging.Formatter):
@@ -288,7 +298,9 @@ class JsonFormatter(logging.Formatter):
 
 
 def formatter_for(service=None):
-    return JsonFormatter(service) if log_format() == "json" else ConsoleFormatter(service)
+    return (
+        JsonFormatter(service) if log_format() == "json" else ConsoleFormatter(service)
+    )
 
 
 class SafeStreamHandler(logging.StreamHandler):

@@ -1,0 +1,12 @@
+\section{Giới thiệu}
+
+Hệ thống cung cấp các thành phần quản lý model, model serving, thu thập prediction, phát hiện drift, training, registry, đóng gói và triển khai trên Docker/Kubernetes. Hướng KLTN mở rộng nền tảng này thành một vòng Continuous Training có khả năng xác minh model đã suy giảm trước khi tiêu tốn nhãn và compute để retrain.
+
+Vấn đề thực tế không phải mọi tín hiệu drift đều cần retrain. Phân phối input có thể thay đổi nhưng chất lượng vẫn ổn định; ngược lại, chất lượng có thể giảm dù input drift chưa rõ. Khi ground truth đến trễ hoặc chi phí gán nhãn cao, hệ thống cần thu thập bằng chứng có chọn lọc, giữ champion an toàn và ghi lại lý do của mỗi quyết định.
+
+\begin{center}
+\code{Drift != Degradation != Retraining Trigger}
+\end{center}
+
+Hai workload được dùng chung một framework. \textbf{Bank Account Fraud (BAF)} là case chính vì có dữ liệu tabular động, sự kiện dương hiếm, biến phân loại và thay đổi separability theo thời gian. \textbf{Diabetes Readmission} là case phụ để kiểm tra khả năng tổng quát sang domain y tế và model machine learning dạng bảng. Bộ CICIDS2017 hiện có trong repository tiếp tục dùng cho kiểm thử hệ thống NIDS, không thay thế hai case study chính của KLTN.
+

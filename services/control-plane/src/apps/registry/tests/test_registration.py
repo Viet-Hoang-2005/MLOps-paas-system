@@ -41,7 +41,7 @@ def test_version_smoke_test_is_tenant_scoped(monkeypatch):
     url = f"/api/registry/versions/{version.public_id}/smoke-test/"
 
     client.force_authenticate(other)
-    assert client.post(url, {"features": {}} , format="json").status_code == 404
+    assert client.post(url, {"features": {}}, format="json").status_code == 404
 
     client.force_authenticate(owner)
     calls = []
@@ -98,9 +98,7 @@ def test_predict_version_proxies_to_healthy_endpoint(routable_version):
     assert result["prediction"] == [1]
     assert result["confidence"] == [0.97]
     assert result["endpoint_url"] == "https://models.example/predict"
-    assert http.calls == [
-        ("POST", "http://worker:3000/predict", {"json": {"features": {"value": 1}}})
-    ]
+    assert http.calls == [("POST", "http://worker:3000/predict", {"json": {"features": {"value": 1}}})]
 
 
 def test_predict_version_rejects_version_without_healthy_endpoint(routable_version):

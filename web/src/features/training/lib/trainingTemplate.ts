@@ -1,4 +1,4 @@
-import { buildStoredZip, downloadFile } from './trainingZip';
+import { buildStoredZip, downloadFile } from "./trainingZip";
 
 const textEncoder = new TextEncoder();
 
@@ -50,18 +50,22 @@ const sampleTrainCsv = `f1,f2,f3,label
 
 export const downloadSampleTrainingTemplate = async () => {
   const sourceZip = buildStoredZip(
-    [
-      { name: 'train.py', data: textEncoder.encode(sampleTrainPy) },
-    ],
-    'source.zip',
+    [{ name: "train.py", data: textEncoder.encode(sampleTrainPy) }],
+    "source.zip",
   );
   const file = buildStoredZip(
     [
-      { name: 'source.zip', data: new Uint8Array(await sourceZip.arrayBuffer()) },
-      { name: 'requirements.txt', data: textEncoder.encode(sampleRequirements) },
-      { name: 'train.csv', data: textEncoder.encode(sampleTrainCsv) },
+      {
+        name: "source.zip",
+        data: new Uint8Array(await sourceZip.arrayBuffer()),
+      },
+      {
+        name: "requirements.txt",
+        data: textEncoder.encode(sampleRequirements),
+      },
+      { name: "train.csv", data: textEncoder.encode(sampleTrainCsv) },
     ],
-    'mlops-training-template.zip',
+    "mlops-training-template.zip",
   );
   downloadFile(file);
 };

@@ -1,0 +1,36 @@
+\section{Phạm vi khóa luận và khuyến nghị triển khai}
+
+Cấu hình nghiên cứu được chốt như sau:
+
+\begin{longtable}{@{}L{4.2cm} L{\dimexpr\linewidth-4.2cm-2\tabcolsep\relax}@{}}
+\caption{Cấu hình thực nghiệm đề xuất.}\label{tab:recommended-configuration}\\
+\toprule\textbf{Thành phần} & \textbf{Lựa chọn}\\
+\midrule\endfirsthead
+\toprule\textbf{Thành phần} & \textbf{Lựa chọn}\\
+\midrule\endhead
+Primary workload & Bank Account Fraud (BAF) + MLP PyTorch.\\
+Secondary workload & Diabetes Readmission.\\
+Research problem & Label-efficient degradation verification.\\
+CT contribution & Budget-aware decision policy.\\
+Verification & CBPE/ATC kết hợp selective labels.\\
+Decision & KEEP / REQUEST\_LABELS / HOLD / RETRAIN.\\
+Training & Pipeline training hiện có.\\
+Candidate safety & Independent Evaluation Gate.\\
+Main comparison & Static, Drift-only, Estimator-only, Periodic, Proposed, Oracle.\\
+Main constraint & \(\mathit{B}_{verify}+\mathit{B}_{train}+\mathit{B}_{gate}\leq\mathit{B}_{total}\).\\
+\bottomrule
+\end{longtable}
+
+Trong bốn tháng, phần \textbf{must-have} gồm BAF và Diabetes dataset, replay harness, hidden-label mechanism, evidence window, label budget, label request/feedback, CBPE/ATC, verification engine, CT policy, PyTorch/sklearn training integration, independent gate, baselines, controlled scenarios, metrics, ablation và experiment reproducible. CT observability, idempotency, worker failure injection, reconciliation, Argo/Kubernetes end-to-end và Diabetes subgroup analysis là \textbf{should-have}.
+
+Không nên mở rộng phạm vi sang LLM, incremental learning, pseudo-labeling, causal inference, advanced HPO, multi-model research, multi-GPU, multi-region HA hoặc autoscaling research. Các hướng đó không cần thiết để trả lời câu hỏi về label-efficient degradation verification.
+
+Thứ tự triển khai nên là: (1) khóa contract prediction và hai baseline; (2) implement replay harness deterministic; (3) thêm hidden labels, evidence window và label pools; (4) tích hợp CBPE/ATC, verification engine và sáu baselines; (5) nối training pipeline và independent gate; (6) chạy S0--S5, ablation và fault injection; (7) so sánh detection rate, missed degradation, unnecessary retraining, label consumption, recovery time và safety promotion.
+
+Đóng góp nên được diễn đạt ở mức có thể kiểm chứng:
+
+\begin{quote}
+\textit{A framework for label-efficient degradation verification and budget-aware Continuous Training, evaluated across a rare-event deep-learning workload and a tabular healthcare machine-learning workload.}
+\end{quote}
+
+Không nên claim policy là \texttt{optimal} hoặc áp dụng tốt cho mọi hệ thống ML. Kết luận phải dựa trên trade-off đo được giữa khả năng phát hiện degradation, số degradation bị bỏ sót, chi phí nhãn, số lần retraining không cần thiết, thời gian phục hồi và độ an toàn khi promote model.

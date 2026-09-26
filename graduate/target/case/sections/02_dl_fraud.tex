@@ -1,0 +1,54 @@
+\section{Case study chính: Bank Account Fraud (BAF)}
+
+\subsection{Nguồn và bối cảnh ứng dụng}
+
+BAF là bộ dữ liệu tabular được giới thiệu trong bài NeurIPS 2022 \source{https://proceedings.neurips.cc/paper_files/paper/2022/hash/d9696563856bd350e4e7ac5e5812f23c-Abstract-Datasets_and_Benchmarks.html}{Turning the Tables: Biased, Imbalanced, Dynamic Tabular Datasets for ML Evaluation}. Bộ dữ liệu được sinh từ pipeline bảo toàn riêng tư dựa trên dữ liệu mở tài khoản ngân hàng đã ẩn danh; mỗi bản ghi biểu diễn một hồ sơ mở tài khoản. BAF có nhiều biến thể để kiểm tra mất cân bằng, bias và thay đổi động trong dữ liệu tabular. \source{https://github.com/feedzai/bank-account-fraud}{Repository và datasheet của tác giả}.
+
+BAF phù hợp với research core vì kết hợp rare event, limited labels, quality uncertainty và verification cost. Các biến theo tháng cho phép xây temporal replay; Variant V có thể được dùng để tạo stress test thay đổi separability sau giai đoạn đầu. Đây là controlled temporal benchmark, không nên diễn giải như dữ liệu ngân hàng production thô hoặc drift tự nhiên ngoài thực tế.
+
+\subsection{MLP và preprocessing}
+
+Model chính là MLP PyTorch nhỏ gồm hai hidden layers, ví dụ 128--64 nút, và một output logit. Pipeline cần thực hiện:
+
+\begin{itemize}
+  \item scale numeric features và encode categorical features, có quy tắc xử lý category mới;
+  \item fit preprocessing chỉ trên training partition, xử lý missing/sentinel theo datasheet;
+  \item dùng weighted binary loss, early stopping và chọn decision threshold trên validation;
+  \item lưu preprocessing, weights, schema, label mapping và threshold trong cùng model version.
+\end{itemize}
+
+Month, target và index không được đưa vào predictive input. Month chỉ dùng cho temporal split và phân tích drift. Artifact cuối phải được đóng gói thành MLflow/PyTorch model có wrapper prediction thống nhất với Deep Learning Serving; file weights \code{.pt} đơn lẻ chưa đủ để bảo đảm prediction parity.
+
+\subsection{Protocol temporal cho Continuous Training}
+
+Sau khi kiểm tra file thực tế, protocol khởi đầu có thể dùng các tháng 0--7:
+
+\begin{enumerate}
+  \item tháng 0--3: fit model và preprocessing;
+  \item tháng 4: validation, chọn hyperparameters và threshold;
+  \item tháng 5: reference và calibration detector trên partition không giao nhau;
+  \item tháng 6: predict trước, tính drift, mở nhãn theo độ trễ đã công bố và tạo candidate;
+  \item tháng 7: future evaluation, không dùng cho tuning hoặc candidate gate.
+\end{enumerate}
+
+Để so sánh policy, cần rolling-origin replay qua nhiều tháng và luôn phát prediction trước khi nhãn của tháng đó được mở. Không biến thứ tự dòng CSV thành timestamp giả. Mỗi episode ghi snapshot hash, model version, policy version, label budget và manifest.
+
+\subsection{Giá trị đối với đề tài}
+
+Với sample nhỏ để verify, có thể thu được rất ít hoặc không có fraud label. Verification Engine vì vậy phải theo dõi đồng thời sample size, positive count và khoảng tin cậy; không kết luận chỉ từ một point estimate như F1 ước lượng. Metrics chính gồm PR-AUC/Average Precision, recall, precision, F1, false negative rate, false positive rate, calibration và số fraud label thu được.
+
+\begin{longtable}{@{}L{3.4cm} L{2.2cm} L{\dimexpr\linewidth-5.6cm-4\tabcolsep\relax}@{}}
+\caption{Đánh giá vai trò của case BAF.}\label{tab:baf-evaluation}\\
+\toprule\textbf{Tiêu chí} & \textbf{Mức phù hợp} & \textbf{Nhận xét}\\
+\midrule\endfirsthead
+\toprule\textbf{Tiêu chí} & \textbf{Mức phù hợp} & \textbf{Nhận xét}\\
+\midrule\endhead
+Deep Learning & 5/5 & MLP PyTorch nhỏ, phù hợp kiểm tra neural artifact và training wrapper.\\
+Class imbalance & 5/5 & Positive class hiếm làm rõ giới hạn của accuracy và random sampling.\\
+Limited labels & 5/5 & Có thể đánh giá số positive label thu được trong cùng budget.\\
+Temporal CT & 5/5 & Có month/variant để xây replay và rolling-origin evaluation.\\
+Quality uncertainty & 5/5 & Cần sample size, positive count và interval thay vì point estimate.\\
+Khả năng tích hợp & 4/5 & Phù hợp nhánh PyTorch hiện có nhưng phải kiểm tra preprocessing, dependency và prediction parity.\\
+Rủi ro phương pháp & \partialstatus & Dữ liệu sinh tổng hợp; protocol temporal là controlled scenario và phải công bố giới hạn.\\
+\bottomrule
+\end{longtable}

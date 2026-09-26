@@ -107,7 +107,9 @@ export function ModelDetailPageContent({ model }: { model: ModelProject }) {
               <ArrowLeft className="h-4 w-4" />
               {t("detail.back")}
             </Link>
-            <h1 className="text-style-section-title font-bold text-color-foreground">{t("detail.title")}</h1>
+            <h1 className="text-style-section-title font-bold text-color-foreground">
+              {t("detail.title")}
+            </h1>
           </div>
 
           <PageTabs

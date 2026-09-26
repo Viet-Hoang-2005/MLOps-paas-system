@@ -1,6 +1,6 @@
-# MLdrift frontend
+# AdaptML frontend
 
-The MLdrift frontend is a React 19, TypeScript, Vite, and Tailwind CSS v4 application for the MLOps PaaS control plane. It follows a feature-oriented architecture and keeps backend lifecycle state in React Query.
+The AdaptML frontend is a React 19, TypeScript, Vite, and Tailwind CSS v4 application for the MLOps PaaS control plane. It follows a feature-oriented architecture and keeps backend lifecycle state in React Query.
 
 ## Local development
 

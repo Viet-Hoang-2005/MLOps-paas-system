@@ -1,17 +1,17 @@
-import type { ResourceId } from '@/shared/types';
-import type { ModelFlavor } from '@/features/catalog/types';
+import type { ResourceId } from "@/shared/types";
+import type { ModelFlavor } from "@/features/catalog/types";
 
 export type TrainingJobStatus =
-  | 'pending'
-  | 'queued'
-  | 'uploading'
-  | 'running'
-  | 'cancelling'
-  | 'completed'
-  | 'failed'
-  | 'cancelled';
-export type TrainingAcceleratorType = 'none' | 'gpu';
-export type TrainingModelStatus = 'none' | 'trained' | 'built' | 'deployed';
+  | "pending"
+  | "queued"
+  | "uploading"
+  | "running"
+  | "cancelling"
+  | "completed"
+  | "failed"
+  | "cancelled";
+export type TrainingAcceleratorType = "none" | "gpu";
+export type TrainingModelStatus = "none" | "trained" | "built" | "deployed";
 
 export interface TrainingBuild {
   id: ResourceId;
@@ -20,7 +20,7 @@ export interface TrainingBuild {
   version_id: ResourceId | null;
   version_number: string | null;
   flavor: ModelFlavor;
-  status: 'pending' | 'queued' | 'building' | 'ready' | 'failed' | 'cancelled';
+  status: "pending" | "queued" | "building" | "ready" | "failed" | "cancelled";
   image_uri: string;
   image_digest: string;
   error_message: string;
@@ -30,7 +30,7 @@ export interface TrainingBuild {
 
 export interface TrainingOutput {
   id: ResourceId;
-  kind: 'model' | 'metric' | 'insight' | 'file';
+  kind: "model" | "metric" | "insight" | "file";
   relative_path: string;
   s3_uri: string;
   checksum: string;
@@ -48,8 +48,8 @@ export interface TrainingJob {
   model_version: string;
   entry_point: string;
   requirements_text: string;
-  training_backend: 'kubeflow' | 'local';
-  backend: 'docker' | 'argo' | 'kubeflow' | 'local';
+  training_backend: "kubeflow" | "local";
+  backend: "docker" | "argo" | "kubeflow" | "local";
   vcpu: number;
   memory: number;
   memory_mb: number;
@@ -89,7 +89,9 @@ export interface TrainingJob {
   updated_at: string;
 }
 
-export interface TrainingJobListResponse { training_jobs: TrainingJob[] }
+export interface TrainingJobListResponse {
+  training_jobs: TrainingJob[];
+}
 
 export interface TrainingJobDeletionRequest {
   id: ResourceId;
@@ -117,12 +119,14 @@ export interface TrainingJobFormValues {
 
 export interface TrainingRuntimeCapabilities {
   enabled: boolean;
-  backend: 'docker' | 'argo';
+  backend: "docker" | "argo";
   cpu_profiles: Array<{ id: string; vcpu: number; memory_mb: number }>;
   accelerators: Array<{ type: TrainingAcceleratorType; counts: number[] }>;
 }
 
-export interface TrainingJobDownloadURLResponse { download_url: string }
+export interface TrainingJobDownloadURLResponse {
+  download_url: string;
+}
 
 export interface TrainingJobLogsResponse {
   job_id: ResourceId;
@@ -172,10 +176,12 @@ export interface TrainingJobEvent {
   created_at: string;
 }
 
-export interface TrainingJobEventsResponse { events: TrainingJobEvent[] }
+export interface TrainingJobEventsResponse {
+  events: TrainingJobEvent[];
+}
 
 export interface TrainingUsageResponse {
-  training_backend: 'kubeflow' | 'local';
+  training_backend: "kubeflow" | "local";
   monthly_quota_seconds: number;
   monthly_runtime_seconds: number;
   remaining_seconds: number;

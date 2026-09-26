@@ -57,9 +57,7 @@ export function RollbackVersionModal({
 
           <div className="flex gap-3 rounded-surface border border-warning-border bg-warning-subtle p-4 text-color-warning shadow-sm">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-color-warning" />
-            <p className="text-style-body">
-              {t("rollbackDialog.description")}
-            </p>
+            <p className="text-style-body">{t("rollbackDialog.description")}</p>
           </div>
 
           <div className="mt-6 flex flex-col gap-3 text-style-body bg-muted p-4 rounded-surface border border-border">

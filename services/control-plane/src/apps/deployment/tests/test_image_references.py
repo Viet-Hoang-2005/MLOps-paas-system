@@ -13,15 +13,16 @@ def test_image_reference_contract_is_project_scoped():
     project_id = "11111111-1111-1111-1111-111111111111"
     build_id = "22222222-2222-2222-2222-222222222222"
 
-    assert temporary_image_reference(project_id, build_id) == (
-        f"image-{project_id}:build-{build_id}"
+    assert temporary_image_reference(project_id, build_id) == (f"image-{project_id}:build-{build_id}")
+    assert (
+        temporary_image_reference(
+            project_id,
+            build_id,
+            registry="https://registry.example/",
+            registry_project="user-images",
+        )
+        == f"registry.example/user-images/image-{project_id}:build-{build_id}"
     )
-    assert temporary_image_reference(
-        project_id,
-        build_id,
-        registry="https://registry.example/",
-        registry_project="user-images",
-    ) == f"registry.example/user-images/image-{project_id}:build-{build_id}"
     assert repository_from_reference("registry.example:5443/user-images/image-project:v1") == (
         "registry.example:5443/user-images/image-project"
     )
@@ -36,9 +37,7 @@ def test_immutable_reference_uses_local_image_id_or_harbor_digest():
     )
 
     assert immutable_image_reference(local) == "sha256:local"
-    assert immutable_image_reference(harbor) == (
-        "registry.example/user-images/image-project@sha256:manifest"
-    )
+    assert immutable_image_reference(harbor) == ("registry.example/user-images/image-project@sha256:manifest")
 
 
 def test_docker_promotion_adds_version_tag_and_removes_temporary_tag():

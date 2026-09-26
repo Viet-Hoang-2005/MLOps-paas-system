@@ -115,9 +115,7 @@ export default function CreateDriftMonitoringPage() {
         await createJob(payload);
       }
       toast.success(
-        existingMonitor
-          ? t("createPage.updated")
-          : t("createPage.created"),
+        existingMonitor ? t("createPage.updated") : t("createPage.created"),
       );
       navigate(`/dashboard/drift-monitoring/${modelId}`);
     } catch (err) {
@@ -132,7 +130,9 @@ export default function CreateDriftMonitoringPage() {
     <div className="flex w-full flex-1 flex-col space-y-6">
       <PageHeader
         title={
-          existingMonitor ? t("createPage.editTitle") : t("createPage.createTitle")
+          existingMonitor
+            ? t("createPage.editTitle")
+            : t("createPage.createTitle")
         }
         backLink={{
           label: t("createPage.back"),

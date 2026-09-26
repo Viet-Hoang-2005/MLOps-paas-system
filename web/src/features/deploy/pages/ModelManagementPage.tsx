@@ -75,7 +75,9 @@ export default function ModelManagementPage() {
       accessorKey: "flavor",
       header: t("columns.flavor"),
       cell: ({ row }) => (
-        <Badge variant={"primary"}>{row.original.flavor || t("status.metadata")}</Badge>
+        <Badge variant={"primary"}>
+          {row.original.flavor || t("status.metadata")}
+        </Badge>
       ),
     },
     {

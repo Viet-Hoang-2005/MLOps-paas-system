@@ -8,8 +8,10 @@ import { Button } from "@/shared/components/Button";
 
 export type OAuthProvider = "google" | "github";
 
-interface OAuthButtonProps
-  extends Omit<ComponentProps<typeof Button>, "children" | "icon"> {
+interface OAuthButtonProps extends Omit<
+  ComponentProps<typeof Button>,
+  "children" | "icon"
+> {
   provider: OAuthProvider;
   label: string;
 }
@@ -36,14 +38,7 @@ export function OAuthButton({
         "flex-1 hover:border-input-hover hover:bg-transparent active:border-primary-active active:bg-transparent",
         className,
       )}
-      icon={
-        <img
-          src={icon}
-          alt=""
-          aria-hidden="true"
-          className="h-5 w-5"
-        />
-      }
+      icon={<img src={icon} alt="" aria-hidden="true" className="h-5 w-5" />}
       data-oauth-provider={provider}
       {...props}
     >

@@ -1,0 +1,28 @@
+\section{Khung đánh giá chung và cách tích hợp}
+
+Một case study phù hợp với đề tài phải đồng thời có dữ liệu có thể replay theo thời gian, nhãn ẩn để mô phỏng giới hạn quan sát, khả năng tạo prediction có xác suất và metric chất lượng rõ ràng. Quan trọng hơn, case phải cho phép tách riêng chi phí xác minh, chi phí huấn luyện và chi phí đánh giá candidate.
+
+Framework dùng chung cho hai workload gồm:
+
+\begin{itemize}
+  \item \textbf{Evidence Window, Drift Detector, CBPE/ATC và Verification Engine:} tạo và kiểm tra bằng chứng về chất lượng.
+  \item \textbf{Label Request, Feedback và Label Budget:} quản lý pool nhãn và bảo đảm
+  \(\mathit{B}_{verify}+\mathit{B}_{train}+\mathit{B}_{gate}\leq\mathit{B}_{total}\).
+  \item \textbf{Decision Policy và Training Orchestrator:} trả về KEEP, REQUEST\_LABELS, HOLD hoặc RETRAIN.
+  \item \textbf{Evaluation Gate và Replay Harness:} kiểm tra candidate trên holdout độc lập, ghi metrics và bảo đảm thí nghiệm tái lập.
+\end{itemize}
+
+Research layer nên được tách khỏi production platform:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Research layer} & replay, scenario, policy, experiment, metrics, results\\
+\textbf{Production layer} & serving, registry, training engine, drift, Kafka, MLflow, deploy\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Không cần xây lại model serving, model registry, training engine, drift detector, Kafka/Redpanda, Kubernetes, Terraform hoặc Ansible. Notebook không gọi trực tiếp database hay Kafka; notebook chỉ chịu trách nhiệm preprocessing, training và evaluation. Các service hiện tại chịu trách nhiệm lưu prediction, theo dõi version, ghi lineage, điều phối job và thực hiện callback.
+
+Mỗi run phải ghi commit notebook, dependency, seed, preprocessing, feature list, train/holdout window, snapshot URI và manifest hash. Replay phải deterministic để cùng một scenario có thể chạy lại và so sánh giữa các policy.

@@ -1,4 +1,5 @@
 from unittest.mock import Mock, patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from redis.exceptions import RedisError
@@ -67,10 +68,13 @@ class CacheInvalidationTests(TestCase):
         fake_backend = Mock()
         fake_backend.stop.return_value = None
 
-        with patch(
-            "apps.deployment.tasks.invalidate_model_server_cache",
-            side_effect=lambda version_id: invalidated_ids.append(version_id),
-        ), patch("apps.deployment.tasks.deployment_backend", return_value=fake_backend):
+        with (
+            patch(
+                "apps.deployment.tasks.invalidate_model_server_cache",
+                side_effect=lambda version_id: invalidated_ids.append(version_id),
+            ),
+            patch("apps.deployment.tasks.deployment_backend", return_value=fake_backend),
+        ):
             status = stop_deployment(str(deployment.public_id))
 
         self.assertEqual(status, "stopped")

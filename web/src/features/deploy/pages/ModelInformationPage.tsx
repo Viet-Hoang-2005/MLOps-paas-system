@@ -42,7 +42,9 @@ export function ModelInformationPage({ modelId }: { modelId: string }) {
 
   if (!project || !form)
     return (
-      <p className="text-style-body text-color-muted-foreground">{t("information.loading")}</p>
+      <p className="text-style-body text-color-muted-foreground">
+        {t("information.loading")}
+      </p>
     );
 
   const setField = <K extends keyof ProjectMetadataForm>(
@@ -118,9 +120,18 @@ export function ModelInformationPage({ modelId }: { modelId: string }) {
       ) : (
         <div className="grid gap-5 md:grid-cols-2">
           <Info label={t("information.modelName")} value={project.name} />
-          <Info label={t("information.accessMode")} value={project.access_mode} />
-          <Info label={t("information.descriptionLabel")} value={project.description || "-"} />
-          <Info label={t("information.sourceCode")} value={project.source_code?.name || "-"} />
+          <Info
+            label={t("information.accessMode")}
+            value={project.access_mode}
+          />
+          <Info
+            label={t("information.descriptionLabel")}
+            value={project.description || "-"}
+          />
+          <Info
+            label={t("information.sourceCode")}
+            value={project.source_code?.name || "-"}
+          />
           <Info
             label={t("information.referenceData")}
             value={project.reference_data?.name || "-"}
@@ -134,7 +145,9 @@ export function ModelInformationPage({ modelId }: { modelId: string }) {
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-style-body-strong text-color-muted-foreground">{label}</p>
+      <p className="text-style-body-strong text-color-muted-foreground">
+        {label}
+      </p>
       <p className="mt-1 whitespace-pre-wrap text-style-body text-color-foreground">
         {value}
       </p>

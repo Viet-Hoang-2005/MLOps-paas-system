@@ -5,12 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  Outlet,
-  useLocation,
-  useNavigate,
-  useParams,
-} from "react-router-dom";
+import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
@@ -40,10 +35,7 @@ import {
 } from "@/features/training/api/trainingApi";
 import { LiveStatusBadge } from "@/features/training/components/TrainingOverviewSections";
 import { trainingQueryKeys } from "@/features/training/queryKeys";
-import type {
-  TrainingJob,
-  TrainingJobStatus,
-} from "@/features/training/types";
+import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
 import type {
   TrainingJobDetailContextValue,
   TrainingJobDetailSection,
@@ -129,9 +121,7 @@ export default function TrainingJobDetailPage() {
     queryFn: () => getTrainingJobLogs(parsedJobId),
     enabled: Boolean(job) && activeSection === "logs",
     refetchInterval:
-      job &&
-      activeSection === "logs" &&
-      ACTIVE_STATUSES.includes(job.status)
+      job && activeSection === "logs" && ACTIVE_STATUSES.includes(job.status)
         ? AUTO_SYNC_INTERVAL_MS
         : false,
   });
@@ -145,9 +135,7 @@ export default function TrainingJobDetailPage() {
     queryFn: () => getTrainingJobMetrics(parsedJobId),
     enabled: Boolean(job) && activeSection === "metrics",
     refetchInterval:
-      job &&
-      activeSection === "metrics" &&
-      ACTIVE_STATUSES.includes(job.status)
+      job && activeSection === "metrics" && ACTIVE_STATUSES.includes(job.status)
         ? AUTO_SYNC_INTERVAL_MS
         : false,
   });
@@ -157,9 +145,7 @@ export default function TrainingJobDetailPage() {
     queryFn: () => getTrainingJobEvents(parsedJobId),
     enabled: Boolean(job) && activeSection === "logs",
     refetchInterval:
-      job &&
-      activeSection === "logs" &&
-      ACTIVE_STATUSES.includes(job.status)
+      job && activeSection === "logs" && ACTIVE_STATUSES.includes(job.status)
         ? AUTO_SYNC_INTERVAL_MS
         : false,
   });
@@ -168,8 +154,7 @@ export default function TrainingJobDetailPage() {
     if (!job?.status) return;
     const previousStatus = lastToastedStatus.current;
     if (previousStatus && previousStatus !== job.status) {
-      if (job.status === "completed")
-        toast.success(t("detail.completedToast"));
+      if (job.status === "completed") toast.success(t("detail.completedToast"));
       else if (job.status === "failed") toast.error(t("detail.failedToast"));
       else if (job.status === "cancelled")
         toast.warning(t("detail.cancelledToast"));
@@ -195,10 +180,7 @@ export default function TrainingJobDetailPage() {
   const refreshStatusMutation = useMutation({
     mutationFn: () => refreshTrainingJobStatus(parsedJobId),
     onSuccess: (updatedJob) => {
-      queryClient.setQueryData(
-        trainingQueryKeys.job(parsedJobId),
-        updatedJob,
-      );
+      queryClient.setQueryData(trainingQueryKeys.job(parsedJobId), updatedJob);
       if (activeSection === "logs") {
         void refetchLogs();
         void refetchEvents();
@@ -254,10 +236,7 @@ export default function TrainingJobDetailPage() {
     mutationFn: () => deleteTrainingOutputs(parsedJobId),
     onSuccess: async (updatedJob) => {
       setDeleteOutputsOpen(false);
-      queryClient.setQueryData(
-        trainingQueryKeys.job(parsedJobId),
-        updatedJob,
-      );
+      queryClient.setQueryData(trainingQueryKeys.job(parsedJobId), updatedJob);
       await queryClient.invalidateQueries({
         queryKey: trainingQueryKeys.jobs(),
       });
@@ -454,7 +433,9 @@ export default function TrainingJobDetailPage() {
         </div>
 
         <div className="grid grid-cols-2 divide-y divide-border bg-muted/50 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
-          <SummaryCell label={t("table.status", { defaultValue: "Training Status" })}>
+          <SummaryCell
+            label={t("table.status", { defaultValue: "Training Status" })}
+          >
             <span className={statusBadgeClass(job.status)}>
               {statusLabels[job.status]}
             </span>
@@ -555,7 +536,8 @@ function SummaryCell({
 }
 
 function statusBadgeClass(status: TrainingJobStatus) {
-  const base = "w-fit rounded-compact border px-2.5 py-0.5 text-style-body-strong";
+  const base =
+    "w-fit rounded-compact border px-2.5 py-0.5 text-style-body-strong";
   if (status === "completed")
     return `${base} border-success/20 bg-success-subtle text-color-success`;
   if (status === "failed")
@@ -568,7 +550,8 @@ function statusBadgeClass(status: TrainingJobStatus) {
 }
 
 function modelStatusBadgeClass(status: TrainingJob["model_status"]) {
-  const base = "w-fit rounded-compact border px-2.5 py-0.5 text-style-body-strong";
+  const base =
+    "w-fit rounded-compact border px-2.5 py-0.5 text-style-body-strong";
   if (status === "deployed")
     return `${base} border-success/20 bg-success-subtle text-color-success`;
   if (status === "built")

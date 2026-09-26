@@ -1,15 +1,20 @@
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext } from "react-router-dom";
 
-import type { ModelAccessMode, ModelFlavor, ModelProject } from '@/features/catalog/types';
+import type {
+  ModelAccessMode,
+  ModelFlavor,
+  ModelProject,
+} from "@/features/catalog/types";
 import type {
   TrainingAcceleratorType,
   TrainingJob,
   TrainingRuntimeCapabilities,
-} from '@/features/training/types';
+} from "@/features/training/types";
 
 export type TrainingStep = 1 | 2 | 3;
-export type TrainingModelMode = 'new' | 'existing';
-export type TrainingTransitionState = 'idle' | 'saving-metadata' | 'saving-source' | 'starting-training';
+export type TrainingModelMode = "new" | "existing";
+export type TrainingTransitionState =
+  "idle" | "saving-metadata" | "saving-source" | "starting-training";
 
 export interface TrainingMetadataForm {
   name: string;
@@ -46,10 +51,19 @@ export interface CreateTrainingJobContext {
   transitionState: TrainingTransitionState;
   setMode(mode: TrainingModelMode): void;
   selectProject(projectId: string): void;
-  setMetadataField<K extends keyof TrainingMetadataForm>(field: K, value: TrainingMetadataForm[K]): void;
-  setSourceField<K extends keyof TrainingSourceForm>(field: K, value: TrainingSourceForm[K]): void;
-  setExecutionField<K extends keyof TrainingExecutionForm>(field: K, value: TrainingExecutionForm[K]): void;
-  setEditorDirty(kind: 'code' | 'data', dirty: boolean): void;
+  setMetadataField<K extends keyof TrainingMetadataForm>(
+    field: K,
+    value: TrainingMetadataForm[K],
+  ): void;
+  setSourceField<K extends keyof TrainingSourceForm>(
+    field: K,
+    value: TrainingSourceForm[K],
+  ): void;
+  setExecutionField<K extends keyof TrainingExecutionForm>(
+    field: K,
+    value: TrainingExecutionForm[K],
+  ): void;
+  setEditorDirty(kind: "code" | "data", dirty: boolean): void;
   continueFromMetadata(): Promise<void>;
   continueFromSource(saveEditors: Array<() => Promise<boolean>>): Promise<void>;
   startTraining(): Promise<void>;
@@ -60,4 +74,5 @@ export interface CreateTrainingJobContext {
   requestExit(): void;
 }
 
-export const useCreateTrainingJob = () => useOutletContext<CreateTrainingJobContext>();
+export const useCreateTrainingJob = () =>
+  useOutletContext<CreateTrainingJobContext>();

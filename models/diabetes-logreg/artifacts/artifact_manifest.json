@@ -1,0 +1,49 @@
+{
+  "created_at": "2026-09-19T06:17:27.067520+00:00",
+  "files": {
+    "model.joblib": {
+      "size_bytes": 8762,
+      "sha256": "f1450a6e66e8dfb03903534ea40bc603d39fd5b0ac0da80f5fe3a137ccf1ff97"
+    },
+    "label_mapping.json": {
+      "size_bytes": 79,
+      "sha256": "83b4faa0354db0bf477a9af03cf6080edc9bdb75009650e37cf3505eb5d08e56"
+    },
+    "data_contract.json": {
+      "size_bytes": 2175,
+      "sha256": "f34068c08268c878e56ac628023b5af0e65d2192c5a1d373d0debedced717d76"
+    },
+    "metrics.json": {
+      "size_bytes": 546,
+      "sha256": "ffb5e026e866bc1946eb5fd3d42f454a88c0503d00b30a61cc54d3b98c8decf1"
+    },
+    "fairness_report.json": {
+      "size_bytes": 4640,
+      "sha256": "386a91dc866b25b43700637fa3e33f5cd26f5fd42c4f59fc41eaec56c0ef83d2"
+    },
+    "split_manifest.json": {
+      "size_bytes": 991,
+      "sha256": "da4dd0d9f1baf3d58c6dd22e0906dc9a6549ff6eee3487b397493a202d363617"
+    },
+    "model_insights.json": {
+      "size_bytes": 7970,
+      "sha256": "bbec48d048650e25952e29a782473391989594b81cdd3225ee5a29cadb34b619"
+    },
+    "training_config.json": {
+      "size_bytes": 312,
+      "sha256": "6243e3567cd12aa492b1b94d5b19bc8552d3b1970472a3f45c10c6c6f1e34d92"
+    },
+    "requirements.txt": {
+      "size_bytes": 62,
+      "sha256": "a0666249c2de18ffd514d3093e1bc25f5954b5713b5c23bac7db4819d3181047"
+    }
+  },
+  "environment": {
+    "python_version": "3.12.13 (main, Mar  4 2026, 09:23:07) [GCC 11.4.0]",
+    "platform": "Linux-6.12.90+-x86_64-with-glibc2.35",
+    "scikit_learn_version": "1.6.1",
+    "pandas_version": "2.3.3",
+    "numpy_version": "2.0.2",
+    "joblib_version": "1.5.3"
+  }
+}
