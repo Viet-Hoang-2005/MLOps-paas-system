@@ -1,0 +1,29 @@
+{
+  "source": "data/reference_data.csv",
+  "source_lineage": [
+    "https://www.unb.ca/cic/datasets/ids-2017.html",
+    "https://www.kaggle.com/datasets/ericanacletoribeiro/cicids2017-cleaned-and-preprocessed",
+    "https://www.kaggle.com/datasets/hongtrnnguynvit/nids-reference-data"
+  ],
+  "lineage_status": "URLs supplied by team; local source checksummed; upstream byte-level lineage not verified",
+  "split_seed": 260926,
+  "split_fractions": {"train": 0.5, "development": 0.1, "reference": 0.2, "evaluation": 0.2},
+  "known_labels": ["BENIGN", "DDoS"],
+  "novel_labels": ["PortScan", "BruteForce", "WebAttacks"],
+  "reference_size": 5000,
+  "baseline_attack_fraction": 0.3,
+  "window_sizes": [500, 1000],
+  "main_seeds": [42, 123, 456, 789, 1024],
+  "additional_stable_seeds": [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024],
+  "s1_attack_fractions": [0.15, 0.5, 0.85],
+  "s2_replacement_fractions": [0.25, 0.5, 1.0],
+  "novel_mix": "equal counts with deterministic remainder allocation in novel_labels order",
+  "alpha": 0.05,
+  "correction": "Benjamini-Hochberg within each window across 52 features",
+  "thresholds": [0.1, 0.3, 0.5, 0.7],
+  "primary_threshold": 0.3,
+  "decision_threshold": 0.5,
+  "xgboost": {"n_estimators": 200, "max_depth": 6, "learning_rate": 0.1, "subsample": 1.0, "colsample_bytree": 1.0, "tree_method": "hist", "objective": "binary:logistic", "eval_metric": "logloss", "random_state": 42, "n_jobs": 4},
+  "sampling": "without replacement within window; same evaluation pool may be reused across windows/seeds",
+  "scope": "Controlled drift on third-party preprocessed, team-subsampled data; no timestamps, CT, temporal validation, serving benchmark or threshold tuning"
+}

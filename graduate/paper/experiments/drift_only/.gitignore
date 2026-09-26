@@ -1,0 +1,3 @@
+# Keep generated scientific tables and row manifests with this experiment.
+!results/**/*.csv
+__pycache__/

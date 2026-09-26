@@ -1,0 +1,11 @@
+{
+  "shared_feature_rows": {
+    "train__development": 0,
+    "train__reference": 0,
+    "train__evaluation": 0,
+    "development__reference": 0,
+    "development__evaluation": 0,
+    "reference__evaluation": 0
+  },
+  "all_zero": true
+}

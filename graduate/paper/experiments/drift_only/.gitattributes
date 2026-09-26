@@ -1,0 +1,2 @@
+# Preserve the script bytes used by artifact provenance hashes across checkouts.
+*.py text eol=lf

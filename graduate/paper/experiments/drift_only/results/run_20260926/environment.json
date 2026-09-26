@@ -1,0 +1,14 @@
+{
+  "python": "3.14.2",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "versions": {
+    "pandas": "2.3.3",
+    "numpy": "2.0.2",
+    "scipy": "1.17.1",
+    "scikit-learn": "1.8.0",
+    "xgboost": "3.2.0",
+    "matplotlib": "3.10.8"
+  },
+  "git_commit": "a77b75ad45d52a30232b6e5533b15bbe754934a3",
+  "runner_sha256": "eda9d34a29a74f79e086b4d08bac9b8d3e89f9f97e0dcb94a99f734bff8c49fb"
+}

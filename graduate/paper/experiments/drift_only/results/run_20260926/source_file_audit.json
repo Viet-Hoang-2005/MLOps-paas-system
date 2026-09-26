@@ -1,0 +1,144 @@
+[
+  {
+    "file": "drift_bruteforce.csv",
+    "rows": 8150,
+    "schema_matches": true,
+    "sha256": "76d7c34a990a7db81387f6971362c48534281f1f1c5cd4c809229c7f7e4e509c",
+    "label_counts": {
+      "BruteForce": 8150
+    },
+    "duplicate_feature_rows": 0,
+    "nonfinite_rows": 0
+  },
+  {
+    "file": "drift_portscan.csv",
+    "rows": 50000,
+    "schema_matches": true,
+    "sha256": "a13da9430aada209f6000da16265412bbd9d65b075fc10717b5ea7a8137c7b78",
+    "label_counts": {
+      "PortScan": 50000
+    },
+    "duplicate_feature_rows": 0,
+    "nonfinite_rows": 0
+  },
+  {
+    "file": "drift_webattacks.csv",
+    "rows": 1715,
+    "schema_matches": true,
+    "sha256": "5de3221774443f81196d375c1f9d9a15ee9767bb03375ae3f46c653a79b81b5b",
+    "label_counts": {
+      "WebAttacks": 1715
+    },
+    "duplicate_feature_rows": 0,
+    "nonfinite_rows": 0
+  },
+  {
+    "file": "portscan.csv",
+    "rows": 50000,
+    "schema_matches": true,
+    "sha256": "04d29b7ea393fbeae0080d7f02262782496a54e0f796055ebcec3ae3366ce0bf",
+    "label_counts": {
+      "PortScan": 50000
+    },
+    "duplicate_feature_rows": 0,
+    "nonfinite_rows": 0
+  },
+  {
+    "file": "reference_100rows.csv",
+    "rows": 100,
+    "schema_matches": true,
+    "sha256": "67904553823520a16c74361c195bca78c547a6462790d253fad6e1c72f67f388",
+    "label_counts": {
+      "BENIGN": 48,
+      "DDoS": 28,
+      "PortScan": 21,
+      "BruteForce": 3
+    },
+    "duplicate_feature_rows": 0,
+    "nonfinite_rows": 0
+  },
+  {
+    "file": "reference_data.csv",
+    "rows": 209865,
+    "schema_matches": true,
+    "sha256": "0728925d293f433a3f7bce4509c00e1648906c59c59d8e63663e1622a226ef6c",
+    "label_counts": {
+      "BENIGN": 100000,
+      "PortScan": 50000,
+      "DDoS": 50000,
+      "BruteForce": 8150,
+      "WebAttacks": 1715
+    },
+    "duplicate_feature_rows": 11,
+    "nonfinite_rows": 0
+  },
+  {
+    "file": "test_data.csv",
+    "rows": 4428,
+    "schema_matches": true,
+    "sha256": "77f436bc0d38340752b8ae979089702ea3cf424888bdc683802018fe6427d162",
+    "label_counts": {
+      "DDoS": 1000,
+      "BruteForce": 1000,
+      "PortScan": 1000,
+      "BENIGN": 1000,
+      "WebAttacks": 428
+    },
+    "duplicate_feature_rows": 0,
+    "nonfinite_rows": 0
+  },
+  {
+    "file": "train_2_classes.csv",
+    "rows": 150000,
+    "schema_matches": true,
+    "sha256": "5a989ec3bc70f1900a05ce3ee9a135a950717a44822a591a0b19df1aae5e33e4",
+    "label_counts": {
+      "BENIGN": 100000,
+      "DDoS": 50000
+    },
+    "duplicate_feature_rows": 1,
+    "nonfinite_rows": 0
+  },
+  {
+    "file": "train_3_classes.csv",
+    "rows": 200000,
+    "schema_matches": true,
+    "sha256": "d56371be6707469a7a83b7a1ffc08b7d6e095ecc3ce17644b3acf2aa93f469b2",
+    "label_counts": {
+      "BENIGN": 100000,
+      "PortScan": 50000,
+      "DDoS": 50000
+    },
+    "duplicate_feature_rows": 11,
+    "nonfinite_rows": 0
+  },
+  {
+    "file": "train_4_classes.csv",
+    "rows": 208150,
+    "schema_matches": true,
+    "sha256": "b9f6eed40095266d2923e1a7db2748f55dc2c976741d56db715244be777ec632",
+    "label_counts": {
+      "BENIGN": 100000,
+      "PortScan": 50000,
+      "DDoS": 50000,
+      "BruteForce": 8150
+    },
+    "duplicate_feature_rows": 11,
+    "nonfinite_rows": 0
+  },
+  {
+    "file": "train_5_classes.csv",
+    "rows": 209865,
+    "schema_matches": true,
+    "sha256": "0728925d293f433a3f7bce4509c00e1648906c59c59d8e63663e1622a226ef6c",
+    "label_counts": {
+      "BENIGN": 100000,
+      "PortScan": 50000,
+      "DDoS": 50000,
+      "BruteForce": 8150,
+      "WebAttacks": 1715
+    },
+    "duplicate_feature_rows": 11,
+    "nonfinite_rows": 0
+  }
+]
