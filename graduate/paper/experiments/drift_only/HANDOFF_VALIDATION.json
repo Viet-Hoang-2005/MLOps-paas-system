@@ -1,0 +1,35 @@
+{
+  "scope": "Offline export/package validation only; no service or cluster benchmark performed",
+  "windows": 12,
+  "pilot_windows": 4,
+  "reference_rows": 5000,
+  "inference_rows": 12000,
+  "frozen_window_confusion_matrices_and_quality_metrics": "matched for all 12 windows",
+  "mlflow_prediction_parity": "12000/12000 labels match frozen UBJ predictions",
+  "bundle_verification": "59 checksums; canonical row hashes; membership order; no reference overlap; feature-only requests",
+  "scoring_tests": "7 passed: shuffled join, missing response, duplicate row ID, duplicate prediction ID, mixed window, invalid binary label, overwrite refusal",
+  "export_safety_checks": [
+    "wrong source checksum rejected before writing output",
+    "existing output rejected"
+  ],
+  "source_sha256": "0728925d293f433a3f7bce4509c00e1648906c59c59d8e63663e1622a226ef6c",
+  "model_sha256": "bd0a91ec11d38ccceca4950a571857f3710bc7034bb8aaf30b40295dfd15e8b5",
+  "export_environment": {
+    "python": "3.14.2",
+    "pandas": "2.3.3",
+    "numpy": "2.0.2",
+    "xgboost": "3.2.0",
+    "mlflow": "3.11.1"
+  },
+  "scripts_sha256": {
+    "export_handoff.py": "13c8a480f22d88b12fa148e58265d75b7fcd19a60517286907ab4a451d0eef24",
+    "handoff_model.py": "10f5c3f4f6af74a9390de3563290782b6ec1150e189e5a0619d4d0c583bbe847",
+    "handoff_tools.py": "aef54750b2e2251efb475a78e9e08b601e57f642a43a7cbff5e3b0039e3671b9",
+    "test_handoff_tools.py": "6a1e272b22f2e84b9e00cfa124921f7b1981eb0e9f1b842caf3d4cb0f9c36dd0"
+  },
+  "limitations": [
+    "MLflow packaging tested locally, not deployed",
+    "Evidently expectations copied from already verified frozen library replay, not a new service run",
+    "Generated payloads are ignored by Git and must be regenerated from the matching dataset"
+  ]
+}

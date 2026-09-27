@@ -47,4 +47,8 @@ The runner records `git rev-parse HEAD`. When reproducing from the ZIP outside a
 
 ## Author decisions still needed
 
+Use the updated [one-week drift plan](../../../docs/paper/csonet_2026_one_week_drift_plan_vi.md) as the canonical teammate handoff: exact S0/S1/S2 mixtures, fixed-model quality metrics, family-level errors, detector sensitivity, paper tables/figures, and the remaining September 27–30 schedule. Its proposed 12-window service replay checks drift/performance parity against frozen offline inputs; it is not a load benchmark and has not yet run. The [handoff note](CSONET_BENCHMARK_HANDOFF_RUNBOOK_VI.md) points to this plan. Any older PDF export of that note is superseded by the Markdown plan.
+
+To prepare the actual inputs, follow the [replay handoff instructions](../experiments/drift_only/HANDOFF_VI.md). The exporter reconstructs the exact windows from the teammate's matching dataset and verifies the packaged model offline. Generated inputs are local artifacts; service replay remains outstanding. Earlier local infrastructure audits are outside this handoff's scope.
+
 Confirm the experimental interpretation, corresponding author/metadata and forms; finalize data availability and have another team member reproduce the main table. Natural drift, retraining policies, serving scalability and adversarial model isolation remain unevaluated. The organizers' specific citation-integrity trigger is still unspecified. No paper or message has been submitted externally by this task.

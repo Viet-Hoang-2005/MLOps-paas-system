@@ -1,0 +1,7 @@
+# Export and model packaging, tested with Python 3.14.2 on the author machine.
+# Keep Evidently 0.4.15 in its separate recorded environment.
+numpy==2.0.2
+pandas==2.3.3
+xgboost==3.2.0
+scikit-learn==1.8.0
+mlflow==3.11.1

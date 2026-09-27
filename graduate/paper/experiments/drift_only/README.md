@@ -4,6 +4,15 @@ Isolated experiment for the CSoNet revision. The Vietnamese baseline report and 
 
 ## Reproduce
 
+For the teammate's fixed-window service replay, start with [HANDOFF_VI.md](HANDOFF_VI.md).
+`export_handoff.py --with-mlflow` extracts the 5,000-row reference and twelve
+1,000-row windows from the frozen manifests, validates source/model hashes and
+offline predictions, and packages the model for the MLflow serving worker.
+It does not train, resample, deploy, send requests, or run a service benchmark.
+Generated payloads stay in the ignored `handoff_exports/` directory; teammates
+with the matching source CSV can recreate them after pulling this branch.
+Local export/package validation is recorded in [HANDOFF_VALIDATION.json](HANDOFF_VALIDATION.json).
+
 Run from the repository root in a Python environment with NumPy, pandas, SciPy, scikit-learn, XGBoost and Matplotlib. Exact versions used are recorded in `results/run_20260926/environment.json`; `requirements.txt` pins those library versions. Use a separate environment if installing dependencies.
 
 ```powershell
