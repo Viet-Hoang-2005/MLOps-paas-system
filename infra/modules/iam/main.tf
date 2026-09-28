@@ -436,8 +436,14 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      # Giới hạn chỉ Repository này mới được quyền dùng Role
-      values = ["repo:Viet-Hoang-2005/MLOps-paas-system:*"]
+      # Giới hạn chỉ Repository này mới được quyền dùng Role. Từ 15/07/2026,
+      # GitHub phát hành sub claim bất biến (repo:owner@id/name@id:...) cho
+      # repo mới thay vì repo:owner/name:...; chấp nhận cả hai định dạng để
+      # không bị khóa role khi GitHub đổi định dạng lần nữa.
+      values = [
+        "repo:Viet-Hoang-2005/MLOps-paas-system:*",
+        "repo:Viet-Hoang-2005@176811259/MLOps-paas-system@1186411235:*",
+      ]
     }
   }
 }
