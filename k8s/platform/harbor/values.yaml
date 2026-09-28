@@ -7,6 +7,10 @@ expose:
 
 externalURL: https://registry.mlops-nids-nt114.id.vn
 
+# jobservice PVC is EBS RWO: RollingUpdate schedules the new pod before the old one releases the volume.
+updateStrategy:
+  type: Recreate
+
 persistence:
   enabled: true
   resourcePolicy: "keep"

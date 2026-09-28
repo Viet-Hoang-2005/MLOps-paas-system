@@ -81,3 +81,51 @@ spec:
         - /spec/volumeClaimTemplates/0/metadata/annotations
         - /spec/volumeClaimTemplates/0/spec/volumeMode
         - /spec/volumeClaimTemplates/0/status
+    # The chart regenerates these secrets on every render; keep the first values to avoid restart loops.
+    - kind: Secret
+      name: mlops-paas-harbor-core
+      namespace: harbor
+      jsonPointers:
+        - /data
+    - kind: Secret
+      name: mlops-paas-harbor-jobservice
+      namespace: harbor
+      jsonPointers:
+        - /data
+    - kind: Secret
+      name: mlops-paas-harbor-registry
+      namespace: harbor
+      jsonPointers:
+        - /data
+    - kind: Secret
+      name: mlops-paas-harbor-registry-htpasswd
+      namespace: harbor
+      jsonPointers:
+        - /data
+    - kind: Secret
+      name: mlops-paas-harbor-registryctl
+      namespace: harbor
+      jsonPointers:
+        - /data
+    - group: apps
+      kind: Deployment
+      name: mlops-paas-harbor-core
+      namespace: harbor
+      jsonPointers:
+        - /spec/template/metadata/annotations/checksum~1secret
+        - /spec/template/metadata/annotations/checksum~1secret-jobservice
+    - group: apps
+      kind: Deployment
+      name: mlops-paas-harbor-jobservice
+      namespace: harbor
+      jsonPointers:
+        - /spec/template/metadata/annotations/checksum~1secret
+        - /spec/template/metadata/annotations/checksum~1secret-core
+    - group: apps
+      kind: Deployment
+      name: mlops-paas-harbor-registry
+      namespace: harbor
+      jsonPointers:
+        - /spec/template/metadata/annotations/checksum~1secret
+        - /spec/template/metadata/annotations/checksum~1secret-core
+        - /spec/template/metadata/annotations/checksum~1secret-jobservice
