@@ -1,12 +1,15 @@
 ---
-- name: Create the K3s configuration directory
+- name: Create the Rancher and K3s configuration directories
   become: true
   ansible.builtin.file:
-    path: /etc/rancher/k3s
+    path: "{{ item }}"
     state: directory
     owner: root
     group: root
     mode: "0755"
+  loop:
+    - /etc/rancher
+    - /etc/rancher/k3s
 
 - name: Render the K3s server configuration
   become: true
@@ -15,7 +18,7 @@
     dest: /etc/rancher/k3s/config.yaml
     owner: root
     group: root
-    mode: "0600"
+    mode: "0644"
   notify: Restart K3s server
 
 - name: Read the installed K3s version
