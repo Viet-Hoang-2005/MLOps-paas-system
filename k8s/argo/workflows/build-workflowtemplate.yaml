@@ -146,6 +146,10 @@ spec:
             valueFrom:
               configMapKeyRef:
                 { name: mlops-paas-execution-config, key: REDIS_URL }
+          - name: HARBOR_REGISTRY_URL
+            valueFrom:
+              configMapKeyRef:
+                { name: mlops-paas-execution-config, key: HARBOR_REGISTRY_URL }
           - { name: BUILD_ENGINE, value: kaniko }
           - { name: BUILD_WORKSPACE_DIR, value: /workspace }
           - { name: TASK_TYPE, value: "{{inputs.parameters.task_type}}" }

@@ -12,3 +12,4 @@ data:
   DB_PORT: "5432"
   DB_NAME: "mlops_paas_db"
   REDIS_URL: "redis://mlops-paas-redis.mlops-redis.svc.cluster.local:6379/1"
+  HARBOR_REGISTRY_URL: "registry.mlops-nids-nt114.id.vn"
