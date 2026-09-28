@@ -3,10 +3,10 @@ kind: Kustomization
 namespace: mlops-control-plane
 
 resources:
-  - ../../../base/control-plane
-  - external-secrets.yaml
+- ../../../base/control-plane
+- external-secrets.yaml
 
 images:
-  - name: mlops-paas-control-plane
-    newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane
-    newTag: 622355e23b19a07315e15f42915566d639bfbe16
+- name: mlops-paas-control-plane
+  newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane
+  newTag: a9ae0ab1265eb17df911d23c71fed10b7e55b7c9
