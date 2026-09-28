@@ -330,6 +330,7 @@ def test_run_notify_task(monkeypatch, tmp_path):
 def configure_zip_task(monkeypatch, tmp_path, kaniko=False):
     monkeypatch.setenv("SOURCE_DOWNLOAD_URL", "http://source")
     monkeypatch.setenv("SOURCE_ARTIFACT_NAME", "package.zip")
+    monkeypatch.setenv("OUTPUT_UPLOAD_URL", "http://package-output")
     monkeypatch.setenv("BUILD_WORKSPACE_DIR", str(tmp_path))
     monkeypatch.setenv("TENANT_ID", "tenant")
     if kaniko:
@@ -343,6 +344,7 @@ def configure_zip_task(monkeypatch, tmp_path, kaniko=False):
             archive.writestr("model/requirements.txt", "numpy==1.26.4\n")
 
     monkeypatch.setattr(cli, "download_presigned_file", download)
+    monkeypatch.setattr(cli, "upload_presigned_file", Mock())
     monkeypatch.setattr(
         cli.subprocess,
         "run",
@@ -368,6 +370,52 @@ def test_run_test_zip_task_kaniko(monkeypatch, tmp_path):
     payload = json.loads((tmp_path / "webhook_payload.json").read_text())
     assert payload["task_type"] == "TEST_ZIP"
     assert "machine-learning-serving" in (tmp_path / "Dockerfile").read_text()
+
+
+@pytest.mark.parametrize("kaniko", [False, True])
+def test_zip_package_is_persisted_before_build_success(monkeypatch, tmp_path, kaniko):
+    configure_zip_task(monkeypatch, tmp_path, kaniko=kaniko)
+    events = []
+    monkeypatch.setattr(cli.mlflow.pyfunc, "load_model", lambda _: events.append("validated"))
+
+    def upload(url, path):
+        assert url == "http://package-output"
+        assert path.read_bytes() == (tmp_path / "package.zip").read_bytes()
+        with zipfile.ZipFile(path) as archive:
+            assert "model/MLmodel" in archive.namelist()
+        assert not (tmp_path / "webhook_payload.json").exists()
+        events.append("persisted")
+
+    monkeypatch.setattr(cli, "upload_presigned_file", upload)
+    monkeypatch.setattr(cli, "build_custom_image", lambda *args: events.append("built"))
+    monkeypatch.setattr(cli, "post_webhook", lambda *args: events.append("notified"))
+    cli.run_test_zip_task("version", "callback")
+    assert events == (["validated", "persisted"] if kaniko else ["validated", "persisted", "built", "notified"])
+
+
+@pytest.mark.parametrize("kaniko", [False, True])
+def test_zip_upload_failure_cannot_signal_success(monkeypatch, tmp_path, kaniko):
+    configure_zip_task(monkeypatch, tmp_path, kaniko=kaniko)
+    monkeypatch.setattr(cli, "upload_presigned_file", Mock(side_effect=RuntimeError("upload failed")))
+    build = Mock()
+    webhook = Mock()
+    monkeypatch.setattr(cli, "build_custom_image", build)
+    monkeypatch.setattr(cli, "post_webhook", webhook)
+    with pytest.raises(RuntimeError, match="upload failed"):
+        cli.run_test_zip_task("version", "callback")
+    build.assert_not_called()
+    webhook.assert_not_called()
+    assert not (tmp_path / "webhook_payload.json").exists()
+
+
+def test_zip_missing_upload_url_fails_before_download(monkeypatch, tmp_path):
+    configure_zip_task(monkeypatch, tmp_path)
+    monkeypatch.delenv("OUTPUT_UPLOAD_URL")
+    download = Mock()
+    monkeypatch.setattr(cli, "download_presigned_file", download)
+    with pytest.raises(ValueError, match="Missing presigned package upload URL"):
+        cli.run_test_zip_task("version", "callback")
+    download.assert_not_called()
 
 
 def test_redis_log_handler(monkeypatch):
