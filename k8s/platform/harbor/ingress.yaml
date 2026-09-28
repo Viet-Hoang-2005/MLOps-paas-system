@@ -1,0 +1,13 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: harbor-registry-ingressroute
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`registry.mlops-nids-nt114.id.vn`)
+      kind: Rule
+      services:
+        - name: harbor
+          port: 80

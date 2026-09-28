@@ -21,6 +21,13 @@ spec:
     spec:
       nodeSelector:
         workload-type: worker
+      # EBS volumes are formatted root-owned; the image runs as the redpanda
+      # user (101), so the kubelet must hand the data volume to that group.
+      securityContext:
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        fsGroupChangePolicy: OnRootMismatch
       containers:
       - name: redpanda
         image: docker.redpanda.com/redpandadata/redpanda:v23.3.21

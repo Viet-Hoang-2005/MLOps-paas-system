@@ -5,6 +5,7 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-29"
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
   labels:
     mlops-paas.io/plane: cluster
     mlops-paas.io/component: image-verification

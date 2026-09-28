@@ -2,6 +2,9 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: harbor
 
+resources:
+  - ingressroute.yaml
+
 helmCharts:
   - name: harbor
     repo: https://helm.goharbor.io
