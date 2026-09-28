@@ -463,10 +463,13 @@ COPY model /app/model_artifact
 def run_test_zip_task(build_id: str, webhook_url: str) -> None:
     source_download_url = os.environ.get("SOURCE_DOWNLOAD_URL", "")
     source_artifact_name = os.environ.get("SOURCE_ARTIFACT_NAME", "")
+    output_upload_url = os.environ.get("OUTPUT_UPLOAD_URL", "")
     flavor = os.environ.get("FLAVOR", "").lower()
     tenant_id = os.environ.get("TENANT_ID", "unknown")
     if not all([source_download_url, source_artifact_name]):
         raise ValueError("Missing presigned download URL for test.")
+    if not output_upload_url:
+        raise ValueError("Missing presigned package upload URL for test.")
 
     workspace_dir = os.environ.get("BUILD_WORKSPACE_DIR")
     if workspace_dir:
@@ -533,6 +536,11 @@ def run_test_zip_task(build_id: str, webhook_url: str) -> None:
 
         mlflow.pyfunc.load_model(str(package_dir))
         runtime_log.detail("Model loaded successfully!")
+
+        # Registration copies the package from OUTPUT_UPLOAD_URL's object key.
+        # Persist validated ZIPs just as the raw-model BUILD path does, before
+        # declaring the build context ready or sending a success callback.
+        upload_presigned_file(output_upload_url, zip_path)
 
         preview_tree = build_preview_tree(extract_dir)
         manifest = {
