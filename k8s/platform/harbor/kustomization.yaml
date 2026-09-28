@@ -3,7 +3,7 @@ kind: Kustomization
 namespace: harbor
 
 resources:
-  - ingressroute.yaml
+  - ingress.yaml
 
 helmCharts:
   - name: harbor
