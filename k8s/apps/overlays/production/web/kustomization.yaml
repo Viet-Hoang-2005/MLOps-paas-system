@@ -3,9 +3,9 @@ kind: Kustomization
 namespace: mlops-web
 
 resources:
-  - ../../../base/web
+- ../../../base/web
 
 images:
-  - name: mlops-paas-web
-    newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-web
-    newTag: 99a9851d1d5e4982f793c6217659152d886417f7
+- name: mlops-paas-web
+  newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-web
+  newTag: 9f6899ce52ddd345fc01dd1f1a2233a014b79adb

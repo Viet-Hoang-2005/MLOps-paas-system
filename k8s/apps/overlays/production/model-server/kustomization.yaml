@@ -9,4 +9,4 @@ resources:
 images:
 - name: mlops-paas-model-server
   newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-server
-  newTag: 0b2ac7ed47dbda09e9108690632f175f677555b2
+  newTag: 9f6899ce52ddd345fc01dd1f1a2233a014b79adb
