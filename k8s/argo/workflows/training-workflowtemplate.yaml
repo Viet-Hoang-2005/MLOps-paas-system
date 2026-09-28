@@ -121,7 +121,7 @@ spec:
                       - name: harbor-registry-pull-secret
                     containers:
                       - name: pytorch
-                        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:375afde3ae576f56733e93b52b2d27fb0faed48d
+                        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:9f6899ce52ddd345fc01dd1f1a2233a014b79adb
                         resources:
                           requests:
                             cpu: "{{inputs.parameters.vcpu}}"
@@ -202,7 +202,7 @@ spec:
                       - name: harbor-registry-pull-secret
                     containers:
                       - name: pytorch
-                        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:375afde3ae576f56733e93b52b2d27fb0faed48d
+                        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:9f6899ce52ddd345fc01dd1f1a2233a014b79adb
                         imagePullPolicy: Always
                         resources:
                           requests:
