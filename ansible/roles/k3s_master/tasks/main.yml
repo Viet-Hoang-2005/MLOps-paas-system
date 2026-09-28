@@ -6,7 +6,7 @@
     state: directory
     owner: root
     group: root
-    mode: "0700"
+    mode: "0755"
 
 - name: Render the K3s server configuration
   become: true
@@ -126,3 +126,29 @@
     path: "{{ k3s_local_kubeconfig }}"
     mode: "0600"
   no_log: true
+
+- name: Ensure .kube directory exists for the remote user
+  become: true
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user | default('ubuntu') }}/.kube"
+    state: directory
+    owner: "{{ ansible_user | default('ubuntu') }}"
+    group: "{{ ansible_user | default('ubuntu') }}"
+    mode: "0755"
+
+- name: Copy kubeconfig to ~/.kube/config for non-root kubectl access
+  become: true
+  ansible.builtin.copy:
+    src: "{{ k3s_remote_kubeconfig }}"
+    dest: "/home/{{ ansible_user | default('ubuntu') }}/.kube/config"
+    remote_src: true
+    owner: "{{ ansible_user | default('ubuntu') }}"
+    group: "{{ ansible_user | default('ubuntu') }}"
+    mode: "0600"
+
+- name: Configure KUBECONFIG environment variable in bashrc
+  become: true
+  ansible.builtin.lineinfile:
+    path: "/home/{{ ansible_user | default('ubuntu') }}/.bashrc"
+    line: "export KUBECONFIG=~/.kube/config"
+    state: present

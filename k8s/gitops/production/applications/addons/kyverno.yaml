@@ -41,3 +41,12 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno
+  # Chart 3.8.2 renders the policies.kyverno.io CRDs with empty `labels: {}` and
+  # `annotations: {}` maps. Server-side apply stores no metadata for them, so
+  # the diff never converges although the CRD specs match the chart.
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /metadata/labels
+        - /metadata/annotations

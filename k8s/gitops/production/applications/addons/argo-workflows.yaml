@@ -26,6 +26,13 @@ spec:
       values: |
         crds:
           install: true
+        # The chart would render a workflow Role and RoleBinding into every
+        # workflow namespace, but mlops-execution belongs to the execution
+        # project, which already grants the executor permissions in
+        # k8s/argo/rbac.yaml. The addon project must not write into it.
+        workflow:
+          rbac:
+            create: false
         controller:
           workflowNamespaces:
             - mlops-execution
