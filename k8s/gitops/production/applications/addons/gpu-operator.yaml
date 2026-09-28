@@ -35,6 +35,9 @@ spec:
               value: "true"
               effect: NoSchedule
         operator:
+          resources:
+            requests:
+              cpu: 50m
           nodeSelector:
             workload-type: worker
         driver:

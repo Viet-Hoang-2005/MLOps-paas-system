@@ -26,6 +26,16 @@ spec:
       values: |
         nodeSelector:
           workload-type: worker
+        resources:
+          operator:
+            requests:
+              cpu: 50m
+          metricServer:
+            requests:
+              cpu: 50m
+          webhooks:
+            requests:
+              cpu: 25m
         metricsServer:
           nodeSelector:
             workload-type: worker

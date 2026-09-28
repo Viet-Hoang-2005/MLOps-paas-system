@@ -25,15 +25,28 @@ spec:
       releaseName: kyverno
       values: |
         admissionController:
+          container:
+            resources:
+              requests:
+                cpu: 50m
           nodeSelector:
             workload-type: worker
         backgroundController:
+          resources:
+            requests:
+              cpu: 25m
           nodeSelector:
             workload-type: worker
         cleanupController:
+          resources:
+            requests:
+              cpu: 25m
           nodeSelector:
             workload-type: worker
         reportsController:
+          resources:
+            requests:
+              cpu: 25m
           nodeSelector:
             workload-type: worker
         existingImagePullSecrets:
