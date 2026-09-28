@@ -4,7 +4,7 @@ metadata:
   name: mlops-prod-platform-cloudflare
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "20"
+    argocd.argoproj.io/sync-wave: "-28"
   labels:
     mlops-paas.io/plane: platform
     mlops-paas.io/component: cloudflare
