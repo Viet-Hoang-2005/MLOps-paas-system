@@ -24,13 +24,11 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: mlflow-server
+  # ESO remoteRef defaults are declared in the manifests instead of ignored here:
+  # RespectIgnoreDifferences copies live values of ignored paths into the target,
+  # and for a .spec.data[] path that replaces the whole array, dropping new keys.
   ignoreDifferences:
     - group: external-secrets.io
       kind: ExternalSecret
       jsonPointers:
         - /metadata/annotations/force-sync
-      jqPathExpressions:
-        - .spec.data[].remoteRef.conversionStrategy
-        - .spec.data[].remoteRef.decodingStrategy
-        - .spec.data[].remoteRef.metadataPolicy
-        - .spec.data[].remoteRef.nullBytePolicy
