@@ -3,10 +3,10 @@ kind: Kustomization
 namespace: mlops-consumer
 
 resources:
-  - ../../../base/consumer
-  - external-secrets.yaml
+- ../../../base/consumer
+- external-secrets.yaml
 
 images:
-  - name: mlops-paas-consumer
-    newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-consumer
-    newTag: 375afde3ae576f56733e93b52b2d27fb0faed48d
+- name: mlops-paas-consumer
+  newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-consumer
+  newTag: 9f6899ce52ddd345fc01dd1f1a2233a014b79adb
