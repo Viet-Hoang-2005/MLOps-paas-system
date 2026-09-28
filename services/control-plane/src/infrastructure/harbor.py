@@ -47,21 +47,26 @@ class HarborClient:
             raise RuntimeError("Harbor image registration requires HARBOR_REGISTRY_URL.")
         project, repository, current_reference = self._parse_image_uri(image_uri)
         reference = reference or current_reference
-        url = (
+        artifacts_url = (
             f"{self.base_url}/api/v2.0/projects/{quote(project, safe='')}/repositories/"
-            f"{quote(repository, safe='')}/artifacts/{quote(reference, safe='')}/tags"
+            f"{quote(repository, safe='')}/artifacts"
         )
+        url = f"{artifacts_url}/{quote(reference, safe='')}/tags"
+        auth = (settings.HARBOR_USERNAME, settings.HARBOR_PASSWORD)
         try:
-            self.http.request(
-                "POST",
-                url,
-                json={"name": tag},
-                auth=(settings.HARBOR_USERNAME, settings.HARBOR_PASSWORD),
-            )
+            self.http.request("POST", url, json={"name": tag}, auth=auth)
         except HTTPError as exc:
-            if getattr(exc.response, "status_code", None) == 409:
+            if getattr(exc.response, "status_code", None) != 409:
+                raise
+            if not reference.startswith("sha256:"):
                 return "already-exists"
-            raise
+            holder = self.http.request("GET", f"{artifacts_url}/{quote(tag, safe='')}", auth=auth).json()
+            if holder.get("digest") == reference:
+                return "already-exists"
+            # A promotion that failed after tagging leaves the tag on an orphaned artifact.
+            self.http.request("DELETE", f"{artifacts_url}/{quote(tag, safe='')}/tags/{quote(tag, safe='')}", auth=auth)
+            self.http.request("POST", url, json={"name": tag}, auth=auth)
+            return "moved"
         return "created"
 
     def delete_tag(self, image_uri, tag):
