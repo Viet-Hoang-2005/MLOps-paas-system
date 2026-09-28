@@ -481,7 +481,7 @@ Ngoài bảy core operator Application, root trực tiếp quản lý 6 training
 | **Argo Workflow UI**  | <https://workflow.mlops-nids-nt114.id.vn> | Orchestration & Workflow UI    |
 | **Harbor Registry**   | <https://registry.mlops-nids-nt114.id.vn> | Private Container Registry     |
 
-Frontend, Argo CD, Argo Workflows, Grafana và MLflow đi qua Cloudflare Tunnel. Control Plane và Harbor đi qua public ALB với TLS termination; Traefik chỉ tin `X-Forwarded-*` từ các Flannel gateway `/32` đã cấu hình, không bật `forwardedHeaders.insecure`.
+Frontend, Argo CD, Argo Workflows, Grafana và MLflow đi qua Cloudflare Tunnel. Control Plane và Harbor đi qua public ALB với TLS termination; Traefik chỉ tin `X-Forwarded-*` từ dải VPC và K3s PodCIDR nội bộ đã cấu hình, không bật `forwardedHeaders.insecure`.
 
 ---
 

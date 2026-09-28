@@ -53,13 +53,12 @@ This matches the public ALB idle timeout and prevents large Harbor layer uploads
 from being terminated by Traefik's 60-second default while the request body is
 still being streamed.
 
-TLS terminates at the public ALB. Because the bundled K3s ServiceLB currently
-uses `externalTrafficPolicy: Cluster`, Traefik sees the selected worker's
-Flannel gateway as the immediate proxy. `traefik_forwarded_headers_trusted_ips`
-must therefore contain only those gateway `/32` addresses. This allows Django
-to honor the ALB's `X-Forwarded-Proto: https` without enabling Traefik's unsafe
-`forwardedHeaders.insecure` mode. Revalidate these addresses after changing the
-static worker topology or cluster PodCIDR allocation.
+TLS terminates at the public ALB. Because the bundled K3s ServiceLB and
+Flannel route traffic across nodes, Traefik receives connections from VPC
+and cluster pod addresses. `traefik_forwarded_headers_trusted_ips` contains
+the AWS VPC CIDR (`10.0.0.0/16`) and K3s PodCIDR (`10.42.0.0/16`). This allows
+Django to honor the ALB's `X-Forwarded-Proto: https` without enabling Traefik's
+unsafe `forwardedHeaders.insecure` mode.
 
 Ansible installs only the pinned Argo CD chart, then creates the public
 `mlops-paas-system` root Application. Argo CD installs AWS EBS CSI, External

@@ -6,8 +6,8 @@ metadata:
 spec:
   valuesContent: |-
     additionalArguments:
-      # TLS terminates at the public ALB. K3s ServiceLB SNATs that connection,
-      # so trust only the configured worker gateway hops; never enable
+      # TLS terminates at the public ALB. K3s ServiceLB and Flannel proxy internal hops,
+      # so trust the VPC CIDR (ALB & EC2 nodes) and K3s PodCIDR; never enable
       # forwardedHeaders.insecure for this public entrypoint.
       - "--entryPoints.web.forwardedHeaders.trustedIPs={{ traefik_forwarded_headers_trusted_ips | join(',') }}"
       - "--providers.kubernetescrd.allowCrossNamespace=true"
