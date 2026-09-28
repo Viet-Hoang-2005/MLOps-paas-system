@@ -51,7 +51,7 @@ def save_project_metadata(*, actor, validated_data, project=None, storage=None):
             _replace_attachment(project=project, kind="code", uploaded_file=source_code_file, storage=storage)
             _replace_attachment(project=project, kind="data", uploaded_file=reference_data_file, storage=storage)
     except IntegrityError as exc:
-        if "project_owner_name_unique" in str(exc) or "catalog_modelproject.owner_id" in str(exc):
+        if "project_owner_active_name_unique" in str(exc) or "catalog_modelproject.owner_id" in str(exc):
             raise Conflict(f"A model project named {data['name']} already exists.") from exc
         raise
     return project
