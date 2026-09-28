@@ -42,6 +42,8 @@ spec:
           nodeSelector:
             workload-type: worker
         server:
+          authModes:
+            - server
           nodeSelector:
             workload-type: worker
   destination:
