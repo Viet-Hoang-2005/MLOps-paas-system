@@ -87,6 +87,7 @@ EXTERNAL_SECRET_OWNERS = {
         ("mlops-execution", "argo-evidently-secret"),
         ("argo-events", "argo-events-webhook-server"),
         ("user-jobs", "harbor-registry-pull-secret"),
+        ("mlops-model-runtimes", "harbor-registry-pull-secret"),
     },
 }
 
