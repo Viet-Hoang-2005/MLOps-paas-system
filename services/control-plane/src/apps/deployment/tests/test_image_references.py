@@ -1,4 +1,8 @@
+from http.client import HTTPMessage
 from types import SimpleNamespace
+
+import requests
+from requests.cookies import MockRequest, MockResponse
 
 from infrastructure.execution.image_references import (
     immutable_image_reference,
@@ -117,3 +121,15 @@ def test_harbor_client_creates_version_tag_then_deletes_only_build_tag(settings)
     assert calls[0][2]["json"] == {"name": "v1"}
     assert calls[1][0] == "DELETE"
     assert calls[1][1].endswith("/artifacts/build-build-id/tags/build-build-id")
+
+
+def test_harbor_client_session_never_replays_cookies(settings):
+    settings.HARBOR_REGISTRY_URL = "registry.example"
+    session = HarborClient().http.session
+    headers = HTTPMessage()
+    headers["Set-Cookie"] = "sid=abc; Path=/"
+    request = requests.Request("GET", "https://registry.example/api/v2.0/projects").prepare()
+
+    session.cookies.extract_cookies(MockResponse(headers), MockRequest(request))
+
+    assert len(session.cookies) == 0

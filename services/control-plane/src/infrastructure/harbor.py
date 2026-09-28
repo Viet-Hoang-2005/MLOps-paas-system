@@ -1,14 +1,24 @@
+from http.cookiejar import DefaultCookiePolicy
 from urllib.parse import quote
 
+import requests
 from django.conf import settings
 from requests import HTTPError
 
 from infrastructure.http import HttpClient
 
 
+def _cookieless_session():
+    # Harbor answers basic-auth calls with a `sid` cookie; replaying it turns the next
+    # write into a session request that fails CSRF (403) before robot auth is checked.
+    session = requests.Session()
+    session.cookies.set_policy(DefaultCookiePolicy(allowed_domains=[]))
+    return session
+
+
 class HarborClient:
     def __init__(self, http=None):
-        self.http = http or HttpClient()
+        self.http = http or HttpClient(session=_cookieless_session())
         registry = settings.HARBOR_REGISTRY_URL
         self.base_url = (
             (registry if registry.startswith(("http://", "https://")) else f"https://{registry}") if registry else ""
