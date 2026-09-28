@@ -18,12 +18,20 @@ POD_IP = str(env("POD_IP", "")).strip()
 if POD_IP and POD_IP not in ALLOWED_HOSTS:
     ALLOWED_HOSTS = [*ALLOWED_HOSTS, POD_IP]
 
+ALLOWED_HOSTS = [
+    *ALLOWED_HOSTS,
+    "mlops-paas-control-plane.mlops-control-plane.svc.cluster.local",
+    "mlops-paas-control-plane.mlops-control-plane.svc",
+    "mlops-paas-control-plane.mlops-control-plane",
+    ".svc.cluster.local",
+]
+
 DEBUG = False
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", True)
-SECURE_REDIRECT_EXEMPT = [r"^health/"]
+SECURE_REDIRECT_EXEMPT = [r"^health/", r"^internal/"]
 SECURE_HSTS_SECONDS = env_int("DJANGO_HSTS_SECONDS", 31536000)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True

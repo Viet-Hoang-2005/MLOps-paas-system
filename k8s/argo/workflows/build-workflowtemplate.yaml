@@ -10,9 +10,16 @@ spec:
   arguments:
     parameters:
       - name: control_plane_webhook_url
+  volumeClaimTemplates:
+    - metadata:
+        name: workspace
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: "local-path"
+        resources:
+          requests:
+            storage: 2Gi
   volumes:
-    - name: workspace
-      emptyDir: {}
     - name: harbor-config
       secret:
         secretName: harbor-registry-dockerconfig
@@ -98,6 +105,9 @@ spec:
           - name: LOG_SUMMARY_INTERVAL_SECONDS
             valueFrom:
               configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_SUMMARY_INTERVAL_SECONDS}
+          - name: REDIS_URL
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: REDIS_URL}
           - {name: BUILD_ENGINE, value: kaniko}
           - {name: BUILD_WORKSPACE_DIR, value: /workspace}
           - {name: TASK_TYPE, value: "{{inputs.parameters.task_type}}"}
@@ -153,6 +163,9 @@ spec:
           - name: LOG_SUMMARY_INTERVAL_SECONDS
             valueFrom:
               configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_SUMMARY_INTERVAL_SECONDS}
+          - name: REDIS_URL
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: REDIS_URL}
           - {name: TASK_TYPE, value: NOTIFY_BUILD}
           - {name: BUILD_WORKSPACE_DIR, value: /workspace}
           - {name: BUILD_ID, value: "{{inputs.parameters.build_id}}"}
