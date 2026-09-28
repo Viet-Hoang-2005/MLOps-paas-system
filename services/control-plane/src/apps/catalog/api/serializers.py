@@ -45,7 +45,7 @@ class ModelProjectSerializer(serializers.ModelSerializer):
 
     def validate_name(self, value):
         request = self.context.get("request")
-        queryset = ModelProject.objects.filter(owner=request.user, name=value)
+        queryset = ModelProject.objects.filter(owner=request.user, name=value, is_active=True)
         if self.instance:
             queryset = queryset.exclude(pk=self.instance.pk)
         if request and queryset.exists():

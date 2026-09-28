@@ -35,7 +35,7 @@ def save_project_metadata(*, actor, validated_data, project=None, storage=None):
     data = dict(validated_data)
     source_code_file = data.pop("source_code_file", None)
     reference_data_file = data.pop("reference_data_file", None)
-    duplicate = ModelProject.objects.filter(owner=actor, name=data["name"])
+    duplicate = ModelProject.objects.filter(owner=actor, name=data["name"], is_active=True)
     if project is not None:
         duplicate = duplicate.exclude(pk=project.pk)
     if duplicate.exists():

@@ -92,8 +92,10 @@ def finalize_project_deletion(project, *, storage=None):
         project.deletion_task_id = ""
         project.deleted_at = timezone.now()
         project.is_active = False
+        project.name = f"{project.name[:130]}#deleted-{project.public_id.hex[:8]}"
         project.save(
             update_fields=[
+                "name",
                 "deletion_state",
                 "deletion_error",
                 "deletion_task_id",
