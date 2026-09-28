@@ -91,34 +91,6 @@
     group: root
     mode: "0600"
 
-- name: Wait for Traefik to receive the trusted proxy configuration
-  become: true
-  kubernetes.core.k8s_info:
-    api_version: apps/v1
-    kind: Deployment
-    name: traefik
-    namespace: kube-system
-    kubeconfig: "{{ k3s_remote_kubeconfig }}"
-  register: traefik_deployment_arguments
-  until: >-
-    traefik_deployment_arguments.resources | length == 1 and
-    ('--entryPoints.web.forwardedHeaders.trustedIPs=' ~
-    (traefik_forwarded_headers_trusted_ips | join(','))) in
-    (traefik_deployment_arguments.resources[0].spec.template.spec.containers[0].args | default([]))
-  retries: 36
-  delay: 5
-  changed_when: false
-
-- name: Wait for Traefik to finish reconciling the runtime configuration
-  become: true
-  kubernetes.core.k8s_info:
-    api_version: apps/v1
-    kind: Deployment
-    name: traefik
-    namespace: kube-system
-    kubeconfig: "{{ k3s_remote_kubeconfig }}"
-    wait: true
-    wait_timeout: 180
 
 - name: Wait for the K3s node token
   become: true
@@ -138,21 +110,6 @@
   ansible.builtin.set_fact:
     k3s_node_token: "{{ node_token_b64.content | b64decode | trim }}"
   no_log: true
-
-- name: Publish the K3s agent token version for elastic nodes
-  delegate_to: localhost
-  become: false
-  community.aws.secretsmanager_secret:
-    name: "{{ karpenter_k3s_token_secret_name }}"
-    description: K3s agent token for self-managed Karpenter nodes
-    state: present
-    secret_type: string
-    json_secret:
-      token: "{{ k3s_node_token }}"
-    overwrite: true
-    region: "{{ aws_region }}"
-  no_log: true
-  when: enable_karpenter | bool
 
 - name: Fetch the root-only kubeconfig into the ignored artifacts directory
   become: true

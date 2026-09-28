@@ -1,4 +1,43 @@
 ---
+# Elastic nodes join with the same agent token as the static workers, but they
+# read it from Secrets Manager instead of an Ansible fact. The token is
+# published here rather than during the K3s server role: a Secrets Manager
+# outage must not strand the static cluster, and the role is self-contained so
+# `--tags platform-training` can run on its own.
+- name: Read the K3s agent token for elastic nodes
+  become: true
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: elastic_node_token_b64
+  no_log: true
+  when: enable_karpenter | bool
+
+- name: Publish the K3s agent token version for elastic nodes
+  delegate_to: localhost
+  become: false
+  community.aws.secretsmanager_secret:
+    name: "{{ karpenter_k3s_token_secret_name }}"
+    description: K3s agent token for self-managed Karpenter nodes
+    state: present
+    secret_type: string
+    json_secret:
+      token: "{{ elastic_node_token_b64.content | b64decode | trim }}"
+    overwrite: true
+    region: "{{ aws_region }}"
+  register: elastic_node_token_secret
+  ignore_errors: true
+  no_log: true
+  when: enable_karpenter | bool
+
+- name: Require the elastic-node token without exposing its value
+  ansible.builtin.assert:
+    that:
+      - not (elastic_node_token_secret.failed | default(false))
+    fail_msg: >-
+      Publishing the agent token to {{ karpenter_k3s_token_secret_name }} failed:
+      {{ elastic_node_token_secret.msg | default('the module returned no message') }}
+  when: enable_karpenter | bool
+
 - name: Require Argo CD to reconcile every training addon and capacity application
   kubernetes.core.k8s_info:
     api_version: argoproj.io/v1alpha1
