@@ -12,3 +12,17 @@ helmCharts:
     releaseName: mlops-paas-harbor
     namespace: harbor
     valuesFile: values.yaml
+
+patches:
+  - target:
+      group: apps
+      kind: Deployment
+      name: mlops-paas-harbor-jobservice
+    patch: |-
+      - op: replace
+        path: /spec/strategy
+        value:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 0
+            maxUnavailable: 1
