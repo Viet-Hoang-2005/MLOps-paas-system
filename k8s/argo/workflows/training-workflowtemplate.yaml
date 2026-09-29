@@ -10,6 +10,10 @@ spec:
   podMetadata:
     labels:
       mlops.io/training-job-id: "{{workflow.parameters.job_id}}"
+  arguments:
+    parameters:
+      - name: job_id
+        value: ""
   templates:
     - name: training-pipeline
       inputs:

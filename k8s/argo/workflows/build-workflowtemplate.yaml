@@ -12,6 +12,8 @@ spec:
   onExit: notify-build-exit
   arguments:
     parameters:
+      - name: build_id
+        value: ""
       - name: control_plane_webhook_url
   volumeClaimTemplates:
     - metadata:

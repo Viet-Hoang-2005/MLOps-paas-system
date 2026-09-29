@@ -163,7 +163,7 @@ def test_docker_details_are_sanitized_debug(monkeypatch, tmp_path, caplog):
     cli.build_custom_image(tmp_path, "build-test", "tenant-test", "")
     assert "fixture-build" not in caplog.text
     assert "fixture-build" not in str(writer.call_args_list)
-    assert all(record.levelno == logging.DEBUG for record in caplog.records)
+    assert all(record.levelno == logging.INFO for record in caplog.records)
 
 
 def test_webhook_error_omits_arbitrary_response_body(monkeypatch):

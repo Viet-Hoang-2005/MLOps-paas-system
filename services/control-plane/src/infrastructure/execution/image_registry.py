@@ -32,7 +32,10 @@ class HarborImageRegistry:
         self.harbor.create_tag(image_uri, tag, reference=image_digest)
         temporary_tag = image_uri.rsplit(":", 1)[-1]
         if temporary_tag != tag:
-            self.harbor.delete_tag(image_uri, temporary_tag)
+            try:
+                self.harbor.delete_tag(image_uri, temporary_tag)
+            except Exception:
+                pass
         repository = image_repository(
             build.project.public_id,
             registry=settings.HARBOR_REGISTRY_URL,

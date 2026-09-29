@@ -99,7 +99,7 @@ metadata:
   namespace: mlops-model-runtimes
 rules:
   - apiGroups: ["apps"]
-    resources: ["deployments"]
+    resources: ["deployments", "replicasets"]
     verbs: ["get", "list", "watch", "create", "patch", "update"]
   - apiGroups: [""]
     resources: ["services"]

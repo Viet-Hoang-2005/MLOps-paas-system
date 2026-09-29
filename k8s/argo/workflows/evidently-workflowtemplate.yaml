@@ -9,6 +9,10 @@ spec:
   podMetadata:
     labels:
       mlops.io/drift-run-id: "{{workflow.parameters.job_id}}"
+  arguments:
+    parameters:
+      - name: job_id
+        value: ""
   templates:
     - name: run-evidently
       nodeSelector:
