@@ -14,7 +14,7 @@ Bản thảo phù hợp hơn với **short paper mô tả prototype và một ca
 
 - Viết rõ policy **đề xuất**: drift alert → kiểm tra, suy giảm có nhãn phải được xem xét ngay cả khi không có alert; chỉ cân nhắc huấn luyện với dữ liệu gắn nhãn đại diện, và promotion cần challenger vượt gate chất lượng/vận hành cùng duyệt của người. Paper ghi rõ policy chưa được kiểm nghiệm.
 - Giữ phần service replay ngắn và tách khỏi bảng KS/BH; nêu việc audit S0 từ UI và 42 lỗi S1 theo đúng pilot report.
-- Đưa link GitHub nhánh paper vào footnote có thể đọc khi in giấy. Vẫn công khai rằng CSV đầu vào đúng checksum chưa có quy trình tải công khai theo version; raw pilot logs ở thư mục tmp chưa được phát hành.
+- Bỏ link GitHub khỏi bản thảo vì repository dự kiến chuyển sang private. Vẫn ghi rõ rằng việc tái lập cần đúng CSV đầu vào theo checksum và quy trình lấy đúng version chưa hoàn tất; raw pilot logs ở thư mục tmp chưa được phát hành.
 - Sửa cách gọi verifier thành “separate verifier” để tránh hàm ý có bên độc lập xác nhận.
 - Rút ba nguồn ít trực tiếp với câu hỏi nghiên cứu: bài dự báo thị trường điện, bài tổng quan data quality, và preprint so sánh workflow frameworks. Giữ 13 nguồn được trích; bổ sung DOI xác minh cho Sommer–Paxson. Sau khi thêm lời cảm ơn, lược thêm nghiên cứu Amershi et al. để giữ giới hạn trang. Không thay số liệu thực nghiệm hay format/lề LNCS.
 
@@ -29,4 +29,4 @@ Bản thảo phù hợp hơn với **short paper mô tả prototype và một ca
 3. Kiểm tra source ZIP/PDF cuối và nộp qua cổng hội nghị. Nếu có thể, hỏi BTC về citation trigger; không giả định đã được chấp thuận vì citation keys và DOI hợp lệ.
 4. Giữ các benchmark tự nhiên/temporal, retraining đối chứng và multi-tenant load sweep ở mục limitation/future work nếu không có số liệu thật trước hạn.
 
-Đã bổ sung nguyên văn lời cảm ơn của thầy trong credits trước Disclosure of Interests, theo template LNCS. Bản LaTeX đã chạy hai lượt pdflatex với llncs.cls v2.24 của template nhóm, ra **8 trang** như giới hạn short paper trên [trang camera-ready chính thức](https://csonet-conf.github.io/csonet26/index.php/camera-ready/index.html). Không có overfull box, undefined citation hay compile error; còn một underfull hbox nhẹ ở bibliography. PDF đã được kiểm tra trực quan. Không có submission ra ngoài trong lượt này.
+Đã bổ sung nguyên văn lời cảm ơn của thầy trong credits trước Disclosure of Interests, theo template LNCS. Bản trước khi bỏ URL đã chạy hai lượt pdflatex với llncs.cls v2.24 và ra **8 trang** như giới hạn short paper trên [trang camera-ready chính thức](https://csonet-conf.github.io/csonet26/index.php/camera-ready/index.html). Bản nguồn mới đã bỏ URL GitHub; editor tự cập nhật PDF 8 trang trên đĩa, và trang 5 đã được kiểm tra trực quan để xác nhận URL biến mất. Lệnh compile tích hợp gọi riêng vẫn báo lỗi môi trường “Unable to find standard directories for platform”, nên không có xác nhận thành công từ lệnh đó. Không có submission ra ngoài trong lượt này.
