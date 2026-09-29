@@ -7,6 +7,7 @@ import json
 import platform
 import shutil
 import subprocess
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -165,10 +166,22 @@ def export(output, source, with_mlflow):
             pip_requirements=[f"mlflow=={mlflow_version}", f"numpy=={np.__version__}",
                               f"pandas=={pd.__version__}", f"xgboost=={xgb.__version__}"],
         )
+        # MLflow on Windows records backslashes and an absolute code path.
+        # Normalize the copied package so Linux serving can resolve its files.
+        metadata = mlflow.models.Model.load(str(package))
+        pyfunc = metadata.flavors["python_function"]
+        pyfunc["model_code_path"] = "handoff_model.py"
+        pyfunc["artifacts"]["baseline"]["path"] = "artifacts/baseline.ubj"
+        pyfunc["artifacts"]["baseline"]["uri"] = "artifacts/baseline.ubj"
+        metadata.save(str(package / "MLmodel"))
         packaged = mlflow.pyfunc.load_model(str(package))
         for wid, frame, predicted in frames:
             require(np.array_equal(packaged.predict(frame), predicted), f"MLflow prediction mismatch: {wid}")
         require(sha(package / "artifacts/baseline.ubj") == model_meta["model_sha256"], "Packaged model changed")
+        with zipfile.ZipFile(output / "model/mlflow.zip", "x", zipfile.ZIP_DEFLATED) as archive:
+            for item in sorted(package.rglob("*")):
+                if item.is_file() and "__pycache__" not in item.parts:
+                    archive.write(item, item.relative_to(package).as_posix())
     for filename in ("config.json", "dataset_manifest.json", "model_manifest.json", "environment.json"):
         shutil.copy2(BASE / filename, output / "provenance" / filename)
     shutil.copy2(EVID / "manifest.json", output / "provenance/evidently_manifest.json")

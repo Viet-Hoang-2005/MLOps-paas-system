@@ -18,15 +18,15 @@ The manuscript has no external table or figure inputs. In the existing Overleaf 
 From the repository/extracted bundle root, PowerShell:
 
 ```powershell
-./graduate/paper/revision/build_paper.ps1
+./research/paper/revision/build_paper.ps1
 ```
 
-The script writes to `graduate/paper/revision/build/`. For other systems, change to `graduate/paper`, ensure `llncs.cls` is discoverable, and run `pdflatex -interaction=nonstopmode -halt-on-error A_Drift-Aware_MLOps_Framework_for_Multi-Model_Serving_CSONET.tex` twice. Bibliography is inline; no BibTeX step is needed.
+The script writes to `research/paper/revision/build/`. For other systems, change to `research/paper`, ensure `llncs.cls` is discoverable, and run `pdflatex -interaction=nonstopmode -halt-on-error A_Drift-Aware_MLOps_Framework_for_Multi-Model_Serving_CSONET.tex` twice. Bibliography is inline; no BibTeX step is needed.
 
 Optional asset regeneration, from the root:
 
 ```powershell
-python graduate/paper/revision/build_result_assets.py
+python research/paper/revision/build_result_assets.py
 ```
 
 Assets are already included; regenerating figures is not required to compile. Required Python libraries/versions are in the experiment requirements. This only reformats existing results and does not rerun the study.
@@ -47,8 +47,8 @@ The runner records `git rev-parse HEAD`. When reproducing from the ZIP outside a
 
 ## Author decisions still needed
 
-Use the updated [one-week drift plan](../../../docs/paper/csonet_2026_one_week_drift_plan_vi.md) as the canonical teammate handoff: exact S0/S1/S2 mixtures, fixed-model quality metrics, family-level errors, detector sensitivity, paper tables/figures, and the remaining September 27–30 schedule. Its proposed 12-window service replay checks drift/performance parity against frozen offline inputs; it is not a load benchmark and has not yet run. The [handoff note](CSONET_BENCHMARK_HANDOFF_RUNBOOK_VI.md) points to this plan. Any older PDF export of that note is superseded by the Markdown plan.
+Use the updated [one-week drift plan](../../../docs/paper/csonet_2026_one_week_drift_plan_vi.md) as the canonical teammate handoff: exact S0/S1/S2 mixtures, fixed-model quality metrics, family-level errors, detector sensitivity, paper tables/figures, and the remaining September 27–30 schedule. The plan proposed a 12-window service replay, not a load benchmark. Four seed-42 windows have now run end-to-end; see the [live pilot report](LIVE_DRIFT_PILOT_20260929_VI.md) for audited production records and Evidently results. The remaining windows have not run on the service. The [handoff note](CSONET_BENCHMARK_HANDOFF_RUNBOOK_VI.md) points to the plan. Any older PDF export of that note is superseded by the Markdown plan.
 
-To prepare the actual inputs, follow the [replay handoff instructions](../experiments/drift_only/HANDOFF_VI.md). The exporter reconstructs the exact windows from the teammate's matching dataset and verifies the packaged model offline. Generated inputs are local artifacts; service replay remains outstanding. Earlier local infrastructure audits are outside this handoff's scope.
+To prepare additional inputs, follow the [replay handoff instructions](../experiments/drift_only/HANDOFF_VI.md). The exporter reconstructs the exact windows from the teammate's matching dataset and verifies the packaged model offline. Generated inputs are local artifacts; four live windows have been audited, while a complete 12-window service replay remains outstanding. Earlier local infrastructure audits are outside this handoff's scope.
 
 Confirm the experimental interpretation, corresponding author/metadata and forms; finalize data availability and have another team member reproduce the main table. Natural drift, retraining policies, serving scalability and adversarial model isolation remain unevaluated. The organizers' specific citation-integrity trigger is still unspecified. No paper or message has been submitted externally by this task.

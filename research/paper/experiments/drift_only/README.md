@@ -11,14 +11,18 @@ offline predictions, and packages the model for the MLflow serving worker.
 It does not train, resample, deploy, send requests, or run a service benchmark.
 Generated payloads stay in the ignored `handoff_exports/` directory; teammates
 with the matching source CSV can recreate them after pulling this branch.
+The historical `handoff_exports/nids_replay/model/mlflow/MLmodel` embeds absolute
+paths from the former `graduate/paper` location. Use the verified portable bundle
+`handoff_exports/nids_replay_portable_20260928/` or regenerate a new export from
+the matching source CSV; do not rewrite a checksummed frozen bundle in place.
 Local export/package validation is recorded in [HANDOFF_VALIDATION.json](HANDOFF_VALIDATION.json).
 
 Run from the repository root in a Python environment with NumPy, pandas, SciPy, scikit-learn, XGBoost and Matplotlib. Exact versions used are recorded in `results/run_20260926/environment.json`; `requirements.txt` pins those library versions. Use a separate environment if installing dependencies.
 
 ```powershell
-python -m pip install -r graduate/paper/experiments/drift_only/requirements.txt
-python -X utf8 graduate/paper/experiments/drift_only/run_experiment.py --output graduate/paper/experiments/drift_only/results/reproduction
-python -X utf8 graduate/paper/experiments/drift_only/verify_results.py graduate/paper/experiments/drift_only/results/reproduction
+python -m pip install -r research/paper/experiments/drift_only/requirements.txt
+python -X utf8 research/paper/experiments/drift_only/run_experiment.py --output research/paper/experiments/drift_only/results/reproduction
+python -X utf8 research/paper/experiments/drift_only/verify_results.py research/paper/experiments/drift_only/results/reproduction
 ```
 
 The output directory must not already exist. The runner does not download data, contact cloud services, execute uploaded models, or edit source CSVs/manuscript files. Its audit reads `data/*.csv`. Its experiment uses only `data/reference_data.csv`; the name reflects the original pipeline role, not the new experimental split.
@@ -58,6 +62,6 @@ The team provided the lineage links in `config.json`. Obtain the exact local CSV
 
 ## Scope limits
 
-The [critical review dated 2026-09-27](EXPERIMENT_CRITICAL_REVIEW_VI_2026-09-27.md) adds post-hoc family-level and model-gain diagnostics without changing the frozen run. Run `python graduate/paper/experiments/drift_only/diagnose_baseline.py` once to write a new `diagnostics/run_20260927` directory (it must not exist). These diagnostics reuse the evaluation pool; they are not independent confirmatory evidence.
+The [critical review dated 2026-09-27](EXPERIMENT_CRITICAL_REVIEW_VI_2026-09-27.md) adds post-hoc family-level and model-gain diagnostics without changing the frozen run. Run `python research/paper/experiments/drift_only/diagnose_baseline.py` once to write a new `diagnostics/run_20260927` directory (it must not exist). These diagnostics reuse the evaluation pool; they are not independent confirmatory evidence.
 
 These are controlled composition shifts in a third-party preprocessed and team-subsampled CICIDS2017 derivative. No temporal validation, concept-drift identification, retraining comparison, serving scalability, or security-isolation claim follows. Upstream feature selection used combined data; splitting afterward cannot remove that potential leakage. Exact deduplication does not establish flow/session/host independence. Stable windows have fixed class counts; alert frequency is conditional on this sampling design. KS asymptotic p-values on tied network-flow features and correlated features need cautious interpretation; BH here is a defined comparison rule, not a guarantee of dataset-level false-alert control.

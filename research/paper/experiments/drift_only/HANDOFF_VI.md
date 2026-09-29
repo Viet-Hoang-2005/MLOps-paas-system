@@ -16,8 +16,8 @@ Nếu đã ở nhánh đó, cập nhật bằng `git pull --ff-only origin codex
 Từ repository root, trong môi trường Python riêng:
 
 ```powershell
-python -m pip install -r graduate/paper/experiments/drift_only/requirements-handoff.txt
-python graduate/paper/experiments/drift_only/export_handoff.py --with-mlflow
+python -m pip install -r research/paper/experiments/drift_only/requirements-handoff.txt
+python research/paper/experiments/drift_only/export_handoff.py --with-mlflow
 ```
 
 Script kiểm tra checksum nguồn trước khi xuất. SHA-256 bắt buộc:
@@ -28,7 +28,7 @@ Script kiểm tra checksum nguồn trước khi xuất. SHA-256 bắt buộc:
 
 Nếu khác checksum, dừng và lấy đúng bản từ nhóm; không bỏ kiểm tra hoặc tự sửa manifest. Dùng `--source "đường dẫn/reference_data.csv"` nếu dữ liệu ở chỗ khác. Script không cần các CSV khác trong `data/`.
 
-Đầu ra mặc định: `graduate/paper/experiments/drift_only/handoff_exports/nids_replay/`. Thư mục này được gitignore vì chứa dữ liệu xuất, không cần push. Script từ chối ghi đè thư mục đã có; muốn xuất lại hãy dùng `--output "đường dẫn mới"`.
+Đầu ra mặc định: `research/paper/experiments/drift_only/handoff_exports/nids_replay/`. Thư mục này được gitignore vì chứa dữ liệu xuất, không cần push. Script từ chối ghi đè thư mục đã có; muốn xuất lại hãy dùng `--output "đường dẫn mới"`.
 
 Không có `--with-mlflow` thì chỉ xuất model UBJ và bộ dữ liệu; chưa có gói MLflow để worker load. Runtime đóng gói và runtime detector nên dùng môi trường riêng: Evidently replay đã khóa ở 0.4.15, pandas 2.0.3, NumPy 1.26.4; toàn bộ môi trường detector nằm trong `provenance/evidently_environment.lock.txt` của output. Không nâng Evidently theo môi trường xuất model.
 
@@ -39,6 +39,7 @@ Không có `--with-mlflow` thì chỉ xuất model UBJ và bộ dữ liệu; ch�
 | `manifest.json` | Danh sách 12 cửa sổ, pilot/extension, schema, hashes và cấu hình |
 | `model/baseline.ubj` | Model gốc bất biến |
 | `model/mlflow/` | Gói MLflow để đưa vào quy trình build/register đang có; được tạo khi dùng `--with-mlflow` |
+| `model/mlflow.zip` | ZIP sẵn để upload bằng Model Package; đường dẫn metadata được chuẩn hóa cho Linux |
 | `model/features.json` | Đúng 52 feature và thứ tự |
 | `reference/features.csv` | Reference 5000 dòng, chỉ có feature |
 | `windows/<window_id>/features.csv` | 1000 dòng input/window, chỉ có feature |
@@ -83,7 +84,7 @@ Giữ bản raw responses để audit. API có thể trả `confidence` là xác
 Từ repository root:
 
 ```powershell
-python graduate/paper/experiments/drift_only/handoff_tools.py verify --bundle graduate/paper/experiments/drift_only/handoff_exports/nids_replay
+python research/paper/experiments/drift_only/handoff_tools.py verify --bundle research/paper/experiments/drift_only/handoff_exports/nids_replay
 ```
 
 Hoặc đứng trong output đã sao chép: `python handoff_tools.py verify --bundle .`. Lệnh chỉ cần Python standard library, kiểm tra checksum, row hashes, 52 feature, thứ tự, label mapping, requests và overlap reference. Không cần dataset gốc để xác minh bundle đã xuất.
@@ -99,7 +100,7 @@ window_id,replay_index,prediction_id,pred_binary
 `pred_binary` phải là 0/1 theo mapping đã nêu; ID phải đến từ response thật, không lấy dự đoán kỳ vọng để điền kết quả đo. Mỗi file đủ 1000 replay_index duy nhất 0–999 và prediction_id duy nhất. Giữ mapping về raw response. Sau đó:
 
 ```powershell
-python graduate/paper/experiments/drift_only/handoff_tools.py score --bundle graduate/paper/experiments/drift_only/handoff_exports/nids_replay --window S0_n1000_s42 --responses responses_S0_n1000_s42.csv --output score_S0_n1000_s42.json
+python research/paper/experiments/drift_only/handoff_tools.py score --bundle research/paper/experiments/drift_only/handoff_exports/nids_replay --window S0_n1000_s42 --responses responses_S0_n1000_s42.csv --output score_S0_n1000_s42.json
 ```
 
 Script từ chối window thiếu mẫu/trùng ID/lẫn scenario và từ chối ghi đè output. Kết quả có TN/FP/FN/TP, recall, FPR, macro-F1, lỗi theo family và số dự đoán khác offline. Lệnh này chỉ chấm file prediction; database coverage, drift report và callback phải audit riêng.

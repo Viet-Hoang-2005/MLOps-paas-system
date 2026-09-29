@@ -22,7 +22,7 @@
     "mlflow": "3.11.1"
   },
   "scripts_sha256": {
-    "export_handoff.py": "13c8a480f22d88b12fa148e58265d75b7fcd19a60517286907ab4a451d0eef24",
+    "export_handoff.py": "1ca77a6326e2cf95af8b2cc636ff889fcd3b85a268da7b315f20d7accf8d22ef",
     "handoff_model.py": "10f5c3f4f6af74a9390de3563290782b6ec1150e189e5a0619d4d0c583bbe847",
     "handoff_tools.py": "aef54750b2e2251efb475a78e9e08b601e57f642a43a7cbff5e3b0039e3671b9",
     "test_handoff_tools.py": "6a1e272b22f2e84b9e00cfa124921f7b1981eb0e9f1b842caf3d4cb0f9c36dd0"
@@ -31,5 +31,12 @@
     "MLflow packaging tested locally, not deployed",
     "Evidently expectations copied from already verified frozen library replay, not a new service run",
     "Generated payloads are ignored by Git and must be regenerated from the matching dataset"
-  ]
+  ],
+  "portable_package_validation_20260928": {
+    "windows": 12,
+    "prediction_parity": "12000/12000",
+    "checksums": 60,
+    "paths": "relative code path and POSIX artifact path; ZIP entries POSIX",
+    "scope": "Offline portable package recheck; live build tracked separately"
+  }
 }
