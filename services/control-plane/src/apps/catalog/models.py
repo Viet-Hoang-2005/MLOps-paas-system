@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 
 
 class ModelProject(models.Model):
@@ -29,7 +30,12 @@ class ModelProject(models.Model):
 
     class Meta:
         ordering = ["-updated_at"]
-        constraints = [models.UniqueConstraint(fields=["owner", "name"], name="project_owner_name_unique")]
+        # Deleted projects keep their row for audit, so only active projects reserve a name.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "name"], condition=Q(is_active=True), name="project_owner_active_name_unique"
+            )
+        ]
         indexes = [models.Index(fields=["owner", "is_active"], name="project_owner_active_idx")]
 
     def __str__(self):

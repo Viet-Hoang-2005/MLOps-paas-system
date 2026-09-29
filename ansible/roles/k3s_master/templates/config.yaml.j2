@@ -1,7 +1,7 @@
 node-name: "{{ k3s_node_name | default(inventory_hostname) }}"
 cluster-init: true
 secrets-encryption: true
-write-kubeconfig-mode: "0600"
+write-kubeconfig-mode: "0644"
 tls-san:
   - "{{ private_ip }}"
 {% if enable_karpenter | bool %}

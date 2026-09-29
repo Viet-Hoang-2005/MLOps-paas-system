@@ -40,7 +40,7 @@ spec:
             template: delete-service
             arguments:
               parameters:
-                - {name: container_name, value: "{{inputs.parameters.container_name}}"}
+                - {name: service_name, value: "{{inputs.parameters.container_name}}-svc"}
 
     - name: delete-deployment
       inputs:
@@ -59,7 +59,9 @@ spec:
     - name: delete-service
       inputs:
         parameters:
-          - name: container_name
+          # Built by the caller: quoted literals inside {{=...}} are escaped when the
+          # template is serialized, so the expression would be left unevaluated.
+          - name: service_name
       resource:
         action: delete
         flags: ["--ignore-not-found"]
@@ -67,7 +69,7 @@ spec:
           apiVersion: v1
           kind: Service
           metadata:
-            name: {{=toJson(sprig.printf("%s-svc", inputs.parameters.container_name))}}
+            name: {{=toJson(inputs.parameters.service_name)}}
             namespace: mlops-model-runtimes
 
     - name: notify-delete-exit

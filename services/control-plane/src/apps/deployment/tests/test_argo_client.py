@@ -71,3 +71,23 @@ def test_argo_webhook_client_does_not_expose_token_when_delivery_fails(caplog):
 
     assert FAILURE_TEST_ARGO_TOKEN not in str(exc_info.value)
     assert FAILURE_TEST_ARGO_TOKEN not in caplog.text
+
+
+@override_settings(ARGO_EVENTS_WEBHOOK_TOKEN=TEST_ARGO_TOKEN)
+def test_argo_webhook_client_handles_non_json_response():
+    class PlainTextResponse:
+        status_code = 200
+        text = "success"
+
+        @staticmethod
+        def json():
+            raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+    class PlainTextHttp:
+        @staticmethod
+        def request(_method, _url, **_kwargs):
+            return PlainTextResponse()
+
+    response = ArgoWebhookClient(http=PlainTextHttp()).trigger("http://argo-events/build", {})
+    assert response == {"status_code": 200, "text": "success"}
+

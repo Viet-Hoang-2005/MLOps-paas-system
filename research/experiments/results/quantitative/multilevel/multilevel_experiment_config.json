@@ -1,0 +1,21 @@
+{
+  "created_at_utc": "2026-07-05T04:13:44.419801+00:00",
+  "command": "python paper/results/quantitative/run_multilevel_drift_recovery_eval.py --binary --drift-threshold 0.30 --random-seed 42",
+  "random_seed": 42,
+  "drift_levels": [
+    {
+      "name": "Mild",
+      "attack_fraction": 0.15
+    },
+    {
+      "name": "Moderate",
+      "attack_fraction": 0.4
+    },
+    {
+      "name": "Severe",
+      "attack_fraction": 0.85
+    }
+  ],
+  "drift_threshold": 0.3,
+  "pvalue_threshold": 0.05
+}

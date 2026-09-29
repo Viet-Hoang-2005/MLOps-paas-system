@@ -31,7 +31,10 @@ def test_resolve_mlflow_model_dir_root_nested_and_missing(tmp_path):
 
 def test_load_model_cache_and_signature(monkeypatch, tmp_path):
     (tmp_path / "MLmodel").write_text("x")
-    inputs = [SimpleNamespace(name="a"), SimpleNamespace(name="b")]
+    inputs = [
+        SimpleNamespace(name="a", type=SimpleNamespace(name="double")),
+        SimpleNamespace(name="b", type=SimpleNamespace(name="string")),
+    ]
     model = SimpleNamespace(
         metadata=SimpleNamespace(signature=SimpleNamespace(inputs=inputs))
     )
@@ -46,6 +49,7 @@ def test_load_model_cache_and_signature(monkeypatch, tmp_path):
 
     assert first is second
     assert first["expected_features"] == ["a", "b"]
+    assert first["float64_features"] == ["a"]
     assert load.call_count == 2
 
 

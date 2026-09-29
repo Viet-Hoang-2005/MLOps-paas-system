@@ -101,10 +101,16 @@ def test_finalization_deletes_project_s3_prefix_and_archives_database_rows():
 
     assert result.deletion_state == "deleted"
     assert result.deleted_at is not None
+    assert "#deleted-" in result.name
     assert storage.prefixes == [f"users/{owner.tenant_id}/models/{project.public_id}"]
     assert deployment.status == "stopped"
     assert endpoint.health_status == "stopped"
     assert ModelVersion.objects.filter(pk=version.pk).exists()  # audit/history is retained.
+
+    # Verifies the original name is immediately reusable for new projects.
+    recreated = ModelProject.objects.create(owner=owner, name="Finalize me")
+    assert recreated.pk != project.pk
+
 
 
 def test_local_cleanup_uses_docker_sdk_without_a_model_cleaner_container():

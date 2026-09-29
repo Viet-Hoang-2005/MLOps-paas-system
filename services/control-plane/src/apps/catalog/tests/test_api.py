@@ -44,6 +44,21 @@ def test_duplicate_project_name_returns_conflict_with_clear_message():
 
 
 @pytest.mark.django_db
+def test_inactive_project_with_same_name_does_not_block_new_project():
+    owner = get_user_model().objects.create_user("reuse-owner@example.com", "password123")
+    # Projects deleted before names were suffixed, or still being deleted, keep the original name.
+    ModelProject.objects.create(owner=owner, name="NIDS", is_active=False, deletion_state="deleted")
+    ModelProject.objects.create(owner=owner, name="NIDS", is_active=False, deletion_state="deleting")
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    response = client.post("/api/models/", {"name": "NIDS", "access_mode": "public"}, format="json")
+
+    assert response.status_code == 201
+    assert ModelProject.objects.filter(owner=owner, name="NIDS", is_active=True).count() == 1
+
+
+@pytest.mark.django_db
 def test_project_list_returns_metadata_image_ready_and_deployed_lifecycle_statuses():
     owner = get_user_model().objects.create_user("lifecycle-owner@example.com", "password123")
     metadata_project = ModelProject.objects.create(owner=owner, name="Metadata only")

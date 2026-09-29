@@ -16,7 +16,11 @@ def test_production_settings_exempt_health_endpoints_from_ssl_redirect(monkeypat
 
     production_settings = importlib.import_module("config.settings.production")
 
-    assert production_settings.SECURE_REDIRECT_EXEMPT == [r"^health/"]
+    assert production_settings.SECURE_REDIRECT_EXEMPT == [
+        r"^health/",
+        r"^internal/",
+        r"^api/auth/\.well-known/jwks\.json$",
+    ]
     assert "10.42.2.44" in production_settings.ALLOWED_HOSTS
 
 
@@ -32,3 +36,18 @@ def test_kubelet_health_request_is_not_redirected_before_host_validation():
     response = middleware(request)
 
     assert response.status_code == 200
+
+
+@override_settings(
+    ALLOWED_HOSTS=["mlops-paas-control-plane.mlops-control-plane.svc.cluster.local"],
+    SECURE_SSL_REDIRECT=True,
+    SECURE_REDIRECT_EXEMPT=[r"^api/auth/\.well-known/jwks\.json$"],
+)
+def test_in_cluster_jwks_request_is_not_redirected():
+    # The model gateway verifies user JWTs with keys fetched over in-cluster HTTP.
+    factory = RequestFactory()
+    host = "mlops-paas-control-plane.mlops-control-plane.svc.cluster.local:8000"
+    middleware = SecurityMiddleware(CommonMiddleware(lambda _request: HttpResponse(status=200)))
+
+    assert middleware(factory.get("/api/auth/.well-known/jwks.json", HTTP_HOST=host)).status_code == 200
+    assert middleware(factory.get("/api/auth/token/", HTTP_HOST=host)).status_code == 301

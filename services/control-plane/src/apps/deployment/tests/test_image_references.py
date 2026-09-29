@@ -1,4 +1,8 @@
+from http.client import HTTPMessage
 from types import SimpleNamespace
+
+import requests
+from requests.cookies import MockRequest, MockResponse
 
 from infrastructure.execution.image_references import (
     immutable_image_reference,
@@ -117,3 +121,54 @@ def test_harbor_client_creates_version_tag_then_deletes_only_build_tag(settings)
     assert calls[0][2]["json"] == {"name": "v1"}
     assert calls[1][0] == "DELETE"
     assert calls[1][1].endswith("/artifacts/build-build-id/tags/build-build-id")
+
+
+def test_harbor_client_session_never_replays_cookies(settings):
+    settings.HARBOR_REGISTRY_URL = "registry.example"
+    session = HarborClient().http.session
+    headers = HTTPMessage()
+    headers["Set-Cookie"] = "sid=abc; Path=/"
+    request = requests.Request("GET", "https://registry.example/api/v2.0/projects").prepare()
+
+    session.cookies.extract_cookies(MockResponse(headers), MockRequest(request))
+
+    assert len(session.cookies) == 0
+
+
+def _harbor_http(responses):
+    """Answer each (method, path after /artifacts) with queued outcomes; ints raise HTTPError."""
+    calls = []
+
+    def request(method, url, **kwargs):
+        path = url.rsplit("/artifacts", 1)[-1]
+        calls.append((method, path))
+        queued = responses.get((method, path), [])
+        outcome = queued.pop(0) if queued else None
+        if isinstance(outcome, int):
+            raise requests.HTTPError(response=SimpleNamespace(status_code=outcome))
+        return SimpleNamespace(json=lambda: outcome or {})
+
+    return SimpleNamespace(request=request), calls
+
+
+def test_harbor_client_keeps_tag_already_on_expected_digest(settings):
+    settings.HARBOR_REGISTRY_URL = "registry.example"
+    http, calls = _harbor_http({("POST", "/sha256%3Anew/tags"): [409], ("GET", "/v1"): [{"digest": "sha256:new"}]})
+    uri = "registry.example/user-images/image-project-id:build-build-id"
+
+    assert HarborClient(http=http).create_tag(uri, "v1", reference="sha256:new") == "already-exists"
+    assert calls == [("POST", "/sha256%3Anew/tags"), ("GET", "/v1")]
+
+
+def test_harbor_client_moves_tag_left_on_orphaned_artifact(settings):
+    settings.HARBOR_REGISTRY_URL = "registry.example"
+    http, calls = _harbor_http({("POST", "/sha256%3Anew/tags"): [409], ("GET", "/v1"): [{"digest": "sha256:old"}]})
+    uri = "registry.example/user-images/image-project-id:build-build-id"
+
+    assert HarborClient(http=http).create_tag(uri, "v1", reference="sha256:new") == "moved"
+    assert calls == [
+        ("POST", "/sha256%3Anew/tags"),
+        ("GET", "/v1"),
+        ("DELETE", "/v1/tags/v1"),
+        ("POST", "/sha256%3Anew/tags"),
+    ]

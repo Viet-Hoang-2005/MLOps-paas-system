@@ -160,6 +160,16 @@ spec:
                 secretKeyRef:
                   name: control-plane-api-secret
                   key: EMAIL_HOST_PASSWORD
+            - name: HARBOR_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-api-secret
+                  key: HARBOR_USERNAME
+            - name: HARBOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: control-plane-api-secret
+                  key: HARBOR_PASSWORD
           envFrom:
             - configMapRef:
                 name: mlops-paas-control-plane-config
@@ -168,7 +178,7 @@ spec:
               mountPath: /app/staticfiles
           resources:
             requests:
-              cpu: 250m
+              cpu: 100m
               memory: 256Mi
             limits:
               cpu: 1000m

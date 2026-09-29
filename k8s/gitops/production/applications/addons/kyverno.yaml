@@ -25,15 +25,28 @@ spec:
       releaseName: kyverno
       values: |
         admissionController:
+          container:
+            resources:
+              requests:
+                cpu: 50m
           nodeSelector:
             workload-type: worker
         backgroundController:
+          resources:
+            requests:
+              cpu: 25m
           nodeSelector:
             workload-type: worker
         cleanupController:
+          resources:
+            requests:
+              cpu: 25m
           nodeSelector:
             workload-type: worker
         reportsController:
+          resources:
+            requests:
+              cpu: 25m
           nodeSelector:
             workload-type: worker
         existingImagePullSecrets:
@@ -41,3 +54,12 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno
+  # Chart 3.8.2 renders the policies.kyverno.io CRDs with empty `labels: {}` and
+  # `annotations: {}` maps. Server-side apply stores no metadata for them, so
+  # the diff never converges although the CRD specs match the chart.
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /metadata/labels
+        - /metadata/annotations

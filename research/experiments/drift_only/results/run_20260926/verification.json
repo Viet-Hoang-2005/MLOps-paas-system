@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "windows_rechecked": 120,
+  "ks_tests_recomputed": 6240,
+  "checks": [
+    "all source CSV checksums unchanged",
+    "canonical identities and exclusion accounting",
+    "unique feature vectors across all four pools",
+    "window membership belongs to evaluation only",
+    "persisted model checksum and recomputed metrics",
+    "all KS tests recomputed",
+    "BH independently checked with scipy.stats.false_discovery_control",
+    "threshold alert counts"
+  ],
+  "verifier_sha256": "06245fb1d07570728f06b93e6f638bd715f5687d9f37c6c45922ed661d709603"
+}

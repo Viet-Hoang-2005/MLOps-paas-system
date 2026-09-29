@@ -6,6 +6,8 @@ metadata:
     policies.kyverno.io/title: Verify platform image signatures
     policies.kyverno.io/category: Software Supply Chain Security
     policies.kyverno.io/severity: high
+    # Only mutate Pods: autogen rules would pin controller images to digests and keep Argo CD OutOfSync.
+    pod-policies.kyverno.io/autogen-controllers: none
 spec:
   background: false
   failurePolicy: Fail

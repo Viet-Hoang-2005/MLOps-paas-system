@@ -1,0 +1,2152 @@
+{
+  "w1": {
+    "Window": "W1",
+    "Dataset": "test_data.csv",
+    "method": "ks_2samp",
+    "total_features": 52,
+    "drifted_feature_count": 51,
+    "drift_share": 0.9807692307692307,
+    "dataset_drift": true,
+    "drift_threshold": 0.5,
+    "drifted_features": [
+      "Destination Port",
+      "Flow Duration",
+      "Total Fwd Packets",
+      "Total Length of Fwd Packets",
+      "Fwd Packet Length Max",
+      "Fwd Packet Length Min",
+      "Fwd Packet Length Mean",
+      "Fwd Packet Length Std",
+      "Bwd Packet Length Max",
+      "Bwd Packet Length Min",
+      "Bwd Packet Length Mean",
+      "Bwd Packet Length Std",
+      "Flow Bytes/s",
+      "Flow Packets/s",
+      "Flow IAT Mean",
+      "Flow IAT Std",
+      "Flow IAT Max",
+      "Flow IAT Min",
+      "Fwd IAT Total",
+      "Fwd IAT Mean",
+      "Fwd IAT Std",
+      "Fwd IAT Max",
+      "Fwd IAT Min",
+      "Bwd IAT Total",
+      "Bwd IAT Mean",
+      "Bwd IAT Std",
+      "Bwd IAT Max",
+      "Bwd IAT Min",
+      "Fwd Header Length",
+      "Bwd Header Length",
+      "Fwd Packets/s",
+      "Bwd Packets/s",
+      "Min Packet Length",
+      "Max Packet Length",
+      "Packet Length Mean",
+      "Packet Length Std",
+      "Packet Length Variance",
+      "PSH Flag Count",
+      "ACK Flag Count",
+      "Average Packet Size",
+      "Subflow Fwd Bytes",
+      "Init_Win_bytes_forward",
+      "Init_Win_bytes_backward",
+      "act_data_pkt_fwd",
+      "min_seg_size_forward",
+      "Active Mean",
+      "Active Max",
+      "Active Min",
+      "Idle Mean",
+      "Idle Max",
+      "Idle Min"
+    ],
+    "feature_results": {
+      "Destination Port": {
+        "method": "ks_2samp",
+        "statistic": 0.18517813911472447,
+        "p_value": 1.40827167660532e-122,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Duration": {
+        "method": "ks_2samp",
+        "statistic": 0.16328729900632333,
+        "p_value": 3.031284232533828e-95,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Total Fwd Packets": {
+        "method": "ks_2samp",
+        "statistic": 0.12821985546522124,
+        "p_value": 9.16668347501079e-59,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Total Length of Fwd Packets": {
+        "method": "ks_2samp",
+        "statistic": 0.06525671183378501,
+        "p_value": 1.6665266909458441e-15,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Max": {
+        "method": "ks_2samp",
+        "statistic": 0.10770158988256551,
+        "p_value": 1.5111420370712033e-41,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Min": {
+        "method": "ks_2samp",
+        "statistic": 0.15622258355916885,
+        "p_value": 3.5602527771276804e-87,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.10972997289972897,
+        "p_value": 4.094234438531102e-43,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.10258066847335146,
+        "p_value": 1.0101591352432853e-37,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Max": {
+        "method": "ks_2samp",
+        "statistic": 0.10921541102077681,
+        "p_value": 1.0292494438680434e-42,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Min": {
+        "method": "ks_2samp",
+        "statistic": 0.15221987353206867,
+        "p_value": 9.158419385210963e-83,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.1281457813911473,
+        "p_value": 1.07109165220503e-58,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.07232538392050591,
+        "p_value": 5.975028205563183e-19,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Bytes/s": {
+        "method": "ks_2samp",
+        "statistic": 0.14583208672086723,
+        "p_value": 5.730886718281422e-76,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.15625447154471545,
+        "p_value": 3.2800150074917053e-87,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.15324364950316172,
+        "p_value": 6.996998765893641e-84,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.15805532068654016,
+        "p_value": 3.1121039712368036e-89,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.15980093947606133,
+        "p_value": 3.233279690468941e-91,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.05511017163504972,
+        "p_value": 3.5231596863413716e-11,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Total": {
+        "method": "ks_2samp",
+        "statistic": 0.16410475158084914,
+        "p_value": 3.34416129521487e-96,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.16067170731707325,
+        "p_value": 3.250312768155738e-92,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.17070757000903347,
+        "p_value": 4.091116185091665e-104,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.16379504968383019,
+        "p_value": 7.719037799761418e-96,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.16249922312556464,
+        "p_value": 2.5114639756009763e-94,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Total": {
+        "method": "ks_2samp",
+        "statistic": 0.10964041553748871,
+        "p_value": 4.8082636727081885e-43,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.1041183017163505,
+        "p_value": 7.509443575537939e-39,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.10919654923215905,
+        "p_value": 1.0645343408793985e-42,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.10599383920505867,
+        "p_value": 2.9910132611701226e-40,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.06789456187895215,
+        "p_value": 9.497406004888353e-17,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Header Length": {
+        "method": "ks_2samp",
+        "statistic": 0.1541324480578139,
+        "p_value": 7.397060633737426e-85,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Header Length": {
+        "method": "ks_2samp",
+        "statistic": 0.12819521228545616,
+        "p_value": 9.6540777477202e-59,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.1559736224028907,
+        "p_value": 6.748492284883221e-87,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.13128726287262876,
+        "p_value": 1.3411505762729211e-61,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Min Packet Length": {
+        "method": "ks_2samp",
+        "statistic": 0.15372343270099365,
+        "p_value": 2.0837795582977047e-84,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Max Packet Length": {
+        "method": "ks_2samp",
+        "statistic": 0.11874363143631433,
+        "p_value": 1.9523166872105244e-50,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.1215144534778681,
+        "p_value": 8.36297709748275e-53,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.10878628726287265,
+        "p_value": 2.2127922550770772e-42,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Variance": {
+        "method": "ks_2samp",
+        "statistic": 0.10878628726287265,
+        "p_value": 2.2127922550770772e-42,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "FIN Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.00281580849141827,
+        "p_value": 0.999999999999999,
+        "threshold": 0.05,
+        "drifted": false
+      },
+      "PSH Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.13481149051490515,
+        "p_value": 6.117294736807447e-65,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "ACK Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.024379150858175214,
+        "p_value": 0.015622275928603178,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Average Packet Size": {
+        "method": "ks_2samp",
+        "statistic": 0.12279275519421856,
+        "p_value": 6.47379498062005e-54,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Subflow Fwd Bytes": {
+        "method": "ks_2samp",
+        "statistic": 0.06525671183378501,
+        "p_value": 1.6665266909458441e-15,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Init_Win_bytes_forward": {
+        "method": "ks_2samp",
+        "statistic": 0.18218411924119238,
+        "p_value": 1.2463432468050442e-118,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Init_Win_bytes_backward": {
+        "method": "ks_2samp",
+        "statistic": 0.15592397470641384,
+        "p_value": 7.66543079163236e-87,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "act_data_pkt_fwd": {
+        "method": "ks_2samp",
+        "statistic": 0.10435071364046977,
+        "p_value": 5.0526439247331016e-39,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "min_seg_size_forward": {
+        "method": "ks_2samp",
+        "statistic": 0.1500728997289973,
+        "p_value": 1.9023421418113443e-80,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.047472917795844616,
+        "p_value": 2.091837090308585e-08,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Max": {
+        "method": "ks_2samp",
+        "statistic": 0.047472917795844616,
+        "p_value": 2.091837090308585e-08,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Min": {
+        "method": "ks_2samp",
+        "statistic": 0.04721291779584469,
+        "p_value": 2.5566553924744028e-08,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.047339548328816594,
+        "p_value": 2.3189384581824073e-08,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Max": {
+        "method": "ks_2samp",
+        "statistic": 0.047339548328816594,
+        "p_value": 2.3189384581824073e-08,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Min": {
+        "method": "ks_2samp",
+        "statistic": 0.04734538392050591,
+        "p_value": 2.3085183102020473e-08,
+        "threshold": 0.05,
+        "drifted": true
+      }
+    },
+    "action": "alert/review-driven retraining triggered"
+  },
+  "w2": {
+    "Window": "W2",
+    "Dataset": "drift_portscan.csv",
+    "method": "ks_2samp",
+    "total_features": 52,
+    "drifted_feature_count": 51,
+    "drift_share": 0.9807692307692307,
+    "dataset_drift": true,
+    "drift_threshold": 0.5,
+    "drifted_features": [
+      "Destination Port",
+      "Flow Duration",
+      "Total Fwd Packets",
+      "Total Length of Fwd Packets",
+      "Fwd Packet Length Max",
+      "Fwd Packet Length Min",
+      "Fwd Packet Length Mean",
+      "Fwd Packet Length Std",
+      "Bwd Packet Length Max",
+      "Bwd Packet Length Min",
+      "Bwd Packet Length Mean",
+      "Bwd Packet Length Std",
+      "Flow Bytes/s",
+      "Flow Packets/s",
+      "Flow IAT Mean",
+      "Flow IAT Std",
+      "Flow IAT Max",
+      "Flow IAT Min",
+      "Fwd IAT Total",
+      "Fwd IAT Mean",
+      "Fwd IAT Std",
+      "Fwd IAT Max",
+      "Fwd IAT Min",
+      "Bwd IAT Total",
+      "Bwd IAT Mean",
+      "Bwd IAT Std",
+      "Bwd IAT Max",
+      "Bwd IAT Min",
+      "Fwd Header Length",
+      "Bwd Header Length",
+      "Fwd Packets/s",
+      "Bwd Packets/s",
+      "Min Packet Length",
+      "Max Packet Length",
+      "Packet Length Mean",
+      "Packet Length Std",
+      "Packet Length Variance",
+      "PSH Flag Count",
+      "ACK Flag Count",
+      "Average Packet Size",
+      "Subflow Fwd Bytes",
+      "Init_Win_bytes_forward",
+      "Init_Win_bytes_backward",
+      "act_data_pkt_fwd",
+      "min_seg_size_forward",
+      "Active Mean",
+      "Active Max",
+      "Active Min",
+      "Idle Mean",
+      "Idle Max",
+      "Idle Min"
+    ],
+    "feature_results": {
+      "Destination Port": {
+        "method": "ks_2samp",
+        "statistic": 0.58922,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Duration": {
+        "method": "ks_2samp",
+        "statistic": 0.6596799999999999,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Total Fwd Packets": {
+        "method": "ks_2samp",
+        "statistic": 0.6294,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Total Length of Fwd Packets": {
+        "method": "ks_2samp",
+        "statistic": 0.68546,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Max": {
+        "method": "ks_2samp",
+        "statistic": 0.67606,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Min": {
+        "method": "ks_2samp",
+        "statistic": 0.35446,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.67562,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.34914,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Max": {
+        "method": "ks_2samp",
+        "statistic": 0.50502,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Min": {
+        "method": "ks_2samp",
+        "statistic": 0.49404,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.5047,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.30512000000000006,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Bytes/s": {
+        "method": "ks_2samp",
+        "statistic": 0.5676,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.62074,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.59554,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.5925,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.65208,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.426,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Total": {
+        "method": "ks_2samp",
+        "statistic": 0.6275200000000001,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.6275200000000001,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.43178000000000005,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.6275200000000001,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.6171800000000001,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Total": {
+        "method": "ks_2samp",
+        "statistic": 0.46218000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.46218000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.30687999999999993,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.46218000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.45982,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Header Length": {
+        "method": "ks_2samp",
+        "statistic": 0.55114,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Header Length": {
+        "method": "ks_2samp",
+        "statistic": 0.53612,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.61518,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.65164,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Min Packet Length": {
+        "method": "ks_2samp",
+        "statistic": 0.35006000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Max Packet Length": {
+        "method": "ks_2samp",
+        "statistic": 0.5449999999999999,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.68262,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.53596,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Variance": {
+        "method": "ks_2samp",
+        "statistic": 0.5356799999999999,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "FIN Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.005299999999999971,
+        "p_value": 0.4820945683973582,
+        "threshold": 0.05,
+        "drifted": false
+      },
+      "PSH Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.48504,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "ACK Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.27532,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Average Packet Size": {
+        "method": "ks_2samp",
+        "statistic": 0.67338,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Subflow Fwd Bytes": {
+        "method": "ks_2samp",
+        "statistic": 0.68546,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Init_Win_bytes_forward": {
+        "method": "ks_2samp",
+        "statistic": 0.45512,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Init_Win_bytes_backward": {
+        "method": "ks_2samp",
+        "statistic": 0.37044,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "act_data_pkt_fwd": {
+        "method": "ks_2samp",
+        "statistic": 0.5840000000000001,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "min_seg_size_forward": {
+        "method": "ks_2samp",
+        "statistic": 0.47806,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.17258000000000007,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Max": {
+        "method": "ks_2samp",
+        "statistic": 0.17258000000000007,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Min": {
+        "method": "ks_2samp",
+        "statistic": 0.17258000000000007,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.17278000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Max": {
+        "method": "ks_2samp",
+        "statistic": 0.17278000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Min": {
+        "method": "ks_2samp",
+        "statistic": 0.17278000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      }
+    },
+    "action": "drift alert observed; review-driven retrained model already active"
+  },
+  "w3": {
+    "Window": "W3",
+    "Dataset": "drift_bruteforce.csv",
+    "method": "ks_2samp",
+    "total_features": 52,
+    "drifted_feature_count": 51,
+    "drift_share": 0.9807692307692307,
+    "dataset_drift": true,
+    "drift_threshold": 0.5,
+    "drifted_features": [
+      "Destination Port",
+      "Flow Duration",
+      "Total Fwd Packets",
+      "Total Length of Fwd Packets",
+      "Fwd Packet Length Max",
+      "Fwd Packet Length Min",
+      "Fwd Packet Length Mean",
+      "Fwd Packet Length Std",
+      "Bwd Packet Length Max",
+      "Bwd Packet Length Min",
+      "Bwd Packet Length Mean",
+      "Bwd Packet Length Std",
+      "Flow Bytes/s",
+      "Flow Packets/s",
+      "Flow IAT Mean",
+      "Flow IAT Std",
+      "Flow IAT Max",
+      "Flow IAT Min",
+      "Fwd IAT Total",
+      "Fwd IAT Mean",
+      "Fwd IAT Std",
+      "Fwd IAT Max",
+      "Fwd IAT Min",
+      "Bwd IAT Total",
+      "Bwd IAT Mean",
+      "Bwd IAT Std",
+      "Bwd IAT Max",
+      "Bwd IAT Min",
+      "Fwd Header Length",
+      "Bwd Header Length",
+      "Fwd Packets/s",
+      "Bwd Packets/s",
+      "Min Packet Length",
+      "Max Packet Length",
+      "Packet Length Mean",
+      "Packet Length Std",
+      "Packet Length Variance",
+      "PSH Flag Count",
+      "ACK Flag Count",
+      "Average Packet Size",
+      "Subflow Fwd Bytes",
+      "Init_Win_bytes_forward",
+      "Init_Win_bytes_backward",
+      "act_data_pkt_fwd",
+      "min_seg_size_forward",
+      "Active Mean",
+      "Active Max",
+      "Active Min",
+      "Idle Mean",
+      "Idle Max",
+      "Idle Min"
+    ],
+    "feature_results": {
+      "Destination Port": {
+        "method": "ks_2samp",
+        "statistic": 0.9547573006134968,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Duration": {
+        "method": "ks_2samp",
+        "statistic": 0.5740969325153374,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Total Fwd Packets": {
+        "method": "ks_2samp",
+        "statistic": 0.6394952147239263,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Total Length of Fwd Packets": {
+        "method": "ks_2samp",
+        "statistic": 0.559359018404908,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Max": {
+        "method": "ks_2samp",
+        "statistic": 0.42669533742331284,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Min": {
+        "method": "ks_2samp",
+        "statistic": 0.4804638036809815,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.43408564417177914,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.6735964417177914,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Max": {
+        "method": "ks_2samp",
+        "statistic": 0.25701030674846626,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Min": {
+        "method": "ks_2samp",
+        "statistic": 0.4982,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.3776958282208589,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.45912760736196323,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Bytes/s": {
+        "method": "ks_2samp",
+        "statistic": 0.46919668711656437,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.46732282208588954,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.45718282208588956,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.4681644171779141,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.4912579141104294,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.2707593865030675,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Total": {
+        "method": "ks_2samp",
+        "statistic": 0.528158527607362,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.496459018404908,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.5102433128834356,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.5021941104294478,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.48252233128834354,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Total": {
+        "method": "ks_2samp",
+        "statistic": 0.6555358282208589,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.6172482208588956,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.630959018404908,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.6480352147239263,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.305682944785276,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Header Length": {
+        "method": "ks_2samp",
+        "statistic": 0.6632352147239263,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Header Length": {
+        "method": "ks_2samp",
+        "statistic": 0.6957601226993866,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.47441693251533745,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.41924638036809814,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Min Packet Length": {
+        "method": "ks_2samp",
+        "statistic": 0.47712,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Max Packet Length": {
+        "method": "ks_2samp",
+        "statistic": 0.4251353374233129,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.4228781595092025,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.4350753374233129,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Variance": {
+        "method": "ks_2samp",
+        "statistic": 0.4350753374233129,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "FIN Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.005299999999999971,
+        "p_value": 0.9887190097939387,
+        "threshold": 0.05,
+        "drifted": false
+      },
+      "PSH Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.24649619631901842,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "ACK Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.03669619631901844,
+        "p_value": 1.2339287387069477e-08,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Average Packet Size": {
+        "method": "ks_2samp",
+        "statistic": 0.4225511656441717,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Subflow Fwd Bytes": {
+        "method": "ks_2samp",
+        "statistic": 0.559359018404908,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Init_Win_bytes_forward": {
+        "method": "ks_2samp",
+        "statistic": 0.5311161963190183,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Init_Win_bytes_backward": {
+        "method": "ks_2samp",
+        "statistic": 0.4599052760736197,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "act_data_pkt_fwd": {
+        "method": "ks_2samp",
+        "statistic": 0.6232525153374233,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "min_seg_size_forward": {
+        "method": "ks_2samp",
+        "statistic": 0.6098546012269939,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.17620000000000002,
+        "p_value": 8.867911251513761e-191,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Max": {
+        "method": "ks_2samp",
+        "statistic": 0.17620000000000002,
+        "p_value": 8.867911251513761e-191,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Min": {
+        "method": "ks_2samp",
+        "statistic": 0.17620000000000002,
+        "p_value": 8.867911251513761e-191,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.1764,
+        "p_value": 3.2541221889554674e-191,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Max": {
+        "method": "ks_2samp",
+        "statistic": 0.1764,
+        "p_value": 3.2541221889554674e-191,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Min": {
+        "method": "ks_2samp",
+        "statistic": 0.1764,
+        "p_value": 3.2541221889554674e-191,
+        "threshold": 0.05,
+        "drifted": true
+      }
+    },
+    "action": "drift alert observed; review-driven retrained model already active"
+  },
+  "w4": {
+    "Window": "W4",
+    "Dataset": "drift_webattacks.csv",
+    "method": "ks_2samp",
+    "total_features": 52,
+    "drifted_feature_count": 51,
+    "drift_share": 0.9807692307692307,
+    "dataset_drift": true,
+    "drift_threshold": 0.5,
+    "drifted_features": [
+      "Destination Port",
+      "Flow Duration",
+      "Total Fwd Packets",
+      "Total Length of Fwd Packets",
+      "Fwd Packet Length Max",
+      "Fwd Packet Length Min",
+      "Fwd Packet Length Mean",
+      "Fwd Packet Length Std",
+      "Bwd Packet Length Max",
+      "Bwd Packet Length Min",
+      "Bwd Packet Length Mean",
+      "Bwd Packet Length Std",
+      "Flow Bytes/s",
+      "Flow Packets/s",
+      "Flow IAT Mean",
+      "Flow IAT Std",
+      "Flow IAT Max",
+      "Flow IAT Min",
+      "Fwd IAT Total",
+      "Fwd IAT Mean",
+      "Fwd IAT Std",
+      "Fwd IAT Max",
+      "Fwd IAT Min",
+      "Bwd IAT Total",
+      "Bwd IAT Mean",
+      "Bwd IAT Std",
+      "Bwd IAT Max",
+      "Bwd IAT Min",
+      "Fwd Header Length",
+      "Bwd Header Length",
+      "Fwd Packets/s",
+      "Bwd Packets/s",
+      "Min Packet Length",
+      "Max Packet Length",
+      "Packet Length Mean",
+      "Packet Length Std",
+      "Packet Length Variance",
+      "PSH Flag Count",
+      "ACK Flag Count",
+      "Average Packet Size",
+      "Subflow Fwd Bytes",
+      "Init_Win_bytes_forward",
+      "Init_Win_bytes_backward",
+      "act_data_pkt_fwd",
+      "min_seg_size_forward",
+      "Active Mean",
+      "Active Max",
+      "Active Min",
+      "Idle Mean",
+      "Idle Max",
+      "Idle Min"
+    ],
+    "feature_results": {
+      "Destination Port": {
+        "method": "ks_2samp",
+        "statistic": 0.45768,
+        "p_value": 4.50177e-318,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Duration": {
+        "method": "ks_2samp",
+        "statistic": 0.6960060641399417,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Total Fwd Packets": {
+        "method": "ks_2samp",
+        "statistic": 0.49694932944606407,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Total Length of Fwd Packets": {
+        "method": "ks_2samp",
+        "statistic": 0.7168917201166181,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Max": {
+        "method": "ks_2samp",
+        "statistic": 0.7168917201166181,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Min": {
+        "method": "ks_2samp",
+        "statistic": 0.48119999999999996,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.7168917201166181,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.2631317201166181,
+        "p_value": 8.547793756447725e-102,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Max": {
+        "method": "ks_2samp",
+        "statistic": 0.6965917201166181,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Min": {
+        "method": "ks_2samp",
+        "statistic": 0.4982,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.6965917201166181,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.22048892128279884,
+        "p_value": 2.865586402984206e-71,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Bytes/s": {
+        "method": "ks_2samp",
+        "statistic": 0.8397117201166181,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.7003584839650145,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.6987479300291545,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.6880419241982507,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.6875342857142857,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.6732032069970845,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Total": {
+        "method": "ks_2samp",
+        "statistic": 0.6796597084548105,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.704287055393586,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.6951870553935859,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.6761559183673469,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.8399027988338192,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Total": {
+        "method": "ks_2samp",
+        "statistic": 0.3752317201166181,
+        "p_value": 3.767108775360561e-210,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.3752317201166181,
+        "p_value": 3.767108775360561e-210,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.21633172011661805,
+        "p_value": 1.351934422464733e-68,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.3752317201166181,
+        "p_value": 3.767108775360561e-210,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.37287172011661807,
+        "p_value": 1.9835839321922367e-207,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Header Length": {
+        "method": "ks_2samp",
+        "statistic": 0.7232093294460641,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Header Length": {
+        "method": "ks_2samp",
+        "statistic": 0.45484932944606415,
+        "p_value": 6.156023241e-314,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.7206462973760932,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.6215373760932945,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Min Packet Length": {
+        "method": "ks_2samp",
+        "statistic": 0.47712,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Max Packet Length": {
+        "method": "ks_2samp",
+        "statistic": 0.8397117201166181,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.8397117201166181,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.7030517201166181,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Variance": {
+        "method": "ks_2samp",
+        "statistic": 0.7030517201166181,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "FIN Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.005299999999999971,
+        "p_value": 0.9999999999090794,
+        "threshold": 0.05,
+        "drifted": false
+      },
+      "PSH Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.42336932944606415,
+        "p_value": 4.6923846062742386e-270,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "ACK Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.2135693294460641,
+        "p_value": 7.555236099223391e-67,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Average Packet Size": {
+        "method": "ks_2samp",
+        "statistic": 0.8397117201166181,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Subflow Fwd Bytes": {
+        "method": "ks_2samp",
+        "statistic": 0.7168917201166181,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Init_Win_bytes_forward": {
+        "method": "ks_2samp",
+        "statistic": 0.7079893294460641,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Init_Win_bytes_backward": {
+        "method": "ks_2samp",
+        "statistic": 0.8537979008746356,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "act_data_pkt_fwd": {
+        "method": "ks_2samp",
+        "statistic": 0.4993117201166181,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "min_seg_size_forward": {
+        "method": "ks_2samp",
+        "statistic": 0.6101,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.17620000000000002,
+        "p_value": 1.7033942853793204e-45,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Max": {
+        "method": "ks_2samp",
+        "statistic": 0.17620000000000002,
+        "p_value": 1.7033942853793204e-45,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Min": {
+        "method": "ks_2samp",
+        "statistic": 0.17620000000000002,
+        "p_value": 1.7033942853793204e-45,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.1764,
+        "p_value": 1.3436109911086698e-45,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Max": {
+        "method": "ks_2samp",
+        "statistic": 0.1764,
+        "p_value": 1.3436109911086698e-45,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Min": {
+        "method": "ks_2samp",
+        "statistic": 0.1764,
+        "p_value": 1.3436109911086698e-45,
+        "threshold": 0.05,
+        "drifted": true
+      }
+    },
+    "action": "drift alert observed; review-driven retrained model already active"
+  },
+  "w5": {
+    "Window": "W5",
+    "Dataset": "portscan.csv",
+    "method": "ks_2samp",
+    "total_features": 52,
+    "drifted_feature_count": 51,
+    "drift_share": 0.9807692307692307,
+    "dataset_drift": true,
+    "drift_threshold": 0.5,
+    "drifted_features": [
+      "Destination Port",
+      "Flow Duration",
+      "Total Fwd Packets",
+      "Total Length of Fwd Packets",
+      "Fwd Packet Length Max",
+      "Fwd Packet Length Min",
+      "Fwd Packet Length Mean",
+      "Fwd Packet Length Std",
+      "Bwd Packet Length Max",
+      "Bwd Packet Length Min",
+      "Bwd Packet Length Mean",
+      "Bwd Packet Length Std",
+      "Flow Bytes/s",
+      "Flow Packets/s",
+      "Flow IAT Mean",
+      "Flow IAT Std",
+      "Flow IAT Max",
+      "Flow IAT Min",
+      "Fwd IAT Total",
+      "Fwd IAT Mean",
+      "Fwd IAT Std",
+      "Fwd IAT Max",
+      "Fwd IAT Min",
+      "Bwd IAT Total",
+      "Bwd IAT Mean",
+      "Bwd IAT Std",
+      "Bwd IAT Max",
+      "Bwd IAT Min",
+      "Fwd Header Length",
+      "Bwd Header Length",
+      "Fwd Packets/s",
+      "Bwd Packets/s",
+      "Min Packet Length",
+      "Max Packet Length",
+      "Packet Length Mean",
+      "Packet Length Std",
+      "Packet Length Variance",
+      "PSH Flag Count",
+      "ACK Flag Count",
+      "Average Packet Size",
+      "Subflow Fwd Bytes",
+      "Init_Win_bytes_forward",
+      "Init_Win_bytes_backward",
+      "act_data_pkt_fwd",
+      "min_seg_size_forward",
+      "Active Mean",
+      "Active Max",
+      "Active Min",
+      "Idle Mean",
+      "Idle Max",
+      "Idle Min"
+    ],
+    "feature_results": {
+      "Destination Port": {
+        "method": "ks_2samp",
+        "statistic": 0.58922,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Duration": {
+        "method": "ks_2samp",
+        "statistic": 0.6596799999999999,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Total Fwd Packets": {
+        "method": "ks_2samp",
+        "statistic": 0.6294,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Total Length of Fwd Packets": {
+        "method": "ks_2samp",
+        "statistic": 0.68546,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Max": {
+        "method": "ks_2samp",
+        "statistic": 0.67606,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Min": {
+        "method": "ks_2samp",
+        "statistic": 0.35446,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.67562,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.34914,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Max": {
+        "method": "ks_2samp",
+        "statistic": 0.50502,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Min": {
+        "method": "ks_2samp",
+        "statistic": 0.49404,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.5047,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.30512000000000006,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Bytes/s": {
+        "method": "ks_2samp",
+        "statistic": 0.5676,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.62074,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.59554,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.5925,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.65208,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Flow IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.426,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Total": {
+        "method": "ks_2samp",
+        "statistic": 0.6275200000000001,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.6275200000000001,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.43178000000000005,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.6275200000000001,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.6171800000000001,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Total": {
+        "method": "ks_2samp",
+        "statistic": 0.46218000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.46218000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Std": {
+        "method": "ks_2samp",
+        "statistic": 0.30687999999999993,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Max": {
+        "method": "ks_2samp",
+        "statistic": 0.46218000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd IAT Min": {
+        "method": "ks_2samp",
+        "statistic": 0.45982,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Header Length": {
+        "method": "ks_2samp",
+        "statistic": 0.55114,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Header Length": {
+        "method": "ks_2samp",
+        "statistic": 0.53612,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Fwd Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.61518,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Bwd Packets/s": {
+        "method": "ks_2samp",
+        "statistic": 0.65164,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Min Packet Length": {
+        "method": "ks_2samp",
+        "statistic": 0.35006000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Max Packet Length": {
+        "method": "ks_2samp",
+        "statistic": 0.5449999999999999,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.68262,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Std": {
+        "method": "ks_2samp",
+        "statistic": 0.53596,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Packet Length Variance": {
+        "method": "ks_2samp",
+        "statistic": 0.5356799999999999,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "FIN Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.005299999999999971,
+        "p_value": 0.4820945683973582,
+        "threshold": 0.05,
+        "drifted": false
+      },
+      "PSH Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.48504,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "ACK Flag Count": {
+        "method": "ks_2samp",
+        "statistic": 0.27532,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Average Packet Size": {
+        "method": "ks_2samp",
+        "statistic": 0.67338,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Subflow Fwd Bytes": {
+        "method": "ks_2samp",
+        "statistic": 0.68546,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Init_Win_bytes_forward": {
+        "method": "ks_2samp",
+        "statistic": 0.45512,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Init_Win_bytes_backward": {
+        "method": "ks_2samp",
+        "statistic": 0.37044,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "act_data_pkt_fwd": {
+        "method": "ks_2samp",
+        "statistic": 0.5840000000000001,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "min_seg_size_forward": {
+        "method": "ks_2samp",
+        "statistic": 0.47806,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.17258000000000007,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Max": {
+        "method": "ks_2samp",
+        "statistic": 0.17258000000000007,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Active Min": {
+        "method": "ks_2samp",
+        "statistic": 0.17258000000000007,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Mean": {
+        "method": "ks_2samp",
+        "statistic": 0.17278000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Max": {
+        "method": "ks_2samp",
+        "statistic": 0.17278000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "Idle Min": {
+        "method": "ks_2samp",
+        "statistic": 0.17278000000000004,
+        "p_value": 0.0,
+        "threshold": 0.05,
+        "drifted": true
+      }
+    },
+    "action": "drift alert observed; review-driven retrained model already active"
+  }
+}

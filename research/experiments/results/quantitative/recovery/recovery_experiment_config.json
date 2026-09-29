@@ -1,0 +1,253 @@
+{
+  "created_at_utc": "2026-07-05T04:09:14.453397+00:00",
+  "command": "python paper/results/quantitative/run_offline_drift_retraining_recovery_eval.py --binary --drift-threshold 0.5 --random-seed 42 --use-mixed-reference-for-drift --drift-benign-mix-fraction 0.0",
+  "binary": true,
+  "random_seed": 42,
+  "max_train_rows": 100000,
+  "max_window_rows": 50000,
+  "attack_trigger_fraction": 0.6,
+  "benign_reference_fraction": 0.6,
+  "benign_retraining_fraction": 0.2,
+  "drift_method": "ks_2samp",
+  "drift_threshold": 0.5,
+  "pvalue_threshold": 0.05,
+  "schema_validation": {
+    "label_column": "Label",
+    "feature_count": 52,
+    "features_match_across_loaded_datasets": true,
+    "feature_columns": [
+      "Destination Port",
+      "Flow Duration",
+      "Total Fwd Packets",
+      "Total Length of Fwd Packets",
+      "Fwd Packet Length Max",
+      "Fwd Packet Length Min",
+      "Fwd Packet Length Mean",
+      "Fwd Packet Length Std",
+      "Bwd Packet Length Max",
+      "Bwd Packet Length Min",
+      "Bwd Packet Length Mean",
+      "Bwd Packet Length Std",
+      "Flow Bytes/s",
+      "Flow Packets/s",
+      "Flow IAT Mean",
+      "Flow IAT Std",
+      "Flow IAT Max",
+      "Flow IAT Min",
+      "Fwd IAT Total",
+      "Fwd IAT Mean",
+      "Fwd IAT Std",
+      "Fwd IAT Max",
+      "Fwd IAT Min",
+      "Bwd IAT Total",
+      "Bwd IAT Mean",
+      "Bwd IAT Std",
+      "Bwd IAT Max",
+      "Bwd IAT Min",
+      "Fwd Header Length",
+      "Bwd Header Length",
+      "Fwd Packets/s",
+      "Bwd Packets/s",
+      "Min Packet Length",
+      "Max Packet Length",
+      "Packet Length Mean",
+      "Packet Length Std",
+      "Packet Length Variance",
+      "FIN Flag Count",
+      "PSH Flag Count",
+      "ACK Flag Count",
+      "Average Packet Size",
+      "Subflow Fwd Bytes",
+      "Init_Win_bytes_forward",
+      "Init_Win_bytes_backward",
+      "act_data_pkt_fwd",
+      "min_seg_size_forward",
+      "Active Mean",
+      "Active Max",
+      "Active Min",
+      "Idle Mean",
+      "Idle Max",
+      "Idle Min"
+    ],
+    "numeric_coercion": "All non-label columns coerced with pandas.to_numeric(errors='coerce')",
+    "imputation": "inf/-inf converted to NaN; NaN imputed with decontaminated M0 training medians"
+  },
+  "label_mapping": {
+    "BENIGN_aliases": [
+      "BENIGN",
+      "Benign",
+      "NORMAL",
+      "Normal",
+      "benign",
+      "normal"
+    ],
+    "non_benign_labels": "ATTACK"
+  },
+  "scenario_policy": {
+    "M0_fixed_model": "Trained once from data/train_2_classes.csv after removing future-holdout overlaps.",
+    "M1_retrained_model": "Per-scenario challenger trained from M0 training data plus trigger/retraining window only.",
+    "future_holdout_policy": "Future holdout rows are excluded from M0/M1 training by row-hash checks.",
+    "claim_safety": "Offline replay/recovery experiment only; no automatic production deployment or promotion is claimed."
+  },
+  "all_scenarios_leakage_safe": true,
+  "leakage_reports": {
+    "S1": {
+      "m1_training_vs_future_holdout_unique_overlap": 0,
+      "trigger_window_vs_future_holdout_unique_overlap": 0,
+      "m1_training_rows_overlapping_future_holdout": 0,
+      "future_holdout_rows_overlapping_m1_training": 0,
+      "trigger_rows_overlapping_future_holdout": 0,
+      "leakage_safe": true
+    },
+    "S2": {
+      "m1_training_vs_future_holdout_unique_overlap": 0,
+      "trigger_window_vs_future_holdout_unique_overlap": 0,
+      "m1_training_rows_overlapping_future_holdout": 0,
+      "future_holdout_rows_overlapping_m1_training": 0,
+      "trigger_rows_overlapping_future_holdout": 0,
+      "leakage_safe": true
+    },
+    "S3": {
+      "m1_training_vs_future_holdout_unique_overlap": 0,
+      "trigger_window_vs_future_holdout_unique_overlap": 0,
+      "m1_training_rows_overlapping_future_holdout": 0,
+      "future_holdout_rows_overlapping_m1_training": 0,
+      "trigger_rows_overlapping_future_holdout": 0,
+      "leakage_safe": true
+    }
+  },
+  "f1_recovery_summary": {
+    "S1": {
+      "attack_family": "PortScan",
+      "delta_macro_f1": 0.8381135947379901,
+      "fixed_macro_f1": 0.16156215100341806,
+      "retrained_macro_f1": 0.9996757457414082,
+      "improved": true
+    },
+    "S2": {
+      "attack_family": "BruteForce",
+      "delta_macro_f1": 0.6251006690944909,
+      "fixed_macro_f1": 0.37438315835548175,
+      "retrained_macro_f1": 0.9994838274499727,
+      "improved": true
+    },
+    "S3": {
+      "attack_family": "WebAttacks",
+      "delta_macro_f1": 0.5310543221714826,
+      "fixed_macro_f1": 0.4664386907669761,
+      "retrained_macro_f1": 0.9974930129384587,
+      "improved": true
+    }
+  },
+  "per_scenario_config": {
+    "S1": {
+      "attack_family": "PortScan",
+      "attack_source": "data/drift_portscan.csv",
+      "trigger_fraction_requested": 0.6,
+      "trigger_attack_rows": 30000,
+      "future_attack_rows": 20000,
+      "trigger_benign_rows": 4774,
+      "future_benign_rows": 4775,
+      "removed_attack_trigger_rows_overlapping_future_holdout": 0,
+      "removed_m1_training_rows_overlapping_future_holdout": 0,
+      "m1_training_binary_counts": {
+        "BENIGN": 68300,
+        "ATTACK": 63256
+      },
+      "future_holdout_binary_counts": {
+        "BENIGN": 4775,
+        "ATTACK": 20000
+      },
+      "leakage_report": {
+        "m1_training_vs_future_holdout_unique_overlap": 0,
+        "trigger_window_vs_future_holdout_unique_overlap": 0,
+        "m1_training_rows_overlapping_future_holdout": 0,
+        "future_holdout_rows_overlapping_m1_training": 0,
+        "trigger_rows_overlapping_future_holdout": 0,
+        "leakage_safe": true
+      }
+    },
+    "S2": {
+      "attack_family": "BruteForce",
+      "attack_source": "data/drift_bruteforce.csv",
+      "trigger_fraction_requested": 0.6,
+      "trigger_attack_rows": 4890,
+      "future_attack_rows": 3260,
+      "trigger_benign_rows": 4774,
+      "future_benign_rows": 4775,
+      "removed_attack_trigger_rows_overlapping_future_holdout": 0,
+      "removed_m1_training_rows_overlapping_future_holdout": 0,
+      "m1_training_binary_counts": {
+        "BENIGN": 68300,
+        "ATTACK": 38146
+      },
+      "future_holdout_binary_counts": {
+        "BENIGN": 4775,
+        "ATTACK": 3260
+      },
+      "leakage_report": {
+        "m1_training_vs_future_holdout_unique_overlap": 0,
+        "trigger_window_vs_future_holdout_unique_overlap": 0,
+        "m1_training_rows_overlapping_future_holdout": 0,
+        "future_holdout_rows_overlapping_m1_training": 0,
+        "trigger_rows_overlapping_future_holdout": 0,
+        "leakage_safe": true
+      }
+    },
+    "S3": {
+      "attack_family": "WebAttacks",
+      "attack_source": "data/drift_webattacks.csv",
+      "trigger_fraction_requested": 0.6,
+      "trigger_attack_rows": 1029,
+      "future_attack_rows": 686,
+      "trigger_benign_rows": 4774,
+      "future_benign_rows": 4775,
+      "removed_attack_trigger_rows_overlapping_future_holdout": 0,
+      "removed_m1_training_rows_overlapping_future_holdout": 0,
+      "m1_training_binary_counts": {
+        "BENIGN": 68300,
+        "ATTACK": 34285
+      },
+      "future_holdout_binary_counts": {
+        "BENIGN": 4775,
+        "ATTACK": 686
+      },
+      "leakage_report": {
+        "m1_training_vs_future_holdout_unique_overlap": 0,
+        "trigger_window_vs_future_holdout_unique_overlap": 0,
+        "m1_training_rows_overlapping_future_holdout": 0,
+        "future_holdout_rows_overlapping_m1_training": 0,
+        "trigger_rows_overlapping_future_holdout": 0,
+        "leakage_safe": true
+      }
+    }
+  },
+  "existing_model_artifact_inspection": {
+    "v1": {
+      "path": "D:\\UIT STUDY\\NT114\\23520541-23521412\\Project\\MLOps-nids-system\\models\\v1\\xgb_nids_model_v1.pkl",
+      "exists": true,
+      "loaded": true,
+      "type": "xgboost.sklearn.XGBClassifier",
+      "n_features_in_": 52,
+      "classes_": [
+        "0",
+        "1"
+      ],
+      "load_error": null
+    },
+    "v2": {
+      "path": "D:\\UIT STUDY\\NT114\\23520541-23521412\\Project\\MLOps-nids-system\\models\\v2\\xgb_nids_model_v2.pkl",
+      "exists": true,
+      "loaded": true,
+      "type": "xgboost.sklearn.XGBClassifier",
+      "n_features_in_": 52,
+      "classes_": [
+        "0",
+        "1",
+        "2"
+      ],
+      "load_error": null
+    },
+    "used_for_recovery_experiment": false
+  }
+}

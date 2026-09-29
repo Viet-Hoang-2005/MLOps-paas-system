@@ -29,15 +29,16 @@ resource "aws_s3_bucket_versioning" "artifacts_versioning" {
   }
 }
 
-# Cấu hình CORS cho S3 bucket
+# Cấu hình CORS cho S3 bucket (Hỗ trợ Presigned Upload)
 resource "aws_s3_bucket_cors_configuration" "artifacts_cors" {
   bucket = aws_s3_bucket.artifacts_bucket.id
 
   cors_rule {
     allowed_headers = ["*"]
-    allowed_methods = ["GET", "HEAD"]
-    allowed_origins = ["*"]
-    expose_headers  = []
+    allowed_methods = ["GET", "HEAD", "PUT", "POST"]
+    allowed_origins = var.cors_allowed_origins
+    expose_headers  = ["ETag"]
     max_age_seconds = 3000
   }
 }
+

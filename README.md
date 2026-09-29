@@ -36,20 +36,20 @@ Hệ thống này là một **nền tảng AI Platform-as-a-Service MLOps phục
 
 ## 2. Tính năng Cốt lõi ✨
 
-| #   | Tính năng                                      | Mô tả chi tiết                                                                                     | Công nghệ                          |
-| --- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| 1   | **Multi-Tenant AI PaaS**                       | Cách ly tài nguyên, quyền hạn và dữ liệu giữa các người dùng/tổ chức với Asymmetric RS256 JWT     | Django DRF + JWKS + Asymmetric JWT |
-| 2   | **Async Build & Package**                      | Celery điều phối Docker backend ở local hoặc Argo/Kaniko ở production để đóng gói và đẩy image | Celery + Argo + Harbor + Kaniko |
-| 3   | **Dynamic Model Serving**                      | Traefik chuyển request vào model-server gateway; gateway resolve version/alias tới worker khỏe mạnh | Traefik + FastAPI + BentoML     |
-| 4   | **Drift Detection**                            | Tạo monitor/run theo model version, phân tích production/reference data và lưu report trên S3 | Evidently AI + Celery + Argo Workflows |
-| 5   | **Training Orchestration**                     | Snapshot bất biến code/data/requirements; Celery chạy Docker local hoặc kích hoạt Argo/Kubeflow | Celery + Argo + Kubeflow PyTorchJob |
-| 6   | **Optional Elastic Training Capacity**         | Có thể provision/thu hồi node CPU/GPU theo nhu cầu sau khi training platform được bật và xác minh | Karpenter NodePool                 |
-| 7   | **Job Events, Logs & Metrics**                 | Lưu trạng thái trong PostgreSQL; stream log/metrics runtime qua Redis và cung cấp API polling cho UI | PostgreSQL + Redis + React Query |
-| 8   | **Immutable Model Registry**                   | Quản lý version, artifact, metric, alias và lineage; MLflow theo dõi experiment/artifact theo job | Django Registry + MLflow + S3 |
-| 9   | **GitOps Deployment**                          | Build/sign image, cập nhật Kustomize tag và đồng bộ rolling update qua ArgoCD                     | ArgoCD GitOps + GitHub Actions     |
-| 10  | **HA PostgreSQL & Event Streaming**            | PostgreSQL production gồm primary/standby; Redpanda vận chuyển inference và domain events          | CloudNativePG + Redpanda Kafka     |
-| 11  | **Full-Stack Observability**                   | Giám sát toàn diện API Latency, Throughput, Error Rate, tài nguyên K3s và Kafka Lag                | Prometheus + Grafana + AlertManager|
-| 12  | **Automated Infrastructure & IaC**             | Chuẩn hóa hạ tầng AWS bằng Terraform và cài đặt hoàn toàn cụm K3s cùng Add-ons chỉ qua 1 lệnh      | Terraform + Ansible Playbook       |
+| #   | Tính năng                              | Mô tả chi tiết                                                                                       | Công nghệ                              |
+| --- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 1   | **Multi-Tenant AI PaaS**               | Cách ly tài nguyên, quyền hạn và dữ liệu giữa các người dùng/tổ chức với Asymmetric RS256 JWT        | Django DRF + JWKS + Asymmetric JWT     |
+| 2   | **Async Build & Package**              | Celery điều phối Docker backend ở local hoặc Argo/Kaniko ở production để đóng gói và đẩy image       | Celery + Argo + Harbor + Kaniko        |
+| 3   | **Dynamic Model Serving**              | Traefik chuyển request vào model-server gateway; gateway resolve version/alias tới worker khỏe mạnh  | Traefik + FastAPI + BentoML            |
+| 4   | **Drift Detection**                    | Tạo monitor/run theo model version, phân tích production/reference data và lưu report trên S3        | Evidently AI + Celery + Argo Workflows |
+| 5   | **Training Orchestration**             | Snapshot bất biến code/data/requirements; Celery chạy Docker local hoặc kích hoạt Argo/Kubeflow      | Celery + Argo + Kubeflow PyTorchJob    |
+| 6   | **Optional Elastic Training Capacity** | Có thể provision/thu hồi node CPU/GPU theo nhu cầu sau khi training platform được bật và xác minh    | Karpenter NodePool                     |
+| 7   | **Job Events, Logs & Metrics**         | Lưu trạng thái trong PostgreSQL; stream log/metrics runtime qua Redis và cung cấp API polling cho UI | PostgreSQL + Redis + React Query       |
+| 8   | **Immutable Model Registry**           | Quản lý version, artifact, metric, alias và lineage; MLflow theo dõi experiment/artifact theo job    | Django Registry + MLflow + S3          |
+| 9   | **GitOps Deployment**                  | Build/sign image, cập nhật Kustomize tag và đồng bộ rolling update qua ArgoCD                        | ArgoCD GitOps + GitHub Actions         |
+| 10  | **HA PostgreSQL & Event Streaming**    | PostgreSQL production gồm primary/standby; Redpanda vận chuyển inference và domain events            | CloudNativePG + Redpanda Kafka         |
+| 11  | **Full-Stack Observability**           | Giám sát toàn diện API Latency, Throughput, Error Rate, tài nguyên K3s và Kafka Lag                  | Prometheus + Grafana + AlertManager    |
+| 12  | **Automated Infrastructure & IaC**     | Chuẩn hóa hạ tầng AWS bằng Terraform và cài đặt hoàn toàn cụm K3s cùng Add-ons chỉ qua 1 lệnh        | Terraform + Ansible Playbook           |
 
 ---
 
@@ -57,15 +57,15 @@ Hệ thống này là một **nền tảng AI Platform-as-a-Service MLOps phục
 
 **1. Quy trình Đóng gói & Triển khai Mô hình (Build & Deploy Workflow)**
 
-![Build and Deploy Workflow](research/paper/assets/build-deploy-workflow-dark.png)
+![Build and Deploy Workflow](images/build-deploy-workflow-dark.png)
 
 **2. Quy trình Huấn luyện & Điều phối Tài nguyên (Training Workflow)**
 
-![Training Workflow](research/paper/assets/training-workflow-dark.png)
+![Training Workflow](images/training-workflow-dark.png)
 
 **3. Quy trình Giám sát & Phát hiện Độ lệch Dữ liệu (Data Drift Workflow)**
 
-![Data Drift Workflow](research/paper/assets/data-drift-workflow-dark.png)
+![Data Drift Workflow](images/data-drift-workflow-dark.png)
 
 > 💡 **Tài liệu Kỹ thuật Chuyên sâu:** Xem giải thích chi tiết về luồng dữ liệu, sơ đồ tuần tự (Sequence Diagrams), cơ chế bảo mật Zero-Trust và lược đồ cơ sở dữ liệu tại [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -73,25 +73,25 @@ Hệ thống này là một **nền tảng AI Platform-as-a-Service MLOps phục
 
 ## 4. Công nghệ sử dụng ⚙️
 
-| Lớp (Layer)                | Công nghệ / Thư viện                                      | Vai trò trong Hệ thống                                                  |
-| -------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------- |
-| **Machine Learning**       | XGBoost, Scikit-learn, PyTorch, TensorFlow                | Framework xây dựng và huấn luyện mô hình ML/DL                           |
-| **Model Serving**          | FastAPI, BentoML, Traefik                                 | Gateway trung tâm định tuyến tới runtime worker ML/DL                    |
-| **Training Orchestration** | Kubeflow Training Operator (PyTorchJob), Argo Workflows   | Điều phối huấn luyện mô hình phân tán và luồng sự kiện                 |
-| **Drift Detection**        | Evidently AI, Celery, Argo Workflows                       | Chạy Data Drift theo monitor/run và lưu report trên S3                  |
-| **Control Plane**          | Django 5.0, Django REST Framework, Celery, JWT RS256      | Modular monolith quản lý tenant, domain state và async execution        |
-| **Message Broker**         | Redpanda (Kafka-compatible broker)                        | Hàng đợi tin nhắn tốc độ cao xử lý lưu lượng suy luận bất đồng bộ       |
-| **Database (HA)**          | PostgreSQL 15, CloudNativePG Operator, SQLAlchemy         | Lưu trữ dữ liệu metadata, người dùng và dữ liệu suy luận production     |
-| **Task Broker / Log Stream** | Redis 7 Alpine                                          | Celery broker/result backend và stream log/metric runtime               |
-| **Container Registry**     | Harbor Registry (Self-hosted), Cosign                     | Lưu trữ Docker image đa người thuê, ký xác thực bảo mật image           |
-| **CI/CD & GitOps**         | GitHub Actions, ArgoCD                                    | Tự động hóa kiểm thử, đóng gói và triển khai liên tục theo mô hình GitOps|
-| **Model Registry**         | Django Registry, MLflow, AWS S3                           | Version/alias/lineage trong Control Plane; tracking và artifact theo job |
-| **Orchestration**          | K3s (Lightweight Kubernetes)                              | Nền tảng quản lý container hiệu năng cao trên Cloud / Edge              |
-| **Infrastructure (IaC)**   | Terraform, AWS (VPC, EC2, ALB, S3, Route53, ACM)          | Khai báo và quản lý tự động hạ tầng đám mây Amazon Web Services         |
-| **Automation**             | Ansible Playbook                                          | Tự động hóa cài đặt K3s Master/Worker và triển khai toàn bộ K8s Add-ons |
-| **Security & Secrets**     | AWS Secrets Manager, External Secrets Operator (ESO)      | Quản lý bảo mật biến môi trường và đồng bộ secret vào Kubernetes         |
-| **Observability**          | Prometheus, Grafana, AlertManager                         | Thu thập metrics, trực quan hóa dashboard và phát cảnh báo tự động      |
-| **Autoscaling**            | KEDA (core), Karpenter NodePool (optional)                | Mở rộng pod theo event; mở rộng node chỉ khi training phase được bật     |
+| Lớp (Layer)                  | Công nghệ / Thư viện                                    | Vai trò trong Hệ thống                                                    |
+| ---------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **Machine Learning**         | XGBoost, Scikit-learn, PyTorch, TensorFlow              | Framework xây dựng và huấn luyện mô hình ML/DL                            |
+| **Model Serving**            | FastAPI, BentoML, Traefik                               | Gateway trung tâm định tuyến tới runtime worker ML/DL                     |
+| **Training Orchestration**   | Kubeflow Training Operator (PyTorchJob), Argo Workflows | Điều phối huấn luyện mô hình phân tán và luồng sự kiện                    |
+| **Drift Detection**          | Evidently AI, Celery, Argo Workflows                    | Chạy Data Drift theo monitor/run và lưu report trên S3                    |
+| **Control Plane**            | Django 5.0, Django REST Framework, Celery, JWT RS256    | Modular monolith quản lý tenant, domain state và async execution          |
+| **Message Broker**           | Redpanda (Kafka-compatible broker)                      | Hàng đợi tin nhắn tốc độ cao xử lý lưu lượng suy luận bất đồng bộ         |
+| **Database (HA)**            | PostgreSQL 15, CloudNativePG Operator, SQLAlchemy       | Lưu trữ dữ liệu metadata, người dùng và dữ liệu suy luận production       |
+| **Task Broker / Log Stream** | Redis 7 Alpine                                          | Celery broker/result backend và stream log/metric runtime                 |
+| **Container Registry**       | Harbor Registry (Self-hosted), Cosign                   | Lưu trữ Docker image đa người thuê, ký xác thực bảo mật image             |
+| **CI/CD & GitOps**           | GitHub Actions, ArgoCD                                  | Tự động hóa kiểm thử, đóng gói và triển khai liên tục theo mô hình GitOps |
+| **Model Registry**           | Django Registry, MLflow, AWS S3                         | Version/alias/lineage trong Control Plane; tracking và artifact theo job  |
+| **Orchestration**            | K3s (Lightweight Kubernetes)                            | Nền tảng quản lý container hiệu năng cao trên Cloud / Edge                |
+| **Infrastructure (IaC)**     | Terraform, AWS (VPC, EC2, ALB, S3, Route53, ACM)        | Khai báo và quản lý tự động hạ tầng đám mây Amazon Web Services           |
+| **Automation**               | Ansible Playbook                                        | Tự động hóa cài đặt K3s Master/Worker và triển khai toàn bộ K8s Add-ons   |
+| **Security & Secrets**       | AWS Secrets Manager, External Secrets Operator (ESO)    | Quản lý bảo mật biến môi trường và đồng bộ secret vào Kubernetes          |
+| **Observability**            | Prometheus, Grafana, AlertManager                       | Thu thập metrics, trực quan hóa dashboard và phát cảnh báo tự động        |
+| **Autoscaling**              | KEDA (core), Karpenter NodePool (optional)              | Mở rộng pod theo event; mở rộng node chỉ khi training phase được bật      |
 
 ---
 
@@ -245,16 +245,16 @@ pnpm dev
 
 **Local Service URLs:**
 
-| Dịch vụ              | URL Local                    | Mô tả                                      |
-| -------------------- | ---------------------------- | ------------------------------------------ |
-| **Control Plane API**| <http://localhost:8000/api/> | REST API của AI PaaS Backend               |
-| **React Dashboard**  | <http://localhost:5173>      | Vite dev server, chạy riêng bằng `pnpm dev`|
-| **Model Server**     | <http://localhost:5001>      | Gateway nội bộ/public trực tiếp            |
-| **Traefik Gateway**  | <http://localhost:5002>      | Public inference routing                   |
-| **Traefik Dashboard**| <http://localhost:8080>      | Dashboard định tuyến local                 |
-| **MLflow Tracking**  | <http://localhost:5003>      | Tracking Server và artifact UI             |
-| **Redpanda Console** | <http://localhost:8081>      | Quản lý Kafka Topics & Consumer Groups     |
-| **pgAdmin 4 GUI**    | <http://localhost:5050>      | Giao diện quản trị cơ sở dữ liệu PostgreSQL|
+| Dịch vụ               | URL Local                    | Mô tả                                       |
+| --------------------- | ---------------------------- | ------------------------------------------- |
+| **Control Plane API** | <http://localhost:8000/api/> | REST API của AI PaaS Backend                |
+| **React Dashboard**   | <http://localhost:5173>      | Vite dev server, chạy riêng bằng `pnpm dev` |
+| **Model Server**      | <http://localhost:5001>      | Gateway nội bộ/public trực tiếp             |
+| **Traefik Gateway**   | <http://localhost:5002>      | Public inference routing                    |
+| **Traefik Dashboard** | <http://localhost:8080>      | Dashboard định tuyến local                  |
+| **MLflow Tracking**   | <http://localhost:5003>      | Tracking Server và artifact UI              |
+| **Redpanda Console**  | <http://localhost:8081>      | Quản lý Kafka Topics & Consumer Groups      |
+| **pgAdmin 4 GUI**     | <http://localhost:5050>      | Giao diện quản trị cơ sở dữ liệu PostgreSQL |
 
 ---
 
@@ -419,13 +419,13 @@ ansible-playbook site.yml --tags verify \
 
 Các phase hiện có:
 
-| Phase/tag | Trách nhiệm | Mặc định |
-| --- | --- | --- |
-| `preflight` | Kiểm tra WSL, Terraform inventory, SSH và rollout flags | Luôn chạy |
-| `bootstrap` | Cài K3s `v1.34.9+k3s1`, một server và hai worker | Bật |
-| `platform-core` | Cài Argo CD, bootstrap root và chờ core add-on/cluster Application | Bật |
+| Phase/tag           | Trách nhiệm                                                                     | Mặc định                      |
+| ------------------- | ------------------------------------------------------------------------------- | ----------------------------- |
+| `preflight`         | Kiểm tra WSL, Terraform inventory, SSH và rollout flags                         | Luôn chạy                     |
+| `bootstrap`         | Cài K3s `v1.34.9+k3s1`, một server và hai worker                                | Bật                           |
+| `platform-core`     | Cài Argo CD, bootstrap root và chờ core add-on/cluster Application              | Bật                           |
 | `platform-training` | Chờ training add-on/capacity Application do Argo CD quản lý và chạy smoke tests | Bật trong group vars hiện tại |
-| `verify` | Xác minh node, operator và root Application | Chạy cuối |
+| `verify`            | Xác minh node, operator và root Application                                     | Chạy cuối                     |
 
 Ansible chỉ cài Argo CD rồi tạo root Application `mlops-paas-system`. Repository GitHub hiện public nên không cần repository credential bootstrap. Root chỉ tạo GitOps control tree; child cluster Application tạo Namespace trước, tiếp đến add-ons, cluster configuration, platform service, execution và workload được Argo CD reconcile theo sync wave; không cần `kubectl apply` thủ công sau khi `platform-core` hoàn tất.
 
@@ -471,17 +471,17 @@ Ngoài bảy core operator Application, root trực tiếp quản lý 6 training
 
 **Production Service URLs:**
 
-| Dịch vụ              | URL Production                                | Mô tả                              |
-| -------------------- | --------------------------------------------- | ---------------------------------- |
-| **Frontend**         | <https://mlops-nids-nt114.id.vn>              | React AI PaaS Dashboard            |
-| **Control Plane**    | <https://api.mlops-nids-nt114.id.vn/api/>     | REST API của Control Plane         |
-| **MLflow Server**    | <https://mlflow.mlops-nids-nt114.id.vn>       | Model Registry & Experiment UI     |
-| **Grafana Dashboard**| <https://grafana.mlops-nids-nt114.id.vn>      | Monitoring & Observability Hub     |
-| **ArgoCD Dashboard** | <https://argocd.mlops-nids-nt114.id.vn>       | GitOps CD Management Portal        |
-| **Argo Workflow UI** | <https://workflow.mlops-nids-nt114.id.vn>     | Orchestration & Workflow UI        |
-| **Harbor Registry**  | <https://registry.mlops-nids-nt114.id.vn>     | Private Container Registry         |
+| Dịch vụ               | URL Production                            | Mô tả                          |
+| --------------------- | ----------------------------------------- | ------------------------------ |
+| **Frontend**          | <https://mlops-nids-nt114.id.vn>          | React AI PaaS Dashboard        |
+| **Control Plane**     | <https://api.mlops-nids-nt114.id.vn/api/> | REST API của Control Plane     |
+| **MLflow Server**     | <https://mlflow.mlops-nids-nt114.id.vn>   | Model Registry & Experiment UI |
+| **Grafana Dashboard** | <https://grafana.mlops-nids-nt114.id.vn>  | Monitoring & Observability Hub |
+| **ArgoCD Dashboard**  | <https://argocd.mlops-nids-nt114.id.vn>   | GitOps CD Management Portal    |
+| **Argo Workflow UI**  | <https://workflow.mlops-nids-nt114.id.vn> | Orchestration & Workflow UI    |
+| **Harbor Registry**   | <https://registry.mlops-nids-nt114.id.vn> | Private Container Registry     |
 
-Frontend, Argo CD, Argo Workflows, Grafana và MLflow đi qua Cloudflare Tunnel. Control Plane và Harbor đi qua public ALB với TLS termination; Traefik chỉ tin `X-Forwarded-*` từ các Flannel gateway `/32` đã cấu hình, không bật `forwardedHeaders.insecure`.
+Frontend, Argo CD, Argo Workflows, Grafana và MLflow đi qua Cloudflare Tunnel. Control Plane và Harbor đi qua public ALB với TLS termination; Traefik chỉ tin `X-Forwarded-*` từ dải VPC và K3s PodCIDR nội bộ đã cấu hình, không bật `forwardedHeaders.insecure`.
 
 ---
 

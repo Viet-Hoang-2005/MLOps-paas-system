@@ -1,5 +1,6 @@
 from urllib.parse import urlparse
 
+import jwt
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
@@ -65,6 +66,25 @@ def test_token_contains_tenant_id():
     assert response.status_code == 200
     assert response.data["tenant_id"] == user.tenant_id
     assert user.tenant_id == f"T-{user.public_id}"
+
+
+@pytest.mark.django_db
+def test_refreshed_access_token_keeps_gateway_claims():
+    user = get_user_model().objects.create_user("refresh@example.com", "password123")
+    client = APIClient()
+    issued = client.post(
+        "/api/auth/token/",
+        {"email": user.email, "password": "password123"},
+        format="json",
+    )
+    response = client.post("/api/auth/token/refresh/", {"refresh": issued.data["refresh"]}, format="json")
+
+    assert response.status_code == 200
+    for token in (response.data["access"], response.data["refresh"]):
+        assert jwt.get_unverified_header(token)["kid"] == "mlops-paas-key-1"
+    claims = jwt.decode(response.data["access"], options={"verify_signature": False})
+    assert claims["tenant_id"] == user.tenant_id
+    assert claims["aud"] == "mlops-paas"
 
 
 @pytest.mark.django_db

@@ -3,7 +3,7 @@ from typing import cast
 import jwt
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from apps.auth.models import CustomUser, UserAvatar
@@ -48,6 +48,11 @@ class TenantTokenSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
         data["tenant_id"] = cast(CustomUser, self.user).tenant_id
         return data
+
+
+class TenantTokenRefreshSerializer(TokenRefreshSerializer):
+    # The model gateway resolves the verifying key by `kid`, so refreshed tokens need it too.
+    token_class = _KeyIdRefreshToken
 
 
 class UserSerializer(serializers.ModelSerializer):

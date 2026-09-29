@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .serializers import RegistrationSerializer, TenantTokenSerializer
+from .serializers import RegistrationSerializer, TenantTokenRefreshSerializer, TenantTokenSerializer
 
 
 class RegisterEndpoint(generics.CreateAPIView):
@@ -51,4 +51,4 @@ class JWKSEndpoint(APIView):
 
 
 token_endpoint = TokenObtainPairView.as_view(serializer_class=TenantTokenSerializer)
-refresh_endpoint = TokenRefreshView.as_view()
+refresh_endpoint = TokenRefreshView.as_view(serializer_class=TenantTokenRefreshSerializer)

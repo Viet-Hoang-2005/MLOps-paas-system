@@ -40,6 +40,7 @@ spec:
             arguments:
               parameters:
                 - {name: container_name, value: "{{inputs.parameters.container_name}}"}
+                - {name: service_name, value: "{{inputs.parameters.container_name}}-svc"}
                 - {name: model_type, value: "{{inputs.parameters.model_type}}"}
                 - {name: target_port, value: "{{inputs.parameters.target_port}}"}
 
@@ -80,6 +81,8 @@ spec:
                 automountServiceAccountToken: false
                 nodeSelector:
                   workload-type: worker
+                imagePullSecrets:
+                  - name: harbor-registry-pull-secret
                 containers:
                   - name: model-server
                     image: {{=toJson(inputs.parameters.image_name)}}
@@ -108,6 +111,9 @@ spec:
       inputs:
         parameters:
           - name: container_name
+          # Built by the caller: quoted literals inside {{=...}} are escaped when the
+          # template is serialized, so the expression would be left unevaluated.
+          - name: service_name
           - name: model_type
           - name: target_port
       resource:
@@ -116,7 +122,7 @@ spec:
           apiVersion: v1
           kind: Service
           metadata:
-            name: {{=toJson(sprig.printf("%s-svc", inputs.parameters.container_name))}}
+            name: {{=toJson(inputs.parameters.service_name)}}
             namespace: mlops-model-runtimes
             labels:
               component: model-server

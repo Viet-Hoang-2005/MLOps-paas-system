@@ -8,10 +8,10 @@ k3s_etcd_snapshot_retention: 12
 k3s_expected_worker_count: 2
 traefik_request_timeout: "600s"
 traefik_forwarded_headers_trusted_ips:
-  # K3s ServiceLB uses externalTrafficPolicy=Cluster, so Traefik sees the
-  # Flannel gateway of the worker selected by the ALB rather than the ALB IP.
-  - "10.42.1.0/32"
-  - "10.42.2.0/32"
+  # TLS terminates at the public ALB. K3s ServiceLB and Flannel proxy internal hops,
+  # so trust the private VPC CIDR (ALB & EC2 nodes) and the K3s PodCIDR.
+  - "10.0.0.0/16"
+  - "10.42.0.0/16"
 
 # Rollout phases are deliberately independent. This production rollout enables
 # the training infrastructure, but the tenant-facing feature stays disabled.

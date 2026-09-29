@@ -1,0 +1,13 @@
+{
+  "date": "2026-09-27",
+  "pdf_pages": 8,
+  "pdf_sha256": "10a65f0939d1c1f7c3d2a2e7c5a8feeccffa8d4392d86cc94ec8fdc1badf9dbe",
+  "tex_sha256": "a30d7a35b05eb785daea7503e255b0fe301a5e0c757730cd9c5e1ee892084fe6",
+  "retained_citations": 17,
+  "all_citations_defined_and_used": true,
+  "latex_warnings": [],
+  "overfull_or_underfull_boxes": 0,
+  "visual_review": "Updated tables on pages 5-6 rendered and inspected; the whole 8-page PDF was not re-reviewed in this pass.",
+  "experiment_baseline": "run_20260926 unchanged; post-hoc diagnostics stored separately in diagnostics/run_20260927",
+  "submission_status": "Team-review draft; source-data acquisition and author decisions remain pending."
+}

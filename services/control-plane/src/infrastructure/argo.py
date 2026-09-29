@@ -16,4 +16,8 @@ class ArgoWebhookClient:
             raise ServiceUnavailable("Argo Events webhook authentication is not configured.")
         request_headers = dict(headers or {})
         request_headers["Authorization"] = f"Bearer {token}"
-        return self.http.request("POST", url, json=payload, headers=request_headers).json()
+        response = self.http.request("POST", url, json=payload, headers=request_headers)
+        try:
+            return response.json()
+        except ValueError:
+            return {"status_code": response.status_code, "text": response.text}

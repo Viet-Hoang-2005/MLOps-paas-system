@@ -35,7 +35,7 @@ def save_project_metadata(*, actor, validated_data, project=None, storage=None):
     data = dict(validated_data)
     source_code_file = data.pop("source_code_file", None)
     reference_data_file = data.pop("reference_data_file", None)
-    duplicate = ModelProject.objects.filter(owner=actor, name=data["name"])
+    duplicate = ModelProject.objects.filter(owner=actor, name=data["name"], is_active=True)
     if project is not None:
         duplicate = duplicate.exclude(pk=project.pk)
     if duplicate.exists():
@@ -51,7 +51,7 @@ def save_project_metadata(*, actor, validated_data, project=None, storage=None):
             _replace_attachment(project=project, kind="code", uploaded_file=source_code_file, storage=storage)
             _replace_attachment(project=project, kind="data", uploaded_file=reference_data_file, storage=storage)
     except IntegrityError as exc:
-        if "project_owner_name_unique" in str(exc) or "catalog_modelproject.owner_id" in str(exc):
+        if "project_owner_active_name_unique" in str(exc) or "catalog_modelproject.owner_id" in str(exc):
             raise Conflict(f"A model project named {data['name']} already exists.") from exc
         raise
     return project
