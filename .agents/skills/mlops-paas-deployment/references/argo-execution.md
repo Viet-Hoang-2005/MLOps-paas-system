@@ -1,5 +1,10 @@
 # Argo execution
 
+Argo task stdout/stderr is collected by namespace-scoped Alloy into seven-day
+Loki/S3 history. Trusted deploy waits for model-loaded readiness, then an exit
+handler reports terminal status using a deployment-bound expiring capability.
+Never pass that capability to the runtime image. See `docs/runtime-logs.md`.
+
 WorkflowTemplates and Argo Events cover:
 
 - Build/package.

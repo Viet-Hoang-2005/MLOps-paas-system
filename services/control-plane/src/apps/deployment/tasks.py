@@ -171,13 +171,38 @@ def execute_deployment(self, deployment_id):
         Endpoint = type(endpoint)
         Endpoint.objects.filter(pk=endpoint.pk).update(health_status="stopped")
         return "stopped"
-    append_deployment_log(deployment, "Runtime resource created; waiting for endpoint health check.")
+    append_deployment_log(deployment, "Runtime resource dispatched; waiting for readiness confirmation.")
     record_transition(deployment, "deploying", phase="dispatched")
     if endpoint.health_status == "healthy":
         _mark_deployment_healthy(deployment)
         return "healthy"
-    check_deployment_health.apply_async(args=[str(deployment.public_id)], countdown=10)
+    if deployment.backend == "argo":
+        mark_deployment_unconfirmed.apply_async(args=[str(deployment.public_id)], countdown=33 * 60)
+    else:
+        check_deployment_health.apply_async(args=[str(deployment.public_id)], countdown=10)
     return "deploying"
+
+
+@shared_task
+def mark_deployment_unconfirmed(deployment_id):
+    with transaction.atomic():
+        deployment = Deployment.objects.select_for_update().select_related("version").get(public_id=deployment_id)
+        if deployment.status != "deploying" or deployment.backend != "argo":
+            return deployment.status
+        deployment.status = "unconfirmed"
+        deployment.error_message = "No deployment result callback arrived before the deadline. Check the workflow logs."
+        deployment.save(update_fields=["status", "error_message", "updated_at"])
+        invalidate_model_server_cache(str(deployment.version.public_id))
+        append_deployment_log(deployment, deployment.error_message)
+        record_transition(deployment, "unconfirmed", reason="Deployment result callback timed out")
+        enqueue_event(
+            topic="deployment.events",
+            aggregate_type="deployment",
+            aggregate_id=deployment.public_id,
+            event_type="deployment.changed",
+            payload={"deployment_id": str(deployment.public_id), "status": "unconfirmed"},
+        )
+    return "unconfirmed"
 
 
 @shared_task(bind=True, max_retries=30)

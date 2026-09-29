@@ -8,6 +8,7 @@ from .validate_cluster_capacity import validate as validate_cluster_capacity
 from .validate_execution_security import validate as validate_execution_security
 from .validate_helm_sources import validate as validate_helm_sources
 from .validate_resource_ownership import validate as validate_resource_ownership
+from .validate_runtime_logging import validate as validate_runtime_logging
 from .validate_secrets import validate as validate_secrets
 from .validate_supply_chain import validate as validate_supply_chain
 
@@ -18,6 +19,7 @@ VALIDATORS = (
     ("execution-security", validate_execution_security),
     ("supply-chain", validate_supply_chain),
     ("cluster-capacity", validate_cluster_capacity),
+    ("runtime-logging", validate_runtime_logging),
     ("helm-sources", validate_helm_sources),
 )
 

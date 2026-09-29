@@ -18,6 +18,7 @@ from apps.training.services.jobs import (
 )
 from apps.training.services.logs import training_logs
 from common.api.exceptions import ServiceUnavailable
+from infrastructure.runtime_logs import runtime_log_page
 
 from .serializers import TrainingBuildSerializer, TrainingJobEventSerializer, TrainingJobSerializer
 
@@ -98,22 +99,12 @@ class TrainingJobEventsEndpoint(APIView):
 
 class TrainingJobLogsEndpoint(APIView):
     def get(self, request, job_id):
-        try:
-            offset = int(request.query_params.get("offset", "0"))
-        except (TypeError, ValueError):
-            offset = -1
-        if offset < 0:
-            return Response(
-                {"detail": "offset must be a non-negative integer."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         job = job_for_user(request.user, job_id)
-        logs, next_offset = training_logs(job, offset)
+        page = runtime_log_page(request, job, "training", training_logs)
         return Response(
             {
                 "training_job_id": str(job.public_id),
-                "logs": logs,
-                "next_offset": next_offset,
+                **page,
                 "status": job.status,
                 "error_message": job.error_message,
             }

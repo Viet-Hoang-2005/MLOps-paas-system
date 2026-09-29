@@ -142,7 +142,7 @@ def test_publish_propagates_only_bounded_correlation():
         reset_context(token)
 
 
-def test_retry_signal_emits_one_safe_warning_with_context(caplog):
+def test_retry_signal_emits_one_safe_warning_with_context(caplog, monkeypatch):
     from celery.exceptions import Retry
     from celery.signals import task_retry
 
@@ -412,14 +412,14 @@ def test_django_converted_exception_retains_diagnostic_and_cleans_up(settings, m
         raise RuntimeError("token=private-view-error")
 
     settings.ROOT_URLCONF = type("LoggingTestUrls", (), {"urlpatterns": [path("broken/", broken_view)]})
-    summary = Mock()
-    monkeypatch.setattr("common.middleware.Summary", lambda *_: summary)
+    emitted = Mock()
+    monkeypatch.setattr("common.middleware.log_event", emitted)
     client = APIClient()
     client.raise_request_exception = False
     response = client.get("/broken/")
     assert response.status_code == 500
-    summary.failure.assert_called_once()
-    fields = summary.failure.call_args.kwargs
+    emitted.assert_called_once()
+    fields = emitted.call_args.kwargs
     assert fields["error_type"] == "RuntimeError"
     assert fields["exc_info"][0] is RuntimeError
     assert fields["exc_info"][2] is not None

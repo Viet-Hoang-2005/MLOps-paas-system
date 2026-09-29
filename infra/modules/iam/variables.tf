@@ -1,3 +1,13 @@
+variable "enable_runtime_logs" {
+  type    = bool
+  default = false
+}
+
+variable "runtime_logs_bucket_arn" {
+  type    = string
+  default = ""
+}
+
 variable "artifacts_bucket_arn" {
   description = "ARN of the S3 bucket for artifacts"
   type        = string

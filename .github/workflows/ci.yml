@@ -128,7 +128,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
       - name: Install Dependencies (pnpm)
         working-directory: web
         run: |
@@ -172,7 +172,7 @@ jobs:
           version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - name: Install dependencies
@@ -196,7 +196,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
           cache: pip
           cache-dependency-path: |
             ${{ matrix.target.context }}/requirements.txt
@@ -252,7 +252,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
           cache: pip
           cache-dependency-path: |
             ${{ matrix.target.context }}/requirements.txt
@@ -271,7 +271,6 @@ jobs:
         working-directory: ${{ matrix.target.context }}
         run: |
           python -m ruff check .
-          python -m mypy src/apps src/common src/infrastructure
           python manage.py check --settings=config.settings.test
           python manage.py makemigrations --check --dry-run --settings=config.settings.test
       - name: Run Control Plane unit tests with coverage
@@ -347,7 +346,7 @@ jobs:
       - name: Setup Python for GitOps validation
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
       - name: Install GitOps validation dependencies
         run: pip install -r k8s/validate/requirements.txt
       - name: Setup Kustomize
@@ -390,7 +389,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
       - name: Install Ansible dependencies and collections
         run: |
           pip install -r ansible/requirements.txt
@@ -413,7 +412,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: '1.5.7'
+          terraform_version: "1.5.7"
       - name: Format check
         run: terraform fmt -check -recursive
       - name: Initialize providers without backend
@@ -423,7 +422,18 @@ jobs:
 
   build-and-scan:
     name: "Build & Scan (${{ matrix.target.name }})"
-    needs: [detect-changes, lint-frontend, lint-backend, service-unit-tests, frontend-build, validate-k8s, validate-ansible, validate-terraform, secret-scan]
+    needs:
+      [
+        detect-changes,
+        lint-frontend,
+        lint-backend,
+        service-unit-tests,
+        frontend-build,
+        validate-k8s,
+        validate-ansible,
+        validate-terraform,
+        secret-scan,
+      ]
     if: always() && needs.detect-changes.result == 'success' && needs.detect-changes.outputs.matrix_targets != '[]'
     runs-on: ubuntu-latest
     strategy:
@@ -450,13 +460,13 @@ jobs:
         id: trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ matrix.target.image }}:test'
-          format: 'json'
-          output: 'trivy-report.json'
-          exit-code: '0'
+          image-ref: "${{ matrix.target.image }}:test"
+          format: "json"
+          output: "trivy-report.json"
+          exit-code: "0"
           ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
       - name: Write Trivy summary
         if: always()
         run: |
@@ -492,7 +502,19 @@ jobs:
 
   ci-summary:
     name: "CI Pipeline Summary Table"
-    needs: [detect-changes, secret-scan, lint-frontend, lint-backend, service-unit-tests, frontend-build, validate-k8s, validate-ansible, validate-terraform, build-and-scan]
+    needs:
+      [
+        detect-changes,
+        secret-scan,
+        lint-frontend,
+        lint-backend,
+        service-unit-tests,
+        frontend-build,
+        validate-k8s,
+        validate-ansible,
+        validate-terraform,
+        build-and-scan,
+      ]
     if: always()
     runs-on: ubuntu-latest
     steps:

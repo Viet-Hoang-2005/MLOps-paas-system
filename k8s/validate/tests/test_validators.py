@@ -7,6 +7,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import yaml
+
 from k8s.validate.common import ValidationContext, identity, repository_root
 from k8s.validate.validate_application_contract import (
     validate_lifecycle,
@@ -20,6 +22,7 @@ from k8s.validate.validate_helm_sources import validate as validate_helm_sources
 from k8s.validate.validate_resource_ownership import (
     validate as validate_resource_ownership,
 )
+from k8s.validate.validate_runtime_logging import validate as validate_runtime_logging
 from k8s.validate.validate_secrets import validate as validate_secrets
 from k8s.validate.validate_supply_chain import validate_cd_workflow
 
@@ -81,7 +84,7 @@ class CommonTests(unittest.TestCase):
 class ValidatorNegativeTests(unittest.TestCase):
     def test_application_contract_rejects_missing_child_applications(self):
         self.assertTrue(
-            any("exactly 31" in error for error in validate_lifecycle(FakeContext()))
+            any("exactly 33" in error for error in validate_lifecycle(FakeContext()))
         )
 
     def test_application_contract_rejects_default_destination(self):
@@ -225,6 +228,32 @@ class ValidatorNegativeTests(unittest.TestCase):
         self.assertTrue(
             any("must render at least one resource" in error for error in errors)
         )
+
+
+class RuntimeLoggingTests(unittest.TestCase):
+    def context(self):
+        root = repository_root()
+        addon_path = root / "k8s/gitops/production/applications/addons"
+        apps = [yaml.safe_load((addon_path / name).read_text()) for name in ("alloy.yaml", "loki.yaml")]
+        template = yaml.safe_load((root / "k8s/argo/workflows/deploy-workflowtemplate.yaml").read_text())
+        roles = list(yaml.safe_load_all((root / "k8s/argo/rbac.yaml").read_text()))
+        return FakeContext(applications=apps, rendered={"k8s/argo": [template, *roles]})
+
+    def test_current_runtime_logging_contract(self):
+        self.assertEqual(validate_runtime_logging(self.context()), [])
+
+    def test_collector_secret_access_and_tenant_callback_token_are_rejected(self):
+        context = self.context()
+        app = context.application("mlops-prod-addon-alloy")
+        values = yaml.safe_load(app["spec"]["source"]["helm"]["values"])
+        values["rbac"]["rules"].append({"resources": ["secrets"], "verbs": ["get"]})
+        app["spec"]["source"]["helm"]["values"] = yaml.safe_dump(values)
+        spec = context.render("k8s/argo")[0]["spec"]
+        template = next(item for item in spec["templates"] if item["name"] == "apply-deployment")
+        template["resource"]["manifest"] += "callback_token: unsafe\n"
+        errors = validate_runtime_logging(context)
+        self.assertTrue(any("read-only" in error for error in errors))
+        self.assertTrue(any("never receive" in error for error in errors))
 
 
 if __name__ == "__main__":

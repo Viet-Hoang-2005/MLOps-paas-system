@@ -16,4 +16,9 @@
 
 ## Runtime logs
 
+Production uses signed Loki cursors through existing authorized Control Plane
+task APIs; local Docker retains offset-based Redis logs. Poll at two seconds,
+bound visible output, drain exit logs after terminal status, and preserve cursors
+during outages. `unconfirmed` deployment means callback missing, not successful.
+
 `TerminalViewer` is presentation-only: title, copy action, optional header actions, placeholder, and supplied log content. Pages/hooks own polling, stream cursors, Run/Stop/Retry behavior, and lifecycle callbacks.

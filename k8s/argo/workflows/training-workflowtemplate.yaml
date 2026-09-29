@@ -7,6 +7,9 @@ spec:
   serviceAccountName: argo-workflow-training-sa
   entrypoint: training-pipeline
   onExit: report-status
+  podMetadata:
+    labels:
+      mlops.io/training-job-id: "{{workflow.parameters.job_id}}"
   templates:
     - name: training-pipeline
       inputs:

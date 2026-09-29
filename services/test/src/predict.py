@@ -10,7 +10,9 @@ from dotenv import load_dotenv
 ROOT_DIR = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
-TEST_CSV_PATH = os.path.join(ROOT_DIR, "data", "test_data.csv")
+TEST_CSV_PATH = os.path.join(
+    ROOT_DIR, "models", "nids-xgboost", "data", "test_data.csv"
+)
 
 # Tự động load biến môi trường từ file .env
 load_dotenv(os.path.join(ROOT_DIR, ".env"))

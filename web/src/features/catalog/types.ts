@@ -145,7 +145,7 @@ export interface Deployment {
   build_id: ResourceId;
   backend: "docker" | "argo";
   status:
-    "pending" | "deploying" | "healthy" | "unhealthy" | "failed" | "stopped";
+    "pending" | "deploying" | "healthy" | "unhealthy" | "failed" | "stopped" | "unconfirmed";
   error_message: string;
 }
 

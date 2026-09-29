@@ -87,6 +87,7 @@ coverage.xml
 htmlcov/
 .tox/
 .tmp-*/
+*tmp/
 
 # Terraform
 *.tfstate

@@ -43,6 +43,7 @@ PRODUCTION_NAMESPACES = {
     "kyverno",
     "mlflow-server",
     "monitoring",
+    "mlops-logging",
     "mlops-cluster-config",
     "mlops-control-plane",
     "mlops-consumer",

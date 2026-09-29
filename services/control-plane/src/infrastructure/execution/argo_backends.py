@@ -1,6 +1,7 @@
 from django.conf import settings
 
 from apps.deployment.models import Endpoint
+from apps.deployment.services.callbacks import issue_callback_token
 from apps.training.services.capabilities import issue_capability
 from apps.training.services.storage_scope import validate_training_uri
 from infrastructure.argo import ArgoWebhookClient
@@ -166,6 +167,22 @@ class ArgoDeploymentBackend(_ArgoBackend):
         container_name = f"deploy-{str(deployment.build.public_id).lower()}"
         model_type = "dl" if version.flavor in {"pytorch", "tensorflow"} else "ml"
         target_port = 3000 if model_type == "dl" else 5001
+        public_url = (
+            f"{settings.MODEL_SERVER_PUBLIC_URL}/{project.owner.tenant_id}/models/"
+            f"{project.public_id}/{version.public_id}"
+        )
+        endpoint = Endpoint.objects.update_or_create(
+            deployment=deployment,
+            defaults={
+                "public_url": public_url,
+                "internal_url": (
+                    f"http://{container_name}-svc.{settings.MODEL_RUNTIME_NAMESPACE}.svc.cluster.local:{target_port}"
+                ),
+                "runtime_name": container_name,
+                "runtime_namespace": settings.MODEL_RUNTIME_NAMESPACE,
+                "health_status": "unknown",
+            },
+        )[0]
         self._log(f"Submitting Argo deployment workflow for runtime {container_name}.")
         self.trigger(
             {
@@ -179,6 +196,10 @@ class ArgoDeploymentBackend(_ArgoBackend):
                 "container_name": container_name,
                 "model_type": model_type,
                 "target_port": str(target_port),
+                "control_plane_webhook_url": (
+                    f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/deployments/{deployment.public_id}/"
+                ),
+                "callback_token": issue_callback_token(deployment.public_id),
                 "model_uri": next(
                     (
                         artifact.uri
@@ -189,23 +210,8 @@ class ArgoDeploymentBackend(_ArgoBackend):
                 ),
             }
         )
-        self._log("Argo workflow submitted; waiting for the Kubernetes service health endpoint.")
-        public_url = (
-            f"{settings.MODEL_SERVER_PUBLIC_URL}/{project.owner.tenant_id}/models/"
-            f"{project.public_id}/{version.public_id}"
-        )
-        return Endpoint.objects.update_or_create(
-            deployment=deployment,
-            defaults={
-                "public_url": public_url,
-                "internal_url": (
-                    f"http://{container_name}-svc.{settings.MODEL_RUNTIME_NAMESPACE}.svc.cluster.local:{target_port}"
-                ),
-                "runtime_name": container_name,
-                "runtime_namespace": settings.MODEL_RUNTIME_NAMESPACE,
-                "health_status": "unknown",
-            },
-        )[0]
+        self._log("Argo workflow submitted; waiting for its readiness result callback.")
+        return endpoint
 
     def stop(self, deployment):
         endpoint = getattr(deployment, "endpoint", None)

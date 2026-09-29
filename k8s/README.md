@@ -1,5 +1,12 @@
 # Production Kubernetes GitOps
 
+## Runtime logs
+
+Loki/Alloy are GitOps-managed addons in `mlops-logging`, with seven-day S3 log
+history and namespace-scoped read-only collection. Control Plane authorizes task
+log access. Deploy workflows confirm actual model readiness by authenticated
+callback. See [runtime log operations](../docs/runtime-logs.md).
+
 `mlops-paas-system` is the single Argo CD root Application. The root owns
 AppProjects, public repository descriptors and explicit child Applications;
 each child owns one independently observable service or domain.

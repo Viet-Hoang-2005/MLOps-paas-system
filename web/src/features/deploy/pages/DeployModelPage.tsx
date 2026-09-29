@@ -14,6 +14,7 @@ const DEPLOYMENT_TERMINAL_STATUSES = [
   "unhealthy",
   "failed",
   "stopped",
+  "unconfirmed",
 ] as const;
 
 export default function DeployModelPage() {
@@ -53,11 +54,13 @@ export default function DeployModelPage() {
   const success = deployment?.status === "healthy";
   const failed = Boolean(
     deployment &&
-    ["failed", "unhealthy", "stopped"].includes(deployment.status),
+    ["failed", "unhealthy", "stopped", "unconfirmed"].includes(deployment.status),
   );
   const deployStatus = !deployment
     ? t("uploadFlow.deploy.none")
-    : success
+    : deployment.status === "unconfirmed"
+      ? t("uploadFlow.deploy.unconfirmed")
+      : success
       ? t("uploadFlow.deploy.success")
       : failed
         ? t("uploadFlow.deploy.error")

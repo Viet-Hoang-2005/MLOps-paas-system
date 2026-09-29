@@ -31,6 +31,8 @@ core_addon_application_names:
   - mlops-prod-addon-argo-events
   - mlops-prod-addon-monitoring
   - mlops-prod-addon-kyverno
+  - mlops-prod-addon-loki
+  - mlops-prod-addon-alloy
 core_cluster_application_names:
   - mlops-prod-cluster-namespaces
   - mlops-prod-cluster-storage
@@ -45,6 +47,8 @@ core_addon_workloads:
   - {namespace: argo-events, release: argo-events}
   - {namespace: monitoring, release: monitoring}
   - {namespace: kyverno, release: kyverno}
+  - {namespace: mlops-logging, release: loki}
+  - {namespace: mlops-logging, release: alloy}
 core_addon_crds:
   - externalsecrets.external-secrets.io
   - clusters.postgresql.cnpg.io

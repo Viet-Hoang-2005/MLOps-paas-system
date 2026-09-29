@@ -18,11 +18,21 @@ spec:
     - https://kedacore.github.io/charts
     - https://argoproj.github.io/argo-helm
     - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+    - https://grafana-community.github.io/helm-charts
     - https://kyverno.github.io/kyverno
     - public.ecr.aws/karpenter
     - registry.k8s.io/nfd/charts
     - https://helm.ngc.nvidia.com/nvidia
   destinations:
+    - namespace: mlops-logging
+      server: https://kubernetes.default.svc
+    - namespace: mlops-execution
+      server: https://kubernetes.default.svc
+    - namespace: mlops-model-runtimes
+      server: https://kubernetes.default.svc
+    - namespace: user-jobs
+      server: https://kubernetes.default.svc
     - namespace: kubeflow
       server: https://kubernetes.default.svc
     - namespace: karpenter

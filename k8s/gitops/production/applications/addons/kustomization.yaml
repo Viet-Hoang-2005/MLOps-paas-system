@@ -9,6 +9,8 @@ resources:
   - argo-workflows.yaml
   - argo-events.yaml
   - monitoring.yaml
+  - loki.yaml
+  - alloy.yaml
   - kyverno.yaml
   - karpenter-crds.yaml
   - karpenter.yaml

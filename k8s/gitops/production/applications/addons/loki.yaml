@@ -1,0 +1,95 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-addon-loki
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    mlops-paas.io/plane: addon
+    mlops-paas.io/component: loki
+spec:
+  project: mlops-addons
+  info:
+    - { name: Owner, value: Platform Engineering }
+    - {
+        name: Source,
+        value: "grafana-community.github.io/helm-charts/loki@18.13.1",
+      }
+    - {
+        name: Runbook,
+        value: "https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#runtime-logs",
+      }
+  source:
+    repoURL: https://grafana-community.github.io/helm-charts
+    chart: loki
+    targetRevision: 18.13.1
+    helm:
+      releaseName: loki
+      values: |
+        deploymentMode: Monolithic
+        fullnameOverride: loki
+        loki:
+          auth_enabled: false
+          commonConfig:
+            replication_factor: 1
+          schemaConfig:
+            configs:
+              - from: "2024-04-01"
+                store: tsdb
+                object_store: s3
+                schema: v13
+                index: {prefix: index_, period: 24h}
+          storage:
+            type: s3
+            bucketNames:
+              chunks: mlops-paas-runtime-logs
+              ruler: mlops-paas-runtime-logs
+              admin: mlops-paas-runtime-logs
+            s3:
+              region: ap-southeast-1
+          limits_config:
+            retention_period: 168h
+            allow_structured_metadata: true
+            max_query_length: 168h
+            max_entries_limit_per_query: 5000
+          compactor:
+            retention_enabled: true
+            delete_request_store: s3
+            working_directory: /var/loki/retention
+        singleBinary:
+          replicas: 1
+          sidecar: false
+          nodeSelector: {workload-type: worker}
+          persistence:
+            enabled: true
+            storageClass: ebs-gp3
+            size: 10Gi
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: 1000m, memory: 1Gi}
+        read: {replicas: 0}
+        write: {replicas: 0}
+        backend: {replicas: 0}
+        gateway: {enabled: false}
+        lokiCanary: {enabled: false}
+        test: {enabled: false}
+        chunksCache: {enabled: false}
+        resultsCache: {enabled: false}
+        networkPolicy:
+          enabled: true
+          ingress:
+            namespaceSelector:
+              matchExpressions:
+                - key: kubernetes.io/metadata.name
+                  operator: In
+                  values: [mlops-logging, mlops-control-plane, monitoring]
+          metrics:
+            namespaceSelector:
+              matchLabels: {kubernetes.io/metadata.name: monitoring}
+          externalStorage:
+            ports: [443, 80]
+            cidrs: [0.0.0.0/0]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mlops-logging

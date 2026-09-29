@@ -42,3 +42,39 @@ resource "aws_s3_bucket_cors_configuration" "artifacts_cors" {
   }
 }
 
+resource "aws_s3_bucket" "runtime_logs" {
+  count  = var.enable_runtime_logs ? 1 : 0
+  bucket = var.runtime_logs_bucket_name
+  tags   = { Component = "runtime-logs" }
+}
+
+resource "aws_s3_bucket_public_access_block" "runtime_logs" {
+  count                   = var.enable_runtime_logs ? 1 : 0
+  bucket                  = aws_s3_bucket.runtime_logs[0].id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "runtime_logs" {
+  count  = var.enable_runtime_logs ? 1 : 0
+  bucket = aws_s3_bucket.runtime_logs[0].id
+  rule {
+    apply_server_side_encryption_by_default { sse_algorithm = "AES256" }
+  }
+}
+
+# Loki compactor implements the 168h retention. This is a cleanup safety net.
+resource "aws_s3_bucket_lifecycle_configuration" "runtime_logs" {
+  count  = var.enable_runtime_logs ? 1 : 0
+  bucket = aws_s3_bucket.runtime_logs[0].id
+  rule {
+    id     = "runtime-log-expiration"
+    status = "Enabled"
+    filter {}
+    expiration { days = 10 }
+    abort_incomplete_multipart_upload { days_after_initiation = 1 }
+  }
+}
+

@@ -85,6 +85,29 @@ resource "aws_iam_instance_profile" "worker_profile" {
   role = aws_iam_role.worker_role.name
 }
 
+# Loki uses the existing static-worker instance credential chain. This policy
+# is not attached to Karpenter's tenant training node role or GitHub Actions.
+resource "aws_iam_role_policy" "worker_runtime_logs" {
+  count = var.enable_runtime_logs ? 1 : 0
+  name  = "mlops-worker-runtime-logs"
+  role  = aws_iam_role.worker_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket", "s3:GetBucketLocation"]
+        Resource = var.runtime_logs_bucket_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload"]
+        Resource = "${var.runtime_logs_bucket_arn}/*"
+      }
+    ]
+  })
+}
+
 # Karpenter IAM Role and Policies
 data "aws_caller_identity" "current" {}
 

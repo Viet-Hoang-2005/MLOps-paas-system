@@ -1,5 +1,10 @@
 # Terraform AWS
 
+Production task logs have a separate private S3 bucket with Loki seven-day
+retention and a ten-day S3 cleanup safety net. Only static-worker IAM gets the
+bucket-scoped policy; Karpenter tenant nodes/GitHub do not. Empty the log bucket
+before destroy; it is intentionally protected by `force_destroy=false`.
+
 The root composition wires modules for:
 
 - `network`: VPC, public/private subnets, routes, NAT/internet gateways.

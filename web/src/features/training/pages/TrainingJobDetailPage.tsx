@@ -29,7 +29,6 @@ import {
   getTrainingJob,
   getTrainingJobDownloadUrl,
   getTrainingJobEvents,
-  getTrainingJobLogs,
   getTrainingJobMetrics,
   refreshTrainingJobStatus,
 } from "@/features/training/api/trainingApi";
@@ -113,20 +112,6 @@ export default function TrainingJobDetailPage() {
   });
 
   const {
-    data: logsResponse,
-    isLoading: loadingLogs,
-    refetch: refetchLogs,
-  } = useQuery({
-    queryKey: trainingQueryKeys.logs(parsedJobId),
-    queryFn: () => getTrainingJobLogs(parsedJobId),
-    enabled: Boolean(job) && activeSection === "logs",
-    refetchInterval:
-      job && activeSection === "logs" && ACTIVE_STATUSES.includes(job.status)
-        ? AUTO_SYNC_INTERVAL_MS
-        : false,
-  });
-
-  const {
     data: metrics,
     isLoading: loadingMetrics,
     refetch: refetchMetrics,
@@ -182,7 +167,6 @@ export default function TrainingJobDetailPage() {
     onSuccess: (updatedJob) => {
       queryClient.setQueryData(trainingQueryKeys.job(parsedJobId), updatedJob);
       if (activeSection === "logs") {
-        void refetchLogs();
         void refetchEvents();
       }
       if (activeSection === "metrics") void refetchMetrics();
@@ -258,7 +242,7 @@ export default function TrainingJobDetailPage() {
   const refreshLogs = async () => {
     setRefreshingSection("logs");
     try {
-      await Promise.all([refetchLogs(), refetchEvents()]);
+      await refetchEvents();
     } finally {
       setRefreshingSection(null);
     }
@@ -341,8 +325,6 @@ export default function TrainingJobDetailPage() {
     job,
     statusLabels,
     activeStatuses: ACTIVE_STATUSES,
-    logsResponse,
-    loadingLogs,
     metrics,
     loadingMetrics,
     eventsResponse,

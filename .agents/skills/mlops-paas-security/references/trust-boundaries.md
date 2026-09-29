@@ -1,5 +1,10 @@
 # Trust boundaries
 
+Production task log access is proxied by tenant-authorized Control Plane
+selectors, never arbitrary client LogQL. Alloy reads only execution/runtime
+Pod logs and cannot read Secrets. Loki is internal-only. Trusted deploy exit
+reporters hold an expiring resource-bound capability, never tenant model Pods.
+
 ## Trusted
 
 - Control Plane API and workers.

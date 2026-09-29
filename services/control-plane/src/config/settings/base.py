@@ -123,6 +123,7 @@ STATIC_URL = "/static/"
 STATIC_ROOT = SERVICE_ROOT / "staticfiles"
 
 REDIS_URL = env("REDIS_URL", "redis://redis:6379/1")
+LOKI_URL = str(env("LOKI_URL", "")).rstrip("/")
 REDPANDA_BROKERS = env("REDPANDA_BROKERS", "redpanda:9092")
 CACHES = {"default": {"BACKEND": "django_redis.cache.RedisCache", "LOCATION": REDIS_URL}}
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels_redis.core.RedisChannelLayer", "CONFIG": {"hosts": [REDIS_URL]}}}

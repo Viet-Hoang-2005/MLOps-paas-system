@@ -46,3 +46,6 @@ class PredictionRecord(models.Model):
             models.Index(fields=["model_version", "-observed_at"], name="prod_version_observed_idx"),
             models.Index(fields=["project", "-observed_at"], name="prod_project_observed_idx"),
         ]
+
+    def __str__(self):
+        return f"Prediction {self.public_id}"

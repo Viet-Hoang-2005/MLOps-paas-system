@@ -63,7 +63,10 @@ class PresignedBuildUploadTests(TestCase):
         self.assertIn("draft_build_id", data)
         self.assertEqual(data["filename"], "model.joblib")
 
-        expected_prefix = f"users/{self.owner.tenant_id}/models/{self.project.public_id}/builds/{data['draft_build_id']}/inputs/source_artifact/model.joblib"
+        expected_prefix = (
+            f"users/{self.owner.tenant_id}/models/{self.project.public_id}/"
+            f"builds/{data['draft_build_id']}/inputs/source_artifact/model.joblib"
+        )
         self.assertTrue(data["s3_uri"].endswith(expected_prefix))
 
     def test_presigned_upload_url_rejects_incompatible_extension(self):
@@ -101,7 +104,10 @@ class PresignedBuildUploadTests(TestCase):
         fake_storage = FakeStorage()
 
         draft_id = "11111111-2222-3333-4444-555555555555"
-        key = f"users/{self.owner.tenant_id}/models/{self.project.public_id}/builds/{draft_id}/inputs/source_artifact/model.pkl"
+        key = (
+            f"users/{self.owner.tenant_id}/models/{self.project.public_id}/"
+            f"builds/{draft_id}/inputs/source_artifact/model.pkl"
+        )
         s3_uri = f"s3://test-bucket/{key}"
 
         payload = {

@@ -17,6 +17,9 @@ ignore = ["DJ001"]
 "src/config/settings/production.py" = ["F403", "F405"]
 "src/config/settings/test.py" = ["F403", "F405"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "common", "config", "infrastructure"]
+
 [tool.mypy]
 python_version = "3.10"
 plugins = ["mypy_django_plugin.main"]

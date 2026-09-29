@@ -6,18 +6,23 @@ import { useTrainingJobDetailContext } from "@/features/training/trainingJobDeta
 import { Button } from "@/shared/components/Button";
 import { PageBody } from "@/shared/components/PageBody";
 import { TerminalViewer } from "@/shared/components/TerminalViewer";
+import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
+
+const TERMINAL_STATUSES = ["completed", "failed", "cancelled"] as const;
 
 export default function TrainingJobLogsPage() {
   const { t } = useTranslation("training");
   const {
     job,
     activeStatuses,
-    logsResponse,
-    loadingLogs,
     eventsResponse,
     refreshingSection,
     refreshLogs,
   } = useTrainingJobDetailContext();
+  const stream = useRuntimeLogStream({
+    source: {kind: "training", id: job.id},
+    terminalStatuses: TERMINAL_STATUSES,
+  });
 
   return (
     <div className="animate-in space-y-4 fade-in duration-300">
@@ -39,12 +44,12 @@ export default function TrainingJobLogsPage() {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => void refreshLogs()}
-            disabled={loadingLogs || refreshingSection === "logs"}
+            onClick={() => { stream.refresh(); void refreshLogs(); }}
+            disabled={refreshingSection === "logs"}
             icon={
               <RefreshCw
                 className={`h-3 w-3 ${
-                  loadingLogs || refreshingSection === "logs"
+                  refreshingSection === "logs"
                     ? "animate-spin"
                     : ""
                 }`}
@@ -55,8 +60,8 @@ export default function TrainingJobLogsPage() {
           </Button>
         }
         logs={
-          logsResponse?.text
-            ? logsResponse.text.split("\n")
+          stream.logs.length || stream.error
+            ? [...stream.logs, ...(stream.error ? [stream.error] : [])]
             : activeStatuses.includes(job.status)
               ? [t("detail.logsPage.waiting")]
               : [t("detail.logsPage.empty")]

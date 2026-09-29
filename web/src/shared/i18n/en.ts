@@ -88,6 +88,7 @@ export const commonEn = {
     copyTitle: "Copy log",
     copy: "Copy",
     error: "Error:",
+    logsUnavailable: "Logs are temporarily unavailable. Retrying; task status is still being checked.",
   },
   accessibility: {
     closeModal: "Close modal",

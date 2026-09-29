@@ -2,6 +2,9 @@
 
 # MLOps PaaS System
 
+Production task stdout/stderr and readiness-based deploy confirmation are
+documented in [Runtime logs](docs/runtime-logs.md).
+
 ### Nền tảng AI PaaS End-to-End phục vụ đa mô hình ML/DL cho các tác vụ xây dựng, triển khai, giám sát, huấn luyện và quản lý phiên bản mô hình
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)

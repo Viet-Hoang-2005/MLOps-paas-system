@@ -23,6 +23,13 @@ Keep Build, project, model version, training job, deployment, monitor, and run U
 
 Redis log streams are keyed by resource type and UUID and support cursor polling. They are transient presentation state; PostgreSQL status remains authoritative.
 
+Production Argo task logs use Loki stdout/stderr with seven-day retention and a
+tenant-authorized Control Plane proxy. Signed task-bound cursors and server-owned
+queries prevent cross-tenant LogQL access. Docker keeps Redis logs. Deploy waits
+for actual model readiness and reports through a short-lived deployment-bound
+capability; missing callbacks become `unconfirmed` after a one-shot deadline.
+See `docs/runtime-logs.md`.
+
 Application-owned container logs use service-owned `src/logging_utils.py`
 (`src/common/logging_utils.py` in Control Plane), using only the standard library
 and either a concise single-line console format (default) or one-line JSON when
@@ -30,9 +37,10 @@ and either a concise single-line console format (default) or one-line JSON when
 installation are required. Keep the contract aligned through local tests. Default INFO; high-frequency activity
 is summarized per process every 60 seconds. Emit lifecycle transitions after commit,
 distinguish dispatch from completion, and keep request/resource IDs separate. Use
-`RuntimeLog` for sanitized job detail with container fallback if its sink is absent
-or fails. Preserve metric/EOF protocols and never infer lifecycle state from tenant
-output. See `docs/backend-logging.md` for the complete logging contract.
+`RuntimeLog` for sanitized job detail emitted to stdout even when its Redis sink
+succeeds, so production collection captures subprocess output. Preserve metric/EOF
+protocols and never infer lifecycle state from tenant output. See
+`docs/runtime-logs.md` for production collection and access boundaries.
 
 ## Configuration
 

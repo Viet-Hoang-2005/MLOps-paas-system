@@ -49,3 +49,4 @@ data:
   MLFLOW_TRACKING_URI: "http://mlflow-server.mlflow-server.svc.cluster.local:5000"
   MLFLOW_TRACKING_REQUIRED: "true"
   PROMETHEUS_INTERNAL_URL: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+  LOKI_URL: "http://loki.mlops-logging.svc.cluster.local:3100"

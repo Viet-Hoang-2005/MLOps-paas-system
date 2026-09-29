@@ -1,4 +1,4 @@
-# grafana-alertrules.yaml: Cấu hình PrometheusRule với các ngưỡng cảnh báo cho hệ thống AI PaaS
+# prometheus-rule.yaml: Cấu hình PrometheusRule với các ngưỡng cảnh báo cho hệ thống AI PaaS
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule

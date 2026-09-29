@@ -239,6 +239,7 @@ export const deployEn = {
       status: "Deploy status",
       none: "None",
       success: "Success",
+      unconfirmed: "Result not confirmed",
       error: "Error",
       deploying: "Deploying",
       console: "Deployment Console",

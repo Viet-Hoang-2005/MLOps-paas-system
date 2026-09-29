@@ -6,6 +6,9 @@ metadata:
 spec:
   serviceAccountName: argo-workflow-basic-sa
   entrypoint: build-model
+  podMetadata:
+    labels:
+      mlops.io/build-id: "{{workflow.parameters.build_id}}"
   onExit: notify-build-exit
   arguments:
     parameters:
