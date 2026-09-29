@@ -97,6 +97,27 @@ def test_prediction_and_webhook_outbox_share_transaction(monkeypatch):
     assert "'webhook'" in outbox_sql and "'automatic_drift'" in outbox_sql
 
 
+def test_records_preserve_zero_prediction():
+    frame = pd.DataFrame([
+        {
+            "public_id": "00000000-0000-0000-0000-000000000001",
+            "project_id": "00000000-0000-0000-0000-000000000002",
+            "model_version_id": "00000000-0000-0000-0000-000000000003",
+            "features": {"x": 1},
+            "prediction": 0,
+        },
+        {
+            "public_id": "00000000-0000-0000-0000-000000000004",
+            "project_id": "00000000-0000-0000-0000-000000000002",
+            "model_version_id": "00000000-0000-0000-0000-000000000003",
+            "features": {"x": 2},
+            "prediction": 1,
+        },
+    ])
+
+    assert [record["prediction"] for record in database._records(frame)] == ["0", "1"]
+
+
 def test_webhook_claim_uses_kind_destination_and_skip_locked(monkeypatch):
     result = Mock()
     result.mappings.return_value = []

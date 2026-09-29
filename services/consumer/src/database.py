@@ -111,7 +111,7 @@ def _records(frame: pd.DataFrame) -> list[dict]:
                 "model_version_id": str(row["model_version_id"]),
                 "observed_at": row.get("observed_at"),
                 "features": json.dumps(row.get("features") or {}),
-                "prediction": str(row.get("prediction") or ""),
+                "prediction": "" if row.get("prediction") is None else str(row["prediction"]),
                 "confidence": row.get("confidence"),
                 "latency_ms": row.get("latency_ms"),
                 "request_id": str(row.get("request_id") or ""),
