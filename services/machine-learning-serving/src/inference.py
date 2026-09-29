@@ -1,5 +1,7 @@
 """Framework-independent tabular inference operations."""
 
+import math
+from numbers import Real
 from typing import Any
 
 import numpy as np
@@ -46,7 +48,23 @@ def run_inference(
         if missing:
             raise KeyError(tuple(sorted(missing)))
 
-    frame = pd.DataFrame([features])
+    # JSON integer tokens can represent a double-valued feature (for example,
+    # 53.0 becomes 53 in JavaScript). Normalize only columns explicitly typed
+    # as double in the MLflow signature before pandas infers int64.
+    normalized = dict(features)
+    for name in loaded_model.get("float64_features", ()):
+        value = normalized[name]
+        if isinstance(value, bool) or not isinstance(value, Real):
+            raise ValueError(f"Feature {name!r} must be a finite number.")
+        try:
+            number = float(value)
+        except OverflowError as exc:
+            raise ValueError(f"Feature {name!r} must be a finite number.") from exc
+        if not math.isfinite(number):
+            raise ValueError(f"Feature {name!r} must be a finite number.")
+        normalized[name] = number
+
+    frame = pd.DataFrame([normalized])
     if expected_features:
         frame = frame[expected_features]
     prediction = model.predict(frame)

@@ -15,6 +15,11 @@ MODEL_CACHE_DIR = os.environ.get("MODEL_CACHE_DIR", "/tmp/mlops_paas_models")
 MODEL_CACHE: dict[str, dict[str, Any]] = {}
 
 
+def _is_double_column(input_spec: Any) -> bool:
+    data_type = getattr(input_spec, "type", None)
+    return getattr(data_type, "name", data_type) == "double"
+
+
 def download_model_artifact(model_version_id: str, model_uri: str) -> Path:
     prebuilt_dir = Path("/app/model_artifact")
     if prebuilt_dir.exists() and any(prebuilt_dir.iterdir()):
@@ -62,6 +67,11 @@ def load_model_from_uri(
             [inp.name for inp in signature.inputs]
             if signature and signature.inputs
             else None
+        )
+        float64_features = (
+            [inp.name for inp in signature.inputs if _is_double_column(inp)]
+            if signature and signature.inputs
+            else []
         )
 
         label_mapping = None
@@ -159,6 +169,7 @@ def load_model_from_uri(
     MODEL_CACHE[model_version_id] = {
         "model": pyfunc_model,
         "expected_features": expected_features,
+        "float64_features": float64_features,
         "label_mapping": label_mapping,
         "version_marker": version_marker,
     }
