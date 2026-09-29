@@ -1,0 +1,79 @@
+{
+  "date": "2026-09-30",
+  "status": "passed",
+  "scope": "Existing-artifact integrity and stored pilot reconciliation; no new model fitting, cloud calls, or live detector replay",
+  "source_sha256": "0728925d293f433a3f7bce4509c00e1648906c59c59d8e63663e1622a226ef6c",
+  "model_sha256": "bd0a91ec11d38ccceca4950a571857f3710bc7034bb8aaf30b40295dfd15e8b5",
+  "schema_features": 52,
+  "split_rows": 209844,
+  "reference_rows": 5000,
+  "windows": 120,
+  "bundle_files_checked": 59,
+  "pilot": [
+    {
+      "window": "S0_n1000_s42",
+      "records": 1000,
+      "unique_ids": 1000,
+      "prediction_source": "UI console with DB cross-check",
+      "legacy_blank_zero_records": 700,
+      "confusion_matrix": [
+        700,
+        0,
+        0,
+        300
+      ],
+      "recall": 1.0,
+      "score_file_sha256": "d73fe6fde8e3cb8d18c414cbd2654864027fec7d82530f6e48b8472db184c687"
+    },
+    {
+      "window": "S1_a85_n1000_s42",
+      "records": 1000,
+      "unique_ids": 1000,
+      "prediction_source": "DB production_predictionrecord",
+      "legacy_blank_zero_records": 0,
+      "confusion_matrix": [
+        150,
+        0,
+        0,
+        850
+      ],
+      "recall": 1.0,
+      "score_file_sha256": "518f1292c76bd641a45755bb793d63112973b2cd5b9d53a78cab4bcadac9c739"
+    },
+    {
+      "window": "S2_r50_n1000_s42",
+      "records": 1000,
+      "unique_ids": 1000,
+      "prediction_source": "DB production_predictionrecord",
+      "legacy_blank_zero_records": 0,
+      "confusion_matrix": [
+        700,
+        0,
+        148,
+        152
+      ],
+      "recall": 0.5066666666666667,
+      "score_file_sha256": "6523ea5c0f4058a8406553263ccad2f99263d0cf14acaf531565250d412a7650"
+    },
+    {
+      "window": "S2_r100_n1000_s42",
+      "records": 1000,
+      "unique_ids": 1000,
+      "prediction_source": "DB production_predictionrecord",
+      "legacy_blank_zero_records": 0,
+      "confusion_matrix": [
+        700,
+        0,
+        297,
+        3
+      ],
+      "recall": 0.01,
+      "score_file_sha256": "4f175cb253f317a1b0441e4d1dbbcfd4545f43d06049d568eb94e63129d9a264"
+    }
+  ],
+  "limitations": [
+    "Did not recompute all 6240 KS tests in this pass; retained verification.json reports that earlier check",
+    "Did not authenticate deployed dependency versions or reproduce live drift reports",
+    "UI bitstream provenance cannot be established independently from stored local evidence"
+  ]
+}

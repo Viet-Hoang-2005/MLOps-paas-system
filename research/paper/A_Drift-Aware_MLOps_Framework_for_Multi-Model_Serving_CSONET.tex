@@ -36,72 +36,55 @@ University of Information Technology, VNU-HCM,\\Ho Chi Minh City, Vietnam\\
 \maketitle
 
 \begin{abstract}
-Input drift does not directly establish predictive degradation. We present a drift-aware MLOps prototype whose Native Registry links tenant-owned model versions, serving, inference logs, references, and monitoring reports. Its contribution separates distribution alerts, labeled performance, and human-reviewed lifecycle actions; it proposes no new classifier or detector. A controlled NIDS experiment fixes a BENIGN/DDoS XGBoost model across disjoint pools, 120 windows, two sizes, and four alert thresholds. Changing attack prevalence produces strong drift while macro-F1 remains near one. Replacing one quarter of attack samples with held-out attack families reduces mean attack recall to 0.7533 for 1,000-sample windows, although a corrected KS monitor alerts in only one of five windows at a drift-share threshold of 0.30. A four-window service replay of the same model further shows distribution drift without recall loss and recall loss without a live alert. These controlled results do not establish natural drift, retraining effectiveness, or production-scale serving.
+Distribution alerts and predictive quality answer different monitoring questions. We quantify their disagreement in a controlled NIDS study and use it to motivate a version-associated MLOps lifecycle design. A fixed BENIGN/DDoS XGBoost model is evaluated across disjoint pools, 120 windows, two sizes, and four alert thresholds. Changing attack prevalence produces strong distribution alerts while macro-F1 remains near one. Replacing one quarter of attack samples with held-out families reduces mean attack recall to 0.7533 for 1,000-sample windows, although a BH-adjusted KS monitor alerts in only one of five windows at a drift-share threshold of 0.30. A four-window service replay supplies separate integration evidence. The prototype's Native Registry links model versions, references, and monitoring reports; the proposed lifecycle contract separates these records from labeled quality evidence and reviewed update decisions. The contribution is the controlled study and its design implications, rather than a new detector, registry technology, or demonstrated adaptation policy.
+
 \keywords{MLOps \and Data Drift \and Multi-model Serving \and Network Intrusion Detection}
 \end{abstract}
 
 \section{Introduction}
-Network intrusion detection encounters changing traffic and attack families, while labels needed to measure predictive quality may arrive late. Generalization beyond the training environment is a longstanding concern~\cite{sommer2010closedworld}. An input-distribution change does not by itself establish predictive degradation; an absent alert does not certify continued accuracy.
+Changing traffic and attack families challenge NIDS generalization~\cite{sommer2010closedworld}; labels for measuring quality may arrive late. Shift detection and harmfulness are already distinct research questions~\cite{rabanser2019}. We ask: \emph{under which constructed changes do distribution alerts agree or disagree with lower predictive quality?} Here degradation means lower performance on changed composition, not deterioration over time.
 
-MLOps coordinates models, data, deployment, and monitoring~\cite{kreuzberger2023mlops}. Our question is how to associate evidence with a tenant and model version while keeping update decisions explicit. A Native Registry and replaceable adapters implement this separation. This is a design choice, not a new learning algorithm or a capability claimed to be absent from existing platforms.
-
-We contribute a tenant/model lifecycle design separating evidence from reviewed actions, and a fixed-model NIDS evaluation with stable controls and threshold/window-size sensitivity. We ask: \emph{under which constructed changes does drift agree or disagree with degradation?} Multi-model serving is the architectural scope; the experiment evaluates one classifier, not multi-tenant scalability.
+Our principal evaluated contribution compares alerts and labeled metrics with a fixed classifier and reference. It motivates a version-associated lifecycle contract separating distribution evidence, quality evidence, and reviewed actions. Native Registry supplies the prototype foundation; a service replay supplies integration evidence. Multi-model serving is architectural scope, whereas this study evaluates monitoring of one classifier.
 
 \section{Related Work}
-MLOps architectures cover integrated components \cite{kreuzberger2023mlops}. Technical debt studies detail data dependencies and system evolution~\cite{sculley2015debt}.
+MLOps and technical-debt research address lifecycle components and dependencies~\cite{kreuzberger2023mlops,sculley2015debt}. TFX, MLflow, and Clipper supply pipeline, lifecycle, and serving foundations~\cite{baylor2017tfx,mlflow,crankshaw2017clipper}; integrating these responsibilities is not itself our novelty.
 
-TFX integrates validation, training, and serving~\cite{baylor2017tfx}; MLflow supports tracking and deployment interfaces~\cite{mlflow}; Clipper studies online serving~\cite{crankshaw2017clipper}. Recent work studies adaptive MLOps~\cite{Bhatt2025HarmonE}. We use existing tools as adapters, without a cross-platform benchmark.
+Rabanser et al. distinguish shift detection from harmfulness~\cite{rabanser2019}; we quantify their disagreement for controlled NIDS mixtures. Sridhar et al. address production governance and prediction provenance~\cite{sridhar2018}; we apply that concern to model/reference/window/report associations. Leest et al. organize contextual information for interpreting monitoring~\cite{leest2025}; version and window identities supply a limited instance of such context. These precedents establish the principles our prototype concretizes.
 
-Gama et al. survey concept-drift adaptation~\cite{gama2014survey}; Webb et al. characterize drift types~\cite{webb2016drift}. Continual-learning NIDS evaluates model updates~\cite{Zhang2025SSFNIDS}; our fixed-model study measures input shift and labeled performance separately, without identifying concept drift or testing adaptation.
+HarmonE monitors accuracy, energy, and distribution shifts to guide adaptation~\cite{Bhatt2025HarmonE}. We evaluate disagreement before an update decision. Concept-drift analyses~\cite{gama2014survey,webb2016drift} and continual-learning NIDS~\cite{Zhang2025SSFNIDS} address changing concepts or updates; our classifier stays fixed. Our addition is the controlled quantification and lifecycle interpretation, not a new distinction between shift and harm.
+
 \section{Framework and Monitoring Contract}
 \label{sec:framework}
-\paragraph{State ownership and execution.}
-The Django control plane stores tenant ownership, model versions, artifact references, readiness metadata, and drift results in PostgreSQL. FastAPI resolves a model record and invokes a loader. Endpoint metadata alone does not prove runtime readiness. Imported artifacts and training outputs share this boundary. MLflow, object storage, and workflow engines are supporting adapters, not owners of product state.
+\paragraph{Implemented foundation.}
+The Django control plane stores product state in PostgreSQL: project ownership, model version UUIDs, and artifact records. FastAPI resolves serving versions; Redpanda and a consumer persist inference events. Monitors link versions to reference assets; run UUIDs identify status, scores, and report URIs. MLflow, storage, and execution engines act as adapters.
 
-Events carry tenant/model identifiers, features, predictions, timestamps, and optional confidence. Redpanda and a consumer separate persistence from synchronous inference; Evidently provides monitoring. The offline experiment does not establish delivery completeness, failure recovery, or correctness under concurrent updates.
-
-\begin{figure}[t]
-\centering
-\small
-\fbox{\parbox{0.93\linewidth}{\centering
-\textbf{Control plane: tenant/model Native Registry}\\
-Artifact references, deployability, reference identity, monitoring results, review state}}
-\par\smallskip
-$\downarrow$\quad model resolution and configuration\quad$\uparrow$\quad monitoring evidence
-\par\smallskip
-\fbox{\parbox{0.23\linewidth}{\centering Serving\\prediction + log event}}
-$\longrightarrow$
-\fbox{\parbox{0.23\linewidth}{\centering Broker/consumer\\production records}}
-$\longrightarrow$
-\fbox{\parbox{0.23\linewidth}{\centering Monitor\\reference vs. window}}
-\caption{Logical responsibilities. A distribution alert feeds review; it does not authorize an automatic model replacement. The experiment in Section~\ref{sec:protocol} isolates the monitoring comparison from this deployed pipeline.}
-\label{fig:architecture}
-\end{figure}
+\paragraph{Defined and evaluated scope.}
+The contract requires evidence to retain tenant, version, reference, window, and report identities. Reference assets have UUIDs and optional checksums; snapshot/window links are optional. The replay path reads the latest version-scoped records, so these fields do not guarantee frozen membership or immutable reference bytes. Offline manifests fix membership; a separate audit reconciles pilot inputs with stored records. The proposed review and promotion conditions below remain unevaluated as lifecycle policies.
 
 \paragraph{Distribution evidence.}
-For tenant $u$ and deployable model version $i$, let $\hat y=f_{u,i}(x)$, with reference $D_{\mathrm{ref}}^{u,i}$ and current window $D_{\mathrm{cur}}^{u,i}$. A report must retain this model/reference/window association to make the evidence interpretable. For $d$ numeric features, a two-sample test produces statistics $\delta_j$ and p-values $p_j$. In the experiment, Benjamini--Hochberg (BH) adjustment~\cite{bh1995} yields $q_j$ within each window, and
+For tenant $u$ and model version $i$, let $\hat y=f_{u,i}(x)$, with reference $D_{\mathrm{ref}}^{u,i}$ and window $D_{\mathrm{cur}}^{u,i}$. In the offline study, two-sample tests yield $p_j$ for $d$ numeric features. Benjamini--Hochberg (BH)~\cite{bh1995} produces adjusted p-values $q_j$ within each window:
 \begin{equation}
 I_j=\mathbf{1}[q_j<0.05],\qquad
 \rho=\frac{1}{d}\sum_{j=1}^{d}I_j,\qquad
 A=\mathbf{1}[\rho\geq\tau_D].
 \label{eq:drift}
 \end{equation}
-Here $\rho$ is a proportion of flagged features, not a probability of model failure. Marginal tests need not detect changes in feature dependence. BH is a defined comparison rule here, not a guarantee of dataset-level false-alert control under dependent, tied network-flow features.
+The flagged-feature fraction $\rho$ depends on the rule, feature set, and sample size; it is neither shift severity, affected-request share, nor failure probability. Marginal tests can miss dependence changes. BH here does not guarantee dataset-level false-alert control under dependent, tied features.
 
-\paragraph{Review boundary.}
-We distinguish readiness, monitoring evidence (window, settings, scores, alert), and reviewed actions. An alert can request inspection while a model remains deployed. With labels, macro-F1, attack recall, and benign false-positive rate (FPR) provide separate evidence. We propose reviewing shifts without measured harm, and escalating measured harm even when $A=0$. Retraining would require representative labeled data; promotion would additionally require a challenger to pass held-out quality and operational gates with human approval. These are proposed decision conditions, not an evaluated retraining policy or verified state machine.
+\paragraph{Proposed review semantics.}
+An alert requests inspection, not replacement. Labeled macro-F1, attack recall, and benign false-positive rate (FPR) provide separate evidence: low quality warrants review even when $A=0$. Actions should reference their supporting report and quality window. Retraining requires representative labels; promotion also requires held-out quality, operational gates, and human review. These conditions are not certified enforcement.
 
 \section{Controlled NIDS Experiment}
 \label{sec:protocol}
 \subsection{Provenance and Disjoint Pools}
-CICIDS2017 provides labeled network flows~\cite{cicids}. Our input is a team-subsampled derivative of the third-party \emph{CICIDS2017: Cleaned \& Preprocessed} dataset, followed by the team's \emph{MLOps NIDS Dataset}.\footnote{\raggedright Kaggle source: \url{https://www.kaggle.com/datasets/ericanacletoribeiro/cicids2017-cleaned-and-preprocessed}; team derivative: \url{https://www.kaggle.com/datasets/hongtrnnguynvit/nids-reference-data}.} The local extraction script caps each label, reserves test rows, and shuffles the remaining rows. The experimental input, named \texttt{reference\_data.csv} by that earlier pipeline, contains 209,865 rows: 100,000 BENIGN, 50,000 DDoS, 50,000 PortScan, 8,150 BruteForce, and 1,715 WebAttacks, with 52 numeric features.
+CICIDS2017 provides labeled network flows~\cite{cicids}. We use a team-subsampled derivative of \emph{CICIDS2017: Cleaned \& Preprocessed} dataset, followed by the team's \emph{MLOps NIDS Dataset}.\footnote{\raggedright Kaggle source: \url{https://www.kaggle.com/datasets/ericanacletoribeiro/cicids2017-cleaned-and-preprocessed}; team derivative: \url{https://www.kaggle.com/datasets/hongtrnnguynvit/nids-reference-data}.} Local extraction caps labels, reserves test rows, and shuffles the remainder. Its \texttt{reference\_data.csv} contains 209,865 rows: 100,000 BENIGN, 50,000 DDoS, 50,000 PortScan, 8,150 BruteForce, and 1,715 WebAttacks, with 52 numeric features.
 
-The associated notebook combines data, cleans values and features, groups labels, and selects features before our split. The local artifact lacks time or capture identifiers; we claim neither a temporal split nor removal of upstream feature-selection leakage. Complete byte-level derivation from the original release remains unverified.
+Upstream preprocessing combines data, cleans values, groups labels, and selects features before our split. Time/capture identifiers are absent. Potential upstream leakage and complete byte-level lineage from the original release remain unverified in this study.
 
-We hash ordered numeric feature vectors, excluding labels and normalizing signed zero. Twenty rows in ten feature-identical, conflicting-label groups and one further duplicate are removed; there are no nonfinite rows. The remaining 209,844 rows are stratified into train/development/reference/evaluation pools at 50/10/20/20\% with split seed 260926. All six pool pairs have zero exact feature-vector overlap, including benign rows. This does not exclude session-level or correlated-flow dependence. The original input files remain unchanged.
+We hash ordered numeric feature vectors, excluding labels and normalizing signed zero. Twenty rows in ten feature-identical, conflicting-label groups and one further duplicate are removed; there are no nonfinite rows. The remaining 209,844 rows are stratified into train/development/reference/evaluation pools at 50/10/20/20\% with split seed 260926. All six pool pairs have zero exact feature-vector overlap, including benign rows. This does not exclude session-level or correlated-flow dependence.
 
 \subsection{Fixed Model and Window Construction}
-One binary XGBoost classifier~\cite{xgboost} is fitted on 74,994 BENIGN/DDoS rows from the train pool. PortScan, BruteForce, and WebAttacks are deliberately unseen during fitting. We use 200 trees, depth 6, learning rate 0.1, full row/column sampling, the histogram tree method, model seed 42, and prediction threshold 0.5. No scaler, SMOTE, or evaluation-based tuning is applied. Two development windows check execution only; the model remains fixed throughout evaluation.
+One binary XGBoost classifier~\cite{xgboost} is fitted on 74,994 BENIGN/DDoS rows from the train pool. PortScan, BruteForce, and WebAttacks are deliberately unseen during fitting. We use 200 trees, depth 6, learning rate 0.1, full row/column sampling, the histogram tree method, model seed 42, and prediction threshold 0.5. No scaler, SMOTE, or evaluation-based tuning is used; two development windows check execution. The model stays fixed.
 
 A separate 5,000-row reference contains 70\% BENIGN and 30\% DDoS (reference sampling seed 260927). Evaluation windows contain $n\in\{500,1000\}$ rows sampled without replacement within each window. Table~\ref{tab:scenarios} specifies the scenarios. In S2, replacement attacks are divided as evenly as possible among the three held-out families. Thus S2 at 25\% replacement and $n=1000$ contains 700 benign, 225 DDoS, and 75 held-out-family rows. Replacement percentage is a fraction of \emph{attack rows}, not of the entire window.
 
@@ -120,12 +103,12 @@ S2 & 30\% & 25\%, 50\%, 100\% \\
 \end{tabular}
 \end{table}
 
-Each scenario/size uses seeds 42, 123, 456, 789, and 1024. S0 adds seeds 2000--2024, giving 30 stable windows per size and 120 windows overall. Windows may reuse rows from the same evaluation pool; standard deviations describe sampling with one model and one reference, not independent captures or training runs. Class counts are fixed by construction, including in S0.
+Seeds are 42, 123, 456, 789, and 1024 per setting; S0 adds 2000--2024, giving 30 windows per size and 120 overall. Windows reuse the evaluation pool with fixed class counts. SD describes sampling with one model/reference, not independent captures or fits.
 
 \subsection{Detection, Metrics, and Reproducibility}
 Two-sided asymptotic Kolmogorov--Smirnov tests cover all 52 features (6,240 tests), followed by Eq.~\ref{eq:drift}. We compare thresholds 0.10, 0.30, 0.50, and 0.70, retaining 0.30 as the principal setting and uncorrected tests as a comparison. Each window yields macro-F1, attack recall, benign FPR, ROC-AUC, family recall, and KS statistics. No threshold is selected retrospectively.
 
-The artifact records settings, versions, checksums, exclusions, pool/window membership, tests, and metrics. A separate verifier reloads the model, recomputes predictions and all KS tests, and checks BH against SciPy; all checks passed. Versions include XGBoost 3.2.0, SciPy 1.17.1, and scikit-learn 1.8.0. Evidently's deployed preset does not explicitly configure this KS/BH rule, so the checks do not validate that adapter. Reproduction requires access to the checksummed local input; its versioned acquisition procedure remains to be finalized.
+The retained local run \texttt{run\_20260926} includes \texttt{dataset\_manifest.json} (input SHA-256, ordered schema, exclusions), \texttt{model\_manifest.json} (model SHA-256), compressed split/window memberships, and \texttt{reference\_manifest.csv}. Config/environment files preserve seeds, hyperparameters, and versions, including XGBoost 3.2.0, SciPy 1.17.1, and scikit-learn 1.8.0. Per-window metrics and feature tests feed the summary tables; \texttt{build\_result\_assets.py} formats the main table. The separate \texttt{verify\_results.py} reloads the model, recomputes predictions and all KS tests, and checks BH against SciPy; its retained verification record reports all checks passed. This supports numerical checking with the frozen local input, not independent reconstruction from Kaggle. Public artifact access and versioned input acquisition are not established; upstream byte-level lineage remains unverified.
 
 \section{Results}
 \label{sec:results}
@@ -152,7 +135,7 @@ S2 (100\%) & 0.981$\pm$0.000 & 0.422$\pm$0.007 & 0.010$\pm$0.007 & 5/5 \\
 \end{tabular*}
 \end{table}
 
-S2 instead tests held-out attack families. At 25\% replacement, attack recall falls to 0.7533, while the principal detector alerts in only 1/5 windows. The same 1/5 count occurs at $n=500$, where mean recall is 0.7520. Hence low alert frequency can coexist with a material failure to recognize attacks in this constructed setting. At full replacement, recall is 0.0100 for $n=1000$: PortScan and WebAttacks recall are zero and BruteForce recall averages 0.0300. This is a limitation of the deliberately restricted BENIGN/DDoS baseline, not an evaluation of a model trained on all families.
+S2 instead tests held-out attack families. At 25\% replacement, attack recall falls to 0.7533, while the principal detector alerts in only 1/5 windows. The same 1/5 count occurs at $n=500$, where mean recall is 0.7520. These held-out attacks occupy only 7.5\% of the full window: substantial recall loss within the attack class can coexist with infrequent dataset alerts. At full replacement, recall is 0.0100 for $n=1000$: PortScan and WebAttacks recall are zero and BruteForce recall averages 0.0300. This is a limitation of the deliberately restricted BENIGN/DDoS baseline, not an evaluation of a model trained on all families.
 
 The S2 trend must be interpreted as a mixture effect: for replacement fraction $r$, aggregate attack recall equals $(1-r)R_{\mathrm{DDoS}}+rR_{\mathrm{held\mbox{-}out}}$. Post-hoc inspection of the full evaluation pool finds 9,999/10,000 DDoS, 4/9,998 PortScan, 60/1,630 BruteForce, and 0/344 WebAttacks predicted as attacks. Increasing poorly recognized families therefore explains the decline; it does not demonstrate loss of DDoS knowledge over time. This inspection reuses the evaluation pool and is not an independent test.
 
@@ -186,22 +169,38 @@ S2 (100\%) & 5/5 & 5/5 & 5/5 & 5/5 & 5/5 & 5/5 & 5/5 & 5/5 \\
 Correction also changes sensitivity. Without BH, S0 at $n=1000$ and $\tau_D=0.10$ produces 3/30 alerts instead of 0/30. Conversely, S2 at 25\% replacement and $\tau_D=0.30$ produces 5/5 alerts instead of 1/5. This trade-off should be reported rather than choosing a test after observing its outcomes. Window size affects statistical power; these non-temporal windows do not measure detection delay.
 
 \subsection{Controlled Service Replay}
-We replayed four seed-42, 1,000-row windows through serving, persistence, and the deployed Evidently preset, using the same fixed artifact/reference but separate model versions. Each window had 1,000 unique records matching frozen 52-feature inputs; labels were withheld until scoring. S0 predictions were audited from the UI after a class-0 persistence bug; S1/S2 used the corrected consumer. At drift-share threshold 0.60, S0 and S1 flagged 1/52 and 43/52 features while attack recall stayed 1.0000. S2 with 50\% and 100\% held-out attack replacement flagged 22/52 and 29/52, without alerts, while recall fell to 0.5067 and 0.0100. These live counts are not interchangeable with offline KS/BH alerts. S1 needed 1,042 HTTP attempts for 1,000 records after 42 HTTP 502/503 failures during a worker interruption; the other windows needed 1,000. This one-model pilot establishes neither temporal drift nor adaptation or scalability; the earlier 89-second Locust replay remains insufficient for availability claims.
+Four seed-42, 1,000-row windows used identical model bytes and the 5,000-row reference under separate version UUIDs, each initially without production records. S1 used 85\% DDoS. Labels were withheld until scoring. Each export had 1,000 unique prediction IDs and request IDs; exact 52-feature-vector matching established one record per frozen input. The browser did not send the handoff row ID, so reconciliation used vectors, not retry identity.
+
+S0's consumer stored 700 class-0 predictions as empty strings. Scoring used all 1,000 UI predictions cross-checked against database records, allowing only that empty-string/zero discrepancy. S1/S2 used post-fix database predictions without blanks. All four prediction sets matched the offline artifact. S1 incurred 42 HTTP 502/503 failures during a worker interruption: recovery submitted those inputs plus 824 unsent inputs, yielding 1,000 records from 1,042 attempts. The audit establishes final coverage, not retry idempotency or unique failure causes.
+
+The service source pins Evidently 0.4.15 and uses \texttt{DataDriftPreset} without feature-test overrides. With 5,000 reference rows, its defaults are normalized Wasserstein distance for numeric columns with more than five distinct values, Jensen--Shannon distance otherwise, and feature threshold 0.1, without BH. This source configuration is not an archived runtime dependency inventory. Reports used dataset threshold 0.60 with all 52 features present. Table~\ref{tab:live} is separate integration evidence, not replication of offline KS/BH.
+
+\begin{table}[t]
+\caption{Single-window live replay per setting; dataset threshold 0.60.}
+\label{tab:live}
+\centering\small
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lccc@{}}
+\toprule
+Window & Flagged features & Alert & Attack recall \\
+\midrule
+S0 & 1/52 & No & 1.0000 \\
+S1 (85\%) & 43/52 & Yes & 1.0000 \\
+S2 (50\%) & 22/52 & No & 0.5067 \\
+S2 (100\%) & 29/52 & No & 0.0100 \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
 \section{Discussion and Limitations}
 \label{sec:discussion}
-\paragraph{Implication for lifecycle design.}
-Distribution alerts and labeled performance should remain separate, version-associated records. An absent alert should not suppress review when labels reveal failures. The registry makes this distinction explicit; our contribution is the scoped design and evaluation, not novelty in KS, BH, XGBoost, or registry technology.
+S1 produces alerts without material measured harm. Conversely, offline S2-r25 remains unflagged in four of five windows at $\tau_D=0.30$, while the reported live S2-r50/r100 windows remain unflagged at the service threshold of 0.60 despite low attack recall. These counterexamples motivate separate version-associated evidence and review, not a proven improvement in update decisions. Native Registry concretizes this contract rather than introducing registry technology.
 
-\paragraph{Data and statistical validity.}
-The study uses a preprocessed, subsampled CICIDS2017 derivative with upstream feature selection and no retained temporal metadata. Exact deduplication does not resolve all leakage or capture dependence. High scores on familiar classes may reflect dataset separability. Five shifted windows per setting, shared evaluation pools, fixed class counts, one model/reference, correlated features, and tied-value asymptotic tests limit inference. The construction measures changed composition and observed degradation; it does not isolate a causal mechanism or establish concept drift in $P(Y\mid X)$.
+Upstream selection, missing time identifiers, correlated flows, and separability of familiar classes limit generalization. Exact deduplication does not resolve these issues. Five shifted windows per setting, fixed class counts, one model/reference, and tied-feature tests limit inference. S2 changes composition, not demonstrated $P(Y\mid X)$ over time. Natural drift and adaptation need separate evaluation.
 
-\paragraph{Security and operational scope.}
-Tenant/model ownership checks address access to records, but do not sandbox model code. A malicious uploaded artifact can execute code through unsafe deserialization, dependency loading, or execution; containerization alone is not evidence of isolation. Restricted artifact formats, isolated execution identities, network/resource limits, and adversarial cross-tenant tests are required before accepting untrusted workloads. No such isolation evaluation is claimed here. Likewise, monitoring completeness under broker failures, model-cache behavior, multi-model/tenant load sweeps, alternative serving platforms, lifecycle ablations, and promotion/rollback gates remain unevaluated.
-
-Further work needs temporal data, other environments, repeated model fits and reference samples, and retraining comparisons. The results support review, not a production threshold or continuous-training benefit.
+The pilot does not verify frozen associations under concurrent changes or failure recovery. Its HTTP errors and the earlier 89-second Locust replay do not establish availability or scalable serving. Multi-model load, lifecycle ablations, and promotion/rollback benefits remain unevaluated. Ownership checks do not sandbox uploaded code: restricted artifact formats, isolated identities, network/resource limits, and adversarial testing are needed for untrusted workloads; such isolation is untested.
 
 \section{Conclusion}
-A Native Registry links tenant/model serving and monitoring evidence. Controlled NIDS shifts show both strong drift without substantial degradation and declining recall with infrequent alerts. Sensitivity results reinforce separating alerts from update decisions. Natural drift, automated adaptation, and scalable secure serving require further evidence.
+The controlled NIDS study quantifies disagreement between distribution alerts and labeled predictive quality across traffic mixtures, window sizes, and thresholds. Its strongest evidence supports separate interpretation of these signals. The version-associated lifecycle contract and Native Registry prototype make that separation concrete; the service replay adds integration evidence, while update effectiveness and broader operational guarantees remain open.
 
 \begin{credits}
 \subsubsection{\ackname}
@@ -211,6 +210,15 @@ This research was supported by the VNUHCM-University of Information Technology's
 The authors have no competing interests to declare that are relevant to the content of this article.
 \end{credits}
 \begin{thebibliography}{99}
+\bibitem{rabanser2019}
+Rabanser, S., G\"unnemann, S., Lipton, Z.: Failing Loudly: An Empirical Study of Methods for Detecting Dataset Shift. In: \textit{Advances in Neural Information Processing Systems}, vol. 32 (2019)
+
+\bibitem{sridhar2018}
+Sridhar, V., Subramanian, S., Arteaga, D., Sundararaman, S., Roselli, D., Talagala, N.: Model Governance: Reducing the Anarchy of Production ML. In: \textit{USENIX ATC}, pp. 351--358 (2018)
+
+\bibitem{leest2025}
+Leest, J., Raibulet, C., Lago, P., Gerostathopoulos, I.: From Tea Leaves to System Maps: A Survey and Framework on Context-Aware Machine Learning Monitoring. \textit{IEEE Transactions on Software Engineering} \textbf{51}(12), 3218--3246 (2025). \doi{10.1109/TSE.2025.3602520}
+
 \bibitem{kreuzberger2023mlops}
 Kreuzberger, D., K\"uhl, N., Hirschl, S.: Machine Learning Operations (MLOps): Overview, Definition, and Architecture. \textit{IEEE Access} \textbf{11}, 31866--31879 (2023). \doi{10.1109/ACCESS.2023.3262138}
 
@@ -228,7 +236,7 @@ Zaharia, M., et al.: Accelerating the Machine Learning Lifecycle with MLflow. \t
 Crankshaw, D., Wang, X., Zhou, G., Franklin, M.J., Gonzalez, J.E., Stoica, I.: Clipper: A Low-Latency Online Prediction Serving System. In: \textit{USENIX NSDI}, pp. 613--627 (2017)
 
 \bibitem{Bhatt2025HarmonE}
-Bhatt, H., Biswas, S., Rakhunathan, S., Vaidhyanathan, K.: HarmonE: A Self-Adaptive Approach to Architecting Sustainable MLOps. arXiv:2505.13693v1 (2025)
+Bhatt, H., Biswas, S., Rakhunathan, S., Vaidhyanathan, K.: HarmonE: A Self-Adaptive Approach to Architecting Sustainable MLOps. arXiv:\allowbreak 2505.13693v1 (2025)
 
 
 \bibitem{gama2014survey}
