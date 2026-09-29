@@ -1,6 +1,6 @@
 # Citation audit for the revised CSoNet short paper
 
-Scope: the 17 references retained in the revised manuscript, their bibliographic identity/version, and the specific broad claim for which they are cited. Checked against publisher pages, author/institution copies, and versioned arXiv records on 26–27 September 2026. This is not a finding about which item triggered the reviewer's unspecified “citation-integrity trigger”; that issue still needs clarification from the organizers if available.
+Scope: the 13 references retained in the 29 September camera-ready manuscript, their bibliographic identity/version, and the specific broad claim for which they are cited. Checked against publisher pages, author/institution copies, and versioned arXiv records on 26–27 September 2026. This is not a finding about which item triggered the reviewer's unspecified “citation-integrity trigger”; that issue still needs clarification from the organizers if available.
 
 ## Corrections and claim changes
 
@@ -18,14 +18,10 @@ Scope: the 17 references retained in the revised manuscript, their bibliographic
 |---|---|---|
 | `kreuzberger2023mlops` | [Institutional copy of published article](https://epub.uni-bayreuth.de/id/eprint/7577/1/Machine_Learning_Operations_MLOps_Overview_Definition_and_Architecture.pdf), title page/abstract and component discussion | MLOps components/workflows. Corrected author initial and added DOI. Does not prove our registry is novel. |
 | `sculley2015debt` | [NeurIPS proceedings](https://papers.nips.cc/paper/2015/hash/86df7dcfd896fcaf2674f757a2463eba-Abstract.html), author list/abstract | Data dependencies and technical debt. Retained. |
-| `amershi2019software` | [Microsoft Research paper](https://www.microsoft.com/en-us/research/wp-content/uploads/2019/03/amershi-icse-2019_Software_Engineering_for_Machine_Learning.pdf), first page/abstract; [publication record](https://www.microsoft.com/en-us/research/publication/software-engineering-for-machine-learning-a-case-study/?lang=zh-cn) | Data/model/software engineering concerns. Retained; venue abbreviated ICSE-SEIP. |
-| `subramanya2022devops` | [Aalto author institution record](https://research.aalto.fi/en/publications/from-devops-to-mlops-overview-and-application-to-electricity-mark/) | MLOps overview and electricity-forecasting application. Replaced wrong authors. Publisher direct fetch was rate-limited; institutional record supplies metadata. |
-| `renggli2021data` | [Author-submitted arXiv v1](https://arxiv.org/abs/2102.07750v1), authors/abstract | Data quality propagation through MLOps. Corrected authors, kept explicit preprint identity. |
 | `baylor2017tfx` | [Google Research publication](https://research.google/pubs/tfx-a-tensorflow-based-production-scale-machine-learning-platform/) and [author paper](https://storage.googleapis.com/gweb-research2023-media/pubtools/4795.pdf) | Integrated validation, training, serving. Google page presents authors in a different display order; paper is the reference for the Baylor-first citation. No comparative claim against our prototype. |
 | `mlflow` | [Author-hosted original paper](https://people.eecs.berkeley.edu/~matei/papers/2018/ieee_mlflow.pdf), abstract/Sections 1–2 | Tracking, reproducibility and deployment interfaces in the 2018 paper. Removed the earlier implication that this citation establishes modern registry feature coverage. |
 | `crankshaw2017clipper` | [USENIX paper and BibTeX](https://www.usenix.org/conference/nsdi17/technical-sessions/presentation/crankshaw) | Low-latency online serving; authors/year/pages confirmed. Does not establish our latency/scalability. |
 | `Bhatt2025HarmonE` | [arXiv v1](https://arxiv.org/abs/2505.13693v1), authors/abstract/version | Self-adaptive sustainable MLOps approach. Cited as preprint; no extrapolation of their evaluated benefits to our system. |
-| `MarcosMercade2026MLOpsFrameworks` | [arXiv v1](https://arxiv.org/abs/2601.20415v1), authors/abstract | Empirical comparison of MLOps workflow tools. No claim that its two ML scenarios benchmark our NIDS framework. |
 | `gama2014survey` | [Coauthor institutional publication record](https://research.tue.nl/en/publications/a-survey-on-concept-drift-adaptation/) | Survey of changes in predictive relations and adaptation. Article 44, 46(4), 37 pages, DOI confirmed. Direct ACM retrieval unavailable; institutional abstract supports the narrow citation. |
 | `webb2016drift` | [Springer article](https://link.springer.com/article/10.1007/s10618-015-0448-4), abstract and bibliographic record | Characterization of forms of drift. Does not identify concept drift in our generated windows. |
 | `Zhang2025SSFNIDS` | [arXiv v4](https://arxiv.org/abs/2412.16264v4), authors/abstract/history | SSF investigates continual-learning NIDS updates. Unlike that study, ours keeps a model fixed; no method comparison is claimed. |
@@ -40,6 +36,9 @@ Kaggle URLs are retained as data-source links supplied by the team. The pages we
 
 `john2021towards`, `zhou2020pipeline`, `polyzotis2017data`, and `kubernetes` were removed together with redundant maturity/platform/infrastructure discussion. This is an editorial scope reduction, not a determination that these papers are invalid. A full metadata audit of those unused entries is not claimed. The original reference list remains recoverable from Git history.
 
+## 29 September update
+
+The shorter manuscript retains 13 cited sources. Four sources removed for scope/page space are subramanya2022devops, renggli2021data, MarcosMercade2026MLOpsFrameworks, and amershi2019software; their earlier metadata corrections remain recorded above but they are no longer cited. Added DOI 10.1109/SP.2010.25 to sommer2010closedworld ([dblp](https://dblp.org/rec/conf/sp/SommerP10.html)). The current manuscript has 13 cited/defined keys, zero missing/unused, and eight DOI entries. The unknown reviewer citation-integrity trigger remains unresolved.
 ## Remaining author checks
 
 Compare this local revision with the actual submitted PDF; request specifics about the citation-integrity trigger if the portal provides no detail. Confirm conference preferences for preprints/DOI formatting in the final source package. A metadata/claim audit cannot certify the absence of every citation-integrity issue in an unseen submitted version.

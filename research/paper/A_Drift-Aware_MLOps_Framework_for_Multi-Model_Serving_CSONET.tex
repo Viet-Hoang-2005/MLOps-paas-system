@@ -36,7 +36,7 @@ University of Information Technology, VNU-HCM,\\Ho Chi Minh City, Vietnam\\
 \maketitle
 
 \begin{abstract}
-Input-distribution drift is useful monitoring evidence, but it does not directly establish predictive degradation. We present a drift-aware MLOps prototype for tenant-owned tabular models, in which a PostgreSQL-backed Native Registry links model versions, serving metadata, inference logs, reference data, and monitoring reports. The contribution is an explicit separation of distribution alerts, labeled performance evidence, and human-reviewed lifecycle actions, rather than a new classifier or drift detector. A controlled NIDS experiment uses a fixed XGBoost model trained on BENIGN and DDoS, disjoint data pools, 120 evaluation windows, two window sizes, and four alert thresholds. Changing attack prevalence produces strong drift while macro-F1 remains near one. Replacing one quarter of attack samples with held-out attack families reduces mean attack recall to 0.7533 for 1,000-sample windows, although a corrected KS monitor alerts in only one of five windows at a drift-share threshold of 0.30. These results characterize a monitoring limitation under controlled shifts; they do not establish natural drift, retraining effectiveness, or production-scale serving.
+Input drift does not directly establish predictive degradation. We present a drift-aware MLOps prototype whose Native Registry links tenant-owned model versions, serving, inference logs, references, and monitoring reports. Its contribution separates distribution alerts, labeled performance, and human-reviewed lifecycle actions; it proposes no new classifier or detector. A controlled NIDS experiment fixes a BENIGN/DDoS XGBoost model across disjoint pools, 120 windows, two sizes, and four alert thresholds. Changing attack prevalence produces strong drift while macro-F1 remains near one. Replacing one quarter of attack samples with held-out attack families reduces mean attack recall to 0.7533 for 1,000-sample windows, although a corrected KS monitor alerts in only one of five windows at a drift-share threshold of 0.30. A four-window service replay of the same model further shows distribution drift without recall loss and recall loss without a live alert. These controlled results do not establish natural drift, retraining effectiveness, or production-scale serving.
 \keywords{MLOps \and Data Drift \and Multi-model Serving \and Network Intrusion Detection}
 \end{abstract}
 
@@ -48,12 +48,11 @@ MLOps coordinates models, data, deployment, and monitoring~\cite{kreuzberger2023
 We contribute a tenant/model lifecycle design separating evidence from reviewed actions, and a fixed-model NIDS evaluation with stable controls and threshold/window-size sensitivity. We ask: \emph{under which constructed changes does drift agree or disagree with degradation?} Multi-model serving is the architectural scope; the experiment evaluates one classifier, not multi-tenant scalability.
 
 \section{Related Work}
-Kreuzberger et al.~\cite{kreuzberger2023mlops} synthesize MLOps components and workflows. Technical-debt and engineering studies emphasize data dependencies and the joint evolution of data, code, and models~\cite{sculley2015debt,amershi2019software}. Subramanya et al.~\cite{subramanya2022devops} discuss MLOps through electricity forecasting, while Renggli et al.~\cite{renggli2021data} examine how data quality affects the lifecycle. These works motivate explicit evidence and metadata management; they do not establish superiority of our implementation.
+MLOps architectures cover integrated components \cite{kreuzberger2023mlops}. Technical debt studies detail data dependencies and system evolution~\cite{sculley2015debt}.
 
-TFX integrates data validation, training, and serving~\cite{baylor2017tfx}; MLflow supports tracking, reproducibility, and deployment interfaces~\cite{mlflow}; Clipper studies low-latency prediction serving~\cite{crankshaw2017clipper}. Recent studies examine self-adaptation for sustainable MLOps~\cite{Bhatt2025HarmonE} and empirically compare workflow frameworks~\cite{MarcosMercade2026MLOpsFrameworks}. We use existing tools as adapters and evaluate a narrower monitoring question, without a cross-platform performance comparison.
+TFX integrates validation, training, and serving~\cite{baylor2017tfx}; MLflow supports tracking and deployment interfaces~\cite{mlflow}; Clipper studies online serving~\cite{crankshaw2017clipper}. Recent work studies adaptive MLOps~\cite{Bhatt2025HarmonE}. We use existing tools as adapters, without a cross-platform benchmark.
 
-Concept-drift surveys distinguish changes in distributions and predictive relationships~\cite{gama2014survey,webb2016drift}. Continual-learning NIDS methods such as SSF~\cite{Zhang2025SSFNIDS} additionally evaluate model updates. Our model remains fixed: we measure input-distribution changes and labeled performance separately, without identifying concept drift or evaluating an adaptation algorithm.
-
+Gama et al. survey concept-drift adaptation~\cite{gama2014survey}; Webb et al. characterize drift types~\cite{webb2016drift}. Continual-learning NIDS evaluates model updates~\cite{Zhang2025SSFNIDS}; our fixed-model study measures input shift and labeled performance separately, without identifying concept drift or testing adaptation.
 \section{Framework and Monitoring Contract}
 \label{sec:framework}
 \paragraph{State ownership and execution.}
@@ -90,7 +89,7 @@ A=\mathbf{1}[\rho\geq\tau_D].
 Here $\rho$ is a proportion of flagged features, not a probability of model failure. Marginal tests need not detect changes in feature dependence. BH is a defined comparison rule here, not a guarantee of dataset-level false-alert control under dependent, tied network-flow features.
 
 \paragraph{Review boundary.}
-We distinguish readiness, monitoring evidence (window, settings, scores, alert), and reviewed actions. An alert can request inspection while a model remains deployed. With labels, macro-F1, attack recall, and benign false-positive rate (FPR) provide separate evidence. Neither $A=1$ nor $A=0$ alone authorizes training, promotion, or rollback. This review boundary is a design recommendation, not an evaluated retraining policy or verified state machine.
+We distinguish readiness, monitoring evidence (window, settings, scores, alert), and reviewed actions. An alert can request inspection while a model remains deployed. With labels, macro-F1, attack recall, and benign false-positive rate (FPR) provide separate evidence. We propose reviewing shifts without measured harm, and escalating measured harm even when $A=0$. Retraining would require representative labeled data; promotion would additionally require a challenger to pass held-out quality and operational gates with human approval. These are proposed decision conditions, not an evaluated retraining policy or verified state machine.
 
 \section{Controlled NIDS Experiment}
 \label{sec:protocol}
@@ -126,7 +125,7 @@ Each scenario/size uses seeds 42, 123, 456, 789, and 1024. S0 adds seeds 2000--2
 \subsection{Detection, Metrics, and Reproducibility}
 Two-sided asymptotic Kolmogorov--Smirnov tests cover all 52 features (6,240 tests), followed by Eq.~\ref{eq:drift}. We compare thresholds 0.10, 0.30, 0.50, and 0.70, retaining 0.30 as the principal setting and uncorrected tests as a comparison. Each window yields macro-F1, attack recall, benign FPR, ROC-AUC, family recall, and KS statistics. No threshold is selected retrospectively.
 
-The artifact records settings, versions, checksums, exclusions, pool/window membership, tests, and metrics. An independent verifier reloads the model, recomputes predictions and all KS tests, and checks BH against SciPy; all checks passed. Versions include XGBoost 3.2.0, SciPy 1.17.1, and scikit-learn 1.8.0. Evidently's deployed preset does not explicitly configure this KS/BH rule, so the checks do not validate that adapter. Reproduction requires the checksummed local input; public versioned acquisition remains to be finalized.
+The artifact records settings, versions, checksums, exclusions, pool/window membership, tests, and metrics. A separate verifier reloads the model, recomputes predictions and all KS tests, and checks BH against SciPy; all checks passed. Versions include XGBoost 3.2.0, SciPy 1.17.1, and scikit-learn 1.8.0. Evidently's deployed preset does not explicitly configure this KS/BH rule, so the checks do not validate that adapter. Code and frozen results are in the paper branch.\footnote{\raggedright\url{https://github.com/Viet-Hoang-2005/MLOps-paas-system/tree/codex/csonet-2026-camera-ready}} Reproduction requires the checksummed local input; public versioned acquisition remains to be finalized.
 
 \section{Results}
 \label{sec:results}
@@ -186,9 +185,8 @@ S2 (100\%) & 5/5 & 5/5 & 5/5 & 5/5 & 5/5 & 5/5 & 5/5 & 5/5 \\
 
 Correction also changes sensitivity. Without BH, S0 at $n=1000$ and $\tau_D=0.10$ produces 3/30 alerts instead of 0/30. Conversely, S2 at 25\% replacement and $\tau_D=0.30$ produces 5/5 alerts instead of 1/5. This trade-off should be reported rather than choosing a test after observing its outcomes. Window size affects statistical power; these non-temporal windows do not measure detection delay.
 
-\subsection{Serving Evidence Boundary}
-The earlier bounded prototype replay used 100 Locust users for approximately 89 seconds, issuing 4,343 requests: 47.6 requests/s on average, 1.74\,s mean latency, 2.30\,s p95, and four HTTP 502 responses. It was not repeated for this revision. The available observation neither diagnoses those errors nor varies tenant/model counts; it cannot support scalability, availability, or comparative serving claims. The offline results above should not be interpreted as end-to-end validation of that platform.
-
+\subsection{Controlled Service Replay}
+We replayed four seed-42, 1,000-row windows through serving, persistence, and the deployed Evidently preset, using the same fixed artifact/reference but separate model versions. Each window had 1,000 unique records matching frozen 52-feature inputs; labels were withheld until scoring. S0 predictions were audited from the UI after a class-0 persistence bug; S1/S2 used the corrected consumer. At drift-share threshold 0.60, S0 and S1 flagged 1/52 and 43/52 features while attack recall stayed 1.0000. S2 with 50\% and 100\% held-out attack replacement flagged 22/52 and 29/52, without alerts, while recall fell to 0.5067 and 0.0100. These live counts are not interchangeable with offline KS/BH alerts. S1 needed 1,042 HTTP attempts for 1,000 records after 42 HTTP 502/503 failures during a worker interruption; the other windows needed 1,000. This one-model pilot establishes neither temporal drift nor adaptation or scalability; the earlier 89-second Locust replay remains insufficient for availability claims.
 \section{Discussion and Limitations}
 \label{sec:discussion}
 \paragraph{Implication for lifecycle design.}
@@ -205,73 +203,53 @@ Further work needs temporal data, other environments, repeated model fits and re
 \section{Conclusion}
 A Native Registry links tenant/model serving and monitoring evidence. Controlled NIDS shifts show both strong drift without substantial degradation and declining recall with infrequent alerts. Sensitivity results reinforce separating alerts from update decisions. Natural drift, automated adaptation, and scalable secure serving require further evidence.
 
-\begin{thebibliography}{99}
+\begin{credits}
+\subsubsection{\ackname}
+This research was supported by the VNUHCM-University of Information Technology's Scientific Research Fund.
 
+\subsubsection{\discintname}
+The authors have no competing interests to declare that are relevant to the content of this article.
+\end{credits}
+\begin{thebibliography}{99}
 \bibitem{kreuzberger2023mlops}
-D. Kreuzberger, N. K\"uhl, and S. Hirschl, ``Machine Learning Operations (MLOps): Overview, Definition, and Architecture,'' \textit{IEEE Access}, vol. 11, pp. 31866--31879, 2023. \url{https://doi.org/10.1109/ACCESS.2023.3262138}.
+Kreuzberger, D., K\"uhl, N., Hirschl, S.: Machine Learning Operations (MLOps): Overview, Definition, and Architecture. \textit{IEEE Access} \textbf{11}, 31866--31879 (2023). \doi{10.1109/ACCESS.2023.3262138}
 
 \bibitem{sculley2015debt}
-D. Sculley, G. Holt, D. Golovin, E. Davydov, T. Phillips, D. Ebner,
-V. Chaudhary, M. Young, J.-F. Crespo, and D. Dennison,
-``Hidden Technical Debt in Machine Learning Systems,''
-in \textit{Advances in Neural Information Processing Systems}, vol. 28, 2015.
+Sculley, D., Holt, G., Golovin, D., Davydov, E., Phillips, T., Ebner, D., Chaudhary, V., Young, M., Crespo, J.-F., Dennison, D.: Hidden Technical Debt in Machine Learning Systems. In: \textit{Advances in Neural Information Processing Systems}, vol. 28 (2015)
 
-\bibitem{amershi2019software}
-S. Amershi, A. Begel, C. Bird, R. DeLine, H. Gall, E. Kamar,
-N. Nagappan, B. Nushi, and T. Zimmermann,
-``Software Engineering for Machine Learning: A Case Study,''
-in \textit{ICSE-SEIP}, 2019, pp. 291--300.
-
-\bibitem{subramanya2022devops}
-R. Subramanya, S. Sierla, and V. Vyatkin, ``From DevOps to MLOps: Overview and Application to Electricity Market Forecasting,'' \textit{Applied Sciences}, vol. 12, no. 19, article 9851, 2022. \url{https://doi.org/10.3390/app12199851}.
-
-\bibitem{renggli2021data}
-C. Renggli, L. Rimanic, N. M. G\"urel, B. Karla\v{s}, W. Wu, and C. Zhang, ``A Data Quality-Driven View of MLOps,'' arXiv:2102.07750v1, 2021.
 
 \bibitem{baylor2017tfx}
-D. Baylor et al.,
-``TFX: A TensorFlow-Based Production-Scale Machine Learning Platform,''
-in \textit{KDD}, 2017, pp. 1387--1395.
+Baylor, D., et al.: TFX: A TensorFlow-Based Production-Scale Machine Learning Platform. In: \textit{KDD}, pp. 1387--1395 (2017). \doi{10.1145/3097983.3098021}
 
 \bibitem{mlflow}
-M. Zaharia et al., ``Accelerating the Machine Learning Lifecycle with MLflow,'' \textit{IEEE Data Engineering Bulletin}, vol. 41, no. 4, pp. 39--45, 2018.
+Zaharia, M., et al.: Accelerating the Machine Learning Lifecycle with MLflow. \textit{IEEE Data Engineering Bulletin} \textbf{41}(4), 39--45 (2018)
 
 \bibitem{crankshaw2017clipper}
-D. Crankshaw, X. Wang, G. Zhou, M. J. Franklin, J. E. Gonzalez, and I. Stoica,
-``Clipper: A Low-Latency Online Prediction Serving System,''
-in \textit{USENIX NSDI}, 2017, pp. 613--627.
+Crankshaw, D., Wang, X., Zhou, G., Franklin, M.J., Gonzalez, J.E., Stoica, I.: Clipper: A Low-Latency Online Prediction Serving System. In: \textit{USENIX NSDI}, pp. 613--627 (2017)
 
 \bibitem{Bhatt2025HarmonE}
-H. Bhatt, S. Biswas, S. Rakhunathan, and K. Vaidhyanathan, ``HarmonE: A Self-Adaptive Approach to Architecting Sustainable MLOps,'' arXiv:2505.13693v1, 2025.
+Bhatt, H., Biswas, S., Rakhunathan, S., Vaidhyanathan, K.: HarmonE: A Self-Adaptive Approach to Architecting Sustainable MLOps. arXiv:2505.13693v1 (2025)
 
-\bibitem{MarcosMercade2026MLOpsFrameworks}
-J. Marcos-Mercad\'e, U. Lopez-Novoa, and M. Ega\~na Aranguren, ``An Empirical Evaluation of Modern MLOps Frameworks,'' arXiv:2601.20415v1, 2026.
 
 \bibitem{gama2014survey}
-J. Gama, I. \v{Z}liobait\.{e}, A. Bifet, M. Pechenizkiy, and A. Bouchachia, ``A Survey on Concept Drift Adaptation,'' \textit{ACM Computing Surveys}, vol. 46, no. 4, article 44, pp. 1--37, 2014. \url{https://doi.org/10.1145/2523813}.
+Gama, J., \v{Z}liobait\.{e}, I., Bifet, A., Pechenizkiy, M., Bouchachia, A.: A Survey on Concept Drift Adaptation. \textit{ACM Computing Surveys} \textbf{46}(4), article 44, 1--37 (2014). \doi{10.1145/2523813}
 
 \bibitem{webb2016drift}
-G. I. Webb, R. Hyde, H. Cao, H.-L. Nguyen, and F. Petitjean,
-``Characterizing Concept Drift,''
-\textit{Data Mining and Knowledge Discovery}, vol. 30, no. 4,
-pp. 964--994, 2016.
+Webb, G.I., Hyde, R., Cao, H., Nguyen, H.-L., Petitjean, F.: Characterizing Concept Drift. \textit{Data Mining and Knowledge Discovery} \textbf{30}(4), 964--994 (2016). \doi{10.1007/s10618-015-0448-4}
 
 \bibitem{Zhang2025SSFNIDS}
-X. Zhang, R. Zhao, Z. Jiang, H. Chen, Y. Ding, E. C. H. Ngai, and S.-H. Yang, ``Continual Learning with Strategic Selection and Forgetting for Network Intrusion Detection,'' arXiv:2412.16264v4, 2025.
+Zhang, X., Zhao, R., Jiang, Z., Chen, H., Ding, Y., Ngai, E.C.H., Yang, S.-H.: Continual Learning with Strategic Selection and Forgetting for Network Intrusion Detection. arXiv:2412.16264v4 (2025)
 
 \bibitem{xgboost}
-T. Chen and C. Guestrin, ``XGBoost: A Scalable Tree Boosting System,'' in \textit{KDD}, 2016, pp. 785--794.
+Chen, T., Guestrin, C.: XGBoost: A Scalable Tree Boosting System. In: \textit{KDD}, pp. 785--794 (2016). \doi{10.1145/2939672.2939785}
 
 \bibitem{cicids}
-I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ``Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization,'' in \textit{ICISSP}, 2018, pp. 108--116.
+Sharafaldin, I., Lashkari, A.H., Ghorbani, A.A.: Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization. In: \textit{ICISSP}, pp. 108--116 (2018). \doi{10.5220/0006639801080116}
 
 \bibitem{sommer2010closedworld}
-R. Sommer and V. Paxson,
-``Outside the Closed World: On Using Machine Learning for Network Intrusion Detection,''
-in \textit{Proc. IEEE Symposium on Security and Privacy}, 2010, pp. 305--316.
+Sommer, R., Paxson, V.: Outside the Closed World: On Using Machine Learning for Network Intrusion Detection. In: \textit{IEEE Symposium on Security and Privacy}, pp. 305--316 (2010). \doi{10.1109/SP.2010.25}
 
 \bibitem{bh1995}
-Y. Benjamini and Y. Hochberg, ``Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing,'' \textit{Journal of the Royal Statistical Society: Series B}, vol. 57, no. 1, pp. 289--300, 1995. \url{https://doi.org/10.1111/j.2517-6161.1995.tb02031.x}.
-
+Benjamini, Y., Hochberg, Y.: Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing. \textit{Journal of the Royal Statistical Society: Series B} \textbf{57}(1), 289--300 (1995). \doi{10.1111/j.2517-6161.1995.tb02031.x}
 \end{thebibliography}
 \end{document}

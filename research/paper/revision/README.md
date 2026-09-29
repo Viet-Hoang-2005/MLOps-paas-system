@@ -1,6 +1,6 @@
-# CSoNet revision for team review — 27 September 2026
+# CSoNet revision for team review — 29 September 2026
 
-This is a revised manuscript and local experiment artifact, **not an assertion that every reviewer request or submission requirement is complete**. Start with the [critical experiment review](../experiments/drift_only/EXPERIMENT_CRITICAL_REVIEW_VI_2026-09-27.md), then read the manuscript and [review response matrix](REVIEW_RESPONSE_MATRIX_VI.md). See [citation audit](CITATION_AUDIT_2026-09-27.md) for source checks and unresolved citation-trigger context.
+This is a revised manuscript and local experiment artifact, **not an assertion that every reviewer request or submission requirement is complete**. Start with the [ARS camera-ready review](ARS_CSONET_REVIEW_20260929_VI.md), then the [critical experiment review](../experiments/drift_only/EXPERIMENT_CRITICAL_REVIEW_VI_2026-09-27.md), then read the manuscript and [review response matrix](REVIEW_RESPONSE_MATRIX_VI.md). See [citation audit](CITATION_AUDIT_2026-09-27.md) for source checks and unresolved citation-trigger context.
 
 ## Changes
 
@@ -8,8 +8,8 @@ This is a revised manuscript and local experiment artifact, **not an assertion t
 - Replaced the old challenger-recovery evidence in the manuscript with the frozen 120-window study; the previous manuscript/results remain in repository history.
 - Added source/split accounting, stable controls, fixed model, family composition scenarios, threshold/window-size sensitivity, and explicit post-hoc mixture interpretation.
 - Distinguished standalone KS/BH results from the deployed Evidently preset and from the earlier bounded Locust replay.
-- Corrected bibliographic author errors, pinned preprint versions, removed unsupported product-gap claims, and added BH citation.
-- Embedded the result and threshold-sensitivity tables directly in the manuscript from the unchanged CSVs. The checked standalone build has 8 pages and no unresolved references or LaTeX box warnings.
+- Checked retained references against primary/author sources, removed peripheral citations, added DOI metadata, and kept the unknown citation-integrity trigger open.
+- Embedded the result and threshold-sensitivity tables directly in the manuscript from the unchanged CSVs. The checked standalone LNCS v2.24 build has 8 pages, no unresolved references or overfull boxes, and one minor underfull bibliography line.
 
 ## Build the paper
 
@@ -47,8 +47,8 @@ The runner records `git rev-parse HEAD`. When reproducing from the ZIP outside a
 
 ## Author decisions still needed
 
-Use the updated [one-week drift plan](../../../docs/paper/csonet_2026_one_week_drift_plan_vi.md) as the canonical teammate handoff: exact S0/S1/S2 mixtures, fixed-model quality metrics, family-level errors, detector sensitivity, paper tables/figures, and the remaining September 27–30 schedule. The plan proposed a 12-window service replay, not a load benchmark. Four seed-42 windows have now run end-to-end; see the [live pilot report](LIVE_DRIFT_PILOT_20260929_VI.md) for audited production records and Evidently results. The remaining windows have not run on the service. The [handoff note](CSONET_BENCHMARK_HANDOFF_RUNBOOK_VI.md) points to the plan. Any older PDF export of that note is superseded by the Markdown plan.
+Use the updated [one-week drift plan](../../../docs/paper/csonet_2026_one_week_drift_plan_vi.md) as the canonical teammate handoff: exact S0/S1/S2 mixtures, fixed-model quality metrics, family-level errors, detector sensitivity, paper tables/figures, and the remaining September 27–30 schedule. The plan proposed a 12-window service replay, not a load benchmark. Four seed-42 windows have now run end-to-end and are summarized separately in the manuscript; see the [live pilot report](LIVE_DRIFT_PILOT_20260929_VI.md) for audited production records and Evidently results. The remaining windows have not run on the service. The [handoff note](CSONET_BENCHMARK_HANDOFF_RUNBOOK_VI.md) points to the plan. Any older PDF export of that note is superseded by the Markdown plan.
 
 To prepare additional inputs, follow the [replay handoff instructions](../experiments/drift_only/HANDOFF_VI.md). The exporter reconstructs the exact windows from the teammate's matching dataset and verifies the packaged model offline. Generated inputs are local artifacts; four live windows have been audited, while a complete 12-window service replay remains outstanding. Earlier local infrastructure audits are outside this handoff's scope.
 
-Confirm the experimental interpretation, corresponding author/metadata and forms; finalize data availability and have another team member reproduce the main table. Natural drift, retraining policies, serving scalability and adversarial model isolation remain unevaluated. The organizers' specific citation-integrity trigger is still unspecified. No paper or message has been submitted externally by this task.
+Confirm the experimental interpretation, funding acknowledgement, corresponding author/metadata and forms; finalize data availability and have another team member reproduce the main table. Natural drift, retraining policies, serving scalability and adversarial model isolation remain unevaluated. The organizers' specific citation-integrity trigger is still unspecified. No paper or message has been submitted externally by this task.

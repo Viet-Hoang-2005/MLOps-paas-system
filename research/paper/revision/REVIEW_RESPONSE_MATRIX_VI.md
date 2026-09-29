@@ -1,6 +1,6 @@
 # CSoNet: thay đổi đã làm và những phần còn thiếu
 
-Ngày: 27/09/2026. Đây là bảng nội bộ để nhóm/thầy kiểm tra, chưa gửi BTC. Vị trí trỏ theo section để không sai khi PDF đổi trang. Bản sửa giữ title/authors, chuyển bằng chứng chính từ challenger recovery cũ sang thực nghiệm fixed-model có pool tách biệt. Số liệu cơ sở không bị ghi đè.
+Cập nhật: 29/09/2026. Đây là bảng nội bộ để nhóm/thầy kiểm tra, chưa gửi BTC. Vị trí trỏ theo section để không sai khi PDF đổi trang. Bản sửa giữ title/authors, chuyển bằng chứng chính từ challenger recovery cũ sang thực nghiệm fixed-model có pool tách biệt. Số liệu cơ sở không bị ghi đè.
 
 | Reviewer / vấn đề | Thay đổi thực tế | Vị trí | Trạng thái và giới hạn |
 |---|---|---|---|
@@ -13,23 +13,23 @@ Ngày: 27/09/2026. Đây là bảng nội bộ để nhóm/thầy kiểm tra, ch
 | R2: provenance thiếu | Thêm Kaggle chain, local checksum/split/exclusion manifests và cảnh báo upstream selection | §4.1, artifact | **Một phần**; thiếu acquisition có version xác minh đầy đủ từ raw |
 | R2: reuse benign reference/evaluation | Chia lại 4 pool; exact feature-vector dedup, loại conflicting-label groups; 6 cặp overlap bằng 0 | §§4.1–4.2 | **Đã sửa exact overlap trong thí nghiệm mới**, không chứng minh session independence |
 | R2: near-perfect challenger không thuyết phục | Loại bảng challenger khỏi bản sửa; giải thích baseline known-family separability và mixture effect | §§4.2,5.1,6 | **Đã đổi evidence/diễn giải**; upstream bias còn |
-| R2: replay ngắn/4 HTTP 502 không đủ | Giữ số liệu và lỗi, ghi chưa chạy lại/chưa xác định nguyên nhân; bỏ claim hiệu năng quy mô lớn | §5.3 | **Thu hẹp claim**, chưa có benchmark mới |
+| R2: replay ngắn/4 HTTP 502 không đủ | Bổ sung pilot bốn cửa sổ qua serving/persistence/Evidently, ghi rõ 42 lỗi HTTP 502/503 trong S1 và audit UI của S0; bỏ claim hiệu năng quy mô lớn | §5.3 | **Bằng chứng tích hợp có kiểm soát**, chưa có load sweep hay độ sẵn sàng |
 | R2: reproducible artifact | Scripts, config, environment, checksums, saved model/window membership, verifier; tài sản LaTeX được tạo từ CSV | §4.3, artifact README | **Tái tính local được**; external reproduction cần đúng CSV nguồn |
 | R2: security uploaded model | Phân biệt ownership checks với sandbox, nêu code-execution threats và controls cần có | §6 | **Phân tích giới hạn**, chưa có adversarial/isolation test |
 | R2: ablation/promotion/rollback | Nêu drift không tự cho phép cập nhật; các gate và ablation chưa được đánh giá | §§3,6 | **Chưa có thực nghiệm**, không claim policy tốt hơn |
-| R2: citation integrity | Sửa 3 lỗi tác giả; ghi article/version; thêm BH; đối chiếu 17 tài liệu giữ lại với claim cụ thể | Related Work, References, citation audit | **Đã sửa lỗi xác minh được**; trigger reviewer chưa rõ, không tự tuyên bố giải quyết hết |
+| R2: citation integrity | Kiểm tra 13 tài liệu còn trích với nguồn tác giả/publisher/arXiv; bổ sung DOI và loại nguồn ngoài trọng tâm | Related Work, References, citation audit | **Metadata/claim đã audit**; trigger reviewer chưa rõ, không tự tuyên bố giải quyết hết |
 
 ## Kiểm tra sâu bổ sung trước khi chốt bản sửa
 
 Chẩn đoán ngày 27/09 trên model đã khóa cho thấy recall DDoS gần 1, PortScan/WebAttacks gần 0; aggregate S2 recall là hỗn hợp theo tỷ trọng family, không phải bằng chứng loss of knowledge theo thời gian. Bản sửa ghi rõ công thức và kết quả hậu nghiệm; không tính chúng là tập kiểm thử mới.
 
-Code service Evidently dùng preset, còn runner dùng KS+BH riêng. Bản sửa không gán các alert count offline cho detector đã deploy. Chưa có end-to-end parity test.
+Code service Evidently dùng preset, còn runner dùng KS+BH riêng. Bản sửa không gán các alert count offline cho detector đã deploy. Pilot bốn cửa sổ xác nhận inference/persistence/Evidently, nhưng không chứng minh KS/BH offline tương đương preset live.
 
 ## Việc nhóm cần chốt trước nộp
 
 1. Đọc chéo và thống nhất contribution/diễn giải của bản sửa; giữ case study NIDS duy nhất.
 2. Cung cấp cách lấy đúng `reference_data.csv` có version và checksum, kiểm tra quyền chia sẻ dữ liệu; một thành viên khác chạy lại từ hướng dẫn.
-3. Nếu môi trường sẵn, kiểm tra tích hợp stable/shift qua monitor thật. Không chờ một deployment lớn để hoàn tất sửa paper; giữ limitation nếu chưa có kết quả.
+3. Pilot stable/shift qua monitor thật đã làm bốn cửa sổ; kiểm tra chéo audit S0 từ UI và 42 lỗi S1. Giữ limitation cho temporal drift, retraining và load sweep chưa làm.
 4. Xác nhận thông tin tác giả/corresponding author, biểu mẫu, đăng ký và yêu cầu cổng nộp. Xin clarification cho citation trigger nếu cần; chưa gửi bất kỳ email nào từ task này.
 
 Theo [hướng dẫn camera-ready](https://csonet-conf.github.io/csonet26/index.php/camera-ready/index.html), short paper 8 trang, có thể mua tối đa 2 trang thêm; hạn 30/09/2026; nộp PDF kèm source. Bản hiện tại nhắm 8 trang, không thay lề hoặc cỡ chữ để ép trang. Không mặc định thời điểm/múi giờ deadline khi cổng chưa ghi rõ.
