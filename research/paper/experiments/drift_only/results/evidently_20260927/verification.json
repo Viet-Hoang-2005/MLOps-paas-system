@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "windows": 120,
+  "feature_results": 6240,
+  "checks": [
+    "frozen source and membership checksums",
+    "one-to-one window IDs with baseline metrics",
+    "52 distinct expected features per window",
+    "feature-level counts, shares and alert flags",
+    "scenario-level alert totals"
+  ],
+  "limit": "Does not independently recompute Evidently's per-feature statistics or test end-to-end service behavior"
+}

@@ -43,8 +43,8 @@ Gộp hai cỡ cửa sổ: **60/60 S0** không alert dưới cả hai detector �
 Từ root repo, với môi trường Python 3.11 và các phiên bản trong `environment.lock.txt`:
 
 ```powershell
-python research/experiments/drift_only/compare_evidently.py --output research/experiments/drift_only/results/evidently_reproduction
-python research/experiments/drift_only/verify_evidently.py research/experiments/drift_only/results/evidently_reproduction
+python research/paper/experiments/drift_only/compare_evidently.py --output research/paper/experiments/drift_only/results/evidently_reproduction
+python research/paper/experiments/drift_only/verify_evidently.py research/paper/experiments/drift_only/results/evidently_reproduction
 ```
 
 Script từ chối ghi đè thư mục kết quả đã có. Dữ liệu nguồn tại `data/reference_data.csv` đã được đối chiếu SHA-256 với baseline trước khi chạy. Các file chính là `window_comparison.csv`, `feature_comparison.csv`, `scenario_comparison.csv`, `manifest.json` và `verification.json` trong `results/evidently_20260927/`.

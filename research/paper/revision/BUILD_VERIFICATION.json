@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-29",
+  "pdf_pages": 8,
+  "template": "Current editor refresh: LNCS class version not independently verified; previous checked build used local v2.24.",
+  "pdf_sha256": "338b3f1425f971dab69481543739f3eea2aeaa94668c621f2cfc69a726917f62",
+  "tex_sha256": "6af092a6e2a2846fb78fe2cbfa16e3af87efdc42a0d0813728a832181cc9bf97",
+  "retained_citations": 13,
+  "doi_entries": 8,
+  "all_citations_defined_and_used": true,
+  "latex_warnings": [
+    "Latest editor refresh has no accessible compiler log; explicit compile tool failed due runtime configuration."
+  ],
+  "overfull_boxes": null,
+  "underfull_boxes": null,
+  "underfull_detail": "Prior local v2.24 build had one mild underfull bibliography line; latest editor refresh not log-verified.",
+  "visual_review": "Current 8-page PDF: page 5 rendered and inspected; URL absent, revised reproduction sentence visible, acknowledgement retained.",
+  "experiment_baseline": "Frozen run_20260926 unchanged; four-window live pilot reported separately.",
+  "submission_status": "Team-review draft; source and refreshed PDF contain no GitHub artifact URL. Explicit compile tool environment remains unavailable.",
+  "last_compiled_tex_sha256": "aae3e256471bc9c44ad4e7b8326413502a0ff44c4f74aa36c5fe5aa4fc901b36",
+  "pdf_matches_current_tex": true,
+  "current_compile_status": "Editor refreshed the PDF after the source edit; PDF text and page 5 were checked. The explicit built-in compile call failed with: Unable to find standard directories for platform."
+}

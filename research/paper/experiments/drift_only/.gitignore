@@ -1,0 +1,6 @@
+# Keep generated scientific tables and row manifests with this experiment.
+!results/**/*.csv
+!diagnostics/**/*.csv
+__pycache__/
+# Generated local replay payloads contain dataset rows; reproduce from manifests.
+handoff_exports/

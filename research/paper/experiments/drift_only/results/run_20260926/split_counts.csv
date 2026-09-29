@@ -1,0 +1,5 @@
+split,BENIGN,BruteForce,DDoS,PortScan,WebAttacks
+development,9998,815,5000,4999,171
+evaluation,20000,1630,10000,9998,344
+reference,19997,1630,10000,9998,343
+train,49994,4075,25000,24995,857

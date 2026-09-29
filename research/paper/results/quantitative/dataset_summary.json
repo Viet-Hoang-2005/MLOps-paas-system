@@ -1,0 +1,164 @@
+{
+  "train_m0": {
+    "path": "data/train_2_classes.csv",
+    "role": "fixed baseline training",
+    "window": "TRAIN-M0",
+    "raw_rows": 150000,
+    "sampled_rows": 100000,
+    "sampling_applied": true,
+    "removed_overlap_rows": 0,
+    "columns": 53,
+    "feature_count": 52,
+    "label_column": "Label",
+    "raw_label_counts": {
+      "BENIGN": 66744,
+      "DDoS": 33256
+    },
+    "binary_label_counts": {
+      "BENIGN": 66744,
+      "ATTACK": 33256
+    }
+  },
+  "train_m1": {
+    "path": "data/train_5_classes.csv",
+    "role": "challenger training (decontaminated against evaluation windows)",
+    "window": "TRAIN-M1",
+    "raw_rows": 209865,
+    "sampled_rows": 71412,
+    "sampling_applied": true,
+    "removed_overlap_rows": 28588,
+    "columns": 53,
+    "feature_count": 52,
+    "label_column": "Label",
+    "raw_label_counts": {
+      "BENIGN": 47696,
+      "DDoS": 23716
+    },
+    "binary_label_counts": {
+      "BENIGN": 47696,
+      "ATTACK": 23716
+    }
+  },
+  "reference": {
+    "path": "data/reference_data.csv",
+    "role": "reference drift baseline",
+    "window": "W0",
+    "raw_rows": 209865,
+    "sampled_rows": 50000,
+    "sampling_applied": true,
+    "removed_overlap_rows": 0,
+    "columns": 53,
+    "feature_count": 52,
+    "label_column": "Label",
+    "raw_label_counts": {
+      "BENIGN": 23873,
+      "PortScan": 11965,
+      "DDoS": 11839,
+      "BruteForce": 1921,
+      "WebAttacks": 402
+    },
+    "binary_label_counts": {
+      "BENIGN": 23873,
+      "ATTACK": 26127
+    }
+  },
+  "w1": {
+    "path": "data/test_data.csv",
+    "role": "similar/holdout replay window",
+    "window": "W1",
+    "raw_rows": 4428,
+    "sampled_rows": 4428,
+    "sampling_applied": false,
+    "removed_overlap_rows": 0,
+    "columns": 53,
+    "feature_count": 52,
+    "label_column": "Label",
+    "raw_label_counts": {
+      "DDoS": 1000,
+      "BruteForce": 1000,
+      "PortScan": 1000,
+      "BENIGN": 1000,
+      "WebAttacks": 428
+    },
+    "binary_label_counts": {
+      "BENIGN": 1000,
+      "ATTACK": 3428
+    }
+  },
+  "w2": {
+    "path": "data/drift_portscan.csv",
+    "role": "drift replay window",
+    "window": "W2",
+    "raw_rows": 50000,
+    "sampled_rows": 50000,
+    "sampling_applied": false,
+    "removed_overlap_rows": 0,
+    "columns": 53,
+    "feature_count": 52,
+    "label_column": "Label",
+    "raw_label_counts": {
+      "PortScan": 50000
+    },
+    "binary_label_counts": {
+      "BENIGN": 0,
+      "ATTACK": 50000
+    }
+  },
+  "w3": {
+    "path": "data/drift_bruteforce.csv",
+    "role": "drift replay window",
+    "window": "W3",
+    "raw_rows": 8150,
+    "sampled_rows": 8150,
+    "sampling_applied": false,
+    "removed_overlap_rows": 0,
+    "columns": 53,
+    "feature_count": 52,
+    "label_column": "Label",
+    "raw_label_counts": {
+      "BruteForce": 8150
+    },
+    "binary_label_counts": {
+      "BENIGN": 0,
+      "ATTACK": 8150
+    }
+  },
+  "w4": {
+    "path": "data/drift_webattacks.csv",
+    "role": "drift replay window",
+    "window": "W4",
+    "raw_rows": 1715,
+    "sampled_rows": 1715,
+    "sampling_applied": false,
+    "removed_overlap_rows": 0,
+    "columns": 53,
+    "feature_count": 52,
+    "label_column": "Label",
+    "raw_label_counts": {
+      "WebAttacks": 1715
+    },
+    "binary_label_counts": {
+      "BENIGN": 0,
+      "ATTACK": 1715
+    }
+  },
+  "w5": {
+    "path": "data/portscan.csv",
+    "role": "optional drift replay window",
+    "window": "W5",
+    "raw_rows": 50000,
+    "sampled_rows": 50000,
+    "sampling_applied": false,
+    "removed_overlap_rows": 0,
+    "columns": 53,
+    "feature_count": 52,
+    "label_column": "Label",
+    "raw_label_counts": {
+      "PortScan": 50000
+    },
+    "binary_label_counts": {
+      "BENIGN": 0,
+      "ATTACK": 50000
+    }
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "S1": {
+    "M0-fixed-XGB": {
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          4774,
+          1
+        ],
+        [
+          20000,
+          0
+        ]
+      ]
+    },
+    "S1-M1-retrained-XGB": {
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          4773,
+          2
+        ],
+        [
+          3,
+          19997
+        ]
+      ]
+    }
+  },
+  "S2": {
+    "M0-fixed-XGB": {
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          4774,
+          1
+        ],
+        [
+          3255,
+          5
+        ]
+      ]
+    },
+    "S2-M1-retrained-XGB": {
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          4773,
+          2
+        ],
+        [
+          2,
+          3258
+        ]
+      ]
+    }
+  },
+  "S3": {
+    "M0-fixed-XGB": {
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          4774,
+          1
+        ],
+        [
+          686,
+          0
+        ]
+      ]
+    },
+    "S3-M1-retrained-XGB": {
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          4774,
+          1
+        ],
+        [
+          5,
+          681
+        ]
+      ]
+    }
+  }
+}
