@@ -3,5 +3,8 @@ kind: Kustomization
 namespace: mlops-redis
 
 resources:
-  - deployment.yaml
-  - service.yaml
+  - external-secrets.yaml
+  - redis-config.yaml
+  - replication.yaml
+  - sentinel.yaml
+  - network-policy.yaml

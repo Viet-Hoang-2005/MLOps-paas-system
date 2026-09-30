@@ -23,14 +23,14 @@ class FakeRedisClient:
 class CacheInvalidationTests(TestCase):
     def test_invalidate_model_server_cache_success(self):
         fake_redis = FakeRedisClient()
-        with patch.object(cache_service.Redis, "from_url", return_value=fake_redis):
+        with patch.object(cache_service, "redis_client", return_value=fake_redis):
             result = cache_service.invalidate_model_server_cache("test-version-uuid")
 
         self.assertTrue(result)
         self.assertEqual(fake_redis.deleted_keys, ["model-version:test-version-uuid"])
 
     def test_invalidate_model_server_cache_handles_redis_error(self):
-        with patch.object(cache_service.Redis, "from_url", side_effect=RedisError("Connection refused")):
+        with patch.object(cache_service, "redis_client", side_effect=RedisError("Connection refused")):
             result = cache_service.invalidate_model_server_cache("test-version-uuid")
         self.assertFalse(result)
 

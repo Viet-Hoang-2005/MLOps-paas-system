@@ -58,9 +58,9 @@ def validate_workload_layout(context: ValidationContext) -> list[str]:
 def validate_lifecycle(context: ValidationContext) -> list[str]:
     errors: list[str] = []
     applications = context.applications
-    if len(applications) != 31:
+    if len(applications) != 34:
         errors.append(
-            f"root GitOps must render exactly 31 child Applications, found {len(applications)}"
+            f"root GitOps must render exactly 34 child Applications, found {len(applications)}"
         )
     boundaries = {
         "k8s/cluster/": ("mlops-prod-cluster-", "mlops-cluster", "cluster"),
@@ -80,11 +80,14 @@ def validate_lifecycle(context: ValidationContext) -> list[str]:
         "mlops-prod-addon-node-feature-discovery": "-24",
         "mlops-prod-cluster-karpenter-capacity": "-23",
         "mlops-prod-addon-gpu-operator": "-23",
+        "mlops-prod-addon-loki": "0",
+        "mlops-prod-addon-alloy": "1",
     }
     for name in (
         "mlops-prod-addon-aws-ebs-csi",
         "mlops-prod-addon-external-secrets",
         "mlops-prod-addon-cloudnative-pg",
+        "mlops-prod-addon-redis-operator",
         "mlops-prod-addon-keda",
         "mlops-prod-addon-argo-workflows",
         "mlops-prod-addon-argo-events",

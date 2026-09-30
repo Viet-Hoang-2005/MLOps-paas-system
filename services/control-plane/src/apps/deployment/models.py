@@ -88,7 +88,7 @@ class BuildInputAsset(models.Model):
 class Deployment(models.Model):
     STATUSES = tuple(
         (value, value.replace("_", " ").title())
-        for value in ("pending", "deploying", "healthy", "unhealthy", "failed", "stopped")
+        for value in ("pending", "deploying", "healthy", "unhealthy", "failed", "stopped", "unconfirmed")
     )
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     version = models.ForeignKey("registry.ModelVersion", on_delete=models.PROTECT, related_name="deployments")

@@ -142,7 +142,7 @@ def test_publish_propagates_only_bounded_correlation():
         reset_context(token)
 
 
-def test_retry_signal_emits_one_safe_warning_with_context(caplog):
+def test_retry_signal_emits_one_safe_warning_with_context(caplog, monkeypatch):
     from celery.exceptions import Retry
     from celery.signals import task_retry
 
@@ -289,7 +289,8 @@ def test_runtime_logs_sanitize_secrets_urls_and_bound_lines(decode):
 @pytest.mark.parametrize("kind", ["build", "training"])
 def test_persisted_log_fallback_is_sanitized_without_changing_offset(kind, monkeypatch):
     redis = Mock(lrange=Mock(return_value=[]), llen=Mock(return_value=0))
-    monkeypatch.setattr(deployment_logs.Redis, "from_url", lambda _: redis)
+    monkeypatch.setattr(deployment_logs, "redis_client", lambda: redis)
+    monkeypatch.setattr(training_logs, "redis_client", lambda: redis)
     resource = SimpleNamespace(
         public_id=uuid.uuid4(),
         logs="first\ntoken=private-value",
@@ -305,7 +306,8 @@ def test_persisted_log_fallback_is_sanitized_without_changing_offset(kind, monke
 
 def test_runtime_writers_sanitize_before_redis(monkeypatch):
     redis = Mock()
-    monkeypatch.setattr(training_logs.Redis, "from_url", lambda _: redis)
+    monkeypatch.setattr(training_logs, "redis_client", lambda: redis)
+    monkeypatch.setattr(deployment_logs, "redis_client", lambda: redis)
     training_logs.append_training_log(uuid.uuid4(), "Authorization: Bearer private-value")
     deployment_logs.append_deployment_log(SimpleNamespace(public_id=uuid.uuid4()), "token=private-value")
     assert redis.rpush.call_count == 2
@@ -412,14 +414,14 @@ def test_django_converted_exception_retains_diagnostic_and_cleans_up(settings, m
         raise RuntimeError("token=private-view-error")
 
     settings.ROOT_URLCONF = type("LoggingTestUrls", (), {"urlpatterns": [path("broken/", broken_view)]})
-    summary = Mock()
-    monkeypatch.setattr("common.middleware.Summary", lambda *_: summary)
+    emitted = Mock()
+    monkeypatch.setattr("common.middleware.log_event", emitted)
     client = APIClient()
     client.raise_request_exception = False
     response = client.get("/broken/")
     assert response.status_code == 500
-    summary.failure.assert_called_once()
-    fields = summary.failure.call_args.kwargs
+    emitted.assert_called_once()
+    fields = emitted.call_args.kwargs
     assert fields["error_type"] == "RuntimeError"
     assert fields["exc_info"][0] is RuntimeError
     assert fields["exc_info"][2] is not None

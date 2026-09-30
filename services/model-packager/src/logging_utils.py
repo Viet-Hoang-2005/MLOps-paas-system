@@ -417,10 +417,10 @@ class RuntimeLog:
         # Sanitize the whole chunk before splitting/truncating presentation lines.
         for line in sanitize("\n".join(lines), limit=None).splitlines():
             safe = sanitize(line)
-            delivered = self._write(safe)
+            self._write(safe)
             log_event(
                 self.logger,
-                "DEBUG" if delivered else "INFO",
+                "INFO",
                 "runtime.output",
                 safe,
                 source="untrusted",

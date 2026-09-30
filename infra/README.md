@@ -149,5 +149,5 @@ terraform destroy
 ## Bảo mật
 
 - **KHÔNG commit** `.tfstate` lên Git (đã có trong `.gitignore`). File này chứa thông tin nhạy cảm về hạ tầng thực tế.
-- Secrets không được hardcode trong Terraform — chỉ tạo resource Secrets Manager rỗng; nội dung được đẩy qua `scripts/push_secrets_to_aws.py`.
+- Secrets không được hardcode trong Terraform — Terraform chỉ tạo container Secrets Manager; nội dung được đẩy qua `scripts/create_and_push_secrets_to_aws.py`.
 - EC2 nodes dùng IAM Instance Profile thay vì Access Key tĩnh.

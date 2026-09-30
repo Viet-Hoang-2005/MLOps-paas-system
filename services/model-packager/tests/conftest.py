@@ -16,7 +16,7 @@ for flavor in ("pytorch", "tensorflow", "keras", "xgboost"):
     _framework_patches.setitem(sys.modules, module.__name__, module)
     _framework_patches.setattr(mlflow, flavor, module, raising=False)
 
-from src import tasks as cli
+from src import tasks as cli  # noqa: E402  # Stub optional ML frameworks before importing tasks.
 
 
 @pytest.fixture(autouse=True)

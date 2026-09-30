@@ -24,6 +24,7 @@ __pycache__/
 .Python
 venv/
 .venv-ansible/
+.venv-secrets/
 *.egg-info/
 dist/
 build/
@@ -87,6 +88,7 @@ coverage.xml
 htmlcov/
 .tox/
 .tmp-*/
+*tmp/
 
 # Terraform
 *.tfstate

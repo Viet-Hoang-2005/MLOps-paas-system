@@ -26,11 +26,14 @@ core_addon_application_names:
   - mlops-prod-addon-aws-ebs-csi
   - mlops-prod-addon-external-secrets
   - mlops-prod-addon-cloudnative-pg
+  - mlops-prod-addon-redis-operator
   - mlops-prod-addon-keda
   - mlops-prod-addon-argo-workflows
   - mlops-prod-addon-argo-events
   - mlops-prod-addon-monitoring
   - mlops-prod-addon-kyverno
+  - mlops-prod-addon-loki
+  - mlops-prod-addon-alloy
 core_cluster_application_names:
   - mlops-prod-cluster-namespaces
   - mlops-prod-cluster-storage
@@ -40,14 +43,19 @@ core_addon_workloads:
   - {namespace: kube-system, release: aws-ebs-csi-driver}
   - {namespace: external-secrets, release: external-secrets}
   - {namespace: cnpg-system, release: cloudnative-pg}
+  - {namespace: redis-operator, release: redis-operator}
   - {namespace: keda, release: keda}
   - {namespace: argo, release: argo-workflows}
   - {namespace: argo-events, release: argo-events}
   - {namespace: monitoring, release: monitoring}
   - {namespace: kyverno, release: kyverno}
+  - {namespace: mlops-logging, release: loki}
+  - {namespace: mlops-logging, release: alloy}
 core_addon_crds:
   - externalsecrets.external-secrets.io
   - clusters.postgresql.cnpg.io
+  - redisreplications.redis.redis.opstreelabs.in
+  - redissentinels.redis.redis.opstreelabs.in
   - scaledobjects.keda.sh
   - workflows.argoproj.io
   - eventsources.argoproj.io

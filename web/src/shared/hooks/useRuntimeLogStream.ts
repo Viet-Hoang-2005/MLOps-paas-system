@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { getRuntimeLogs } from "@/shared/api/runtimeLogs";
 import type { RuntimeLogSource, RuntimeStatus } from "@/shared/types";
 
@@ -14,14 +15,17 @@ export interface RuntimeLogStream {
   status: RuntimeStatus | null;
   error: string;
   isPolling: boolean;
+  refresh: () => void;
 }
 
 export function useRuntimeLogStream({
   source,
   enabled = true,
   terminalStatuses = [],
-  pollIntervalMs = 1500,
+  pollIntervalMs = 2000,
 }: RuntimeLogStreamOptions): RuntimeLogStream {
+  const { t } = useTranslation("common");
+  const [refreshKey, setRefreshKey] = useState(0);
   const sourceKind = source?.kind;
   const sourceId = source?.id;
   const sourceKey = sourceKind && sourceId ? `${sourceKind}:${sourceId}` : "";
@@ -41,6 +45,10 @@ export function useRuntimeLogStream({
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let offset = 0;
+    let cursor: string | undefined;
+    let receivedFirstBatch = false;
+    let terminalSince: number | undefined;
+    const controller = new AbortController();
     const terminalStatusSet = new Set(
       terminalStatusesKey ? terminalStatusesKey.split("\u0000") : [],
     );
@@ -50,26 +58,44 @@ export function useRuntimeLogStream({
 
     const poll = async () => {
       try {
-        const batch = await getRuntimeLogs(activeSource, offset);
+        const batch = await getRuntimeLogs(activeSource, offset, cursor, controller.signal);
         if (cancelled) return;
 
         const nextLogs = batch.logs.filter(
           (line) => !line.startsWith("BUILD_EOF_"),
         );
         offset = batch.nextOffset;
+        cursor = batch.nextCursor;
+        const append = receivedFirstBatch;
+        receivedFirstBatch = true;
         setState((previous) => ({
           sourceKey,
           logs:
-            previous.sourceKey === sourceKey
-              ? [...previous.logs, ...nextLogs]
+            append && previous.sourceKey === sourceKey
+              ? [...previous.logs, ...nextLogs].slice(-10000)
               : nextLogs,
           status: batch.status,
-          error: batch.error,
+          error: batch.error || (batch.logError ? t("terminal.logsUnavailable") : ""),
         }));
 
-        if (terminalStatusSet.has(batch.status)) return;
+        if (terminalStatusSet.has(batch.status)) {
+          terminalSince ??= Date.now();
+          // Drain exit-handler logs after the authoritative result has arrived.
+          if (!batch.hasMore && Date.now() - terminalSince >= 15000) return;
+        } else terminalSince = undefined;
+        if (batch.hasMore) {
+          timer = setTimeout(poll, 100);
+          return;
+        }
       } catch {
-        // Runtime log polling is best-effort. Retry transient failures.
+        if (cancelled) return;
+        setState((previous) => ({
+          sourceKey,
+          logs: previous.sourceKey === sourceKey ? previous.logs : [],
+          status: previous.sourceKey === sourceKey ? previous.status : null,
+          error: t("terminal.logsUnavailable"),
+        }));
+        // Keep the cursor and retry without losing collected output.
       }
 
       if (!cancelled) timer = setTimeout(poll, pollIntervalMs);
@@ -79,6 +105,7 @@ export function useRuntimeLogStream({
 
     return () => {
       cancelled = true;
+      controller.abort();
       if (timer) clearTimeout(timer);
     };
   }, [
@@ -88,6 +115,8 @@ export function useRuntimeLogStream({
     sourceKey,
     sourceKind,
     terminalStatusesKey,
+    refreshKey,
+    t,
   ]);
 
   return {
@@ -97,5 +126,6 @@ export function useRuntimeLogStream({
     isPolling: Boolean(
       enabled && sourceKey && !terminalStatuses.includes(current.status ?? ""),
     ),
+    refresh: () => setRefreshKey((value) => value + 1),
   };
 }

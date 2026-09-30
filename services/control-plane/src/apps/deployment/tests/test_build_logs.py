@@ -25,7 +25,7 @@ def test_build_logs_streams_redis_lines_for_build_owner(monkeypatch):
     project = ModelProject.objects.create(owner=owner, name="build logs")
     version = ModelVersion.objects.create(project=project, version="1")
     build = Build.objects.create(project=project, version=version, flavor="sklearn", status="building")
-    monkeypatch.setattr(log_service.Redis, "from_url", lambda _url: FakeRedis([b"first", b"second"]))
+    monkeypatch.setattr(log_service, "redis_client", lambda: FakeRedis([b"first", b"second"]))
     client = APIClient()
     client.force_authenticate(owner)
 
@@ -47,7 +47,7 @@ def test_build_logs_falls_back_to_persisted_history_when_redis_is_unavailable(mo
     project = ModelProject.objects.create(owner=owner, name="build history")
     version = ModelVersion.objects.create(project=project, version="1")
     build = Build.objects.create(project=project, version=version, flavor="sklearn", status="ready", logs="one\ntwo")
-    monkeypatch.setattr(log_service.Redis, "from_url", lambda _url: (_ for _ in ()).throw(log_service.RedisError()))
+    monkeypatch.setattr(log_service, "redis_client", lambda: (_ for _ in ()).throw(log_service.RedisError()))
     client = APIClient()
     client.force_authenticate(owner)
 
@@ -85,7 +85,7 @@ def test_deployment_logs_stream_runtime_progress_for_owner(monkeypatch):
     from apps.deployment.models import Deployment
 
     deployment = Deployment.objects.create(version=version, build=build, status="deploying")
-    monkeypatch.setattr(log_service.Redis, "from_url", lambda _url: FakeRedis([b"starting", b"healthy"]))
+    monkeypatch.setattr(log_service, "redis_client", lambda: FakeRedis([b"starting", b"healthy"]))
     client = APIClient()
     client.force_authenticate(owner)
 

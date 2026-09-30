@@ -34,6 +34,9 @@ class MaintenancePolicy(PublicModel):
             ),
         ]
 
+    def __str__(self):
+        return f"Policy {self.public_id}"
+
 
 class DatasetSnapshot(PublicModel):
     ROLES = (
@@ -60,6 +63,9 @@ class DatasetSnapshot(PublicModel):
     metadata = models.JSONField(default=dict, blank=True)
     sealed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Dataset snapshot {self.public_id}"
 
 
 class EvidenceWindow(PublicModel):
@@ -101,6 +107,9 @@ class EvidenceWindow(PublicModel):
             models.CheckConstraint(check=Q(ends_at__gt=F("starts_at")), name="ct_window_valid_range"),
         ]
 
+    def __str__(self):
+        return f"Evidence window {self.public_id}"
+
 
 class EvidenceWindowSample(PublicModel):
     POOLS = (("hidden", "Hidden"), ("verify", "Verify"), ("train", "Train"), ("gate", "Gate"))
@@ -120,6 +129,9 @@ class EvidenceWindowSample(PublicModel):
         constraints = [
             models.UniqueConstraint(fields=["window", "pool", "randomized_rank"], name="ct_window_pool_rank_unique")
         ]
+
+    def __str__(self):
+        return f"Evidence sample {self.public_id}"
 
 
 class LabelBudget(PublicModel):
@@ -175,6 +187,9 @@ class LabelBudget(PublicModel):
             ),
         ]
 
+    def __str__(self):
+        return f"Label budget {self.public_id}"
+
 
 class LabelRequest(PublicModel):
     PURPOSES = (("verify", "Verify"), ("train", "Train"), ("gate", "Gate"))
@@ -204,6 +219,9 @@ class LabelRequest(PublicModel):
             )
         ]
 
+    def __str__(self):
+        return f"Label request {self.public_id}"
+
 
 class LabelRequestItem(PublicModel):
     STATUSES = (("reserved", "Reserved"), ("revealed", "Revealed"), ("released", "Released"), ("rejected", "Rejected"))
@@ -217,6 +235,9 @@ class LabelRequestItem(PublicModel):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return f"Label request item {self.public_id}"
+
 
 class Feedback(PublicModel):
     SOURCES = (("human", "Human"), ("evaluator", "Evaluator"), ("import", "Import"))
@@ -228,6 +249,9 @@ class Feedback(PublicModel):
     checksum = models.CharField(max_length=128, blank=True)
     revealed_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Feedback {self.public_id}"
 
 
 class LabelLedgerEntry(PublicModel):
@@ -244,6 +268,9 @@ class LabelLedgerEntry(PublicModel):
     units = models.PositiveIntegerField()
     idempotency_key = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Label ledger entry {self.public_id}"
 
 
 class MaintenanceDecision(PublicModel):
@@ -274,6 +301,9 @@ class MaintenanceDecision(PublicModel):
                 fields=["window", "policy", "evaluation_attempt"], name="ct_decision_window_policy_attempt"
             )
         ]
+
+    def __str__(self):
+        return f"Maintenance decision {self.public_id}"
 
 
 class MaintenanceRun(PublicModel):
@@ -320,6 +350,9 @@ class MaintenanceRun(PublicModel):
             )
         ]
 
+    def __str__(self):
+        return f"Maintenance run {self.public_id}"
+
 
 class MaintenanceStepAttempt(PublicModel):
     STEPS = (
@@ -359,6 +392,9 @@ class MaintenanceStepAttempt(PublicModel):
             models.UniqueConstraint(fields=["run", "step", "attempt_number"], name="ct_step_run_attempt_unique")
         ]
 
+    def __str__(self):
+        return f"Maintenance step {self.public_id}"
+
 
 class EvaluationGate(PublicModel):
     STATUSES = (
@@ -393,3 +429,6 @@ class EvaluationGate(PublicModel):
 
     class Meta:
         constraints = [models.CheckConstraint(check=~Q(candidate=F("champion")), name="ct_gate_distinct_versions")]
+
+    def __str__(self):
+        return f"Evaluation gate {self.public_id}"

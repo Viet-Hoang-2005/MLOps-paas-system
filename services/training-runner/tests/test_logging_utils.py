@@ -180,7 +180,7 @@ class LoggingTests(unittest.TestCase):
         runtime = RuntimeLog(self.logger, writer)
         runtime.detail('password="unsafe-value"')
         self.assertNotIn("unsafe-value", saved[0])
-        self.assertIn("[DEBUG]:", self.output.getvalue())
+        self.assertIn("[INFO]:", self.output.getvalue())
         self.output.truncate(0)
         self.output.seek(0)
 

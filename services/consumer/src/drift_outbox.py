@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 delivery_summary = Summary(logger, "drift_signal_delivery_summary")
 database_summary = Summary(logger, "drift_outbox_database_summary")
 
-from src.database import (
+from src.database import (  # noqa: E402  # Initialize log summaries before database import.
     claim_automatic_drift_signals,
     mark_automatic_drift_signal_published,
     reschedule_automatic_drift_signal,

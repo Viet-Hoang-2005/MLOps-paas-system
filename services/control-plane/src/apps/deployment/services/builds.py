@@ -1,3 +1,4 @@
+import uuid
 from pathlib import Path
 
 from django.db import transaction
@@ -36,9 +37,6 @@ def request_build(version, backend):
     )
     transaction.on_commit(lambda: _enqueue(build))
     return build
-
-
-import uuid
 
 
 def create_build_presigned_url(*, project, validated_data, storage=None):

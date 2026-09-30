@@ -1,5 +1,10 @@
 # Terraform AWS
 
+Production task logs have a separate private S3 bucket with Loki seven-day
+retention and a ten-day S3 cleanup safety net. Only static-worker IAM gets the
+bucket-scoped policy; Karpenter tenant nodes/GitHub do not. Empty the log bucket
+before destroy; it is intentionally protected by `force_destroy=false`.
+
 The root composition wires modules for:
 
 - `network`: VPC, public/private subnets, routes, NAT/internet gateways.
@@ -30,7 +35,7 @@ Turning a flag off proposes resource destruction; it is not a pause mechanism. R
 
 The four repository-managed Secrets Manager containers intentionally use
 `recovery_window_in_days = 0`. A Terraform destroy permanently deletes their
-metadata and stored versions. After recreation, `scripts/push_secrets_to_aws.py`
+metadata and stored versions. After recreation, `scripts/create_and_push_secrets_to_aws.py`
 publishes the three application secret values; Ansible publishes the K3s agent
 token after server bootstrap. Never destroy this module unless the required
 source values are available.

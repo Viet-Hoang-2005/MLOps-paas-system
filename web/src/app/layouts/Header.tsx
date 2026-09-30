@@ -93,6 +93,7 @@ export default function Header({
       >
         <img src={AdaptMLLogo} alt="" className="h-7 w-7" />
         <span className="text-style-section-title font-semibold text-color-foreground">
+          {/* i18n-ignore: AdaptML is the product brand. */}
           Adapt<span className="text-color-info italic">ML</span>
         </span>
       </button>

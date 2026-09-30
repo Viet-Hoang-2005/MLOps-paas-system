@@ -1,6 +1,5 @@
 from django.conf import settings
 from rest_framework import generics, status
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -15,6 +14,7 @@ from apps.deployment.selectors import (
 from apps.deployment.services.builds import request_build, request_cancel
 from apps.deployment.services.deployments import endpoint_logs, request_deployment, request_stop
 from apps.deployment.services.logs import build_logs, deployment_logs
+from infrastructure.runtime_logs import runtime_log_page
 
 from .serializers import BuildSerializer, DeploymentSerializer, EndpointSerializer
 
@@ -47,20 +47,12 @@ class BuildCancelEndpoint(APIView):
 
 class BuildLogsEndpoint(APIView):
     def get(self, request, build_id):
-        try:
-            offset = int(request.query_params.get("offset", "0"))
-        except (TypeError, ValueError) as exc:
-            raise ValidationError({"offset": "Must be a non-negative integer."}) from exc
-        if offset < 0:
-            raise ValidationError({"offset": "Must be a non-negative integer."})
-
         build = build_for_user(request.user, build_id)
-        logs, next_offset = build_logs(build, offset)
+        page = runtime_log_page(request, build, "build", build_logs)
         return Response(
             {
                 "build_id": str(build.public_id),
-                "logs": logs,
-                "next_offset": next_offset,
+                **page,
                 "status": build.status,
                 "error_message": build.error_message,
             }
@@ -95,20 +87,12 @@ class DeploymentStopEndpoint(APIView):
 
 class DeploymentLogsEndpoint(APIView):
     def get(self, request, deployment_id):
-        try:
-            offset = int(request.query_params.get("offset", "0"))
-        except (TypeError, ValueError) as exc:
-            raise ValidationError({"offset": "Must be a non-negative integer."}) from exc
-        if offset < 0:
-            raise ValidationError({"offset": "Must be a non-negative integer."})
-
         deployment = deployment_for_user(request.user, deployment_id)
-        logs, next_offset = deployment_logs(deployment, offset)
+        page = runtime_log_page(request, deployment, "deployment", deployment_logs)
         return Response(
             {
                 "deployment_id": str(deployment.public_id),
-                "logs": logs,
-                "next_offset": next_offset,
+                **page,
                 "status": deployment.status,
                 "error_message": deployment.error_message,
             }

@@ -1,8 +1,6 @@
-from django.conf import settings
 from django.db import connections
 from django.http import HttpResponse, JsonResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-from redis import Redis
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,6 +9,7 @@ from apps.catalog.selectors import project_for_user
 from apps.observability.selectors import latest_production_data
 from apps.observability.services.models import model_observability
 from common.metrics import shared_celery_metrics
+from common.redis_client import redis_client
 
 from .serializers import ProductionDataQuerySerializer
 
@@ -35,7 +34,7 @@ class ReadyEndpoint(APIView):
         except Exception as exc:
             checks["postgres"] = str(exc)
         try:
-            checks["redis"] = "ok" if Redis.from_url(settings.REDIS_URL).ping() else "failed"
+            checks["redis"] = "ok" if redis_client().ping() else "failed"
         except Exception as exc:
             checks["redis"] = str(exc)
         status_code = 200 if all(value == "ok" for value in checks.values()) else 503

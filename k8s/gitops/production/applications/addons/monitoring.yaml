@@ -44,6 +44,13 @@ spec:
             serviceMonitorSelectorNilUsesHelmValues: false
             ruleSelectorNilUsesHelmValues: false
         grafana:
+          additionalDataSources:
+            - name: Runtime logs
+              type: loki
+              uid: runtime-logs
+              access: proxy
+              url: http://loki.mlops-logging.svc.cluster.local:3100
+              isDefault: false
           nodeSelector:
             workload-type: worker
           persistence:

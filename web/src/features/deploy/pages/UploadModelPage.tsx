@@ -400,7 +400,7 @@ export default function UploadModelPage() {
           ? { ...current, status: status as Deployment["status"] }
           : current,
       );
-      if (["healthy", "unhealthy", "failed", "stopped"].includes(status)) {
+      if (["healthy", "unhealthy", "failed", "stopped", "unconfirmed"].includes(status)) {
         void queryClient.invalidateQueries({
           queryKey: catalogQueryKeys.projects(),
         });

@@ -1,0 +1,59 @@
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: RedisReplication
+metadata:
+  name: mlops-paas-redis-ha
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  clusterSize: 2
+  kubernetesConfig:
+    image: quay.io/opstree/redis:v7.4.8
+    imagePullPolicy: IfNotPresent
+    redisSecret:
+      name: redis-ha-secret
+      key: REDIS_PASSWORD
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+  redisConfig:
+    maxMemoryPercentOfLimit: 50
+    additionalRedisConfig: redis-ha-config
+  storage:
+    keepAfterDelete: true
+    volumeClaimTemplate:
+      spec:
+        storageClassName: ebs-gp3
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 5Gi
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
+  nodeSelector:
+    workload-type: worker
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: mlops-paas-redis-ha
+              role: replication
+          topologyKey: kubernetes.io/hostname
+  pdb:
+    enabled: true
+    minAvailable: 1
+  redisExporter:
+    enabled: true
+    image: quay.io/opstree/redis-exporter:v1.44.0
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi

@@ -49,6 +49,15 @@ spec:
       eventName: deploy
       filters:
         data:
+          - path: body.deployment_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.control_plane_webhook_url
+            type: string
+            value: ['^http://mlops-paas-control-plane\.mlops-control-plane\.svc\.cluster\.local:8000/internal/webhooks/deployments/[0-9a-f-]{36}/$']
+          - path: body.callback_token
+            type: string
+            value: ['^[0-9]{10}\.[0-9a-f]{64}$']
           - path: body.project_id
             type: string
             value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
@@ -71,10 +80,12 @@ spec:
             type: string
             value: ['^(3000|5001)$']
         exprs:
-          - expr: image_name =~ project_id
+          - expr: image_name =~ project_id && callback =~ deployment_id
             fields:
               - {name: image_name, path: body.image_name}
               - {name: project_id, path: body.project_id}
+              - {name: callback, path: body.control_plane_webhook_url}
+              - {name: deployment_id, path: body.deployment_id}
     - name: drift-dep
       eventSourceName: webhook-eventsource
       eventName: drift
@@ -326,6 +337,12 @@ spec:
                       value: "5001"
                     - name: model_uri
                       value: ""
+                    - name: deployment_id
+                      value: ""
+                    - name: control_plane_webhook_url
+                      value: ""
+                    - name: callback_token
+                      value: ""
           parameters:
             - src:
                 dependencyName: deploy-dep
@@ -363,6 +380,12 @@ spec:
                 dependencyName: deploy-dep
                 dataKey: body.model_uri
               dest: spec.arguments.parameters.8.value
+            - src: {dependencyName: deploy-dep, dataKey: body.deployment_id}
+              dest: spec.arguments.parameters.9.value
+            - src: {dependencyName: deploy-dep, dataKey: body.control_plane_webhook_url}
+              dest: spec.arguments.parameters.10.value
+            - src: {dependencyName: deploy-dep, dataKey: body.callback_token}
+              dest: spec.arguments.parameters.11.value
 
     - template:
         name: drift-workflow-trigger

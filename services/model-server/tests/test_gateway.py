@@ -8,6 +8,7 @@ import pytest
 from fastapi import BackgroundTasks, HTTPException
 from src import api as index
 from src import database
+from src.routing import serving_engine_for_flavor
 
 
 class FakeResponse:
@@ -191,10 +192,10 @@ def test_resolve_worker_url_local_and_kubernetes(monkeypatch):
 
 
 def test_serving_engine_is_derived_from_version_flavor():
-    assert index.serving_engine_for_flavor("pytorch") == "dl"
-    assert index.serving_engine_for_flavor("TensorFlow") == "dl"
-    assert index.serving_engine_for_flavor("xgboost") == "ml"
-    assert index.serving_engine_for_flavor(None) == "ml"
+    assert serving_engine_for_flavor("pytorch") == "dl"
+    assert serving_engine_for_flavor("TensorFlow") == "dl"
+    assert serving_engine_for_flavor("xgboost") == "ml"
+    assert serving_engine_for_flavor(None) == "ml"
 
 
 def test_send_to_redpanda_payload_and_failure(monkeypatch):

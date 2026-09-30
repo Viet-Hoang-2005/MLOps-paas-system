@@ -51,6 +51,7 @@ def test_local_deployment_uses_embedded_model_artifact_and_becomes_healthy(monke
     endpoint = DockerDeploymentBackend(docker_client=docker, http=HealthyHttpClient()).deploy(deployment)
 
     assert docker.kwargs["environment"] == {
+        "LOG_FORMAT": "console",
         "PROJECT_ID": str(project.public_id),
         "MODEL_VERSION_ID": str(version.public_id),
         "MODEL_VERSION": "1",

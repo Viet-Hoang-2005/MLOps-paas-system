@@ -6,6 +6,16 @@ metadata:
 spec:
   serviceAccountName: argo-workflow-deploy-sa
   entrypoint: deploy-model
+  onExit: report-deployment-result
+  activeDeadlineSeconds: 1800
+  podMetadata:
+    labels:
+      mlops.io/deployment-id: "{{workflow.parameters.deployment_id}}"
+  arguments:
+    parameters:
+      - name: deployment_id
+      - name: control_plane_webhook_url
+      - name: callback_token
   templates:
     - name: deploy-model
       inputs:
@@ -34,6 +44,7 @@ spec:
                 - {name: image_name, value: "{{inputs.parameters.image_name}}"}
                 - {name: container_name, value: "{{inputs.parameters.container_name}}"}
                 - {name: target_port, value: "{{inputs.parameters.target_port}}"}
+                - {name: model_type, value: "{{inputs.parameters.model_type}}"}
                 - {name: model_uri, value: "{{inputs.parameters.model_uri}}"}
         - - name: service
             template: apply-service
@@ -43,6 +54,12 @@ spec:
                 - {name: service_name, value: "{{inputs.parameters.container_name}}-svc"}
                 - {name: model_type, value: "{{inputs.parameters.model_type}}"}
                 - {name: target_port, value: "{{inputs.parameters.target_port}}"}
+
+        - - name: model-ready
+            template: await-model-ready
+            arguments:
+              parameters:
+                - {name: container_name, value: "{{inputs.parameters.container_name}}"}
 
     - name: apply-deployment
       inputs:
@@ -54,6 +71,7 @@ spec:
           - name: image_name
           - name: container_name
           - name: target_port
+          - name: model_type
           - name: model_uri
       resource:
         action: apply
@@ -70,6 +88,7 @@ spec:
               model-version: {{=toJson(inputs.parameters.model_version_id)}}
           spec:
             replicas: 1
+            progressDeadlineSeconds: 1500
             selector:
               matchLabels:
                 app: {{=toJson(inputs.parameters.container_name)}}
@@ -77,6 +96,7 @@ spec:
               metadata:
                 labels:
                   app: {{=toJson(inputs.parameters.container_name)}}
+                  mlops.io/deployment-id: "{{workflow.parameters.deployment_id}}"
               spec:
                 automountServiceAccountToken: false
                 nodeSelector:
@@ -92,6 +112,8 @@ spec:
                     env:
                       - {name: LOG_FORMAT, value: "console"}
                       - {name: LOG_SUMMARY_INTERVAL_SECONDS, value: "60"}
+                      - {name: MODEL_HEALTH_PORT, value: "{{inputs.parameters.target_port}}"}
+                      - {name: MODEL_HEALTH_TYPE, value: "{{inputs.parameters.model_type}}"}
                       - {name: PROJECT_ID, value: {{=toJson(inputs.parameters.project_id)}}}
                       - {name: MODEL_VERSION_ID, value: {{=toJson(inputs.parameters.model_version_id)}}}
                       - {name: MODEL_VERSION, value: {{=toJson(inputs.parameters.version)}}}
@@ -103,6 +125,23 @@ spec:
                     resources:
                       requests: {cpu: 250m, memory: 512Mi}
                       limits: {cpu: 1000m, memory: 1Gi}
+                    startupProbe:
+                      exec:
+                        command:
+                          - python
+                          - -c
+                          - 'import json,os,sys,urllib.request; r=urllib.request.Request("http://127.0.0.1:"+os.environ["MODEL_HEALTH_PORT"]+"/health",data=b"{}" if os.environ["MODEL_HEALTH_TYPE"]=="dl" else None,headers={"Content-Type":"application/json"}); p=json.load(urllib.request.urlopen(r,timeout=3)); sys.exit(0 if p.get("model_loaded") is True and p.get("status")!="unhealthy" else 1)'
+                      periodSeconds: 10
+                      timeoutSeconds: 5
+                      failureThreshold: 150
+                    readinessProbe:
+                      exec:
+                        command:
+                          - python
+                          - -c
+                          - 'import json,os,sys,urllib.request; r=urllib.request.Request("http://127.0.0.1:"+os.environ["MODEL_HEALTH_PORT"]+"/health",data=b"{}" if os.environ["MODEL_HEALTH_TYPE"]=="dl" else None,headers={"Content-Type":"application/json"}); p=json.load(urllib.request.urlopen(r,timeout=3)); sys.exit(0 if p.get("model_loaded") is True and p.get("status")!="unhealthy" else 1)'
+                      periodSeconds: 10
+                      timeoutSeconds: 5
                 volumes:
                   - {name: dynamic-libs, emptyDir: {}}
                   - {name: pip-cache, emptyDir: {}}
@@ -135,3 +174,50 @@ spec:
                 protocol: TCP
                 port: {{inputs.parameters.target_port}}
                 targetPort: {{inputs.parameters.target_port}}
+
+    - name: await-model-ready
+      nodeSelector: {workload-type: worker}
+      inputs:
+        parameters:
+          - name: container_name
+      container:
+        image: registry.k8s.io/kubectl:v1.34.1
+        command: [kubectl]
+        args:
+          - rollout
+          - status
+          - "deployment/{{inputs.parameters.container_name}}"
+          - --namespace=mlops-model-runtimes
+          - --timeout=25m
+        resources:
+          requests: {cpu: 25m, memory: 64Mi}
+          limits: {cpu: 100m, memory: 128Mi}
+
+    - name: report-deployment-result
+      nodeSelector: {workload-type: worker}
+      retryStrategy:
+        limit: "5"
+        retryPolicy: Always
+        backoff: {duration: "2s", factor: "2", maxDuration: "120s"}
+      container:
+        image: curlimages/curl:8.8.0
+        args:
+          - --fail-with-body
+          - --silent
+          - --show-error
+          - --connect-timeout
+          - "5"
+          - --max-time
+          - "15"
+          - --request
+          - POST
+          - "{{workflow.parameters.control_plane_webhook_url}}"
+          - --header
+          - "Content-Type: application/json"
+          - --header
+          - "X-Deployment-Callback-Token: {{workflow.parameters.callback_token}}"
+          - --data
+          - '{"status":"{{workflow.status}}","workflow_name":"{{workflow.name}}"}'
+        resources:
+          requests: {cpu: 25m, memory: 32Mi}
+          limits: {cpu: 100m, memory: 64Mi}

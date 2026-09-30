@@ -1,11 +1,19 @@
+import re
+
 from django.conf import settings
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.deployment.models import Build
-from apps.deployment.tasks import cleanup_failed_build_artifacts
+from apps.deployment.models import Build, Deployment, Endpoint
+from apps.deployment.services.cache import invalidate_model_server_cache
+from apps.deployment.services.callbacks import valid_callback_token
+from apps.deployment.services.logs import append_deployment_log
+from apps.deployment.tasks import _mark_deployment_healthy, cleanup_failed_build_artifacts
+from apps.observability.services.outbox import enqueue_event
 from apps.registry.services.versions import register_successful_build
 from common.api.permissions import HasInternalWebhookSecret
 from common.logging import record_transition
@@ -14,6 +22,68 @@ from infrastructure.execution.image_references import temporary_image_reference
 
 def _dict_payload(value):
     return value if isinstance(value, dict) else {}
+
+
+class HasDeploymentCallbackToken(BasePermission):
+    message = "Invalid deployment reporter token."
+
+    def has_permission(self, request, view):
+        return valid_callback_token(
+            request.headers.get("X-Deployment-Callback-Token", ""), view.kwargs["deployment_id"]
+        )
+
+
+class DeploymentWebhookEndpoint(APIView):
+    authentication_classes = ()
+    permission_classes = (HasDeploymentCallbackToken,)
+
+    def post(self, request, deployment_id):
+        payload = _dict_payload(request.data)
+        incoming = str(payload.get("status", "")).lower()
+        workflow = str(payload.get("workflow_name", ""))
+        if incoming not in {"succeeded", "failed", "error"} or not re.fullmatch(
+            r"deploy-model-job-[a-z0-9-]{1,100}", workflow
+        ):
+            return Response({"detail": "A terminal workflow result and workflow name are required."}, status=400)
+        with transaction.atomic():
+            deployment = get_object_or_404(
+                Deployment.objects.select_for_update().select_related("version__project"),
+                public_id=deployment_id,
+            )
+            if deployment.backend != "argo":
+                return Response({"detail": "This deployment does not use Argo."}, status=409)
+            if deployment.status in {"healthy", "failed", "stopped"}:
+                return Response({"status": deployment.status, "duplicate": True})
+            if deployment.version.project.deletion_state != "active":
+                return Response({"status": deployment.status, "ignored": True})
+            if deployment.external_deployment_id and deployment.external_deployment_id != workflow:
+                return Response({"detail": "Workflow does not match this deployment."}, status=409)
+            deployment.external_deployment_id = workflow
+            deployment.save(update_fields=["external_deployment_id", "updated_at"])
+            if incoming == "succeeded":
+                _mark_deployment_healthy(deployment)
+                result = "healthy"
+            else:
+                result = "failed"
+                deployment.status = result
+                deployment.error_message = (
+                    f"Deployment workflow {workflow} finished with {incoming}. See execution logs."
+                )
+                deployment.save(update_fields=["status", "error_message", "updated_at"])
+                Endpoint.objects.filter(deployment=deployment).update(
+                    health_status="unhealthy", last_checked_at=timezone.now()
+                )
+                invalidate_model_server_cache(str(deployment.version.public_id))
+                append_deployment_log(deployment, deployment.error_message)
+                record_transition(deployment, result, source="webhook", reason="Deployment workflow failed")
+                enqueue_event(
+                    topic="deployment.events",
+                    aggregate_type="deployment",
+                    aggregate_id=deployment.public_id,
+                    event_type="deployment.changed",
+                    payload={"deployment_id": str(deployment.public_id), "status": result},
+                )
+        return Response({"status": result})
 
 
 class BuildWebhookEndpoint(APIView):

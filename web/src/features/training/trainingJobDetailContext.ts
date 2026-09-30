@@ -3,7 +3,6 @@ import { useOutletContext } from "react-router-dom";
 import type {
   TrainingJob,
   TrainingJobEventsResponse,
-  TrainingJobLogsResponse,
   TrainingJobMetricsResponse,
   TrainingJobStatus,
 } from "@/features/training/types";
@@ -15,8 +14,6 @@ export interface TrainingJobDetailContextValue {
   job: TrainingJob;
   statusLabels: Record<TrainingJobStatus, string>;
   activeStatuses: TrainingJobStatus[];
-  logsResponse?: TrainingJobLogsResponse;
-  loadingLogs: boolean;
   metrics?: TrainingJobMetricsResponse;
   loadingMetrics: boolean;
   eventsResponse?: TrainingJobEventsResponse;

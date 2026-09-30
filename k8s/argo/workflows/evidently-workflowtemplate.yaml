@@ -6,6 +6,13 @@ metadata:
 spec:
   serviceAccountName: argo-workflow-basic-sa
   entrypoint: run-evidently
+  podMetadata:
+    labels:
+      mlops.io/drift-run-id: "{{workflow.parameters.job_id}}"
+  arguments:
+    parameters:
+      - name: job_id
+        value: ""
   templates:
     - name: run-evidently
       nodeSelector:

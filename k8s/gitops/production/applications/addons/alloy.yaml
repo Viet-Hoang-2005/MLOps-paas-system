@@ -1,0 +1,139 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-addon-alloy
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    mlops-paas.io/plane: addon
+    mlops-paas.io/component: alloy
+spec:
+  project: mlops-addons
+  info:
+    - {name: Owner, value: Platform Engineering}
+    - {name: Source, value: "grafana.github.io/helm-charts/alloy@1.13.0"}
+    - {name: Runbook, value: "https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#runtime-logs"}
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: alloy
+    targetRevision: 1.13.0
+    helm:
+      releaseName: alloy
+      values: |
+        controller:
+          type: deployment
+          replicas: 1
+          nodeSelector: {workload-type: worker}
+        rbac:
+          create: true
+          namespaces: [mlops-execution, mlops-model-runtimes, user-jobs]
+          rules:
+            - apiGroups: [""]
+              resources: [pods]
+              verbs: [get, list, watch]
+            - apiGroups: [""]
+              resources: [pods/log]
+              verbs: [get]
+          clusterRules: []
+        alloy:
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 384Mi}
+          configMap:
+            content: |
+              discovery.kubernetes "tasks" {
+                role = "pod"
+                namespaces { names = ["mlops-execution", "mlops-model-runtimes", "user-jobs"] }
+              }
+              discovery.relabel "tasks" {
+                targets = discovery.kubernetes.tasks.targets
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_container_name"]
+                  regex = "wait|init"
+                  action = "drop"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_namespace"]
+                  target_label = "namespace"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_name"]
+                  target_label = "pod"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_container_name"]
+                  target_label = "container"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_build_id"]
+                  regex = "(.+)"
+                  target_label = "task_id"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_build_id"]
+                  regex = "(.+)"
+                  target_label = "task_kind"
+                  replacement = "build"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_deployment_id"]
+                  regex = "(.+)"
+                  target_label = "task_id"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_deployment_id"]
+                  regex = "(.+)"
+                  target_label = "task_kind"
+                  replacement = "deployment"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_drift_run_id"]
+                  regex = "(.+)"
+                  target_label = "task_id"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_drift_run_id"]
+                  regex = "(.+)"
+                  target_label = "task_kind"
+                  replacement = "drift"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_training_job_id"]
+                  regex = "(.+)"
+                  target_label = "task_id"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_training_job_id"]
+                  regex = "(.+)"
+                  target_label = "task_kind"
+                  replacement = "training"
+                }
+                rule {
+                  source_labels = ["task_id"]
+                  regex = ".+"
+                  action = "keep"
+                }
+              }
+              loki.source.kubernetes "tasks" {
+                targets = discovery.relabel.tasks.output
+                forward_to = [loki.process.tasks.receiver]
+              }
+              loki.process "tasks" {
+                stage.pack {
+                  labels = ["task_id", "pod"]
+                  ingest_timestamp = false
+                }
+                stage.json {
+                  expressions = {task_id = "task_id", pod = "pod", original = "_entry"}
+                }
+                stage.structured_metadata { values = {task_id = "", pod = ""} }
+                stage.output { source = "original" }
+                forward_to = [loki.write.tasks.receiver]
+              }
+              loki.write "tasks" {
+                endpoint { url = "http://loki.mlops-logging.svc.cluster.local:3100/loki/api/v1/push" }
+              }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mlops-logging
