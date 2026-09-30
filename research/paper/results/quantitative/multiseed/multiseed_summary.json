@@ -1,0 +1,24 @@
+{
+  "created_at_utc": "2026-07-30T10:44:28.797868+00:00",
+  "seeds": [
+    42,
+    123,
+    456,
+    789,
+    1024
+  ],
+  "n_seeds": 5,
+  "total_evaluations": 45,
+  "config": {
+    "max_train_rows": 100000,
+    "max_window_rows": 50000,
+    "attack_trigger_fraction": 0.6,
+    "pvalue_threshold": 0.05,
+    "drift_threshold": 0.3,
+    "levels": {
+      "Mild": 0.15,
+      "Moderate": 0.4,
+      "Severe": 0.85
+    }
+  }
+}

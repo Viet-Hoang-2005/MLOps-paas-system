@@ -1,0 +1,17 @@
+{
+  "baseline": "graduate/paper/experiments/drift_only/results/run_20260926",
+  "source_sha256": "0728925d293f433a3f7bce4509c00e1648906c59c59d8e63663e1622a226ef6c",
+  "model_sha256": "bd0a91ec11d38ccceca4950a571857f3710bc7034bb8aaf30b40295dfd15e8b5",
+  "baseline_membership_sha256": "aaad723e76e4a16cd9072a2b0b962f27c631d08c2f5a86ca9d1f7ae801fdf084",
+  "script_sha256": "342029ca89d8cf48e223369391b446f50449bfbde445326d1bb4b44f4cf48aa8",
+  "python": "3.11.14",
+  "evidently": "0.4.15",
+  "pandas": "2.0.3",
+  "configured_service_evidently": "0.4.15",
+  "service_default_threshold": 0.6,
+  "exploratory_threshold": 0.3,
+  "windows": 120,
+  "feature_comparisons": 6240,
+  "seconds": 399.95,
+  "scope": "Direct Evidently DataDriftPreset replay on frozen windows; no service, database, broker or callback"
+}

@@ -1,0 +1,3 @@
+window_id,scenario,seed,n,attack_fraction,novel_replacement,drift_share,uncorrected_drift_share,mean_ks,max_ks,macro_f1,attack_recall,benign_fpr,roc_auc,tn,fp,fn,tp,n_BENIGN,recall_BENIGN,n_DDoS,recall_DDoS,n_PortScan,recall_PortScan,n_BruteForce,recall_BruteForce,n_WebAttacks,recall_WebAttacks
+pilot_stable,pilot_stable,2026,500,0.3,0,0.0,0.019230769230769232,0.03479999999999999,0.0706,1.0,1.0,0.0,1.0,350,0,0,150,350,1.0,150,1.0,0,,0,,0,
+pilot_ratio,pilot_ratio,2026,500,0.5,0,0.8076923076923077,0.8269230769230769,0.10082307692307693,0.17000000000000004,1.0,1.0,0.0,1.0,250,0,0,250,250,1.0,250,1.0,0,,0,,0,

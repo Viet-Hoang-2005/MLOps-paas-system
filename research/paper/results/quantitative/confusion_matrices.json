@@ -1,0 +1,186 @@
+{
+  "M0-fixed-XGB": {
+    "w1": {
+      "Window": "W1",
+      "Dataset": "test_data.csv",
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          1000,
+          0
+        ],
+        [
+          2427,
+          1001
+        ]
+      ]
+    },
+    "w2": {
+      "Window": "W2",
+      "Dataset": "drift_portscan.csv",
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          50000,
+          0
+        ]
+      ]
+    },
+    "w3": {
+      "Window": "W3",
+      "Dataset": "drift_bruteforce.csv",
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          8138,
+          12
+        ]
+      ]
+    },
+    "w4": {
+      "Window": "W4",
+      "Dataset": "drift_webattacks.csv",
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          1715,
+          0
+        ]
+      ]
+    },
+    "w5": {
+      "Window": "W5",
+      "Dataset": "portscan.csv",
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          50000,
+          0
+        ]
+      ]
+    }
+  },
+  "M1-challenger-XGB": {
+    "w1": {
+      "Window": "W1",
+      "Dataset": "test_data.csv",
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          1000,
+          0
+        ],
+        [
+          2428,
+          1000
+        ]
+      ]
+    },
+    "w2": {
+      "Window": "W2",
+      "Dataset": "drift_portscan.csv",
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          50000,
+          0
+        ]
+      ]
+    },
+    "w3": {
+      "Window": "W3",
+      "Dataset": "drift_bruteforce.csv",
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          8150,
+          0
+        ]
+      ]
+    },
+    "w4": {
+      "Window": "W4",
+      "Dataset": "drift_webattacks.csv",
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          1715,
+          0
+        ]
+      ]
+    },
+    "w5": {
+      "Window": "W5",
+      "Dataset": "portscan.csv",
+      "labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          50000,
+          0
+        ]
+      ]
+    }
+  }
+}

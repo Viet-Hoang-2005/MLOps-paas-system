@@ -1,0 +1,64 @@
+{
+  "date": "2026-09-30",
+  "pdf_pages": 8,
+  "template": "Local LNCS llncs 2024/01/29 v2.24; unchanged font size and margins",
+  "tex_sha256": "b62eb86bbe8cb255ad04236d231c6195e1ff21092b11a354f63abcd4f4199a4d",
+  "pdf_sha256": "4d4879b23f4dd41cfad2f800e3d320caa479c15859ec3327bc66583705c2e2df",
+  "log_sha256": "9dc7db0177a48c38a53f46695d01e0fca64aa55743d30cb2638698087b164247",
+  "retained_citations": 16,
+  "doi_entries": 9,
+  "all_citations_defined_and_used": true,
+  "all_cross_references_defined": true,
+  "overfull_boxes": 0,
+  "underfull_boxes": 1,
+  "latex_warnings": [
+    "Package epstopdf Warning: Shell escape feature is not enabled.",
+    "Underfull \\hbox (badness 1028) in paragraph at lines 239--240"
+  ],
+  "numeric_tables_byte_preserved": true,
+  "title_preserved": true,
+  "standalone_tex_body": true,
+  "experiment_baseline": "Frozen run_20260926 untouched; no new experiment or live infrastructure operation",
+  "current_compile_status": "SUCCESS with existing MiKTeX pdflatex, two passes, --disable-installer --no-shell-escape; native compiler unavailable",
+  "native_compiler_status": "Final polishing pass: built-in compiler failed with Unable to find standard directories for platform; existing MiKTeX compiled the same source successfully in two passes.",
+  "pdf_matches_current_tex": true,
+  "visual_review": "Final polished PDF: all eight pages rendered with Poppler and inspected; four tables, equation, URLs/DOIs, references and credits remain within margins; no figures.",
+  "submission_status": "Revised author-review draft; artifact access, historical runtime inventory and lifecycle invariant evidence remain limited",
+  "final_camera_ready_polish": {
+    "date": "2026-09-30",
+    "scope": "Exactly four requested sentence replacements; no additional manuscript changes.",
+    "edits": [
+      {
+        "line": 196,
+        "section": "Discussion",
+        "change": "Qualify offline S2-r25 at tau_D 0.30 and live S2-r50/r100 at service threshold 0.60."
+      },
+      {
+        "line": 176,
+        "section": "Controlled Service Replay",
+        "change": "Attribute Evidently version pin to service source."
+      },
+      {
+        "line": 62,
+        "section": "Framework",
+        "change": "Describe separate audit reconciling pilot inputs with stored records."
+      },
+      {
+        "line": 82,
+        "section": "Provenance",
+        "change": "Describe upstream leakage and lineage as unverified in this study."
+      }
+    ],
+    "exactly_four_replacements_verified": true,
+    "tables_equation_title_credits_bibliography_preserved": true,
+    "all_16_citation_keys_defined_and_used": true,
+    "claims_audit": "No unsupported novelty, temporal forgetting, lifecycle enforcement, scalability, retraining, reliability or public reconstruction claim found within the final-pass scope.",
+    "limitations": [
+      "Public artifact acquisition not established",
+      "Upstream lineage unverified",
+      "Historical runtime dependency inventory not archived",
+      "Lifecycle policies and broader operational guarantees unevaluated"
+    ],
+    "blocking_manuscript_issue": false
+  }
+}

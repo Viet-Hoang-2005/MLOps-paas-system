@@ -55,7 +55,7 @@ Reviewer 2 vẫn có các điểm phải xử lý: provenance, overlap, giới h
 | Replay qua toàn bộ service | Chưa có kết quả mới | Bạn phụ trách hệ thống chạy bộ replay ở mục 9 |
 | Người thứ hai tái lập bảng chính | Cần thực hiện | Kiểm tra từ model, manifest, dữ liệu và script |
 
-Nguồn kết quả: [experiment README](../../graduate/paper/experiments/drift_only/README.md), thư mục `results/run_20260926` và `results/evidently_20260927` bên trong cùng thư mục experiment. Không ghi đè các kết quả đã khóa.
+Nguồn kết quả: [experiment README](../../research/paper/experiments/drift_only/README.md), thư mục `results/run_20260926` và `results/evidently_20260927` bên trong cùng thư mục experiment. Không ghi đè các kết quả đã khóa.
 
 ## 4. Khóa protocol trước khi phân tích tiếp
 
@@ -200,7 +200,7 @@ Bắt đầu với 4 scenario ở seed 42. Nếu audit dữ liệu/parity đạt
 
 ### 9.2. Gói dữ liệu giao trước khi chạy
 
-**Đã bổ sung công cụ bàn giao:** xem [HANDOFF_VI.md](../../graduate/paper/experiments/drift_only/HANDOFF_VI.md). Sau khi pull nhánh, chạy `export_handoff.py --with-mlflow` theo hướng dẫn để xuất đúng reference/12 windows từ dataset đã có. Script kiểm tra checksum nguồn, dự đoán offline và bản đóng gói MLflow; không tự chạy benchmark qua service.
+**Đã bổ sung công cụ bàn giao:** xem [HANDOFF_VI.md](../../research/paper/experiments/drift_only/HANDOFF_VI.md). Sau khi pull nhánh, chạy `export_handoff.py --with-mlflow` theo hướng dẫn để xuất đúng reference/12 windows từ dataset đã có. Script kiểm tra checksum nguồn, dự đoán offline và bản đóng gói MLflow; không tự chạy benchmark qua service.
 
 Người phụ trách thực nghiệm xuất từ frozen membership:
 

@@ -1,0 +1,211 @@
+{
+  "created_at_utc": "2026-07-03T14:02:04.567380+00:00",
+  "command": "python paper/results/quantitative/run_offline_drift_retraining_eval.py --binary --drift-threshold 0.5 --random-seed 42",
+  "binary": true,
+  "random_seed": 42,
+  "max_train_rows": 100000,
+  "max_window_rows": 50000,
+  "drift_threshold": 0.5,
+  "pvalue_threshold": 0.05,
+  "schema_validation": {
+    "label_column": "Label",
+    "feature_count": 52,
+    "features_match_across_loaded_datasets": true,
+    "feature_columns": [
+      "Destination Port",
+      "Flow Duration",
+      "Total Fwd Packets",
+      "Total Length of Fwd Packets",
+      "Fwd Packet Length Max",
+      "Fwd Packet Length Min",
+      "Fwd Packet Length Mean",
+      "Fwd Packet Length Std",
+      "Bwd Packet Length Max",
+      "Bwd Packet Length Min",
+      "Bwd Packet Length Mean",
+      "Bwd Packet Length Std",
+      "Flow Bytes/s",
+      "Flow Packets/s",
+      "Flow IAT Mean",
+      "Flow IAT Std",
+      "Flow IAT Max",
+      "Flow IAT Min",
+      "Fwd IAT Total",
+      "Fwd IAT Mean",
+      "Fwd IAT Std",
+      "Fwd IAT Max",
+      "Fwd IAT Min",
+      "Bwd IAT Total",
+      "Bwd IAT Mean",
+      "Bwd IAT Std",
+      "Bwd IAT Max",
+      "Bwd IAT Min",
+      "Fwd Header Length",
+      "Bwd Header Length",
+      "Fwd Packets/s",
+      "Bwd Packets/s",
+      "Min Packet Length",
+      "Max Packet Length",
+      "Packet Length Mean",
+      "Packet Length Std",
+      "Packet Length Variance",
+      "FIN Flag Count",
+      "PSH Flag Count",
+      "ACK Flag Count",
+      "Average Packet Size",
+      "Subflow Fwd Bytes",
+      "Init_Win_bytes_forward",
+      "Init_Win_bytes_backward",
+      "act_data_pkt_fwd",
+      "min_seg_size_forward",
+      "Active Mean",
+      "Active Max",
+      "Active Min",
+      "Idle Mean",
+      "Idle Max",
+      "Idle Min"
+    ],
+    "numeric_coercion": "All non-label columns coerced with pandas.to_numeric(errors='coerce')",
+    "imputation": "inf/-inf converted to NaN; NaN imputed with decontaminated M0 training medians"
+  },
+  "label_mapping": {
+    "BENIGN_aliases": [
+      "BENIGN",
+      "Benign",
+      "NORMAL",
+      "Normal",
+      "benign",
+      "normal"
+    ],
+    "non_benign_labels": "ATTACK"
+  },
+  "training_sources": {
+    "M0-fixed-XGB": "data/train_2_classes.csv",
+    "M1-challenger-XGB": "data/train_5_classes.csv",
+    "decontamination": "Rows overlapping any evaluation window by row hash are removed before fitting."
+  },
+  "framework_path_policy": {
+    "before_drift_trigger": "M0-fixed-XGB",
+    "first_detected_drift_window": "alert/review trigger; not counted as instant production promotion",
+    "subsequent_windows_after_first_detected_drift": "M1-challenger-XGB active in offline replay comparison",
+    "claim_safety": "Offline replay only; no automatic production deployment or promotion is claimed."
+  },
+  "f1_recovery_summary": {
+    "delta_macro_f1_by_window": {
+      "W1": 0.0,
+      "W2": 0.0,
+      "W3": -0.001470227885322225,
+      "W4": 0.0,
+      "W5": 0.0
+    },
+    "mean_delta_macro_f1_after_retrained_model_active": -0.00036755697133055625,
+    "first_drift_window_is_trigger_not_instant_promotion": true
+  },
+  "leakage_checks": {
+    "method": "SHA-256 over pandas row hash of numeric feature columns plus normalized binary Label",
+    "training_rows_removed_before_fit": true,
+    "any_overlap_detected_after_decontamination": false,
+    "checks": {
+      "train_m0_vs_w1": {
+        "train_dataset": "train_2_classes.csv",
+        "eval_dataset": "test_data.csv",
+        "unique_overlap_count": 0,
+        "overlapping_training_rows": 0,
+        "overlapping_eval_rows": 0,
+        "train_rows": 100000,
+        "eval_rows": 4428,
+        "overlap_ratio_eval": 0.0
+      },
+      "train_m0_vs_w2": {
+        "train_dataset": "train_2_classes.csv",
+        "eval_dataset": "drift_portscan.csv",
+        "unique_overlap_count": 0,
+        "overlapping_training_rows": 0,
+        "overlapping_eval_rows": 0,
+        "train_rows": 100000,
+        "eval_rows": 50000,
+        "overlap_ratio_eval": 0.0
+      },
+      "train_m0_vs_w3": {
+        "train_dataset": "train_2_classes.csv",
+        "eval_dataset": "drift_bruteforce.csv",
+        "unique_overlap_count": 0,
+        "overlapping_training_rows": 0,
+        "overlapping_eval_rows": 0,
+        "train_rows": 100000,
+        "eval_rows": 8150,
+        "overlap_ratio_eval": 0.0
+      },
+      "train_m0_vs_w4": {
+        "train_dataset": "train_2_classes.csv",
+        "eval_dataset": "drift_webattacks.csv",
+        "unique_overlap_count": 0,
+        "overlapping_training_rows": 0,
+        "overlapping_eval_rows": 0,
+        "train_rows": 100000,
+        "eval_rows": 1715,
+        "overlap_ratio_eval": 0.0
+      },
+      "train_m0_vs_w5": {
+        "train_dataset": "train_2_classes.csv",
+        "eval_dataset": "portscan.csv",
+        "unique_overlap_count": 0,
+        "overlapping_training_rows": 0,
+        "overlapping_eval_rows": 0,
+        "train_rows": 100000,
+        "eval_rows": 50000,
+        "overlap_ratio_eval": 0.0
+      },
+      "train_m1_vs_w1": {
+        "train_dataset": "train_5_classes.csv",
+        "eval_dataset": "test_data.csv",
+        "unique_overlap_count": 0,
+        "overlapping_training_rows": 0,
+        "overlapping_eval_rows": 0,
+        "train_rows": 71412,
+        "eval_rows": 4428,
+        "overlap_ratio_eval": 0.0
+      },
+      "train_m1_vs_w2": {
+        "train_dataset": "train_5_classes.csv",
+        "eval_dataset": "drift_portscan.csv",
+        "unique_overlap_count": 0,
+        "overlapping_training_rows": 0,
+        "overlapping_eval_rows": 0,
+        "train_rows": 71412,
+        "eval_rows": 50000,
+        "overlap_ratio_eval": 0.0
+      },
+      "train_m1_vs_w3": {
+        "train_dataset": "train_5_classes.csv",
+        "eval_dataset": "drift_bruteforce.csv",
+        "unique_overlap_count": 0,
+        "overlapping_training_rows": 0,
+        "overlapping_eval_rows": 0,
+        "train_rows": 71412,
+        "eval_rows": 8150,
+        "overlap_ratio_eval": 0.0
+      },
+      "train_m1_vs_w4": {
+        "train_dataset": "train_5_classes.csv",
+        "eval_dataset": "drift_webattacks.csv",
+        "unique_overlap_count": 0,
+        "overlapping_training_rows": 0,
+        "overlapping_eval_rows": 0,
+        "train_rows": 71412,
+        "eval_rows": 1715,
+        "overlap_ratio_eval": 0.0
+      },
+      "train_m1_vs_w5": {
+        "train_dataset": "train_5_classes.csv",
+        "eval_dataset": "portscan.csv",
+        "unique_overlap_count": 0,
+        "overlapping_training_rows": 0,
+        "overlapping_eval_rows": 0,
+        "train_rows": 71412,
+        "eval_rows": 50000,
+        "overlap_ratio_eval": 0.0
+      }
+    }
+  }
+}

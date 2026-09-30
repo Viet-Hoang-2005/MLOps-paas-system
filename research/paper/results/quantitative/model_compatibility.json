@@ -1,0 +1,92 @@
+{
+  "note": "Existing artifacts are inspected for compatibility only; this experiment trains fresh M0/M1 models by default.",
+  "expected_feature_count": 52,
+  "artifacts": {
+    "v1": {
+      "model": {
+        "path": "D:\\UIT STUDY\\NT114\\23520541-23521412\\Project\\MLOps-nids-system\\models\\v1\\xgb_nids_model_v1.pkl",
+        "exists": true,
+        "loaded": true,
+        "load_error": null,
+        "type": "xgboost.sklearn.XGBClassifier",
+        "n_features_in_": 52,
+        "classes_": [
+          "0",
+          "1"
+        ]
+      },
+      "label_classes_path": "D:\\UIT STUDY\\NT114\\23520541-23521412\\Project\\MLOps-nids-system\\models\\v1\\label_classes_v1.json",
+      "label_classes": [
+        "BENIGN",
+        "DDoS"
+      ],
+      "normalized_binary_labels": [
+        "BENIGN",
+        "ATTACK"
+      ],
+      "metrics_path": "D:\\UIT STUDY\\NT114\\23520541-23521412\\Project\\MLOps-nids-system\\models\\v1\\metrics_v1.json",
+      "metrics_exists": true,
+      "feature_compatible": true,
+      "binary_projection_possible": true,
+      "used_for_experiment": false
+    },
+    "v2": {
+      "model": {
+        "path": "D:\\UIT STUDY\\NT114\\23520541-23521412\\Project\\MLOps-nids-system\\models\\v2\\xgb_nids_model_v2.pkl",
+        "exists": true,
+        "loaded": true,
+        "load_error": null,
+        "type": "xgboost.sklearn.XGBClassifier",
+        "n_features_in_": 52,
+        "classes_": [
+          "0",
+          "1",
+          "2"
+        ]
+      },
+      "label_classes_path": "D:\\UIT STUDY\\NT114\\23520541-23521412\\Project\\MLOps-nids-system\\models\\v2\\label_classes_v2.json",
+      "label_classes": [
+        "BENIGN",
+        "DDoS",
+        "PortScan"
+      ],
+      "normalized_binary_labels": [
+        "BENIGN",
+        "ATTACK",
+        "ATTACK"
+      ],
+      "metrics_path": "D:\\UIT STUDY\\NT114\\23520541-23521412\\Project\\MLOps-nids-system\\models\\v2\\metrics_v2.json",
+      "metrics_exists": true,
+      "feature_compatible": true,
+      "binary_projection_possible": true,
+      "used_for_experiment": false
+    },
+    "mlflow_package_v2": {
+      "model": {
+        "path": "D:\\UIT STUDY\\NT114\\23520541-23521412\\Project\\MLOps-nids-system\\models\\nids-model-mlflow-package\\model\\model.ubj",
+        "exists": true,
+        "loaded": false,
+        "load_error": "Not a pickle artifact; not loaded by this offline evaluator.",
+        "type": null,
+        "n_features_in_": null,
+        "classes_": null
+      },
+      "label_classes_path": "D:\\UIT STUDY\\NT114\\23520541-23521412\\Project\\MLOps-nids-system\\models\\nids-model-mlflow-package\\model\\label_classes_v2.json",
+      "label_classes": [
+        "BENIGN",
+        "DDoS",
+        "PortScan"
+      ],
+      "normalized_binary_labels": [
+        "BENIGN",
+        "ATTACK",
+        "ATTACK"
+      ],
+      "metrics_path": "D:\\UIT STUDY\\NT114\\23520541-23521412\\Project\\MLOps-nids-system\\models\\nids-model-mlflow-package\\model\\MLmodel",
+      "metrics_exists": true,
+      "feature_compatible": true,
+      "binary_projection_possible": true,
+      "used_for_experiment": false
+    }
+  }
+}

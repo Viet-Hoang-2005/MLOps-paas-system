@@ -1,0 +1,68 @@
+{
+  "train_m0": {
+    "path": "data/train_2_classes.csv",
+    "raw_rows": 150000,
+    "sampled_rows": 100000,
+    "sampling_applied": true,
+    "removed_rows_overlapping_any_future_holdout": 3218,
+    "final_training_rows": 96782,
+    "binary_label_counts": {
+      "BENIGN": 63526,
+      "ATTACK": 33256
+    }
+  },
+  "reference_data": {
+    "path": "data/reference_data.csv",
+    "raw_rows": 209865,
+    "sampled_rows": 50000,
+    "sampling_applied": true,
+    "benign_split": {
+      "source": "data/reference_data.csv BENIGN rows",
+      "unique_benign_rows": 23872,
+      "dropped_duplicate_rows": 1,
+      "reference_rows": 14323,
+      "retraining_rows": 4774,
+      "evaluation_holdout_rows": 4775,
+      "reference_fraction_requested": 0.6,
+      "retraining_fraction_requested": 0.2
+    }
+  },
+  "scenarios": {
+    "S1": {
+      "attack_family": "PortScan",
+      "attack_source": "data/drift_portscan.csv",
+      "raw_rows": 50000,
+      "sampled_rows": 50000,
+      "sampling_applied": false,
+      "dropped_duplicate_attack_rows": 0,
+      "trigger_attack_rows": 30000,
+      "future_attack_rows": 20000,
+      "trigger_benign_rows": 4774,
+      "future_benign_rows": 4775
+    },
+    "S2": {
+      "attack_family": "BruteForce",
+      "attack_source": "data/drift_bruteforce.csv",
+      "raw_rows": 8150,
+      "sampled_rows": 8150,
+      "sampling_applied": false,
+      "dropped_duplicate_attack_rows": 0,
+      "trigger_attack_rows": 4890,
+      "future_attack_rows": 3260,
+      "trigger_benign_rows": 4774,
+      "future_benign_rows": 4775
+    },
+    "S3": {
+      "attack_family": "WebAttacks",
+      "attack_source": "data/drift_webattacks.csv",
+      "raw_rows": 1715,
+      "sampled_rows": 1715,
+      "sampling_applied": false,
+      "dropped_duplicate_attack_rows": 0,
+      "trigger_attack_rows": 1029,
+      "future_attack_rows": 686,
+      "trigger_benign_rows": 4774,
+      "future_benign_rows": 4775
+    }
+  }
+}

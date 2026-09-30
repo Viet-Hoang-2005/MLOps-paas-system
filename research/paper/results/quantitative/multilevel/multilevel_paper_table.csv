@@ -1,0 +1,10 @@
+Scenario,Attack Family,Drift Level,Attack% in Window,Drift Share,Mean KS Stat,Drift Alert,Fixed Macro-F1,Retrained Macro-F1,Delta Macro-F1
+S1,PortScan,Mild,17.3000,0.9808,0.1008,Yes,0.4526,0.9992,0.5466
+S1,PortScan,Moderate,40.0000,0.9808,0.2339,Yes,0.3750,0.9997,0.6247
+S1,PortScan,Severe,85.0000,0.9808,0.4930,Yes,0.1304,0.9997,0.8693
+S2,BruteForce,Mild,15.0000,0.9615,0.0675,Yes,0.4598,0.9999,0.5401
+S2,BruteForce,Moderate,40.0000,0.9615,0.1814,Yes,0.3753,1.0000,0.6247
+S2,BruteForce,Severe,85.0000,0.9808,0.3857,Yes,0.1307,1.0000,0.8693
+S3,WebAttacks,Mild,15.0000,0.9808,0.0853,Yes,0.4595,0.9970,0.5375
+S3,WebAttacks,Moderate,40.0000,0.9808,0.2240,Yes,0.3749,0.9957,0.6208
+S3,WebAttacks,Severe,85.0000,0.9808,0.4815,Yes,0.1304,0.9834,0.8530
