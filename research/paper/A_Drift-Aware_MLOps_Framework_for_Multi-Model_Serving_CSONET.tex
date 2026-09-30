@@ -9,6 +9,7 @@
 \usepackage{url}
 \usepackage[hidelinks]{hyperref}
 \usepackage{array}
+\usepackage{placeins}
 
 
 
@@ -55,14 +56,47 @@ HarmonE monitors accuracy, energy, and distribution shifts to guide adaptation~\
 
 \section{Framework and Monitoring Contract}
 \label{sec:framework}
-\paragraph{Implemented foundation.}
-The Django control plane stores product state in PostgreSQL: project ownership, model version UUIDs, and artifact records. FastAPI resolves serving versions; Redpanda and a consumer persist inference events. Monitors link versions to reference assets; run UUIDs identify status, scores, and report URIs. MLflow, storage, and execution engines act as adapters.
+Figure~\ref{fig:architecture} and Table~\ref{tab:responsibilities} summarize the workflow and implementation status.
 
-\paragraph{Defined and evaluated scope.}
-The contract requires evidence to retain tenant, version, reference, window, and report identities. Reference assets have UUIDs and optional checksums; snapshot/window links are optional. The replay path reads the latest version-scoped records, so these fields do not guarantee frozen membership or immutable reference bytes. Offline manifests fix membership; a separate audit reconciles pilot inputs with stored records. The proposed review and promotion conditions below remain unevaluated as lifecycle policies.
+\subsection{Control Plane and Native Registry}
+The Django/DRF control plane stores lifecycle metadata in PostgreSQL. Each tenant owns projects grouping model families; version UUIDs link artifacts, flavor, stage, and deployability. Deployment/endpoint records supply runtime addresses and health state. Metadata alone does not establish runtime readiness.
 
-\paragraph{Distribution evidence.}
-For tenant $u$ and model version $i$, let $\hat y=f_{u,i}(x)$, with reference $D_{\mathrm{ref}}^{u,i}$ and window $D_{\mathrm{cur}}^{u,i}$. In the offline study, two-sample tests yield $p_j$ for $d$ numeric features. Benjamini--Hochberg (BH)~\cite{bh1995} produces adjusted p-values $q_j$ within each window:
+Native Registry denotes product-state ownership, not new registry technology. A monitor links a version to a reference asset; run UUIDs identify status, scores, and report URIs. Reference UUIDs have optional checksums; snapshot/window links are optional. They do not guarantee immutable reference bytes, frozen membership, or consistency under concurrent changes. Evidence-linked review remains a proposed contract.
+
+\begin{figure}[t]
+    \centering
+    \setlength{\fboxsep}{2pt}
+    \setlength{\fboxrule}{0.2pt}
+    \fbox{%
+        \includegraphics[
+            width=0.73\linewidth,
+            keepaspectratio
+        ]{figures/overall-workflow.png}%
+    }
+    \caption{Platform workflow: packaging, deployment, prediction logging,
+    monitoring, and training. Training and compute paths show configured
+    scope; their effectiveness is unevaluated.}
+    \label{fig:architecture}
+\end{figure}
+
+\subsection{Data Plane and Multi-Model Serving}
+The FastAPI gateway resolves versions and checks private-model access through project API keys or bearer identity; public models permit public invocation. Workers load or reuse version-associated models and return predictions with optional confidence.
+
+Multiple versions can be routed; this study evaluates one classifier, not tenant performance isolation, cache efficiency, scalability, or concurrency robustness.
+
+\subsection{Production Logging and Evidence Collection}
+Successful inference schedules a background event for Redpanda; a consumer persists production records in PostgreSQL. A compact representation is
+\[
+z_t=(u,i,x_t,\hat y_t,c_t,t),
+\]
+where $u,i$ identify tenant/version, $x_t,\hat y_t$ input/prediction, $c_t$ optional confidence, and $t$ the timestamp. Events also carry project, prediction, and request IDs; stored version/project relations preserve ownership context.
+
+Persistence is outside the synchronous prediction response, whose success does not guarantee durable logging. Exactly-once delivery, retry idempotency, and complete failure recovery are not established; the replay audits final coverage.
+
+\subsection{Drift and Quality Evidence}
+For tenant $u$ and version $i$, let $\hat y=f_{u,i}(x)$, with reference $D_{\mathrm{ref}}^{u,i}$ and window $D_{\mathrm{cur}}^{u,i}$. Reports should retain these identities, membership, configuration, and run context. The deployed reader selects the latest version-scoped records; membership can change. Offline manifests fix membership; a separate audit reconciles pilot inputs with stored records.
+
+Offline tests yield $p_j$ for $d$ features. Applying Benjamini--Hochberg (BH)~\cite{bh1995} within each window gives adjusted p-values $q_j$:
 \begin{equation}
 I_j=\mathbf{1}[q_j<0.05],\qquad
 \rho=\frac{1}{d}\sum_{j=1}^{d}I_j,\qquad
@@ -71,9 +105,55 @@ A=\mathbf{1}[\rho\geq\tau_D].
 \end{equation}
 The flagged-feature fraction $\rho$ depends on the rule, feature set, and sample size; it is neither shift severity, affected-request share, nor failure probability. Marginal tests can miss dependence changes. BH here does not guarantee dataset-level false-alert control under dependent, tied features.
 
-\paragraph{Proposed review semantics.}
-An alert requests inspection, not replacement. Labeled macro-F1, attack recall, and benign false-positive rate (FPR) provide separate evidence: low quality warrants review even when $A=0$. Actions should reference their supporting report and quality window. Retraining requires representative labels; promotion also requires held-out quality, operational gates, and human review. These conditions are not certified enforcement.
+Live Evidently uses a separate \texttt{DataDriftPreset} configuration (Sect.~\ref{sec:live}), not replication of KS/BH. Quality evidence requires ground truth matched to predictions for macro-F1, attack recall, and benign false-positive rate (FPR). This study scores labels in the evaluation layer; automatic production labeling is not demonstrated. Missing labels leave quality unknown.
 
+\subsection{Review and Lifecycle Action Boundary}
+An alert requests inspection, not replacement. Low labeled quality warrants review even when $A=0$. Actions should reference their supporting report and quality window. Retraining requires representative labels; promotion also requires held-out quality, operational gates, and human review. These are proposed conditions, not certified enforcement or evaluated policies. The study tests monitoring evidence, not action effectiveness.
+
+\begin{table}[t]
+\caption{Responsibility/status: implemented (I), defined (D), evaluated (E), or live replay only (R). I does not imply operational guarantees.}
+\label{tab:responsibilities}
+\centering\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}L{0.18\linewidth}L{0.22\linewidth}L{0.35\linewidth}L{0.19\linewidth}@{}}
+\toprule
+Responsibility & Owner & State/evidence & Status \\
+\midrule
+Identity & Native Registry & Project, version, artifacts & I \\
+Serving & Gateway, worker & Version, prediction & I \\
+Logging & Broker, consumer & Version-associated records & I \\
+Monitoring & Registry, monitor & Reference, run, report; optional window links & I, limited \\
+Distribution & KS/BH; Evidently & Feature decisions, alert & E; R \\
+Quality & Evaluation layer & Macro-F1, recall, FPR & E \\
+Review/action & Lifecycle contract & Evidence-linked decision & D \\
+Update policy & Workflow contract & Candidate, gates, action & D, not E \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Prototype Implementation and Interface Views}
+Object storage holds artifacts and reports; MLflow optionally supports tracking and loading. Docker or Argo backends execute build, deployment, training, and drift jobs; Argo/Kubeflow resources support cluster execution. These adapters do not own product state, and not all paths are evaluated.
+
+Figure~\ref{fig:prototype-ui} shows three prototype interfaces.
+
+\begin{figure}[t]
+\centering
+\begin{minipage}[t]{0.48\linewidth}
+\centering\vspace{0pt}
+\includegraphics[width=0.75\linewidth,keepaspectratio]{figures/model_deployment.png}
+\par\vspace{1mm}{\scriptsize (a) Deployment.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\linewidth}
+\centering\vspace{0pt}
+\includegraphics[width=0.75\linewidth,keepaspectratio]{figures/model_predict.png}
+\par\vspace{1mm}{\scriptsize (b) Prediction testing.}
+\end{minipage}
+\par\smallskip
+\includegraphics[width=0.45\linewidth,keepaspectratio]{figures/model_data_drift.png}
+\par\vspace{1mm}{\scriptsize (c) Drift monitoring.}
+\caption{Prototype interfaces: (a) deployment; (b) prediction testing; (c) Evidently drift monitoring. UI values are not study results. The monitor includes a prediction column; this example is separate from the 52-feature replay.}
+\label{fig:prototype-ui}
+\end{figure}
 \section{Controlled NIDS Experiment}
 \label{sec:protocol}
 \subsection{Provenance and Disjoint Pools}
@@ -169,9 +249,12 @@ S2 (100\%) & 5/5 & 5/5 & 5/5 & 5/5 & 5/5 & 5/5 & 5/5 & 5/5 \\
 Correction also changes sensitivity. Without BH, S0 at $n=1000$ and $\tau_D=0.10$ produces 3/30 alerts instead of 0/30. Conversely, S2 at 25\% replacement and $\tau_D=0.30$ produces 5/5 alerts instead of 1/5. This trade-off should be reported rather than choosing a test after observing its outcomes. Window size affects statistical power; these non-temporal windows do not measure detection delay.
 
 \subsection{Controlled Service Replay}
+\label{sec:live}
 Four seed-42, 1,000-row windows used identical model bytes and the 5,000-row reference under separate version UUIDs, each initially without production records. S1 used 85\% DDoS. Labels were withheld until scoring. Each export had 1,000 unique prediction IDs and request IDs; exact 52-feature-vector matching established one record per frozen input. The browser did not send the handoff row ID, so reconciliation used vectors, not retry identity.
 
 S0's consumer stored 700 class-0 predictions as empty strings. Scoring used all 1,000 UI predictions cross-checked against database records, allowing only that empty-string/zero discrepancy. S1/S2 used post-fix database predictions without blanks. All four prediction sets matched the offline artifact. S1 incurred 42 HTTP 502/503 failures during a worker interruption: recovery submitted those inputs plus 824 unsent inputs, yielding 1,000 records from 1,042 attempts. The audit establishes final coverage, not retry idempotency or unique failure causes.
+
+
 
 The service source pins Evidently 0.4.15 and uses \texttt{DataDriftPreset} without feature-test overrides. With 5,000 reference rows, its defaults are normalized Wasserstein distance for numeric columns with more than five distinct values, Jensen--Shannon distance otherwise, and feature threshold 0.1, without BH. This source configuration is not an archived runtime dependency inventory. Reports used dataset threshold 0.60 with all 52 features present. Table~\ref{tab:live} is separate integration evidence, not replication of offline KS/BH.
 
@@ -193,22 +276,18 @@ S2 (100\%) & 29/52 & No & 0.0100 \\
 
 \section{Discussion and Limitations}
 \label{sec:discussion}
-S1 produces alerts without material measured harm. Conversely, offline S2-r25 remains unflagged in four of five windows at $\tau_D=0.30$, while the reported live S2-r50/r100 windows remain unflagged at the service threshold of 0.60 despite low attack recall. These counterexamples motivate separate version-associated evidence and review, not a proven improvement in update decisions. Native Registry concretizes this contract rather than introducing registry technology.
+S1 alerts without material measured harm; offline S2-r25 remains unflagged in four of five windows at $\tau_D=0.30$. The reported live S2-r50/r100 windows remain unflagged at service threshold 0.60 despite low attack recall. These cases motivate separate version-associated evidence and review, not proven update benefits.
 
-Upstream selection, missing time identifiers, correlated flows, and separability of familiar classes limit generalization. Exact deduplication does not resolve these issues. Five shifted windows per setting, fixed class counts, one model/reference, and tied-feature tests limit inference. S2 changes composition, not demonstrated $P(Y\mid X)$ over time. Natural drift and adaptation need separate evaluation.
+Upstream selection, missing time identifiers, correlated flows, and familiar-class separability limit generalization despite exact deduplication. Five shifted windows per setting, fixed class counts, one model/reference, and tied-feature tests limit inference. S2 changes composition, not demonstrated temporal $P(Y\mid X)$; natural drift and adaptation require separate evaluation.
 
-The pilot does not verify frozen associations under concurrent changes or failure recovery. Its HTTP errors and the earlier 89-second Locust replay do not establish availability or scalable serving. Multi-model load, lifecycle ablations, and promotion/rollback benefits remain unevaluated. Ownership checks do not sandbox uploaded code: restricted artifact formats, isolated identities, network/resource limits, and adversarial testing are needed for untrusted workloads; such isolation is untested.
+The pilot verifies neither frozen associations under concurrency nor failure recovery. Its HTTP errors and the earlier 89-second Locust replay establish neither availability nor scalability. Multi-model load, lifecycle ablations, and promotion/rollback benefits remain unevaluated. Ownership checks do not sandbox uploaded code; isolation remains untested and requires restricted artifact formats, isolated identities, network/resource limits, and adversarial testing.
 
 \section{Conclusion}
 The controlled NIDS study quantifies disagreement between distribution alerts and labeled predictive quality across traffic mixtures, window sizes, and thresholds. Its strongest evidence supports separate interpretation of these signals. The version-associated lifecycle contract and Native Registry prototype make that separation concrete; the service replay adds integration evidence, while update effectiveness and broader operational guarantees remain open.
 
-\begin{credits}
-\subsubsection{\ackname}
+\section*{Acknowledgement}
 This research was supported by the VNUHCM-University of Information Technology's Scientific Research Fund.
 
-\subsubsection{\discintname}
-The authors have no competing interests to declare that are relevant to the content of this article.
-\end{credits}
 \begin{thebibliography}{99}
 \bibitem{rabanser2019}
 Rabanser, S., G\"unnemann, S., Lipton, Z.: Failing Loudly: An Empirical Study of Methods for Detecting Dataset Shift. In: \textit{Advances in Neural Information Processing Systems}, vol. 32 (2019)
