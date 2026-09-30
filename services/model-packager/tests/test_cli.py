@@ -262,6 +262,20 @@ def test_run_build_task_prepares_kaniko_context(monkeypatch, tmp_path, flavor, b
     assert payload["status"] == "success" and payload["build_id"] == "version"
 
 
+def test_run_build_task_includes_uploaded_label_mapping(monkeypatch, tmp_path):
+    configure_build(monkeypatch, tmp_path)
+    monkeypatch.setenv("BUILD_ENGINE", "kaniko")
+    monkeypatch.setenv("LABEL_MAPPING_DOWNLOAD_URL", "http://mapping")
+    monkeypatch.setenv("LABEL_MAPPING_FILENAME", "label_classes_v1.json")
+    stub_package_helpers(monkeypatch)
+
+    cli.run_build_task("version", "http://callback")
+
+    assert (tmp_path / "model" / "label_classes_v1.json").read_bytes() == b"artifact"
+    with zipfile.ZipFile(tmp_path / "model-package.zip") as archive:
+        assert "model/label_classes_v1.json" in archive.namelist()
+
+
 def test_run_build_task_docker_posts_callback(monkeypatch, tmp_path):
     configure_build(monkeypatch, tmp_path)
     monkeypatch.delenv("BUILD_ENGINE", raising=False)

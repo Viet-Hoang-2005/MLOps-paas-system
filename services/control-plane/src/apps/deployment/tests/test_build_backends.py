@@ -14,9 +14,11 @@ class RecordingStorage:
 
     def __init__(self):
         self.downloaded_uri = ""
+        self.downloaded_uris = []
 
     def presigned_get(self, uri, _ttl):
         self.downloaded_uri = uri
+        self.downloaded_uris.append(uri)
         return "https://storage.example/download"
 
     @staticmethod
@@ -93,3 +95,45 @@ def test_argo_build_backend_uses_build_input_s3_uri():
     assert result["response"]["project_id"] == str(build.project.public_id)
     assert result["response"]["image_repository"].endswith(f"image-{build.project.public_id}")
     assert result["response"]["image_tag"] == f"build-{build.public_id}"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("backend_name", ["docker", "argo"])
+def test_build_backend_passes_uploaded_label_mapping_to_packager(backend_name):
+    build, source = create_build_with_input()
+    mapping = BuildInputAsset.objects.create(
+        build=build,
+        kind="label_mapping",
+        name="label_classes_v1.json",
+        s3_uri="s3://artifact-bucket/build-input/label_classes_v1.json",
+    )
+    storage = RecordingStorage()
+    if backend_name == "docker":
+        docker = RecordingDocker()
+        DockerBuildBackend(docker_client=docker, storage=storage).run(build)
+        data = docker.environment
+        assert data["LABEL_MAPPING_DOWNLOAD_URL"] == "https://storage.example/download"
+        assert data["LABEL_MAPPING_FILENAME"] == mapping.name
+    else:
+        client = SimpleNamespace(trigger=lambda _url, payload: payload)
+        data = ArgoBuildBackend(client=client, storage=storage).run(build)["response"]
+        assert data["label_mapping_download_url"] == "https://storage.example/download"
+        assert data["label_mapping_filename"] == mapping.name
+    assert storage.downloaded_uris == [mapping.s3_uri, source.s3_uri]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("backend_name", ["docker", "argo"])
+def test_build_backend_keeps_label_mapping_optional(backend_name):
+    build, _ = create_build_with_input()
+    storage = RecordingStorage()
+    if backend_name == "docker":
+        docker = RecordingDocker()
+        DockerBuildBackend(docker_client=docker, storage=storage).run(build)
+        assert docker.environment["LABEL_MAPPING_DOWNLOAD_URL"] == ""
+        assert docker.environment["LABEL_MAPPING_FILENAME"] == ""
+    else:
+        client = SimpleNamespace(trigger=lambda _url, payload: payload)
+        data = ArgoBuildBackend(client=client, storage=storage).run(build)["response"]
+        assert data["label_mapping_download_url"] == ""
+        assert data["label_mapping_filename"] == ""

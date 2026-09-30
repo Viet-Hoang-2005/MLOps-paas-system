@@ -226,6 +226,10 @@ spec:
                       value: ""
                     - name: control_plane_webhook_url
                       value: ""
+                    - name: label_mapping_download_url
+                      value: ""
+                    - name: label_mapping_filename
+                      value: ""
           parameters:
             - src:
                 dependencyName: build-dep
@@ -279,6 +283,14 @@ spec:
                 dependencyName: build-dep
                 dataKey: body.control_plane_webhook_url
               dest: spec.arguments.parameters.12.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.label_mapping_download_url
+              dest: spec.arguments.parameters.13.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.label_mapping_filename
+              dest: spec.arguments.parameters.14.value
     - template:
         name: deploy-workflow-trigger
         conditions: "deploy-dep"

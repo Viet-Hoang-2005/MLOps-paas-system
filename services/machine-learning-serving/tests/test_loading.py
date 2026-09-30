@@ -64,6 +64,21 @@ def test_load_label_mapping_list_becomes_dictionary(monkeypatch, tmp_path):
     assert loaded["label_mapping"] == {0: "safe", 1: "attack"}
 
 
+def test_load_label_mapping_skips_unrelated_json_and_invalid_candidate(monkeypatch, tmp_path):
+    (tmp_path / "MLmodel").write_text("x")
+    (tmp_path / "input_example.json").write_text('{"features": [1]}')
+    (tmp_path / "label_mapping.json").write_text("not json")
+    (tmp_path / "label_classes_v1.json").write_text(json.dumps(["BENIGN", "DDoS"]))
+    model = SimpleNamespace(metadata=SimpleNamespace(signature=None))
+    monkeypatch.setattr(loading.mlflow.pyfunc, "load_model", lambda *_: model)
+    monkeypatch.setattr(loading, "download_model_artifact", lambda *_: tmp_path)
+    loading.MODEL_CACHE.clear()
+
+    loaded = loading.load_model_from_uri("m", "uri")
+
+    assert loaded["label_mapping"] == {0: "BENIGN", 1: "DDoS"}
+
+
 def test_load_model_empty_uri_and_loader_failure(monkeypatch, tmp_path):
     loading.MODEL_CACHE.clear()
     with pytest.raises(HTTPException) as exc:

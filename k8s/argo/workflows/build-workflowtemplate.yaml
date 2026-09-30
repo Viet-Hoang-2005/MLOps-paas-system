@@ -10,6 +10,8 @@ spec:
   arguments:
     parameters:
       - name: control_plane_webhook_url
+      - name: label_mapping_download_url
+      - name: label_mapping_filename
   volumeClaimTemplates:
     - metadata:
         name: workspace
@@ -42,6 +44,8 @@ spec:
           - name: source_download_url
           - name: output_upload_url
           - name: control_plane_webhook_url
+          - name: label_mapping_download_url
+          - name: label_mapping_filename
       steps:
         - - name: prepare-package
             template: prepare-package
@@ -60,6 +64,8 @@ spec:
                 - {name: source_download_url, value: "{{inputs.parameters.source_download_url}}"}
                 - {name: output_upload_url, value: "{{inputs.parameters.output_upload_url}}"}
                 - {name: control_plane_webhook_url, value: "{{inputs.parameters.control_plane_webhook_url}}"}
+                - {name: label_mapping_download_url, value: "{{inputs.parameters.label_mapping_download_url}}"}
+                - {name: label_mapping_filename, value: "{{inputs.parameters.label_mapping_filename}}"}
         - - name: build-image
             template: build-image
             arguments:
@@ -92,8 +98,10 @@ spec:
           - {name: source_download_url}
           - {name: output_upload_url}
           - {name: control_plane_webhook_url}
+          - {name: label_mapping_download_url}
+          - {name: label_mapping_filename}
       container:
-        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:c0e4ac0aeaa9cccf871db90e2cc3fb2bc669aa35
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:96e1dce6396ce4cdbcb4f55718e476bb74985c2e
         imagePullPolicy: Always
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
@@ -123,6 +131,8 @@ spec:
           - {name: SOURCE_ARTIFACT_NAME, value: "{{inputs.parameters.source_artifact_name}}"}
           - {name: SOURCE_TYPE, value: "{{inputs.parameters.source_type}}"}
           - {name: SOURCE_DOWNLOAD_URL, value: "{{inputs.parameters.source_download_url}}"}
+          - {name: LABEL_MAPPING_DOWNLOAD_URL, value: "{{inputs.parameters.label_mapping_download_url}}"}
+          - {name: LABEL_MAPPING_FILENAME, value: "{{inputs.parameters.label_mapping_filename}}"}
           - {name: OUTPUT_UPLOAD_URL, value: "{{inputs.parameters.output_upload_url}}"}
           - {name: CONTROL_PLANE_WEBHOOK_URL, value: "{{inputs.parameters.control_plane_webhook_url}}"}
           - name: CONTROL_PLANE_WEBHOOK_SECRET
@@ -154,7 +164,7 @@ spec:
           - {name: image_tag}
           - {name: control_plane_webhook_url}
       container:
-        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:c0e4ac0aeaa9cccf871db90e2cc3fb2bc669aa35
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:96e1dce6396ce4cdbcb4f55718e476bb74985c2e
         imagePullPolicy: Always
         volumeMounts:
           - {name: workspace, mountPath: /workspace}

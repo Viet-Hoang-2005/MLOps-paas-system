@@ -48,6 +48,41 @@ def resolve_mlflow_model_dir(source_dir: Path) -> Path:
     return candidates[0].parent
 
 
+def load_label_mapping(source_dir: Path, mlflow_model_dir: Path) -> dict | None:
+    """Find a mapping by filename before parsing unrelated MLflow JSON files."""
+    candidates: list[Path] = []
+    seen: set[Path] = set()
+    for root, recursive in ((mlflow_model_dir, False), (source_dir, True)):
+        files = root.rglob("*") if recursive else root.iterdir()
+        for path in sorted(files):
+            if path in seen or not path.is_file() or path.suffix.lower() not in {".json", ".pkl"}:
+                continue
+            if not any(part in path.name.lower() for part in ("mapping", "label", "dictionary")):
+                continue
+            seen.add(path)
+            candidates.append(path)
+
+    for path in candidates:
+        try:
+            with path.open("rb" if path.suffix.lower() == ".pkl" else "r") as handle:
+                mapping = pickle.load(handle) if path.suffix.lower() == ".pkl" else json.load(handle)
+            if isinstance(mapping, list):
+                mapping = dict(enumerate(mapping))
+            if isinstance(mapping, dict) and mapping:
+                return mapping
+        except (
+            OSError,
+            ValueError,
+            TypeError,
+            EOFError,
+            ImportError,
+            AttributeError,
+            pickle.UnpicklingError,
+        ):
+            log_event(logger, "WARNING", "label_mapping_load_failed", "Label mapping could not be loaded")
+    return None
+
+
 def load_model_from_uri(
     model_version_id: str, model_uri: str, version_marker: str = "latest"
 ) -> dict[str, Any]:
@@ -74,53 +109,7 @@ def load_model_from_uri(
             else []
         )
 
-        label_mapping = None
-        for ext, loader, mode in [
-            (".json", json.load, "r"),
-            (".pkl", pickle.load, "rb"),
-        ]:
-            mapping_file = next(mlflow_model_dir.glob(f"*{ext}"), None)
-            if mapping_file and (
-                "mapping" in mapping_file.name.lower()
-                or "label" in mapping_file.name.lower()
-                or "dictionary" in mapping_file.name.lower()
-            ):
-                try:
-                    with mapping_file.open(mode) as f:
-                        label_mapping = loader(f)
-                        if isinstance(label_mapping, list):
-                            label_mapping = {i: v for i, v in enumerate(label_mapping)}
-                    break
-                except Exception as e:
-                    log_event(
-                        logger,
-                        "WARNING",
-                        "label_mapping_load_failed",
-                        "Label mapping could not be loaded",
-                        error_type=type(e).__name__,
-                    )
-
-        if not label_mapping:
-            for ext, loader, mode in [
-                (".json", json.load, "r"),
-                (".pkl", pickle.load, "rb"),
-            ]:
-                mapping_file = next(source_dir.rglob(f"*{ext}"), None)
-                if mapping_file and (
-                    "mapping" in mapping_file.name.lower()
-                    or "label" in mapping_file.name.lower()
-                    or "dictionary" in mapping_file.name.lower()
-                ):
-                    try:
-                        with mapping_file.open(mode) as f:
-                            label_mapping = loader(f)
-                            if isinstance(label_mapping, list):
-                                label_mapping = {
-                                    i: v for i, v in enumerate(label_mapping)
-                                }
-                        break
-                    except Exception:
-                        pass
+        label_mapping = load_label_mapping(source_dir, mlflow_model_dir)
 
     except Exception as exc:
         load_summary.failure(
