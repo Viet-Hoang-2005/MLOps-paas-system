@@ -249,6 +249,10 @@ class ArgoDriftBackend(_ArgoBackend):
             name: f"s3://{self.storage.bucket}/{prefix}{name}"
             for name in ("report.html", "report.json", "summary.json")
         }
+        drift_run.report_html_uri = uris["report.html"]
+        drift_run.report_json_uri = uris["report.json"]
+        drift_run.summary_uri = uris["summary.json"]
+        drift_run.save(update_fields=["report_html_uri", "report_json_uri", "summary_uri"])
         return self.trigger(
             {
                 "job_id": str(drift_run.public_id),
