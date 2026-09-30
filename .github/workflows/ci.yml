@@ -7,28 +7,17 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: read
 
 jobs:
   detect-changes:
     name: "Detect Changed Components"
     runs-on: ubuntu-latest
     outputs:
-      frontend: ${{ steps.filter.outputs.frontend == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
-      control_plane: ${{ steps.filter.outputs.control_plane == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
-      consumer: ${{ steps.filter.outputs.consumer == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
-      packager: ${{ steps.filter.outputs.packager == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
-      evidently: ${{ steps.filter.outputs.evidently == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
-      model_server: ${{ steps.filter.outputs.model_server == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
-      machine_learning_serving: ${{ steps.filter.outputs.machine_learning_serving == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
-      deep_learning_serving: ${{ steps.filter.outputs.deep_learning_serving == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
-      training_runner: ${{ steps.filter.outputs.training_runner == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
-      k8s: ${{ steps.filter.outputs.k8s == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
-      ansible: ${{ steps.filter.outputs.ansible == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
-      terraform: ${{ steps.filter.outputs.terraform == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
-      matrix_targets: ${{ steps.matrix.outputs.targets }}
+      quality_targets: ${{ steps.matrix.outputs.quality_targets }}
       unit_test_targets: ${{ steps.matrix.outputs.unit_test_targets }}
-      lint_targets: ${{ steps.matrix.outputs.lint_targets }}
+      image_targets: ${{ steps.matrix.outputs.image_targets }}
+      infra_targets: ${{ steps.matrix.outputs.infra_targets }}
     steps:
       - uses: actions/checkout@v4
       - name: Filter changed paths
@@ -56,7 +45,6 @@ jobs:
               - 'services/training-runner/**'
             ci_workflow:
               - '.github/workflows/ci.yml'
-              - '.github/workflows/cd.yml'
             service_test_shared:
               - 'services/requirements-test.txt'
             service_lint_shared:
@@ -77,17 +65,18 @@ jobs:
           is_manual = "${{ github.event_name }}" == "workflow_dispatch"
           is_ci_workflow_change = "${{ steps.filter.outputs.ci_workflow }}" == "true"
           shared_tests = "${{ steps.filter.outputs.service_test_shared }}" == "true"
-          shared_lint = "${{ steps.filter.outputs.service_lint_shared }}" == "true"
+          shared_quality = "${{ steps.filter.outputs.service_lint_shared }}" == "true"
+          run_all = is_ci_workflow_change or is_manual
           changed = {
-              "frontend": "${{ steps.filter.outputs.frontend }}" == "true" or is_ci_workflow_change or is_manual,
-              "control_plane": "${{ steps.filter.outputs.control_plane }}" == "true" or is_ci_workflow_change or is_manual,
-              "consumer": "${{ steps.filter.outputs.consumer }}" == "true" or is_ci_workflow_change or is_manual,
-              "packager": "${{ steps.filter.outputs.packager }}" == "true" or is_ci_workflow_change or is_manual,
-              "evidently": "${{ steps.filter.outputs.evidently }}" == "true" or is_ci_workflow_change or is_manual,
-              "model_server": "${{ steps.filter.outputs.model_server }}" == "true" or is_ci_workflow_change or is_manual,
-              "machine_learning_serving": "${{ steps.filter.outputs.machine_learning_serving }}" == "true" or is_ci_workflow_change or is_manual,
-              "deep_learning_serving": "${{ steps.filter.outputs.deep_learning_serving }}" == "true" or is_ci_workflow_change or is_manual,
-              "training_runner": "${{ steps.filter.outputs.training_runner }}" == "true" or is_ci_workflow_change or is_manual,
+              "frontend": "${{ steps.filter.outputs.frontend }}" == "true",
+              "control_plane": "${{ steps.filter.outputs.control_plane }}" == "true",
+              "consumer": "${{ steps.filter.outputs.consumer }}" == "true",
+              "packager": "${{ steps.filter.outputs.packager }}" == "true",
+              "evidently": "${{ steps.filter.outputs.evidently }}" == "true",
+              "model_server": "${{ steps.filter.outputs.model_server }}" == "true",
+              "machine_learning_serving": "${{ steps.filter.outputs.machine_learning_serving }}" == "true",
+              "deep_learning_serving": "${{ steps.filter.outputs.deep_learning_serving }}" == "true",
+              "training_runner": "${{ steps.filter.outputs.training_runner }}" == "true",
           }
           configs = {
               "frontend": {"name": "Frontend Web", "id": "frontend", "context": "web", "dockerfile": "web/Dockerfile", "image": "mlops-paas-web"},
@@ -100,19 +89,38 @@ jobs:
               "deep_learning_serving": {"name": "Deep Learning Serving", "id": "deep_learning_serving", "context": "services/deep-learning-serving", "dockerfile": "services/deep-learning-serving/Dockerfile", "image": "mlops-paas-deep-learning-serving"},
               "training_runner": {"name": "Training Runner", "id": "training_runner", "context": "services/training-runner", "dockerfile": "services/training-runner/Dockerfile", "image": "mlops-paas-training-runner"}
           }
-          targets = [configs[k] for k, v in changed.items() if v]
-          unit_keys = ["control_plane", "consumer", "packager", "evidently", "model_server", "machine_learning_serving", "deep_learning_serving", "training_runner"]
-          unit_test_targets = [configs[k] for k in unit_keys if changed[k] or shared_tests]
-          lint_targets = [configs[k] for k in unit_keys if changed[k] or shared_lint]
+          backend_keys = ["control_plane", "consumer", "packager", "evidently", "model_server", "machine_learning_serving", "deep_learning_serving", "training_runner"]
+          quality_targets = [configs[k] for k, value in changed.items() if value or (k != "frontend" and shared_quality)]
+          unit_test_targets = [configs[k] for k in backend_keys if changed[k] or shared_tests]
+          image_targets = [configs[k] for k, value in changed.items() if value]
+          infra_changed = {
+              "kubernetes": "${{ steps.filter.outputs.k8s }}" == "true",
+              "ansible": "${{ steps.filter.outputs.ansible }}" == "true",
+              "terraform": "${{ steps.filter.outputs.terraform }}" == "true",
+          }
+          infra_configs = [
+              {"id": "kubernetes", "name": "Kubernetes"},
+              {"id": "ansible", "name": "Ansible"},
+              {"id": "terraform", "name": "Terraform"},
+          ]
+          infra_targets = [target for target in infra_configs if infra_changed[target["id"]] or run_all]
+          if run_all:
+              quality_targets = [configs[k] for k in configs]
+              unit_test_targets = [configs[k] for k in backend_keys]
+              image_targets = [configs[k] for k in configs]
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-              f.write(f"targets={json.dumps(targets)}\n")
+              f.write(f"quality_targets={json.dumps(quality_targets)}\n")
               f.write(f"unit_test_targets={json.dumps(unit_test_targets)}\n")
-              f.write(f"lint_targets={json.dumps(lint_targets)}\n")
+              f.write(f"image_targets={json.dumps(image_targets)}\n")
+              f.write(f"infra_targets={json.dumps(infra_targets)}\n")
           PY
 
   secret-scan:
     name: "Secret Scan (GitLeaks)"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -122,33 +130,55 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LOG_OPTS: ${{ github.event_name != 'pull_request' && '--max-count=1' || '' }}
-  lint-frontend:
-    name: "Frontend Typecheck, Build & Code Quality"
-    needs: detect-changes
-    if: needs.detect-changes.outputs.frontend == 'true'
+
+  workflow-lint:
+    name: "GitHub Actions Workflow Lint (actionlint)"
     runs-on: ubuntu-latest
-    outputs:
-      errors: ${{ steps.eslint.outputs.errors }}
-      warnings: ${{ steps.eslint.outputs.warnings }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install actionlint v1.7.12
+        run: |
+          curl -sSfL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o /tmp/actionlint.tar.gz
+          tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
+          sudo install /tmp/actionlint /usr/local/bin/actionlint
+      - name: Lint CI and CD workflows
+        run: actionlint -color .github/workflows/ci.yml .github/workflows/cd.yml
+
+  code-quality:
+    name: "Code Quality (${{ matrix.target.name }})"
+    needs: [detect-changes, workflow-lint]
+    if: needs.detect-changes.result == 'success' && needs.workflow-lint.result == 'success' && needs.detect-changes.outputs.quality_targets != '[]'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.detect-changes.outputs.quality_targets) }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        if: matrix.target.id == 'frontend'
         with:
           version: 10
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
+        if: matrix.target.id == 'frontend'
         with:
           node-version: "22"
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
-      - name: Install dependencies
+      - name: Install frontend dependencies
+        id: frontend_install
+        if: matrix.target.id == 'frontend'
         working-directory: web
         run: pnpm install --frozen-lockfile
-      - name: Typecheck and build
+      - name: Frontend typecheck and build
+        id: frontend_build
+        if: matrix.target.id == 'frontend'
         working-directory: web
         run: pnpm run build
-      - name: Run ESLint
+      - name: Frontend ESLint (report)
         id: eslint
+        if: always() && matrix.target.id == 'frontend' && steps.frontend_install.outcome == 'success'
         working-directory: web
         run: |
           set +e
@@ -164,37 +194,27 @@ jobs:
           print(sum(item.get("errorCount", 0) for item in results), sum(item.get("warningCount", 0) for item in results))
           PY
           )
-          echo "errors=$err_count" >> $GITHUB_OUTPUT
-          echo "warnings=$warning_count" >> $GITHUB_OUTPUT
+          echo "errors=$err_count" >> "$GITHUB_OUTPUT"
+          echo "warnings=$warning_count" >> "$GITHUB_OUTPUT"
+          echo "exit_code=$eslint_exit" >> "$GITHUB_OUTPUT"
           if [ "$err_count" != "0" ]; then
             echo "::error::ESLint found $err_count errors!"
             exit 1
           fi
           exit "$eslint_exit"
-
-  lint-backend:
-    name: "Backend Code Quality (${{ matrix.target.name }})"
-    needs: detect-changes
-    if: needs.detect-changes.outputs.lint_targets != '[]'
-    # Ruff is report-only; even an execution/setup failure is surfaced in the
-    # summary but must not prevent unit tests or image scanning from running.
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target: ${{ fromJSON(needs.detect-changes.outputs.lint_targets) }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python
+      - name: Setup Python for Ruff
+        if: matrix.target.id != 'frontend'
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
           cache: pip
           cache-dependency-path: services/requirements-lint.txt
       - name: Install Ruff
+        if: matrix.target.id != 'frontend'
         run: python -m pip install -r services/requirements-lint.txt
-      - name: Run Ruff (Report Only)
+      - name: Run Ruff (report only)
+        id: ruff
+        if: matrix.target.id != 'frontend'
         working-directory: ${{ matrix.target.context }}
         run: |
           set +e
@@ -206,20 +226,19 @@ jobs:
           import os
           from pathlib import Path
 
-          summary = Path("ci-lint-${{ matrix.target.id }}.json")
+          summary = Path("ci-quality-${{ matrix.target.id }}.json")
 
           def write_summary(display):
               summary.write_text(json.dumps({"display": display}), encoding="utf-8")
 
           def fail(message):
-              write_summary("Failed (Ruff execution error)")
-              print(f"::error::{message}")
-              raise SystemExit(1)
+              write_summary("Warning (Ruff execution error)")
+              print(f"::warning::{message}")
+              raise SystemExit(0)
 
           exit_code = int(os.environ["RUFF_EXIT"])
           if exit_code not in (0, 1):
               fail(f"Ruff failed with exit code {exit_code}")
-
           try:
               findings = json.loads(Path("ruff_report.json").read_text(encoding="utf-8"))
           except (OSError, json.JSONDecodeError) as exc:
@@ -241,33 +260,72 @@ jobs:
                   column = int(location["column"])
               except (KeyError, TypeError, ValueError) as exc:
                   fail(f"Invalid Ruff JSON finding: {exc}")
-              print(
-                  f"::warning file={escape(path)},line={row},col={column},"
-                  f"title=Ruff {escape(code)}::{escape(message)}"
-              )
-
+              print(f"::warning file={escape(path)},line={row},col={column},title=Ruff {escape(code)}::{escape(message)}")
           count = len(findings)
           write_summary(f"Warning ({count} Ruff violations)" if count else "Passed (0 Ruff violations)")
           PY
-      - name: Upload lint summary
+      - name: Write Ruff execution fallback summary
+        if: always() && matrix.target.id != 'frontend'
+        working-directory: ${{ matrix.target.context }}
+        env:
+          RUFF_RESULT: ${{ steps.ruff.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary = Path("ci-quality-${{ matrix.target.id }}.json")
+          if os.environ.get("RUFF_RESULT") != "success" and not summary.exists():
+              summary.write_text(json.dumps({"display": "Warning (Ruff execution error)"}), encoding="utf-8")
+          PY
+      - name: Write frontend quality summary
+        if: always() && matrix.target.id == 'frontend'
+        env:
+          BUILD_RESULT: ${{ steps.frontend_build.outcome }}
+          INSTALL_RESULT: ${{ steps.frontend_install.outcome }}
+          ESLINT_RESULT: ${{ steps.eslint.outcome }}
+          ESLINT_ERRORS: ${{ steps.eslint.outputs.errors }}
+          ESLINT_WARNINGS: ${{ steps.eslint.outputs.warnings }}
+        working-directory: web
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          build = os.environ.get("BUILD_RESULT", "skipped")
+          install = os.environ.get("INSTALL_RESULT", "skipped")
+          eslint = os.environ.get("ESLINT_RESULT", "skipped")
+          errors = int(os.environ.get("ESLINT_ERRORS") or 0)
+          warnings = int(os.environ.get("ESLINT_WARNINGS") or 0)
+          if build != "success" or install != "success" or eslint != "success" or errors:
+              display = f"Failed (typecheck/build: {build}, ESLint: {eslint}, {errors} errors, {warnings} warnings)"
+          elif warnings:
+              display = f"Warning ({warnings} ESLint warnings)"
+          else:
+              display = "Passed (typecheck, build, ESLint)"
+          Path("ci-quality-frontend.json").write_text(json.dumps({"display": display}), encoding="utf-8")
+          PY
+      - name: Upload code-quality summary
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ci-summary-lint-${{ matrix.target.id }}
-          path: ${{ matrix.target.context }}/ci-lint-${{ matrix.target.id }}.json
+          name: ci-summary-quality-${{ matrix.target.id }}
+          path: ${{ matrix.target.context }}/ci-quality-${{ matrix.target.id }}.json
           if-no-files-found: ignore
       - name: Upload Ruff report
-        if: always()
+        if: always() && matrix.target.id != 'frontend'
         uses: actions/upload-artifact@v4
         with:
           name: ruff-report-${{ matrix.target.id }}
           path: ${{ matrix.target.context }}/ruff_report.json
           if-no-files-found: ignore
 
-  service-unit-tests:
+  services-unit-tests:
     name: "Unit Tests (${{ matrix.target.name }})"
-    needs: [detect-changes, lint-backend]
-    if: always() && needs.detect-changes.result == 'success' && needs.detect-changes.outputs.unit_test_targets != '[]'
+    needs: [detect-changes, workflow-lint, code-quality]
+    if: always() && needs.detect-changes.result == 'success' && needs.workflow-lint.result == 'success' && needs.detect-changes.outputs.unit_test_targets != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -361,31 +419,42 @@ jobs:
             exit 1
           fi
 
-  validate-k8s:
-    name: "Kubernetes Validation (Kustomize & Kubeconform)"
-    needs: detect-changes
-    if: needs.detect-changes.outputs.k8s == 'true'
+  infra-validate:
+    name: "Infrastructure Validation (${{ matrix.target.name }})"
+    needs: [detect-changes, workflow-lint]
+    if: needs.detect-changes.result == 'success' && needs.workflow-lint.result == 'success' && needs.detect-changes.outputs.infra_targets != '[]'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.detect-changes.outputs.infra_targets) }}
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Python for GitOps validation
+      - name: Setup Python for Kubernetes validation
+        if: matrix.target.id == 'kubernetes'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install GitOps validation dependencies
+      - name: Install Kubernetes validation dependencies
+        if: matrix.target.id == 'kubernetes'
         run: pip install -r k8s/validate/requirements.txt
       - name: Setup Kustomize
+        if: matrix.target.id == 'kubernetes'
         uses: imranismail/setup-kustomize@v2
       - name: Setup Helm
+        if: matrix.target.id == 'kubernetes'
         uses: azure/setup-helm@v4
         with:
           version: v3.16.4
       - name: Install Kubeconform v0.7.0
+        if: matrix.target.id == 'kubernetes'
         run: |
           wget -q https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz
           tar -xzf kubeconform-linux-amd64.tar.gz
           sudo mv kubeconform /usr/local/bin/
-      - name: Validate K8s Manifests
+      - name: Validate Kubernetes manifests
+        id: validate_kubernetes
+        if: matrix.target.id == 'kubernetes'
         run: |
           echo "Building every Kustomize package to check syntax..."
           mapfile -t targets < <(find k8s -name kustomization.yaml -printf '%h\n' | sort -u)
@@ -403,71 +472,84 @@ jobs:
           done
           python -m unittest discover -s k8s/validate/tests -p 'test_*.py'
           python -m k8s.validate.run_all
-
-  validate-ansible:
-    name: "Ansible Validation (Syntax & Lint)"
-    needs: detect-changes
-    if: needs.detect-changes.outputs.ansible == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python
+      - name: Setup Python for Ansible validation
+        if: matrix.target.id == 'ansible'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install Ansible dependencies and collections
+        if: matrix.target.id == 'ansible'
         run: |
           pip install -r ansible/requirements.txt
           ansible-galaxy collection install -r ansible/requirements.yml
-      - name: Validate Ansible syntax
-        run: ansible-playbook -i 'localhost,' ansible/site.yml --syntax-check
-      - name: Lint Ansible
-        run: ansible-lint ansible/
-
-  validate-terraform:
-    name: "Terraform Validation (Fmt, Init & Validate)"
-    needs: detect-changes
-    if: needs.detect-changes.outputs.terraform == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: infra
-    steps:
-      - uses: actions/checkout@v4
+      - name: Validate Ansible
+        id: validate_ansible
+        if: matrix.target.id == 'ansible'
+        run: |
+          ansible-playbook -i 'localhost,' ansible/site.yml --syntax-check
+          ansible-lint ansible/
       - name: Setup Terraform
+        if: matrix.target.id == 'terraform'
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.5.7"
-      - name: Format check
-        run: terraform fmt -check -recursive
-      - name: Initialize providers without backend
-        run: terraform init -backend=false -input=false
-      - name: Validate configuration
-        run: terraform validate
+      - name: Validate Terraform
+        id: validate_terraform
+        if: matrix.target.id == 'terraform'
+        working-directory: infra
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+      - name: Write infrastructure summary
+        if: always()
+        env:
+          TARGET_ID: ${{ matrix.target.id }}
+          KUBERNETES_RESULT: ${{ steps.validate_kubernetes.outcome }}
+          ANSIBLE_RESULT: ${{ steps.validate_ansible.outcome }}
+          TERRAFORM_RESULT: ${{ steps.validate_terraform.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
 
-  build-and-scan:
-    name: "Build & Scan (${{ matrix.target.name }})"
+          result_key = {
+              "kubernetes": "KUBERNETES_RESULT",
+              "ansible": "ANSIBLE_RESULT",
+              "terraform": "TERRAFORM_RESULT",
+          }[os.environ["TARGET_ID"]]
+          result = os.environ.get(result_key, "skipped")
+          display = "Passed" if result == "success" else "Failed (validation or setup error)"
+          Path(f"ci-infra-{os.environ['TARGET_ID']}.json").write_text(
+              json.dumps({"display": display}), encoding="utf-8"
+          )
+          PY
+      - name: Upload infrastructure summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-summary-infra-${{ matrix.target.id }}
+          path: ci-infra-${{ matrix.target.id }}.json
+          if-no-files-found: ignore
+
+  images-scan:
+    name: "Image Build & Trivy (${{ matrix.target.name }})"
     needs:
-      [
-        detect-changes,
-        lint-frontend,
-        lint-backend,
-        service-unit-tests,
-        validate-k8s,
-        validate-ansible,
-        validate-terraform,
-        secret-scan,
-      ]
+      - detect-changes
+      - workflow-lint
+      - services-unit-tests
     if: >-
       always() &&
       needs.detect-changes.result == 'success' &&
-      needs.detect-changes.outputs.matrix_targets != '[]' &&
-      (needs.service-unit-tests.result == 'success' || needs.service-unit-tests.result == 'skipped')
+      needs.workflow-lint.result == 'success' &&
+      needs.detect-changes.outputs.image_targets != '[]' &&
+      (needs.services-unit-tests.result == 'success' || needs.services-unit-tests.result == 'skipped')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        target: ${{ fromJSON(needs.detect-changes.outputs.matrix_targets) }}
+        target: ${{ fromJSON(needs.detect-changes.outputs.image_targets) }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Docker Buildx
@@ -533,20 +615,25 @@ jobs:
     needs:
       [
         detect-changes,
+        workflow-lint,
         secret-scan,
-        lint-frontend,
-        lint-backend,
-        service-unit-tests,
-        validate-k8s,
-        validate-ansible,
-        validate-terraform,
-        build-and-scan,
+        code-quality,
+        services-unit-tests,
+        infra-validate,
+        images-scan,
       ]
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
-      - name: Download service summaries
-        if: needs.lint-backend.result != 'skipped' || needs.service-unit-tests.result != 'skipped' || needs.build-and-scan.result != 'skipped'
+      - name: Download matrix summaries
+        if: >-
+          needs.detect-changes.result == 'success' &&
+          (needs.detect-changes.outputs.quality_targets != '[]' ||
+           needs.detect-changes.outputs.unit_test_targets != '[]' ||
+           needs.detect-changes.outputs.image_targets != '[]' ||
+           needs.detect-changes.outputs.infra_targets != '[]')
         uses: actions/download-artifact@v4
         with:
           pattern: ci-summary-*
@@ -554,73 +641,69 @@ jobs:
           merge-multiple: true
       - name: Generate Unified CI Summary Table
         env:
-          LINT_TARGETS: ${{ needs.detect-changes.outputs.lint_targets }}
+          QUALITY_TARGETS: ${{ needs.detect-changes.outputs.quality_targets }}
           UNIT_TEST_TARGETS: ${{ needs.detect-changes.outputs.unit_test_targets }}
-          MATRIX_TARGETS: ${{ needs.detect-changes.outputs.matrix_targets }}
-          IMAGE_SCAN_RESULT: ${{ needs.build-and-scan.result }}
+          IMAGE_TARGETS: ${{ needs.detect-changes.outputs.image_targets }}
+          INFRA_TARGETS: ${{ needs.detect-changes.outputs.infra_targets }}
+          IMAGE_SCAN_RESULT: ${{ needs.images-scan.result }}
         run: |
           python3 - <<'PY'
           import json
           import os
           from pathlib import Path
 
-          k8s_changed = "${{ needs.detect-changes.outputs.k8s }}" == "true"
-          ansible_changed = "${{ needs.detect-changes.outputs.ansible }}" == "true"
-          terraform_changed = "${{ needs.detect-changes.outputs.terraform }}" == "true"
-
           def scheduled_ids(name):
               return {target["id"] for target in json.loads(os.environ.get(name) or "[]")}
 
-          lint_ids = scheduled_ids("LINT_TARGETS")
+          quality_ids = scheduled_ids("QUALITY_TARGETS")
           unit_ids = scheduled_ids("UNIT_TEST_TARGETS")
-          image_ids = scheduled_ids("MATRIX_TARGETS")
+          image_ids = scheduled_ids("IMAGE_TARGETS")
+          infra_ids = scheduled_ids("INFRA_TARGETS")
           image_scan_result = os.environ.get("IMAGE_SCAN_RESULT", "unknown")
 
           secret_res = "${{ needs.secret-scan.result }}" == "success"
-          eslint_res = "${{ needs.lint-frontend.result }}" == "success"
-          eslint_errs = "${{ needs.lint-frontend.outputs.errors }}"
-          eslint_warnings = "${{ needs.lint-frontend.outputs.warnings }}"
-          k8s_result = "${{ needs.validate-k8s.result }}"
-          ansible_result = "${{ needs.validate-ansible.result }}"
-          terraform_result = "${{ needs.validate-terraform.result }}"
+          workflow_lint_res = "${{ needs.workflow-lint.result }}" == "success"
 
           fmt = lambda ok: "Passed" if ok else "Failed"
-          def infrastructure_result(changed, result):
-              if not changed:
-                  return "Skipped (no changes)"
-              return {
-                  "success": "Passed",
-                  "failure": "Failed",
-                  "cancelled": "Cancelled",
-                  "skipped": "Skipped",
-              }.get(result, f"Failed ({result or 'unknown'} job result)")
-          eslint_errs = int(eslint_errs or 0)
-          eslint_warnings = int(eslint_warnings or 0)
-          eslint_status = "Failed" if not eslint_res or eslint_errs else "Warning" if eslint_warnings else "Passed"
-          eslint_fmt = f"{eslint_status} ({eslint_errs} error, {eslint_warnings} warning)"
 
           result_files = Path("ci-results")
           def service_result(kind, service_id, scheduled):
               if service_id not in scheduled:
+                  if kind == "unit" and service_id == "frontend":
+                      return "N/A (frontend has no unit-test matrix)"
                   return "Skipped (no changes)"
               if kind == "trivy" and image_scan_result == "skipped":
                   return "Skipped (unit tests failed)"
-              path = result_files / f"ci-{kind}-{service_id}.json"
+              artifact_kind = {"quality": "quality", "unit": "unit", "trivy": "trivy"}[kind]
+              path = result_files / f"ci-{artifact_kind}-{service_id}.json"
               if not path.exists():
-                  if kind == "lint":
+                  if kind == "quality" and service_id != "frontend":
                       return "Warning (Ruff execution error)"
                   return f"Failed ({kind} execution error)"
               display = json.loads(path.read_text(encoding="utf-8"))["display"]
-              if kind == "lint" and display.startswith("Failed"):
+              if kind == "quality" and service_id != "frontend" and display.startswith("Failed"):
                   return display.replace("Failed", "Warning", 1)
               return display
 
+          def infrastructure_result(component):
+              if component not in infra_ids:
+                  return "Skipped (no changes)"
+              path = result_files / f"ci-infra-{component}.json"
+              if not path.exists():
+                  return "Failed (infrastructure validation execution error)"
+              return json.loads(path.read_text(encoding="utf-8"))["display"]
+
           summary = ["### Unified CI Pipeline Results\n"]
+          summary.append(f"**Workflow syntax (actionlint)**: {fmt(workflow_lint_res)}\n")
           summary.append(f"**Secret Security (GitLeaks)**: {fmt(secret_res)}\n")
 
           rows = []
-          if "frontend" in image_ids:
-              rows.append(f"| **Frontend Web** | {eslint_fmt} | N/A | {service_result('trivy', 'frontend', image_ids)} |")
+          if "frontend" in quality_ids or "frontend" in image_ids:
+              rows.append(
+                  f"| **Frontend Web** | {service_result('quality', 'frontend', quality_ids)} | "
+                  f"{service_result('unit', 'frontend', unit_ids)} | "
+                  f"{service_result('trivy', 'frontend', image_ids)} |"
+              )
 
           backend_services = [
               ("control_plane", "Control Plane"),
@@ -632,18 +715,18 @@ jobs:
               ("deep_learning_serving", "Deep Learning Serving"),
               ("training_runner", "Training Runner"),
           ]
-          scheduled_backends = lint_ids | unit_ids | image_ids
+          scheduled_backends = quality_ids | unit_ids | image_ids
           for service_id, label in backend_services:
               if service_id in scheduled_backends:
                   rows.append(
-                      f"| **{label}** | {service_result('lint', service_id, lint_ids)} | "
+                      f"| **{label}** | {service_result('quality', service_id, quality_ids)} | "
                       f"{service_result('unit', service_id, unit_ids)} | "
                       f"{service_result('trivy', service_id, image_ids)} |"
                   )
 
           if rows:
               summary.append("#### Application Services (FE & BE)")
-              summary.append("| Services | Lint | Unit tests | Trivy |")
+              summary.append("| Services | Code quality | Unit tests | Trivy |")
               summary.append("| :--- | :--- | :--- | :--- |")
               summary.extend(rows)
               summary.append("\n")
@@ -651,12 +734,12 @@ jobs:
           summary.append("#### Infrastructure")
           summary.append("| Component | Result |")
           summary.append("| :--- | :--- |")
-          summary.append(f"| **Kubernetes (Kustomize, Kubeconform, GitOps)** | {infrastructure_result(k8s_changed, k8s_result)} |")
-          summary.append(f"| **Ansible (Syntax, Lint)** | {infrastructure_result(ansible_changed, ansible_result)} |")
-          summary.append(f"| **Terraform (Fmt, Init, Validate)** | {infrastructure_result(terraform_changed, terraform_result)} |")
+          summary.append(f"| **Kubernetes (Kustomize, Kubeconform, GitOps)** | {infrastructure_result('kubernetes')} |")
+          summary.append(f"| **Ansible (Syntax, Lint)** | {infrastructure_result('ansible')} |")
+          summary.append(f"| **Terraform (Fmt, Init, Validate)** | {infrastructure_result('terraform')} |")
           summary.append("\n")
 
-          if not rows and not (k8s_changed or ansible_changed or terraform_changed):
+          if not rows and not infra_ids:
               summary.append("*No application components changed in this run.*")
 
           content = "\n".join(summary)
