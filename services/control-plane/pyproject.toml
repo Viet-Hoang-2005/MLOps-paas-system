@@ -4,21 +4,16 @@ pythonpath = ["src"]
 testpaths = ["src/apps"]
 
 [tool.ruff]
-line-length = 120
-target-version = "py310"
-exclude = ["**/migrations/*.py", "*.md", "**/*.md"]
+extend = "../ruff.toml"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "DJ"]
+extend-select = ["DJ"]
 ignore = ["DJ001"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/config/settings/local.py" = ["F403", "F405"]
 "src/config/settings/production.py" = ["F403", "F405"]
 "src/config/settings/test.py" = ["F403", "F405"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["apps", "common", "config", "infrastructure"]
 
 [tool.mypy]
 python_version = "3.10"

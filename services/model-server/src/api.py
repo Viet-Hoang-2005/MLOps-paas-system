@@ -44,7 +44,7 @@ logger = get_logger(__name__)
 publication_summary = Summary(logger, "inference_enqueue_summary")
 jwks_summary = Summary(logger, "jwks_fetch_summary")
 
-from src.database import (
+from src.database import (  # noqa: E402  # Initialize log summaries before database import.
     _fetch_model_version_from_db,
     cache_summary,
     get_model_version_record,

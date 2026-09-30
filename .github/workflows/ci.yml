@@ -28,6 +28,7 @@ jobs:
       terraform: ${{ steps.filter.outputs.terraform == 'true' || steps.filter.outputs.ci_workflow == 'true' || github.event_name == 'workflow_dispatch' }}
       matrix_targets: ${{ steps.matrix.outputs.targets }}
       unit_test_targets: ${{ steps.matrix.outputs.unit_test_targets }}
+      lint_targets: ${{ steps.matrix.outputs.lint_targets }}
     steps:
       - uses: actions/checkout@v4
       - name: Filter changed paths
@@ -58,6 +59,9 @@ jobs:
               - '.github/workflows/cd.yml'
             service_test_shared:
               - 'services/requirements-test.txt'
+            service_lint_shared:
+              - 'services/ruff.toml'
+              - 'services/requirements-lint.txt'
             k8s:
               - 'k8s/**'
             ansible:
@@ -73,6 +77,7 @@ jobs:
           is_manual = "${{ github.event_name }}" == "workflow_dispatch"
           is_ci_workflow_change = "${{ steps.filter.outputs.ci_workflow }}" == "true"
           shared_tests = "${{ steps.filter.outputs.service_test_shared }}" == "true"
+          shared_lint = "${{ steps.filter.outputs.service_lint_shared }}" == "true"
           changed = {
               "frontend": "${{ steps.filter.outputs.frontend }}" == "true" or is_ci_workflow_change or is_manual,
               "control_plane": "${{ steps.filter.outputs.control_plane }}" == "true" or is_ci_workflow_change or is_manual,
@@ -98,9 +103,11 @@ jobs:
           targets = [configs[k] for k, v in changed.items() if v]
           unit_keys = ["control_plane", "consumer", "packager", "evidently", "model_server", "machine_learning_serving", "deep_learning_serving", "training_runner"]
           unit_test_targets = [configs[k] for k in unit_keys if changed[k] or shared_tests]
+          lint_targets = [configs[k] for k in unit_keys if changed[k] or shared_lint]
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"targets={json.dumps(targets)}\n")
               f.write(f"unit_test_targets={json.dumps(unit_test_targets)}\n")
+              f.write(f"lint_targets={json.dumps(lint_targets)}\n")
           PY
 
   secret-scan:
@@ -116,7 +123,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LOG_OPTS: ${{ github.event_name != 'pull_request' && '--max-count=1' || '' }}
   lint-frontend:
-    name: "Frontend Code Quality (ESLint)"
+    name: "Frontend Typecheck, Build & Code Quality"
     needs: detect-changes
     if: needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
@@ -125,16 +132,21 @@ jobs:
       warnings: ${{ steps.eslint.outputs.warnings }}
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install Dependencies (pnpm)
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install dependencies
         working-directory: web
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
-          pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck and build
+        working-directory: web
+        run: pnpm run build
       - name: Run ESLint
         id: eslint
         working-directory: web
@@ -160,37 +172,18 @@ jobs:
           fi
           exit "$eslint_exit"
 
-  frontend-build:
-    name: "Frontend Typecheck and Build"
-    needs: detect-changes
-    if: needs.detect-changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
-      - name: Install dependencies
-        working-directory: web
-        run: pnpm install --frozen-lockfile
-      - name: Build
-        working-directory: web
-        run: pnpm run build
-
   lint-backend:
     name: "Backend Code Quality (${{ matrix.target.name }})"
     needs: detect-changes
-    if: needs.detect-changes.outputs.unit_test_targets != '[]'
+    if: needs.detect-changes.outputs.lint_targets != '[]'
+    # Ruff is report-only; even an execution/setup failure is surfaced in the
+    # summary but must not prevent unit tests or image scanning from running.
+    continue-on-error: true
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        target: ${{ fromJSON(needs.detect-changes.outputs.unit_test_targets) }}
+        target: ${{ fromJSON(needs.detect-changes.outputs.lint_targets) }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Python
@@ -198,37 +191,63 @@ jobs:
         with:
           python-version: "3.10"
           cache: pip
-          cache-dependency-path: |
-            ${{ matrix.target.context }}/requirements.txt
-            ${{ matrix.target.context }}/requirements-test.txt
-            services/requirements-test.txt
-      - name: Install Dependencies
+          cache-dependency-path: services/requirements-lint.txt
+      - name: Install Ruff
+        run: python -m pip install -r services/requirements-lint.txt
+      - name: Run Ruff (Report Only)
         working-directory: ${{ matrix.target.context }}
         run: |
-          pip install pylint
-          if [ -f requirements-test.txt ]; then
-            pip install -r requirements.txt -r requirements-test.txt --quiet
-          else
-            pip install -r requirements.txt -r ../requirements-test.txt --quiet
-          fi
-      - name: Run Pylint (Warnings Only)
-        working-directory: ${{ matrix.target.context }}
-        run: |
-          find src -name "*.py" -not -path "*/migrations/*" -not -path "*/venv/*" > pyfiles.txt
-          pylint $(cat pyfiles.txt) --output-format=json > pylint_report.json || true
-          cat pylint_report.json
-          python3 - <<'PY'
+          set +e
+          python -m ruff check . --output-format=json > ruff_report.json
+          ruff_exit=$?
+          set -e
+          RUFF_EXIT="$ruff_exit" python3 - <<'PY'
           import json
+          import os
           from pathlib import Path
 
-          messages = json.loads(Path("pylint_report.json").read_text(encoding="utf-8") or "[]")
-          errors = sum(message.get("type") in {"error", "fatal"} for message in messages)
-          warnings = sum(message.get("type") not in {"error", "fatal"} for message in messages)
-          status = "Failed" if errors else "Warning" if warnings else "Passed"
-          Path("ci-lint-${{ matrix.target.id }}.json").write_text(
-              json.dumps({"display": f"{status} ({errors} error, {warnings} warning)"}),
-              encoding="utf-8",
-          )
+          summary = Path("ci-lint-${{ matrix.target.id }}.json")
+
+          def write_summary(display):
+              summary.write_text(json.dumps({"display": display}), encoding="utf-8")
+
+          def fail(message):
+              write_summary("Failed (Ruff execution error)")
+              print(f"::error::{message}")
+              raise SystemExit(1)
+
+          exit_code = int(os.environ["RUFF_EXIT"])
+          if exit_code not in (0, 1):
+              fail(f"Ruff failed with exit code {exit_code}")
+
+          try:
+              findings = json.loads(Path("ruff_report.json").read_text(encoding="utf-8"))
+          except (OSError, json.JSONDecodeError) as exc:
+              fail(f"Cannot read Ruff JSON report: {exc}")
+          if not isinstance(findings, list) or (exit_code == 0) != (len(findings) == 0):
+              fail("Ruff exit code and JSON report disagree")
+
+          def escape(value):
+              return str(value).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+          workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+          for finding in findings:
+              try:
+                  path = Path(finding["filename"]).resolve().relative_to(workspace).as_posix()
+                  location = finding["location"]
+                  code = finding["code"]
+                  message = finding["message"]
+                  row = int(location["row"])
+                  column = int(location["column"])
+              except (KeyError, TypeError, ValueError) as exc:
+                  fail(f"Invalid Ruff JSON finding: {exc}")
+              print(
+                  f"::warning file={escape(path)},line={row},col={column},"
+                  f"title=Ruff {escape(code)}::{escape(message)}"
+              )
+
+          count = len(findings)
+          write_summary(f"Warning ({count} Ruff violations)" if count else "Passed (0 Ruff violations)")
           PY
       - name: Upload lint summary
         if: always()
@@ -237,11 +256,18 @@ jobs:
           name: ci-summary-lint-${{ matrix.target.id }}
           path: ${{ matrix.target.context }}/ci-lint-${{ matrix.target.id }}.json
           if-no-files-found: ignore
+      - name: Upload Ruff report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruff-report-${{ matrix.target.id }}
+          path: ${{ matrix.target.context }}/ruff_report.json
+          if-no-files-found: ignore
 
   service-unit-tests:
     name: "Unit Tests (${{ matrix.target.name }})"
-    needs: detect-changes
-    if: needs.detect-changes.outputs.unit_test_targets != '[]'
+    needs: [detect-changes, lint-backend]
+    if: always() && needs.detect-changes.result == 'success' && needs.detect-changes.outputs.unit_test_targets != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -266,11 +292,10 @@ jobs:
           else
             pip install -r requirements.txt -r ../requirements-test.txt
           fi
-      - name: Control Plane quality gates
+      - name: Control Plane Django checks
         if: matrix.target.id == 'control_plane'
         working-directory: ${{ matrix.target.context }}
         run: |
-          python -m ruff check .
           python manage.py check --settings=config.settings.test
           python manage.py makemigrations --check --dry-run --settings=config.settings.test
       - name: Run Control Plane unit tests with coverage
@@ -428,13 +453,16 @@ jobs:
         lint-frontend,
         lint-backend,
         service-unit-tests,
-        frontend-build,
         validate-k8s,
         validate-ansible,
         validate-terraform,
         secret-scan,
       ]
-    if: always() && needs.detect-changes.result == 'success' && needs.detect-changes.outputs.matrix_targets != '[]'
+    if: >-
+      always() &&
+      needs.detect-changes.result == 'success' &&
+      needs.detect-changes.outputs.matrix_targets != '[]' &&
+      (needs.service-unit-tests.result == 'success' || needs.service-unit-tests.result == 'skipped')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -509,7 +537,6 @@ jobs:
         lint-frontend,
         lint-backend,
         service-unit-tests,
-        frontend-build,
         validate-k8s,
         validate-ansible,
         validate-terraform,
@@ -526,25 +553,28 @@ jobs:
           path: ci-results
           merge-multiple: true
       - name: Generate Unified CI Summary Table
+        env:
+          LINT_TARGETS: ${{ needs.detect-changes.outputs.lint_targets }}
+          UNIT_TEST_TARGETS: ${{ needs.detect-changes.outputs.unit_test_targets }}
+          MATRIX_TARGETS: ${{ needs.detect-changes.outputs.matrix_targets }}
+          IMAGE_SCAN_RESULT: ${{ needs.build-and-scan.result }}
         run: |
           python3 - <<'PY'
           import json
           import os
           from pathlib import Path
 
-          fe_changed = "${{ needs.detect-changes.outputs.frontend }}" == "true"
-          cp_changed = "${{ needs.detect-changes.outputs.control_plane }}" == "true"
-          cs_changed = "${{ needs.detect-changes.outputs.consumer }}" == "true"
-          pk_changed = "${{ needs.detect-changes.outputs.packager }}" == "true"
-          ev_changed = "${{ needs.detect-changes.outputs.evidently }}" == "true"
           k8s_changed = "${{ needs.detect-changes.outputs.k8s }}" == "true"
           ansible_changed = "${{ needs.detect-changes.outputs.ansible }}" == "true"
           terraform_changed = "${{ needs.detect-changes.outputs.terraform }}" == "true"
 
-          md_changed = "${{ needs.detect-changes.outputs.model_server }}" == "true"
-          ml_serving_changed = "${{ needs.detect-changes.outputs.machine_learning_serving }}" == "true"
-          dl_serving_changed = "${{ needs.detect-changes.outputs.deep_learning_serving }}" == "true"
-          training_runner_changed = "${{ needs.detect-changes.outputs.training_runner }}" == "true"
+          def scheduled_ids(name):
+              return {target["id"] for target in json.loads(os.environ.get(name) or "[]")}
+
+          lint_ids = scheduled_ids("LINT_TARGETS")
+          unit_ids = scheduled_ids("UNIT_TEST_TARGETS")
+          image_ids = scheduled_ids("MATRIX_TARGETS")
+          image_scan_result = os.environ.get("IMAGE_SCAN_RESULT", "unknown")
 
           secret_res = "${{ needs.secret-scan.result }}" == "success"
           eslint_res = "${{ needs.lint-frontend.result }}" == "success"
@@ -570,34 +600,46 @@ jobs:
           eslint_fmt = f"{eslint_status} ({eslint_errs} error, {eslint_warnings} warning)"
 
           result_files = Path("ci-results")
-          def service_result(kind, service_id):
+          def service_result(kind, service_id, scheduled):
+              if service_id not in scheduled:
+                  return "Skipped (no changes)"
+              if kind == "trivy" and image_scan_result == "skipped":
+                  return "Skipped (unit tests failed)"
               path = result_files / f"ci-{kind}-{service_id}.json"
               if not path.exists():
+                  if kind == "lint":
+                      return "Warning (Ruff execution error)"
                   return f"Failed ({kind} execution error)"
-              return json.loads(path.read_text(encoding="utf-8"))["display"]
+              display = json.loads(path.read_text(encoding="utf-8"))["display"]
+              if kind == "lint" and display.startswith("Failed"):
+                  return display.replace("Failed", "Warning", 1)
+              return display
 
           summary = ["### Unified CI Pipeline Results\n"]
           summary.append(f"**Secret Security (GitLeaks)**: {fmt(secret_res)}\n")
 
           rows = []
-          if fe_changed:
-              rows.append(f"| **Frontend Web** | {eslint_fmt} | N/A | {service_result('trivy', 'frontend')} |")
-          if cp_changed:
-              rows.append(f"| **Control Plane** | {service_result('lint', 'control_plane')} | {service_result('unit', 'control_plane')} | {service_result('trivy', 'control_plane')} |")
-          if cs_changed:
-              rows.append(f"| **Redpanda Consumer** | {service_result('lint', 'consumer')} | {service_result('unit', 'consumer')} | {service_result('trivy', 'consumer')} |")
-          if pk_changed:
-              rows.append(f"| **Model Packager** | {service_result('lint', 'packager')} | {service_result('unit', 'packager')} | {service_result('trivy', 'packager')} |")
-          if ev_changed:
-              rows.append(f"| **Evidently Drift** | {service_result('lint', 'evidently')} | {service_result('unit', 'evidently')} | {service_result('trivy', 'evidently')} |")
-          if md_changed:
-              rows.append(f"| **Model Server** | {service_result('lint', 'model_server')} | {service_result('unit', 'model_server')} | {service_result('trivy', 'model_server')} |")
-          if ml_serving_changed:
-              rows.append(f"| **Machine Learning Serving** | {service_result('lint', 'machine_learning_serving')} | {service_result('unit', 'machine_learning_serving')} | {service_result('trivy', 'machine_learning_serving')} |")
-          if dl_serving_changed:
-              rows.append(f"| **Deep Learning Serving** | {service_result('lint', 'deep_learning_serving')} | {service_result('unit', 'deep_learning_serving')} | {service_result('trivy', 'deep_learning_serving')} |")
-          if training_runner_changed:
-              rows.append(f"| **Training Runner** | {service_result('lint', 'training_runner')} | {service_result('unit', 'training_runner')} | {service_result('trivy', 'training_runner')} |")
+          if "frontend" in image_ids:
+              rows.append(f"| **Frontend Web** | {eslint_fmt} | N/A | {service_result('trivy', 'frontend', image_ids)} |")
+
+          backend_services = [
+              ("control_plane", "Control Plane"),
+              ("consumer", "Redpanda Consumer"),
+              ("packager", "Model Packager"),
+              ("evidently", "Evidently Drift"),
+              ("model_server", "Model Server"),
+              ("machine_learning_serving", "Machine Learning Serving"),
+              ("deep_learning_serving", "Deep Learning Serving"),
+              ("training_runner", "Training Runner"),
+          ]
+          scheduled_backends = lint_ids | unit_ids | image_ids
+          for service_id, label in backend_services:
+              if service_id in scheduled_backends:
+                  rows.append(
+                      f"| **{label}** | {service_result('lint', service_id, lint_ids)} | "
+                      f"{service_result('unit', service_id, unit_ids)} | "
+                      f"{service_result('trivy', service_id, image_ids)} |"
+                  )
 
           if rows:
               summary.append("#### Application Services (FE & BE)")

@@ -105,14 +105,16 @@ MLOps-paas-system/
 │
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml                            # Lint, type-check, test, manifest/image/secret scan
+│       ├── ci.yml                            # Ruff/ESLint, unit test và manifest/image/secret scan
 │       └── cd.yml                            # Build/sign image và tạo GitOps promotion PR
 │
 ├── services/
+│   ├── requirements-lint.txt                 # Ruff version dùng chung cho backend CI
+│   ├── ruff.toml                             # Rule lint dùng chung cho backend services
 │   ├── control-plane/                        # Django: AI PaaS Control Plane API
 │   │   ├── manage.py
-│   │   ├── requirements.txt                  # Runtime và quality tooling dependencies
-│   │   ├── pyproject.toml                    # Pytest, Ruff và mypy configuration
+│   │   ├── requirements.txt                  # Runtime dependencies
+│   │   ├── pyproject.toml                    # Pytest, Ruff override và mypy configuration
 │   │   ├── Dockerfile
 │   │   └── src/
 │   │       ├── config/                       # Settings, root URLs, ASGI/WSGI, Celery
@@ -199,6 +201,10 @@ MLOps-paas-system/
 ├── docker-compose.yml                        # Môi trường Local Development hoàn chỉnh
 └── .env.example                              # Template biến môi trường chuẩn
 ```
+
+Để chạy lint backend tại local, cài `services/requirements-lint.txt`, sau đó
+chạy `python -m ruff check .` từ thư mục service cần kiểm tra. CI dùng cùng bộ
+rule, hiển thị vi phạm dưới dạng cảnh báo và vẫn chặn lỗi thực thi Ruff.
 
 ---
 

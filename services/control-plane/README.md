@@ -51,11 +51,15 @@ celery -A config worker
 Quality gates:
 
 ```bash
+python -m pip install -r ../requirements-lint.txt
 python -m ruff check .
 python -m pytest
 python manage.py check --settings=config.settings.test
 python manage.py makemigrations --check --dry-run --settings=config.settings.test
 ```
+
+Ruff reports lint findings in CI without blocking the pipeline; Django checks
+and unit tests remain required.
 
 Health endpoints are `/health/live`, `/health/ready`, and `/health/metrics`.
 The public API intentionally has no version prefix. See
