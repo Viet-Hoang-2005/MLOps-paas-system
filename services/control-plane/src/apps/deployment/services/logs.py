@@ -1,11 +1,10 @@
 from collections.abc import Sequence
 
-from django.conf import settings
 from django.utils import timezone
-from redis import Redis
 from redis.exceptions import RedisError
 
 from common.logging import runtime_line
+from common.redis_client import redis_client
 
 LOG_TTL_SECONDS = 3600
 
@@ -23,7 +22,7 @@ def build_logs(build, offset: int) -> tuple[list[str], int]:
     """
     key = f"build_logs:{build.public_id}"
     try:
-        redis = Redis.from_url(settings.REDIS_URL)
+        redis = redis_client()
         lines = redis.lrange(key, offset, -1)
         total = redis.llen(key)
         if total:
@@ -38,7 +37,7 @@ def build_logs(build, offset: int) -> tuple[list[str], int]:
 def deployment_logs(deployment, offset: int) -> tuple[list[str], int]:
     """Return the short-lived deployment progress stream."""
     try:
-        redis = Redis.from_url(settings.REDIS_URL)
+        redis = redis_client()
         key = f"deployment_logs:{deployment.public_id}"
         return _decode_logs(redis.lrange(key, offset, -1)), redis.llen(key)
     except RedisError:
@@ -47,7 +46,7 @@ def deployment_logs(deployment, offset: int) -> tuple[list[str], int]:
 
 def reset_deployment_logs(deployment, message: str) -> None:
     try:
-        redis = Redis.from_url(settings.REDIS_URL)
+        redis = redis_client()
         key = f"deployment_logs:{deployment.public_id}"
         redis.delete(key)
         _push_runtime_log(redis, key, message)
@@ -57,7 +56,7 @@ def reset_deployment_logs(deployment, message: str) -> None:
 
 def append_deployment_log(deployment, message: str) -> None:
     try:
-        redis = Redis.from_url(settings.REDIS_URL)
+        redis = redis_client()
         _push_runtime_log(redis, f"deployment_logs:{deployment.public_id}", message)
     except RedisError:
         pass

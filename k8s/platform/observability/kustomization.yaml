@@ -5,3 +5,4 @@ resources:
   - prometheus-rule.yaml
   - model-server-servicemonitor.yaml
   - control-plane-servicemonitor.yaml
+  - redis-servicemonitor.yaml

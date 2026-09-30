@@ -24,6 +24,7 @@ spec:
     - public.ecr.aws/karpenter
     - registry.k8s.io/nfd/charts
     - https://helm.ngc.nvidia.com/nvidia
+    - ghcr.io/ot-container-kit/charts
   destinations:
     - namespace: mlops-logging
       server: https://kubernetes.default.svc
@@ -44,6 +45,8 @@ spec:
     - namespace: external-secrets
       server: https://kubernetes.default.svc
     - namespace: cnpg-system
+      server: https://kubernetes.default.svc
+    - namespace: redis-operator
       server: https://kubernetes.default.svc
     - namespace: keda
       server: https://kubernetes.default.svc

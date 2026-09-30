@@ -63,6 +63,37 @@ PostgreSQL, Redis, Redpanda, Harbor and MLflow each have an independent
 Application. Runtime-default ignore rules are scoped to the Application that
 owns the affected resource.
 
+## Redis HA
+
+`mlops-prod-addon-redis-operator` installs OT-Container-Kit Redis Operator
+`0.26.0` in `redis-operator` (wave `-40`). `mlops-prod-platform-redis` owns a
+`RedisReplication` with two Redis Pods on the two static workers and a separate
+`RedisSentinel` with three Pods spread across both workers and the K3s master.
+Redis data uses two 5 GiB `ebs-gp3` PVCs, AOF `everysec`, and Sentinel quorum
+`2`. Only Sentinel tolerates the control-plane taint. Redis replication is
+asynchronous: a master failure can still lose the most recent acknowledged
+writes; this topology does not make the K3s control plane highly available.
+
+Before syncing these Applications, set distinct passwords of at least 16 characters
+for `REDIS_PASSWORD` and
+`REDIS_SENTINEL_PASSWORD` in the local `.env`, then run
+`python scripts/create_and_push_secrets_to_aws.py --groups 2` to update `mlops/production-secrets`. ESO
+materializes credentials only into Redis, Control Plane API/worker, and Model
+Server namespaces. Do not print Secret values or send them to Workflow Pods.
+Production clients use the three per-Pod Sentinel DNS names and master set
+`mlops-paas-redis`; Docker Compose continues to use direct Redis URLs.
+
+This is a clean cutover: GitOps prunes the old standalone Redis Deployment and
+Service, and no old cache, Celery queue, or result data is migrated. Schedule
+the change when losing outstanding Celery tasks is acceptable. Verify two
+Redis Pods on different workers, three Sentinel Pods on distinct static nodes,
+`SENTINEL CKQUORUM mlops-paas-redis`, replication status, Control Plane/Celery
+and Model Server readiness, and Prometheus targets before accepting traffic.
+Maintain one node at a time; wait for Redis replication and Sentinel quorum to
+recover before the next drain. Rotating either password requires a controlled
+Redis/Sentinel and client restart after ESO refresh; an updated Kubernetes
+Secret alone does not reconfigure already-running Redis processes.
+
 ## Execution
 
 `mlops-prod-execution-argo` owns the EventBus, EventSource, Sensor and their stable

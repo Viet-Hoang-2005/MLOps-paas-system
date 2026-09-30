@@ -5,6 +5,7 @@ resources:
   - aws-ebs-csi.yaml
   - external-secrets.yaml
   - cloudnative-pg.yaml
+  - redis-operator.yaml
   - keda.yaml
   - argo-workflows.yaml
   - argo-events.yaml

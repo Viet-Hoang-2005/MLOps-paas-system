@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 import jwt
 import redis
+from redis.sentinel import Sentinel
 from confluent_kafka import Producer
 from fastapi import (
     BackgroundTasks,
@@ -59,14 +60,37 @@ JWKS_URL = os.environ.get(
 REDPANDA_BROKERS = os.environ.get("REDPANDA_BROKERS", "redpanda:9092")
 KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "mlops_paas_production_data")
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/1")
+REDIS_CONNECTION_MODE = os.environ.get("REDIS_CONNECTION_MODE", "direct")
+
+
+def _redis_connection():
+    if REDIS_CONNECTION_MODE == "direct":
+        return redis.from_url(REDIS_URL)
+    if REDIS_CONNECTION_MODE != "sentinel":
+        raise ValueError("REDIS_CONNECTION_MODE must be direct or sentinel")
+    addresses = os.environ.get("REDIS_SENTINEL_HOSTS", "")
+    hosts = []
+    for address in addresses.split(","):
+        if address.strip():
+            host, _, port = address.strip().partition(":")
+            hosts.append((host, int(port or "26379")))
+    master_name = os.environ.get("REDIS_SENTINEL_MASTER_NAME", "")
+    password = os.environ.get("REDIS_PASSWORD", "")
+    sentinel_password = os.environ.get("REDIS_SENTINEL_PASSWORD", "")
+    if len(hosts) < 3 or not all((master_name, password, sentinel_password)):
+        raise ValueError("Redis Sentinel requires three hosts, master name and both credentials")
+    sentinel = Sentinel(hosts, sentinel_kwargs={"password": sentinel_password, "socket_timeout": 2}, socket_timeout=2)
+    return sentinel.master_for(master_name, db=1, password=password)
 
 
 def create_redis_client():
     try:
-        client = redis.from_url(REDIS_URL)
+        client = _redis_connection()
         client.ping()
         log_event(logger, "INFO", "redis_connected", "Redis connection established")
         return client
+    except ValueError:
+        raise
     except Exception as exc:
         log_event(
             logger,
@@ -75,6 +99,8 @@ def create_redis_client():
             "Redis connection failed",
             error_type=type(exc).__name__,
         )
+        if REDIS_CONNECTION_MODE == "sentinel":
+            raise
         return None
 
 

@@ -19,6 +19,7 @@ from k8s.validate.validate_execution_security import (
     validate as validate_execution_security,
 )
 from k8s.validate.validate_helm_sources import validate as validate_helm_sources
+from k8s.validate.validate_redis_ha import validate as validate_redis_ha
 from k8s.validate.validate_resource_ownership import (
     validate as validate_resource_ownership,
 )
@@ -82,9 +83,16 @@ class CommonTests(unittest.TestCase):
 
 
 class ValidatorNegativeTests(unittest.TestCase):
+    def test_redis_ha_rejects_missing_sentinel_quorum(self):
+        context = FakeContext(rendered={"k8s/platform/redis": [
+            {"kind": "RedisReplication", "spec": {"clusterSize": 2, "nodeSelector": {"workload-type": "worker"}}},
+            {"kind": "RedisSentinel", "spec": {"clusterSize": 3, "redisSentinelConfig": {"quorum": "1"}}},
+        ]})
+        self.assertTrue(any("quorum two" in error for error in validate_redis_ha(context)))
+
     def test_application_contract_rejects_missing_child_applications(self):
         self.assertTrue(
-            any("exactly 33" in error for error in validate_lifecycle(FakeContext()))
+            any("exactly 34" in error for error in validate_lifecycle(FakeContext()))
         )
 
     def test_application_contract_rejects_default_destination(self):

@@ -36,6 +36,16 @@ spec:
                 secretKeyRef:
                   name: model-server-secret
                   key: DB_PASSWORD
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: model-server-secret
+                  key: REDIS_PASSWORD
+            - name: REDIS_SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: model-server-secret
+                  key: REDIS_SENTINEL_PASSWORD
           envFrom:
             - configMapRef:
                 name: mlops-paas-model-server-config

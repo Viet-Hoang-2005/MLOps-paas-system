@@ -53,6 +53,7 @@ PRODUCTION_NAMESPACES = {
     "mlops-postgres",
     "mlops-redpanda",
     "mlops-redis",
+    "redis-operator",
     "mlops-routing",
     "mlops-web",
     "user-jobs",
@@ -79,6 +80,7 @@ EXTERNAL_SECRET_OWNERS = {
         ("mlops-model-server", "model-server-secret")
     },
     "k8s/platform/postgres": {("mlops-postgres", "postgres-bootstrap-secret")},
+    "k8s/platform/redis": {("mlops-redis", "redis-ha-secret")},
     "k8s/platform/mlflow": {("mlflow-server", "mlflow-secret")},
     "k8s/platform/cloudflare": {("cloudflare", "tunnel-token")},
     "k8s/argo": {

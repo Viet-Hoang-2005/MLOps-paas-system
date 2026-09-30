@@ -1,5 +1,6 @@
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import quote
 
 from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
@@ -123,12 +124,73 @@ STATIC_URL = "/static/"
 STATIC_ROOT = SERVICE_ROOT / "staticfiles"
 
 REDIS_URL = env("REDIS_URL", "redis://redis:6379/1")
+REDIS_CONNECTION_MODE = env("REDIS_CONNECTION_MODE", "direct")
+if REDIS_CONNECTION_MODE not in {"direct", "sentinel"}:
+    raise ImproperlyConfigured("REDIS_CONNECTION_MODE must be direct or sentinel")
 LOKI_URL = str(env("LOKI_URL", "")).rstrip("/")
 REDPANDA_BROKERS = env("REDPANDA_BROKERS", "redpanda:9092")
-CACHES = {"default": {"BACKEND": "django_redis.cache.RedisCache", "LOCATION": REDIS_URL}}
-CHANNEL_LAYERS = {"default": {"BACKEND": "channels_redis.core.RedisChannelLayer", "CONFIG": {"hosts": [REDIS_URL]}}}
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://redis:6379/3")
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", "redis://redis:6379/4")
+if REDIS_CONNECTION_MODE == "sentinel":
+    REDIS_PASSWORD = env("REDIS_PASSWORD", "")
+    REDIS_SENTINEL_PASSWORD = env("REDIS_SENTINEL_PASSWORD", "")
+    REDIS_SENTINEL_MASTER_NAME = env("REDIS_SENTINEL_MASTER_NAME", "")
+    REDIS_SENTINELS = []
+    for address in env("REDIS_SENTINEL_HOSTS", "").split(","):
+        if address.strip():
+            host, _, port = address.strip().partition(":")
+            REDIS_SENTINELS.append((host, int(port or "26379")))
+    if not all((REDIS_PASSWORD, REDIS_SENTINEL_PASSWORD, REDIS_SENTINEL_MASTER_NAME)) or len(REDIS_SENTINELS) < 3:
+        raise ImproperlyConfigured("Redis Sentinel requires three hosts, master name and both credentials")
+    sentinel_kwargs = {"password": REDIS_SENTINEL_PASSWORD, "socket_timeout": 2}
+    DJANGO_REDIS_CONNECTION_FACTORY = "django_redis.pool.SentinelConnectionFactory"
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": f"redis://{REDIS_SENTINEL_MASTER_NAME}/1",
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.SentinelClient",
+                "SENTINELS": REDIS_SENTINELS,
+                "SENTINEL_KWARGS": sentinel_kwargs,
+                "PASSWORD": REDIS_PASSWORD,
+            },
+        }
+    }
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [
+                    {
+                        "sentinels": REDIS_SENTINELS,
+                        "master_name": REDIS_SENTINEL_MASTER_NAME,
+                        "db": 1,
+                        "password": REDIS_PASSWORD,
+                        "sentinel_kwargs": sentinel_kwargs,
+                    }
+                ]
+            },
+        }
+    }
+    def _celery_sentinel_urls(db: int) -> str:
+        return ";".join(
+            f"sentinel://:{quote(REDIS_PASSWORD, safe='')}@{host}:{port}/{db}"
+            for host, port in REDIS_SENTINELS
+        )
+
+    CELERY_BROKER_URL = _celery_sentinel_urls(3)
+    CELERY_RESULT_BACKEND = _celery_sentinel_urls(4)
+    CELERY_BROKER_TRANSPORT_OPTIONS = {
+        "master_name": REDIS_SENTINEL_MASTER_NAME,
+        "sentinel_kwargs": sentinel_kwargs,
+    }
+    CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
+        "master_name": REDIS_SENTINEL_MASTER_NAME,
+        "sentinel_kwargs": sentinel_kwargs,
+    }
+else:
+    CACHES = {"default": {"BACKEND": "django_redis.cache.RedisCache", "LOCATION": REDIS_URL}}
+    CHANNEL_LAYERS = {"default": {"BACKEND": "channels_redis.core.RedisChannelLayer", "CONFIG": {"hosts": [REDIS_URL]}}}
+    CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://redis:6379/3")
+    CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", "redis://redis:6379/4")
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = env_int("CELERY_TASK_TIME_LIMIT", 43200)
 CELERY_TASK_SOFT_TIME_LIMIT = env_int("CELERY_TASK_SOFT_TIME_LIMIT", 42600)

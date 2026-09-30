@@ -139,3 +139,42 @@ spec:
           annotations:
             summary: "Node Disk almost full (> 80%)"
             description: "Node {{ $labels.instance }}: {{ $value | humanize }}% disk usage."
+
+    - name: paas.redis-ha
+      rules:
+        - alert: RedisHAReplicasUnavailable
+          expr: kube_statefulset_status_replicas_ready{namespace="mlops-redis",statefulset="mlops-paas-redis-ha"} < 2 or kube_statefulset_status_replicas_ready{namespace="mlops-redis",statefulset="mlops-paas-redis-ha-sentinel"} < 3
+          for: 3m
+          labels:
+            severity: critical
+            team: infrastructure
+          annotations:
+            summary: "Redis HA has unavailable Redis or Sentinel replicas"
+            description: "Check the two Redis and three Sentinel Pods and their node placement."
+        - alert: RedisReplicaLinkDown
+          expr: redis_master_link_up{namespace="mlops-redis"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            team: infrastructure
+          annotations:
+            summary: "Redis replica lost its master link"
+            description: "Inspect Sentinel election and Redis replication before accepting more writes."
+        - alert: RedisHAMemoryHigh
+          expr: redis_memory_used_bytes{namespace="mlops-redis"} / clamp_min(redis_memory_max_bytes{namespace="mlops-redis"}, 1) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            team: infrastructure
+          annotations:
+            summary: "Redis memory usage exceeds 85% of maxmemory"
+            description: "Investigate queue depth and key retention before Redis rejects writes."
+        - alert: RedisHAPVCAlmostFull
+          expr: kubelet_volume_stats_used_bytes{namespace="mlops-redis"} / clamp_min(kubelet_volume_stats_capacity_bytes{namespace="mlops-redis"}, 1) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            team: infrastructure
+          annotations:
+            summary: "Redis HA PVC exceeds 80% usage"
+            description: "AOF storage is approaching the 5 GiB volume limit."

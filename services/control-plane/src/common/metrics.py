@@ -2,9 +2,8 @@ import time
 from typing import cast
 
 from celery.signals import task_postrun, task_prerun
-from django.conf import settings
 from prometheus_client import Counter, Histogram
-from redis import Redis
+from common.redis_client import redis_client
 
 API_REQUESTS = Counter(
     "control_plane_api_requests_total",
@@ -48,7 +47,7 @@ def record_task_complete(task_id=None, task=None, state=None, **kwargs):
     status = (state or "unknown").lower()
     CELERY_TASKS.labels(task=name, status=status).inc()
     try:
-        redis = Redis.from_url(settings.REDIS_URL)
+        redis = redis_client()
         redis.hincrby("metrics:celery:tasks", f"{name}|{status}", 1)
         redis.hincrbyfloat("metrics:celery:duration_seconds", name, duration)
         redis.hincrby("metrics:celery:duration_count", name, 1)
@@ -58,13 +57,14 @@ def record_task_complete(task_id=None, task=None, state=None, **kwargs):
 
 def shared_celery_metrics():
     try:
-        redis = Redis.from_url(settings.REDIS_URL)
+        redis = redis_client()
+        broker = redis_client(db=3)
         task_totals = cast(dict[bytes, bytes], redis.hgetall("metrics:celery:tasks"))
         duration_totals = cast(dict[bytes, bytes], redis.hgetall("metrics:celery:duration_seconds"))
         duration_counts = cast(dict[bytes, bytes], redis.hgetall("metrics:celery:duration_count"))
         lines = [
             "# TYPE control_plane_celery_queue_depth gauge",
-            f"control_plane_celery_queue_depth {redis.llen('celery')}",
+            f"control_plane_celery_queue_depth {broker.llen('celery')}",
         ]
         lines.append("# TYPE control_plane_celery_shared_tasks_total counter")
         for raw_key, raw_value in task_totals.items():

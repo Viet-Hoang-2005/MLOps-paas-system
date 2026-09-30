@@ -24,6 +24,7 @@ __pycache__/
 .Python
 venv/
 .venv-ansible/
+.venv-secrets/
 *.egg-info/
 dist/
 build/

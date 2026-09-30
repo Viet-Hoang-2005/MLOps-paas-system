@@ -85,7 +85,7 @@ Hệ thống này là một **nền tảng AI Platform-as-a-Service MLOps phục
 | **Control Plane**            | Django 5.0, Django REST Framework, Celery, JWT RS256    | Modular monolith quản lý tenant, domain state và async execution          |
 | **Message Broker**           | Redpanda (Kafka-compatible broker)                      | Hàng đợi tin nhắn tốc độ cao xử lý lưu lượng suy luận bất đồng bộ         |
 | **Database (HA)**            | PostgreSQL 15, CloudNativePG Operator, SQLAlchemy       | Lưu trữ dữ liệu metadata, người dùng và dữ liệu suy luận production       |
-| **Task Broker / Log Stream** | Redis 7 Alpine                                          | Celery broker/result backend và stream log/metric runtime                 |
+| **Task Broker / Log Stream** | Docker: Redis 7 Alpine; production: Redis 7.4.8 + Sentinel (OT Redis Operator) | Celery broker/result backend và stream log/metric runtime |
 | **Container Registry**       | Harbor Registry (Self-hosted), Cosign                   | Lưu trữ Docker image đa người thuê, ký xác thực bảo mật image             |
 | **CI/CD & GitOps**           | GitHub Actions, ArgoCD                                  | Tự động hóa kiểm thử, đóng gói và triển khai liên tục theo mô hình GitOps |
 | **Model Registry**           | Django Registry, MLflow, AWS S3                         | Version/alias/lineage trong Control Plane; tracking và artifact theo job  |
@@ -322,11 +322,11 @@ terraform output -json
 
 #### Bước 2: Tự động đồng bộ cấu hình lên AWS Secrets Manager
 
-Hệ thống cung cấp script `scripts/push_secrets_to_aws.py` sử dụng thư viện `boto3` để tự động đọc file `.env` và đẩy lên AWS Secrets Manager (region: `ap-southeast-1`).
+Script `scripts/create_and_push_secrets_to_aws.py` chọn nhóm secret, bổ sung năm secret nội bộ Control Plane còn thiếu vào `.env`, rồi đồng bộ các nhóm đã chọn lên AWS Secrets Manager (region: `ap-southeast-1`). Terraform phải tạo ba secret container trước; script chỉ ghi version, không tạo container ngoài Terraform.
 
 Quay lại root repository trước khi chạy script; ở bước Terraform, working directory đang là `infra/`.
 
-**1. Chuẩn bị file `.env` từ file mẫu:**
+**1. Chuẩn bị file `.env` (nếu chưa có, script sẽ tạo từ `.env.example`):**
 
 ```bash
 cp .env.example .env
@@ -339,7 +339,7 @@ cp .env.example .env
 - **Harbor Registry**: `HARBOR_USERNAME`, `HARBOR_PASSWORD`, `HARBOR_GITHUB_USERNAME`, `HARBOR_GITHUB_PASSWORD`
 - **GitHub & CI/CD**: `GITHUB_REPO`, `GITHUB_TOKEN`
 - **Ký image**: CD dùng GitHub Actions OIDC và Cosign keyless; không lưu Cosign private key hoặc password trong `.env` hay AWS Secrets Manager.
-- **Django, JWT & internal execution**: `DJANGO_SECRET_KEY`, `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`, `CONTROL_PLANE_WEBHOOK_SECRET`, `ARGO_EVENTS_WEBHOOK_TOKEN`
+- **Django, JWT & internal execution**: script tự sinh năm giá trị này khi thiếu; không tự thay giá trị đã có.
 - **OAuth & Cloudflare Tunnel**: `GOOGLE_OAUTH2_CLIENT_ID`, `GITHUB_OAUTH2_CLIENT_ID`, `GITHUB_OAUTH2_CLIENT_SECRET`, `TUNNEL_TOKEN`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`
 
 **3. Chạy script đồng bộ lên AWS Secrets Manager:**
@@ -350,14 +350,18 @@ cd ..
 # Dùng virtual environment riêng để không sửa Python hệ thống
 python3 -m venv .venv-secrets
 source .venv-secrets/bin/activate
-python -m pip install boto3 python-dotenv
+python -m pip install -r scripts/requirements.txt
 
-# Thực hiện đẩy tự động lên AWS Secrets Manager
-python scripts/push_secrets_to_aws.py
+# Chỉ chọn nhóm cần đồng bộ; 5 = Control Plane, 1 = PostgreSQL, 2 = Redis.
+python scripts/create_and_push_secrets_to_aws.py --groups 5
+# Dùng --groups 0 khi mọi key của cả 10 nhóm đã được điền.
+# Chỉ rotate có chủ đích: --groups 5 --rotate jwt (luôn thay cả cặp khóa).
 deactivate
 ```
 
-**Script sẽ tự động phân nhóm và tạo/cập nhật chính xác 3 kho Secret trên AWS:**
+Script giữ các property AWS không được chọn và bỏ qua lần ghi nếu giá trị không đổi. Nhóm được chọn mà thiếu credential bên ngoài sẽ báo lỗi trước khi ghi; nếu đẩy AWS thất bại, `.env` vẫn được giữ để chạy lại. `--yes` chỉ bỏ bước xác nhận, không bỏ kiểm tra. Script dùng AWS credential từ `.env` khi có đủ cặp access key, nếu không sẽ dùng credential chain/profile của boto3. Rotation `jwt` làm vô hiệu access token đã ký bằng khóa cũ; chỉ chạy trong cửa sổ bảo trì và chờ ESO đồng bộ trước khi restart workload liên quan.
+
+Ba container do Terraform quản lý là:
 
 - **`mlops/aws-secrets`**: Lưu thông tin xác thực AWS S3.
 - **`mlops/github-actions-secrets`**: Lưu Harbor robot credential cho CI/CD; Cosign dùng GitHub Actions OIDC keyless.

@@ -27,3 +27,18 @@ stringData:
   name: nfd-public-oci
   url: registry.k8s.io/nfd/charts
   enableOCI: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-operator-public-oci
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+    app.kubernetes.io/part-of: mlops-paas
+    mlops-paas.io/environment: production
+stringData:
+  type: helm
+  name: redis-operator-public-oci
+  url: ghcr.io/ot-container-kit/charts
+  enableOCI: "true"

@@ -1,0 +1,41 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-ha-monitor
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames: [mlops-redis]
+  selector:
+    matchLabels:
+      app: mlops-paas-redis-ha
+      app.kubernetes.io/component: metrics
+      redis_setup_type: replication
+      role: replication
+  endpoints:
+    - port: redis-exporter
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-sentinel-monitor
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames: [mlops-redis]
+  selector:
+    matchLabels:
+      app: mlops-paas-redis-ha-sentinel
+      app.kubernetes.io/component: metrics
+      redis_setup_type: sentinel
+      role: sentinel
+  endpoints:
+    - port: redis-exporter
+      interval: 30s
+      scrapeTimeout: 10s

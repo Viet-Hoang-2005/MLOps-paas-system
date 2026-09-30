@@ -59,6 +59,16 @@ spec:
                 secretKeyRef:
                   name: celery-worker-secret
                   key: ARGO_EVENTS_WEBHOOK_TOKEN
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: celery-worker-secret
+                  key: REDIS_PASSWORD
+            - name: REDIS_SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: celery-worker-secret
+                  key: REDIS_SENTINEL_PASSWORD
             - name: HARBOR_USERNAME
               valueFrom:
                 secretKeyRef:

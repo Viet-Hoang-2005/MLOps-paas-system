@@ -256,6 +256,54 @@
     fail_msg: CloudNativePG does not have two ready instances.
   when: verify_scope == 'platform'
 
+- name: Read the Redis HA StatefulSets
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: StatefulSet
+    name: "{{ item }}"
+    namespace: mlops-redis
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  loop:
+    - mlops-paas-redis-ha
+    - mlops-paas-redis-ha-sentinel
+  register: verified_redis_statefulsets
+  when: verify_scope == 'platform'
+
+- name: Require two Redis and three Sentinel replicas Ready
+  ansible.builtin.assert:
+    that:
+      - verified_redis_statefulsets.results[0].resources | length == 1
+      - verified_redis_statefulsets.results[1].resources | length == 1
+      - verified_redis_statefulsets.results[0].resources[0].status.readyReplicas | default(0) | int == 2
+      - verified_redis_statefulsets.results[1].resources[0].status.readyReplicas | default(0) | int == 3
+    fail_msg: Redis HA must have two Redis and three Sentinel replicas Ready.
+  when: verify_scope == 'platform'
+
+- name: Read Redis and Sentinel Pod placement
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: mlops-redis
+    label_selectors:
+      - "app={{ item.app }}"
+      - "role={{ item.role }}"
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  loop:
+    - {app: mlops-paas-redis-ha, role: replication}
+    - {app: mlops-paas-redis-ha-sentinel, role: sentinel}
+  register: verified_redis_pods
+  when: verify_scope == 'platform'
+
+- name: Require Redis only on separate workers and Sentinel on all three static nodes
+  ansible.builtin.assert:
+    that:
+      - verified_redis_pods.results[0].resources | length == 2
+      - verified_redis_pods.results[1].resources | length == 3
+      - (verified_redis_pods.results[0].resources | map(attribute='spec.nodeName') | list | sort) == (groups['workers'] | sort)
+      - (verified_redis_pods.results[1].resources | map(attribute='spec.nodeName') | list | sort) == ((groups['master'] + groups['workers']) | sort)
+    fail_msg: Redis/Sentinel placement does not match the three-node HA topology.
+  when: verify_scope == 'platform'
+
 - name: Validate a build Workflow against the live API server
   kubernetes.core.k8s:
     state: present

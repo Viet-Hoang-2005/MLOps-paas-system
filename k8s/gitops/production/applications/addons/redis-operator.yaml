@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-addon-redis-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-40"
+  labels:
+    mlops-paas.io/plane: addon
+    mlops-paas.io/component: redis-operator
+spec:
+  project: mlops-addons
+  info:
+    - name: Owner
+      value: Platform Engineering
+    - name: Source
+      value: ghcr.io/ot-container-kit/charts/redis-operator@0.26.0
+    - name: Runbook
+      value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#redis
+  source:
+    repoURL: ghcr.io/ot-container-kit/charts
+    chart: redis-operator
+    targetRevision: 0.26.0
+    helm:
+      releaseName: redis-operator
+      values: |
+        redisOperator:
+          imageTag: v0.26.0
+          initContainerImageTag: v0.26.0
+          watchNamespace: mlops-redis
+          webhook: false
+        nodeSelector:
+          workload-type: worker
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 500Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: redis-operator

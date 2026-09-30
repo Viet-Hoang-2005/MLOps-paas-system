@@ -109,9 +109,7 @@ spec:
           - name: LOG_SUMMARY_INTERVAL_SECONDS
             valueFrom:
               configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_SUMMARY_INTERVAL_SECONDS}
-          - name: REDIS_URL
-            valueFrom:
-              configMapKeyRef: {name: mlops-paas-execution-config, key: REDIS_URL}
+          - {name: REDIS_URL, value: ""}
           - name: HARBOR_REGISTRY_URL
             valueFrom:
               configMapKeyRef: {name: mlops-paas-execution-config, key: HARBOR_REGISTRY_URL}
@@ -170,9 +168,7 @@ spec:
           - name: LOG_SUMMARY_INTERVAL_SECONDS
             valueFrom:
               configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_SUMMARY_INTERVAL_SECONDS}
-          - name: REDIS_URL
-            valueFrom:
-              configMapKeyRef: {name: mlops-paas-execution-config, key: REDIS_URL}
+          - {name: REDIS_URL, value: ""}
           - {name: TASK_TYPE, value: NOTIFY_BUILD}
           - {name: BUILD_WORKSPACE_DIR, value: /workspace}
           - {name: BUILD_ID, value: "{{inputs.parameters.build_id}}"}

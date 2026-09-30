@@ -36,6 +36,11 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  name: redis-operator
+---
+apiVersion: v1
+kind: Namespace
+metadata:
   name: mlops-redpanda
 ---
 apiVersion: v1

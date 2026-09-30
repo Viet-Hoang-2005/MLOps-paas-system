@@ -289,7 +289,8 @@ def test_runtime_logs_sanitize_secrets_urls_and_bound_lines(decode):
 @pytest.mark.parametrize("kind", ["build", "training"])
 def test_persisted_log_fallback_is_sanitized_without_changing_offset(kind, monkeypatch):
     redis = Mock(lrange=Mock(return_value=[]), llen=Mock(return_value=0))
-    monkeypatch.setattr(deployment_logs.Redis, "from_url", lambda _: redis)
+    monkeypatch.setattr(deployment_logs, "redis_client", lambda: redis)
+    monkeypatch.setattr(training_logs, "redis_client", lambda: redis)
     resource = SimpleNamespace(
         public_id=uuid.uuid4(),
         logs="first\ntoken=private-value",
@@ -305,7 +306,8 @@ def test_persisted_log_fallback_is_sanitized_without_changing_offset(kind, monke
 
 def test_runtime_writers_sanitize_before_redis(monkeypatch):
     redis = Mock()
-    monkeypatch.setattr(training_logs.Redis, "from_url", lambda _: redis)
+    monkeypatch.setattr(training_logs, "redis_client", lambda: redis)
+    monkeypatch.setattr(deployment_logs, "redis_client", lambda: redis)
     training_logs.append_training_log(uuid.uuid4(), "Authorization: Bearer private-value")
     deployment_logs.append_deployment_log(SimpleNamespace(public_id=uuid.uuid4()), "token=private-value")
     assert redis.rpush.call_count == 2
