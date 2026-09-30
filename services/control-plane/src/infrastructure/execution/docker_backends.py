@@ -16,6 +16,7 @@ from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import build_prefix, drift_run_prefix
 
 from .image_references import build_image_tag, image_repository, immutable_image_reference
+from .build_inputs import label_mapping_input
 
 
 def _logging_environment():
@@ -52,6 +53,7 @@ class DockerBuildBackend:
         if not source:
             raise RuntimeError("The build has no source artifact.")
         source_uri = getattr(source, "s3_uri", "") or source.uri
+        label_mapping_url, label_mapping_filename = label_mapping_input(build, self.storage)
         package_root = build_prefix(project.owner.tenant_id, project.public_id, build.public_id)
         package_uri = f"s3://{self.storage.bucket}/{package_root}/artifacts/model-package.zip"
         build.package_uri = package_uri
@@ -71,6 +73,8 @@ class DockerBuildBackend:
             "SOURCE_ARTIFACT_NAME": source.name,
             "SOURCE_TYPE": "training_job" if build.source_job_id else "manual_upload",
             "SOURCE_DOWNLOAD_URL": self.storage.presigned_get(source_uri, 14400),
+            "LABEL_MAPPING_DOWNLOAD_URL": label_mapping_url,
+            "LABEL_MAPPING_FILENAME": label_mapping_filename,
             "OUTPUT_UPLOAD_URL": self.storage.presigned_put(package_uri, 14400),
             "CONTROL_PLANE_WEBHOOK_URL": webhook,
             "CONTROL_PLANE_WEBHOOK_SECRET": settings.CONTROL_PLANE_WEBHOOK_SECRET,
