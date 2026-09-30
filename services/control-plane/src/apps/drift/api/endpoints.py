@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.drift.selectors import monitor_for_user, monitors_for_user, run_for_user
+from apps.drift.services.reports import report_uri_for_run
 from apps.drift.services.logs import drift_run_logs
 from apps.drift.services.runs import request_run
 from common.api.exceptions import Conflict
@@ -66,6 +67,7 @@ class DriftRunReportURLEndpoint(APIView):
         run = run_for_user(request.user, run_id)
         if run.status != "completed":
             raise Conflict("The drift report is not available until the run has completed.")
-        if not run.report_html_uri:
+        report_uri = report_uri_for_run(run, "report_html_uri")
+        if not report_uri:
             raise Conflict("The completed drift run does not have an HTML report.")
-        return Response({"url": S3Storage().presigned_get(run.report_html_uri, 900)})
+        return Response({"url": S3Storage().presigned_get(report_uri, 900)})

@@ -150,7 +150,7 @@ export default function DriftMonitoringPage() {
           variant="ghost"
           size="sm"
           icon={<ExternalLink className="h-4 w-4" />}
-          disabled={!row.original.report_html_uri}
+          disabled={row.original.status !== "completed" || !row.original.report_html_uri}
           onClick={() => handleViewReport(row.original.id)}
         >
           {t("viewReport")}

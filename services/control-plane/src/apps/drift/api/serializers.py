@@ -2,12 +2,25 @@ from rest_framework import serializers
 
 from apps.catalog.models import WorkspaceAsset
 from apps.drift.models import DriftMonitor, DriftRun
+from apps.drift.services.reports import report_uri_for_run
 from apps.registry.models import ModelVersion
 from common.api.exceptions import Conflict
 
 
 class DriftRunSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="public_id", read_only=True)
+    report_html_uri = serializers.SerializerMethodField()
+    report_json_uri = serializers.SerializerMethodField()
+    summary_uri = serializers.SerializerMethodField()
+
+    def get_report_html_uri(self, run):
+        return report_uri_for_run(run, "report_html_uri")
+
+    def get_report_json_uri(self, run):
+        return report_uri_for_run(run, "report_json_uri")
+
+    def get_summary_uri(self, run):
+        return report_uri_for_run(run, "summary_uri")
 
     class Meta:
         model = DriftRun

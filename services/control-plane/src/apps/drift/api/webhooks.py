@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from apps.drift.models import DriftRun
 from apps.drift.services.automatic import request_automatic_drift_runs
+from apps.drift.services.reports import report_artifact_uris
 from common.api.permissions import HasInternalWebhookSecret
 from common.logging import record_transition
 
@@ -26,8 +27,16 @@ class DriftRunWebhookEndpoint(APIView):
             summary = request.data.get("drift_summary") or request.data.get("summary") or {}
             drift_score = summary.get("drift_score", summary.get("share_of_drifted_columns"))
             has_drift = summary.get("has_drift", summary.get("dataset_drift"))
+            report_uris = report_artifact_uris(run, summary)
 
             if run.status == "completed" and run.summary and run.drift_score is not None:
+                report_fields = []
+                for field, uri in report_uris.items():
+                    if uri and not getattr(run, field):
+                        setattr(run, field, uri)
+                        report_fields.append(field)
+                if report_fields:
+                    run.save(update_fields=report_fields)
                 return Response({"status": run.status, "duplicate": True})
 
             already_completed = run.status == "completed"
@@ -37,7 +46,12 @@ class DriftRunWebhookEndpoint(APIView):
             run.status = "completed"
             run.completed_at = run.completed_at or timezone.now()
             run.error_message = ""
-            run.save(update_fields=["summary", "drift_score", "has_drift", "status", "completed_at", "error_message"])
+            update_fields = ["summary", "drift_score", "has_drift", "status", "completed_at", "error_message"]
+            for field, uri in report_uris.items():
+                if uri and not getattr(run, field):
+                    setattr(run, field, uri)
+                    update_fields.append(field)
+            run.save(update_fields=update_fields)
             record_transition(
                 run,
                 "completed",
