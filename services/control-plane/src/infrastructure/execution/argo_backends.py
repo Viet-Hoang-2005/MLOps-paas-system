@@ -13,6 +13,7 @@ from .image_references import (
     image_repository,
     immutable_image_reference,
 )
+from .build_inputs import label_mapping_input
 
 
 class _ArgoBackend:
@@ -38,6 +39,7 @@ class ArgoBuildBackend(_ArgoBackend):
         if not source:
             raise RuntimeError("The build has no source artifact.")
         source_uri = getattr(source, "s3_uri", "") or source.uri
+        label_mapping_url, label_mapping_filename = label_mapping_input(build, self.storage)
         package_uri = (
             f"s3://{self.storage.bucket}/"
             f"{build_prefix(project.owner.tenant_id, project.public_id, build.public_id)}"
@@ -62,6 +64,8 @@ class ArgoBuildBackend(_ArgoBackend):
                 "source_artifact_name": source.name,
                 "source_type": "training_job" if build.source_job_id else "manual_upload",
                 "source_download_url": self.storage.presigned_get(source_uri, 14400),
+                "label_mapping_download_url": label_mapping_url,
+                "label_mapping_filename": label_mapping_filename,
                 "output_upload_url": self.storage.presigned_put(package_uri, 14400),
                 "control_plane_webhook_url": (
                     f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/builds/{build.public_id}/"
