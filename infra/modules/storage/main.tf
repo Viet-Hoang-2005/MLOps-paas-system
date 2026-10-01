@@ -43,9 +43,10 @@ resource "aws_s3_bucket_cors_configuration" "artifacts_cors" {
 }
 
 resource "aws_s3_bucket" "runtime_logs" {
-  count  = var.enable_runtime_logs ? 1 : 0
-  bucket = var.runtime_logs_bucket_name
-  tags   = { Component = "runtime-logs" }
+  count         = var.enable_runtime_logs ? 1 : 0
+  bucket        = var.runtime_logs_bucket_name
+  force_destroy = true
+  tags          = { Component = "runtime-logs" }
 }
 
 resource "aws_s3_bucket_public_access_block" "runtime_logs" {
