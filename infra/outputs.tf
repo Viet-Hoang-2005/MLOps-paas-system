@@ -15,7 +15,7 @@ output "master_private_ip" {
 
 output "worker_private_ips" {
   description = "List of Private IPs of Worker Nodes inside VPC"
-  value       = local.enable_k3s_compute_stack ? module.compute[0].worker_private_ips : []
+  value       = local.enable_k3s_compute_stack ? module.compute[0].worker_private_ips : null
 }
 
 output "vpc_id" {
