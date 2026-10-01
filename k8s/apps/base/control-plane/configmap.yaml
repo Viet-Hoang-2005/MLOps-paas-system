@@ -5,7 +5,8 @@ metadata:
   labels:
     app: mlops-paas-control-plane
 data:
-  LOG_FORMAT: "console"
+  LOG_FORMAT: "json"
+  LOG_STORAGE_BACKEND: "loki"
   LOG_SUMMARY_INTERVAL_SECONDS: "60"
   PYTHONUNBUFFERED: "1"
   PYTHONPATH: "/app/src"

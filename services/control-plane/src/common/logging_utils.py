@@ -40,6 +40,8 @@ _FIELDS = frozenset(
         "training_job_id",
         "drift_run_id",
         "deployment_id",
+        "task_id",
+        "task_kind",
         "resource_id",
         "backend",
         "attempt",
@@ -205,6 +207,21 @@ def _record_fields(record, service):
         value = getattr(record, key, context.get(key))
         if value is not None and value != "":
             fields[key] = value
+    if not fields.get("task_id"):
+        for candidate in ("deployment_id", "build_id", "training_job_id", "drift_run_id", "resource_id"):
+            val = fields.get(candidate)
+            if val:
+                fields["task_id"] = str(val)
+                break
+    if not fields.get("task_kind"):
+        if fields.get("deployment_id"):
+            fields["task_kind"] = "deployment"
+        elif fields.get("build_id"):
+            fields["task_kind"] = "build"
+        elif fields.get("training_job_id"):
+            fields["task_kind"] = "training"
+        elif fields.get("drift_run_id"):
+            fields["task_kind"] = "drift"
     fields["msg"] = sanitize(record.getMessage())
     if record.exc_info:
         error_type, _, tb = record.exc_info

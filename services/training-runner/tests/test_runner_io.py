@@ -28,6 +28,10 @@ def test_redis_logging_is_optional_and_failure_safe(monkeypatch):
     assert runner.log_to_redis("hello") is True
     client.rpush.assert_called_once_with("training_logs:job-1", "hello")
     client.expire.assert_called_once()
+    monkeypatch.setenv("LOG_STORAGE_BACKEND", "loki")
+    assert runner.log_to_redis("skip-redis") is False
+    assert client.rpush.call_count == 1
+    monkeypatch.delenv("LOG_STORAGE_BACKEND")
     module.from_url.side_effect = RuntimeError("offline")
     assert runner.log_to_redis("safe") is False
 

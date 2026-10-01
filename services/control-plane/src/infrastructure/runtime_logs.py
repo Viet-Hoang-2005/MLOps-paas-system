@@ -16,10 +16,10 @@ from common.logging import runtime_line
 PAGE_SIZE = 500
 CURSOR_SALT = "runtime-logs-v1"
 NAMESPACES = {
-    "build": "mlops-execution",
-    "deployment": "mlops-execution|mlops-model-runtimes",
-    "drift": "mlops-execution",
-    "training": "mlops-execution|user-jobs",
+    "build": "mlops-execution|mlops-control-plane",
+    "deployment": "mlops-execution|mlops-model-runtimes|mlops-control-plane",
+    "drift": "mlops-execution|mlops-control-plane",
+    "training": "mlops-execution|user-jobs|mlops-control-plane",
 }
 
 

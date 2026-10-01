@@ -12,8 +12,8 @@ def validate(context: ValidationContext) -> list[str]:
     alloy = context.application("mlops-prod-addon-alloy")
     values = yaml.safe_load(alloy["spec"]["source"]["helm"]["values"])
     rbac = values.get("rbac", {})
-    if set(rbac.get("namespaces", [])) != {"mlops-execution", "mlops-model-runtimes", "user-jobs"}:
-        errors.append("Alloy must collect only task namespaces")
+    if set(rbac.get("namespaces", [])) != {"mlops-execution", "mlops-model-runtimes", "user-jobs", "mlops-control-plane"}:
+        errors.append("Alloy must collect only task and control-plane namespaces")
     if rbac.get("clusterRules") != []:
         errors.append("Alloy must not grant cluster-wide discovery rights")
     for rule in rbac.get("rules", []):

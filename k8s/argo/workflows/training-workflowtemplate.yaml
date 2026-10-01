@@ -138,6 +138,7 @@ spec:
                             memory: "{{inputs.parameters.memory}}Mi"
                         env:
                           - {name: LOG_FORMAT, value: "console"}
+                          - {name: LOG_STORAGE_BACKEND, value: "loki"}
                           - {name: LOG_SUMMARY_INTERVAL_SECONDS, value: "60"}
                           - {name: S3_SOURCE_URI, value: {{=toJson(inputs.parameters.s3_source_uri)}}}
                           - {name: S3_TRAINING_DATA_URI, value: {{=toJson(inputs.parameters.s3_training_data_uri)}}}
@@ -222,6 +223,7 @@ spec:
                             nvidia.com/gpu: "{{inputs.parameters.accelerator_count}}"
                         env:
                           - {name: LOG_FORMAT, value: "console"}
+                          - {name: LOG_STORAGE_BACKEND, value: "loki"}
                           - {name: LOG_SUMMARY_INTERVAL_SECONDS, value: "60"}
                           - {name: S3_SOURCE_URI, value: {{=toJson(inputs.parameters.s3_source_uri)}}}
                           - {name: S3_TRAINING_DATA_URI, value: {{=toJson(inputs.parameters.s3_training_data_uri)}}}

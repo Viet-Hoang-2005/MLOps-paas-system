@@ -96,3 +96,44 @@ def test_log_api_resolves_tenant_ownership_before_querying_loki(settings, monkey
     client.force_authenticate(other)
     assert client.get(f"/api/builds/{build.public_id}/logs/").status_code == 404
     get.assert_not_called()
+
+
+def test_runtime_log_query_includes_control_plane_namespace(resource, monkeypatch):
+    resource.monitor = SimpleNamespace(backend="argo")
+    get = Mock(return_value=response([]))
+    monkeypatch.setattr("infrastructure.runtime_logs.requests.get", get)
+    for kind in ("build", "deployment", "drift", "training"):
+        runtime_log_page(SimpleNamespace(query_params={}), resource, kind, Mock())
+        query = get.call_args.kwargs["params"]["query"]
+        assert "mlops-control-plane" in query
+
+
+def test_append_deployment_log_bypasses_redis_in_production(settings, monkeypatch):
+    from apps.deployment.services import logs as deployment_logs
+
+    settings.LOKI_URL = "http://loki.test:3100"
+    redis = Mock()
+    monkeypatch.setattr(deployment_logs, "redis_client", lambda: redis)
+    deployment = SimpleNamespace(public_id=uuid.uuid4(), backend="argo")
+    deployment_logs.append_deployment_log(deployment, "Dispatched argo deployment")
+    redis.rpush.assert_not_called()
+
+    deployment_local = SimpleNamespace(public_id=uuid.uuid4(), backend="docker")
+    deployment_logs.append_deployment_log(deployment_local, "Local docker deployment")
+    redis.rpush.assert_called_once()
+
+
+def test_append_training_log_bypasses_redis_in_production(settings, monkeypatch):
+    from apps.training.services import logs as training_logs
+
+    settings.LOKI_URL = "http://loki.test:3100"
+    settings.EXECUTION_BACKEND = "argo"
+    redis = Mock()
+    monkeypatch.setattr(training_logs, "redis_client", lambda: redis)
+    training_logs.append_training_log(uuid.uuid4(), "Dispatched argo training")
+    redis.rpush.assert_not_called()
+
+    settings.EXECUTION_BACKEND = "docker"
+    training_logs.append_training_log(uuid.uuid4(), "Local docker training")
+    redis.rpush.assert_called_once()
+

@@ -641,18 +641,19 @@ def setup_logger(build_id: str):
     global runtime_log
     configure("model-packager")
     writer = None
-    redis_url = os.environ.get("REDIS_URL", "redis://redis:6379/1")
-    if redis_url and build_id:
-        try:
-            writer = RedisLogHandler(redis_url, build_id).write
-        except Exception as exc:
-            log_event(
-                logger,
-                logging.WARNING,
-                "runtime_log_unavailable",
-                "Could not connect to Redis for build log streaming",
-                reason=sanitize(str(exc)),
-            )
+    if os.environ.get("LOG_STORAGE_BACKEND", "").strip().lower() != "loki":
+        redis_url = os.environ.get("REDIS_URL", "redis://redis:6379/1")
+        if redis_url and build_id:
+            try:
+                writer = RedisLogHandler(redis_url, build_id).write
+            except Exception as exc:
+                log_event(
+                    logger,
+                    logging.WARNING,
+                    "runtime_log_unavailable",
+                    "Could not connect to Redis for build log streaming",
+                    reason=sanitize(str(exc)),
+                )
     runtime_log = RuntimeLog(logger, writer=writer)
     return logger
 

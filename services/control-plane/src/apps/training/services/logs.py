@@ -1,11 +1,14 @@
+import logging
 from collections.abc import Sequence
 
+from django.conf import settings
 from redis.exceptions import RedisError
 
 from common.logging import runtime_line
 from common.redis_client import redis_client
 
 LOG_TTL_SECONDS = 3600
+logger = logging.getLogger("control_plane.training")
 
 
 def _decode(lines: Sequence[bytes | str]) -> list[str]:
@@ -27,13 +30,22 @@ def training_logs(job, offset: int) -> tuple[list[str], int]:
 
 
 def append_training_log(job_id, message: str) -> None:
-    try:
-        redis = redis_client()
-        key = f"training_logs:{job_id}"
-        redis.rpush(key, runtime_line(message))
-        redis.expire(key, LOG_TTL_SECONDS)
-    except RedisError:
-        return
+    logger.info(
+        message,
+        extra={
+            "training_job_id": str(job_id),
+            "task_id": str(job_id),
+            "task_kind": "training",
+        },
+    )
+    if not settings.LOKI_URL or getattr(settings, "EXECUTION_BACKEND", "") != "argo":
+        try:
+            redis = redis_client()
+            key = f"training_logs:{job_id}"
+            redis.rpush(key, runtime_line(message))
+            redis.expire(key, LOG_TTL_SECONDS)
+        except RedisError:
+            return
 
 
 def delete_training_logs(job_id) -> None:

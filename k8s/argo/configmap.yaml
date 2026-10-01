@@ -5,6 +5,7 @@ metadata:
   namespace: mlops-execution
 data:
   LOG_FORMAT: "console"
+  LOG_STORAGE_BACKEND: "loki"
   LOG_SUMMARY_INTERVAL_SECONDS: "60"
   AWS_DEFAULT_REGION: "ap-southeast-1"
   AWS_BUCKET_NAME: "mlops-paas-artifacts"

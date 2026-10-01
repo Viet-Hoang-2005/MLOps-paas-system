@@ -27,7 +27,7 @@ spec:
           nodeSelector: {workload-type: worker}
         rbac:
           create: true
-          namespaces: [mlops-execution, mlops-model-runtimes, user-jobs]
+          namespaces: [mlops-execution, mlops-model-runtimes, user-jobs, mlops-control-plane]
           rules:
             - apiGroups: [""]
               resources: [pods]
@@ -115,9 +115,37 @@ spec:
                   action = "keep"
                 }
               }
+              discovery.kubernetes "control_plane" {
+                role = "pod"
+                namespaces { names = ["mlops-control-plane"] }
+              }
+              discovery.relabel "control_plane" {
+                targets = discovery.kubernetes.control_plane.targets
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_container_name"]
+                  regex = "wait|init"
+                  action = "drop"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_namespace"]
+                  target_label = "namespace"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_name"]
+                  target_label = "pod"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_container_name"]
+                  target_label = "container"
+                }
+              }
               loki.source.kubernetes "tasks" {
                 targets = discovery.relabel.tasks.output
                 forward_to = [loki.process.tasks.receiver]
+              }
+              loki.source.kubernetes "control_plane" {
+                targets = discovery.relabel.control_plane.output
+                forward_to = [loki.process.control_plane.receiver]
               }
               loki.process "tasks" {
                 stage.pack {
@@ -129,6 +157,31 @@ spec:
                 }
                 stage.structured_metadata { values = {task_id = "", pod = ""} }
                 stage.output { source = "original" }
+                forward_to = [loki.write.tasks.receiver]
+              }
+              loki.process "control_plane" {
+                stage.json {
+                  expressions = {
+                    task_id   = "task_id",
+                    task_kind = "task_kind",
+                    msg       = "msg",
+                    level     = "level",
+                    pod       = "pod",
+                  }
+                }
+                stage.labels {
+                  values = { task_kind = "" }
+                }
+                stage.structured_metadata {
+                  values = { task_id = "", pod = "" }
+                }
+                stage.template {
+                  source = "msg"
+                  template = "[{{ or .level \"INFO\" }}] {{ .msg }}"
+                }
+                stage.output {
+                  source = "msg"
+                }
                 forward_to = [loki.write.tasks.receiver]
               }
               loki.write "tasks" {

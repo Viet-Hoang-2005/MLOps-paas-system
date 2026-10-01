@@ -114,6 +114,9 @@ spec:
           - name: LOG_FORMAT
             valueFrom:
               configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_FORMAT}
+          - name: LOG_STORAGE_BACKEND
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_STORAGE_BACKEND}
           - name: LOG_SUMMARY_INTERVAL_SECONDS
             valueFrom:
               configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_SUMMARY_INTERVAL_SECONDS}
@@ -175,6 +178,9 @@ spec:
           - name: LOG_FORMAT
             valueFrom:
               configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_FORMAT}
+          - name: LOG_STORAGE_BACKEND
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_STORAGE_BACKEND}
           - name: LOG_SUMMARY_INTERVAL_SECONDS
             valueFrom:
               configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_SUMMARY_INTERVAL_SECONDS}

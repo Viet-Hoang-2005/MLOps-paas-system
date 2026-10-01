@@ -98,17 +98,18 @@ def setup_logger(run_id: str):
     global runtime_log
     configure("evidently")
     writer = None
-    if run_id and REDIS_URL:
-        try:
-            writer = RedisLogHandler(REDIS_URL, run_id).write
-        except Exception as exc:
-            log_event(
-                logger,
-                logging.WARNING,
-                "runtime_log_unavailable",
-                "Could not connect to Redis for drift log streaming",
-                reason=sanitize(str(exc)),
-            )
+    if os.environ.get("LOG_STORAGE_BACKEND", "").strip().lower() != "loki":
+        if run_id and REDIS_URL:
+            try:
+                writer = RedisLogHandler(REDIS_URL, run_id).write
+            except Exception as exc:
+                log_event(
+                    logger,
+                    logging.WARNING,
+                    "runtime_log_unavailable",
+                    "Could not connect to Redis for drift log streaming",
+                    reason=sanitize(str(exc)),
+                )
     runtime_log = RuntimeLog(logger, writer=writer)
     return logger
 
