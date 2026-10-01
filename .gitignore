@@ -114,3 +114,8 @@ kubeconform
 
 # Kustomize Helm chart cache
 k8s/platform/harbor/charts/
+
+# Agent
+.claude/
+.codex/
+.antigravity/

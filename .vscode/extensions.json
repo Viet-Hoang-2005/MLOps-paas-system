@@ -10,7 +10,6 @@
     "redhat.ansible",
     "dbaeumer.vscode-eslint",
     "bradlc.vscode-tailwindcss",
-    "james-yu.latex-workshop",
     "github.vscode-github-actions"
   ]
 }
