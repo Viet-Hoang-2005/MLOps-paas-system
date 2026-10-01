@@ -127,13 +127,42 @@ def test_append_training_log_bypasses_redis_in_production(settings, monkeypatch)
     from apps.training.services import logs as training_logs
 
     settings.LOKI_URL = "http://loki.test:3100"
-    settings.EXECUTION_BACKEND = "argo"
+    settings.TRAINING_BACKEND = "argo"
     redis = Mock()
     monkeypatch.setattr(training_logs, "redis_client", lambda: redis)
     training_logs.append_training_log(uuid.uuid4(), "Dispatched argo training")
     redis.rpush.assert_not_called()
 
-    settings.EXECUTION_BACKEND = "docker"
+    settings.TRAINING_BACKEND = "docker"
     training_logs.append_training_log(uuid.uuid4(), "Local docker training")
     redis.rpush.assert_called_once()
 
+
+def test_only_explicit_progress_records_are_tenant_visible():
+    import json
+    import logging
+
+    from common.logging_utils import JsonFormatter, bind_context, reset_context
+    from infrastructure.runtime_logs import emit_tenant_log
+
+    task_id = uuid.uuid4()
+    formatter = JsonFormatter("control-plane")
+    token = bind_context(deployment_id=str(task_id), task_kind="deployment", audience="tenant")
+    try:
+        logger = logging.getLogger("control_plane.test")
+        lines = []
+        handler = logging.Handler()
+        handler.emit = lambda record: lines.append(formatter.format(record))
+        logger.addHandler(handler)
+        try:
+            logger.warning("internal retry to argo-events")
+            emit_tenant_log(logger, "deployment", task_id, "Dispatching argo deployment backend.")
+        finally:
+            logger.removeHandler(handler)
+    finally:
+        reset_context(token)
+    internal, progress = (json.loads(line) for line in lines)
+    assert {"task_id", "task_kind", "audience"}.isdisjoint(internal)
+    assert internal["deployment_id"] == str(task_id)
+    assert progress["audience"] == "tenant"
+    assert (progress["task_kind"], progress["task_id"]) == ("deployment", str(task_id))

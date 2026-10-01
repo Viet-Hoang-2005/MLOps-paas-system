@@ -160,28 +160,28 @@ spec:
                 forward_to = [loki.write.tasks.receiver]
               }
               loki.process "control_plane" {
+                // Forward only curated tenant progress records; platform logs stay in kubectl logs.
                 stage.json {
-                  expressions = {
-                    task_id   = "task_id",
-                    task_kind = "task_kind",
-                    msg       = "msg",
-                    level     = "level",
-                    pod       = "pod",
-                  }
+                  expressions    = {audience = "audience", task_id = "task_id", task_kind = "task_kind", ts = "ts", level = "level", msg = "msg"}
+                  drop_malformed = true
                 }
-                stage.labels {
-                  values = { task_kind = "" }
+                stage.labels { values = {audience = "", task_kind = ""} }
+                stage.match {
+                  selector = "{namespace=\"mlops-control-plane\", audience!=\"tenant\"}"
+                  action   = "drop"
                 }
-                stage.structured_metadata {
-                  values = { task_id = "", pod = "" }
+                stage.match {
+                  selector = "{namespace=\"mlops-control-plane\", task_kind!~\"build|deployment|drift|training\"}"
+                  action   = "drop"
                 }
+                stage.label_drop { values = ["audience"] }
+                stage.structured_metadata { values = {task_id = ""} }
+                // The chart renders this content with Helm tpl, so Alloy's template is a Helm raw string.
                 stage.template {
-                  source = "msg"
-                  template = "[{{ or .level \"INFO\" }}] {{ .msg }}"
+                  source   = "line"
+                  template = "{{`{{ .ts }} [{{ .level }}]: {{ .msg }}`}}"
                 }
-                stage.output {
-                  source = "msg"
-                }
+                stage.output { source = "line" }
                 forward_to = [loki.write.tasks.receiver]
               }
               loki.write "tasks" {

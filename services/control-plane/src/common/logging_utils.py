@@ -27,6 +27,8 @@ _SECRETS = re.compile(
     + r"[\w-]{0,96}[\"\x27]?\s*[:=]\s*)(?:\"(?:\\.|[^\"\\])*\"|\x27(?:\\.|[^\x27\\])*\x27|[^\s,;}]+)"
 )
 _URL = re.compile(r"\b[a-zA-Z][a-zA-Z0-9+.-]{0,31}://[^\s<>\"']+")
+# Tenant-visible routing must be explicit per record; inherited context would expose a whole task.
+_RECORD_ONLY_FIELDS = frozenset({"task_id", "task_kind", "audience"})
 _SAFE_VALUE = re.compile(r"^[a-zA-Z0-9_.:/@+-]+$")
 _PROTOCOL = re.compile(r"^(\s*METRIC_JSON(?::| )\s*)(.*)$", re.S)
 _FIELDS = frozenset(
@@ -42,6 +44,7 @@ _FIELDS = frozenset(
         "deployment_id",
         "task_id",
         "task_kind",
+        "audience",
         "resource_id",
         "backend",
         "attempt",
@@ -160,7 +163,8 @@ def current_context():
 
 
 def bind_context(**fields):
-    return _context.set({**_context.get(), **{k: v for k, v in fields.items() if k in _FIELDS}})
+    allowed = _FIELDS - _RECORD_ONLY_FIELDS
+    return _context.set({**_context.get(), **{k: v for k, v in fields.items() if k in allowed}})
 
 
 def reset_context(token):
@@ -204,24 +208,9 @@ def _record_fields(record, service):
         if os.environ.get(env_key):
             context.setdefault(env_key.lower(), os.environ[env_key])
     for key in sorted(_FIELDS):
-        value = getattr(record, key, context.get(key))
+        value = getattr(record, key, None if key in _RECORD_ONLY_FIELDS else context.get(key))
         if value is not None and value != "":
             fields[key] = value
-    if not fields.get("task_id"):
-        for candidate in ("deployment_id", "build_id", "training_job_id", "drift_run_id", "resource_id"):
-            val = fields.get(candidate)
-            if val:
-                fields["task_id"] = str(val)
-                break
-    if not fields.get("task_kind"):
-        if fields.get("deployment_id"):
-            fields["task_kind"] = "deployment"
-        elif fields.get("build_id"):
-            fields["task_kind"] = "build"
-        elif fields.get("training_job_id"):
-            fields["task_kind"] = "training"
-        elif fields.get("drift_run_id"):
-            fields["task_kind"] = "drift"
     fields["msg"] = sanitize(record.getMessage())
     if record.exc_info:
         error_type, _, tb = record.exc_info

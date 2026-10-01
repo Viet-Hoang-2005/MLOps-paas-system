@@ -1,12 +1,12 @@
 import logging
 from collections.abc import Sequence
 
-from django.conf import settings
 from django.utils import timezone
 from redis.exceptions import RedisError
 
 from common.logging import runtime_line
 from common.redis_client import redis_client
+from infrastructure.runtime_logs import emit_tenant_log, uses_loki
 
 LOG_TTL_SECONDS = 3600
 logger = logging.getLogger("control_plane.deployment")
@@ -48,39 +48,27 @@ def deployment_logs(deployment, offset: int) -> tuple[list[str], int]:
 
 
 def reset_deployment_logs(deployment, message: str) -> None:
-    logger.info(
-        message,
-        extra={
-            "deployment_id": str(deployment.public_id),
-            "task_id": str(deployment.public_id),
-            "task_kind": "deployment",
-        },
-    )
-    if not settings.LOKI_URL or getattr(deployment, "backend", "") != "argo":
-        try:
-            redis = redis_client()
-            key = f"deployment_logs:{deployment.public_id}"
-            redis.delete(key)
-            _push_runtime_log(redis, key, message)
-        except RedisError:
-            pass
+    emit_tenant_log(logger, "deployment", deployment.public_id, message)
+    if uses_loki(deployment.backend):
+        return
+    try:
+        redis = redis_client()
+        key = f"deployment_logs:{deployment.public_id}"
+        redis.delete(key)
+        _push_runtime_log(redis, key, message)
+    except RedisError:
+        pass
 
 
 def append_deployment_log(deployment, message: str) -> None:
-    logger.info(
-        message,
-        extra={
-            "deployment_id": str(deployment.public_id),
-            "task_id": str(deployment.public_id),
-            "task_kind": "deployment",
-        },
-    )
-    if not settings.LOKI_URL or getattr(deployment, "backend", "") != "argo":
-        try:
-            redis = redis_client()
-            _push_runtime_log(redis, f"deployment_logs:{deployment.public_id}", message)
-        except RedisError:
-            pass
+    emit_tenant_log(logger, "deployment", deployment.public_id, message)
+    if uses_loki(deployment.backend):
+        return
+    try:
+        redis = redis_client()
+        _push_runtime_log(redis, f"deployment_logs:{deployment.public_id}", message)
+    except RedisError:
+        pass
 
 
 def _push_runtime_log(redis, key: str, message: str) -> None:

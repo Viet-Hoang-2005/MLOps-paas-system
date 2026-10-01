@@ -6,6 +6,7 @@ from redis.exceptions import RedisError
 
 from common.logging import runtime_line
 from common.redis_client import redis_client
+from infrastructure.runtime_logs import emit_tenant_log, uses_loki
 
 LOG_TTL_SECONDS = 3600
 logger = logging.getLogger("control_plane.training")
@@ -30,22 +31,17 @@ def training_logs(job, offset: int) -> tuple[list[str], int]:
 
 
 def append_training_log(job_id, message: str) -> None:
-    logger.info(
-        message,
-        extra={
-            "training_job_id": str(job_id),
-            "task_id": str(job_id),
-            "task_kind": "training",
-        },
-    )
-    if not settings.LOKI_URL or getattr(settings, "EXECUTION_BACKEND", "") != "argo":
-        try:
-            redis = redis_client()
-            key = f"training_logs:{job_id}"
-            redis.rpush(key, runtime_line(message))
-            redis.expire(key, LOG_TTL_SECONDS)
-        except RedisError:
-            return
+    emit_tenant_log(logger, "training", job_id, message)
+    # Jobs record TRAINING_BACKEND at creation, so this matches the reader's job.backend check.
+    if uses_loki(settings.TRAINING_BACKEND):
+        return
+    try:
+        redis = redis_client()
+        key = f"training_logs:{job_id}"
+        redis.rpush(key, runtime_line(message))
+        redis.expire(key, LOG_TTL_SECONDS)
+    except RedisError:
+        return
 
 
 def delete_training_logs(job_id) -> None:

@@ -309,7 +309,9 @@ def test_runtime_writers_sanitize_before_redis(monkeypatch):
     monkeypatch.setattr(training_logs, "redis_client", lambda: redis)
     monkeypatch.setattr(deployment_logs, "redis_client", lambda: redis)
     training_logs.append_training_log(uuid.uuid4(), "Authorization: Bearer private-value")
-    deployment_logs.append_deployment_log(SimpleNamespace(public_id=uuid.uuid4()), "token=private-value")
+    deployment_logs.append_deployment_log(
+        SimpleNamespace(public_id=uuid.uuid4(), backend="docker"), "token=private-value"
+    )
     assert redis.rpush.call_count == 2
     assert "private-value" not in str(redis.rpush.call_args_list)
 
