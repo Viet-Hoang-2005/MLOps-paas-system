@@ -93,3 +93,31 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: mlops-logging
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      name: loki
+      namespace: mlops-logging
+      jsonPointers:
+        - /spec/persistentVolumeClaimRetentionPolicy
+        - /spec/podManagementPolicy
+        - /spec/revisionHistoryLimit
+        - /spec/template/spec/dnsPolicy
+        - /spec/template/spec/restartPolicy
+        - /spec/template/spec/schedulerName
+        - /spec/template/spec/serviceAccount
+        - /spec/template/spec/terminationGracePeriodSeconds
+        - /spec/template/spec/containers/0/imagePullPolicy
+        - /spec/template/spec/containers/0/terminationMessagePath
+        - /spec/template/spec/containers/0/terminationMessagePolicy
+        - /spec/template/spec/containers/0/resources/limits/cpu
+        - /spec/template/spec/containers/0/livenessProbe/scheme
+        - /spec/template/spec/containers/0/readinessProbe/scheme
+        - /spec/template/spec/containers/0/env/0/valueFrom/fieldRef/apiVersion
+        - /spec/template/spec/volumes/1/configMap/defaultMode
+        - /spec/template/spec/volumes/2/configMap/defaultMode
+        - /spec/updateStrategy/type
+        - /spec/volumeClaimTemplates/0/apiVersion
+        - /spec/volumeClaimTemplates/0/kind
+        - /spec/volumeClaimTemplates/0/spec/volumeMode
+        - /spec/volumeClaimTemplates/0/status
