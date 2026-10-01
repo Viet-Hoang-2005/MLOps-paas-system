@@ -1,21 +1,25 @@
 """Prepare local secrets and publish selected groups to Terraform-owned AWS containers.
 
-Only the five Control Plane secrets are generated. Other credentials must be
-obtained from their respective providers and entered in .env by the operator.
+Internal secrets (Control Plane, Redis, PostgreSQL database passwords) are generated
+automatically if missing or when rotated. External credentials must be obtained from
+their respective providers and entered in .env or supplied when prompted.
 Secret values, PEM keys and AWS payloads are never printed.
 """
 
 from __future__ import annotations
 
 import argparse
+import getpass
 import io
 import json
 import os
 import re
 import secrets
 import stat
+import string
 import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -39,8 +43,62 @@ ROTATION_KEYS = {
     "jwt": JWT_KEYS,
     "control-plane-webhook": ("CONTROL_PLANE_WEBHOOK_SECRET",),
     "argo-events-webhook": ("ARGO_EVENTS_WEBHOOK_TOKEN",),
+    "redis": ("REDIS_PASSWORD", "REDIS_SENTINEL_PASSWORD"),
+    "db": ("DB_PASSWORD",),
+    "harbor": ("HARBOR_PASSWORD", "HARBOR_GITHUB_PASSWORD"),
 }
 ASSIGNMENT = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z_0-9]*)\s*=")
+
+DEFAULT_VALUES: dict[str, str] = {
+    "DB_USER": "postgres",
+    "HARBOR_USERNAME": "robot_user-images+model-packager",
+    "HARBOR_GITHUB_USERNAME": "robot_mlops-paas+github-actions",
+    "GITHUB_REPO": "Viet-Hoang-2005/MLOps-paas-system",
+}
+
+HYBRID_PASSWORD_KEYS: tuple[str, ...] = (
+    "HARBOR_PASSWORD",
+    "HARBOR_GITHUB_PASSWORD",
+)
+
+EXTERNAL_PROMPTS: dict[str, dict[str, Any]] = {
+    "TUNNEL_TOKEN": {
+        "label": "Cloudflare Tunnel Token",
+        "secret": True,
+    },
+    "GOOGLE_OAUTH2_CLIENT_ID": {
+        "label": "Google OAuth2 Client ID",
+        "secret": False,
+    },
+    "GITHUB_OAUTH2_CLIENT_ID": {
+        "label": "GitHub OAuth2 Client ID",
+        "secret": False,
+    },
+    "GITHUB_OAUTH2_CLIENT_SECRET": {
+        "label": "GitHub OAuth2 Client Secret",
+        "secret": True,
+    },
+    "EMAIL_HOST_USER": {
+        "label": "Email SMTP Host User (e.g. user@gmail.com)",
+        "secret": False,
+    },
+    "EMAIL_HOST_PASSWORD": {
+        "label": "Email SMTP Host Password",
+        "secret": True,
+    },
+    "GITHUB_TOKEN": {
+        "label": "GitHub Personal Access Token",
+        "secret": True,
+    },
+    "AWS_ACCESS_KEY_ID": {
+        "label": "AWS Access Key ID",
+        "secret": False,
+    },
+    "AWS_SECRET_ACCESS_KEY": {
+        "label": "AWS Secret Access Key",
+        "secret": True,
+    },
+}
 
 SECRET_GROUPS: dict[int, dict[str, Any]] = {
     1: {
@@ -219,20 +277,56 @@ def validate_jwt_key_pair(private_pem: str, public_pem: str) -> None:
         ) from exc
 
 
+def generate_strong_password(length: int = 32) -> str:
+    """Generate a cryptographically secure alphanumeric password without confusing symbols."""
+    alphabet = string.ascii_letters + string.digits
+    chars = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+        secrets.choice(string.digits),
+    ] + [secrets.choice(alphabet) for _ in range(length - 6)]
+    shuffled = chars[:]
+    for i in range(len(shuffled) - 1, 0, -1):
+        j = secrets.randbelow(i + 1)
+        shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+    return "".join(shuffled)
+
+
+AUTO_GENERATORS: dict[str, Callable[[], str]] = {
+    "DJANGO_SECRET_KEY": lambda: secrets.token_urlsafe(64),
+    "CONTROL_PLANE_WEBHOOK_SECRET": lambda: secrets.token_urlsafe(48),
+    "ARGO_EVENTS_WEBHOOK_TOKEN": lambda: secrets.token_urlsafe(48),
+    "REDIS_PASSWORD": lambda: generate_strong_password(32),
+    "REDIS_SENTINEL_PASSWORD": lambda: generate_strong_password(32),
+    "DB_PASSWORD": lambda: generate_strong_password(32),
+}
+
+
 def prepare_env_content(
-    original: str, selected_groups: list[int], rotate: list[str]
+    original: str,
+    selected_groups: list[int],
+    rotate: list[str],
+    interactive: bool = True,
 ) -> tuple[str, dict[str, str]]:
-    if rotate and CONTROL_PLANE_GROUP not in selected_groups:
-        raise SecretPreparationError(
-            "Rotation requires selecting Control Plane group 5."
-        )
     selected_keys = {
         key for group_id in selected_groups for key in SECRET_GROUPS[group_id]["keys"]
     }
+    for name in rotate:
+        target_keys = ROTATION_KEYS[name]
+        if not any(k in selected_keys for k in target_keys):
+            raise SecretPreparationError(
+                f"Rotation of '{name}' requires selecting the group containing {', '.join(target_keys)}."
+            )
+
     values = parse_env_content(original)
     replacements: dict[str, str] = {}
-    if CONTROL_PLANE_GROUP in selected_groups:
-        rotated = {key for name in rotate for key in ROTATION_KEYS[name]}
+    rotated = {key for name in rotate for key in ROTATION_KEYS[name]}
+
+    # 1. JWT keys (Control Plane group 5)
+    if JWT_KEYS[0] in selected_keys:
         private_present = bool(values.get(JWT_KEYS[0], "").strip())
         public_present = bool(values.get(JWT_KEYS[1], "").strip())
         if private_present != public_present and "jwt" not in rotate:
@@ -245,13 +339,55 @@ def prepare_env_content(
             )
         else:
             validate_jwt_key_pair(values[JWT_KEYS[0]], values[JWT_KEYS[1]])
-        for key, size in (
-            ("DJANGO_SECRET_KEY", 64),
-            ("CONTROL_PLANE_WEBHOOK_SECRET", 48),
-            ("ARGO_EVENTS_WEBHOOK_TOKEN", 48),
+
+    # 2. Automatically generated secure keys (Redis, DB, Django, Webhook tokens)
+    for key, generator in AUTO_GENERATORS.items():
+        if key in selected_keys and (key in rotated or not values.get(key, "").strip()):
+            replacements[key] = generator()
+
+    # 3. Hybrid keys (Harbor passwords: prompt or auto-generate compliant password)
+    for key in HYBRID_PASSWORD_KEYS:
+        if key in selected_keys and (key in rotated or not values.get(key, "").strip()):
+            if interactive:
+                try:
+                    val = getpass.getpass(
+                        f"Enter {key} (press Enter to auto-generate): "
+                    ).strip()
+                except (EOFError, KeyboardInterrupt):
+                    raise SecretPreparationError("Input aborted by operator.") from None
+                replacements[key] = val if val else generate_strong_password(24)
+            else:
+                replacements[key] = generate_strong_password(24)
+
+    # 4. Defaultable identifier keys (DB_USER, GITHUB_REPO, HARBOR_USERNAME)
+    for key, default_val in DEFAULT_VALUES.items():
+        if key in selected_keys and (key in rotated or not values.get(key, "").strip()):
+            if interactive:
+                try:
+                    val = input(f"Enter {key} [{default_val}]: ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    raise SecretPreparationError("Input aborted by operator.") from None
+                replacements[key] = val if val else default_val
+            else:
+                replacements[key] = default_val
+
+    # 5. External provider credentials (Cloudflare, OAuth, SMTP, GitHub PAT, AWS IAM)
+    for key, meta in EXTERNAL_PROMPTS.items():
+        if (
+            key in selected_keys
+            and (key in rotated or not values.get(key, "").strip())
+            and interactive
         ):
-            if key in rotated or not values.get(key, "").strip():
-                replacements[key] = secrets.token_urlsafe(size)
+            label = meta["label"]
+            try:
+                if meta["secret"]:
+                    val = getpass.getpass(f"Enter {label} [{key}]: ").strip()
+                else:
+                    val = input(f"Enter {label} [{key}]: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                raise SecretPreparationError("Input aborted by operator.") from None
+            if val:
+                replacements[key] = val
 
     updated = update_env_content(original, replacements, selected_keys)
     effective = parse_env_content(updated)
@@ -364,6 +500,7 @@ def publish(
     groups: list[int],
     rotate: list[str],
     yes: bool,
+    interactive: bool = True,
     client: Any | None = None,
 ) -> int:
     if env_path.exists():
@@ -372,7 +509,9 @@ def publish(
         original = example_path.read_text(encoding="utf-8")
     else:
         raise SecretPreparationError(".env and .env.example are both missing.")
-    updated, values = prepare_env_content(original, groups, rotate)
+    updated, values = prepare_env_content(
+        original, groups, rotate, interactive=interactive
+    )
     payloads = make_payloads(values, groups)
     if client is None:
         region = (
@@ -439,15 +578,22 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Confirm local and AWS writes without prompting.",
     )
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Disable interactive prompts for missing external secrets.",
+    )
     args = parser.parse_args(argv)
     try:
         groups = select_groups(args.groups)
+        is_interactive = not (args.yes or args.non_interactive or not sys.stdin.isatty())
         return publish(
             env_path=args.env_file.expanduser().resolve(),
             example_path=PROJECT_ROOT / ".env.example",
             groups=groups,
             rotate=args.rotate,
             yes=args.yes,
+            interactive=is_interactive,
         )
     except SecretPreparationError as exc:
         print(f"Error: {exc}", file=sys.stderr)
