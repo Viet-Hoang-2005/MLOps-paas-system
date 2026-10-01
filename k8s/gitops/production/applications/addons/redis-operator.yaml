@@ -30,7 +30,6 @@ spec:
           watchNamespace: mlops-redis
           webhook: false
         featureGates:
-          AvoidCommandLinePassword: null
           GenerateConfigInInitContainer: false
         nodeSelector:
           workload-type: worker
