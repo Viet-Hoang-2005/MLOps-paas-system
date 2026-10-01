@@ -92,7 +92,7 @@ Database local được kiểm tra còn `public.paas_production_logs`. Bảng n�
 | `registry_modelmetric` | version, dataset role/split, metric name/value, step/time/metadata | Giữ và thêm `dataset_role` để phân biệt train/calibration/holdout/gate. |
 | `registry_registryalias` | project, alias, version, updated time | Giữ; `champion` là con trỏ mô hình được policy kỳ vọng. |
 | `training_trainingjob` | project, retry relation, trigger kind, baseline version, dataset snapshot, recipe version, runtime config/resources, backend IDs/status/error/timestamps | Bỏ URI dataset/output lặp; dataset đi qua snapshot, output đi qua `training_trainingoutput`. Bỏ `source_job_reference` ở các bảng liên quan. |
-| `training_trainingjobcapability` | job, purpose, token hash, expiry/consumption | Giữ. |
+| `training_trainingjobcapability` | job, purpose, token_hash (băm token), expiry/consumption | Giữ. |
 | `training_trainingoutput` | job, kind/path, URI/checksum/size/type/metadata | Giữ. |
 | `deployment_build` | project, source job, version, flavor/format/requirements, backend IDs/status, image/package identity, error/timestamps | Thay `logs TEXT` bằng `log_uri` và `log_tail`; bỏ `source_job_reference`. |
 | `deployment_buildinputasset` | build, kind/name, URI/checksum/size/type/purge time | Giữ. |

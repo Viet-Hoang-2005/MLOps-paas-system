@@ -1,0 +1,12 @@
+# .gitleaks.toml
+# Gitleaks configuration extending default rules with project-specific allowlists
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist for test fixtures and documentation false positives"
+paths = [
+    '''(^|/)tests/.*\.py$''',
+    '''(^|/)docs/.*\.md$''',
+]

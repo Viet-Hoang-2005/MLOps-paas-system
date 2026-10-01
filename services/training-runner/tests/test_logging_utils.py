@@ -110,9 +110,9 @@ class LoggingTests(unittest.TestCase):
     def test_partial_private_keys_are_masked_per_stream(self):
         saved = []
         runtime = RuntimeLog(self.logger, lambda line: saved.append(line) or True)
-        runtime.detail("-----BEGIN PRIVATE KEY-----")
+        runtime.detail("-----BEGIN PRIVATE KEY-----")  # gitleaks:allow
         runtime.detail("private-base64-body")
-        runtime.detail("-----END PRIVATE KEY-----")
+        runtime.detail("-----END PRIVATE KEY-----")  # gitleaks:allow
         runtime.detail("useful failure diagnosis")
         self.assertNotIn("private-base64-body", str(saved))
         self.assertIn("useful failure diagnosis", saved)
@@ -180,7 +180,7 @@ class LoggingTests(unittest.TestCase):
         runtime = RuntimeLog(self.logger, writer)
         runtime.detail('password="unsafe-value"')
         self.assertNotIn("unsafe-value", saved[0])
-        self.assertIn("[INFO]:", self.output.getvalue())
+        self.assertIn("[DEBUG]:", self.output.getvalue())
         self.output.truncate(0)
         self.output.seek(0)
 
