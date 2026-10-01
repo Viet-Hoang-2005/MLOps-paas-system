@@ -42,3 +42,15 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: redis-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: redis-operator
+      jqPathExpressions:
+        - .spec.template.spec.containers[].env[] | select(.name == "FEATURE_GATES")
