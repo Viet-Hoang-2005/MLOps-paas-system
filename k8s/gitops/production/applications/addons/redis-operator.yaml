@@ -29,8 +29,7 @@ spec:
           initContainerImageTag: v0.26.0
           watchNamespace: mlops-redis
           webhook: false
-        featureGates:
-          GenerateConfigInInitContainer: false
+        featureGates: null
         nodeSelector:
           workload-type: worker
         resources:
