@@ -106,7 +106,7 @@ spec:
           - {name: label_mapping_download_url}
           - {name: label_mapping_filename}
       container:
-        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:e8d3e6126b1760a7bd001e8a594b2361db3f6eba
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:2dfce0251c6bb4d0c1ee9923493a23eb6e2322f0
         imagePullPolicy: Always
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
@@ -167,7 +167,7 @@ spec:
           - {name: image_tag}
           - {name: control_plane_webhook_url}
       container:
-        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:e8d3e6126b1760a7bd001e8a594b2361db3f6eba
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:2dfce0251c6bb4d0c1ee9923493a23eb6e2322f0
         imagePullPolicy: Always
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
