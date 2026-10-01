@@ -1,11 +1,15 @@
+import logging
 from collections.abc import Sequence
 
+from django.conf import settings
 from redis.exceptions import RedisError
 
 from common.logging import runtime_line
 from common.redis_client import redis_client
+from infrastructure.runtime_logs import emit_tenant_log, uses_loki
 
 LOG_TTL_SECONDS = 3600
+logger = logging.getLogger("control_plane.training")
 
 
 def _decode(lines: Sequence[bytes | str]) -> list[str]:
@@ -27,6 +31,10 @@ def training_logs(job, offset: int) -> tuple[list[str], int]:
 
 
 def append_training_log(job_id, message: str) -> None:
+    emit_tenant_log(logger, "training", job_id, message)
+    # Jobs record TRAINING_BACKEND at creation, so this matches the reader's job.backend check.
+    if uses_loki(settings.TRAINING_BACKEND):
+        return
     try:
         redis = redis_client()
         key = f"training_logs:{job_id}"

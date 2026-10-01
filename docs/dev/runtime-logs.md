@@ -10,7 +10,11 @@ expires leftover objects after ten days. Empty the logs bucket before Terraform
 destroy: it deliberately does not use `force_destroy`.
 
 Alloy has namespace-scoped read-only Pod/log RBAC in `mlops-execution`,
-`mlops-model-runtimes`, and `user-jobs`. No Secret reads, node mounts, privileged
+`mlops-model-runtimes`, `user-jobs`, and `mlops-control-plane`. From the Control
+Plane it forwards only JSON records written by `emit_tenant_log` (`audience=tenant`
+with a valid `task_kind`); platform, framework and inherited-context logs stay in
+`kubectl logs`. `task_id`, `task_kind` and `audience` are never inherited from log
+context, so a whole Celery task cannot become tenant-visible. No Secret reads, node mounts, privileged
 DaemonSet, Control Plane Kubernetes credentials, or public Loki endpoint are
 required. Authoritative Pod labels correlate tasks. UUID/Pod become structured
 metadata instead of high-cardinality index labels. Logs remain untrusted
@@ -19,7 +23,9 @@ presentation data, never lifecycle truth.
 Existing task-log APIs authorize resources with tenant-scoped selectors before
 generating bounded Loki queries. Clients cannot supply LogQL or namespaces.
 Signed cursors bind the task UUID/kind; returned lines are sanitized. Local
-Docker retains Redis logs. Web polls every two seconds, drains terminal output,
+Docker retains Redis logs. `uses_loki(backend)` is the single Control Plane switch
+for writers and readers; Argo workloads skip Redis when the execution ConfigMap sets
+`LOG_STORAGE_BACKEND=loki`, which the validator keeps aligned with `LOKI_URL`. Web polls every two seconds, drains terminal output,
 and limits its buffer to 10,000 lines. Loki outages preserve the cursor and do
 not change task status.
 
@@ -72,7 +78,7 @@ currently has pre-existing typing errors; resolve that gate before merging rathe
 than disabling it. Schema/render checks are not a substitute for runtime smoke.
 
 - Check Loki/Alloy Application health, collector errors and Loki `/ready`.
-- Confirm Alloy can read task Pods/logs but not Secrets or Control Plane Pods.
+- Confirm Alloy can read task and Control Plane Pods/logs but not Secrets.
 - Compare Pod task labels with UUIDs and inspect structured metadata when output
   is missing. Retry log API errors without discarding the cursor.
 - For `unconfirmed`, inspect the Workflow exit handler and callback HTTP result

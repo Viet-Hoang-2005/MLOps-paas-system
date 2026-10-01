@@ -16,11 +16,21 @@ from common.logging import runtime_line
 PAGE_SIZE = 500
 CURSOR_SALT = "runtime-logs-v1"
 NAMESPACES = {
-    "build": "mlops-execution",
-    "deployment": "mlops-execution|mlops-model-runtimes",
-    "drift": "mlops-execution",
-    "training": "mlops-execution|user-jobs",
+    "build": "mlops-execution|mlops-control-plane",
+    "deployment": "mlops-execution|mlops-model-runtimes|mlops-control-plane",
+    "drift": "mlops-execution|mlops-control-plane",
+    "training": "mlops-execution|user-jobs|mlops-control-plane",
 }
+
+
+def uses_loki(backend):
+    """Single switch shared by log writers and readers for one execution backend."""
+    return bool(settings.LOKI_URL) and backend == "argo"
+
+
+def emit_tenant_log(logger, kind, task_id, message):
+    """Write a curated progress line; Alloy forwards only `audience=tenant` control-plane records."""
+    logger.info(message, extra={"task_id": str(task_id), "task_kind": kind, "audience": "tenant"})
 
 
 def _cursor(value, resource, kind):
@@ -55,7 +65,7 @@ def runtime_log_page(request, resource, kind, fallback):
     except (ValueError, TypeError) as exc:
         raise ValidationError({"offset": "Must be a non-negative integer."}) from exc
     backend = resource.monitor.backend if kind == "drift" else getattr(resource, "backend", "")
-    if not settings.LOKI_URL or backend != "argo":
+    if not uses_loki(backend):
         lines, next_offset = fallback(resource, offset)
         return {"logs": lines, "next_offset": next_offset}
 

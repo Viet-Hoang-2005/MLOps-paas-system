@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Sequence
 
 from django.utils import timezone
@@ -5,8 +6,10 @@ from redis.exceptions import RedisError
 
 from common.logging import runtime_line
 from common.redis_client import redis_client
+from infrastructure.runtime_logs import emit_tenant_log, uses_loki
 
 LOG_TTL_SECONDS = 3600
+logger = logging.getLogger("control_plane.deployment")
 
 
 def _decode_logs(lines: Sequence[bytes | str]) -> list[str]:
@@ -45,6 +48,9 @@ def deployment_logs(deployment, offset: int) -> tuple[list[str], int]:
 
 
 def reset_deployment_logs(deployment, message: str) -> None:
+    emit_tenant_log(logger, "deployment", deployment.public_id, message)
+    if uses_loki(deployment.backend):
+        return
     try:
         redis = redis_client()
         key = f"deployment_logs:{deployment.public_id}"
@@ -55,6 +61,9 @@ def reset_deployment_logs(deployment, message: str) -> None:
 
 
 def append_deployment_log(deployment, message: str) -> None:
+    emit_tenant_log(logger, "deployment", deployment.public_id, message)
+    if uses_loki(deployment.backend):
+        return
     try:
         redis = redis_client()
         _push_runtime_log(redis, f"deployment_logs:{deployment.public_id}", message)

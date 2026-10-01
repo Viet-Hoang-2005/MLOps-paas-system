@@ -47,6 +47,8 @@ logger = get_logger("training-runner")
 
 
 def log_to_redis(message: str) -> bool:
+    if os.environ.get("LOG_STORAGE_BACKEND", "").strip().lower() == "loki":
+        return False
     job_id = os.environ.get("TRAINING_JOB_ID", "").strip()
     redis_url = os.environ.get("REDIS_URL", "").strip()
     if not job_id or not redis_url:

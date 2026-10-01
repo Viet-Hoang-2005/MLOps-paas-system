@@ -575,8 +575,8 @@ jobs:
           push: false
           load: true
           tags: ${{ matrix.target.image }}:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.target.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target.image }}
 
       - name: Trivy Vulnerability Scan
         id: trivy

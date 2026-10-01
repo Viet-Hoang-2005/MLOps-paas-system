@@ -12,8 +12,8 @@ def validate(context: ValidationContext) -> list[str]:
     alloy = context.application("mlops-prod-addon-alloy")
     values = yaml.safe_load(alloy["spec"]["source"]["helm"]["values"])
     rbac = values.get("rbac", {})
-    if set(rbac.get("namespaces", [])) != {"mlops-execution", "mlops-model-runtimes", "user-jobs"}:
-        errors.append("Alloy must collect only task namespaces")
+    if set(rbac.get("namespaces", [])) != {"mlops-execution", "mlops-model-runtimes", "user-jobs", "mlops-control-plane"}:
+        errors.append("Alloy must collect only task and control-plane namespaces")
     if rbac.get("clusterRules") != []:
         errors.append("Alloy must not grant cluster-wide discovery rights")
     for rule in rbac.get("rules", []):
@@ -23,6 +23,12 @@ def validate(context: ValidationContext) -> list[str]:
     for contract in ("stage.structured_metadata", "stage.pack", 'action = "keep"'):
         if contract not in content:
             errors.append(f"Missing task correlation contract: {contract}")
+    for contract in ('audience!=\\"tenant\\"', "drop_malformed = true"):
+        if contract not in content:
+            errors.append(f"Control-plane logs must be limited to tenant records: missing {contract}")
+    # The chart passes this content through Helm tpl; Alloy templates must be Helm raw strings.
+    if any("{{" in line and "{{`" not in line for line in content.splitlines()):
+        errors.append("Alloy template expressions must be escaped as Helm raw strings")
     loki = context.application("mlops-prod-addon-loki")
     values = yaml.safe_load(loki["spec"]["source"]["helm"]["values"])
     if values.get("loki", {}).get("limits_config", {}).get("retention_period") != "168h":
@@ -30,6 +36,20 @@ def validate(context: ValidationContext) -> list[str]:
     if values.get("networkPolicy", {}).get("enabled") is not True:
         errors.append("Internal Loki must have a NetworkPolicy")
     execution = context.render("k8s/argo")
+    control_plane = find_resource(
+        context.render("k8s/apps/overlays/production/control-plane"), "ConfigMap", "mlops-paas-control-plane-config"
+    )
+    execution_config = find_resource(execution, "ConfigMap", "mlops-paas-execution-config")
+    reads_loki = bool(control_plane.get("data", {}).get("LOKI_URL"))
+    if "LOG_STORAGE_BACKEND" in control_plane.get("data", {}):
+        errors.append("Control plane selects the log store from LOKI_URL; LOG_STORAGE_BACKEND is ignored there")
+    if reads_loki != (execution_config.get("data", {}).get("LOG_STORAGE_BACKEND") == "loki"):
+        errors.append("Execution LOG_STORAGE_BACKEND must be loki exactly when the control plane reads Loki")
+    training = find_resource(execution, "WorkflowTemplate", "mlops-paas-training-pipeline-template")
+    manifests = [item.get("resource", {}).get("manifest", "") for item in training.get("spec", {}).get("templates", [])]
+    storage = '{name: LOG_STORAGE_BACKEND, value: "loki"}'
+    if any("LOG_FORMAT" in manifest and (storage in manifest) != reads_loki for manifest in manifests):
+        errors.append("Training pods must use the same log store as the control plane")
     role = find_resource(execution, "Role", "argo-workflow-deploy")
     deployment_verbs = {
         verb

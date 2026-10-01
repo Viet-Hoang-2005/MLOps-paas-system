@@ -168,8 +168,8 @@ jobs:
             VITE_GITHUB_CLIENT_ID=${{ vars.VITE_GITHUB_CLIENT_ID }}
             VITE_GITHUB_REDIRECT_URI=${{ vars.VITE_GITHUB_REDIRECT_URI }}
             VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.target.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target.image }}
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.5.0
