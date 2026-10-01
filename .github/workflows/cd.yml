@@ -312,27 +312,29 @@ jobs:
           
           EOF_DELIM=$(openssl rand -hex 8)
           
-          RAW_SUMMARY="### Delivery Summary
-          | Component | Image Tag | Delivery |
-          | :--- | :--- | :--- |
-          | **Frontend Web** (\`mlops-paas-web\`) | \`$WEB_TAG\` | GitOps promotion |
-          | **Control Plane** (\`mlops-paas-control-plane\`) | \`$DJANGO_TAG\` | GitOps promotion |
-          | **Redpanda Consumer** (\`mlops-paas-consumer\`) | \`$CONSUMER_TAG\` | GitOps promotion |
-          | **Model Packager** (\`mlops-paas-model-packager\`) | \`$PACKAGER_TAG\` | GitOps promotion |
-          | **Evidently Drift** (\`mlops-paas-evidently\`) | \`$EVIDENTLY_TAG\` | GitOps promotion |
-          | **MLflow Tracking Server** (\`mlops-paas-mlflow\`) | \`$MLFLOW_TAG\` | GitOps promotion |
-          | **Model Server** (\`mlops-paas-model-server\`) | \`$MODEL_SERVER_TAG\` | GitOps promotion |
-          | **Machine Learning Serving Base** (\`machine-learning-serving\`) | \`$MACHINE_LEARNING_SERVING_TAG\` | Registry base image |
-          | **Deep Learning Serving Base** (\`deep-learning-serving\`) | \`$DEEP_LEARNING_SERVING_TAG\` | Registry base image |
-          | **Training Runner** (\`mlops-paas-training-runner\`) | \`$TRAINING_RUNNER_TAG\` | GitOps promotion |"
+          {
+            echo "### Delivery Summary"
+            echo "| Component | Image Tag | Delivery |"
+            echo "| :--- | :--- | :--- |"
+            echo "| **Frontend Web** (\`mlops-paas-web\`) | \`$WEB_TAG\` | GitOps promotion |"
+            echo "| **Control Plane** (\`mlops-paas-control-plane\`) | \`$DJANGO_TAG\` | GitOps promotion |"
+            echo "| **Redpanda Consumer** (\`mlops-paas-consumer\`) | \`$CONSUMER_TAG\` | GitOps promotion |"
+            echo "| **Model Packager** (\`mlops-paas-model-packager\`) | \`$PACKAGER_TAG\` | GitOps promotion |"
+            echo "| **Evidently Drift** (\`mlops-paas-evidently\`) | \`$EVIDENTLY_TAG\` | GitOps promotion |"
+            echo "| **MLflow Tracking Server** (\`mlops-paas-mlflow\`) | \`$MLFLOW_TAG\` | GitOps promotion |"
+            echo "| **Model Server** (\`mlops-paas-model-server\`) | \`$MODEL_SERVER_TAG\` | GitOps promotion |"
+            echo "| **Machine Learning Serving Base** (\`machine-learning-serving\`) | \`$MACHINE_LEARNING_SERVING_TAG\` | Registry base image |"
+            echo "| **Deep Learning Serving Base** (\`deep-learning-serving\`) | \`$DEEP_LEARNING_SERVING_TAG\` | Registry base image |"
+            echo "| **Training Runner** (\`mlops-paas-training-runner\`) | \`$TRAINING_RUNNER_TAG\` | GitOps promotion |"
+          } > delivery_summary.md
+
+          cat delivery_summary.md >> "$GITHUB_STEP_SUMMARY"
           
-          SUMMARY_CONTENT=$(echo "$RAW_SUMMARY" | sed 's/^ *//')
-          
-          echo "$SUMMARY_CONTENT" >> $GITHUB_STEP_SUMMARY
-          
-          echo "pr_body<<$EOF_DELIM" >> $GITHUB_OUTPUT
-          echo "$SUMMARY_CONTENT" >> $GITHUB_OUTPUT
-          echo "$EOF_DELIM" >> $GITHUB_OUTPUT
+          {
+            echo "pr_body<<$EOF_DELIM"
+            cat delivery_summary.md
+            echo "$EOF_DELIM"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6

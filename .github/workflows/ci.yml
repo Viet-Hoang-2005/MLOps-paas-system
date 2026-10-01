@@ -122,14 +122,20 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout PR commits (Full history)
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Checkout latest commit only (Manual dispatch)
+        if: github.event_name != 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - name: GitLeaks Scan
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LOG_OPTS: ${{ github.event_name != 'pull_request' && '--max-count=1' || '' }}
 
   workflow-lint:
     name: "GitHub Actions Workflow Lint (actionlint)"
@@ -194,9 +200,11 @@ jobs:
           print(sum(item.get("errorCount", 0) for item in results), sum(item.get("warningCount", 0) for item in results))
           PY
           )
-          echo "errors=$err_count" >> "$GITHUB_OUTPUT"
-          echo "warnings=$warning_count" >> "$GITHUB_OUTPUT"
-          echo "exit_code=$eslint_exit" >> "$GITHUB_OUTPUT"
+          {
+            echo "errors=$err_count"
+            echo "warnings=$warning_count"
+            echo "exit_code=$eslint_exit"
+          } >> "$GITHUB_OUTPUT"
           if [ "$err_count" != "0" ]; then
             echo "::error::ESLint found $err_count errors!"
             exit 1
@@ -460,8 +468,12 @@ jobs:
           mapfile -t targets < <(find k8s -name kustomization.yaml -printf '%h\n' | sort -u)
           for target in "${targets[@]}"; do
             output="$(echo "$target" | tr '/' '-')-manifest.yaml"
-            for i in 1 2 3; do
-              kustomize build --enable-helm "$target" > "$output" && break || sleep 10
+            for attempt in 1 2 3; do
+              if kustomize build --enable-helm "$target" > "$output"; then
+                break
+              fi
+              echo "Attempt $attempt failed for $target, retrying in 10s..."
+              sleep 10
             done
             if [ ! -s "$output" ]; then
               echo "::error::Kustomize build failed for $target after 3 retries."
