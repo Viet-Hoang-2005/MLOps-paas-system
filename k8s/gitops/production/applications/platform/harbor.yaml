@@ -27,7 +27,7 @@ spec:
   ignoreDifferences:
     - group: apps
       kind: StatefulSet
-      name: mlops-paas-harbor-database
+      name: harbor-database
       namespace: harbor
       jsonPointers:
         - /spec/persistentVolumeClaimRetentionPolicy
@@ -56,7 +56,7 @@ spec:
         - /spec/volumeClaimTemplates/0/status
     - group: apps
       kind: StatefulSet
-      name: mlops-paas-harbor-redis
+      name: harbor-redis
       namespace: harbor
       jsonPointers:
         - /spec/persistentVolumeClaimRetentionPolicy
@@ -83,47 +83,47 @@ spec:
         - /spec/volumeClaimTemplates/0/status
     # The chart regenerates these secrets on every render; keep the first values to avoid restart loops.
     - kind: Secret
-      name: mlops-paas-harbor-core
+      name: harbor-core
       namespace: harbor
       jsonPointers:
         - /data
     - kind: Secret
-      name: mlops-paas-harbor-jobservice
+      name: harbor-jobservice
       namespace: harbor
       jsonPointers:
         - /data
     - kind: Secret
-      name: mlops-paas-harbor-registry
+      name: harbor-registry
       namespace: harbor
       jsonPointers:
         - /data
     - kind: Secret
-      name: mlops-paas-harbor-registry-htpasswd
+      name: harbor-registry-htpasswd
       namespace: harbor
       jsonPointers:
         - /data
     - kind: Secret
-      name: mlops-paas-harbor-registryctl
+      name: harbor-registryctl
       namespace: harbor
       jsonPointers:
         - /data
     - group: apps
       kind: Deployment
-      name: mlops-paas-harbor-core
+      name: harbor-core
       namespace: harbor
       jsonPointers:
         - /spec/template/metadata/annotations/checksum~1secret
         - /spec/template/metadata/annotations/checksum~1secret-jobservice
     - group: apps
       kind: Deployment
-      name: mlops-paas-harbor-jobservice
+      name: harbor-jobservice
       namespace: harbor
       jsonPointers:
         - /spec/template/metadata/annotations/checksum~1secret
         - /spec/template/metadata/annotations/checksum~1secret-core
     - group: apps
       kind: Deployment
-      name: mlops-paas-harbor-registry
+      name: harbor-registry
       namespace: harbor
       jsonPointers:
         - /spec/template/metadata/annotations/checksum~1secret

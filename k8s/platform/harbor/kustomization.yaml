@@ -9,7 +9,7 @@ helmCharts:
   - name: harbor
     repo: https://helm.goharbor.io
     version: 1.15.0
-    releaseName: mlops-paas-harbor
+    releaseName: harbor
     namespace: harbor
     valuesFile: values.yaml
 
@@ -17,7 +17,7 @@ patches:
   - target:
       group: apps
       kind: Deployment
-      name: mlops-paas-harbor-jobservice
+      name: harbor-jobservice
     patch: |-
       - op: replace
         path: /spec/strategy
