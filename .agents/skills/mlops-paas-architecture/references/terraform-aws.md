@@ -1,47 +1,34 @@
-# Terraform AWS
+# Terraform AWS Infrastructure
 
-Production task logs have a separate private S3 bucket with Loki seven-day
-retention and a ten-day S3 cleanup safety net. Only static-worker IAM gets the
-bucket-scoped policy; Karpenter tenant nodes/GitHub do not. Empty the log bucket
-before destroy; it is intentionally protected by `force_destroy=false`.
+The Terraform composition (`infra/`) provisions IaaS cloud resources across 9 dedicated modules:
 
-The root composition wires modules for:
+## Module Breakdown
 
-- `network`: VPC, public/private subnets, routes, NAT/internet gateways.
-- `security`: security groups and traffic boundaries.
-- `storage`: S3 buckets and storage configuration.
-- `secrets`: Secrets Manager resources, not secret values in state/source.
-- `iam`: instance, workload, registry, and automation permissions.
-- `compute`: control/worker instances or related bootstrap compute.
-- `alb`: listeners, target groups, certificates, and public service routing.
-- `dns`: Route53 records.
-- Karpenter dependencies: queues, node roles/profiles, discovery tags, the
-  agent-token secret container, and private Route53 DNS for the K3s API.
+1. **`network`:** VPC (`10.0.0.0/16`), public & private subnets across multiple AZs, route tables, Internet Gateway, and NAT Gateway.
+2. **`security`:** Security groups establishing strict boundaries:
+   - ALB Security Group: Inbound HTTP (80) & HTTPS (443) from internet.
+   - Master Node Security Group: Inbound SSH (22) from internet, K3s API (6443) from VPC/workers, NodePort/Traefik from ALB.
+   - Worker Node Security Group: Inbound all traffic from Master and fellow Workers, NodePort from ALB.
+3. **`storage`:** AWS S3 buckets:
+   - `artifacts_bucket` (`mlops-paas-artifacts`): S3 bucket for model weights, snapshots, datasets, and reports. Versioning enabled, public access blocked, CORS configured.
+   - `runtime_logs` (`mlops-paas-runtime-logs`): Dedicated bucket for production Loki task logs. Uses `force_destroy = true` for clean teardown during terraform destroy.
+4. **`secrets`:** AWS Secrets Manager containers with `recovery_window_in_days = 0` (secret metadata only, not values in state).
+5. **`iam`:** Instance profiles, worker roles, Karpenter node roles, and GitHub Actions OIDC federation.
+6. **`compute`:** Ubuntu 22.04 LTS EC2 instances for K3s Master (public IP/bastion) and static Workers (private IPs).
+7. **`alb`:** AWS Application Load Balancer with listeners, health check target groups, and idle timeout 600s.
+8. **`dns`:** Route 53 private and public zones with ACM SSL certificates.
+9. **Karpenter Dependencies:** SQS Interruption Queue and EventBridge rules for EC2 Spot rebalance / termination notices.
 
-Inspect `variables.tf`, feature flags, `main.tf`, and outputs together. Disabled optional modules must not be referenced unconditionally. Apply least privilege and avoid wildcard Secrets Manager/S3/IAM permissions.
+## Deployment Modes
 
-## Root feature flags
+1. **Full Production:** All modules enabled via `terraform.tfvars`. Deploys VPC, EC2 cluster, ALB, S3, Secrets Manager, and IAM.
+2. **S3-Only for Local Docker Compose:** Minimal deployment using `s3-only.tfvars`:
+   ```bash
+   terraform apply -var-file="s3-only.tfvars"
+   ```
+   Provisions only the S3 artifacts bucket. In this mode, `worker_private_ips` outputs `null` (not `[]`) to keep the plan clean.
 
-Persistent foundation resources use `enable_artifact_storage`, `enable_secrets_manager`, `enable_github_oidc`, and `enable_acm_certificate`. Runtime resources use `enable_network`, `enable_nat_gateway`, `enable_k3s_compute`, `enable_alb`, and `enable_karpenter`.
+## Teardown & Dynamic EBS Cleanup
 
-Current dependencies are enforced by root `check` blocks:
-
-- K3s compute requires network, NAT, artifact storage, and Secrets Manager.
-- ALB requires network, K3s compute, and ACM.
-- Karpenter requires network, NAT, and the static K3s cluster.
-- GitHub OIDC currently requires artifact storage and Secrets Manager because its IAM policy references both.
-
-Turning a flag off proposes resource destruction; it is not a pause mechanism. Review the plan and protect or separate persistent foundation state before disabling S3 or Secrets Manager.
-
-The four repository-managed Secrets Manager containers intentionally use
-`recovery_window_in_days = 0`. A Terraform destroy permanently deletes their
-metadata and stored versions. After recreation, `scripts/create_and_push_secrets_to_aws.py`
-publishes the three application secret values; Ansible publishes the K3s agent
-token after server bootstrap. Never destroy this module unless the required
-source values are available.
-
-Terraform owns only the `mlops/k3s-agent-token` secret metadata. Ansible writes
-its runtime version after K3s starts, so the token must never enter Terraform
-configuration, plan, outputs, or state.
-
-Do not edit generated state, commit tfvars containing secrets, or infer that AWS EC2 is still the only target; the deployment may use external VMs while retaining S3/Secrets Manager.
+- Dynamic EBS volumes created by Kubernetes CSI drivers (e.g. CloudNativePG, Prometheus, Redis PVCs) are not managed by Terraform.
+- Before running `terraform destroy`, all dynamic PVCs/EBS volumes in AWS must be deleted, or cleaned up via AWS CLI post-destroy to prevent orphaned resources.

@@ -1,44 +1,28 @@
-# Configuration matrix
+# Configuration Matrix
 
-| Category | Local | Production |
-| --- | --- | --- |
-| Execution | Docker SDK/Compose network | Argo/Kubeflow/Kubernetes |
-| Images | Docker image store | Harbor registry |
-| Artifacts | S3-compatible configuration/AWS S3 | AWS S3 |
-| Secrets | developer `.env` | Secrets Manager + External Secrets |
-| Public routing | localhost + Traefik | ingress/tunnel/load-balancer design |
-| Runtime naming | Docker container names | Kubernetes resource names |
+## Environment Comparison Matrix
 
-## Precedence
+| Category | Local Docker Compose | Production Kubernetes K3s |
+|---|---|---|
+| **Execution Backend** | `EXECUTION_BACKEND=docker` | `EXECUTION_BACKEND=argo` |
+| **Component Overrides** | `BUILD_BACKEND=docker`<br>`DEPLOYMENT_BACKEND=docker`<br>`TRAINING_BACKEND=docker`<br>`DRIFT_BACKEND=docker` | Can be set to `argo` or `docker` independently |
+| **Container Images** | Local Docker daemon cache | Harbor OCI Registry (`user-images/*`) |
+| **Relational Database** | Single PostgreSQL container (`mlops_paas_db`) | CloudNativePG HA Cluster (`schema control_plane`) |
+| **Redis Connection** | `REDIS_CONNECTION_MODE=direct` (`redis://redis:6379/1`) | `REDIS_CONNECTION_MODE=sentinel` (`REDIS_SENTINEL_HOSTS`, `REDIS_SENTINEL_MASTER_NAME`) |
+| **Log Storage** | `LOG_STORAGE_BACKEND=redis` (Redis streams: `*_logs:*`) | `LOG_STORAGE_BACKEND=loki` (Grafana Loki with task-bound cursors) |
+| **Message Broker** | Single Redpanda container (`redpanda:9092`) | Redpanda Operator HA cluster (`mlops_paas_production_data`) |
+| **Storage S3** | AWS S3 (`s3-only.tfvars`) or local S3-compatible | AWS S3 (`mlops-paas-artifacts` & `mlops-paas-runtime-logs`) |
+| **Secrets Delivery** | Local `.env` file | AWS Secrets Manager synchronized by External Secrets Operator (ESO) |
+| **Public Routing** | Direct ports (`8000`, `5001`, `5002`, `5004`, `5173`) | AWS ALB + Traefik Ingress Controller + Cloudflare Tunnel |
 
-1. Component-specific backend setting.
+## Setting Precedence
+
+1. Component-specific execution override (`BUILD_BACKEND`, `TRAINING_BACKEND`, etc.).
 2. Global `EXECUTION_BACKEND`.
-3. Code default.
+3. Code default (`docker`).
 
-Confirm actual setting names in Control Plane settings and ConfigMaps before changing them.
+## Logging Configurations
 
-## Variable groups
-
-- Database, Redis, broker, MLflow.
-- S3 region/bucket/endpoints and presign TTL.
-- OAuth/JWT/API/security secrets.
-- Docker/registry/Harbor.
-- Argo Events/Workflow namespaces and service endpoints.
-- Runtime IDs and scoped callback/upload URLs.
-
-Never copy real values into skills or source. Do not assume example values are current contracts.
-
-## Backend logging
-
-Each application owns its logging utilities (`src/logging_utils.py`, or
-`src/common/logging_utils.py` for Control Plane). Docker build context is
-`services/<service>` with its own `.dockerignore`; no shared logging installation.
-Set `LOG_FORMAT=console` (the default) for readable container output, or
-`LOG_FORMAT=json` before reproducing an incident to retain structured metadata.
-Compose selects `Dockerfile` within that context; CI/CD use `matrix.target.context`
-and the explicit repository-relative Dockerfile path. Per-service path changes
-select only that service. Gateway/ML-serving use `src.uvicorn_entrypoint`; Django,
-Celery/Gunicorn and BentoML retain their local adapters. MLflow keeps its own context. Default `LOG_LEVEL=INFO` and
-`LOG_SUMMARY_INTERVAL_SECONDS=60` apply to Compose and production execution.
-Production training has no shared Redis log credentials: retain sanitized container
-detail until a trusted job-log transport exists. Do not remove that fallback.
+- `LOG_FORMAT`: `console` (human-readable single line, default) or `json` (one-line structured JSON).
+- `LOG_LEVEL`: Default `INFO`.
+- `LOG_SUMMARY_INTERVAL_SECONDS`: Default `60` (summarizes high-frequency metrics per process every 60s).

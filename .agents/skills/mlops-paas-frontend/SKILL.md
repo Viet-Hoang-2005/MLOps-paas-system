@@ -3,30 +3,33 @@ name: mlops-paas-frontend
 description: Implement or review the React/Vite frontend, including feature-first boundaries, route coordinators, React Query, API clients, design tokens, responsive UI, accessibility, i18n, and runtime logs. Use for any change under web/ or any browser-facing workflow.
 ---
 
-# MLOps PaaS frontend
+# MLOps PaaS Frontend
+
+Use this skill to implement, modify, review, or troubleshoot the React 18 / TypeScript / Vite frontend application (`web/`).
+
+Never embed passwords, tokens, private keys, or credentials in source code, mock fixtures, or translations.
 
 ## Workflow
 
-1. Inspect the current route, page, feature API, query hook, shared component, and translations before editing.
+1. Inspect the relevant route, page coordinator, feature API client, React Query hook, shared component, and translation files (`web/src/locales/`).
 2. Read the relevant references: [code-architecture.md](references/code-architecture.md), [routing-and-state.md](references/routing-and-state.md), [api-and-server-state.md](references/api-and-server-state.md), [design-system.md](references/design-system.md), and [i18n-and-quality-gates.md](references/i18n-and-quality-gates.md).
-3. Preserve `app → features → shared`; shared must not import a feature.
-4. Keep pages as coordinators/composition. Put HTTP in domain clients and server state in query hooks.
-5. Preserve routes, payloads, status semantics, dark mode, accessibility, and responsive behavior unless the request changes them.
-6. Inspect live backend serializers/endpoints when a frontend contract is uncertain.
-7. Preserve user changes and avoid unrelated visual refactors.
-8. If the change intentionally alters a frontend contract, update this skill.
+3. Preserve the strict dependency direction: `app` $\rightarrow$ `features` $\rightarrow$ `shared`. Components in `shared/` must never import from `features/`.
+4. Keep page components as coordinators and compositional shells (`Outlet`); delegate network calls to domain API clients and server state to `@tanstack/react-query` hooks.
+5. Maintain route conventions, payload typing, error handling, dark/light theme tokens, ARIA accessibility, and responsive layouts.
+6. Verify live backend endpoints and serializers (`services/control-plane/src/apps/`) when an API contract is uncertain.
+7. Support real-time task log streaming via cursor-based HTTP polling hooks (`useRuntimeLogs`).
+8. Ensure all user-facing strings are localized in both English (`en.json`) and Vietnamese (`vi.json`).
 
-Load `$mlops-paas-overview` for cross-service workflows and `$mlops-paas-security` for auth, tenancy, credentials, uploads, or public endpoints.
+## Required Validation
 
-Treat code, tests, build configuration, and the live backend contract as more authoritative than README or architecture prose; reconcile conflicts explicitly. Never embed passwords, tokens, private keys, real environment values, or SSH credentials.
-
-## Required validation
-
-From `web/`, run:
-
+Execute from the `web/` directory:
 ```bash
 pnpm lint
 pnpm build
 ```
 
-Manually smoke-test the affected route, theme modes, keyboard focus, loading/empty/error states, and API recovery path.
+Manually smoke-test:
+- Affected routes and query parameter preservation.
+- Light and dark theme transitions.
+- Form validation, dirty form exit confirmation, and error recovery states.
+- Responsive breakpoints (mobile, tablet, desktop).

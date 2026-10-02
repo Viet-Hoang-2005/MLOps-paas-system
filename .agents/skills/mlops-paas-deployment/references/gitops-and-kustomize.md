@@ -1,37 +1,35 @@
-# GitOps and Kustomize
+# GitOps & Kustomize
 
-- Ansible installs Argo CD and bootstraps the public `mlops-paas-system` root Application; no Git credential is required while the repository remains public.
-- Root `k8s/kustomization.yaml` renders only the production GitOps control tree after migration.
-- The root owns only GitOps control resources. `mlops-prod-cluster-namespaces`
-  owns namespaces from `k8s/cluster/namespaces` at wave `-50`; cluster storage,
-  secret-store, policy and capacity are separate `mlops-prod-cluster-*` Apps.
-- Explicit child Applications under `k8s/gitops/production` own service/domain Kustomizations.
-- Static workload manifests live under `k8s/apps/base`; Argo CD reconciles only environment overlays such as `k8s/apps/overlays/production`. Infrastructure, Argo execution and operator resources have separate ownership paths.
-- `mlops-prod-cluster-secret-store` owns only `ClusterSecretStore`. Each workload, platform domain and execution source owns its colocated `ExternalSecret` and the narrowly scoped Kubernetes target Secret it consumes; AWS Secrets Manager remains the shared value source.
+## Root Application & Sync Waves
 
-## Current topology caveats
+Argo CD manages the cluster using the Application-of-Applications pattern anchored at `k8s/gitops/production/applications.yaml`. Resources are synchronized according to strict **Sync Waves**:
 
-- `k8s/security/` contains inactive broad policies and is intentionally outside every Application source. The targeted EventSource/EventBus NetworkPolicies in `k8s/argo` are active execution resources.
-- `mlops-addons` installs pinned Helm/Git controller, CRD and driver capabilities; cluster and platform Applications configure their instances.
-- `mlops-prod-addon-kyverno` and `mlops-prod-cluster-image-verification` enforce keyless Cosign verification only for `registry.mlops-nids-nt114.id.vn/mlops-paas/*`. The policy identity is the repository's `cd.yml` workflow on `main`; tenant `user-images/*` remain outside the policy until their build path can sign independently.
-- `mlops-prod-cluster-karpenter-capacity` owns CPU/GPU EC2NodeClasses and NodePools. Git
-  contains stable non-secret identifiers and the private K3s API DNS name;
-  Terraform owns AWS primitives and Ansible publishes only the token value.
-- `mlops-prod-platform-cloudflare` owns the Cloudflare Tunnel and its scoped
-  credential. `mlops-prod-platform-routing` separately owns the Traefik routes
-  and health endpoint in `mlops-routing`; routes name backend namespaces
-  explicitly. Keep these boundaries separate when changing public exposure.
-- Production owners never reconcile into `default`: static services, data,
-  execution workflows and dynamic model runtimes use their dedicated
-  `mlops-*` namespaces. Cross-owner service calls use FQDNs.
-- `k8s/security/` remains intentionally excluded during the current stability
-  phase; do not describe its NetworkPolicies or custom PDBs as active. Do not
-  extend that statement to the reconciled policies under `k8s/argo`.
+| Plane | Sync Wave | Applications / Resources |
+|---|---|---|
+| **Cluster Plane** | `-50` | `mlops-prod-cluster-namespaces`, CRDs, PriorityClasses |
+| **Addons Plane** | `-40` to `-31` | Traefik, CloudNativePG, Redis Operator, Redpanda Operator, ESO, Loki, Alloy, Prometheus Stack, Harbor |
+| **Platform Plane** | `-30` to `-21` | `ClusterSecretStore` (AWS Secrets Manager), Cert-Manager, Kyverno policies |
+| **Execution Plane** | `-20` to `-11` | Argo Workflows, Argo Events EventSource/Sensors, Kubeflow Training Operator, Karpenter, KEDA |
+| **Workloads Plane** | `0` to `20` | DB Migrations (Wave 0), Control Plane & Celery (Wave 10), Model Server & Consumer (Wave 10), MLflow (Wave 10), Web Dashboard (Wave 20) |
 
-Do not silently claim an unreferenced manifest is active. Fix ownership/reconciliation explicitly and validate rendered output.
+## Operational Caveats & Drift Protections
 
-GitOps promotion changes image references/manifests in Git; Argo CD reconciles them. Avoid manual drift except authorized emergency operations with a documented rollback.
-`mlops-prod-platform-cloudflare` owns the Cloudflare Tunnel and its scoped
-credential, while `mlops-prod-platform-routing` owns the Traefik routes and
-health endpoint. Keep these Application boundaries separate when changing
-public exposure.
+1. **`redis-operator` Feature Gates Drift:**
+   - The upstream chart attempts to pass `FEATURE_GATES` environment variables that cause reconcile loops.
+   - Suppressed by setting `featureGates: null` in `k8s/gitops/production/applications/addons/redis-operator.yaml`.
+2. **`ExternalSecret` Webhook Defaults Drift:**
+   - The ESO mutating webhook injects 4 default fields:
+     - `conversionStrategy: Default`
+     - `decodingStrategy: None`
+     - `metadataPolicy: None`
+     - `nullBytePolicy: Ignore`
+   - All `ExternalSecret` manifests across `control-plane`, `model-server`, and `redis` explicitly declare these 4 fields to eliminate perpetual Argo CD OutOfSync status.
+3. **Loki StatefulSet Field Normalization:**
+   - `loki.yaml` configures `ignoreDifferences` for Kubernetes defaulted StatefulSet fields (`revisionHistoryLimit`, `updateStrategy.rollingUpdate.partition`) to prevent perpetual drift.
+4. **Alloy Destination Allowlist:**
+   - In `addons.yaml`, the `alloy` Application explicitly allows destination namespace `mlops-control-plane` so Alloy can discover and scrape application pods.
+5. **Kyverno Image Verification:**
+   - Enforces keyless Cosign verification on `registry.mlops-nids-nt114.id.vn/mlops-paas/*` images produced by the repository's `cd.yml` workflow on `main`.
+   - Tenant user model images (`user-images/*`) remain exempted until tenant build workflows implement signing.
+6. **Namespace Isolation:**
+   - No production application or data store reconciles into `default`. Dedicated namespaces: `mlops-system`, `mlops-control-plane`, `mlops-model-runtimes`, `mlops-data`, `mlops-monitoring`, `mlops-execution`.

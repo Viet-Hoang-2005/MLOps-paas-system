@@ -17,7 +17,7 @@ data:
   DB_SCHEMA: "control_plane"
   CONTROL_PLANE_DB_SCHEMA: "control_plane"
   DJANGO_DEBUG: "False"
-  DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,0.0.0.0,control-plane,mlops-paas-control-plane,mlops_paas_control_plane,api.mlops-nids-nt114.id.vn,mlops-paas-control-plane.mlops-control-plane.svc.cluster.local,mlops-paas-control-plane.mlops-control-plane.svc,mlops-paas-control-plane.mlops-control-plane"
+  DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,0.0.0.0,control-plane,mlops-paas-control-plane,control_plane,api.mlops-nids-nt114.id.vn,mlops-paas-control-plane.mlops-control-plane.svc.cluster.local,mlops-paas-control-plane.mlops-control-plane.svc,mlops-paas-control-plane.mlops-control-plane"
   EXECUTION_BACKEND: "argo"
   TRAINING_ENABLED: "false"
   TRAINING_GPU_ENABLED: "false"

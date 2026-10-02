@@ -5,7 +5,7 @@ services:
       context: ./services/control-plane
       dockerfile: Dockerfile
     image: mlops-paas-control-plane
-    container_name: mlops_paas_control_plane
+    container_name: control_plane
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -19,7 +19,7 @@ services:
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0,control-plane,mlops_paas_control_plane}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0,control-plane,control_plane}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://mlops-nids-nt114.id.vn,http://localhost:5173,http://127.0.0.1:5173}
       DB_HOST_RW: postgres
       DB_HOST_RO: postgres
@@ -87,7 +87,7 @@ services:
     build:
       context: ./services/control-plane
       dockerfile: Dockerfile
-    container_name: mlops_paas_celery_worker
+    container_name: celery_worker
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: 1
@@ -149,7 +149,7 @@ services:
       context: ./services/model-server
       dockerfile: Dockerfile
     image: mlops-paas-model-server
-    container_name: mlops_paas_model_server
+    container_name: model_server
     restart: unless-stopped
     ports:
       - "5001:5000"
@@ -192,7 +192,7 @@ services:
       context: ./services/machine-learning-serving
       dockerfile: Dockerfile
     image: mlops-paas-machine-learning-serving:latest
-    container_name: mlops_paas_machine_learning_serving
+    container_name: machine_learning_serving
     environment:
       LOG_FORMAT: ${LOG_FORMAT:-console}
       LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
@@ -212,7 +212,7 @@ services:
       context: ./services/deep-learning-serving
       dockerfile: Dockerfile
     image: mlops-paas-deep-learning-serving:latest
-    container_name: mlops_paas_deep_learning_serving
+    container_name: deep_learning_serving
     environment:
       LOG_FORMAT: ${LOG_FORMAT:-console}
     restart: "no"
@@ -228,7 +228,7 @@ services:
   # 2.3 Traefik API Gateway for Model Server
   traefik:
     image: traefik:latest
-    container_name: mlops_paas_traefik
+    container_name: traefik
     command:
       - "--api.insecure=true"
       - "--providers.docker=true"
@@ -249,7 +249,7 @@ services:
       context: ./services/model-packager
       dockerfile: Dockerfile
     image: mlops-paas-model-packager
-    container_name: mlops_paas_model_packager
+    container_name: model_packager
     restart: "no"
     command:
       - python
@@ -269,7 +269,7 @@ services:
       context: ./services/evidently
       dockerfile: Dockerfile
     image: mlops-paas-evidently
-    container_name: mlops_paas_evidently
+    container_name: evidently
     restart: "no"
     command:
       - python
@@ -289,6 +289,7 @@ services:
       context: ./services/training-runner
       dockerfile: Dockerfile
     image: mlops-paas-training-runner:latest
+    container_name: training_runner
     restart: "no"
     command:
       - python
@@ -304,7 +305,7 @@ services:
   # 6. PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: mlops_paas_postgres
+    container_name: postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -313,7 +314,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - mlops_paas_pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - mlops_paas_network
     healthcheck:
@@ -326,7 +327,7 @@ services:
   # 6.1 Init Container để tạo schema cho Control Plane và MLflow
   schema-init:
     image: postgres:15-alpine
-    container_name: mlops_paas_schema_init
+    container_name: postgres_schema_init
     restart: "no"
     environment:
       PGPASSWORD: ${DB_PASSWORD}
@@ -345,7 +346,7 @@ services:
   # 7. Redpanda Kafka Broker
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:latest
-    container_name: mlops_paas_redpanda
+    container_name: redpanda
     command:
       - redpanda
       - start
@@ -368,7 +369,7 @@ services:
   # 7.1 Redpanda Init Kafka Topic
   redpanda-init:
     image: docker.redpanda.com/redpandadata/redpanda:latest
-    container_name: mlops_paas_redpanda_init
+    container_name: redpanda_init
     restart: "no"
     entrypoint: ["/bin/sh", "-ec"]
     command:
@@ -398,7 +399,7 @@ services:
       context: ./services/consumer
       dockerfile: Dockerfile
     image: mlops-paas-consumer
-    container_name: mlops_paas_consumer
+    container_name: consumer
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: 1
@@ -441,7 +442,7 @@ services:
   # 8. Redis
   redis:
     image: redis:7-alpine
-    container_name: mlops_paas_redis
+    container_name: redis
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -456,7 +457,7 @@ services:
       context: ./services/mlflow
       dockerfile: Dockerfile
     image: mlops-paas-mlflow:v2.14.1
-    container_name: mlops_paas_mlflow
+    container_name: mlflow
     restart: unless-stopped
     command: >
       mlflow server
@@ -493,7 +494,7 @@ networks:
 
 # Volume để lưu trữ dữ liệu của PostgreSQL và Redpanda
 volumes:
-  mlops_paas_pgdata:
-    name: ${POSTGRES_VOLUME_NAME:-mlops_paas_pgdata}
+  postgres_data:
+    name: ${POSTGRES_VOLUME_NAME:-postgres_data}
   redpanda_data:
-    name: mlops_paas_redpanda_data
+    name: redpanda_data
