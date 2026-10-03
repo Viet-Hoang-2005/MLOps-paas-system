@@ -17,9 +17,9 @@ TEST_CSV_PATH = os.path.join(
 # Tự động load biến môi trường từ file .env
 load_dotenv(os.path.join(ROOT_DIR, ".env"))
 
-# Đọc API_URL và đảm bảo nó trỏ đúng vào endpoint /predict
-API_URL = os.environ.get("API_URL", "http://localhost:5000").rstrip("/")
-API_KEY = os.environ.get("API_KEY")
+# Đọc MODEL_PROJECT_API_UR và đảm bảo nó trỏ đúng vào endpoint /predict
+MODEL_PROJECT_API_URL = os.environ.get("MODEL_PROJECT_API_URL", "http://localhost:5000").rstrip("/")
+MODEL_PROJECT_API_KEY = os.environ.get("MODEL_PROJECT_API_KEY")
 
 
 def api_test_continuous(samples_per_class=1):
@@ -64,10 +64,10 @@ def api_test_continuous(samples_per_class=1):
                     start_time = time.time()
 
                     headers = {}
-                    if API_KEY:
-                        headers["X-API-Key"] = API_KEY
+                    if MODEL_PROJECT_API_KEY:
+                        headers["X-API-Key"] = MODEL_PROJECT_API_KEY
 
-                    response = requests.post(API_URL, json=payload, headers=headers)
+                    response = requests.post(MODEL_PROJECT_API_URL, json=payload, headers=headers)
                     end_time = time.time()
 
                     latency = round((end_time - start_time) * 1000, 2)

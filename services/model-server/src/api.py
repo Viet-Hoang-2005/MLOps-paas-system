@@ -42,6 +42,7 @@ from src.logging_utils import request_id as validated_request_id
 from src.routing import resolve_worker_url
 from src.schemas import InferenceRequest
 from src.runtime_metrics import record_request
+from src.prometheus_metrics import metrics_response
 
 logger = get_logger(__name__)
 publication_summary = Summary(logger, "inference_enqueue_summary")
@@ -189,7 +190,8 @@ paas_latency_histogram = Histogram(
     ["tenant_id", "project_id", "model_version_id"],
 )
 
-Instrumentator().instrument(app).expose(app)
+Instrumentator().instrument(app)
+app.add_api_route("/metrics", metrics_response, include_in_schema=False)
 
 JWKS_CACHE: dict[str, Any] = {}
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)

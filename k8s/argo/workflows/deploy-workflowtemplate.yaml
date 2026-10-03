@@ -97,6 +97,9 @@ spec:
                 labels:
                   app: {{=toJson(inputs.parameters.container_name)}}
                   mlops.io/deployment-id: "{{workflow.parameters.deployment_id}}"
+                  mlops.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
+                  mlops.io/project-id: {{=toJson(inputs.parameters.project_id)}}
+                  mlops.io/model-version-id: {{=toJson(inputs.parameters.model_version_id)}}
               spec:
                 automountServiceAccountToken: false
                 nodeSelector:

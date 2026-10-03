@@ -82,6 +82,8 @@ spec:
           tls:
             enabled: false
         kube-state-metrics:
+          metricLabelsAllowlist:
+            - pods=[mlops.io/deployment-id,mlops.io/tenant-id,mlops.io/project-id,mlops.io/model-version-id]
           nodeSelector:
             workload-type: worker
   destination:

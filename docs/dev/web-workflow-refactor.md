@@ -246,7 +246,9 @@ Theo quyết định cập nhật, local chỉ cần quan sát realtime ngắn, 
 - CPU theo cores, RAM working set theo MiB. RPS dùng counter atomic gateway trong Redis hiện có (TTL 300 giây), phối hợp giữa các worker; không lưu chuỗi mẫu server-side.
 - Control Plane trả snapshot cho tenant/project đã xác thực; không nhận container ID hoặc truy vấn tùy ý từ Web.
 - Web poll mỗi 5 giây khi mở tab, giữ tối đa 60 điểm/5 phút trong bộ nhớ. Rời trang/F5/đổi deployment bắt đầu lại; không có history 1h/24h ở local.
-- Mẫu đầu, nguồn metric lỗi hoặc counter reset hiện “Chưa có dữ liệu/Không khả dụng”, không giả số 0 hoặc spike. Production Prometheus không thay đổi.
+- Mẫu đầu, nguồn metric lỗi hoặc counter reset hiện “Chưa có dữ liệu/Không khả dụng”, không giả số 0 hoặc spike.
+- Production dùng Prometheus: CPU/RAM join cAdvisor với `kube_pod_labels` theo namespace và nhãn tenant/project/version/deployment, chỉ lấy container runtime `model-server`. Monitoring allowlist bốn nhãn Pod này. Runtime triển khai trước thay đổi cần redeploy để nhận đủ nhãn; không tự sửa runtime đang chạy.
+- Gateway export counter/histogram multiprocess giữa các Uvicorn worker trong mỗi Pod. Parent tạo directory mới trước khi import app/spawn; worker restart giữ counter, parent restart reset counter. Production dùng `emptyDir` riêng từng Pod; Prometheus áp dụng `rate()` trước khi cộng các Pod. Local vẫn dùng Redis counter realtime, không cần Prometheus.
 - Giữ Redis runtime logs. Trạng thái tác vụ lấy từ PostgreSQL; nghiệm thu Docker stats thực tế được tách khỏi test mock.
 
 ## 5. Lộ trình thực hiện

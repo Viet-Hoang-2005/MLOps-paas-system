@@ -1,3 +1,6 @@
+import json
+
+from django.conf import settings
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -28,11 +31,24 @@ def runtime_metrics(project, *, window="1h", prometheus=None, docker=None, redis
     end = timezone.now().timestamp()
     duration = RANGES[window]
     start = max(end - duration, deployment.deployed_at.timestamp() if deployment.deployed_at else end - duration)
-    scope = f'container_label_mlops_deployment_id="{deployment.public_id}",container_label_mlops_tenant_id="{project.owner.tenant_id}"'
+    namespace = json.dumps(settings.MODEL_RUNTIME_NAMESPACE)
+    # cAdvisor exposes namespace/pod/container, not Docker container_label_*.
+    # Join the explicit KSM allowlist; deduplicate exporter/scrape replicas.
+    labels = {
+        "namespace": settings.MODEL_RUNTIME_NAMESPACE,
+        "label_mlops_io_deployment_id": str(deployment.public_id),
+        "label_mlops_io_tenant_id": str(project.owner.tenant_id),
+        "label_mlops_io_project_id": str(project.public_id),
+        "label_mlops_io_model_version_id": str(deployment.version.public_id),
+    }
+    scope = ",".join(f"{key}={json.dumps(value)}" for key, value in labels.items())
+    owned_pods = f"max by (namespace,pod) (kube_pod_labels{{{scope}}})"
+    container_scope = f'namespace={namespace},container="model-server",job="kubelet",metrics_path="/metrics/cadvisor"'
+    join = f"* on (namespace,pod) group_left() ({owned_pods})"
     request_scope = f'project_id="{project.public_id}",model_version_id="{deployment.version.public_id}",tenant_id="{project.owner.tenant_id}"'
     expressions = {
-        "cpu": f"sum(rate(container_cpu_usage_seconds_total{{{scope}}}[1m]))",
-        "memory": f"sum(container_memory_working_set_bytes{{{scope}}}) / 1048576",
+        "cpu": f"sum(max by (namespace,pod,container) (rate(container_cpu_usage_seconds_total{{{container_scope}}}[2m])) {join})",
+        "memory": f"sum(max by (namespace,pod,container) (container_memory_working_set_bytes{{{container_scope}}}) {join}) / 1048576",
         "requests": f"sum(rate(paas_predictions_total{{{request_scope}}}[1m]))",
     }
     try:

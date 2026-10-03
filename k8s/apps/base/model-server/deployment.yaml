@@ -16,6 +16,9 @@ spec:
         app: mlops-paas-model-server
         component: model-gateway
     spec:
+      volumes:
+        - name: prometheus-multiprocess
+          emptyDir: {}
       nodeSelector:
         workload-type: worker
       containers:
@@ -26,6 +29,8 @@ spec:
             - name: http
               containerPort: 5000
           env:
+            - name: PROMETHEUS_MULTIPROC_DIR
+              value: /var/run/model-server-metrics
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
@@ -49,6 +54,9 @@ spec:
           envFrom:
             - configMapRef:
                 name: mlops-paas-model-server-config
+          volumeMounts:
+            - name: prometheus-multiprocess
+              mountPath: /var/run/model-server-metrics
           resources:
             requests:
               cpu: 150m

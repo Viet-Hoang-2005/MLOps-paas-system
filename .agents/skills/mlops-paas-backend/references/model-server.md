@@ -1,5 +1,7 @@
 # Model Server
 
+Production metrics: the Uvicorn parent creates a fresh process-metric directory before importing the app/spawning workers. `/metrics` builds a fresh MultiProcessCollector registry per scrape, aggregating counters/histograms across workers in this pod. Worker restarts must not clear files; parent restarts reset counters. Each production Pod has its own emptyDir. CPU/RAM comes from cAdvisor joined to explicit kube-state-metrics Pod identity labels (tenant/project/version/deployment); never Docker-style labels on Kubernetes. Existing runtimes need redeployment to receive these Pod labels. Local Web realtime still uses Docker SDK and the short-lived Redis request counter.
+
 The Model Server (`services/model-server/`) is the centralized, trusted inference gateway. Worker runtimes (`machine-learning-serving`, `deep-learning-serving`) reside in protected internal networks and do not implement authentication.
 
 ## Core Responsibilities
