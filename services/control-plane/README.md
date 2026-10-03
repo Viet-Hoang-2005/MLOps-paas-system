@@ -333,6 +333,8 @@ python manage.py makemigrations --check --dry-run --settings=config.settings.tes
 > - **Redis Streams** chỉ được sử dụng làm bộ đệm tạm thời (transient presentation state) để phục vụ UI streaming logs realtime. PostgreSQL luôn là nguồn chân lý duy nhất cho trạng thái của tài nguyên.
 > - Trên môi trường Production Kubernetes, logs tác vụ của Argo được lưu trữ tập trung trên **Grafana Loki** (thời gian lưu trữ 7 ngày). Control Plane đóng vai trò là Proxy bảo mật, tự động ký token con trỏ (signed task-bound cursor) để ngăn chặn việc người dùng lợi dụng LogQL để truy vấn trộm log của tenant khác.
 
+Metric runtime local dùng `infrastructure/docker_metrics.py` đọc CPU/RAM bằng Docker SDK cho đúng deployment Running và kiểm tra đủ label owner. API `/api/observability/models/<project>/runtime-metrics/` trả snapshot, không lưu lịch sử. RPS dùng counter gateway atomic ngắn hạn trong Redis; Web giữ tối đa 5 phút trong bộ nhớ lúc mở trang. Không cần Prometheus/cAdvisor local; adapter Prometheus production được giữ nguyên.
+
 > [!NOTE]
 > **Chế độ Kết nối Redis (Redis Direct vs. Redis Sentinel):**
 > Biến môi trường `REDIS_CONNECTION_MODE` quyết định phương thức kết nối:

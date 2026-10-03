@@ -19,6 +19,8 @@
 
 ## Navigation rules
 
+- Local Overview metrics poll Docker snapshots at 5s while foregrounded; retain at most 60 points/5 minutes only for the mounted page. Reset for new Running deployment, skip RPS across counter resets/outages, and don't show stale values as current measurements. Production keeps its separate Prometheus history mode.
+
 - Back/step navigation uses the same validation and persistence rules as footer actions.
 - Dirty local files/forms use SPA blocking plus a confirmation modal; `beforeunload` covers refresh/close.
 - Direct URLs missing required IDs must route to the earliest recoverable step.

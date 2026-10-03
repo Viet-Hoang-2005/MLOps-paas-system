@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 import jwt
 import redis
+import redis.asyncio as async_redis
 from redis.sentinel import Sentinel
 from confluent_kafka import Producer
 from fastapi import (
@@ -40,6 +41,7 @@ from src.logging_utils import (
 from src.logging_utils import request_id as validated_request_id
 from src.routing import resolve_worker_url
 from src.schemas import InferenceRequest
+from src.runtime_metrics import record_request
 
 logger = get_logger(__name__)
 publication_summary = Summary(logger, "inference_enqueue_summary")
@@ -54,13 +56,12 @@ from src.database import (  # noqa: E402  # Initialize log summaries before data
     verify_project_api_key,
 )
 
-JWKS_URL = os.environ.get(
-    "JWKS_URL", "http://control-plane:8000/api/auth/.well-known/jwks.json"
-)
+JWKS_URL = os.environ.get("JWKS_URL", "http://control-plane:8000/api/auth/.well-known/jwks.json")
 REDPANDA_BROKERS = os.environ.get("REDPANDA_BROKERS", "redpanda:9092")
 KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "mlops_paas_production_data")
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/1")
 REDIS_CONNECTION_MODE = os.environ.get("REDIS_CONNECTION_MODE", "direct")
+LOCAL_RUNTIME_METRICS_ENABLED = os.environ.get("LOCAL_RUNTIME_METRICS_ENABLED", "false").lower() == "true"
 
 
 def _redis_connection():
@@ -132,18 +133,25 @@ def create_kafka_producer():
 
 
 redis_client = None
+metrics_redis_client = None
 kafka_producer = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global redis_client, kafka_producer
+    global redis_client, kafka_producer, metrics_redis_client
     configure("model-server")
     redis_client = create_redis_client()
+    if LOCAL_RUNTIME_METRICS_ENABLED:
+        # A separate, bounded async connection; no blocking Redis IO in predict.
+        metrics_redis_client = async_redis.from_url(REDIS_URL, socket_timeout=0.2, socket_connect_timeout=0.2)
     kafka_producer = create_kafka_producer()
     try:
         yield
     finally:
+        if metrics_redis_client is not None:
+            await metrics_redis_client.aclose()
+            metrics_redis_client = None
         try:
             if kafka_producer:
                 kafka_producer.flush(timeout=5.0)
@@ -254,9 +262,7 @@ async def health_check():
 
 
 @app.get("/models/{version_id}/health")
-async def model_health(
-    version_id: str, token_payload: dict = Depends(verify_model_access)
-):
+async def model_health(version_id: str, token_payload: dict = Depends(verify_model_access)):
     model_record = token_payload["model_record"]
     worker_url = resolve_worker_url(model_record, "/health")
     resolved_model_version_id = str(model_record.get("id", version_id))
@@ -275,9 +281,7 @@ async def model_health(
                 },
             )
     except Exception as exc:
-        invalidate_model_version_cache(
-            resolved_model_version_id, redis_client=redis_client
-        )
+        invalidate_model_version_cache(resolved_model_version_id, redis_client=redis_client)
         return JSONResponse(
             status_code=503,
             content={
@@ -297,13 +301,9 @@ async def predict(
     token_payload: dict = Depends(verify_model_access),
 ):
     model_record = token_payload["model_record"]
-    raw_request_id = (
-        request.headers.get("x-request-id") if hasattr(request, "headers") else None
-    )
+    raw_request_id = request.headers.get("x-request-id") if hasattr(request, "headers") else None
     context = {
-        "request_id": validated_request_id(
-            current_context().get("request_id") or raw_request_id
-        ),
+        "request_id": validated_request_id(current_context().get("request_id") or raw_request_id),
         "tenant_id": str(model_record["tenant_id"]),
         "project_id": str(model_record["project_id"]),
         "model_version_id": str(model_record["id"]),
@@ -314,11 +314,15 @@ async def predict(
         request.scope.setdefault("state", {})["mlops_log_context"] = context
     token = bind_context(**context)
     try:
-        return await _predict(
-            version_id, request, payload, background_tasks, token_payload
-        )
+        return await _predict(version_id, request, payload, background_tasks, token_payload)
     finally:
-        reset_context(token)
+        try:
+            if LOCAL_RUNTIME_METRICS_ENABLED:
+                await record_request(
+                    metrics_redis_client, context["tenant_id"], context["project_id"], context["model_version_id"]
+                )
+        finally:
+            reset_context(token)
 
 
 async def _predict(
@@ -344,9 +348,7 @@ async def _predict(
                 "features": features_dict,
                 "model_version_id": resolved_model_version_id,
             }
-            response = await client.post(
-                worker_url, json=worker_payload, headers={"X-Request-ID": request_id}
-            )
+            response = await client.post(worker_url, json=worker_payload, headers={"X-Request-ID": request_id})
             latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
             if response.status_code != 200:
@@ -360,9 +362,7 @@ async def _predict(
                     error_detail = response.json()
                 except Exception:
                     error_detail = response.text
-                return JSONResponse(
-                    status_code=response.status_code, content=error_detail
-                )
+                return JSONResponse(status_code=response.status_code, content=error_detail)
 
             prediction_result, confidence, engine = parse_worker_prediction(
                 response.json(),
@@ -411,9 +411,7 @@ async def _predict(
             status="error_503",
         ).inc()
         # Reactive invalidation: evict stale routing cache immediately
-        invalidate_model_version_cache(
-            resolved_model_version_id, redis_client=redis_client
-        )
+        invalidate_model_version_cache(resolved_model_version_id, redis_client=redis_client)
 
         fresh_record = None
         try:

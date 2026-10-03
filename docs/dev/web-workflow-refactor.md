@@ -38,7 +38,7 @@ flowchart TD
 | Access Mode | Chỉnh tại tab Information, áp dụng ngay cho toàn project |
 | Drift sau đổi Running | Tạo monitor mới thủ công; giữ lịch sử version cũ |
 | Thiếu reference CSV | Cho upload CSV riêng khi tạo monitor; không sửa Preview/version |
-| Metric local | Thêm Prometheus và cAdvisor để có lịch sử CPU/RAM/request |
+| Metric local | Docker SDK realtime CPU/RAM, counter gateway cho RPS; tối đa 5 phút trong bộ nhớ Web, không lưu lịch sử (quyết định cập nhật của người dùng) |
 | Dữ liệu local cũ | Không backfill; chỉ reset khi người dùng chủ động thực hiện |
 
 Phạm vi công việc là refactor code và kiểm thử local. Không tự destroy hạ tầng, reset volume, commit, push, chạy CD hoặc apply K3s. Các adapter Argo được cập nhật nhất quán nếu contract dùng chung thay đổi, nhưng không rollout production trong đợt này.
@@ -240,15 +240,14 @@ Evolution chỉ hiển thị snapshot đã đăng ký, gồm lineage, metadata, 
 
 ## 4. Observability trên Docker Compose
 
-Bổ sung Prometheus và cAdvisor vào Compose, lưu time-series bằng volume riêng. cAdvisor cung cấp metric container để Prometheus thu thập, theo [hướng dẫn Docker Compose của Prometheus](https://prometheus.io/docs/guides/cadvisor/).
+Theo quyết định cập nhật, local chỉ cần quan sát realtime ngắn, không chạy Prometheus/cAdvisor hoặc lưu time-series.
 
-- Gắn label project/version/deployment lên runtime container.
-- CPU hiển thị theo cores, RAM theo MiB; request dùng counter gateway hiện có.
-- Bổ sung range query qua Control Plane, lọc bằng tenant/project đã xác thực; Web không gửi PromQL tùy ý.
-- Mặc định scrape/poll metric 15 giây, retention 7 ngày; UI chọn 15 phút, 1 giờ hoặc 24 giờ.
-- Khi chưa có mẫu hoặc nguồn metric lỗi, hiện “Chưa có dữ liệu/Không khả dụng”, không vẽ số 0 giả.
-- Prometheus/cAdvisor chỉ truy cập nội bộ hoặc localhost; kiểm chứng việc đọc container metric trên Docker Desktop/WSL trước acceptance.
-- Tiếp tục dùng Redis runtime logs cho local. Trạng thái tác vụ vẫn lấy từ PostgreSQL qua Control Plane.
+- Giữ label tenant/project/version/deployment trên runtime; Docker SDK chỉ đọc đúng Running container, timeout 2 giây.
+- CPU theo cores, RAM working set theo MiB. RPS dùng counter atomic gateway trong Redis hiện có (TTL 300 giây), phối hợp giữa các worker; không lưu chuỗi mẫu server-side.
+- Control Plane trả snapshot cho tenant/project đã xác thực; không nhận container ID hoặc truy vấn tùy ý từ Web.
+- Web poll mỗi 5 giây khi mở tab, giữ tối đa 60 điểm/5 phút trong bộ nhớ. Rời trang/F5/đổi deployment bắt đầu lại; không có history 1h/24h ở local.
+- Mẫu đầu, nguồn metric lỗi hoặc counter reset hiện “Chưa có dữ liệu/Không khả dụng”, không giả số 0 hoặc spike. Production Prometheus không thay đổi.
+- Giữ Redis runtime logs. Trạng thái tác vụ lấy từ PostgreSQL; nghiệm thu Docker stats thực tế được tách khỏi test mock.
 
 ## 5. Lộ trình thực hiện
 
@@ -306,10 +305,10 @@ Phụ thuộc snapshot/Running từ giai đoạn 1–2 và điều hướng từ
 - [x] Cập nhật Monitoring theo Running, reference snapshot và lịch sử từng version.
 - [x] Cho upload reference CSV riêng của monitor khi version thiếu reference.
 - [x] Ngừng auto-trigger monitor cũ khi chuyển Running; tạo monitor mới thủ công.
-- [x] Thêm Prometheus/cAdvisor, label runtime, cấu hình scrape và range-query API.
-- [x] Kết nối biểu đồ CPU/RAM/request với range-query API; chưa kiểm chứng mẫu thật từ Docker Desktop.
+- [x] Thêm Docker SDK snapshot API và counter gateway ngắn hạn; bỏ Prometheus/cAdvisor local.
+- [x] Kết nối biểu đồ CPU/RAM/request realtime, giới hạn cửa sổ Web 5 phút; chưa kiểm chứng Docker daemon thật.
 
-**Đầu ra:** Training → Build → Register → Deploy hoạt động; drift dùng đúng reference bất biến; report mở được; metric có lịch sử và không trộn giữa các deployment.
+**Đầu ra:** Training → Build → Register → Deploy hoạt động; drift dùng đúng reference bất biến; report mở được; metric realtime không trộn giữa các deployment.
 
 ### Giai đoạn 5 — Dọn code cũ, kiểm thử tích hợp và tài liệu
 
@@ -362,7 +361,7 @@ Phụ thuộc các giai đoạn trước.
 5. **Deployment thất bại:** Running cũ vẫn phục vụ, Web hiện lỗi bản mới và cho retry.
 6. **Drift:** tạo monitor → chạy Evidently → xem log → mở report; kiểm tra reference từ version và CSV upload riêng.
 7. **Đổi Running:** lịch sử drift cũ vẫn truy cập được; monitor mới chỉ tạo khi người dùng yêu cầu.
-8. **Metric:** CPU/RAM/request có dữ liệu thật; mất nguồn metric hiện unavailable, không giả thành zero.
+8. **Metric:** CPU/RAM/request có dữ liệu realtime thật; mất nguồn hiện unavailable, không giả thành zero; F5/đổi deployment bắt đầu lại.
 9. **Hard delete:** xóa project có runtime/job/history; tài nguyên thuộc project được dọn, project khác không bị ảnh hưởng.
 
 ### 6.4. Tiêu chí hoàn tất
@@ -387,11 +386,11 @@ Phụ thuộc các giai đoạn trước.
 
 ## 8. Kết quả kiểm tra triển khai
 
-- Control Plane: **226 test pass**, bao gồm integration API/ORM, snapshot, Register, Running, training retry, cleanup retry và callback đến muộn; Django system check và migration dry-run pass.
-- Model Server: **56 test pass** với `LOG_FORMAT=console` (test logging local yêu cầu định dạng console).
+- Control Plane: **235 test pass**, bao gồm integration API/ORM, snapshot, Register, Running, training retry, cleanup retry, callback đến muộn và Docker realtime metrics/tenant isolation; Django system check và migration dry-run pass.
+- Model Server: **60 test pass** với `LOG_FORMAT=console` (test logging local yêu cầu định dạng console), gồm counter realtime và inference success/failure.
 - Model Packager: **66 test pass**, bao gồm callback requirements, upload package và label mapping; ML framework native được stub theo fixture hiện có.
-- Web: TypeScript, ESLint, architecture/i18n/design-token checks, Vite build và 13 test điều hướng Header.
+- Web: TypeScript, ESLint, architecture/i18n/design-token checks, Vite build, 13 test điều hướng Header và 13 test metric realtime.
 - Render Argo/root Kustomize và Kubeconform pass; custom resource thiếu schema upstream được skip theo cấu hình hiện có.
 - Compose config và Git whitespace check được chạy; không apply production, commit/push, reset volume hoặc restart container cũ.
 
-Giới hạn: chưa chạy build/predict/training/Evidently với Docker/S3 thật sau refactor, chưa xác nhận cAdvisor trên Docker Desktop, chưa nghiệm thu UI bằng trình duyệt. Đây không phải báo cáo nghiệm thu production.
+Giới hạn: chưa chạy build/predict/training/Evidently với Docker/S3 thật sau refactor, chưa xác nhận Docker stats realtime trên Docker Desktop, chưa nghiệm thu UI bằng trình duyệt. Đây không phải báo cáo nghiệm thu production.

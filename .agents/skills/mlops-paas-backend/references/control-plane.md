@@ -38,5 +38,7 @@ HTTP Request
 
 ## Runtime Logs Architecture
 
+Local runtime metrics are read-only Docker SDK snapshots of the project's explicit Running deployment, guarded by tenant/project/version/deployment labels. Redis carries one short-lived shared gateway request counter; Web owns the short sample window, not PostgreSQL/Redis time-series. Docker IO is bounded to 2s and counter IO to 0.2s. Production range queries remain Prometheus-backed.
+
 - **Local Development:** Transient real-time logs stream into Redis lists (`training_logs:{job_id}`, `build_logs:{build_id}`, `drift_logs:{run_id}`). Web frontend polls using cursor tokens.
 - **Production Kubernetes:** Task logs are collected by Alloy into Grafana Loki (7-day retention). Control Plane acts as an authorized proxy: generates signed task-bound cursors to prevent cross-tenant LogQL injection.

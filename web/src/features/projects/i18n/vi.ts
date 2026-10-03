@@ -76,6 +76,8 @@ export const projectsVi = {
     metric_cpu: "CPU (cores)",
     metric_memory: "RAM (MiB)",
     metric_requests: "Request / giây",
+    realtimeHint:
+      "Realtime khi mở trang · cập nhật mỗi 5 giây · tối đa 5 phút trong bộ nhớ, không lưu lịch sử.",
     range_15m: "15 phút",
     range_1h: "1 giờ",
     range_24h: "24 giờ",

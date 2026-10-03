@@ -76,6 +76,8 @@ export const catalogEn = {
     metric_cpu: "CPU (cores)",
     metric_memory: "RAM (MiB)",
     metric_requests: "Requests / second",
+    realtimeHint:
+      "Live while this page is open · refreshed every 5 seconds · up to 5 minutes in memory, no saved history.",
     range_15m: "15 minutes",
     range_1h: "1 hour",
     range_24h: "24 hours",

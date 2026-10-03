@@ -231,7 +231,10 @@ export default function ProjectOverviewPage() {
             <code className="block break-all text-style-code-sm">
               {model.endpoint_url}
             </code>
-            <RuntimeMetrics projectId={modelId!} />
+            <RuntimeMetrics
+              projectId={modelId!}
+              deploymentId={model.active_endpoint?.deployment_id ?? ""}
+            />
             <Suspense fallback={<p>{t("workflow.loading")}</p>}>
               <ModelTestingPage />
             </Suspense>

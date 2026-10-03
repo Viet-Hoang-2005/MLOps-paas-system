@@ -26,6 +26,8 @@ pnpm build
 
 `pnpm test:workflow` checks Header navigation across main/detail/create/account routes without a browser. It does not replace manual UI or Docker/S3 end-to-end acceptance. See the [local workflow runbook](../docs/dev/web-workflow-local.md).
 
+Local Overview metrics use Docker SDK CPU/RAM snapshots and a short-lived shared gateway counter for RPS. Polling runs every 5 seconds while foregrounded; at most 60 samples/5 minutes are held in page memory, not localStorage or a history database. Leaving, refreshing or changing the Running deployment resets the window. `pnpm test:metrics` covers buffering, counter resets and gaps. Production retains Prometheus history mode.
+
 ## Source architecture
 
 ```text

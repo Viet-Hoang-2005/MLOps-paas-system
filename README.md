@@ -205,7 +205,7 @@ Hệ thống hỗ trợ 2 chế độ triển khai chính:
 
 ### 6.1. Chạy Cục bộ (Local Development với Docker Compose)
 
-Workflow Web mới: **Project/Preview → Build → Register → Deploy/Running**. Training completed là nguồn Build, không tự đăng ký version. Overview chỉ hiển thị snapshot Running; drift monitor có reference riêng bất biến. Prometheus/cAdvisor local cung cấp CPU/RAM/RPS qua Control Plane.
+Workflow Web mới: **Project/Preview → Build → Register → Deploy/Running**. Training completed là nguồn Build, không tự đăng ký version. Overview chỉ hiển thị snapshot Running; drift monitor có reference riêng bất biến. Local dùng Docker SDK cho CPU/RAM và counter gateway ngắn hạn cho RPS; Web giữ tối đa 5 phút trong phiên mở trang, không lưu lịch sử metric.
 
 Đợt refactor này cần database ứng dụng sạch, không có backfill hoặc route compatibility. Xem [kế hoạch và trạng thái](docs/dev/web-workflow-refactor.md) và [runbook khởi chạy/kiểm thử local](docs/dev/web-workflow-local.md) trước khi chạy lại Compose. Không tự xóa volume hoặc dữ liệu cũ.
 ```bash

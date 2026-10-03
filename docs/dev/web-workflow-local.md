@@ -17,7 +17,7 @@ Compose có tên container cố định nên stack mới không thể chạy son
    ```bash
    docker compose stop control-plane celery-worker consumer model-server
    docker compose build model-packager training-runner evidently machine-learning-serving deep-learning-serving
-   docker compose up -d --build postgres schema-init redis redpanda redpanda-init mlflow control-plane celery-worker model-server consumer traefik prometheus cadvisor
+   docker compose up -d --build postgres schema-init redis redpanda redpanda-init mlflow control-plane celery-worker model-server consumer traefik
    docker compose config --quiet
    docker compose logs --tail 80 control-plane celery-worker
    ```
@@ -48,7 +48,7 @@ Compose có tên container cố định nên stack mới không thể chạy son
 | Snapshot source | `GET /api/models/<project>/running-source/` chỉ đọc version Running |
 | Drift monitor | `POST /api/drift-monitors/`; chỉ version Running, CSV riêng nếu version không có reference |
 | Training retry | `POST /api/training-jobs/<job>/retry/`; tạo job mới từ input bất biến, không đọc workspace hiện tại |
-| Metric | `GET /api/observability/models/<project>/runtime-metrics/?window=1h`; window `15m/1h/24h` |
+| Metric local | `GET /api/observability/models/<project>/runtime-metrics/`; snapshot realtime, không có lịch sử |
 | Delete project | `DELETE /api/models/<project>/`; async hard cleanup, lỗi giữ `delete_failed` để retry |
 
 Các route Web bắt đầu ở `/dashboard/projects`. Trang chính theo `/dashboard/projects/<project>/{overview,deployment,monitoring,training,evolution}`. Form tạo deployment và monitoring có selector riêng; Header chọn project ở trang chi tiết sẽ về Overview. API Token ở `/dashboard/api-tokens`, không còn nằm trong Settings.
@@ -57,12 +57,15 @@ Preview thay đổi không ảnh hưởng snapshot đang Running. Build thành c
 
 ## Quan sát local
 
-- Prometheus + cAdvisor chạy nội bộ, không publish port. Retention 7 ngày, scrape 15 giây.
-- Scrape gateway tại `model-server:5000`, API tại `control-plane:8000/health/metrics`, cAdvisor tại `cadvisor:8080`.
-- CPU cores/RAM MiB lọc theo label runtime deployment/tenant; RPS theo counter gateway project/version. Không gửi PromQL tùy ý từ Web.
-- UI báo `no_data` hoặc `unavailable` nếu chưa có mẫu/nguồn lỗi; không coi số 0 là phép đo thành công.
-- cAdvisor cần quyền/mount host để đọc Docker metric. Docker Desktop/WSL có thể không cung cấp đủ metric; kiểm tra target UP và label thực tế trước khi kết luận biểu đồ đúng. Không nới quyền hoặc mở port công khai để xử lý.
+- Local không chạy Prometheus/cAdvisor, không có volume metric hoặc collector nền.
+- Control Plane lấy CPU cores/RAM working set MiB qua Docker SDK `stats(stream=False)` với timeout 2 giây, chỉ đọc container Running có đủ label tenant/project/version/deployment. Không nhận container ID hoặc URL Docker từ Web.
+- Web poll khi mở tab mỗi 5 giây, không poll khi tab trình duyệt ở nền. Biểu đồ giữ tối đa 60 điểm/5 phút trong bộ nhớ; rời trang, F5 hoặc đổi deployment bắt đầu lại. Không có chọn lịch sử 1h/24h ở local.
+- `LOCAL_RUNTIME_METRICS_ENABLED=true` chỉ được inject vào Model Server trong Compose. Gateway dùng counter atomic chia sẻ giữa các worker trong Redis DB 1, scoped tenant/project/version và TTL 300 giây từ request cuối. Đây là một counter, không lưu chuỗi mẫu. Lỗi cập nhật là best-effort, không làm inference thất bại; Redis IO có timeout 0.2 giây.
+- RPS lấy chênh lệch counter giữa hai lần poll liên tiếp. Mẫu đầu, counter hết TTL/reset hoặc khoảng mất kết nối dài hiện chưa có dữ liệu, không tạo spike hoặc số 0 giả. Request bị từ chối trước authentication không nằm trong counter model.
+- Nếu Docker/Redis lỗi, UI báo thiếu dữ liệu cho metric tương ứng, không hiện số cũ như phép đo hiện tại. Production vẫn dùng Prometheus; không sửa chart hay retention production.
 - Log dùng Redis; trạng thái job và Running lấy từ PostgreSQL, không suy luận từ nội dung TerminalViewer.
+
+Nếu stack local đã có hai container metric cũ, kiểm kê rồi dừng/xóa đúng container Prometheus và cAdvisor đó trước khi recreate client; giữ volume cũ nếu còn cần dữ liệu. Không dùng `down -v` hoặc `--remove-orphans` để dọn toàn Docker vì runtime model động cũng nằm ngoài service Compose. Đợt sửa code này không tự dừng/xóa container hoặc volume đang chạy.
 
 ## Kiểm thử nghiệm thu còn phải chạy trên runtime thật
 
@@ -72,7 +75,7 @@ Preview thay đổi không ảnh hưởng snapshot đang Running. Build thành c
 4. Training project chưa artifact → Set as Reference → training → Build → Register → Deploy; đổi/xóa workspace không làm đổi input retry.
 5. Deployment lỗi: runtime cũ còn phục vụ; registration/cleanup lỗi có thể retry.
 6. Drift dùng reference của version hoặc CSV riêng → Evidently hoàn tất → report mở được; lịch sử version cũ còn nguyên.
-7. CPU/RAM/RPS có mẫu thật, không lẫn deployment; mất Prometheus hiển thị unavailable.
+7. CPU/RAM/RPS có mẫu realtime thật, không lẫn deployment; mất Docker/Redis hiển thị thiếu dữ liệu; F5/đổi deployment bắt đầu cửa sổ mới.
 8. Hard delete chỉ dọn runtime/job/image/object/cache/DB của project chọn; project khác không bị ảnh hưởng.
 9. F5/deep link/Header/dirty form; light/dark, keyboard và mobile/tablet/desktop.
 
@@ -91,6 +94,7 @@ LOG_FORMAT=console python -m pytest
 pnpm lint
 pnpm build
 pnpm test:workflow
+pnpm test:metrics
 # root
 docker compose config --quiet
 git diff --check

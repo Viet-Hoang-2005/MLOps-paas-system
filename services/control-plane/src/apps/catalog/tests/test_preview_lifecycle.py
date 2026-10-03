@@ -215,6 +215,8 @@ def test_monitor_csv_is_private_snapshot_not_version_mutation(project):
 
 def test_metrics_scoped_to_active_deployment_and_missing_data_not_zero(project):
     deployment = running(project)
+    deployment.backend = "argo"
+    deployment.save(update_fields=["backend"])
     queries = []
     client = SimpleNamespace(enabled=True, query_range=lambda expression, **kwargs: queries.append(expression) or [])
     result = runtime_metrics(project, prometheus=client)

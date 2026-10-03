@@ -12,8 +12,8 @@ export const projectOverviewKeys = {
   asset: (url: string) => ["projects", "snapshot", url] as const,
   source: (projectId: string, versionId: string) =>
     ["projects", "running-source", projectId, versionId] as const,
-  metrics: (projectId: string, window: string) =>
-    ["projects", "runtime-metrics", projectId, window] as const,
+  metrics: (projectId: string, deploymentId: string, window: string) =>
+    ["projects", "runtime-metrics", projectId, deploymentId, window] as const,
 };
 export const useProjectOverview = (id?: string) =>
   useQuery({
