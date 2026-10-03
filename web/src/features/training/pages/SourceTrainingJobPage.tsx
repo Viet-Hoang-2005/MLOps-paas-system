@@ -5,9 +5,9 @@ import { useTranslation } from "react-i18next";
 import {
   SourceEditor,
   type SourceEditorHandle,
-} from "@/features/catalog/components/SourceEditor";
+} from "@/features/projects/components/SourceEditor";
 import { useCreateTrainingJob } from "@/features/training/trainingFlowContext";
-import type { ModelFlavor } from "@/features/catalog/types";
+import type { ModelFlavor } from "@/features/projects/types";
 import { Button } from "@/shared/components/Button";
 import { FileDropzone } from "@/shared/components/FileDropzone";
 import { Picker } from "@/shared/components/Picker";
@@ -84,6 +84,14 @@ export default function SourceTrainingJobPage() {
           icon={<Database className="h-4 w-4" />}
           accept=".zip,.csv,.parquet"
           editorType="csv"
+          currentEntryPoint={flow.sourceForm.reference_path}
+          onSetEntryPoint={(file) =>
+            flow.setSourceField("reference_path", file)
+          }
+          entryPointExtension=".csv"
+          setAsMainLabel={t("createFlow.source.setReference", {
+            defaultValue: "Set as Reference",
+          })}
           onDirtyChange={(dirty) => flow.setEditorDirty("data", dirty)}
         />
         <div className="space-y-4">

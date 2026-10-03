@@ -19,11 +19,11 @@
 7. **Upload & Callback:**
    - Requests a Presigned PUT URL using its Capability Token and uploads to S3.
    - Calls `POST /internal/webhooks/training-jobs/<id>/` with shared secret.
-   - Control Plane locks row via `select_for_update()`, transitions to `COMPLETED`, and registers an immutable `ModelVersion` into the Model Registry.
+   - Control Plane locks the job and transitions to `COMPLETED`; it does not register a version automatically. Reference CSV is frozen separately from training data; retries copy original snapshots into a new job.
 
 ## 2. Packaging & Build Lifecycle
 
-1. **Trigger:** User creates a Build via `POST /api/builds/` (or auto-triggered from a trained model).
+1. **Trigger:** User creates a Build from a revision-checked project Preview or completed TrainingJob. Project has one mutable Preview; Build copies all input assets into immutable build-scoped keys.
 2. **Analysis:** `model-packager` downloads model artifacts from S3, detects model flavor (`sklearn`, `xgboost`, `pytorch`, `tensorflow`, `keras`), and normalizes to MLflow PyFunc format (`MLmodel`).
 3. **Dockerfile Generation:** Automatically selects optimal base image:
    - Scikit-Learn / XGBoost $\rightarrow$ `machine-learning-serving` (FastAPI).
@@ -31,7 +31,10 @@
 4. **Image Build:**
    - *Local:* Docker SDK builds image directly into Docker daemon.
    - *Production K3s:* Kaniko rootless builder compiles image without Docker socket and pushes to Harbor OCI Registry as `image-{project_uuid}:build-{build_uuid}`.
-5. **Log Streaming & Callback:** Streams logs to Redis (`build_logs:{build_id}`) and invokes the Build webhook to mark the Build `COMPLETED`.
+5. **Log Streaming & Callback:** Streams logs and marks the Build `ready`; no automatic registration. Explicit `POST /api/builds/<build>/register/` creates one immutable version idempotently, retaining source/reference/advanced assets and actual requirements.
+6. **Deployment:** Only registered Builds deploy. Runtime names use deployment UUIDs. `ModelProject.active_deployment` changes only after readiness; a failed candidate leaves the old Running version serving. Stop old runtime after handoff and invalidate gateway cache.
+7. **Overview/Drift:** Read the Running snapshot, never latest/Preview fallback. Monitors have immutable reference copies; replacing Running disables old automatic monitors but retains history. Creating a new monitor is manual.
+8. **Deletion:** Disable the project first, stop jobs/runtimes, delete project-scoped images/objects/logs/cache, then hard-delete dependent DB rows. Failures stay `delete_failed` and retry; no shared-image or bucket deletion.
 
 ## 3. Serving & Inference Lifecycle
 

@@ -3,7 +3,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.catalog.models import ModelProject
-from apps.deployment.models import Deployment, Endpoint
+from apps.deployment.models import Deployment
 from apps.deployment.services.cache import invalidate_model_server_cache
 from common.logging import record_transition
 from infrastructure.execution.cleanup_backends import project_cleanup_backend
@@ -13,7 +13,7 @@ from infrastructure.storage.paths import project_prefix
 
 
 def request_project_deletion(project):
-    """Start an idempotent project-wide cleanup without deleting lifecycle audit rows."""
+    """Disable a project before retryable hard cleanup."""
     with transaction.atomic():
         project = ModelProject.objects.select_for_update().get(pk=project.pk)
         if project.deletion_state == "deleted":
@@ -54,17 +54,52 @@ def project_cleanup_manifest(project):
         {
             getattr(deployment, "endpoint", None).runtime_name
             if getattr(deployment, "endpoint", None) and deployment.endpoint.runtime_name
-            else f"deploy-{deployment.build.public_id}"
+            else f"deploy-{deployment.public_id}"
             for deployment in deployments
         }
     )
-    return {"container_names": container_names, "image_uris": image_uris}
+    from apps.drift.models import DriftRun
+
+    jobs = [
+        *[f"build-{build.public_id}" for build in builds],
+        *[f"training-{value}" for value in project.training_jobs.values_list("public_id", flat=True)],
+        *[
+            f"drift-{value}"
+            for value in DriftRun.objects.filter(monitor__version__project=project).values_list("public_id", flat=True)
+        ],
+    ]
+    return {"container_names": container_names, "job_container_names": jobs, "image_uris": image_uris}
 
 
 def run_project_cleanup(project):
     if project.deletion_state != "deleting":
         raise ValidationError({"project": "Project deletion is not active."})
+    _stop_project_jobs(project)
     return project_cleanup_backend().run(project, project_cleanup_manifest(project))
+
+
+def _stop_project_jobs(project):
+    from infrastructure.execution import build_backend, training_backend, drift_backend
+    from apps.drift.models import DriftRun
+
+    for build in project.builds.exclude(status__in=("ready", "failed", "cancelled")):
+        result = build_backend(build.backend).cancel(build)
+        if build.backend == "argo" and (not isinstance(result, dict) or not result.get("confirmed")):
+            raise ValidationError("Wait for the active build workflow to finish before retrying cleanup.")
+        type(build).objects.filter(pk=build.pk).update(status="cancelled", completed_at=timezone.now())
+    for job in project.training_jobs.exclude(status__in=("completed", "failed", "cancelled")):
+        result = training_backend(job.backend).cancel(job)
+        if isinstance(result, dict) and not result.get("confirmed", False):
+            raise ValidationError("Training cancellation has not completed; retry project cleanup.")
+        type(job).objects.filter(pk=job.pk).update(status="cancelled", completed_at=timezone.now())
+    for run in DriftRun.objects.filter(monitor__version__project=project).exclude(
+        status__in=("completed", "failed", "cancelled")
+    ):
+        backend = drift_backend(run.monitor.backend)
+        if not hasattr(backend, "cancel"):
+            raise ValidationError("Cancel running drift workflows before retrying project cleanup.")
+        backend.cancel(run)
+        type(run).objects.filter(pk=run.pk).update(status="cancelled", completed_at=timezone.now())
 
 
 def delete_project_build_images(project):
@@ -75,36 +110,61 @@ def delete_project_build_images(project):
 
 
 def finalize_project_deletion(project, *, storage=None):
-    """Remove tenant project objects from S3 and retain DB rows as a deleted audit record."""
+    """Remove owned objects and DB aggregates, leaving unrelated projects untouched."""
     storage = storage or S3Storage()
     storage.delete_prefix(project_prefix(project.owner.tenant_id, project.public_id))
     with transaction.atomic():
         project = ModelProject.objects.select_for_update().get(pk=project.pk)
-        Deployment.objects.filter(version__project=project).exclude(status="stopped").update(
-            status="stopped",
-            stopped_at=timezone.now(),
-        )
-        Endpoint.objects.filter(deployment__version__project=project).update(health_status="stopped")
+        from apps.ct import models as ct
+        from apps.drift.models import DriftMonitor, DriftRun
+        from apps.registry.models import RegistryAlias
+        from apps.observability.models import EventOutbox, LifecycleEvent
+        from common.redis_client import redis_client
+
+        aggregates = [
+            project.public_id,
+            *project.versions.values_list("public_id", flat=True),
+            *project.builds.values_list("public_id", flat=True),
+            *project.training_jobs.values_list("public_id", flat=True),
+            *Deployment.objects.filter(version__project=project).values_list("public_id", flat=True),
+            *DriftRun.objects.filter(monitor__version__project=project).values_list("public_id", flat=True),
+        ]
+        redis = redis_client()
+        keys = [
+            *[f"build_logs:{value}" for value in project.builds.values_list("public_id", flat=True)],
+            *[f"training_logs:{value}" for value in project.training_jobs.values_list("public_id", flat=True)],
+            *[
+                f"deployment_logs:{value}"
+                for value in Deployment.objects.filter(version__project=project).values_list("public_id", flat=True)
+            ],
+            *[
+                f"drift_logs:{value}"
+                for value in DriftRun.objects.filter(monitor__version__project=project).values_list(
+                    "public_id", flat=True
+                )
+            ],
+        ]
+        if keys:
+            redis.delete(*keys)
         for version_id in project.versions.values_list("public_id", flat=True):
             invalidate_model_server_cache(str(version_id))
-        project.deletion_state = "deleted"
-        project.deletion_error = ""
-        project.deletion_task_id = ""
-        project.deleted_at = timezone.now()
-        project.is_active = False
-        project.name = f"{project.name[:130]}#deleted-{project.public_id.hex[:8]}"
-        project.save(
-            update_fields=[
-                "name",
-                "deletion_state",
-                "deletion_error",
-                "deletion_task_id",
-                "deleted_at",
-                "is_active",
-                "updated_at",
-            ]
-        )
+        ct.EvaluationGate.objects.filter(run__project=project).delete()
+        ct.MaintenanceRun.objects.filter(project=project).delete()
+        ct.MaintenanceDecision.objects.filter(window__project=project).delete()
+        ct.Feedback.objects.filter(prediction__project=project).delete()
+        ct.LabelLedgerEntry.objects.filter(budget__project=project).delete()
+        ct.LabelRequest.objects.filter(window__project=project).delete()
+        ct.EvidenceWindow.objects.filter(project=project).delete()
+        ct.DatasetSnapshot.objects.filter(project=project).delete()
+        ct.LabelBudget.objects.filter(project=project).delete()
+        ct.MaintenancePolicy.objects.filter(project=project).delete()
+        DriftMonitor.objects.filter(version__project=project).delete()
+        RegistryAlias.objects.filter(project=project).delete()
+        Deployment.objects.filter(version__project=project).delete()
+        EventOutbox.objects.filter(aggregate_id__in=aggregates).delete()
+        LifecycleEvent.objects.filter(project=project).delete()
         record_transition(project, "deleted")
+        project.delete()
     return project
 
 

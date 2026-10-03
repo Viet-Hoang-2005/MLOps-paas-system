@@ -119,20 +119,20 @@ Mọi luồng xử lý ghi trạng thái trong Control Plane đều tuân thủ 
      - Nếu là môi trường `docker`: Khởi chạy container `training-runner` trên mạng Docker nội bộ.
      - Nếu là môi trường `argo`: Bắn webhook tới Argo Events EventSource để khởi chạy Kubernetes `Workflow` hoặc Kubeflow `PyTorchJob`.
    - `training-runner` khởi động, dùng token gọi Control Plane lấy Presigned URL tải mã nguồn/dữ liệu và Presigned URL tải artifacts kết quả lên S3.
-   - Khi hoàn tất, `training-runner` gọi callback `POST /internal/webhooks/training-jobs/<uuid>/`. Control Plane kiểm tra token, cập nhật trạng thái `COMPLETED` và tự động đăng ký `ModelVersion` mới vào Model Registry (nếu đạt yêu cầu).
+   - Khi hoàn tất, `training-runner` gọi callback `POST /internal/webhooks/training-jobs/<uuid>/`. Control Plane kiểm tra token, cập nhật trạng thái `COMPLETED`, không tự đăng ký version. Source/data/reference của job được đóng băng; retry tạo job mới từ snapshot gốc.
 
 2. **Luồng Đóng gói & Triển khai (Build & Deploy Workflow):**
-   - Khi người dùng muốn phục vụ mô hình: Client tạo `Build` (`POST /api/builds/`).
+   - Khi người dùng muốn phục vụ mô hình: Client tạo `Build` từ revision Preview (`POST /api/models/<project>/builds/`) hoặc output TrainingJob completed (`POST /api/training-jobs/<job>/build/`).
    - Celery giao việc cho `model-packager` để tải model artifact từ S3, tạo Dockerfile tối ưu (hỗ trợ MLflow / Sklearn / PyTorch) và đẩy container image lên Harbor Registry (hoặc Docker daemon nội bộ).
-   - Khi Build hoàn tất qua callback, người dùng kích hoạt `Deployment` (`POST /api/deployments/`).
+   - Callback chỉ hoàn tất Build. Người dùng gọi `POST /api/builds/<build>/register/` để tạo snapshot Evolution idempotent; sau đó mới gọi `POST /api/deployments/`.
    - Control Plane điều phối:
      - Với Docker: Dựng container phục vụ suy luận (`machine-learning-serving` hoặc `deep-learning-serving`) nối vào mạng nội bộ.
      - Với Argo/K8s: Kích hoạt triển khai Deployment/Pod trên namespace `mlops-model-runtimes` được quản lý bởi K3s Traefik.
-   - Cập nhật cấu hình router `Endpoint` và cấu hình gateway `model-server` để bắt đầu nhận lưu lượng dự đoán.
+   - Chỉ sau readiness mới chuyển `ModelProject.active_deployment`; gateway/Overview/Monitoring dùng chung pointer này. Bản mới lỗi không thay Running cũ. Runtime đặt tên theo deployment UUID; dừng bản cũ sau handoff.
 
 3. **Luồng Giám sát Drift & Tự động Kích hoạt (Drift & CT Workflow):**
    - Service `consumer` đọc dữ liệu suy luận thực tế từ topic Kafka `mlops_paas_production_data`, lưu vào bảng `production_predictionrecord`.
-   - Định kỳ hoặc khi lượng bản ghi mới đạt ngưỡng, `consumer` bắn signal tới webhook `POST /internal/webhooks/automatic-drift/`.
+   - Sau mỗi batch ingest thành công, dispatcher outbox của `consumer` gửi signal tới webhook `POST /internal/webhooks/automatic-drift/`.
    - Control Plane kiểm tra `DriftMonitor`, khởi tạo `DriftRun` và ủy quyền cho `evidently` runner thực thi phân tích trôi dạt so sánh giữa dữ liệu suy luận và dữ liệu baseline trên S3.
    - `evidently` báo cáo kết quả qua callback webhook `POST /internal/webhooks/drift-runs/<uuid>/`. Nếu drift vượt ngưỡng an toàn đã cấu hình, module `apps.ct` sẽ tự động kích hoạt một `TrainingJob` mới để huấn luyện lại mô hình với dữ liệu cập nhật.
 
@@ -200,6 +200,8 @@ services/control-plane/
 ---
 
 ## 3. Hướng dẫn khởi chạy và các lệnh cần thiết
+
+Workflow mới dùng Project + Preview 1–1, snapshot Build/Version bất biến và Running tường minh. Không backfill dữ liệu cũ. Đọc [runbook clean bootstrap local](../../docs/dev/web-workflow-local.md) trước khi khởi động lại trên database đang có; không tự xóa volume. Xóa project là cleanup bất đồng bộ retryable, chỉ hard-delete DB sau khi runtime/object/image thuộc project đã được dọn.
 
 ### 3.1. Khởi chạy bằng Docker Compose (Môi trường phát triển cục bộ)
 

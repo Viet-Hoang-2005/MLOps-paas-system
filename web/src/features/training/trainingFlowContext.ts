@@ -4,7 +4,7 @@ import type {
   ModelAccessMode,
   ModelFlavor,
   ModelProject,
-} from "@/features/catalog/types";
+} from "@/features/projects/types";
 import type {
   TrainingAcceleratorType,
   TrainingJob,
@@ -14,7 +14,10 @@ import type {
 export type TrainingStep = 1 | 2 | 3;
 export type TrainingModelMode = "new" | "existing";
 export type TrainingTransitionState =
-  "idle" | "saving-metadata" | "saving-source" | "starting-training";
+  | "idle"
+  | "saving-metadata"
+  | "saving-source"
+  | "starting-training";
 
 export interface TrainingMetadataForm {
   name: string;
@@ -25,6 +28,7 @@ export interface TrainingMetadataForm {
 export interface TrainingSourceForm {
   model_flavor: ModelFlavor;
   entry_point: string;
+  reference_path: string;
   requirements_text: string;
   requirements_file?: File | null;
 }

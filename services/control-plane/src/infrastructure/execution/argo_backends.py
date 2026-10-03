@@ -168,7 +168,7 @@ class ArgoDeploymentBackend(_ArgoBackend):
     def deploy(self, deployment):
         version = deployment.version
         project = version.project
-        container_name = f"deploy-{str(deployment.build.public_id).lower()}"
+        container_name = f"deploy-{str(deployment.public_id).lower()}"
         model_type = "dl" if version.flavor in {"pytorch", "tensorflow"} else "ml"
         target_port = 3000 if model_type == "dl" else 5001
         public_url = (
@@ -268,7 +268,7 @@ class ArgoDriftBackend(_ArgoBackend):
                 "model_version_id": str(monitor.version.public_id),
                 "model_name": project.name,
                 "model_uri": "",
-                "reference_data_url": self.storage.presigned_get(monitor.reference_asset.s3_uri, 7200),
+                "reference_data_url": self.storage.presigned_get(monitor.reference_uri, 7200),
                 "html_s3_uri": uris["report.html"],
                 "report_json_s3_uri": uris["report.json"],
                 "summary_json_s3_uri": uris["summary.json"],

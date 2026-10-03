@@ -24,6 +24,16 @@ class Build(models.Model):
     flavor = models.CharField(max_length=80)
     artifact_format = models.CharField(max_length=20, default="raw")
     requirements_snapshot = models.TextField(blank=True)
+    preview_revision = models.PositiveIntegerField(null=True, blank=True)
+    registration_status = models.CharField(
+        max_length=20,
+        default="unregistered",
+        choices=tuple((value, value.title()) for value in ("unregistered", "registering", "registered", "failed")),
+    )
+    registration_error = models.TextField(blank=True)
+    metrics_summary = models.JSONField(default=dict, blank=True)
+    params_summary = models.JSONField(default=dict, blank=True)
+    insights_summary = models.JSONField(default=dict, blank=True)
     backend = models.CharField(max_length=30, default="docker")
     status = models.CharField(max_length=30, choices=STATUSES, default="pending")
     celery_task_id = models.CharField(max_length=255, blank=True, db_index=True)
@@ -46,7 +56,7 @@ class Build(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["source_job"],
-                condition=models.Q(source_job__isnull=False, status__in=("pending", "queued", "building", "ready")),
+                condition=models.Q(source_job__isnull=False, status__in=("pending", "queued", "building")),
                 name="build_active_source_job_unique",
             )
         ]
@@ -58,6 +68,8 @@ class Build(models.Model):
 class BuildInputAsset(models.Model):
     KINDS = (
         ("source_artifact", "Source Artifact"),
+        ("source_code", "Source Code"),
+        ("reference_data", "Reference Data"),
         ("training_output", "Training Output"),
         ("label_mapping", "Label Mapping"),
         ("metrics", "Metrics"),
@@ -75,6 +87,7 @@ class BuildInputAsset(models.Model):
     checksum = models.CharField(max_length=128, blank=True)
     size_bytes = models.PositiveBigIntegerField(default=0)
     content_type = models.CharField(max_length=160, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
     purged_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

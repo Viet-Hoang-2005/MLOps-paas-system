@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
-import { ModelSelectionProvider } from "@/features/catalog/components/ModelSelectionProvider";
+import { ModelSelectionProvider } from "@/features/projects/components/ModelSelectionProvider";
 
 export default function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

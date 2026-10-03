@@ -8,6 +8,7 @@ from rest_framework.test import APIClient
 from apps.catalog.models import ModelProject, WorkspaceAsset
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.registry.models import ModelVersion
+from apps.deployment.models import Build, Deployment
 from infrastructure.execution.argo_backends import ArgoDriftBackend
 
 
@@ -15,6 +16,9 @@ def _monitor_fixture():
     owner = get_user_model().objects.create_user("automatic-drift@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="automatic drift")
     version = ModelVersion.objects.create(project=project, version="1")
+    build = Build.objects.create(project=project, version=version, status="ready")
+    project.active_deployment = Deployment.objects.create(version=version, build=build, status="healthy")
+    project.save(update_fields=["active_deployment"])
     asset = WorkspaceAsset.objects.create(
         project=project,
         kind="data",
@@ -31,6 +35,7 @@ def test_automatic_drift_webhook_creates_one_durable_threshold_crossing(monkeypa
     monitor = DriftMonitor.objects.create(
         version=version,
         reference_asset=asset,
+        reference_uri=asset.s3_uri,
         name="default",
         trigger_threshold=100,
     )
@@ -62,6 +67,7 @@ def test_automatic_drift_webhook_does_not_trigger_before_threshold(monkeypatch):
     monitor = DriftMonitor.objects.create(
         version=version,
         reference_asset=asset,
+        reference_uri=asset.s3_uri,
         name="default",
         trigger_threshold=100,
         last_automatic_trigger_count=50,
@@ -103,7 +109,9 @@ def test_automatic_drift_webhook_requires_secret_and_uuid():
 )
 def test_automatic_drift_run_dispatches_complete_argo_payload():
     version, asset = _monitor_fixture()
-    monitor = DriftMonitor.objects.create(version=version, reference_asset=asset, name="default")
+    monitor = DriftMonitor.objects.create(
+        version=version, reference_asset=asset, reference_uri=asset.s3_uri, name="default"
+    )
     run = DriftRun.objects.create(monitor=monitor, idempotency_key="automatic-drift-argo")
     captured = {}
 

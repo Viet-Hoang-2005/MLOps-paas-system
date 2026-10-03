@@ -33,35 +33,24 @@ const ProtectedRoute = lazy(() =>
   })),
 );
 const DashboardLayout = lazy(() => import("@/app/layouts/DashboardLayout"));
+
 const NotificationsPage = lazy(
   () => import("@/features/notifications/pages/NotificationsPage"),
 );
-const CatalogLayout = lazy(
-  () => import("@/features/catalog/pages/CatalogLayout"),
+const ProjectListPage = lazy(
+  () => import("@/features/projects/pages/ProjectListPage"),
 );
-const ModelProjectPage = lazy(
-  () => import("@/features/catalog/pages/ModelProjectPage"),
+const ProjectFormPage = lazy(
+  () => import("@/features/projects/pages/ProjectFormPage"),
 );
-const ModelTestingPage = lazy(
-  () => import("@/features/catalog/pages/ModelTestingPage"),
+const ProjectOverviewPage = lazy(
+  () => import("@/features/projects/pages/ProjectOverviewPage"),
 );
-const ModelManagementPage = lazy(
-  () => import("@/features/deploy/pages/ModelManagementPage"),
+const DeploymentHistoryPage = lazy(
+  () => import("@/features/deployments/pages/DeploymentHistoryPage"),
 );
-const UploadModelPage = lazy(
-  () => import("@/features/deploy/pages/UploadModelPage"),
-);
-const MetadataModelPage = lazy(
-  () => import("@/features/deploy/pages/MetadataModelPage"),
-);
-const BuildModelPage = lazy(
-  () => import("@/features/deploy/pages/BuildModelPage"),
-);
-const DeployModelPage = lazy(
-  () => import("@/features/deploy/pages/DeployModelPage"),
-);
-const ModelDetailPage = lazy(
-  () => import("@/features/deploy/pages/ModelDetailPage"),
+const CreateDeploymentPage = lazy(
+  () => import("@/features/deployments/pages/CreateDeploymentPage"),
 );
 const TrainingModelPage = lazy(
   () => import("@/features/training/pages/TrainingModelPage"),
@@ -96,28 +85,27 @@ const SourceTrainingJobPage = lazy(
 const ExecutionTrainingJobPage = lazy(
   () => import("@/features/training/pages/ExecutionTrainingJobPage"),
 );
-const RegistryPage = lazy(
-  () => import("@/features/registry/pages/RegistryPage"),
+const EvolutionPage = lazy(
+  () => import("@/features/evolution/pages/EvolutionPage"),
 );
 const DriftMonitoringPage = lazy(
-  () => import("@/features/drift/pages/DriftMonitoringPage"),
+  () => import("@/features/monitoring/pages/DriftMonitoringPage"),
 );
 const CreateDriftMonitoringPage = lazy(
-  () => import("@/features/drift/pages/CreateDriftMonitoringPage"),
+  () => import("@/features/monitoring/pages/CreateDriftMonitoringPage"),
 );
 const DriftReportPage = lazy(
-  () => import("@/features/drift/pages/DriftReportPage"),
-);
-const SettingsLayout = lazy(
-  () => import("@/features/settings/pages/SettingsLayout"),
+  () => import("@/features/monitoring/pages/DriftReportPage"),
 );
 const ProfileSettingPage = lazy(
   () => import("@/features/settings/pages/ProfileSettingPage"),
 );
-const DeveloperSettingPage = lazy(
-  () => import("@/features/settings/pages/DeveloperSettingPage"),
+const ApiTokensPage = lazy(
+  () => import("@/features/api-tokens/pages/ApiTokensPage"),
 );
-const ApiKeyPage = lazy(() => import("@/features/settings/pages/ApiKeyPage"));
+const ApiKeyPage = lazy(() => import("@/features/api-tokens/pages/ApiKeyPage"));
+const NotFoundPage = lazy(() => import("./NotFoundPage"));
+const ProjectRouteBoundary = lazy(() => import("./ProjectRouteBoundary"));
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -141,8 +129,7 @@ const router = createBrowserRouter(
         />
         <Route path="/oauth/github/callback" element={<GitHubCallbackPage />} />
       </Route>
-
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<Navigate to="/dashboard/projects" replace />} />
       <Route
         path="/dashboard"
         element={
@@ -151,91 +138,52 @@ const router = createBrowserRouter(
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="home/models" replace />} />
-        <Route path="home" element={<CatalogLayout />}>
-          <Route index element={<Navigate to="models" replace />} />
-          <Route path="models">
-            <Route index element={<ModelProjectPage />} />
-            <Route path=":modelId" element={<ModelProjectPage />} />
-          </Route>
-          <Route path="model-testing">
-            <Route index element={<ModelTestingPage />} />
-            <Route path=":modelId" element={<ModelTestingPage />} />
-          </Route>
-        </Route>
-        <Route path="drift-monitoring">
-          <Route index element={<DriftMonitoringPage />} />
-          <Route path=":modelId" element={<DriftMonitoringPage />} />
-          <Route path=":modelId/new" element={<CreateDriftMonitoringPage />} />
-          <Route path=":modelId/edit" element={<CreateDriftMonitoringPage />} />
-          <Route path=":modelId/report/:runId" element={<DriftReportPage />} />
-        </Route>
-        <Route path="model-training">
-          <Route index element={<TrainingModelPage />} />
-          <Route path=":modelId" element={<TrainingModelPage />} />
-          <Route path="create" element={<CreateTrainingJobPage />}>
-            <Route index element={<Navigate to="metadata" replace />} />
-            <Route path="metadata" element={<MetadataTrainingJobPage />} />
-            <Route path="source" element={<SourceTrainingJobPage />} />
-            <Route path="execution" element={<ExecutionTrainingJobPage />} />
-          </Route>
+        <Route index element={<Navigate to="projects" replace />} />
+        <Route path="projects" element={<ProjectListPage />} />
+        <Route path="projects/new" element={<ProjectFormPage />} />
+        <Route path="projects/:modelId" element={<ProjectRouteBoundary />}>
+          <Route path="edit" element={<ProjectFormPage />} />
+          <Route path="overview" element={<ProjectOverviewPage />} />
+          <Route path="deployment" element={<DeploymentHistoryPage />} />
+          <Route path="monitoring" element={<DriftMonitoringPage />} />
           <Route
-            path="jobs/:jobId"
-            element={<Navigate to="details/overview" replace />}
+            path="monitoring/report/:runId"
+            element={<DriftReportPage />}
           />
-          <Route path="jobs/:jobId/details" element={<TrainingJobDetailPage />}>
-            <Route index element={<Navigate to="overview" replace />} />
-            <Route path="overview" element={<TrainingJobOverviewPage />} />
-            <Route path="logs" element={<TrainingJobLogsPage />} />
-            <Route path="metrics" element={<TrainingJobMetricsPage />} />
-            <Route path="artifacts" element={<TrainingJobArtifactsPage />} />
-            <Route path="config" element={<TrainingJobConfigPage />} />
-            <Route path="*" element={<Navigate to="overview" replace />} />
-          </Route>
+          <Route path="training" element={<TrainingModelPage />} />
+          <Route path="evolution" element={<EvolutionPage />} />
         </Route>
-        <Route path="model-evolution">
-          <Route index element={<RegistryPage />} />
-          <Route path=":familyId" element={<RegistryPage />} />
-        </Route>
-        <Route path="management" element={<ModelManagementPage />} />
-        <Route path="management/model/upload" element={<UploadModelPage />}>
+        <Route path="deployments/new" element={<CreateDeploymentPage />} />
+        <Route path="monitoring/new" element={<CreateDriftMonitoringPage />} />
+        <Route
+          path="monitoring/:monitorId/edit"
+          element={<CreateDriftMonitoringPage />}
+        />
+        <Route path="training/new" element={<CreateTrainingJobPage />}>
           <Route index element={<Navigate to="metadata" replace />} />
-          <Route path="metadata" element={<MetadataModelPage />} />
-          <Route path="build" element={<BuildModelPage />} />
-          <Route path="deploy" element={<DeployModelPage />} />
+          <Route path="metadata" element={<MetadataTrainingJobPage />} />
+          <Route path="source" element={<SourceTrainingJobPage />} />
+          <Route path="execution" element={<ExecutionTrainingJobPage />} />
         </Route>
-        <Route
-          path="management/model/:modelId"
-          element={<Navigate to="information" replace />}
-        />
-        <Route
-          path="management/model/:modelId/:tab"
-          element={<ModelDetailPage />}
-        />
+        <Route path="training/jobs/:jobId" element={<TrainingJobDetailPage />}>
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<TrainingJobOverviewPage />} />
+          <Route path="logs" element={<TrainingJobLogsPage />} />
+          <Route path="metrics" element={<TrainingJobMetricsPage />} />
+          <Route path="artifacts" element={<TrainingJobArtifactsPage />} />
+          <Route path="config" element={<TrainingJobConfigPage />} />
+        </Route>
         <Route path="notifications" element={<NotificationsPage />} />
-        <Route path="settings" element={<SettingsLayout />}>
-          <Route index element={<Navigate to="profile" replace />} />
-          <Route path="profile" element={<ProfileSettingPage />} />
-          <Route path="developer" element={<DeveloperSettingPage />} />
-        </Route>
-        <Route
-          path="settings/developer/api-keys/create"
-          element={<ApiKeyPage />}
-        />
-        <Route
-          path="settings/developer/api-keys/:keyId"
-          element={<ApiKeyPage />}
-        />
-        <Route
-          path="*"
-          element={<Navigate to="/dashboard/home/models" replace />}
-        />
+        <Route path="settings/profile" element={<ProfileSettingPage />} />
+        <Route path="api-tokens" element={<ApiTokensPage />} />
+        <Route path="api-tokens/new" element={<ApiKeyPage />} />
+        <Route path="api-tokens/:keyId" element={<ApiKeyPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
     </>,
   ),
 );
-
 export function AppRouter() {
   return (
     <Suspense fallback={<RouteFallback />}>

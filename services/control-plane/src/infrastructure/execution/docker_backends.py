@@ -5,6 +5,7 @@ import time
 import docker
 import docker.errors
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 
 from apps.deployment.models import Endpoint
@@ -17,6 +18,22 @@ from infrastructure.storage.paths import build_prefix, drift_run_prefix
 
 from .image_references import build_image_tag, image_repository, immutable_image_reference
 from .build_inputs import label_mapping_input
+
+
+def _start_container(docker_client, project, resource, identity_field, **kwargs):
+    """Serialize runtime creation with project deletion, not the whole long-running job."""
+    from apps.catalog.models import ModelProject
+    from common.api.exceptions import Conflict
+
+    with transaction.atomic():
+        locked = ModelProject.objects.select_for_update().get(pk=project.pk)
+        current = type(resource).objects.select_for_update().get(pk=resource.pk)
+        if locked.deletion_state != "active" or current.status in {"cancelled", "cancelling", "stopped", "failed"}:
+            raise Conflict("The task or project has been cancelled.")
+        container = docker_client.run(**kwargs)
+        setattr(resource, identity_field, container.id)
+        resource.save(update_fields=[identity_field])
+        return container
 
 
 def _logging_environment():
@@ -84,7 +101,11 @@ class DockerBuildBackend:
             "HARBOR_PASSWORD": settings.HARBOR_PASSWORD,
             "REDIS_URL": settings.REDIS_URL,
         }
-        container = self.docker.run(
+        container = _start_container(
+            self.docker,
+            project,
+            build,
+            "external_build_id",
             image="mlops-paas-model-packager",
             name=f"build-{build.public_id}",
             environment=environment,
@@ -138,7 +159,11 @@ class DockerTrainingBackend:
             else "",
             "REDIS_URL": settings.REDIS_URL,
         }
-        container = self.docker.run(
+        container = _start_container(
+            self.docker,
+            project,
+            job,
+            "external_job_id",
             image="mlops-paas-training-runner:latest",
             name=f"training-{job.public_id}",
             environment=environment,
@@ -217,14 +242,24 @@ class DockerDeploymentBackend:
     def deploy(self, deployment):
         project = deployment.version.project
         image = immutable_image_reference(deployment.build)
-        container_name = f"deploy-{deployment.build.public_id}"
+        container_name = f"deploy-{deployment.public_id}"
         target_port = 5002 if deployment.version.flavor in {"pytorch", "tensorflow"} else 5001
         internal_url = f"http://{container_name}:{target_port}"
         public_path = f"/{project.owner.tenant_id}/models/{project.public_id}/{deployment.version.public_id}"
         public_url = f"{settings.MODEL_SERVER_PUBLIC_URL}{public_path}"
-        labels = {"traefik.enable": "false"}
+        labels = {
+            "traefik.enable": "false",
+            "mlops_project_id": str(project.public_id),
+            "mlops_version_id": str(deployment.version.public_id),
+            "mlops_deployment_id": str(deployment.public_id),
+            "mlops_tenant_id": str(project.owner.tenant_id),
+        }
         self._log(f"Creating runtime container {container_name}.")
-        container = self.docker.run(
+        container = _start_container(
+            self.docker,
+            project,
+            deployment,
+            "external_deployment_id",
             image=image,
             name=container_name,
             environment={
@@ -321,7 +356,7 @@ class DockerDriftBackend:
             "MODEL_VERSION_ID": str(monitor.version.public_id),
             "MODEL_NAME": project.name,
             "MODEL_URI": source.uri if source else "",
-            "REFERENCE_DATA_URL": self.storage.presigned_get(monitor.reference_asset.s3_uri, 7200),
+            "REFERENCE_DATA_URL": self.storage.presigned_get(monitor.reference_uri, 7200),
             "HTML_S3_URI": uris["report.html"],
             "REPORT_JSON_S3_URI": uris["report.json"],
             "SUMMARY_JSON_S3_URI": uris["summary.json"],
@@ -341,7 +376,11 @@ class DockerDriftBackend:
             "DB_PORT": os.environ.get("DB_PORT", "5432"),
             "DB_SCHEMA": settings.DB_SCHEMA,
         }
-        container = self.docker.run(
+        container = _start_container(
+            self.docker,
+            project,
+            drift_run,
+            "external_run_id",
             image="mlops-paas-evidently",
             name=f"drift-{drift_run.public_id}",
             environment=environment,

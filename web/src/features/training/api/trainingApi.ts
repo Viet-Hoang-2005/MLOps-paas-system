@@ -1,8 +1,7 @@
 import { apiClient } from "@/shared/api/client";
 import { controlPlaneURL } from "@/shared/api/config";
-import { pageResults } from "@/shared/api/pagination";
+import { fetchAllPages } from "@/shared/api/pagination";
 import type {
-  TrainingBuild,
   TrainingJob,
   TrainingJobDownloadURLResponse,
   TrainingJobDeletionRequest,
@@ -22,6 +21,7 @@ const trainingJobFormData = (payload: TrainingJobFormValues) => {
   formData.append("model_flavor", payload.model_flavor);
   formData.append("project", payload.project_id || "");
   formData.append("entry_point", payload.entry_point || "train.py");
+  formData.append("reference_path", payload.reference_path || "");
   formData.append("requirements_text", payload.requirements_text);
   formData.append("vcpu", String(payload.vcpu));
   formData.append("memory_mb", String(payload.memory));
@@ -50,10 +50,10 @@ export const createTrainingJob = async (
 };
 
 export const listTrainingJobs = async (): Promise<TrainingJobListResponse> => {
-  const { data } = await apiClient.get<
-    { results: TrainingJob[] } | TrainingJob[]
-  >(controlPlaneURL("/training-jobs/"));
-  return { training_jobs: pageResults(data) };
+  const data = await fetchAllPages<TrainingJob>(
+    controlPlaneURL("/training-jobs/"),
+  );
+  return { training_jobs: data };
 };
 
 export const getTrainingUsage = async (): Promise<TrainingUsageResponse> => {
@@ -99,15 +99,6 @@ export const getTrainingJobDownloadUrl = async (
   (
     await apiClient.get<TrainingJobDownloadURLResponse>(
       controlPlaneURL(`/training-jobs/${jobId}/download/`),
-    )
-  ).data;
-
-export const buildAndRegisterTrainingJob = async (
-  jobId: string,
-): Promise<TrainingBuild> =>
-  (
-    await apiClient.post<TrainingBuild>(
-      controlPlaneURL(`/training-jobs/${jobId}/build/`),
     )
   ).data;
 
@@ -186,32 +177,12 @@ export const cancelTrainingJob = async (
   return "training_job" in data ? data.training_job : data;
 };
 
-export const retryTrainingJob = async (jobId: string): Promise<TrainingJob> => {
-  const previous = await getTrainingJob(jobId);
-  const { data: job } = await apiClient.post<TrainingJob>(
-    controlPlaneURL("/training-jobs/"),
-    {
-      project: previous.project_id,
-      name: previous.name,
-      model_flavor: previous.model_flavor,
-      entry_point: previous.entry_point,
-      requirements_text: previous.requirements_text,
-      code_snapshot_uri: previous.code_snapshot_uri,
-      data_snapshot_uri: previous.data_snapshot_uri,
-      backend: previous.backend,
-      vcpu: previous.vcpu,
-      memory_mb: previous.memory_mb,
-      max_runtime_seconds: previous.max_runtime_seconds,
-      accelerator_type: previous.accelerator_type,
-      accelerator_count: previous.accelerator_count,
-    },
-  );
-  return (
+export const retryTrainingJob = async (jobId: string): Promise<TrainingJob> =>
+  (
     await apiClient.post<TrainingJob>(
-      controlPlaneURL(`/training-jobs/${job.id}/submit/`),
+      controlPlaneURL(`/training-jobs/${jobId}/retry/`),
     )
   ).data;
-};
 
 export const deleteTrainingJob = async (
   jobId: string,

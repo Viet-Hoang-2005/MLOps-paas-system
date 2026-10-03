@@ -21,7 +21,9 @@ class DriftMonitorListCreateEndpoint(generics.ListCreateAPIView):
         return monitors_for_user(self.request.user).prefetch_related("runs")
 
     def perform_create(self, serializer):
-        serializer.save(backend=settings.DRIFT_BACKEND)
+        from apps.drift.services.monitors import create_monitor
+
+        serializer.instance = create_monitor(data=serializer.validated_data, backend=settings.DRIFT_BACKEND)
 
 
 class DriftMonitorDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):

@@ -61,7 +61,11 @@ class TrainingJobWebhookEndpoint(APIView):
                     {"detail": "A terminal workflow_status is required."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            if job.status in {"cancelling", "completed", "failed", "cancelled"} or job.deletion_requested_at:
+            if (
+                job.status in {"cancelling", "completed", "failed", "cancelled"}
+                or job.deletion_requested_at
+                or job.project.deletion_state != "active"
+            ):
                 capability.consumed_at = timezone.now()
                 capability.save(update_fields=["consumed_at"])
                 return Response({"status": job.status, "ignored": True})

@@ -7,17 +7,18 @@ from apps.catalog.models import ModelProject
 from apps.catalog.selectors import project_for_user
 from apps.catalog.services.deletion import request_project_deletion
 from apps.catalog.services.project_metadata import save_project_metadata
-from apps.catalog.services.workspace import save_workspace_file
+from apps.catalog.services.preview import create_project_preview, save_preview
+from apps.catalog.services.workspace import save_workspace_file, delete_workspace_file
 from apps.deployment.api.serializers import (
     BuildSerializer,
-    ManualBuildCreateSerializer,
-    PresignedUploadUrlSerializer,
 )
-from apps.deployment.services.builds import create_build_presigned_url, request_manual_build
-from infrastructure.storage import S3Storage
+from apps.deployment.services.builds import request_preview_build
 
 from .serializers import (
     ModelProjectSerializer,
+    ModelPreviewSerializer,
+    PreviewWriteSerializer,
+    ProjectCreateSerializer,
     ProjectMetadataWriteSerializer,
     WorkspaceAssetSerializer,
     WorkspaceUploadSerializer,
@@ -28,14 +29,17 @@ class ModelProjectListCreateEndpoint(generics.ListCreateAPIView):
     serializer_class = ModelProjectSerializer
 
     def get_queryset(self):
-        return ModelProject.objects.filter(owner=self.request.user, is_active=True).prefetch_related(
-            "workspace_assets", "versions__deployments__endpoint", "builds"
+        return (
+            ModelProject.objects.filter(owner=self.request.user)
+            .exclude(deletion_state="deleted")
+            .select_related("preview", "active_deployment__version", "active_deployment__endpoint")
+            .prefetch_related("workspace_assets", "versions__deployments__endpoint", "builds")
         )
 
     def create(self, request, *args, **kwargs):
-        serializer = ProjectMetadataWriteSerializer(data=request.data)
+        serializer = ProjectCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        project = save_project_metadata(actor=request.user, validated_data=serializer.validated_data)
+        project = create_project_preview(actor=request.user, data=serializer.validated_data)
         return Response(ModelProjectSerializer(project).data, status=status.HTTP_201_CREATED)
 
 
@@ -45,13 +49,16 @@ class ModelProjectDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
     lookup_url_kwarg = "project_id"
 
     def get_queryset(self):
-        return ModelProject.objects.filter(owner=self.request.user, is_active=True).prefetch_related(
-            "workspace_assets", "versions__deployments__endpoint", "builds"
+        return (
+            ModelProject.objects.filter(owner=self.request.user)
+            .exclude(deletion_state="deleted")
+            .select_related("preview", "active_deployment__version", "active_deployment__endpoint")
+            .prefetch_related("workspace_assets", "versions__deployments__endpoint", "builds")
         )
 
     def update(self, request, *args, **kwargs):
         project = self.get_object()
-        serializer = ProjectMetadataWriteSerializer(data=request.data)
+        serializer = ProjectMetadataWriteSerializer(data=request.data, partial=kwargs.get("partial", False))
         serializer.is_valid(raise_exception=True)
         project = save_project_metadata(
             actor=request.user,
@@ -64,6 +71,14 @@ class ModelProjectDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
         project = self.get_object()
         project = request_project_deletion(project)
         return Response(ModelProjectSerializer(project).data, status=status.HTTP_202_ACCEPTED)
+
+
+class TrainingProjectCreateEndpoint(APIView):
+    def post(self, request):
+        serializer = ProjectMetadataWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        project = save_project_metadata(actor=request.user, validated_data=serializer.validated_data)
+        return Response(ModelProjectSerializer(project).data, status=status.HTTP_201_CREATED)
 
 
 class WorkspaceFilesEndpoint(APIView):
@@ -85,13 +100,27 @@ class WorkspaceFilesEndpoint(APIView):
 
     def delete(self, request, project_id, kind):
         project = project_for_user(request.user, project_id)
-        relative_path = str(request.data.get("relative_path", ""))
-        asset = project.workspace_assets.filter(kind=kind, relative_path=relative_path).first()
-        if not asset:
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        S3Storage().delete(asset.s3_uri)
-        asset.delete()
+        delete_workspace_file(project=project, kind=kind, relative_path=str(request.data.get("relative_path", "")))
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProjectPreviewEndpoint(APIView):
+    def get(self, request, project_id):
+        return Response(ModelPreviewSerializer(project_for_user(request.user, project_id).preview).data)
+
+    def patch(self, request, project_id):
+        project = project_for_user(request.user, project_id)
+        serializer = PreviewWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        preview = save_preview(project=project, data=serializer.validated_data)
+        return Response(ModelPreviewSerializer(preview).data)
+
+
+class RunningSourceEndpoint(APIView):
+    def get(self, request, project_id):
+        from apps.catalog.services.snapshots import running_source
+
+        return Response({"content": running_source(project_for_user(request.user, project_id))})
 
 
 class ProjectBuildEndpoint(APIView):
@@ -101,23 +130,8 @@ class ProjectBuildEndpoint(APIView):
 
     def post(self, request, project_id):
         project = project_for_user(request.user, project_id)
-        serializer = ManualBuildCreateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        build = request_manual_build(
-            project=project,
-            validated_data=serializer.validated_data,
-            backend=settings.BUILD_BACKEND,
-        )
+        from rest_framework import serializers
+
+        revision = serializers.IntegerField(min_value=1).run_validation(request.data.get("revision"))
+        build = request_preview_build(project=project, revision=revision, backend=settings.BUILD_BACKEND)
         return Response(BuildSerializer(build).data, status=status.HTTP_201_CREATED)
-
-
-class ProjectBuildUploadUrlEndpoint(APIView):
-    def post(self, request, project_id):
-        project = project_for_user(request.user, project_id)
-        serializer = PresignedUploadUrlSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        result = create_build_presigned_url(
-            project=project,
-            validated_data=serializer.validated_data,
-        )
-        return Response(result, status=status.HTTP_200_OK)

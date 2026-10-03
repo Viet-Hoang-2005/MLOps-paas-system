@@ -14,6 +14,7 @@ export interface SelectProps {
   options: SelectOption[];
   placeholder?: string;
   className?: string;
+  disabled?: boolean;
 }
 
 export function Select({
@@ -22,6 +23,7 @@ export function Select({
   options,
   placeholder = "Select an option",
   className,
+  disabled = false,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const selectedOption = options.find((opt) => opt.value === value);
@@ -31,6 +33,7 @@ export function Select({
       <Popover.Trigger asChild>
         <button
           type="button"
+          disabled={disabled}
           className={cn(
             "flex h-14 w-full items-center justify-between gap-3 rounded-control border bg-surface px-4 text-left text-style-body-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20",
             open ? "border-ring" : "border-input hover:border-input-hover",

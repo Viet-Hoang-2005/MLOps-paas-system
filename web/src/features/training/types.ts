@@ -1,5 +1,5 @@
 import type { ResourceId } from "@/shared/types";
-import type { ModelFlavor } from "@/features/catalog/types";
+import type { ModelFlavor } from "@/features/projects/types";
 
 export type TrainingJobStatus =
   | "pending"
@@ -41,6 +41,8 @@ export interface TrainingOutput {
 }
 
 export interface TrainingJob {
+  reference_path: string;
+  reference_snapshot_uri: string;
   id: ResourceId;
   project_id: ResourceId;
   name: string;
@@ -102,6 +104,7 @@ export interface TrainingJobDeletionRequest {
 }
 
 export interface TrainingJobFormValues {
+  reference_path?: string;
   name: string;
   model_version?: string;
   model_flavor: ModelFlavor;

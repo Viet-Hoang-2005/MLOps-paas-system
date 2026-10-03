@@ -22,7 +22,7 @@ def execute_training_job(self, job_id):
 
     with transaction.atomic():
         job = TrainingJob.objects.select_for_update().select_related("project", "project__owner").get(public_id=job_id)
-        if job.status != "queued" or job.deletion_requested_at:
+        if job.status != "queued" or job.deletion_requested_at or job.project.deletion_state != "active":
             return job.status
         job.mark_started()
         job.celery_task_id = self.request.id or job.celery_task_id

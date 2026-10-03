@@ -24,7 +24,7 @@ pnpm build
 
 `pnpm lint` runs both ESLint boundary rules and the architecture check for allowed source roots, parent-relative imports, legacy imports, and circular dependencies.
 
-The current migration intentionally does not add a frontend unit-test or browser-test gate. Use the manual verification checklist below before merging changes that affect a user journey.
+`pnpm test:workflow` checks Header navigation across main/detail/create/account routes without a browser. It does not replace manual UI or Docker/S3 end-to-end acceptance. See the [local workflow runbook](../docs/dev/web-workflow-local.md).
 
 ## Source architecture
 
@@ -37,7 +37,7 @@ src/
   shared/    HTTP/error foundation, shared types, utilities, and UI primitives
 ```
 
-The active domains are `auth`, `catalog`, `build-deploy`, `training`, `registry`, `drift`, `settings`, and `notifications`.
+The active domains are `auth`, `projects`, `deployments`, `training`, `evolution`, `monitoring`, `api-tokens`, `settings`, and `notifications`.
 
 Architecture rules:
 
@@ -50,7 +50,7 @@ Architecture rules:
 - Shared modules must not import features. ESLint enforces the most important import boundaries.
 - Cross-directory imports use the `@/` alias; parent-relative imports are rejected by ESLint.
 - The legacy roots `components`, `hooks`, `lib`, `pages`, and `types` are not allowed under `src`.
-- Routes keep their existing public URLs and are lazy-loaded. Monaco and ZIP tooling stay outside the eager application bundle.
+- Routes are lazy-loaded under `/dashboard/projects/:projectId/{overview,deployment,monitoring,training,evolution}`. New forms use independent selectors; old upload/management/registry routes are removed. Monaco and ZIP tooling stay outside the eager application bundle.
 
 See [Frontend architecture](docs/frontend-architecture.md) and [Design system](docs/design-system.md) before adding a new domain or primitive.
 
@@ -61,17 +61,17 @@ See [Frontend architecture](docs/frontend-architecture.md) and [Design system](d
 - Status must include text or an icon; color alone is not sufficient.
 - Every interactive control needs a visible `focus-visible` state and a meaningful accessible name.
 - Support `light`, `dark`, and `system` themes. Theme preference is persisted locally.
-- User-facing copy is English and belongs to the relevant i18n namespace even though no language selector is currently shown.
+- Copy belongs to its feature i18n namespace. New lifecycle/navigation copy includes Vietnamese resources with English fallback for unchanged screens; no language selector is currently shown.
 
 ## Manual verification checklist
 
 - Login, signup, OAuth, password recovery, and session refresh
-- Model selection and lifecycle navigation across Overview, Build & Deploy, Training, Registry, and Monitoring
-- Upload, source/reference editing, build, deployment, health, prediction, stop, and runtime logs
+- Header preserves a main section, but choosing a project from detail/create/account pages goes to its Overview; dirty forms confirm exit
+- New/Edit Preview, immutable source/reference snapshots, explicit Build → Register → Deploy, prediction and runtime logs
 - Training create, list, detail polling, cancel, retry, register, artifacts, and deployment
-- Registry compare, promote, rollback, build, deploy, health, and history
+- Evolution snapshot comparison/lineage, Running badge and confirmed deploy; deployment failure keeps the old Running version
 - Drift configure, run, runtime logs, report, and delete
-- Profile, avatar, password, and API keys
+- Profile, avatar, password, and the separate API Token feature
 - Light/dark/system at 768 px, 1024 px, and 1440 px
 - Keyboard navigation, visible focus, 200% zoom, WCAG AA contrast, and reduced motion
 

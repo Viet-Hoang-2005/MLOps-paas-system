@@ -27,7 +27,7 @@ def execute_drift_run(self, run_id):
             )
             .get(public_id=run_id)
         )
-        if run.status in {"completed", "cancelled"}:
+        if run.status in {"completed", "cancelled", "failed"} or run.monitor.version.project.deletion_state != "active":
             return run.status
         run.status = "running"
         run.started_at = run.started_at or timezone.now()

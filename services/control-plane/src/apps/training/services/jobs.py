@@ -15,12 +15,24 @@ from apps.training.tasks import (
     purge_training_job_outputs,
 )
 from common.api.exceptions import Conflict
+from rest_framework.exceptions import ValidationError
 from infrastructure.storage import S3Storage
+from infrastructure.storage.paths import training_job_prefix
 
 ACTIVE_STATUSES = {"pending", "queued", "uploading", "running", "cancelling"}
 
 
+@transaction.atomic
 def create_job(*, project, validated_data):
+    project = type(project).objects.select_for_update().get(pk=project.pk)
+    if project.deletion_state != "active":
+        raise Conflict("This project is being deleted.")
+    reference_path = validated_data.get("reference_path", "")
+    reference_asset = (
+        project.workspace_assets.filter(kind="data", relative_path=reference_path).first() if reference_path else None
+    )
+    if reference_path and (not reference_asset or not reference_path.lower().endswith(".csv")):
+        raise ValidationError({"reference_path": "Choose a CSV from this project's workspace."})
     source_zip = validated_data.pop("source_zip", None)
     training_data = validated_data.pop("training_data", None)
     validated_data["backend"] = settings.TRAINING_BACKEND
@@ -38,18 +50,29 @@ def create_job(*, project, validated_data):
     draft.mlflow_artifact_uri = scoped_uris["mlflow"]
     draft.save()
     storage = S3Storage()
-    if source_zip:
-        storage.put(storage.parse_uri(draft.code_snapshot_uri)[1], source_zip, "application/zip")
-    else:
-        _snapshot_code(project, draft, storage)
-    if training_data:
-        storage.put(
-            storage.parse_uri(draft.data_snapshot_uri)[1],
-            training_data,
-            training_data.content_type or "text/csv",
-        )
-    else:
-        _snapshot_data(project, draft, storage)
+    try:
+        if source_zip:
+            storage.put(storage.parse_uri(draft.code_snapshot_uri)[1], source_zip, "application/zip")
+        else:
+            _snapshot_code(project, draft, storage)
+        if training_data:
+            storage.put(
+                storage.parse_uri(draft.data_snapshot_uri)[1], training_data, training_data.content_type or "text/csv"
+            )
+        else:
+            _snapshot_data(project, draft, storage)
+        if draft.reference_path:
+            key = (
+                storage.parse_uri(draft.data_snapshot_uri)[1].rsplit("/", 1)[0]
+                + "/reference/"
+                + reference_asset.relative_path.rsplit("/", 1)[-1]
+            )
+            copied = storage.copy(reference_asset.s3_uri, key)
+            draft.reference_snapshot_uri = copied.uri
+            draft.save(update_fields=["reference_snapshot_uri"])
+    except Exception:
+        storage.delete_prefix(training_job_prefix(project.owner.tenant_id, project.public_id, draft.public_id))
+        raise
     record_training_event(job=draft, event_type="created", message="Training job created.")
     return draft
 
@@ -76,7 +99,60 @@ def _snapshot_data(project, job, storage):
     storage.put(storage.parse_uri(job.data_snapshot_uri)[1], body, asset.content_type or "text/csv")
 
 
+@transaction.atomic
+def retry_job(job, *, storage=None):
+    """Retry the original immutable inputs, never the current workspace."""
+    project = type(job.project).objects.select_for_update().get(pk=job.project_id)
+    job = TrainingJob.objects.select_for_update().get(pk=job.pk)
+    if project.deletion_state != "active" or job.deletion_requested_at:
+        raise Conflict("This project or job is being deleted.")
+    if job.status not in {"failed", "cancelled"}:
+        raise Conflict("Only failed or cancelled jobs can be retried.")
+    fields = (
+        "name",
+        "model_flavor",
+        "entry_point",
+        "requirements_text",
+        "reference_path",
+        "vcpu",
+        "memory_mb",
+        "max_runtime_seconds",
+        "accelerator_type",
+        "accelerator_count",
+        "baseline_version_id",
+        "dataset_snapshot_id",
+    )
+    retry = TrainingJob(
+        project=project,
+        retry_of=job,
+        trigger_kind="retry",
+        backend=settings.TRAINING_BACKEND,
+        **{field: getattr(job, field) for field in fields},
+    )
+    storage = storage or S3Storage()
+    uris = expected_training_uris(retry, storage.bucket)
+    retry.output_uri, retry.mlflow_artifact_uri = uris["output"], uris["mlflow"]
+    try:
+        for field, kind in (("code_snapshot_uri", "code"), ("data_snapshot_uri", "data")):
+            copied = storage.copy(getattr(job, field), storage.parse_uri(uris[kind])[1])
+            setattr(retry, field, copied.uri)
+        if job.reference_snapshot_uri:
+            key = storage.parse_uri(uris["data"])[1].rsplit("/", 1)[0] + "/reference/reference.csv"
+            retry.reference_snapshot_uri = storage.copy(job.reference_snapshot_uri, key).uri
+        retry.save()
+        record_training_event(job=retry, event_type="created", message="Training retry created from immutable inputs.")
+        return submit_job(retry)
+    except Exception:
+        storage.delete_prefix(training_job_prefix(project.owner.tenant_id, project.public_id, retry.public_id))
+        raise
+
+
+@transaction.atomic
 def submit_job(job):
+    project = type(job.project).objects.select_for_update().get(pk=job.project_id)
+    job = TrainingJob.objects.select_for_update().get(pk=job.pk)
+    if project.deletion_state != "active":
+        raise Conflict("This project is being deleted.")
     if job.deletion_requested_at:
         raise Conflict("This training job is being deleted.")
     if job.status not in {"pending", "failed"}:

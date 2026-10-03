@@ -59,6 +59,8 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "training_data",
             "code_snapshot_uri",
             "data_snapshot_uri",
+            "reference_path",
+            "reference_snapshot_uri",
             "output_uri",
             "mlflow_artifact_uri",
             "mlflow_run_id",
@@ -91,6 +93,7 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "backend",
             "code_snapshot_uri",
             "data_snapshot_uri",
+            "reference_snapshot_uri",
             "output_uri",
             "mlflow_artifact_uri",
             "external_job_id",
@@ -114,6 +117,17 @@ class TrainingJobSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             self.fields["project"].queryset = ModelProject.objects.filter(owner=request.user, is_active=True)
+
+    def validate(self, attrs):
+        if self.instance and any(
+            field in attrs for field in ("project", "source_zip", "training_data", "reference_path")
+        ):
+            raise serializers.ValidationError(
+                "The project and uploaded input snapshots are immutable; create a new job."
+            )
+        if self.instance and self.instance.status != "pending" and attrs:
+            raise serializers.ValidationError("Submitted training inputs are immutable; create a new job.")
+        return attrs
 
     @staticmethod
     def get_output_available(instance):
@@ -139,9 +153,9 @@ class TrainingJobSerializer(serializers.ModelSerializer):
         if not ready_builds:
             return "trained"
 
-        active_deployment_statuses = {"pending", "deploying", "healthy"}
+        active_id = instance.project.active_deployment_id
         for build in ready_builds:
-            if any(deployment.status in active_deployment_statuses for deployment in build.version.deployments.all()):
+            if any(deployment.pk == active_id for deployment in build.version.deployments.all()):
                 return "deployed"
         return "built"
 

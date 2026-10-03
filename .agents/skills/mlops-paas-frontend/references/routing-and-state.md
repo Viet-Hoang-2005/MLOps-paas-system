@@ -10,10 +10,12 @@
 
 ## Current coordinated workflows
 
-- Upload: Metadata → Build Model → Deploy Model.
+- Project creation/edit is one Preview form; deployment wizard is Build → explicit Register → Deploy. Editing Preview never changes Running snapshots.
 - Training creation: Metadata → Source → Execution.
 - Training detail: overview, logs, metrics, artifacts, and config nested routes.
-- Registry/version detail and drift report routes load the exact UUID in the URL.
+- Main pages use `/dashboard/projects/:projectId/{overview,deployment,monitoring,training,evolution}`; forms `/dashboard/deployments/new`, `/dashboard/monitoring/new`, `/dashboard/training/new` own explicit project selectors. API tokens live at `/dashboard/api-tokens`.
+- Header preserves the main section when changing project; from forms/details/account pages it navigates to the chosen project's Overview without retaining old resource IDs. Project boundary remounts state on ID change and rejects unknown IDs.
+- Feature owners are projects/deployments/monitoring/training/evolution/api-tokens; no legacy route compatibility. Overview source/reference are read-only Running snapshots; name/description/access are project-level immediate updates.
 
 ## Navigation rules
 

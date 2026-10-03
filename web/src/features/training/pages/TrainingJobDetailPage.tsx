@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 
 import {
-  buildAndRegisterTrainingJob,
   deleteTrainingJob,
   deleteTrainingOutputs,
   getTrainingJob,
@@ -197,23 +196,10 @@ export default function TrainingJobDetailPage() {
       await queryClient.invalidateQueries({
         queryKey: trainingQueryKeys.jobs(),
       });
-      navigate("/dashboard/model-training");
+      navigate("/dashboard/training");
     },
     onError: (error) =>
       toast.error(getApiErrorMessage(error, t("delete.failed"))),
-  });
-
-  const buildAndRegisterMutation = useMutation({
-    mutationFn: () => buildAndRegisterTrainingJob(parsedJobId),
-    onSuccess: async () => {
-      toast.success(t("detail.buildStarted"));
-      await refetchJob();
-      await queryClient.invalidateQueries({
-        queryKey: trainingQueryKeys.jobs(),
-      });
-    },
-    onError: (error) =>
-      toast.error(getApiErrorMessage(error, t("detail.buildFailed"))),
   });
 
   const deleteOutputsMutation = useMutation({
@@ -299,7 +285,7 @@ export default function TrainingJobDetailPage() {
           {t("detail.notFoundDescription")}
         </p>
         <Button
-          onClick={() => navigate("/dashboard/model-training")}
+          onClick={() => navigate("/dashboard/training")}
           variant="secondary"
           className="mt-2"
         >
@@ -336,8 +322,6 @@ export default function TrainingJobDetailPage() {
     },
     downloadOutput: () => downloadMutation.mutate(),
     downloadingOutput: downloadMutation.isPending,
-    buildAndRegister: () => buildAndRegisterMutation.mutate(),
-    buildingAndRegistering: buildAndRegisterMutation.isPending,
     requestDeleteOutputs: () => setDeleteOutputsOpen(true),
     copyUri,
   };
@@ -346,7 +330,7 @@ export default function TrainingJobDetailPage() {
     <section className="flex w-full flex-1 flex-col space-y-6">
       <button
         type="button"
-        onClick={() => navigate("/dashboard/model-training")}
+        onClick={() => navigate("/dashboard/training")}
         className="group mb-6 flex items-center gap-2 text-style-body-strong text-color-muted-foreground transition-colors hover:text-color-foreground"
       >
         <ArrowLeft className="h-4 w-4 transition-all group-hover:-translate-x-0.5" />
@@ -452,9 +436,7 @@ export default function TrainingJobDetailPage() {
             icon: tab.icon,
             isActive: activeSection === tab.id,
             onClick: () =>
-              navigate(
-                `/dashboard/model-training/jobs/${job.id}/details/${tab.id}`,
-              ),
+              navigate(`/dashboard/training/jobs/${job.id}/${tab.id}`),
           }))}
         />
       </div>

@@ -33,11 +33,6 @@ class ModelVersion(models.Model):
         ordering = ["-registered_at"]
         constraints = [
             models.UniqueConstraint(fields=["project", "version"], name="registry_project_version_unique"),
-            models.UniqueConstraint(
-                fields=["source_job"],
-                condition=models.Q(source_job__isnull=False),
-                name="registry_source_job_unique",
-            ),
         ]
 
     def __str__(self):
@@ -47,6 +42,8 @@ class ModelVersion(models.Model):
 class ModelArtifact(models.Model):
     KINDS = (
         ("source", "Source"),
+        ("source_code", "Source Code"),
+        ("reference_data", "Reference Data"),
         ("training_output", "Training Output"),
         ("package", "Package"),
         ("label_mapping", "Label Mapping"),

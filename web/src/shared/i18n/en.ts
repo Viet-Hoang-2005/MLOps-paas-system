@@ -18,11 +18,13 @@ export const commonEn = {
   navigation: {
     primary: "Primary navigation",
     workspace: "Workspace",
-    home: "Home",
-    driftMonitoring: "Drift Monitoring",
-    modelTraining: "Model Training",
-    modelEvolution: "Model Evolution",
-    management: "Management",
+    home: "Overview Model",
+    deployment: "Deployment Model",
+    driftMonitoring: "Monitoring Model",
+    modelTraining: "Training Model",
+    modelEvolution: "Evolution Model",
+    management: "Model Project",
+    apiTokens: "API Token",
     notification: "Notification",
     setting: "Setting",
   },
@@ -88,7 +90,8 @@ export const commonEn = {
     copyTitle: "Copy log",
     copy: "Copy",
     error: "Error:",
-    logsUnavailable: "Logs are temporarily unavailable. Retrying; task status is still being checked.",
+    logsUnavailable:
+      "Logs are temporarily unavailable. Retrying; task status is still being checked.",
   },
   accessibility: {
     closeModal: "Close modal",

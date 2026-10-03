@@ -23,10 +23,7 @@ def test_build_database_url_explicit_and_composed(monkeypatch):
     monkeypatch.setenv("DB_USER", "u@x")
     monkeypatch.setenv("DB_PASSWORD", "p word")
     monkeypatch.setenv("DB_HOST_RO", "db")
-    assert (
-        database.build_control_plane_database_url()
-        == "postgresql://u%40x:p+word@db:5432/mlops_paas_db"
-    )
+    assert database.build_control_plane_database_url() == "postgresql://u%40x:p+word@db:5432/mlops_paas_db"
     monkeypatch.delenv("DB_PASSWORD")
     assert database.build_control_plane_database_url() is None
 
@@ -66,6 +63,7 @@ def test_fetch_model_version_normalizes_values(monkeypatch):
     }
     query = str(conn.execute.call_args.args[0])
     assert "version.flavor" in query
+    assert "d.id = project.active_deployment_id" in query
     assert "project.model_type" not in query
     mappings.first.return_value = None
     assert database._fetch_model_version_from_db("missing") is None

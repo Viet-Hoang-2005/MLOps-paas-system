@@ -7,10 +7,33 @@ from apps.registry.models import ModelArtifact, ModelMetric, ModelVersion
 from infrastructure.execution.image_references import repository_from_reference
 from infrastructure.execution.image_registry import image_registry_for
 from infrastructure.storage import S3Storage
-from infrastructure.storage.paths import build_prefix, version_prefix
+from infrastructure.storage.paths import version_prefix
+from contextlib import contextmanager
+
+
+@contextmanager
+def _registration_storage(storage):
+    """Remove copied objects if publishing the database snapshot fails."""
+    copied = []
+
+    class TrackedStorage:
+        def copy(self, uri, key):
+            result = storage.copy(uri, key)
+            copied.append(result.uri)
+            return result
+
+    try:
+        yield TrackedStorage()
+    except Exception:
+        for uri in copied:
+            storage.delete(uri)
+        raise
+
 
 BUILD_INPUT_ARTIFACT_KINDS = {
     "source_artifact": "source",
+    "source_code": "source_code",
+    "reference_data": "reference_data",
     "training_output": "training_output",
     "label_mapping": "label_mapping",
     "metrics": "metrics",
@@ -36,9 +59,16 @@ def register_successful_build(
 
     storage = storage or S3Storage()
     image_registry = image_registry or image_registry_for(build)
-    with transaction.atomic():
-        build = type(build).objects.select_for_update().select_related("project", "project__owner").get(pk=build.pk)
+    with _registration_storage(storage) as storage, transaction.atomic():
         project = type(build.project).objects.select_for_update().get(pk=build.project_id)
+        build = type(build).objects.select_for_update().select_related("project", "project__owner").get(pk=build.pk)
+        if build.status != "ready" or project.deletion_state != "active":
+            raise ValidationError({"build": "Only successful builds of active projects can be registered."})
+        if build.version_id:
+            return build
+        metrics_summary = metrics_summary if metrics_summary is not None else build.metrics_summary
+        params_summary = params_summary if params_summary is not None else build.params_summary
+        insights_summary = insights_summary if insights_summary is not None else build.insights_summary
         if build.version_id is None:
             version_number = project.next_version_number
             while ModelVersion.objects.filter(project=project, version=str(version_number)).exists():
@@ -72,12 +102,12 @@ def register_successful_build(
                     content_type=stored.content_type,
                     metadata={
                         "artifact_format": build.artifact_format,
-                        "source_job_id": str(build.source_job.public_id),
+                        "source_job_id": str(build.source_job_reference),
                     }
                     if asset.kind == "training_output"
                     else {"artifact_format": build.artifact_format}
                     if asset.kind == "source_artifact"
-                    else {},
+                    else asset.metadata,
                 )
             if build.package_uri:
                 package_name = "model-package.zip"
@@ -142,9 +172,19 @@ def register_successful_build(
         build.image_digest = resolved_image_digest
         build.status = "ready"
         build.error_message = ""
-        build.save(update_fields=["version", "image_uri", "image_digest", "status", "error_message", "updated_at"])
-        transaction.on_commit(
-            lambda: storage.delete_prefix(build_prefix(project.owner.tenant_id, project.public_id, build.public_id))
+        build.registration_status = "registered"
+        build.registration_error = ""
+        build.save(
+            update_fields=[
+                "version",
+                "image_uri",
+                "image_digest",
+                "status",
+                "error_message",
+                "registration_status",
+                "registration_error",
+                "updated_at",
+            ]
         )
     return build
 

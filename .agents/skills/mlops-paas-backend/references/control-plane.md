@@ -6,10 +6,10 @@ The Django Control Plane is a domain-oriented modular monolith (`services/contro
 
 1. **`auth`:** CustomUser, user profile avatars, RS256 JWT issuance, JWKS endpoint (`/api/auth/.well-known/jwks.json`), OAuth2 (Google/GitHub), 2FA/TOTP.
 2. **`access`:** Project-scoped API keys (`ApiKey`) hashed with SHA-256 for machine-to-machine authentication.
-3. **`catalog`:** Mutable workspaces (`ModelProject`), dataset snapshots, feature views, async project deletion.
+3. **`catalog`:** Project metadata, one revision-checked `ModelPreview` per project, mutable training workspace, Running snapshot access, async retryable hard deletion.
 4. **`registry`:** Immutable registered versions (`ModelVersion`), artifacts, metrics, insights, dynamic aliases (`champion`/`challenger`).
 5. **`training`:** Training jobs (`TrainingJob`), short-lived Capability Tokens, Presigned S3 URLs, resource quotas, graceful cancellation.
-6. **`deployment`:** Container packaging builds (`Build`), model serving deployments (`Deployment`), router endpoints (`Endpoint`), execution task dispatch.
+6. **`deployment`:** Immutable Build input snapshots, explicit asynchronous idempotent registration, serving deployment/readiness. Project.active_deployment is the Running source of truth; runtime uses deployment UUID, not Build UUID.
 7. **`drift`:** Drift monitors (`DriftMonitor`), scheduled and event-driven drift runs (`DriftRun`), report access, threshold configuration.
 8. **`ct` (Continuous Training):** Retraining policies, automated retraining triggers (`RetrainingTrigger`), pipeline orchestration upon drift signals.
 9. **`production`:** Production inference records (`ProductionPredictionRecord`), telemetry datasets, schema coordination with Consumer worker.
@@ -33,6 +33,8 @@ HTTP Request
 - Avoid circular imports by placing task imports at dispatch boundaries or moving shared queries to selectors.
 - Use `select_for_update()` when transitioning terminal states to prevent race conditions.
 - Late callbacks must never revive cancelled or deleting resources (return HTTP 200 no-op).
+- Lock project before Preview/Build/job when coordinating deletion or snapshots; dispatch after commit. Normal new project requires artifact, training-created project does not. No legacy upload/backfill compatibility in the clean local workflow.
+- Keep raw/package artifact, requirements, source/reference and Advanced assets immutable across Build → Register; training retry uses original snapshots, not current workspace. Only registered versions deploy, and failed deployments retain old Running.
 
 ## Runtime Logs Architecture
 

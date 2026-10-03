@@ -1,8 +1,6 @@
 from rest_framework import serializers
 
-from apps.catalog.artifact_types import ARTIFACT_FORMATS, validate_source_artifact
 from apps.deployment.models import Build, BuildInputAsset, Deployment, Endpoint
-from apps.registry.models import ModelVersion
 
 
 class BuildSerializer(serializers.ModelSerializer):
@@ -11,9 +9,6 @@ class BuildSerializer(serializers.ModelSerializer):
     source_job_id = serializers.SerializerMethodField()
     version_id = serializers.UUIDField(source="version.public_id", allow_null=True, read_only=True)
     version_number = serializers.CharField(source="version.version", allow_null=True, read_only=True)
-    version = serializers.SlugRelatedField(
-        slug_field="public_id", queryset=ModelVersion.objects.none(), required=False, write_only=True
-    )
     input_assets = serializers.SerializerMethodField()
 
     class Meta:
@@ -22,7 +17,6 @@ class BuildSerializer(serializers.ModelSerializer):
             "id",
             "project_id",
             "source_job_id",
-            "version",
             "version_id",
             "version_number",
             "flavor",
@@ -30,6 +24,9 @@ class BuildSerializer(serializers.ModelSerializer):
             "requirements_snapshot",
             "backend",
             "status",
+            "preview_revision",
+            "registration_status",
+            "registration_error",
             "celery_task_id",
             "external_build_id",
             "image_uri",
@@ -63,12 +60,6 @@ class BuildSerializer(serializers.ModelSerializer):
     def get_source_job_id(instance):
         return instance.source_job_reference or (instance.source_job.public_id if instance.source_job_id else None)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        request = self.context.get("request")
-        if request and request.user.is_authenticated:
-            self.fields["version"].queryset = ModelVersion.objects.filter(project__owner=request.user)
-
     @staticmethod
     def get_input_assets(instance):
         return BuildInputAssetSerializer(instance.input_assets.all(), many=True).data
@@ -80,75 +71,6 @@ class BuildInputAssetSerializer(serializers.ModelSerializer):
     class Meta:
         model = BuildInputAsset
         fields = ("id", "kind", "name", "checksum", "size_bytes", "content_type", "purged_at")
-
-
-class PresignedUploadUrlSerializer(serializers.Serializer):
-    flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"))
-    artifact_format = serializers.ChoiceField(choices=ARTIFACT_FORMATS, default="raw")
-    filename = serializers.CharField(max_length=255)
-    content_type = serializers.CharField(max_length=120, required=False, default="application/octet-stream")
-
-    def validate(self, attrs):
-        validate_source_artifact(
-            filename=attrs["filename"],
-            flavor=attrs["flavor"],
-            artifact_format=attrs["artifact_format"],
-        )
-        return attrs
-
-
-class ManualBuildCreateSerializer(serializers.Serializer):
-    flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"))
-    artifact_format = serializers.ChoiceField(choices=ARTIFACT_FORMATS, default="raw")
-    requirements_text = serializers.CharField(required=False, allow_blank=True, default="")
-    source_artifact = serializers.FileField(required=False, allow_null=True)
-    source_artifact_uri = serializers.CharField(required=False, allow_blank=True)
-    source_artifact_name = serializers.CharField(required=False, allow_blank=True)
-    source_artifact_size = serializers.IntegerField(required=False, min_value=0)
-    source_artifact_checksum = serializers.CharField(required=False, allow_blank=True)
-    label_mapping_file = serializers.FileField(required=False)
-    metrics_file = serializers.FileField(required=False)
-    params_file = serializers.FileField(required=False)
-    model_insights_file = serializers.FileField(required=False)
-    feature_importance_file = serializers.FileField(required=False)
-    input_schema_file = serializers.FileField(required=False)
-
-    def validate(self, attrs):
-        has_file = bool(attrs.get("source_artifact"))
-        has_uri = bool(attrs.get("source_artifact_uri"))
-        if not has_file and not has_uri:
-            raise serializers.ValidationError(
-                {"source_artifact": "Provide either source_artifact file or source_artifact_uri."}
-            )
-
-        filename = attrs["source_artifact"].name if has_file else attrs.get("source_artifact_name", "")
-        if not filename and has_uri:
-            filename = attrs["source_artifact_uri"].rstrip("/").split("/")[-1]
-            attrs["source_artifact_name"] = filename
-
-        validate_source_artifact(
-            filename=filename,
-            flavor=attrs["flavor"],
-            artifact_format=attrs["artifact_format"],
-        )
-        if attrs["artifact_format"] == "mlflow_zip":
-            extras = [
-                field
-                for field in (
-                    "label_mapping_file",
-                    "metrics_file",
-                    "params_file",
-                    "model_insights_file",
-                    "feature_importance_file",
-                    "input_schema_file",
-                )
-                if attrs.get(field)
-            ]
-            if extras:
-                raise serializers.ValidationError(
-                    {field: "Include this file inside the model package ZIP instead." for field in extras}
-                )
-        return attrs
 
 
 class DeploymentSerializer(serializers.ModelSerializer):

@@ -155,7 +155,10 @@ def test_training_job_list_reports_model_lifecycle_status():
         flavor="sklearn",
         status="ready",
     )
-    Deployment.objects.create(version=deployed_version, build=deployed_build, status="healthy")
+    project.active_deployment = Deployment.objects.create(
+        version=deployed_version, build=deployed_build, status="healthy"
+    )
+    project.save(update_fields=["active_deployment"])
 
     client = APIClient()
     client.force_authenticate(user)

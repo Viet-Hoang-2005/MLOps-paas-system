@@ -6,13 +6,16 @@ const root = path.resolve("src");
 const namespaceFiles = new Map([
   ["common", path.join(root, "shared", "i18n", "en.ts")],
   ["auth", path.join(root, "features", "auth", "i18n", "en.ts")],
-  ["catalog", path.join(root, "features", "catalog", "i18n", "en.ts")],
-  ["deploy", path.join(root, "features", "deploy", "i18n", "en.ts")],
+  ["projects", path.join(root, "features", "projects", "i18n", "en.ts")],
+  ["deployments", path.join(root, "features", "deployments", "i18n", "en.ts")],
   ["training", path.join(root, "features", "training", "i18n", "en.ts")],
-  ["registry", path.join(root, "features", "registry", "i18n", "en.ts")],
-  ["drift", path.join(root, "features", "drift", "i18n", "en.ts")],
+  ["evolution", path.join(root, "features", "evolution", "i18n", "en.ts")],
+  ["monitoring", path.join(root, "features", "monitoring", "i18n", "en.ts")],
   ["settings", path.join(root, "features", "settings", "i18n", "en.ts")],
-  ["notifications", path.join(root, "features", "notifications", "i18n", "en.ts")],
+  [
+    "notifications",
+    path.join(root, "features", "notifications", "i18n", "en.ts"),
+  ],
 ]);
 const displayProps = new Set([
   "title",
@@ -26,11 +29,7 @@ const displayProps = new Set([
   "cancelText",
   "emptyText",
 ]);
-const configProps = new Set([
-  ...displayProps,
-  "header",
-  "message",
-]);
+const configProps = new Set([...displayProps, "header", "message"]);
 const brands = new Set([
   "ML",
   "drift",
@@ -74,19 +73,30 @@ const unwrapExpression = (node) => {
   return current;
 };
 const propertyName = (node) => {
-  if (ts.isIdentifier(node) || ts.isStringLiteral(node) || ts.isNumericLiteral(node)) {
+  if (
+    ts.isIdentifier(node) ||
+    ts.isStringLiteral(node) ||
+    ts.isNumericLiteral(node)
+  ) {
     return node.text;
   }
   return null;
 };
 const collectResourceKeys = (object, prefix, keys) => {
   for (const property of object.properties) {
-    if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) continue;
+    if (
+      !ts.isPropertyAssignment(property) &&
+      !ts.isShorthandPropertyAssignment(property)
+    )
+      continue;
     const name = propertyName(property.name);
     if (!name) continue;
     const key = prefix ? `${prefix}.${name}` : name;
     keys.add(key);
-    if (ts.isPropertyAssignment(property) && ts.isObjectLiteralExpression(property.initializer)) {
+    if (
+      ts.isPropertyAssignment(property) &&
+      ts.isObjectLiteralExpression(property.initializer)
+    ) {
       collectResourceKeys(property.initializer, key, keys);
     }
   }
@@ -115,7 +125,9 @@ for (const [namespace, resourceFile] of namespaceFiles) {
   translationKeys.set(namespace, keys);
 }
 const hasIgnoreComment = (sourceFile, node) => {
-  const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line;
+  const start = sourceFile.getLineAndCharacterOfPosition(
+    node.getStart(sourceFile),
+  ).line;
   const lines = sourceFile.text.split(/\r?\n/);
   return [lines[start], lines[start - 1]]
     .filter(Boolean)
@@ -128,20 +140,33 @@ const isTechnicalLiteral = (value) => {
   if (/^&[A-Za-z]+;$/.test(text)) return true;
   if (/^\d+(?:K|m|h)$/.test(text)) return true;
   if (/^v\d+$/.test(text)) return true;
-  if (/^(CPU|GPU|RAM|vCPU|API|URL|UUID|ID|HTTP|GET|POST|PUT|PATCH|DELETE)$/i.test(text)) return true;
-  if (/^(https?:\/\/|\/dashboard\/|\/api\/|[.#][\w-]+|[\w-]+\.(py|csv|json|zip|pkl|joblib|txt|html))/.test(text)) return true;
+  if (
+    /^(CPU|GPU|RAM|vCPU|API|URL|UUID|ID|HTTP|GET|POST|PUT|PATCH|DELETE)$/i.test(
+      text,
+    )
+  )
+    return true;
+  if (
+    /^(https?:\/\/|\/dashboard\/|\/api\/|[.#][\w-]+|[\w-]+\.(py|csv|json|zip|pkl|joblib|txt|html))/.test(
+      text,
+    )
+  )
+    return true;
   if (/^[\w@./:+-]+(?:==|>=|<=|~=|>|<)\d/.test(text)) return true;
   return false;
 };
 const report = (sourceFile, node, value, kind) => {
   if (isTechnicalLiteral(value) || hasIgnoreComment(sourceFile, node)) return;
-  const location = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+  const location = sourceFile.getLineAndCharacterOfPosition(
+    node.getStart(sourceFile),
+  );
   failures.push(
     `${path.relative(process.cwd(), sourceFile.fileName)}:${location.line + 1}:${location.character + 1} ${kind}: ${JSON.stringify(value.trim())}`,
   );
 };
 const stringValue = (node) => {
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+    return node.text;
   return null;
 };
 const isInsideCodeSample = (node) => {
@@ -183,7 +208,10 @@ const isRenderedExpressionLiteral = (node) => {
       ) {
         return false;
       }
-      if (operator === ts.SyntaxKind.AmpersandAmpersandToken && current === parent.left) {
+      if (
+        operator === ts.SyntaxKind.AmpersandAmpersandToken &&
+        current === parent.left
+      ) {
         return false;
       }
       current = parent;
@@ -229,11 +257,14 @@ for (const file of files) {
       return;
     }
     const namespaceArgument = node.initializer.arguments[0];
-    const namespace = namespaceArgument && ts.isStringLiteral(namespaceArgument)
-      ? namespaceArgument.text
-      : "common";
+    const namespace =
+      namespaceArgument && ts.isStringLiteral(namespaceArgument)
+        ? namespaceArgument.text
+        : "common";
     for (const element of node.name.elements) {
-      const importedName = element.propertyName ? propertyName(element.propertyName) : propertyName(element.name);
+      const importedName = element.propertyName
+        ? propertyName(element.propertyName)
+        : propertyName(element.name);
       if (importedName === "t" && ts.isIdentifier(element.name)) {
         translators.set(element.name.text, namespace);
       }
@@ -261,12 +292,19 @@ for (const file of files) {
 
     if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name)) {
       const name = node.name.text;
-      if (displayProps.has(name) && node.initializer && ts.isStringLiteral(node.initializer)) {
+      if (
+        displayProps.has(name) &&
+        node.initializer &&
+        ts.isStringLiteral(node.initializer)
+      ) {
         report(sourceFile, node, node.initializer.text, `JSX ${name}`);
       }
     }
 
-    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression)
+    ) {
       const owner = node.expression.expression;
       const method = node.expression.name.text;
       if (
@@ -275,7 +313,8 @@ for (const file of files) {
         ["success", "error", "warning", "info"].includes(method)
       ) {
         const value = node.arguments[0] ? stringValue(node.arguments[0]) : null;
-        if (value) report(sourceFile, node.arguments[0], value, `toast.${method}`);
+        if (value)
+          report(sourceFile, node.arguments[0], value, `toast.${method}`);
       }
     }
 
@@ -289,12 +328,16 @@ for (const file of files) {
       const configuredNamespace = translators.get(node.expression.text);
       const rawKey = node.arguments[0].text;
       const separator = rawKey.indexOf(":");
-      const namespace = separator >= 0 ? rawKey.slice(0, separator) : configuredNamespace;
+      const namespace =
+        separator >= 0 ? rawKey.slice(0, separator) : configuredNamespace;
       const key = separator >= 0 ? rawKey.slice(separator + 1) : rawKey;
       const keys = translationKeys.get(namespace);
-      const pluralKeyExists = keys && [...keys].some((candidate) => candidate.startsWith(`${key}_`));
+      const pluralKeyExists =
+        keys && [...keys].some((candidate) => candidate.startsWith(`${key}_`));
       if (!keys || (!keys.has(key) && !pluralKeyExists)) {
-        const location = sourceFile.getLineAndCharacterOfPosition(node.arguments[0].getStart(sourceFile));
+        const location = sourceFile.getLineAndCharacterOfPosition(
+          node.arguments[0].getStart(sourceFile),
+        );
         failures.push(
           `${path.relative(process.cwd(), sourceFile.fileName)}:${location.line + 1}:${location.character + 1} missing i18n key: ${namespace}:${key}`,
         );
@@ -308,7 +351,13 @@ for (const file of files) {
         (ts.isStringLiteral(node.name) && configProps.has(node.name.text)))
     ) {
       const value = stringValue(node.initializer);
-      if (value) report(sourceFile, node.initializer, value, `UI config ${node.name.getText(sourceFile)}`);
+      if (value)
+        report(
+          sourceFile,
+          node.initializer,
+          value,
+          `UI config ${node.name.getText(sourceFile)}`,
+        );
     }
 
     ts.forEachChild(node, walk);
@@ -317,7 +366,9 @@ for (const file of files) {
 }
 
 if (failures.length > 0) {
-  console.error("Frontend i18n validation failed. Use react-i18next, register the namespace/key, or add a scoped `i18n-ignore: reason` comment for technical literals.");
+  console.error(
+    "Frontend i18n validation failed. Use react-i18next, register the namespace/key, or add a scoped `i18n-ignore: reason` comment for technical literals.",
+  );
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }

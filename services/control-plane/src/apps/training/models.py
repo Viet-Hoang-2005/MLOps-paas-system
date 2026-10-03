@@ -47,6 +47,8 @@ class TrainingJob(models.Model):
     requirements_text = models.TextField(blank=True)
     code_snapshot_uri = models.CharField(max_length=1024)
     data_snapshot_uri = models.CharField(max_length=1024)
+    reference_snapshot_uri = models.CharField(max_length=1024, blank=True)
+    reference_path = models.CharField(max_length=512, blank=True)
     output_uri = models.CharField(max_length=1024)
     mlflow_artifact_uri = models.CharField(max_length=1024, blank=True)
     mlflow_run_id = models.CharField(max_length=255, blank=True, db_index=True)

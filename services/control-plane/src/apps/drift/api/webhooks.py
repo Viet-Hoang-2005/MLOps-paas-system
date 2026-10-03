@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.drift.models import DriftRun
+from apps.catalog.models import ModelProject
 from apps.drift.services.automatic import request_automatic_drift_runs
 from apps.drift.services.reports import report_artifact_uris
 from common.api.permissions import HasInternalWebhookSecret
@@ -21,8 +22,16 @@ class DriftRunWebhookEndpoint(APIView):
 
     def post(self, request, run_id):
         with transaction.atomic():
-            run = DriftRun.objects.select_for_update().get(public_id=run_id)
-            if run.status == "cancelled":
+            project_id = (
+                DriftRun.objects.filter(public_id=run_id).values_list("monitor__version__project_id", flat=True).first()
+            )
+            project = ModelProject.objects.select_for_update().filter(pk=project_id).first()
+            if not project:
+                return Response({"status": "deleted", "ignored": True})
+            run = DriftRun.objects.select_for_update().filter(public_id=run_id).first()
+            if not run:
+                return Response({"status": "deleted", "ignored": True})
+            if project.deletion_state != "active" or run.status in {"cancelled", "failed"}:
                 return Response({"status": run.status, "duplicate": True})
             summary = request.data.get("drift_summary") or request.data.get("summary") or {}
             drift_score = summary.get("drift_score", summary.get("share_of_drifted_columns"))

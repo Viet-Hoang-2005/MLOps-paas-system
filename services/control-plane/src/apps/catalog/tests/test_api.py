@@ -32,7 +32,7 @@ def test_duplicate_project_name_returns_conflict_with_clear_message():
     client = APIClient()
     client.force_authenticate(owner)
 
-    response = client.post("/api/models/", {"name": "NIDS", "access_mode": "public"}, format="json")
+    response = client.post("/api/models/training-projects/", {"name": "NIDS", "access_mode": "public"}, format="json")
 
     assert response.status_code == 409
     assert response.data == {
@@ -52,7 +52,7 @@ def test_inactive_project_with_same_name_does_not_block_new_project():
     client = APIClient()
     client.force_authenticate(owner)
 
-    response = client.post("/api/models/", {"name": "NIDS", "access_mode": "public"}, format="json")
+    response = client.post("/api/models/training-projects/", {"name": "NIDS", "access_mode": "public"}, format="json")
 
     assert response.status_code == 201
     assert ModelProject.objects.filter(owner=owner, name="NIDS", is_active=True).count() == 1
@@ -75,7 +75,10 @@ def test_project_list_returns_metadata_image_ready_and_deployed_lifecycle_status
         flavor="sklearn",
         status="ready",
     )
-    Deployment.objects.create(version=deployed_version, build=deployed_build, status="healthy")
+    deployed_project.active_deployment = Deployment.objects.create(
+        version=deployed_version, build=deployed_build, status="healthy"
+    )
+    deployed_project.save(update_fields=["active_deployment"])
 
     client = APIClient()
     client.force_authenticate(owner)
@@ -84,9 +87,9 @@ def test_project_list_returns_metadata_image_ready_and_deployed_lifecycle_status
     assert response.status_code == 200
     statuses = {project["name"]: project["lifecycle_status"] for project in response.data["results"]}
     assert statuses == {
-        metadata_project.name: "metadata",
-        image_project.name: "image_ready",
-        deployed_project.name: "deployed",
+        metadata_project.name: "preview",
+        image_project.name: "registered",
+        deployed_project.name: "running",
     }
 
 
@@ -97,6 +100,8 @@ def test_project_list_returns_latest_active_endpoint_for_the_owner():
     version = ModelVersion.objects.create(project=project, version="1")
     build = Build.objects.create(project=project, version=version, flavor="xgboost", status="ready")
     deployment = Deployment.objects.create(version=version, build=build, status="healthy")
+    project.active_deployment = deployment
+    project.save(update_fields=["active_deployment"])
     endpoint = Endpoint.objects.create(
         deployment=deployment,
         public_url="http://localhost:5002/tenant/models/project/version",
@@ -113,6 +118,7 @@ def test_project_list_returns_latest_active_endpoint_for_the_owner():
         "id": str(endpoint.public_id),
         "deployment_id": str(deployment.public_id),
         "version_id": str(version.public_id),
+        "version_number": version.version,
         "url": f"{endpoint.public_url}/predict",
         "health_url": f"{endpoint.public_url}/health",
         "health_status": "healthy",

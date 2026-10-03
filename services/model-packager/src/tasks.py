@@ -106,18 +106,12 @@ def find_supported_model_file(root: Path, flavor: str = "") -> Path:
     normalized_flavor = flavor.strip().lower() if flavor else ""
     if normalized_flavor and normalized_flavor in FLAVOR_MODEL_EXTENSIONS:
         allowed_extensions = set(FLAVOR_MODEL_EXTENSIONS[normalized_flavor])
-        preferred_filenames = FLAVOR_PREFERRED_FILENAMES.get(
-            normalized_flavor, PREFERRED_MODEL_FILENAMES
-        )
+        preferred_filenames = FLAVOR_PREFERRED_FILENAMES.get(normalized_flavor, PREFERRED_MODEL_FILENAMES)
     else:
         allowed_extensions = SUPPORTED_MODEL_EXTENSIONS
         preferred_filenames = PREFERRED_MODEL_FILENAMES
 
-    files = [
-        item
-        for item in root.rglob("*")
-        if item.is_file() and item.suffix.lower() in allowed_extensions
-    ]
+    files = [item for item in root.rglob("*") if item.is_file() and item.suffix.lower() in allowed_extensions]
     if not files:
         if normalized_flavor and normalized_flavor in FLAVOR_MODEL_EXTENSIONS:
             ext_str = ", ".join(sorted(allowed_extensions))
@@ -157,9 +151,7 @@ def find_label_mapping_file(root: Path) -> Path | None:
         lowered = item.name.lower()
         if "mapping" in lowered or "label" in lowered or "dictionary" in lowered:
             candidates.append(item)
-    return (
-        sorted(candidates, key=lambda item: item.as_posix())[0] if candidates else None
-    )
+    return sorted(candidates, key=lambda item: item.as_posix())[0] if candidates else None
 
 
 def webhook_headers() -> dict[str, str]:
@@ -180,19 +172,13 @@ def built_image_metadata() -> dict[str, str]:
     try:
         image = docker.from_env().images.get(image_uri)
         repo_digests = image.attrs.get("RepoDigests") or []
-        digest = (
-            repo_digests[0].split("@", 1)[1]
-            if repo_digests
-            else image.attrs.get("Id", "")
-        )
+        digest = repo_digests[0].split("@", 1)[1] if repo_digests else image.attrs.get("Id", "")
     except Exception:
         digest = ""
     return {"image_uri": image_uri, "image_digest": digest}
 
 
-def build_custom_image(
-    workspace: Path, build_id: str, tenant_id: str, requirements_text: str
-) -> None:
+def build_custom_image(workspace: Path, build_id: str, tenant_id: str, requirements_text: str) -> None:
     image_build.build_image(
         workspace=workspace,
         build_id=build_id,
@@ -206,9 +192,7 @@ def build_custom_image(
     )
 
 
-def build_bento_image(
-    workspace: Path, build_id: str, tenant_id: str, requirements_text: str
-) -> None:
+def build_bento_image(workspace: Path, build_id: str, tenant_id: str, requirements_text: str) -> None:
     image_build.build_image(
         workspace=workspace,
         build_id=build_id,
@@ -234,9 +218,7 @@ def parse_conda_pip_requirements(conda_file: Path) -> list[str]:
 
 
 def read_training_summaries(extracted_dir: Path) -> tuple[dict[str, dict], Path | None]:
-    mlops_dir = next(
-        (path for path in sorted(extracted_dir.rglob("_mlops")) if path.is_dir()), None
-    )
+    mlops_dir = next((path for path in sorted(extracted_dir.rglob("_mlops")) if path.is_dir()), None)
     summaries = {"metrics_summary": {}, "params_summary": {}, "insights_summary": {}}
     if mlops_dir is None:
         return summaries, None
@@ -276,9 +258,7 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
     if source_type == "training_job":
         if not all([flavor, source_download_url, output_upload_url]):
             raise ValueError("Missing presigned URLs for training artifact build.")
-    elif not all(
-        [flavor, source_download_url, source_artifact_name, output_upload_url]
-    ):
+    elif not all([flavor, source_download_url, source_artifact_name, output_upload_url]):
         raise ValueError("Missing required environment variables for build.")
 
     workspace_dir = os.environ.get("BUILD_WORKSPACE_DIR")
@@ -306,25 +286,17 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
             safe_extract_tar(training_archive_path, extracted_dir)
             artifact_path = find_supported_model_file(extracted_dir, flavor=flavor)
             artifact_name = artifact_path.name
-            training_summaries, extracted_mlops_dir = read_training_summaries(
-                extracted_dir
-            )
+            training_summaries, extracted_mlops_dir = read_training_summaries(extracted_dir)
 
             if not requirements_text.strip():
-                requirements_file = next(
-                    iter(sorted(extracted_dir.rglob("requirements.txt"))), None
-                )
+                requirements_file = next(iter(sorted(extracted_dir.rglob("requirements.txt"))), None)
                 if requirements_file:
-                    requirements_text = requirements_file.read_text(
-                        encoding="utf-8"
-                    ).strip()
+                    requirements_text = requirements_file.read_text(encoding="utf-8").strip()
                     runtime_log.detail("Using requirements.txt from training artifact.")
 
             extracted_label_mapping_path = find_label_mapping_file(extracted_dir)
             if extracted_label_mapping_path:
-                runtime_log.detail(
-                    f"Using label mapping from training artifact: {extracted_label_mapping_path.name}"
-                )
+                runtime_log.detail(f"Using label mapping from training artifact: {extracted_label_mapping_path.name}")
         else:
             artifact_name = Path(source_artifact_name).name
             artifact_path = workspace / artifact_name
@@ -340,14 +312,10 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
         save_mlflow_model(model, flavor, package_dir, requirements)
 
         if requirements_text.strip():
-            (package_dir / "requirements.txt").write_text(
-                requirements_text.strip() + "\n", encoding="utf-8"
-            )
+            (package_dir / "requirements.txt").write_text(requirements_text.strip() + "\n", encoding="utf-8")
 
         if label_mapping_download_url:
-            mapping_path = (
-                package_dir / Path(label_mapping_filename or "label-mapping.json").name
-            )
+            mapping_path = package_dir / Path(label_mapping_filename or "label-mapping.json").name
             download_presigned_file(label_mapping_download_url, mapping_path)
         elif extracted_label_mapping_path:
             shutil.copy2(
@@ -355,9 +323,7 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
                 package_dir / extracted_label_mapping_path.name,
             )
         if extracted_mlops_dir:
-            shutil.copytree(
-                extracted_mlops_dir, package_dir / "_mlops", dirs_exist_ok=True
-            )
+            shutil.copytree(extracted_mlops_dir, package_dir / "_mlops", dirs_exist_ok=True)
 
         preview_tree = build_preview_tree(package_dir)
         manifest = {
@@ -375,14 +341,10 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
         upload_presigned_file(output_upload_url, zip_path)
 
         if os.environ.get("BUILD_ENGINE", "").lower() == "kaniko":
-            runtime_log.detail(
-                "Kaniko build engine detected. Preparing build context without Docker daemon..."
-            )
+            runtime_log.detail("Kaniko build engine detected. Preparing build context without Docker daemon...")
             harbor_url = os.environ.get("HARBOR_REGISTRY_URL", "").strip().rstrip("/")
             if flavor in ["pytorch", "tensorflow", "keras"]:
-                runtime_log.detail(
-                    "Detected Deep Learning flavor. Generating BentoML Dockerfile..."
-                )
+                runtime_log.detail("Detected Deep Learning flavor. Generating BentoML Dockerfile...")
                 base_image = (
                     f"{harbor_url}/mlops-paas/deep-learning-serving:latest"
                     if harbor_url
@@ -411,9 +373,7 @@ COPY model /app/model_artifact
 """
             (workspace / "Dockerfile").write_text(dockerfile_content, encoding="utf-8")
             (workspace / "requirements.txt").write_text(
-                (requirements_text.strip() + "\n")
-                if requirements_text.strip()
-                else "\n",
+                (requirements_text.strip() + "\n") if requirements_text.strip() else "\n",
                 encoding="utf-8",
             )
 
@@ -423,19 +383,14 @@ COPY model /app/model_artifact
                 "package_manifest": manifest,
                 "package_preview_tree": preview_tree,
                 "task_type": "BUILD",
+                "requirements_snapshot": requirements_text,
                 **training_summaries,
             }
-            (workspace / "webhook_payload.json").write_text(
-                json.dumps(payload), encoding="utf-8"
-            )
-            runtime_log.protocol(
-                "Build context prepared successfully for Kaniko! BUILD_PREPARE_SUCCESS"
-            )
+            (workspace / "webhook_payload.json").write_text(json.dumps(payload), encoding="utf-8")
+            runtime_log.protocol("Build context prepared successfully for Kaniko! BUILD_PREPARE_SUCCESS")
             return
         elif flavor in ["pytorch", "tensorflow", "keras"]:
-            runtime_log.detail(
-                "Detected Deep Learning flavor. Building BentoML container image..."
-            )
+            runtime_log.detail("Detected Deep Learning flavor. Building BentoML container image...")
             build_bento_image(workspace, build_id, tenant_id, requirements_text)
         else:
             runtime_log.detail("Building custom lightweight Docker image...")
@@ -508,9 +463,7 @@ def run_test_zip_task(build_id: str, webhook_url: str) -> None:
                 requirements_text = "\n".join(pip_requirements)
                 runtime_log.detail("Extracted pip requirements from conda.yaml.")
         else:
-            runtime_log.detail(
-                "No requirements.txt or conda.yaml found. Proceeding with default environment."
-            )
+            runtime_log.detail("No requirements.txt or conda.yaml found. Proceeding with default environment.")
 
         if requirements_text.strip():
             runtime_log.detail("Installing package requirements for validation...")
@@ -552,9 +505,7 @@ def run_test_zip_task(build_id: str, webhook_url: str) -> None:
 
         runtime_log.detail("Building custom Docker image...")
         if os.environ.get("BUILD_ENGINE", "").lower() == "kaniko":
-            runtime_log.detail(
-                "Kaniko build engine detected. Preparing build context for TEST_ZIP..."
-            )
+            runtime_log.detail("Kaniko build engine detected. Preparing build context for TEST_ZIP...")
             harbor_url = os.environ.get("HARBOR_REGISTRY_URL", "").strip().rstrip("/")
             is_deep_learning = flavor in ["pytorch", "tensorflow", "keras"]
             base_image = (
@@ -575,9 +526,7 @@ COPY model /app/model_artifact
 """
             (workspace / "Dockerfile").write_text(dockerfile_content, encoding="utf-8")
             (workspace / "requirements.txt").write_text(
-                (requirements_text.strip() + "\n")
-                if requirements_text.strip()
-                else "\n",
+                (requirements_text.strip() + "\n") if requirements_text.strip() else "\n",
                 encoding="utf-8",
             )
             payload = {
@@ -586,13 +535,10 @@ COPY model /app/model_artifact
                 "package_manifest": manifest,
                 "package_preview_tree": preview_tree,
                 "task_type": "TEST_ZIP",
+                "requirements_snapshot": requirements_text,
             }
-            (workspace / "webhook_payload.json").write_text(
-                json.dumps(payload), encoding="utf-8"
-            )
-            runtime_log.protocol(
-                "TEST_ZIP context prepared successfully for Kaniko! BUILD_PREPARE_SUCCESS"
-            )
+            (workspace / "webhook_payload.json").write_text(json.dumps(payload), encoding="utf-8")
+            runtime_log.protocol("TEST_ZIP context prepared successfully for Kaniko! BUILD_PREPARE_SUCCESS")
             return
         else:
             if flavor in ["pytorch", "tensorflow", "keras"]:
@@ -630,9 +576,7 @@ def run_notify_task(workspace_dir: str, webhook_url: str) -> None:
         payload["image_uri"] = image_uri
     if digest_file.exists():
         payload["image_digest"] = digest_file.read_text(encoding="utf-8").strip()
-    runtime_log.detail(
-        f"Sending post-build notification for build {payload.get('build_id')}..."
-    )
+    runtime_log.detail(f"Sending post-build notification for build {payload.get('build_id')}...")
     post_webhook(webhook_url, payload)
     runtime_log.protocol("NOTIFY_EOF_SUCCESS")
 

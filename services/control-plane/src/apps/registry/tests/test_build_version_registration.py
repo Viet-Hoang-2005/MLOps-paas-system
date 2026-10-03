@@ -32,7 +32,7 @@ def build_for(project, name="model.pkl"):
         project=project,
         flavor="sklearn",
         requirements_snapshot="numpy==1.26.4",
-        status="building",
+        status="ready",
     )
     BuildInputAsset.objects.create(
         build=build,

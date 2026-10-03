@@ -57,6 +57,15 @@ class ModelObservabilityEndpoint(APIView):
         return Response(model_observability(project))
 
 
+class RuntimeMetricsEndpoint(APIView):
+    def get(self, request, project_id):
+        from apps.observability.services.runtime_metrics import runtime_metrics
+
+        return Response(
+            runtime_metrics(project_for_user(request.user, project_id), window=request.query_params.get("window", "1h"))
+        )
+
+
 class ProductionDataEndpoint(APIView):
     def get(self, request, project_id):
         project = project_for_user(request.user, project_id)

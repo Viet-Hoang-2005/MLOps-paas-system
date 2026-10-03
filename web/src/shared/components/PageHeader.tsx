@@ -11,6 +11,7 @@ export interface PageHeaderProps {
   };
   tabs?: React.ComponentProps<typeof PageTabs>["tabs"];
   children?: React.ReactNode;
+  actions?: React.ReactNode;
 }
 
 export function PageHeader({
@@ -18,6 +19,7 @@ export function PageHeader({
   backLink,
   tabs,
   children,
+  actions,
 }: PageHeaderProps) {
   return (
     <header
@@ -38,6 +40,7 @@ export function PageHeader({
 
       {tabs && <PageTabs tabs={tabs} />}
       {children && !tabs && <div>{children}</div>}
+      {actions && <div>{actions}</div>}
     </header>
   );
 }

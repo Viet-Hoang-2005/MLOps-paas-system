@@ -8,6 +8,7 @@ from django.utils import timezone
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.services.logs import append_deployment_log, reset_deployment_logs
+from apps.deployment.services.completion import complete_build
 from apps.observability.services.outbox import enqueue_event
 from apps.registry.services.versions import register_successful_build
 from common.logging import failure_reported, record_transition
@@ -21,9 +22,28 @@ logger = logging.getLogger(__name__)
 
 
 def _mark_deployment_healthy(deployment):
-    Deployment = type(deployment)
-    Deployment.objects.filter(pk=deployment.pk).update(status="healthy", deployed_at=timezone.now(), error_message="")
-    Endpoint.objects.filter(deployment=deployment).update(health_status="healthy", last_checked_at=timezone.now())
+    from apps.catalog.models import ModelProject
+    from apps.drift.models import DriftMonitor
+
+    with transaction.atomic():
+        project = ModelProject.objects.select_for_update().get(pk=deployment.version.project_id)
+        deployment = Deployment.objects.select_for_update().get(pk=deployment.pk)
+        if project.deletion_state != "active" or deployment.status in {"stopped", "failed"}:
+            return
+        old_id = project.active_deployment_id
+        Deployment.objects.filter(pk=deployment.pk).update(
+            status="healthy", deployed_at=timezone.now(), error_message=""
+        )
+        Endpoint.objects.filter(deployment=deployment).update(health_status="healthy", last_checked_at=timezone.now())
+        project.active_deployment = deployment
+        project.save(update_fields=["active_deployment", "updated_at"])
+        DriftMonitor.objects.filter(version__project=project).exclude(version_id=deployment.version_id).update(
+            is_active=False
+        )
+        if old_id and old_id != deployment.pk:
+            old = Deployment.objects.select_related("version").get(pk=old_id)
+            transaction.on_commit(lambda: invalidate_model_server_cache(str(old.version.public_id)))
+            transaction.on_commit(lambda: stop_deployment.delay(str(old.public_id)))
     invalidate_model_server_cache(str(deployment.version.public_id))
     append_deployment_log(deployment, "Endpoint passed health checks; deployment is healthy.")
     record_transition(deployment, "healthy")
@@ -40,7 +60,7 @@ def _mark_deployment_healthy(deployment):
 def execute_build(self, build_id):
     with transaction.atomic():
         build = Build.objects.select_for_update().select_related("project", "project__owner").get(public_id=build_id)
-        if build.status in {"ready", "cancelled"}:
+        if build.status in {"ready", "cancelled", "failed"}:
             return build.status
         if build.project.deletion_state != "active":
             build.status = "cancelled"
@@ -58,7 +78,7 @@ def execute_build(self, build_id):
         result = build_backend(build.backend).run(build)
     except Exception as exc:
         already_failed = Build.objects.filter(pk=build.pk, status="failed").exists()
-        Build.objects.filter(pk=build.pk).update(
+        Build.objects.filter(pk=build.pk).exclude(status__in=("cancelled", "ready")).update(
             status="failed", error_message=str(exc)[:12000], completed_at=timezone.now()
         )
         if not already_failed:
@@ -78,19 +98,36 @@ def execute_build(self, build_id):
         record_transition(build, "building", phase="dispatched")
         return "building"
     build.refresh_from_db()
-    registered_locally = build.status != "ready"
-    if build.status != "ready":
+    completed_locally = build.status != "ready"
+    if build.status not in {"ready", "cancelled", "failed"}:
         image_uri = build.image_uri or temporary_image_reference(
             build.project.public_id,
             build.public_id,
             registry=settings.HARBOR_REGISTRY_URL if build.backend == "argo" else "",
             registry_project=settings.HARBOR_USER_PROJECT,
         )
-        build = register_successful_build(build=build, image_uri=image_uri, image_digest=build.image_digest)
+        build = complete_build(build, image_uri=image_uri, image_digest=build.image_digest)
     Build.objects.filter(pk=build.pk).update(logs=str(result)[-20000:], completed_at=timezone.now())
-    if registered_locally:
-        record_transition(build, "ready")
-    return "ready"
+    if completed_locally:
+        record_transition(build, build.status)
+    return build.status
+
+
+@shared_task
+def register_build(build_id):
+    build = Build.objects.select_related("project").filter(public_id=build_id).first()
+    if not build:
+        return "not_found"
+    if build.version_id:
+        return "registered"
+    try:
+        register_successful_build(build=build, image_uri=build.image_uri, image_digest=build.image_digest)
+    except Exception as exc:
+        Build.objects.filter(pk=build.pk, version__isnull=True).update(
+            registration_status="failed", registration_error=str(exc)[:12000]
+        )
+        raise
+    return "registered"
 
 
 @shared_task(bind=True)
@@ -231,11 +268,15 @@ def check_deployment_health(self, deployment_id):
     raise self.retry(countdown=min(10 + self.request.retries * 2, 60))
 
 
-@shared_task(bind=True)
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def stop_deployment(self, deployment_id):
     deployment = Deployment.objects.select_related("version", "build").get(public_id=deployment_id)
     deployment_backend(deployment.backend).stop(deployment)
     Deployment.objects.filter(pk=deployment.pk).update(status="stopped", stopped_at=timezone.now())
+    Endpoint.objects.filter(deployment=deployment).update(health_status="stopped", last_checked_at=timezone.now())
+    from apps.catalog.models import ModelProject
+
+    ModelProject.objects.filter(active_deployment=deployment).update(active_deployment=None)
     invalidate_model_server_cache(str(deployment.version.public_id))
     append_deployment_log(deployment, "Deployment stopped.")
     record_transition(deployment, "stopped")

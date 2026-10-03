@@ -15,6 +15,7 @@ from apps.training.services.jobs import (
     request_job_deletion,
     request_output_purge,
     submit_job,
+    retry_job,
 )
 from apps.training.services.logs import training_logs
 from common.api.exceptions import ServiceUnavailable
@@ -85,6 +86,13 @@ class TrainingJobCancelEndpoint(APIView):
     def post(self, request, job_id):
         job = cancel_job(job_for_user(request.user, job_id))
         return Response(TrainingJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
+
+
+class TrainingJobRetryEndpoint(APIView):
+    def post(self, request, job_id):
+        require_training_enabled()
+        job = retry_job(job_for_user(request.user, job_id))
+        return Response(TrainingJobSerializer(job).data, status=status.HTTP_201_CREATED)
 
 
 class TrainingJobEventsEndpoint(APIView):

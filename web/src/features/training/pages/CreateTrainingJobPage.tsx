@@ -10,14 +10,14 @@ import {
 } from "react-router-dom";
 
 import {
-  createModelProject,
+  createTrainingProject,
   getModelProject,
   listModelProjects,
   listReferenceFiles,
   listSourceCodeFiles,
   updateModelProject,
-} from "@/features/catalog/api/catalogApi";
-import type { ModelProject } from "@/features/catalog/types";
+} from "@/features/projects/api/catalogApi";
+import type { ModelProject } from "@/features/projects/types";
 import {
   cancelTrainingJob,
   createTrainingJob,
@@ -43,8 +43,8 @@ import { LineSteps } from "@/shared/components/LineSteps";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { toast } from "@/shared/components/toastStore";
 
-const trainingPath = "/dashboard/model-training";
-const createPath = `${trainingPath}/create`;
+const trainingPath = "/dashboard/training";
+const createPath = `${trainingPath}/new`;
 
 const emptyMetadata: TrainingMetadataForm = {
   name: "",
@@ -54,6 +54,7 @@ const emptyMetadata: TrainingMetadataForm = {
 const emptySource: TrainingSourceForm = {
   model_flavor: "sklearn",
   entry_point: "",
+  reference_path: "",
   requirements_text: "",
 };
 const emptyExecution: TrainingExecutionForm = {
@@ -74,6 +75,7 @@ const sourceFingerprint = (form: TrainingSourceForm) =>
   JSON.stringify({
     model_flavor: form.model_flavor,
     entry_point: form.entry_point.trim(),
+    reference_path: form.reference_path,
     requirements_text: form.requirements_text,
   });
 
@@ -269,7 +271,7 @@ export default function CreateTrainingJobPage() {
     try {
       let nextProject = project;
       if (!project) {
-        nextProject = await createModelProject(metadataForm);
+        nextProject = await createTrainingProject(metadataForm);
         setProjects((current) =>
           nextProject ? [...current, nextProject] : current,
         );
@@ -361,6 +363,7 @@ export default function CreateTrainingJobPage() {
         project_id: project.id,
         model_flavor: sourceForm.model_flavor,
         entry_point: sourceForm.entry_point,
+        reference_path: sourceForm.reference_path,
         requirements_text: sourceForm.requirements_text,
         vcpu: executionForm.vcpu,
         memory: executionForm.memory_mb,
@@ -406,7 +409,7 @@ export default function CreateTrainingJobPage() {
       return;
     }
     allowExit.current = true;
-    navigate(`${trainingPath}/jobs/${job.id}/details/overview`);
+    navigate(`${trainingPath}/jobs/${job.id}/overview`);
   };
 
   const goToStep = useCallback(

@@ -29,13 +29,9 @@ def build_control_plane_database_url():
 
 
 CONTROL_PLANE_DATABASE_URL = build_control_plane_database_url()
-CONTROL_PLANE_DB_SCHEMA = os.environ.get("CONTROL_PLANE_DB_SCHEMA") or os.environ.get(
-    "DB_SCHEMA", "control_plane"
-)
+CONTROL_PLANE_DB_SCHEMA = os.environ.get("CONTROL_PLANE_DB_SCHEMA") or os.environ.get("DB_SCHEMA", "control_plane")
 if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", CONTROL_PLANE_DB_SCHEMA):
-    raise RuntimeError(
-        "CONTROL_PLANE_DB_SCHEMA must be a simple PostgreSQL identifier."
-    )
+    raise RuntimeError("CONTROL_PLANE_DB_SCHEMA must be a simple PostgreSQL identifier.")
 
 model_registry_engine = (
     create_engine(
@@ -72,7 +68,7 @@ def _fetch_model_version_from_db(version_id: str) -> dict[str, Any] | None:
         INNER JOIN identity_customuser AS users ON users.id = project.owner_id
         LEFT JOIN LATERAL (
             SELECT d.* FROM deployment_deployment AS d
-            WHERE d.version_id = version.id AND d.status IN ('healthy', 'deploying')
+            WHERE d.version_id = version.id AND d.id = project.active_deployment_id AND d.status IN ('healthy', 'unhealthy')
             ORDER BY d.created_at DESC LIMIT 1
         ) AS deployment ON TRUE
         LEFT JOIN deployment_endpoint AS endpoint ON endpoint.deployment_id = deployment.id
@@ -84,11 +80,7 @@ def _fetch_model_version_from_db(version_id: str) -> dict[str, Any] | None:
     if not row:
         return None
     return {
-        key: value.isoformat()
-        if hasattr(value, "isoformat")
-        else str(value)
-        if key in {"id", "project_id"}
-        else value
+        key: value.isoformat() if hasattr(value, "isoformat") else str(value) if key in {"id", "project_id"} else value
         for key, value in dict(row).items()
     }
 

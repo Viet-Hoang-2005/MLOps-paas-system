@@ -1,4 +1,9 @@
 export const trainingEn = {
+  workflow: {
+    snapshotHint:
+      "These inputs were frozen when the job was created; workspace edits do not change them.",
+    openBuild: "Build, register and deploy",
+  },
   title: "Model Training",
   create: "Create training job",
   empty: "Create a training job to track runtime progress and artifacts.",
@@ -321,6 +326,7 @@ export const trainingEn = {
       optional: "Optional",
       sourceCode: "Source code",
       referenceData: "Reference data",
+      setReference: "Set as Reference",
       flavors: {
         sklearn: "Pickle or joblib estimators.",
         xgboost: "Booster or XGBModel artifacts.",

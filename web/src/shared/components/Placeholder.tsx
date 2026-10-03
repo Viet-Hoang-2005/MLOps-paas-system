@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useModelSelection } from "@/features/catalog/hooks/useModelSelection";
+import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { useTranslation } from "react-i18next";
 
 export interface PlaceholderProps {

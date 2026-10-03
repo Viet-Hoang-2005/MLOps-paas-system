@@ -7,6 +7,10 @@ from apps.drift.tasks import execute_drift_run
 
 
 def request_run(monitor, idempotency_key=None):
+    from common.api.exceptions import Conflict
+
+    if monitor.version.project.deletion_state != "active":
+        raise Conflict("This project is being deleted.")
     key = idempotency_key or str(uuid.uuid4())
     run, created = DriftRun.objects.get_or_create(monitor=monitor, idempotency_key=key, defaults={"status": "queued"})
     if created:

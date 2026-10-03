@@ -80,6 +80,8 @@ def routable_version(db):
     version = ModelVersion.objects.create(project=project, version="1")
     build = Build.objects.create(project=project, version=version, flavor="sklearn", status="ready")
     deployment = Deployment.objects.create(version=version, build=build, status="healthy")
+    project.active_deployment = deployment
+    project.save(update_fields=["active_deployment"])
     Endpoint.objects.create(
         deployment=deployment,
         public_url="https://models.example/predict",

@@ -9,12 +9,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.deployment.models import Build, Deployment, Endpoint
+from apps.catalog.models import ModelProject
 from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.services.callbacks import valid_callback_token
 from apps.deployment.services.logs import append_deployment_log
 from apps.deployment.tasks import _mark_deployment_healthy, cleanup_failed_build_artifacts
 from apps.observability.services.outbox import enqueue_event
-from apps.registry.services.versions import register_successful_build
+from apps.deployment.services.completion import complete_build
 from common.api.permissions import HasInternalWebhookSecret
 from common.logging import record_transition
 from infrastructure.execution.image_references import temporary_image_reference
@@ -46,6 +47,8 @@ class DeploymentWebhookEndpoint(APIView):
         ):
             return Response({"detail": "A terminal workflow result and workflow name are required."}, status=400)
         with transaction.atomic():
+            candidate = get_object_or_404(Deployment.objects.select_related("version"), public_id=deployment_id)
+            ModelProject.objects.select_for_update().get(pk=candidate.version.project_id)
             deployment = get_object_or_404(
                 Deployment.objects.select_for_update().select_related("version__project"),
                 public_id=deployment_id,
@@ -90,8 +93,15 @@ class BuildWebhookEndpoint(APIView):
     authentication_classes = ()
     permission_classes = (HasInternalWebhookSecret,)
 
+    @transaction.atomic
     def post(self, request, build_id):
-        build = Build.objects.select_related("project", "project__owner", "version").get(public_id=build_id)
+        candidate = get_object_or_404(Build, public_id=build_id)
+        ModelProject.objects.select_for_update().get(pk=candidate.project_id)
+        build = (
+            Build.objects.select_for_update()
+            .select_related("project", "project__owner", "version")
+            .get(pk=candidate.pk)
+        )
         incoming = str(request.data.get("status", "")).lower()
         if build.status in {"ready", "failed", "cancelled"}:
             return Response(
@@ -101,6 +111,8 @@ class BuildWebhookEndpoint(APIView):
                     "duplicate": True,
                 }
             )
+        if incoming not in {"success", "succeeded", "ready", "completed", "failed", "error"}:
+            return Response({"detail": "A terminal build result is required."}, status=400)
         if incoming in {"success", "succeeded", "ready", "completed"}:
             project = build.project
             image_uri = str(
@@ -126,13 +138,16 @@ class BuildWebhookEndpoint(APIView):
             else:
                 build.package_uri = str(request.data.get("package_uri") or build.package_uri)
                 build.save(update_fields=["package_uri", "updated_at"])
-                build = register_successful_build(
-                    build=build,
+                build = complete_build(
+                    build,
                     image_uri=image_uri,
                     image_digest=image_digest,
-                    metrics_summary=_dict_payload(request.data.get("metrics_summary")),
-                    params_summary=_dict_payload(request.data.get("params_summary")),
-                    insights_summary=_dict_payload(request.data.get("insights_summary")),
+                    metrics=_dict_payload(request.data.get("metrics_summary")),
+                    params=_dict_payload(request.data.get("params_summary")),
+                    insights=_dict_payload(request.data.get("insights_summary")),
+                    requirements=request.data.get("requirements_snapshot")
+                    if isinstance(request.data.get("requirements_snapshot"), str)
+                    else None,
                 )
                 build.completed_at = timezone.now()
                 build.save(update_fields=["completed_at", "updated_at"])

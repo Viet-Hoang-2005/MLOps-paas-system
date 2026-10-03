@@ -8,12 +8,14 @@ import {
   LogOut,
   Menu,
   Settings,
+  KeyRound,
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation } from "react-router-dom";
 import { routes } from "@/app/router/paths";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { cn } from "@/shared/lib/cn";
 
 interface DashboardSidebarProps {
@@ -23,30 +25,27 @@ interface DashboardSidebarProps {
   onCloseMobile: () => void;
 }
 
-const workspaceItems = [
-  { key: "home", to: routes.overview, icon: Home, match: "/dashboard/home" },
+const sectionItems = [
+  { key: "home", section: "overview", icon: Home },
+  { key: "deployment", section: "deployment", icon: Bot },
   {
     key: "driftMonitoring",
-    to: routes.monitoring,
+    section: "monitoring",
     icon: LineChart,
-    match: routes.monitoring,
   },
   {
     key: "modelTraining",
-    to: routes.training,
+    section: "training",
     icon: BrainCircuit,
-    match: routes.training,
   },
   {
     key: "modelEvolution",
-    to: routes.registry,
+    section: "evolution",
     icon: GitBranch,
-    match: routes.registry,
   },
 ] as const;
 
 const utilityItems = [
-  { key: "management", to: routes.deploy, icon: Bot, match: routes.deploy },
   {
     key: "notification",
     to: routes.notifications,
@@ -59,6 +58,12 @@ const utilityItems = [
     icon: Settings,
     match: "/dashboard/settings",
   },
+  {
+    key: "apiTokens",
+    to: routes.apiTokens,
+    icon: KeyRound,
+    match: routes.apiTokens,
+  },
 ] as const;
 
 export default function Sidebar({
@@ -70,11 +75,33 @@ export default function Sidebar({
   const location = useLocation();
   const { logout } = useAuth();
   const { t } = useTranslation("common");
+  const { selectedModel } = useModelSelection();
+  const workspaceItems = [
+    {
+      key: "management",
+      to: routes.projects,
+      icon: Bot,
+      match: routes.projects,
+    },
+    ...sectionItems.map((item) => ({
+      ...item,
+      to: selectedModel
+        ? `/dashboard/projects/${selectedModel.id}/${item.section}`
+        : routes.projects,
+      match: selectedModel
+        ? `/dashboard/projects/${selectedModel.id}/${item.section}`
+        : `/dashboard/${item.section}`,
+    })),
+  ];
 
   const itemClass = (match: string) =>
     cn(
       "group flex h-10 items-center gap-3 rounded-compact px-3 text-style-body-strong transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-      location.pathname.startsWith(match)
+      (
+        match === routes.projects
+          ? location.pathname === match
+          : location.pathname.startsWith(match)
+      )
         ? "bg-primary text-color-primary-foreground"
         : "text-color-muted-foreground hover:bg-muted hover:text-color-foreground",
       "md:justify-center md:px-0 xl:justify-start xl:px-3",

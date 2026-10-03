@@ -16,6 +16,7 @@ def predict_version(*, version, payload, http=None):
     endpoint = (
         Endpoint.objects.filter(
             deployment__version=version,
+            deployment__active_projects=version.project,
             deployment__status="healthy",
             health_status="healthy",
         )

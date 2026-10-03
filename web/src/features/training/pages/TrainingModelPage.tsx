@@ -16,7 +16,7 @@ import {
 } from "@/features/training/components/TrainingJobListSections";
 import { trainingQueryKeys } from "@/features/training/queryKeys";
 import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
-import { useModelSelection } from "@/features/catalog/hooks/useModelSelection";
+import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { formatDuration } from "@/shared/lib/formatDuration";
 import { Badge } from "@/shared/components/Badge";
@@ -195,9 +195,7 @@ export default function TrainingModelPage() {
             type="button"
             className="text-left font-medium hover:text-color-primary transition-colors focus:outline-none"
             onClick={() =>
-              navigate(
-                `/dashboard/model-training/jobs/${row.original.id}/details/overview`,
-              )
+              navigate(`/dashboard/training/jobs/${row.original.id}/overview`)
             }
           >
             {row.original.started_at
@@ -295,9 +293,7 @@ export default function TrainingModelPage() {
                 icon={<Eye className="h-4 w-4" />}
                 disabled={deleting}
                 onClick={() =>
-                  navigate(
-                    `/dashboard/model-training/jobs/${job.id}/details/overview`,
-                  )
+                  navigate(`/dashboard/training/jobs/${job.id}/overview`)
                 }
               />
               <Button
@@ -423,7 +419,7 @@ export default function TrainingModelPage() {
         <Button
           size="md"
           icon={<Rocket className="h-4 w-4" />}
-          onClick={() => navigate("/dashboard/model-training/create/metadata")}
+          onClick={() => navigate("/dashboard/training/new/metadata")}
         >
           {t("newJob")}
         </Button>

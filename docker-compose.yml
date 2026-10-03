@@ -44,6 +44,7 @@ services:
       BUILD_BACKEND: ${BUILD_BACKEND:-}
       DEPLOYMENT_BACKEND: ${DEPLOYMENT_BACKEND:-}
       TRAINING_BACKEND: ${TRAINING_BACKEND:-}
+      TRAINING_ENABLED: ${TRAINING_ENABLED:-true}
       TRAINING_GPU_ENABLED: ${TRAINING_GPU_ENABLED:-false}
       TRAINING_GPU_COUNTS: ${TRAINING_GPU_COUNTS:-1}
       DRIFT_BACKEND: ${DRIFT_BACKEND:-}
@@ -57,6 +58,7 @@ services:
       MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:-mlops-paas-training}
       MLFLOW_UI_URL: ${MLFLOW_UI_URL:-http://localhost:5003}
       MODEL_SERVER_PUBLIC_URL: ${MODEL_SERVER_PUBLIC_URL:-http://localhost:5002}
+      PROMETHEUS_INTERNAL_URL: http://prometheus:9090
       MODEL_SERVER_INTERNAL_URL: ${MODEL_SERVER_INTERNAL_URL:-http://traefik:5000}
       MODEL_PACKAGER_URL: ${MODEL_PACKAGER_URL:-http://model-packager:7000}
       CONTROL_PLANE_INTERNAL_URL: ${CONTROL_PLANE_INTERNAL_URL:-http://control-plane:8000}
@@ -118,6 +120,7 @@ services:
       BUILD_BACKEND: ${BUILD_BACKEND:-}
       DEPLOYMENT_BACKEND: ${DEPLOYMENT_BACKEND:-}
       TRAINING_BACKEND: ${TRAINING_BACKEND:-}
+      TRAINING_ENABLED: ${TRAINING_ENABLED:-true}
       TRAINING_GPU_ENABLED: ${TRAINING_GPU_ENABLED:-false}
       TRAINING_GPU_COUNTS: ${TRAINING_GPU_COUNTS:-1}
       DRIFT_BACKEND: ${DRIFT_BACKEND:-}
@@ -486,6 +489,27 @@ services:
     networks:
       - mlops_paas_network
 
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d"]
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks: [mlops_paas_network]
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:0.60.2
+    restart: unless-stopped
+    privileged: true
+    command: ["--docker_only=true", "--store_container_labels=true", "--housekeeping_interval=15s"]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    networks: [mlops_paas_network]
+
 # Mạng nội bộ cho các container
 networks:
   mlops_paas_network:
@@ -494,6 +518,7 @@ networks:
 
 # Volume để lưu trữ dữ liệu của PostgreSQL và Redpanda
 volumes:
+  prometheus_data:
   postgres_data:
     name: ${POSTGRES_VOLUME_NAME:-postgres_data}
   redpanda_data:

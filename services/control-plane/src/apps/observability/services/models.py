@@ -1,4 +1,4 @@
-from apps.deployment.models import Build, Deployment, Endpoint
+from apps.deployment.models import Build
 from apps.drift.models import DriftRun
 from apps.training.models import TrainingJob
 from infrastructure.prometheus import PrometheusClient
@@ -6,8 +6,8 @@ from infrastructure.prometheus import PrometheusClient
 
 def model_observability(project, prometheus=None):
     latest_build = Build.objects.filter(project=project).order_by("-created_at").first()
-    latest_deployment = Deployment.objects.filter(version__project=project).order_by("-created_at").first()
-    endpoint = Endpoint.objects.filter(deployment__version__project=project).order_by("-created_at").first()
+    latest_deployment = project.active_deployment
+    endpoint = getattr(latest_deployment, "endpoint", None) if latest_deployment else None
     latest_training = TrainingJob.objects.filter(project=project).order_by("-created_at").first()
     latest_drift = DriftRun.objects.filter(monitor__version__project=project).order_by("-created_at").first()
     metrics_client = prometheus or PrometheusClient()

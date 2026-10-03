@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint . && node scripts/check-architecture.mjs && node scripts/check-i18n.mjs && node scripts/check-colors.mjs && node scripts/check-radii.mjs && node scripts/check-typography.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:workflow": "node scripts/test-workflow-navigation.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",

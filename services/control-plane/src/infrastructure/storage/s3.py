@@ -36,6 +36,17 @@ class S3Storage:
         bucket, key = self.parse_uri(uri)
         self.client.download_file(bucket, key, str(destination))
 
+    def read(self, uri, max_bytes=4 * 1024 * 1024):
+        bucket, key = self.parse_uri(uri)
+        body = self.client.get_object(Bucket=bucket, Key=key)["Body"]
+        try:
+            value = body.read(max_bytes + 1)
+        finally:
+            body.close()
+        if len(value) > max_bytes:
+            raise ValueError("Object exceeds the allowed read size.")
+        return value
+
     def presigned_get(self, uri, expires_in=900):
         bucket, key = self.parse_uri(uri)
         return self.client.generate_presigned_url(

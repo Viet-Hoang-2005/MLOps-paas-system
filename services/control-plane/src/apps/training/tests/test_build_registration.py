@@ -80,7 +80,8 @@ def test_training_build_reuses_active_attempt_and_snapshots_output(monkeypatch, 
     assert first.source_job == job
     assert first.flavor == "xgboost"
     assert first.requirements_snapshot == "xgboost==2.0.3"
-    assert first.input_assets.get().kind == "training_output"
+    assert first.input_assets.get(kind="training_output").s3_uri != job.output_uri
+    assert first.input_assets.get(kind="source_code").s3_uri != job.code_snapshot_uri
     assert queued == [str(first.public_id)]
 
 
@@ -102,7 +103,7 @@ def test_successful_training_build_creates_one_version_with_summaries():
         flavor=job.model_flavor,
         artifact_format="training_output",
         requirements_snapshot=job.requirements_text,
-        status="building",
+        status="ready",
     )
     output = job.outputs.get(kind="model")
     build.input_assets.create(

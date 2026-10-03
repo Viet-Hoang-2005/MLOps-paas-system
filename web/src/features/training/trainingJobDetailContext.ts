@@ -8,7 +8,11 @@ import type {
 } from "@/features/training/types";
 
 export type TrainingJobDetailSection =
-  "overview" | "logs" | "metrics" | "artifacts" | "config";
+  | "overview"
+  | "logs"
+  | "metrics"
+  | "artifacts"
+  | "config";
 
 export interface TrainingJobDetailContextValue {
   job: TrainingJob;
@@ -23,8 +27,6 @@ export interface TrainingJobDetailContextValue {
   refreshJob: () => Promise<void>;
   downloadOutput: () => void;
   downloadingOutput: boolean;
-  buildAndRegister: () => void;
-  buildingAndRegistering: boolean;
   requestDeleteOutputs: () => void;
   copyUri: (value: string) => void;
 }

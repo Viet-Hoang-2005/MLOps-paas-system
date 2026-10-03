@@ -80,12 +80,13 @@ spec:
             type: string
             value: ['^(3000|5001)$']
         exprs:
-          - expr: image_name =~ project_id && callback =~ deployment_id
+          - expr: image_name =~ project_id && callback =~ deployment_id && container_name == 'deploy-' + deployment_id
             fields:
               - {name: image_name, path: body.image_name}
               - {name: project_id, path: body.project_id}
               - {name: callback, path: body.control_plane_webhook_url}
               - {name: deployment_id, path: body.deployment_id}
+              - {name: container_name, path: body.container_name}
     - name: drift-dep
       eventSourceName: webhook-eventsource
       eventName: drift

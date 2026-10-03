@@ -25,7 +25,7 @@ import type { ThemeMode } from "@/app/theme/theme";
 import { routes } from "@/app/router/paths";
 import { useTheme } from "@/app/theme/useTheme";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { useModelSelection } from "@/features/catalog/hooks/useModelSelection";
+import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { getProfile } from "@/features/settings/api/profileApi";
 import { settingsQueryKeys } from "@/features/settings/queryKeys";
 import type { UserProfile } from "@/features/settings/types";
@@ -88,7 +88,7 @@ export default function Header({
 
       <button
         type="button"
-        onClick={() => navigate("/dashboard/home/models")}
+        onClick={() => navigate("/dashboard/projects")}
         className="hidden min-w-40 shrink-0 items-center gap-3 rounded-surface focus-visible:ring-2 focus-visible:ring-ring sm:flex xl:min-w-48"
       >
         <img src={AdaptMLLogo} alt="" className="h-7 w-7" />
@@ -162,7 +162,7 @@ export default function Header({
                           {model.name}
                         </span>
                         <span className="block truncate text-style-caption capitalize text-color-muted-foreground">
-                          {model.status || t("statuses.registered")} ·{" "}
+                          {model.lifecycle_status || t("statuses.registered")} ·{" "}
                           {model.flavor || t("statuses.registered")}
                         </span>
                       </span>
@@ -182,7 +182,7 @@ export default function Header({
                   type="button"
                   onClick={() => {
                     setModelMenuOpen(false);
-                    navigate(routes.uploadModel);
+                    navigate(routes.newProject);
                   }}
                   className="flex h-10 w-full items-center gap-2 rounded-surface px-3 text-style-body-strong text-color-muted-foreground hover:bg-muted hover:text-color-foreground"
                 >
@@ -201,7 +201,7 @@ export default function Header({
           title={t("actions.createModel")}
           icon={<Plus className="h-5 w-5" />}
           variant="secondary"
-          onClick={() => navigate(routes.uploadModel)}
+          onClick={() => navigate(routes.newProject)}
           className="hidden sm:inline-flex"
         />
 
