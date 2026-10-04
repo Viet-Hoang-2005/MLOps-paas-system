@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Eye, Rocket, Trash2 } from "lucide-react";
+import { BrainCircuit, Eye, Rocket, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { RouteFallback } from "@/app/router/RouteFallback";
+import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
 
 import {
   deleteTrainingJob,
@@ -60,10 +62,13 @@ const displayStatus = (job: TrainingJob) => {
 };
 
 export default function TrainingModelPage() {
+  const { modelId } = useParams();
   const { t } = useTranslation("training");
+  const { t: tCommon } = useTranslation("common");
+  const { t: tProjects } = useTranslation("projects");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { selectedModel } = useModelSelection();
+  const { selectedModel, loading: isModelLoading } = useModelSelection();
   const [statusFilter, setStatusFilter] = useState<TrainingStatusFilter>("all");
   const [jobToDelete, setJobToDelete] = useState<TrainingJob | null>(null);
   const pendingDeletionIds = useRef<Set<string>>(new Set());
@@ -313,6 +318,26 @@ export default function TrainingModelPage() {
     ],
     [navigate, t],
   );
+
+  if (!selectedModel) {
+    if (isModelLoading) return <RouteFallback />;
+    return (
+      <NoProjectPlaceholder
+        title={tCommon("navigation.modelTraining")}
+        description={tProjects("workflow.noProjectTraining")}
+        icon={<BrainCircuit className="h-6 w-6" />}
+      />
+    );
+  }
+
+  if (!modelId) {
+    return (
+      <Navigate
+        to={`/dashboard/projects/${selectedModel.id}/training`}
+        replace
+      />
+    );
+  }
 
   return (
     <section className="flex w-full flex-1 flex-col space-y-6">

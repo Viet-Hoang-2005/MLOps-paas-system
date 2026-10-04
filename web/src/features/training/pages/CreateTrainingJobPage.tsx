@@ -16,7 +16,7 @@ import {
   listReferenceFiles,
   listSourceCodeFiles,
   updateModelProject,
-} from "@/features/projects/api/catalogApi";
+} from "@/shared/api/catalogApi";
 import type { ModelProject } from "@/features/projects/types";
 import {
   cancelTrainingJob,

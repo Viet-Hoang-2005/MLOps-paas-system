@@ -154,6 +154,11 @@ export interface ProjectMetadataForm {
   reference_data_file: File | null;
 }
 
+export interface CodeDataForm {
+  source_code_file: File | null;
+  reference_data_file: File | null;
+}
+
 export interface BuildInputForm {
   source_artifact: File | null;
   artifact_format: ModelArtifactFormat;
@@ -168,7 +173,9 @@ export interface BuildInputForm {
   requirements_file?: File | null;
 }
 
-export type ModelBuildFormValues = ProjectMetadataForm & BuildInputForm;
+export type ModelBuildFormValues = ProjectMetadataForm &
+  CodeDataForm &
+  BuildInputForm;
 
 export type ModelBuildInputAssetKind =
   | "source_artifact"

@@ -153,6 +153,11 @@ const router = createBrowserRouter(
           <Route path="training" element={<TrainingModelPage />} />
           <Route path="evolution" element={<EvolutionPage />} />
         </Route>
+        <Route path="overview" element={<ProjectOverviewPage />} />
+        <Route path="deployment" element={<DeploymentHistoryPage />} />
+        <Route path="monitoring" element={<DriftMonitoringPage />} />
+        <Route path="training" element={<TrainingModelPage />} />
+        <Route path="evolution" element={<EvolutionPage />} />
         <Route path="deployments/new" element={<CreateDeploymentPage />} />
         <Route path="monitoring/new" element={<CreateDriftMonitoringPage />} />
         <Route

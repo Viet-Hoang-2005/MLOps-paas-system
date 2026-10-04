@@ -8,16 +8,12 @@ import {
 } from "@/features/projects/api/previewApi";
 import { usePreview } from "@/features/projects/hooks/usePreview";
 import { catalogQueryKeys } from "@/features/projects/queryKeys";
-import type {
-  ModelBuildFormValues,
-  BuildInputForm,
-  ProjectMetadataForm,
-} from "@/features/projects/types";
-import { BuildInputFields } from "@/features/projects/components/BuildInputFields";
-import { ProjectMetadataFields } from "@/features/projects/components/ProjectMetadataFields";
+import type { ModelBuildFormValues } from "@/features/projects/types";
+import { ModelArtifactFields } from "@/features/projects/components/ModelArtifactFields";
+import { CodeDataFields } from "@/features/projects/components/CodeDataFields";
+import { ModelMetadataFields } from "@/features/projects/components/ModelMetadataFields";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Button } from "@/shared/components/Button";
-import { FileDropzone } from "@/shared/components/FileDropzone";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { getApiErrorMessage } from "@/shared/api/errors";
 
@@ -63,10 +59,7 @@ export default function ProjectFormPage() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
-  const setField = <K extends keyof ModelBuildFormValues>(
-    key: K,
-    value: ModelBuildFormValues[K],
-  ) => {
+  const setField = (key: string, value: unknown) => {
     setForm((current) => ({ ...current, [key]: value }));
     setDirty(true);
   };
@@ -88,93 +81,93 @@ export default function ProjectFormPage() {
     },
   });
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-6">
       <PageHeader
         title={t(modelId ? "workflow.editPreview" : "workflow.newProject")}
       />
       <form
-        className="space-y-8 rounded-surface border border-border bg-surface p-6"
+        className="space-y-6"
         onSubmit={(event) => {
           event.preventDefault();
           save.mutate();
         }}
       >
-        {modelId ? (
-          <>
-            <p>{t("workflow.editHint")}</p>
-            <ul className="space-y-2 text-style-caption text-color-muted-foreground">
-              {preview.data?.assets.map((asset) => (
-                <li key={asset.kind}>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={removed.includes(asset.kind)}
-                      onChange={(event) => {
-                        setRemoved((current) =>
-                          event.target.checked
-                            ? [...current, asset.kind]
-                            : current.filter((kind) => kind !== asset.kind),
-                        );
-                        setDirty(true);
-                      }}
-                    />
-                    {t("workflow.removeAsset")}: {asset.kind} · {asset.name}
-                  </label>
-                </li>
-              ))}
-            </ul>
-            <FileDropzone
-              accept=".py"
-              subtitle=".py"
-              title={form.source_code_file?.name || t("workflow.source")}
-              onChange={(file) => setField("source_code_file", file)}
-            />
-            <FileDropzone
-              accept=".csv"
-              subtitle=".csv"
-              title={form.reference_data_file?.name || t("workflow.reference")}
-              onChange={(file) => setField("reference_data_file", file)}
-            />
-          </>
-        ) : (
-          <ProjectMetadataFields
+        <div className="space-y-8 rounded-surface border border-border bg-surface p-6">
+          {modelId ? (
+            <>
+              <p>{t("workflow.editHint")}</p>
+              <ul className="space-y-2 text-style-caption text-color-muted-foreground">
+                {preview.data?.assets.map((asset) => (
+                  <li key={asset.kind}>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={removed.includes(asset.kind)}
+                        onChange={(event) => {
+                          setRemoved((current) =>
+                            event.target.checked
+                              ? [...current, asset.kind]
+                              : current.filter((kind) => kind !== asset.kind),
+                          );
+                          setDirty(true);
+                        }}
+                      />
+                      {t("workflow.removeAsset")}: {asset.kind} · {asset.name}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <hr className="border-border" />
+            </>
+          ) : (
+            <>
+              <ModelMetadataFields
+                form={form}
+                setField={(field, value) => setField(field, value)}
+              />
+              <hr className="border-border" />
+            </>
+          )}
+          <ModelArtifactFields
             form={form}
-            setField={<K extends keyof ProjectMetadataForm>(
-              key: K,
-              value: ProjectMetadataForm[K],
-            ) => {
-              setForm((current) => ({ ...current, [key]: value }));
-              setDirty(true);
-            }}
+            setField={(field, value) => setField(field, value)}
           />
-        )}
-        <BuildInputFields
-          form={form}
-          setField={<K extends keyof BuildInputForm>(
-            key: K,
-            value: BuildInputForm[K],
-          ) => {
-            setForm((current) => ({ ...current, [key]: value }));
-            setDirty(true);
-          }}
-        />
-        {(save.isError || preview.isError) && (
-          <p role="alert" className="text-color-danger">
-            {getApiErrorMessage(
-              save.error || preview.error,
-              t("workflow.failed"),
-            )}
-          </p>
-        )}
-        <Button
-          type="submit"
-          loading={save.isPending}
-          disabled={
-            modelId ? !preview.data : !form.name.trim() || !form.source_artifact
-          }
-        >
-          {t("workflow.savePreview")}
-        </Button>
+          <hr className="border-border" />
+          <CodeDataFields
+            form={form}
+            project={null}
+            setField={(field, value) => setField(field, value)}
+          />
+          {(save.isError || preview.isError) && (
+            <p role="alert" className="text-color-danger">
+              {getApiErrorMessage(
+                save.error || preview.error,
+                t("workflow.failed"),
+              )}
+            </p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Button
+            type="button"
+            variant="secondary"
+            fullWidth
+            onClick={() => navigate(-1)}
+          >
+            {t("workflow.cancel")}
+          </Button>
+          <Button
+            type="submit"
+            fullWidth
+            loading={save.isPending}
+            disabled={
+              modelId ? !preview.data : !form.name.trim() || !form.source_artifact
+            }
+          >
+            {t("workflow.savePreview")}
+          </Button>
+        </div>
       </form>
       <ConfirmModal
         open={blocker.state === "blocked"}

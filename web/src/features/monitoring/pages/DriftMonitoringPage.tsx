@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { RouteFallback } from "@/app/router/RouteFallback";
+import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
+import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
 import {
   useProjectOverview,
   useRunningVersion,
@@ -40,7 +43,10 @@ const DRIFT_TERMINAL_STATUSES = ["completed", "failed", "cancelled"] as const;
 
 export default function DriftMonitoringPage() {
   const { t, i18n } = useTranslation("monitoring");
+  const { t: tCommon } = useTranslation("common");
+  const { t: tProjects } = useTranslation("projects");
   const { modelId } = useParams<{ modelId: string }>();
+  const { selectedModel, loading: isModelLoading } = useModelSelection();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const project = useProjectOverview(modelId);
@@ -102,6 +108,25 @@ export default function DriftMonitoringPage() {
   const handleViewReport = (runId: string) => {
     navigate(`/dashboard/projects/${modelId}/monitoring/report/${runId}`);
   };
+
+  if (!modelId) {
+    if (isModelLoading) return <RouteFallback />;
+    if (selectedModel) {
+      return (
+        <Navigate
+          to={`/dashboard/projects/${selectedModel.id}/monitoring`}
+          replace
+        />
+      );
+    }
+    return (
+      <NoProjectPlaceholder
+        title={tCommon("navigation.driftMonitoring")}
+        description={tProjects("workflow.noProjectMonitoring")}
+        icon={<LineChart className="h-6 w-6" />}
+      />
+    );
+  }
 
   if (isLoadingJobs) {
     return <div className="p-8">{t("loading")}</div>;

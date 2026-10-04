@@ -1,4 +1,4 @@
-import type { WorkspaceFile } from "@/features/projects/api/catalogApi";
+import type { WorkspaceFile } from "@/shared/api/catalogApi";
 
 export type CreatingFileState = {
   type: "file" | "folder";

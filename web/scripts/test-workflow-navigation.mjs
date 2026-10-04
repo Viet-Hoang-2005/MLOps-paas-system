@@ -12,6 +12,7 @@ const compiled = ts.transpileModule(source, {
 const { projectSelectionPath } = await import(
   `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`
 );
+let cases = 0;
 for (const section of [
   "overview",
   "deployment",
@@ -23,6 +24,12 @@ for (const section of [
     projectSelectionPath(`/dashboard/projects/old/${section}`, "new"),
     `/dashboard/projects/new/${section}`,
   );
+  cases++;
+  assert.equal(
+    projectSelectionPath(`/dashboard/${section}`, "new"),
+    `/dashboard/projects/new/${section}`,
+  );
+  cases++;
 }
 for (const path of [
   "/dashboard/projects/old/edit",
@@ -38,5 +45,6 @@ for (const path of [
     projectSelectionPath(path, "new"),
     "/dashboard/projects/new/overview",
   );
+  cases++;
 }
-console.log("Workflow navigation: 13 cases passed");
+console.log(`Workflow navigation: ${cases} cases passed`);

@@ -9,7 +9,7 @@ import {
   Play,
 } from "lucide-react";
 
-import type { CreatingFileState, SourceTreeNode } from "./sourceTreeModel";
+import type { CreatingFileState, SourceTreeNode } from "@/shared/components/sourceTreeModel";
 
 function InlineTreeInput({ onCommit }: { onCommit: (value: string) => void }) {
   const { t } = useTranslation("projects");

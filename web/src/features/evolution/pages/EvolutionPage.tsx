@@ -1,7 +1,11 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { GitBranch } from "lucide-react";
+import { RouteFallback } from "@/app/router/RouteFallback";
+import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
+import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
 import {
   getProjectVersions,
   deployBuild,
@@ -21,6 +25,8 @@ import { evolutionQueryKeys } from "@/features/evolution/queryKeys";
 export default function EvolutionPage() {
   const { modelId } = useParams();
   const { t } = useTranslation("projects");
+  const { t: tCommon } = useTranslation("common");
+  const { selectedModel, loading: isModelLoading } = useModelSelection();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [confirm, setConfirm] = useState(false);
@@ -44,6 +50,24 @@ export default function EvolutionPage() {
         `/dashboard/deployments/new?projectId=${modelId}&buildId=${build!.id}&step=deploy&deploymentId=${deployment.id}`,
       ),
   });
+  if (!modelId) {
+    if (isModelLoading) return <RouteFallback />;
+    if (selectedModel) {
+      return (
+        <Navigate
+          to={`/dashboard/projects/${selectedModel.id}/evolution`}
+          replace
+        />
+      );
+    }
+    return (
+      <NoProjectPlaceholder
+        title={tCommon("navigation.modelEvolution")}
+        description={t("workflow.noProjectEvolution")}
+        icon={<GitBranch className="h-6 w-6" />}
+      />
+    );
+  }
   return (
     <div className="space-y-6">
       <PageHeader title={t("workflow.evolution")} />

@@ -30,8 +30,8 @@ import {
   uploadReferenceFile,
   deleteReferenceFile,
   type WorkspaceFile as S3File,
-} from "@/features/projects/api/catalogApi";
-import { SourceTree } from "./SourceTree";
+} from "@/shared/api/catalogApi";
+import { SourceTree } from "@/shared/components/SourceTree";
 import { buildSourceTree, type CreatingFileState } from "./sourceTreeModel";
 
 export interface SourceEditorProps {

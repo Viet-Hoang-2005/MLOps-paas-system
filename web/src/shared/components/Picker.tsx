@@ -8,6 +8,7 @@ export interface PickerOption<T> {
 }
 
 export interface PickerProps<T> {
+  title?: ReactNode;
   value: T;
   onChange: (value: T) => void;
   options: PickerOption<T>[];
@@ -15,12 +16,13 @@ export interface PickerProps<T> {
 }
 
 export function Picker<T extends string | number>({
+  title,
   value,
   onChange,
   options,
   className,
 }: PickerProps<T>) {
-  return (
+  const content = (
     <div className={cn("grid gap-4 sm:grid-cols-2", className)}>
       {options.map((option) => (
         <button
@@ -42,6 +44,19 @@ export function Picker<T extends string | number>({
           )}
         </button>
       ))}
+    </div>
+  );
+
+  if (!title) {
+    return content;
+  }
+
+  return (
+    <div className="flex w-full flex-col gap-2">
+      <label className="text-style-body-strong text-color-foreground">
+        {title}
+      </label>
+      {content}
     </div>
   );
 }

@@ -10,7 +10,7 @@ import { StepTitle } from "@/shared/components/StepTitle";
 import { Switch } from "@/shared/components/Switch";
 import { TextArea } from "@/shared/components/TextArea";
 
-interface BuildInputFieldsProps {
+interface ModelArtifactFieldsProps {
   form: BuildInputForm;
   setField: <K extends keyof BuildInputForm>(
     field: K,
@@ -58,7 +58,7 @@ const packageExamples: Record<ModelFlavor, string[]> = {
   ],
 };
 
-export function BuildInputFields({ form, setField }: BuildInputFieldsProps) {
+export function ModelArtifactFields({ form, setField }: ModelArtifactFieldsProps) {
   const { t } = useTranslation("deployments");
   const flavorOptions: Array<{
     value: ModelFlavor;
@@ -171,29 +171,37 @@ export function BuildInputFields({ form, setField }: BuildInputFieldsProps) {
             <summary className="cursor-pointer text-style-body-strong">
               {t("advancedArtifacts")}
             </summary>
-            <FileDropzone
-              accept=".pkl,.json"
-              title={
-                form.label_mapping_file?.name ||
-                t("uploadFlow.build.attachments.labelMapping")
-              }
-              subtitle={t("uploadFlow.build.attachments.labelMappingHint")}
-              onChange={(file) => setField("label_mapping_file", file)}
-            />
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
+              <FileDropzone
+                accept=".pkl,.json"
+                title={
+                  form.label_mapping_file?.name ||
+                  t("uploadFlow.build.attachments.labelMapping")
+                }
+                subtitle={t("uploadFlow.build.attachments.labelMappingSubtitle")}
+                hint={t("uploadFlow.build.attachments.labelMappingIndicators")}
+                onChange={(file) => setField("label_mapping_file", file)}
+              />
               <FileDropzone
                 accept=".json"
-                title={form.input_schema_file?.name || t("inputSchema")}
-                subtitle=".json"
+                title={
+                  form.input_schema_file?.name ||
+                  t("uploadFlow.build.attachments.inputSchema")
+                }
+                subtitle={t("uploadFlow.build.attachments.inputSchemaSubtitle")}
+                hint={t("uploadFlow.build.attachments.inputSchemaIndicators")}
                 onChange={(file) => setField("input_schema_file", file)}
               />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <FileDropzone
                 accept=".json"
                 title={
                   form.metrics_file?.name ||
                   t("uploadFlow.build.attachments.metrics")
                 }
-                subtitle={t("uploadFlow.build.attachments.metricsHint")}
+                subtitle={t("uploadFlow.build.attachments.metricsSubtitle")}
+                hint={t("uploadFlow.build.attachments.metricsIndicators")}
                 onChange={(file) => setField("metrics_file", file)}
               />
               <FileDropzone
@@ -202,7 +210,8 @@ export function BuildInputFields({ form, setField }: BuildInputFieldsProps) {
                   form.params_file?.name ||
                   t("uploadFlow.build.attachments.params")
                 }
-                subtitle={t("uploadFlow.build.attachments.paramsHint")}
+                subtitle={t("uploadFlow.build.attachments.paramsSubtitle")}
+                hint={t("uploadFlow.build.attachments.paramsIndicators")}
                 onChange={(file) => setField("params_file", file)}
               />
               <FileDropzone
@@ -211,7 +220,8 @@ export function BuildInputFields({ form, setField }: BuildInputFieldsProps) {
                   form.model_insights_file?.name ||
                   t("uploadFlow.build.attachments.insights")
                 }
-                subtitle={t("uploadFlow.build.attachments.insightsHint")}
+                subtitle={t("uploadFlow.build.attachments.insightsSubtitle")}
+                hint={t("uploadFlow.build.attachments.insightsIndicators")}
                 onChange={(file) => setField("model_insights_file", file)}
               />
               <FileDropzone
@@ -221,7 +231,10 @@ export function BuildInputFields({ form, setField }: BuildInputFieldsProps) {
                   t("uploadFlow.build.attachments.featureImportance")
                 }
                 subtitle={t(
-                  "uploadFlow.build.attachments.featureImportanceHint",
+                  "uploadFlow.build.attachments.featureImportanceSubtitle",
+                )}
+                hint={t(
+                  "uploadFlow.build.attachments.featureImportanceIndicators",
                 )}
                 onChange={(file) => setField("feature_importance_file", file)}
               />

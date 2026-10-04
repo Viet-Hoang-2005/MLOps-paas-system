@@ -1,5 +1,5 @@
 const projectSection =
-  /^\/dashboard\/projects\/[^/]+\/(overview|deployment|monitoring|training|evolution)\/?$/;
+  /^\/dashboard\/(?:projects\/[^/]+\/)?(overview|deployment|monitoring|training|evolution)\/?$/;
 
 export function projectSelectionPath(
   pathname: string,

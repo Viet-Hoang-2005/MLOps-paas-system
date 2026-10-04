@@ -2,6 +2,9 @@ export const commonVi = {
   navigation: {
     primary: "Điều hướng chính",
     workspace: "Không gian làm việc",
+    managementGroup: "Management",
+    modelGroup: "Model",
+    systemGroup: "System",
     home: "Tổng quan mô hình",
     deployment: "Triển khai mô hình",
     driftMonitoring: "Giám sát mô hình",
@@ -34,5 +37,7 @@ export const commonVi = {
     closeNavigation: "Đóng menu",
     expandSidebar: "Mở rộng sidebar",
     collapseSidebar: "Thu gọn sidebar",
+    expandGroup: "Mở rộng nhóm",
+    collapseGroup: "Thu gọn nhóm",
   },
 } as const;

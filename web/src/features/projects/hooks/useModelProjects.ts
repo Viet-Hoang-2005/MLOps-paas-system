@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { listModelProjects } from "@/features/projects/api/catalogApi";
+import { listModelProjects } from "@/shared/api/catalogApi";
 import { catalogQueryKeys } from "@/features/projects/queryKeys";
 
 export function useModelProjects() {

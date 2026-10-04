@@ -50,6 +50,16 @@ export const catalogEn = {
       "No Running version. Build, register and deploy a version to view its snapshot.",
     noSource: "This Running version has no source snapshot.",
     noReference: "This Running version has no reference snapshot.",
+    noProjectOverview:
+      "No model project found. Create a new model project to view the overview, runtime deployment, and metrics.",
+    noProjectDeployment:
+      "No model project available for deployment. Create a new model project to build and deploy models.",
+    noProjectMonitoring:
+      "No model project available for monitoring. Create a new model project to monitor data drift and model metrics.",
+    noProjectTraining:
+      "No model project available for training. Create a new model project to start training jobs.",
+    noProjectEvolution:
+      "No model project found. Create a new model project to track version lineage and model evolution.",
     deploy: "Deploy the model",
     build: "Build image",
     register: "Register model",

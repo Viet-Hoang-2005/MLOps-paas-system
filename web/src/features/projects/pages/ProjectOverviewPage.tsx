@@ -1,12 +1,17 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  Navigate,
   useBlocker,
   useNavigate,
   useParams,
   useSearchParams,
 } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Home } from "lucide-react";
+import { RouteFallback } from "@/app/router/RouteFallback";
+import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
+import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
 import {
   useProjectOverview,
   useSnapshotText,
@@ -15,7 +20,7 @@ import {
 import {
   updateModelProject,
   deleteModelProject,
-} from "@/features/projects/api/catalogApi";
+} from "@/shared/api/catalogApi";
 import { catalogQueryKeys } from "@/features/projects/queryKeys";
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
@@ -35,6 +40,8 @@ const ModelTestingPage = lazy(
 export default function ProjectOverviewPage() {
   const { modelId } = useParams();
   const { t } = useTranslation("projects");
+  const { t: tCommon } = useTranslation("common");
+  const { selectedModel, loading: isModelLoading } = useModelSelection();
   const { resolvedTheme } = useTheme();
   const navigate = useNavigate();
   const client = useQueryClient();
@@ -85,6 +92,24 @@ export default function ProjectOverviewPage() {
       navigate("/dashboard/projects");
     },
   });
+  if (!modelId) {
+    if (isModelLoading) return <RouteFallback />;
+    if (selectedModel) {
+      return (
+        <Navigate
+          to={`/dashboard/projects/${selectedModel.id}/overview`}
+          replace
+        />
+      );
+    }
+    return (
+      <NoProjectPlaceholder
+        title={tCommon("navigation.home")}
+        description={t("workflow.noProjectOverview")}
+        icon={<Home className="h-6 w-6" />}
+      />
+    );
+  }
   if (project.isError)
     return (
       <p role="alert">

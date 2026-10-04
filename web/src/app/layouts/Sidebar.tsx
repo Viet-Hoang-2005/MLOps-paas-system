@@ -1,7 +1,9 @@
+import { useState } from "react";
 import {
   Bell,
   Bot,
   BrainCircuit,
+  ChevronDown,
   GitBranch,
   Home,
   LineChart,
@@ -76,32 +78,48 @@ export default function Sidebar({
   const { logout } = useAuth();
   const { t } = useTranslation("common");
   const { selectedModel } = useModelSelection();
-  const workspaceItems = [
-    {
-      key: "management",
-      to: routes.projects,
-      icon: Bot,
-      match: routes.projects,
-    },
-    ...sectionItems.map((item) => ({
-      ...item,
-      to: selectedModel
-        ? `/dashboard/projects/${selectedModel.id}/${item.section}`
-        : routes.projects,
-      match: selectedModel
-        ? `/dashboard/projects/${selectedModel.id}/${item.section}`
-        : `/dashboard/${item.section}`,
-    })),
-  ];
+  const [modelGroupOpen, setModelGroupOpen] = useState(true);
+  const [systemGroupOpen, setSystemGroupOpen] = useState(true);
 
-  const itemClass = (match: string) =>
+  const managementItem = {
+    key: "management",
+    to: routes.projects,
+    icon: Bot,
+    match: routes.projects,
+  };
+
+  const modelItems = sectionItems.map((item) => ({
+    ...item,
+    to: selectedModel
+      ? `/dashboard/projects/${selectedModel.id}/${item.section}`
+      : `/dashboard/${item.section}`,
+  }));
+
+  const systemItems = utilityItems;
+
+  const isItemActive = (key: string, section?: string, to?: string) => {
+    if (key === "management") {
+      return (
+        location.pathname === routes.projects ||
+        location.pathname === routes.newProject
+      );
+    }
+    if (section) {
+      const regex = new RegExp(
+        `^/dashboard/(?:projects/[^/]+/)?${section}(?:/|$)`,
+      );
+      return regex.test(location.pathname);
+    }
+    if (to) {
+      return location.pathname === to || location.pathname.startsWith(to);
+    }
+    return false;
+  };
+
+  const itemClass = (active: boolean) =>
     cn(
       "group flex h-10 items-center gap-3 rounded-compact px-3 text-style-body-strong transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-      (
-        match === routes.projects
-          ? location.pathname === match
-          : location.pathname.startsWith(match)
-      )
+      active
         ? "bg-primary text-color-primary-foreground"
         : "text-color-muted-foreground hover:bg-muted hover:text-color-foreground",
       "md:justify-center md:px-0 xl:justify-start xl:px-3",
@@ -114,15 +132,22 @@ export default function Sidebar({
   );
 
   const renderItem = (
-    item: (typeof workspaceItems)[number] | (typeof utilityItems)[number],
+    item:
+      | typeof managementItem
+      | (typeof modelItems)[number]
+      | (typeof utilityItems)[number],
   ) => {
     const Icon = item.icon;
+    const active =
+      "section" in item
+        ? isItemActive(item.key, item.section)
+        : isItemActive(item.key, undefined, item.match);
     return (
       <NavLink
         key={item.key}
         to={item.to}
         onClick={onCloseMobile}
-        className={itemClass(item.match)}
+        className={itemClass(active)}
         title={collapsed ? t(`navigation.${item.key}`) : undefined}
       >
         <Icon className="h-5 w-5 shrink-0" />
@@ -150,7 +175,7 @@ export default function Sidebar({
       >
         <div className="flex h-16 items-center justify-between border-b border-border px-3 md:hidden">
           <span className="text-style-body text-color-muted-foreground">
-            {t("navigation.workspace")}
+            {t("navigation.managementGroup")}
           </span>
           <button
             type="button"
@@ -162,11 +187,19 @@ export default function Sidebar({
           </button>
         </div>
 
-        <div className="hidden h-12 items-center gap-1 border-b border-border p-3 md:flex md:justify-center xl:justify-start">
+        <div className="hidden h-12 items-center border-b border-border px-3 md:flex md:justify-center xl:justify-between">
+          <span
+            className={cn(
+              "text-style-body text-color-muted-foreground md:hidden xl:block",
+              collapsed && "xl:hidden",
+            )}
+          >
+            {t("navigation.managementGroup")}
+          </span>
           <button
             type="button"
             onClick={onToggle}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-surface text-color-muted-foreground hover:text-color-foreground"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-surface text-color-muted-foreground hover:bg-muted hover:text-color-foreground"
             aria-label={
               collapsed
                 ? t("actions.expandSidebar")
@@ -175,23 +208,107 @@ export default function Sidebar({
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span
-            className={cn(
-              "text-style-body text-color-muted-foreground md:hidden xl:block",
-              collapsed && "xl:hidden",
-            )}
-          >
-            {t("navigation.workspace")}
-          </span>
         </div>
 
         <nav
-          className="flex min-h-0 flex-1 flex-col justify-between overflow-y-auto p-3"
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3"
           aria-label={t("navigation.primary")}
         >
-          <div className="space-y-1">{workspaceItems.map(renderItem)}</div>
-          <div className="mb-2 space-y-1">
-            {utilityItems.map(renderItem)}
+          <div className="space-y-1">{renderItem(managementItem)}</div>
+
+          <div
+            className={cn(
+              "-mx-3 flex items-center justify-between border-b border-border transition-all",
+              collapsed
+                ? "h-10 px-3 md:h-0 md:my-2 md:px-0 xl:h-0 xl:my-2 xl:px-0"
+                : "h-10 px-3 mt-3 mb-2 cursor-pointer select-none group/model md:h-0 md:my-2 md:px-0 xl:h-10 xl:px-3 xl:mt-3 xl:mb-2",
+            )}
+            onClick={() => !collapsed && setModelGroupOpen((open) => !open)}
+          >
+            <span
+              className={cn(
+                "text-style-body text-color-muted-foreground group-hover/model:text-color-foreground transition-colors md:hidden xl:block",
+                collapsed && "xl:hidden",
+              )}
+            >
+              {t("navigation.modelGroup")}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setModelGroupOpen((open) => !open);
+              }}
+              className={cn(
+                "flex h-7 w-7 items-center justify-center rounded-compact text-color-muted-foreground hover:bg-muted hover:text-color-foreground transition-colors md:hidden xl:flex",
+                collapsed && "xl:hidden",
+              )}
+              aria-label={
+                modelGroupOpen
+                  ? t("actions.collapseGroup")
+                  : t("actions.expandGroup")
+              }
+            >
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 transition-transform duration-200",
+                  !modelGroupOpen && "-rotate-90",
+                )}
+              />
+            </button>
+          </div>
+
+          {(modelGroupOpen || collapsed) && (
+            <div className="space-y-1">{modelItems.map(renderItem)}</div>
+          )}
+
+          <div
+            className={cn(
+              "-mx-3 flex items-center justify-between border-b border-border transition-all",
+              collapsed
+                ? "h-10 px-3 md:h-0 md:my-2 md:px-0 xl:h-0 xl:my-2 xl:px-0"
+                : "h-10 px-3 mt-3 mb-2 cursor-pointer select-none group/system md:h-0 md:my-2 md:px-0 xl:h-10 xl:px-3 xl:mt-3 xl:mb-2",
+            )}
+            onClick={() => !collapsed && setSystemGroupOpen((open) => !open)}
+          >
+            <span
+              className={cn(
+                "text-style-body text-color-muted-foreground group-hover/system:text-color-foreground transition-colors md:hidden xl:block",
+                collapsed && "xl:hidden",
+              )}
+            >
+              {t("navigation.systemGroup")}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSystemGroupOpen((open) => !open);
+              }}
+              className={cn(
+                "flex h-7 w-7 items-center justify-center rounded-compact text-color-muted-foreground hover:bg-muted hover:text-color-foreground transition-colors md:hidden xl:flex",
+                collapsed && "xl:hidden",
+              )}
+              aria-label={
+                systemGroupOpen
+                  ? t("actions.collapseGroup")
+                  : t("actions.expandGroup")
+              }
+            >
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 transition-transform duration-200",
+                  !systemGroupOpen && "-rotate-90",
+                )}
+              />
+            </button>
+          </div>
+
+          {(systemGroupOpen || collapsed) && (
+            <div className="space-y-1">{systemItems.map(renderItem)}</div>
+          )}
+
+          <div className="mt-auto pt-3 border-t border-border">
             <button
               type="button"
               onClick={logout}

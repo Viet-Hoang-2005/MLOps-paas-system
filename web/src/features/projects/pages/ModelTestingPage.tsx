@@ -16,7 +16,7 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { TerminalViewer } from "@/shared/components/TerminalViewer";
 import { Button } from "@/shared/components/Button";
 import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
-import { predictWithModelProject } from "@/features/projects/api/catalogApi";
+import { predictWithModelProject } from "@/shared/api/catalogApi";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { toast } from "@/shared/components/toastStore";
 import { FileDropzone } from "@/shared/components/FileDropzone";

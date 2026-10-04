@@ -4,11 +4,13 @@ export function FileDropzone({
   accept,
   title,
   subtitle,
+  hint,
   onChange,
 }: {
   accept: string;
   title: string;
   subtitle: string;
+  hint?: string;
   onChange: (file: File | null) => void;
 }) {
   return (
@@ -20,6 +22,11 @@ export function FileDropzone({
       <span className="mt-1 text-style-caption text-color-muted-foreground">
         {subtitle}
       </span>
+      {hint && (
+        <span className="mt-0.5 text-style-caption text-color-muted-foreground">
+          {hint}
+        </span>
+      )}
       <input
         type="file"
         accept={accept}

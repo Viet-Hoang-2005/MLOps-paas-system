@@ -1,5 +1,6 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { Navigate, useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Bot } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Build } from "@/features/projects/types";
 import {
@@ -9,12 +10,17 @@ import {
 import { PageHeader } from "@/shared/components/PageHeader";
 import { DataTable } from "@/shared/components/DataTable";
 import { Button } from "@/shared/components/Button";
+import { RouteFallback } from "@/app/router/RouteFallback";
 import { useProjectOverview } from "@/features/projects/hooks/useProjectOverview";
+import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
+import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
 import { getApiErrorMessage } from "@/shared/api/errors";
 
 export default function DeploymentHistoryPage() {
   const { modelId } = useParams();
   const { t } = useTranslation("projects");
+  const { t: tCommon } = useTranslation("common");
+  const { selectedModel, loading: isModelLoading } = useModelSelection();
   const navigate = useNavigate();
   const builds = useBuildHistory(modelId);
   const deployments = useDeployments();
@@ -81,6 +87,24 @@ export default function DeploymentHistoryPage() {
       },
     },
   ];
+  if (!modelId) {
+    if (isModelLoading) return <RouteFallback />;
+    if (selectedModel) {
+      return (
+        <Navigate
+          to={`/dashboard/projects/${selectedModel.id}/deployment`}
+          replace
+        />
+      );
+    }
+    return (
+      <NoProjectPlaceholder
+        title={tCommon("navigation.deployment")}
+        description={t("workflow.noProjectDeployment")}
+        icon={<Bot className="h-6 w-6" />}
+      />
+    );
+  }
   return (
     <div className="space-y-6">
       <PageHeader

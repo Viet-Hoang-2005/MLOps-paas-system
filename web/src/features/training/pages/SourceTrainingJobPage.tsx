@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import {
   SourceEditor,
   type SourceEditorHandle,
-} from "@/features/projects/components/SourceEditor";
+} from "@/shared/components/SourceEditor";
 import { useCreateTrainingJob } from "@/features/training/trainingFlowContext";
 import type { ModelFlavor } from "@/features/projects/types";
 import { Button } from "@/shared/components/Button";

@@ -8,6 +8,7 @@ import { Badge } from "@/shared/components/Badge";
 import { DataTable } from "@/shared/components/DataTable";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { getApiErrorMessage } from "@/shared/api/errors";
+import { Plus } from "lucide-react";
 
 export default function ProjectListPage() {
   const { t, i18n } = useTranslation("projects");
@@ -54,7 +55,7 @@ export default function ProjectListPage() {
       <PageHeader
         title={t("workflow.projects")}
         actions={
-          <Button onClick={() => navigate("/dashboard/projects/new")}>
+          <Button size={"md"} icon={<Plus className="h-4 w-4" />} onClick={() => navigate("/dashboard/projects/new")}>
             {t("workflow.newProject")}
           </Button>
         }

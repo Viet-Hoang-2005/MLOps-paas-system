@@ -50,6 +50,16 @@ export const projectsVi = {
       "Chưa có phiên bản Running. Hãy build, đăng ký và triển khai để xem snapshot.",
     noSource: "Phiên bản Running không có snapshot mã nguồn.",
     noReference: "Phiên bản Running không có CSV tham chiếu.",
+    noProjectOverview:
+      "Chưa có Model Project nào. Hãy tạo một Model Project mới để theo dõi tổng quan, trạng thái triển khai và chỉ số mô hình.",
+    noProjectDeployment:
+      "Chưa có Model Project nào để triển khai. Hãy tạo một Model Project mới để đóng gói và triển khai mô hình.",
+    noProjectMonitoring:
+      "Chưa có Model Project nào để giám sát. Hãy tạo một Model Project mới để theo dõi độ lệch dữ liệu và chất lượng mô hình.",
+    noProjectTraining:
+      "Chưa có Model Project nào để huấn luyện. Hãy tạo một Model Project mới để bắt đầu khởi chạy các phiên huấn luyện.",
+    noProjectEvolution:
+      "Chưa có Model Project nào. Hãy tạo một Model Project mới để quản lý lịch sử phiên bản và vòng đời tiến hóa của mô hình.",
     deploy: "Triển khai mô hình",
     build: "Build image",
     register: "Đăng ký mô hình",

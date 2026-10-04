@@ -3,7 +3,7 @@ import {
   getModelProject,
   getVersionSnapshot,
   getRunningSource,
-} from "@/features/projects/api/catalogApi";
+} from "@/shared/api/catalogApi";
 import { downloadText } from "@/shared/api/files";
 import { evolutionQueryKeys } from "@/features/evolution/queryKeys";
 
