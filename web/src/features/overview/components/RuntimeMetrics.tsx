@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useRuntimeMetrics } from "@/features/projects/hooks/useRuntimeMetrics";
+import { useRuntimeMetrics } from "@/features/overview/hooks/useRuntimeMetrics";
 import { Select } from "@/shared/components/Select";
 
 export function RuntimeMetrics({
@@ -10,7 +10,7 @@ export function RuntimeMetrics({
   projectId: string;
   deploymentId: string;
 }) {
-  const { t } = useTranslation("projects");
+  const { t } = useTranslation("overview");
   const [window, setWindow] = useState("1h");
   const metrics = useRuntimeMetrics(projectId, deploymentId, window);
   const realtime = metrics.data?.mode !== "history";

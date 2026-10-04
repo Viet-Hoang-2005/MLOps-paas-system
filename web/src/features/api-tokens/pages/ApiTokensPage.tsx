@@ -8,7 +8,7 @@ import { ApiModal } from "@/features/api-tokens/components/ApiModal";
 import { useApiTokens } from "@/features/api-tokens/hooks/useApiTokens";
 import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
 import type { APIKeyRecord } from "@/features/api-tokens/types";
-import { PageBody } from "@/shared/components/PageBody";
+import { PageHeader } from "@/shared/components/PageHeader";
 import { DataTable } from "@/shared/components/DataTable";
 import { Badge } from "@/shared/components/Badge";
 import { useTranslation } from "react-i18next";
@@ -137,17 +137,10 @@ export default function DeveloperSettingPage() {
   ];
 
   return (
-    <div className="flex w-full flex-1 flex-col space-y-6">
-      <PageBody>
-        <div className="flex flex-col gap-4 border-b border-border px-6 py-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-style-section-title font-bold text-color-foreground">
-              {t("apiKey.developerTitle")}
-            </h2>
-            <p className="mt-1 text-style-body text-color-muted-foreground">
-              {t("apiKey.developerDescription")}
-            </p>
-          </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={t("apiKey.developerTitle")}
+        actions={
           <Button
             id="btn-create-api-key"
             size="md"
@@ -156,19 +149,17 @@ export default function DeveloperSettingPage() {
           >
             {t("apiKey.createTitle")}
           </Button>
-        </div>
+        }
+      />
 
-        <div className="px-6 py-6">
-          <DataTable
-            columns={columns}
-            data={apiKeys}
-            getRowId={(key) => key.id}
-            loading={loading}
-            pageSize={10}
-            emptyMessage={t("apiKey.empty")}
-          />
-        </div>
-      </PageBody>
+      <DataTable
+        columns={columns}
+        data={apiKeys}
+        getRowId={(key) => key.id}
+        loading={loading}
+        pageSize={10}
+        emptyMessage={t("apiKey.empty")}
+      />
 
       {createdApiKey && (
         <ApiModal

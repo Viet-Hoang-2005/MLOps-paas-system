@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getRuntimeMetrics } from "@/features/projects/api/metricsApi";
-import { projectOverviewKeys } from "@/features/projects/hooks/useProjectOverview";
-import { createRealtimeSession } from "@/features/projects/realtimeMetrics";
+import { getRuntimeMetrics } from "@/features/overview/api/metricsApi";
+import { overviewQueryKeys } from "@/features/overview/queryKeys";
+import { createRealtimeSession } from "@/features/overview/realtimeMetrics";
 
 export function useRuntimeMetrics(
   projectId: string,
@@ -14,7 +14,7 @@ export function useRuntimeMetrics(
     [deploymentId],
   );
   return useQuery({
-    queryKey: projectOverviewKeys.metrics(projectId, deploymentId, window),
+    queryKey: overviewQueryKeys.metrics(projectId, deploymentId, window),
     queryFn: async ({ signal }) => {
       try {
         const data = await getRuntimeMetrics(projectId, window, signal);

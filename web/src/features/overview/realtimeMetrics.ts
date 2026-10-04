@@ -1,4 +1,4 @@
-import type { RuntimeMetricsResponse } from "@/features/projects/api/metricsApi";
+import type { RuntimeMetricsResponse } from "@/features/overview/api/metricsApi";
 
 export type MetricKey = "cpu" | "memory" | "requests";
 export interface RealtimePoint {

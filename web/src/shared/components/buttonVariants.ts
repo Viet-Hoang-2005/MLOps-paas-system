@@ -5,9 +5,9 @@ export const buttonVariants = cva(
   {
     variants: {
       size: {
-        sm: "h-8 gap-1.5 rounded-control px-3 text-style-caption-strong",
-        md: "h-10 gap-2 rounded-control px-4 text-style-control",
-        lg: "h-12 gap-2 rounded-control px-5 text-style-control",
+        sm: "h-8 gap-1.5 rounded-surface px-3 text-style-caption-strong",
+        md: "h-10 gap-2 rounded-surface px-4 text-style-control",
+        lg: "h-12 gap-2 rounded-surface px-5 text-style-control",
         icon: "h-10 w-10 rounded-surface p-0",
       },
       variant: {

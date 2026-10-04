@@ -11,7 +11,7 @@ import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPl
 import {
   useProjectOverview,
   useRunningVersion,
-} from "@/features/projects/hooks/useProjectOverview";
+} from "@/features/overview/hooks/useProjectOverview";
 import { SnapshotMetadata } from "@/features/evolution/components/SnapshotMetadata";
 import { Select } from "@/shared/components/Select";
 import {
@@ -125,11 +125,14 @@ export default function DriftMonitoringPage() {
       );
     }
     return (
-      <NoProjectPlaceholder
-        title={tCommon("navigation.driftMonitoring")}
-        description={tProjects("workflow.noProjectMonitoring")}
-        icon={<LineChart className="h-6 w-6" />}
-      />
+      <div className="flex w-full flex-1 flex-col space-y-6">
+        <PageHeader title={t("title")} />
+        <NoProjectPlaceholder
+          title={tCommon("navigation.driftMonitoring")}
+          description={tProjects("workflow.noProjectMonitoring")}
+          icon={<LineChart className="h-6 w-6" />}
+        />
+      </div>
     );
   }
 

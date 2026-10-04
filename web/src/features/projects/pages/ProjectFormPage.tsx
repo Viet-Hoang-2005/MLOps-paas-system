@@ -84,6 +84,7 @@ export default function ProjectFormPage() {
     <div className="space-y-6 pb-6">
       <PageHeader
         title={t(modelId ? "workflow.editPreview" : "workflow.newProject")}
+        back
       />
       <form
         className="space-y-6"

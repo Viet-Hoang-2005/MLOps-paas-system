@@ -1,5 +1,6 @@
 export const commonEn = {
   actions: {
+    back: "Back",
     close: "Close",
     cancel: "Cancel",
     save: "Save",

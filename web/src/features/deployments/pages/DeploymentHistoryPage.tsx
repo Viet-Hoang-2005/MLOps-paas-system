@@ -1,20 +1,20 @@
-import { Navigate, useParams, useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { Bot } from "lucide-react";
-import type { ColumnDef } from "@tanstack/react-table";
-import type { Build } from "@/features/projects/types";
+import { RouteFallback } from "@/app/router/RouteFallback";
 import {
   useBuildHistory,
   useDeployments,
 } from "@/features/deployments/hooks/useDeploymentFlow";
-import { PageHeader } from "@/shared/components/PageHeader";
-import { DataTable } from "@/shared/components/DataTable";
-import { Button } from "@/shared/components/Button";
-import { RouteFallback } from "@/app/router/RouteFallback";
-import { useProjectOverview } from "@/features/projects/hooks/useProjectOverview";
-import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
+import { useProjectOverview } from "@/features/overview/hooks/useProjectOverview";
 import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
+import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
+import type { Build } from "@/features/projects/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
+import { Button } from "@/shared/components/Button";
+import { DataTable } from "@/shared/components/DataTable";
+import { PageHeader } from "@/shared/components/PageHeader";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Box } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 
 export default function DeploymentHistoryPage() {
   const { modelId } = useParams();
@@ -98,11 +98,14 @@ export default function DeploymentHistoryPage() {
       );
     }
     return (
-      <NoProjectPlaceholder
-        title={tCommon("navigation.deployment")}
-        description={t("workflow.noProjectDeployment")}
-        icon={<Bot className="h-6 w-6" />}
-      />
+      <div className="flex w-full flex-1 flex-col space-y-6">
+        <PageHeader title={t("workflow.deployment")} />
+        <NoProjectPlaceholder
+          title={tCommon("navigation.deployment")}
+          description={t("workflow.noProjectDeployment")}
+          icon={<Box className="h-6 w-6" />}
+        />
+      </div>
     );
   }
   return (

@@ -147,7 +147,7 @@ const extractPredictionError = (
 };
 
 export default function ModelTestingPage() {
-  const { t } = useTranslation("projects");
+  const { t } = useTranslation("overview");
   const { selectedModel } = useModelSelection();
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [csvText, setCsvText] = useState("");

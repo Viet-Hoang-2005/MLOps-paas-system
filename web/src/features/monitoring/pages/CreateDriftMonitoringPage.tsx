@@ -11,7 +11,7 @@ import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
 import {
   useProjectOverview,
   useRunningVersion,
-} from "@/features/projects/hooks/useProjectOverview";
+} from "@/features/overview/hooks/useProjectOverview";
 import {
   createDriftMonitoringJob,
   getDriftMonitor,
@@ -76,6 +76,7 @@ export default function CreateDriftMonitoringPage() {
     <div className="space-y-6">
       <PageHeader
         title={t(monitorId ? "createPage.editTitle" : "createPage.createTitle")}
+        back
       />
       <form
         className="space-y-6 rounded-surface border border-border bg-surface p-6"

@@ -21,8 +21,8 @@ export function Placeholder({
   const { selectedModel } = useModelSelection();
 
   return (
-    <section className="flex-1 rounded-surface border border-dashed border-border bg-surface px-8 py-10">
-      <div className="flex h-full flex-col items-center justify-center text-center">
+    <section className="flex flex-1 flex-col rounded-surface border border-dashed border-border bg-surface px-8 py-10">
+      <div className="flex flex-1 flex-col items-center justify-center text-center">
         <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-surface bg-muted text-color-foreground">
           {icon}
         </div>

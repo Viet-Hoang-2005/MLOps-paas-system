@@ -1,13 +1,18 @@
 import { ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { PageTabs } from "./PageTabs";
+import { Button } from "./Button";
 import React from "react";
 
 export interface PageHeaderProps {
   title: string;
+  back?: boolean;
+  showBack?: boolean;
+  onBack?: () => void;
   backLink?: {
-    to: string;
-    label: string;
+    to?: string;
+    label?: string;
   };
   tabs?: React.ComponentProps<typeof PageTabs>["tabs"];
   children?: React.ReactNode;
@@ -16,24 +21,42 @@ export interface PageHeaderProps {
 
 export function PageHeader({
   title,
+  back = false,
+  showBack,
+  onBack,
   backLink,
   tabs,
   children,
   actions,
 }: PageHeaderProps) {
+  const navigate = useNavigate();
+  const { t } = useTranslation("common");
+  const hasBack = back || (showBack ?? false) || Boolean(backLink);
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      navigate(-1);
+    }
+  };
+
   return (
     <header
       className={`flex min-h-10 flex-col gap-4 border-b border-border md:flex-row md:items-end md:justify-between ${!tabs ? "pb-2" : ""}`}
     >
-      <div className={tabs ? "mb-2" : ""}>
-        {backLink && (
-          <Link
-            to={backLink.to}
-            className="inline-flex min-h-9 items-center gap-2 rounded-control text-style-body-strong text-color-muted-foreground hover:text-color-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {backLink.label}
-          </Link>
+      <div className={`flex items-center gap-2 ${tabs ? "mb-2" : ""}`}>
+        {hasBack && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={handleBack}
+            className="h-8 w-8 text-color-muted-foreground hover:text-color-foreground"
+            aria-label={t("actions.back")}
+            title={t("actions.back")}
+            icon={<ArrowLeft className="h-5 w-5" />}
+          />
         )}
         <h1 className="text-style-page-title text-color-foreground">{title}</h1>
       </div>

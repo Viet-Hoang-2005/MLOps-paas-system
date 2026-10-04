@@ -16,6 +16,7 @@ const namespaceFiles = new Map([
     "notifications",
     path.join(root, "features", "notifications", "i18n", "en.ts"),
   ],
+  ["overview", path.join(root, "features", "overview", "i18n", "en.ts")],
 ]);
 const displayProps = new Set([
   "title",

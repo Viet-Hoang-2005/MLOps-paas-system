@@ -521,7 +521,7 @@ export default function CreateTrainingJobPage() {
           if (blocker.state === "blocked") blocker.reset();
         }}
       />
-      <PageHeader title={t("createFlow.title")} />
+      <PageHeader title={t("createFlow.title")} back />
       <LineSteps
         steps={steps}
         currentStep={currentStep}

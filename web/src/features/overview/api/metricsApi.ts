@@ -1,8 +1,10 @@
 import { apiClient } from "@/shared/api/client";
 import { controlPlaneURL } from "@/shared/api/config";
+
 export interface MetricSeries {
   values: Array<[number, string]>;
 }
+
 export interface RuntimeMetricsResponse {
   mode: "realtime" | "history";
   status: "available" | "unavailable" | "no_data";
@@ -15,6 +17,7 @@ export interface RuntimeMetricsResponse {
     request_counter: { count: number; generation: string } | null;
   } | null;
 }
+
 export async function getRuntimeMetrics(
   projectId: string,
   window: string,

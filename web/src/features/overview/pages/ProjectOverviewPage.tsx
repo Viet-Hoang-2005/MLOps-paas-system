@@ -16,7 +16,7 @@ import {
   useProjectOverview,
   useSnapshotText,
   useRunningSource,
-} from "@/features/projects/hooks/useProjectOverview";
+} from "@/features/overview/hooks/useProjectOverview";
 import {
   updateModelProject,
   deleteModelProject,
@@ -29,17 +29,18 @@ import { Select } from "@/shared/components/Select";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { CSVEditor } from "@/shared/components/CSVEditor";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { RuntimeMetrics } from "@/features/projects/components/RuntimeMetrics";
+import { RuntimeMetrics } from "@/features/overview/components/RuntimeMetrics";
+import { PageHeader } from "@/shared/components/PageHeader";
 import { LazyCodeEditor } from "@/shared/components/LazyCodeEditor";
 import { useTheme } from "@/app/theme/useTheme";
 
 const ModelTestingPage = lazy(
-  () => import("@/features/projects/pages/ModelTestingPage"),
+  () => import("@/features/overview/pages/ModelTestingPage"),
 );
 
 export default function ProjectOverviewPage() {
   const { modelId } = useParams();
-  const { t } = useTranslation("projects");
+  const { t } = useTranslation("overview");
   const { t: tCommon } = useTranslation("common");
   const { selectedModel, loading: isModelLoading } = useModelSelection();
   const { resolvedTheme } = useTheme();
@@ -103,11 +104,14 @@ export default function ProjectOverviewPage() {
       );
     }
     return (
-      <NoProjectPlaceholder
-        title={tCommon("navigation.home")}
-        description={t("workflow.noProjectOverview")}
-        icon={<Home className="h-6 w-6" />}
-      />
+      <div className="flex w-full flex-1 flex-col space-y-6">
+        <PageHeader title={tCommon("navigation.home")} />
+        <NoProjectPlaceholder
+          title={tCommon("navigation.home")}
+          description={t("workflow.noProjectOverview")}
+          icon={<Home className="h-6 w-6" />}
+        />
+      </div>
     );
   }
   if (project.isError)

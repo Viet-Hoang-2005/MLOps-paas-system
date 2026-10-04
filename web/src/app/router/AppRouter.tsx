@@ -44,7 +44,7 @@ const ProjectFormPage = lazy(
   () => import("@/features/projects/pages/ProjectFormPage"),
 );
 const ProjectOverviewPage = lazy(
-  () => import("@/features/projects/pages/ProjectOverviewPage"),
+  () => import("@/features/overview/pages/ProjectOverviewPage"),
 );
 const DeploymentHistoryPage = lazy(
   () => import("@/features/deployments/pages/DeploymentHistoryPage"),

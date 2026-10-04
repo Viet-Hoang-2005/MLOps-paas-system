@@ -113,7 +113,7 @@ export default function CreateDeploymentPage() {
     deployment.error;
   return (
     <div className="space-y-6">
-      <PageHeader title={t("workflow.createDeployment")} />
+      <PageHeader title={t("workflow.createDeployment")} back />
       <div className="flex gap-2">
         <Button
           variant={deploying ? "secondary" : "primary"}

@@ -1,9 +1,21 @@
+import { AvatarCropModal } from "@/features/settings/components/AvatarCropModal";
+import { AvatarModal } from "@/features/settings/components/AvatarModal";
+import { useProfileSettings } from "@/features/settings/hooks/useProfileSettings";
+import type { UserProfile } from "@/features/settings/types";
+import BaseModal from "@/shared/components/BaseModal";
+import { Button } from "@/shared/components/Button";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { Input, InputPassword } from "@/shared/components/Input";
+import { OTPInput } from "@/shared/components/OTPInput";
+import { PageHeader } from "@/shared/components/PageHeader";
+import { toast } from "@/shared/components/toastStore";
 import {
   BriefcaseBusiness,
   Building2,
   CalendarDays,
   Camera,
   ChevronDown,
+  Edit3,
   FileText,
   Fingerprint,
   Globe2,
@@ -13,21 +25,10 @@ import {
   Tags,
   Trash2,
   UserRound,
-  Edit3,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ReactNode } from "react";
-import { AvatarCropModal } from "@/features/settings/components/AvatarCropModal";
-import { AvatarModal } from "@/features/settings/components/AvatarModal";
-import { Button } from "@/shared/components/Button";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { Input, InputPassword } from "@/shared/components/Input";
-import { OTPInput } from "@/shared/components/OTPInput";
-import { useProfileSettings } from "@/features/settings/hooks/useProfileSettings";
-import { toast } from "@/shared/components/toastStore";
-import type { UserProfile } from "@/features/settings/types";
-import BaseModal from "@/shared/components/BaseModal";
 
 const formatDate = (value: string | undefined, fallback: string) => {
   if (!value) return fallback;
@@ -166,10 +167,11 @@ export default function ProfileSettingPage() {
   };
 
   return (
-    <div className="w-full space-y-6">
-      <section className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="flex flex-col">
-          <div className="flex-1 rounded-surface border border-border bg-surface">
+    <div className="flex w-full flex-1 flex-col space-y-6">
+      <PageHeader title={t("profile")} />
+      <section className="flex flex-1 flex-col gap-6 lg:grid lg:grid-cols-[360px_minmax(0,1fr)]">
+        <aside className="flex flex-col h-full">
+          <div className="flex flex-1 flex-col rounded-surface border border-border bg-surface">
             <div className="flex flex-col items-center text-center p-6">
               <button
                 type="button"
@@ -249,194 +251,198 @@ export default function ProfileSettingPage() {
           </div>
         </aside>
 
-        <div className="rounded-surface border border-border bg-surface p-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-style-heading text-color-foreground">
-                {t("profileInformation")}
-              </h3>
-              {editingProfile ? (
-                <div className="flex gap-2">
+        <div className="flex flex-1 flex-col rounded-surface border border-border bg-surface p-6 h-full">
+          <div className="flex flex-1 flex-col justify-between space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-style-heading text-color-foreground">
+                  {t("profileInformation")}
+                </h3>
+                {editingProfile ? (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      onClick={handleCancelEdit}
+                    >
+                      {t("apiKey.cancel")}
+                    </Button>
+                    <Button
+                      id="btn-save-profile"
+                      size="md"
+                      loading={saving}
+                      disabled={loading || !profileChanged}
+                      onClick={handleSave}
+                    >
+                      {t("apiKey.save")}
+                    </Button>
+                  </div>
+                ) : (
                   <Button
+                    id="btn-edit-profile"
                     variant="secondary"
                     size="md"
-                    onClick={handleCancelEdit}
+                    onClick={() => setEditingProfile(true)}
+                    disabled={loading}
                   >
-                    {t("apiKey.cancel")}
+                    <Edit3 className="h-4 w-4" />
+                    {t("editProfile")}
                   </Button>
-                  <Button
-                    id="btn-save-profile"
-                    size="md"
-                    loading={saving}
-                    disabled={loading || !profileChanged}
-                    onClick={handleSave}
-                  >
-                    {t("apiKey.save")}
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  id="btn-edit-profile"
-                  variant="secondary"
-                  size="md"
-                  onClick={() => setEditingProfile(true)}
-                  disabled={loading}
-                >
-                  <Edit3 className="h-4 w-4" />
-                  {t("editProfile")}
-                </Button>
-              )}
-            </div>
+                )}
+              </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                id="profile-full-name"
-                label={t("fullName")}
-                icon={
-                  <UserRound className="h-4 w-4 text-color-muted-foreground" />
-                }
-                placeholder={t("profilePage.fullNamePlaceholder")}
-                value={formValues.fullName}
-                disabled={loading}
-                readOnly={!editingProfile}
-                tabIndex={!editingProfile ? -1 : undefined}
-                className={!editingProfile ? readOnlyFieldClass : ""}
-                onChange={(event) =>
-                  updateProfileField("fullName", event.target.value)
-                }
-              />
-              {editingProfile ? (
-                <label
-                  htmlFor="profile-pronouns"
-                  className="flex flex-col gap-2 text-style-body-strong text-color-foreground"
-                >
-                  {t("pronouns")}
-                  <div className="relative">
-                    <Tags className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-color-muted-foreground" />
-                    <select
-                      id="profile-pronouns"
-                      value={formValues.pronouns}
-                      disabled={loading}
-                      onChange={(event) =>
-                        updateProfileField("pronouns", event.target.value)
-                      }
-                      className="h-14 w-full appearance-none rounded-control border border-border bg-surface pl-10 pr-10 text-style-body font-normal text-color-foreground outline-none transition-colors duration-200 hover:border-primary focus:border-primary disabled:bg-muted disabled:text-color-muted-foreground"
-                    >
-                      <option value="">
-                        {t("profilePage.pronounUnspecified")}
-                      </option>
-                      <option value="he/him">
-                        {t("profilePage.pronounHe")}
-                      </option>
-                      <option value="she/her">
-                        {t("profilePage.pronounShe")}
-                      </option>
-                      <option value="they/them">
-                        {t("profilePage.pronounThey")}
-                      </option>
-                      <option value="other">
-                        {t("profilePage.pronounOther")}
-                      </option>
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-color-muted-foreground" />
-                  </div>
-                </label>
-              ) : (
+              <div className="grid gap-4 md:grid-cols-2">
                 <Input
-                  id="profile-pronouns"
-                  label={t("pronouns")}
+                  id="profile-full-name"
+                  label={t("fullName")}
                   icon={
-                    <Tags className="h-4 w-4 text-color-muted-foreground" />
+                    <UserRound className="h-4 w-4 text-color-muted-foreground" />
                   }
-                  value={
-                    formValues.pronouns || t("profilePage.pronounUnspecified")
-                  }
-                  disabled={loading}
-                  readOnly
-                  tabIndex={-1}
-                  className={readOnlyFieldClass}
-                />
-              )}
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                id="profile-company"
-                label={t("company")}
-                icon={
-                  <Building2 className="h-4 w-4 text-color-muted-foreground" />
-                }
-                placeholder={t("profilePage.companyPlaceholder")}
-                value={formValues.company}
-                disabled={loading}
-                readOnly={!editingProfile}
-                tabIndex={!editingProfile ? -1 : undefined}
-                className={!editingProfile ? readOnlyFieldClass : ""}
-                onChange={(event) =>
-                  updateProfileField("company", event.target.value)
-                }
-              />
-              <Input
-                id="profile-field-of-work"
-                label={t("fieldOfWork")}
-                icon={
-                  <BriefcaseBusiness className="h-4 w-4 text-color-muted-foreground" />
-                }
-                placeholder={t("profilePage.fieldPlaceholder")}
-                value={formValues.fieldOfWork}
-                disabled={loading}
-                readOnly={!editingProfile}
-                tabIndex={!editingProfile ? -1 : undefined}
-                className={!editingProfile ? readOnlyFieldClass : ""}
-                onChange={(event) =>
-                  updateProfileField("fieldOfWork", event.target.value)
-                }
-              />
-            </div>
-
-            <Input
-              id="profile-country"
-              label={t("country")}
-              icon={<Globe2 className="h-4 w-4 text-color-muted-foreground" />}
-              placeholder={t("profilePage.countryPlaceholder")}
-              value={formValues.country}
-              disabled={loading}
-              readOnly={!editingProfile}
-              tabIndex={!editingProfile ? -1 : undefined}
-              className={!editingProfile ? readOnlyFieldClass : ""}
-              onChange={(event) =>
-                updateProfileField("country", event.target.value)
-              }
-              onKeyDown={(event) => event.key === "Enter" && handleSave()}
-            />
-
-            <label
-              htmlFor="profile-description"
-              className="flex flex-col gap-2 text-style-body-strong text-color-foreground"
-            >
-              {t("description")}
-              <div className="relative">
-                <FileText className="pointer-events-none absolute left-3 top-4 h-4 w-4 text-color-muted-foreground" />
-                <textarea
-                  id="profile-description"
-                  className={`text-style-body text-color-foreground placeholder:text-color-muted-foreground font-normal placeholder:font-normal min-h-24 w-full resize-y rounded-control border border-border bg-surface py-3 pl-10 pr-4 outline-none transition-colors duration-200 disabled:bg-muted disabled:text-color-muted-foreground ${
-                    editingProfile
-                      ? "hover:border-primary focus:border-primary"
-                      : "cursor-default hover:border-border focus:border-border"
-                  }`}
-                  placeholder={t("profilePage.descriptionPlaceholder")}
-                  value={formValues.description}
+                  placeholder={t("profilePage.fullNamePlaceholder")}
+                  value={formValues.fullName}
                   disabled={loading}
                   readOnly={!editingProfile}
                   tabIndex={!editingProfile ? -1 : undefined}
+                  className={!editingProfile ? readOnlyFieldClass : ""}
                   onChange={(event) =>
-                    updateProfileField("description", event.target.value)
+                    updateProfileField("fullName", event.target.value)
+                  }
+                />
+                {editingProfile ? (
+                  <label
+                    htmlFor="profile-pronouns"
+                    className="flex flex-col gap-2 text-style-body-strong text-color-foreground"
+                  >
+                    {t("pronouns")}
+                    <div className="relative">
+                      <Tags className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-color-muted-foreground" />
+                      <select
+                        id="profile-pronouns"
+                        value={formValues.pronouns}
+                        disabled={loading}
+                        onChange={(event) =>
+                          updateProfileField("pronouns", event.target.value)
+                        }
+                        className="h-14 w-full appearance-none rounded-control border border-border bg-surface pl-10 pr-10 text-style-body font-normal text-color-foreground outline-none transition-colors duration-200 hover:border-primary focus:border-primary disabled:bg-muted disabled:text-color-muted-foreground"
+                      >
+                        <option value="">
+                          {t("profilePage.pronounUnspecified")}
+                        </option>
+                        <option value="he/him">
+                          {t("profilePage.pronounHe")}
+                        </option>
+                        <option value="she/her">
+                          {t("profilePage.pronounShe")}
+                        </option>
+                        <option value="they/them">
+                          {t("profilePage.pronounThey")}
+                        </option>
+                        <option value="other">
+                          {t("profilePage.pronounOther")}
+                        </option>
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-color-muted-foreground" />
+                    </div>
+                  </label>
+                ) : (
+                  <Input
+                    id="profile-pronouns"
+                    label={t("pronouns")}
+                    icon={
+                      <Tags className="h-4 w-4 text-color-muted-foreground" />
+                    }
+                    value={
+                      formValues.pronouns || t("profilePage.pronounUnspecified")
+                    }
+                    disabled={loading}
+                    readOnly
+                    tabIndex={-1}
+                    className={readOnlyFieldClass}
+                  />
+                )}
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  id="profile-company"
+                  label={t("company")}
+                  icon={
+                    <Building2 className="h-4 w-4 text-color-muted-foreground" />
+                  }
+                  placeholder={t("profilePage.companyPlaceholder")}
+                  value={formValues.company}
+                  disabled={loading}
+                  readOnly={!editingProfile}
+                  tabIndex={!editingProfile ? -1 : undefined}
+                  className={!editingProfile ? readOnlyFieldClass : ""}
+                  onChange={(event) =>
+                    updateProfileField("company", event.target.value)
+                  }
+                />
+                <Input
+                  id="profile-field-of-work"
+                  label={t("fieldOfWork")}
+                  icon={
+                    <BriefcaseBusiness className="h-4 w-4 text-color-muted-foreground" />
+                  }
+                  placeholder={t("profilePage.fieldPlaceholder")}
+                  value={formValues.fieldOfWork}
+                  disabled={loading}
+                  readOnly={!editingProfile}
+                  tabIndex={!editingProfile ? -1 : undefined}
+                  className={!editingProfile ? readOnlyFieldClass : ""}
+                  onChange={(event) =>
+                    updateProfileField("fieldOfWork", event.target.value)
                   }
                 />
               </div>
-            </label>
 
-            <div className="flex justify-end space-x-3 pt-1">
+              <Input
+                id="profile-country"
+                label={t("country")}
+                icon={
+                  <Globe2 className="h-4 w-4 text-color-muted-foreground" />
+                }
+                placeholder={t("profilePage.countryPlaceholder")}
+                value={formValues.country}
+                disabled={loading}
+                readOnly={!editingProfile}
+                tabIndex={!editingProfile ? -1 : undefined}
+                className={!editingProfile ? readOnlyFieldClass : ""}
+                onChange={(event) =>
+                  updateProfileField("country", event.target.value)
+                }
+                onKeyDown={(event) => event.key === "Enter" && handleSave()}
+              />
+
+              <label
+                htmlFor="profile-description"
+                className="flex flex-col gap-2 text-style-body-strong text-color-foreground"
+              >
+                {t("description")}
+                <div className="relative">
+                  <FileText className="pointer-events-none absolute left-3 top-4 h-4 w-4 text-color-muted-foreground" />
+                  <textarea
+                    id="profile-description"
+                    className={`text-style-body text-color-foreground placeholder:text-color-muted-foreground font-normal placeholder:font-normal min-h-24 w-full resize-y rounded-control border border-border bg-surface py-3 pl-10 pr-4 outline-none transition-colors duration-200 disabled:bg-muted disabled:text-color-muted-foreground ${
+                      editingProfile
+                        ? "hover:border-primary focus:border-primary"
+                        : "cursor-default hover:border-border focus:border-border"
+                    }`}
+                    placeholder={t("profilePage.descriptionPlaceholder")}
+                    value={formValues.description}
+                    disabled={loading}
+                    readOnly={!editingProfile}
+                    tabIndex={!editingProfile ? -1 : undefined}
+                    onChange={(event) =>
+                      updateProfileField("description", event.target.value)
+                    }
+                  />
+                </div>
+              </label>
+            </div>
+
+            <div className="mt-auto flex justify-end space-x-3 pt-4">
               <Button
                 id="btn-change-password"
                 variant="secondary"

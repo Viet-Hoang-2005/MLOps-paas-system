@@ -4,7 +4,7 @@ import ts from "typescript";
 
 const compiled = ts.transpileModule(
   readFileSync(
-    new URL("../src/features/projects/realtimeMetrics.ts", import.meta.url),
+    new URL("../src/features/overview/realtimeMetrics.ts", import.meta.url),
     "utf8",
   ),
   {

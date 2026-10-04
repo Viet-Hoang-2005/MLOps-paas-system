@@ -59,13 +59,7 @@ export default function DriftReportPage() {
 
   return (
     <div className="flex w-full flex-1 flex-col min-h-0 space-y-6">
-      <PageHeader
-        title={t("reportPage.title")}
-        backLink={{
-          to: `/dashboard/projects/${modelId}/monitoring`,
-          label: t("reportPage.back"),
-        }}
-      >
+      <PageHeader title={t("reportPage.title")} back>
         {reportUrl && (
           <Button
             size="md"

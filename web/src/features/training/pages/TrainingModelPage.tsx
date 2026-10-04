@@ -322,11 +322,14 @@ export default function TrainingModelPage() {
   if (!selectedModel) {
     if (isModelLoading) return <RouteFallback />;
     return (
-      <NoProjectPlaceholder
-        title={tCommon("navigation.modelTraining")}
-        description={tProjects("workflow.noProjectTraining")}
-        icon={<BrainCircuit className="h-6 w-6" />}
-      />
+      <section className="flex w-full flex-1 flex-col space-y-6">
+        <PageHeader title={t("title")} />
+        <NoProjectPlaceholder
+          title={tCommon("navigation.modelTraining")}
+          description={tProjects("workflow.noProjectTraining")}
+          icon={<BrainCircuit className="h-6 w-6" />}
+        />
+      </section>
     );
   }
 

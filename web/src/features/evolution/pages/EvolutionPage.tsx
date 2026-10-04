@@ -16,7 +16,7 @@ import {
   deployBuild,
 } from "@/features/deployments/api/deployApi";
 import { useBuildHistory } from "@/features/deployments/hooks/useDeploymentFlow";
-import { useProjectOverview } from "@/features/projects/hooks/useProjectOverview";
+import { useProjectOverview } from "@/features/overview/hooks/useProjectOverview";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Button } from "@/shared/components/Button";
 import { Badge } from "@/shared/components/Badge";
@@ -66,11 +66,14 @@ export default function EvolutionPage() {
       );
     }
     return (
-      <NoProjectPlaceholder
-        title={tCommon("navigation.modelEvolution")}
-        description={t("workflow.noProjectEvolution")}
-        icon={<GitBranch className="h-6 w-6" />}
-      />
+      <div className="flex w-full flex-1 flex-col space-y-6">
+        <PageHeader title={t("workflow.evolution")} />
+        <NoProjectPlaceholder
+          title={tCommon("navigation.modelEvolution")}
+          description={t("workflow.noProjectEvolution")}
+          icon={<GitBranch className="h-6 w-6" />}
+        />
+      </div>
     );
   }
   return (

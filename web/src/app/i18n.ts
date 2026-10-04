@@ -13,6 +13,8 @@ import { commonVi } from "@/shared/i18n/vi";
 import { projectsVi } from "@/features/projects/i18n/vi";
 import { monitoringVi } from "@/features/monitoring/i18n/vi";
 import { evolutionVi } from "@/features/evolution/i18n/vi";
+import { overviewEn } from "@/features/overview/i18n/en";
+import { overviewVi } from "@/features/overview/i18n/vi";
 
 const resources = {
   vi: {
@@ -20,6 +22,7 @@ const resources = {
     projects: projectsVi,
     monitoring: monitoringVi,
     evolution: evolutionVi,
+    overview: overviewVi,
   },
   en: {
     common: commonEn,
@@ -31,6 +34,7 @@ const resources = {
     monitoring: driftEn,
     settings: settingsEn,
     notifications: notificationsEn,
+    overview: overviewEn,
   },
 } as const;
 

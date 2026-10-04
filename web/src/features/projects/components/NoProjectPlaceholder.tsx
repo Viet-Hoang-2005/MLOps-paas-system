@@ -21,22 +21,20 @@ export function NoProjectPlaceholder({
   const { t } = useTranslation("projects");
 
   return (
-    <div className="flex flex-1 flex-col py-6">
-      <Placeholder
-        title={title}
-        description={description}
-        icon={icon}
-        showModelName={true}
-        action={
-          <Button
-            size="md"
-            icon={<Plus className="h-4 w-4" />}
-            onClick={() => navigate(routes.newProject)}
-          >
-            {t("workflow.newProject")}
-          </Button>
-        }
-      />
-    </div>
+    <Placeholder
+      title={title}
+      description={description}
+      icon={icon}
+      showModelName={true}
+      action={
+        <Button
+          size="md"
+          icon={<Plus className="h-4 w-4" />}
+          onClick={() => navigate(routes.newProject)}
+        >
+          {t("workflow.newProject")}
+        </Button>
+      }
+    />
   );
 }

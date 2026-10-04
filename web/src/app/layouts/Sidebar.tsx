@@ -1,24 +1,25 @@
-import { useState } from "react";
-import {
-  Bell,
-  Bot,
-  BrainCircuit,
-  ChevronDown,
-  GitBranch,
-  Home,
-  LineChart,
-  LogOut,
-  Menu,
-  Settings,
-  KeyRound,
-  X,
-} from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { NavLink, useLocation } from "react-router-dom";
 import { routes } from "@/app/router/paths";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { cn } from "@/shared/lib/cn";
+import {
+  Bell,
+  Bot,
+  Box,
+  BrainCircuit,
+  ChevronDown,
+  GitBranch,
+  Home,
+  KeyRound,
+  LineChart,
+  LogOut,
+  Menu,
+  Settings,
+  X,
+} from "lucide-react";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { NavLink, useLocation } from "react-router-dom";
 
 interface DashboardSidebarProps {
   collapsed: boolean;
@@ -29,22 +30,10 @@ interface DashboardSidebarProps {
 
 const sectionItems = [
   { key: "home", section: "overview", icon: Home },
-  { key: "deployment", section: "deployment", icon: Bot },
-  {
-    key: "driftMonitoring",
-    section: "monitoring",
-    icon: LineChart,
-  },
-  {
-    key: "modelTraining",
-    section: "training",
-    icon: BrainCircuit,
-  },
-  {
-    key: "modelEvolution",
-    section: "evolution",
-    icon: GitBranch,
-  },
+  { key: "deployment", section: "deployment", icon: Box },
+  { key: "driftMonitoring", section: "monitoring", icon: LineChart },
+  { key: "modelTraining", section: "training", icon: BrainCircuit },
+  { key: "modelEvolution", section: "evolution", icon: GitBranch },
 ] as const;
 
 const utilityItems = [

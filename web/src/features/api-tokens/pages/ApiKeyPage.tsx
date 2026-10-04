@@ -107,10 +107,7 @@ export default function ApiKeyPage() {
     <div className="flex w-full flex-col space-y-6">
       <PageHeader
         title={keyId ? t("apiKey.editTitle") : t("apiKey.createTitle")}
-        backLink={{
-          to: "/dashboard/api-tokens",
-          label: t("apiKey.back"),
-        }}
+        back
       />
 
       <PageBody className="p-6 space-y-6">
