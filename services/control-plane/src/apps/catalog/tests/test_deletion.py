@@ -140,8 +140,8 @@ def test_local_cleanup_uses_docker_sdk_without_a_model_cleaner_container():
 
 @pytest.mark.django_db
 def test_failed_finalization_can_retry_without_affecting_other_project(monkeypatch):
-    from apps.catalog.tasks import execute_project_deletion
     from apps.catalog.services.deletion import request_project_deletion
+    from apps.catalog.tasks import execute_project_deletion
 
     owner = get_user_model().objects.create_user("retry-cleanup@example.test", "test-password")
     project = ModelProject.objects.create(owner=owner, name="Remove", deletion_state="deleting", is_active=False)

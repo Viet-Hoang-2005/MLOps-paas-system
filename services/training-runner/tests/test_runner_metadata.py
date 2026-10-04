@@ -49,9 +49,7 @@ def test_json_reading_and_metric_splitting(tmp_path):
     array = tmp_path / "array.json"
     array.write_text("[]", encoding="utf-8")
     assert runner.read_json_object(array, "params", warnings) == {}
-    metrics = runner.split_numeric_metrics(
-        {"loss": 0.2, "enabled": True, "note": "x"}, warnings, "file"
-    )
+    metrics = runner.split_numeric_metrics({"loss": 0.2, "enabled": True, "note": "x"}, warnings, "file")
     assert metrics == {"loss": 0.2}
     assert any(item["code"] == "non_numeric_metric_ignored" for item in warnings)
 
@@ -113,18 +111,12 @@ def test_writes_mlops_bundle_and_manifest(runner_workspace):
     mlops_dir = model_dir / "_mlops"
     metrics = json.loads((mlops_dir / "metrics.json").read_text(encoding="utf-8"))
     assert metrics == {"accuracy": 0.99, "loss": 0.05, "precision": 0.8}
-    insights = json.loads(
-        (mlops_dir / "model_insights.json").read_text(encoding="utf-8")
-    )
+    insights = json.loads((mlops_dir / "model_insights.json").read_text(encoding="utf-8"))
     assert insights["items"][0]["name"] == "packet_rate"
-    manifest = json.loads(
-        (mlops_dir / "artifact_manifest.json").read_text(encoding="utf-8")
-    )
+    manifest = json.loads((mlops_dir / "artifact_manifest.json").read_text(encoding="utf-8"))
     model_entry = next(item for item in manifest if item["path"] == "model.pkl")
     assert model_entry["kind"] == "model"
     assert len(model_entry["sha256"]) == 64
-    summary = json.loads(
-        (mlops_dir / "training_summary.json").read_text(encoding="utf-8")
-    )
+    summary = json.loads((mlops_dir / "training_summary.json").read_text(encoding="utf-8"))
     assert summary["status"] == "succeeded"
     assert summary["warnings_count"] >= 2

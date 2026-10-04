@@ -6,9 +6,9 @@ from django.test import override_settings
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject, WorkspaceAsset
+from apps.deployment.models import Build, Deployment
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.registry.models import ModelVersion
-from apps.deployment.models import Build, Deployment
 from infrastructure.execution.argo_backends import ArgoDriftBackend
 
 

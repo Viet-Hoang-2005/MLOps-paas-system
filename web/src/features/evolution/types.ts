@@ -1,14 +1,7 @@
 export type RegistryStage =
-  | "none"
-  | "candidate"
-  | "staging"
-  | "production"
-  | "archived";
+  "none" | "candidate" | "staging" | "production" | "archived";
 export type RegistryDeployabilityStatus =
-  | "unknown"
-  | "deployable"
-  | "track_only"
-  | "invalid";
+  "unknown" | "deployable" | "track_only" | "invalid";
 
 export interface RegistryModelInsightItem {
   name: string;

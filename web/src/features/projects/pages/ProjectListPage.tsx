@@ -55,7 +55,11 @@ export default function ProjectListPage() {
       <PageHeader
         title={t("workflow.projects")}
         actions={
-          <Button size={"md"} icon={<Plus className="h-4 w-4" />} onClick={() => navigate("/dashboard/projects/new")}>
+          <Button
+            size={"md"}
+            icon={<Plus className="h-4 w-4" />}
+            onClick={() => navigate("/dashboard/projects/new")}
+          >
             {t("workflow.newProject")}
           </Button>
         }

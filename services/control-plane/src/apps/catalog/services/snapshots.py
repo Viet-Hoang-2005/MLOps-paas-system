@@ -1,6 +1,8 @@
 from io import BytesIO
-from zipfile import ZipFile, BadZipFile
+from zipfile import BadZipFile, ZipFile
+
 from rest_framework.exceptions import ValidationError
+
 from infrastructure.storage import S3Storage
 
 

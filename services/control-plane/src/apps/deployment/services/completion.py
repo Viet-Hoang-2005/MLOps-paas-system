@@ -1,8 +1,9 @@
+from datetime import timedelta
+
 from django.db import transaction
 from django.utils import timezone
-from datetime import timedelta
-from apps.catalog.models import ModelProject
 
+from apps.catalog.models import ModelProject
 from apps.deployment.models import Build
 
 

@@ -9,8 +9,8 @@ from .endpoints import (
     TrainingJobListCreateEndpoint,
     TrainingJobLogsEndpoint,
     TrainingJobOutputsEndpoint,
-    TrainingJobSubmitEndpoint,
     TrainingJobRetryEndpoint,
+    TrainingJobSubmitEndpoint,
     TrainingRuntimeCapabilitiesEndpoint,
 )
 

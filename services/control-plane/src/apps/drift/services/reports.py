@@ -2,7 +2,6 @@ from django.conf import settings
 
 from infrastructure.storage.paths import drift_run_prefix
 
-
 REPORT_ARTIFACT_FIELDS = {
     "report_html_uri": ("html_s3_uri", "report.html"),
     "report_json_uri": ("report_json_s3_uri", "report.json"),
@@ -31,8 +30,7 @@ def report_artifact_uris(run, summary):
     return {
         field: artifacts[artifact_key]
         for field, (artifact_key, _filename) in REPORT_ARTIFACT_FIELDS.items()
-        if isinstance(artifacts.get(artifact_key), str)
-        and artifacts[artifact_key] == expected_uris[field]
+        if isinstance(artifacts.get(artifact_key), str) and artifacts[artifact_key] == expected_uris[field]
     }
 
 

@@ -84,8 +84,8 @@ def runtime_log_page(request, resource, kind, fallback):
     if end < start:
         return result
     query = (
-        f'{{namespace=~{json.dumps(NAMESPACES[kind])},task_kind={json.dumps(kind)}}}'
-        f' | task_id={json.dumps(state["task"])}'
+        f"{{namespace=~{json.dumps(NAMESPACES[kind])},task_kind={json.dumps(kind)}}}"
+        f" | task_id={json.dumps(state['task'])}"
     )
     try:
         response = requests.get(

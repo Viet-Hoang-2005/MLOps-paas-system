@@ -1,7 +1,7 @@
 """Revision-checked drafts and immutable build inputs."""
 
-import uuid
 import json
+import uuid
 from pathlib import Path
 
 from django.db import transaction

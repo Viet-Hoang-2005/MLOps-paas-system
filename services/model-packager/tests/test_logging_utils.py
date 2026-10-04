@@ -128,9 +128,7 @@ class LoggingTests(unittest.TestCase):
     def test_protocol_stays_valid_json_for_token_named_metrics(self):
         runtime = RuntimeLog(self.logger)
         with patch("sys.stdout", new_callable=io.StringIO) as output:
-            runtime.protocol(
-                'METRIC_JSON {"tokens_per_second":123,"api_token":"private-value"}'
-            )
+            runtime.protocol('METRIC_JSON {"tokens_per_second":123,"api_token":"private-value"}')
         payload = json.loads(output.getvalue().split(" ", 1)[1])
         self.assertEqual(payload["tokens_per_second"], 123)
         self.assertEqual(payload["api_token"], "[REDACTED]")

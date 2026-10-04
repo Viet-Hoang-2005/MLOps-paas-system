@@ -14,9 +14,7 @@ from datetime import datetime, timezone
 from typing import cast
 from urllib.parse import urlsplit, urlunsplit
 
-_context: contextvars.ContextVar[dict[str, object]] = contextvars.ContextVar(
-    "mlops_log_context", default={}
-)
+_context: contextvars.ContextVar[dict[str, object]] = contextvars.ContextVar("mlops_log_context", default={})
 _service = "backend"
 _output_lock = threading.RLock()
 _SECRET_KEY = (
@@ -123,14 +121,8 @@ def sanitize(value, limit=2048):
         try:
             payload = _protocol_value(json.loads(protocol.group(2)))
             prefix = "METRIC_JSON:" if ":" in protocol.group(1) else "METRIC_JSON "
-            encoded = prefix + json.dumps(
-                payload, separators=(",", ":"), ensure_ascii=True
-            )
-            return (
-                encoded
-                if limit is None or len(encoded) <= limit
-                else "[protocol record exceeds log limit]"
-            )
+            encoded = prefix + json.dumps(payload, separators=(",", ":"), ensure_ascii=True)
+            return encoded if limit is None or len(encoded) <= limit else "[protocol record exceeds log limit]"
         except (ValueError, RecursionError):
             return "[invalid metric protocol record]"
     for name, secret in os.environ.items():
@@ -142,20 +134,14 @@ def sanitize(value, limit=2048):
         text,
         flags=re.DOTALL,
     )
-    text = re.sub(
-        r"-----BEGIN [^-]*PRIVATE KEY-----.*", "[REDACTED]", text, flags=re.DOTALL
-    )
+    text = re.sub(r"-----BEGIN [^-]*PRIVATE KEY-----.*", "[REDACTED]", text, flags=re.DOTALL)
     text = re.sub(r"(?i)\b(Bearer|Basic)\s+[A-Za-z0-9+/_.=~-]+", r"\1 [REDACTED]", text)
-    text = re.sub(
-        r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "[REDACTED]", text
-    )
+    text = re.sub(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "[REDACTED]", text)
 
     def safe_url(match):
         try:
             parts = urlsplit(match.group())
-            return urlunsplit(
-                (parts.scheme, parts.hostname or "redacted", "/[REDACTED]", "", "")
-            )
+            return urlunsplit((parts.scheme, parts.hostname or "redacted", "/[REDACTED]", "", ""))
         except ValueError:
             return "[REDACTED_URL]"
 
@@ -163,9 +149,7 @@ def sanitize(value, limit=2048):
     text = _SECRETS.sub(r"\1[REDACTED]", text)
     text = re.sub(r"(?is)\[SQL:.*", "[database details omitted]", text)
     text = re.sub(r"(?is)\[parameters:.*", "[database parameters omitted]", text)
-    return (
-        text if limit is None or len(text) <= limit else text[:limit] + "...[truncated]"
-    )
+    return text if limit is None or len(text) <= limit else text[:limit] + "...[truncated]"
 
 
 def current_context():
@@ -173,9 +157,7 @@ def current_context():
 
 
 def bind_context(**fields):
-    return _context.set(
-        {**_context.get(), **{k: v for k, v in fields.items() if k in _FIELDS}}
-    )
+    return _context.set({**_context.get(), **{k: v for k, v in fields.items() if k in _FIELDS}})
 
 
 def reset_context(token):
@@ -229,9 +211,7 @@ def _record_fields(record, service):
         locations = []
         while tb is not None:
             code = tb.tb_frame.f_code
-            locations.append(
-                f"{os.path.basename(code.co_filename)}:{tb.tb_lineno}:{code.co_name}"
-            )
+            locations.append(f"{os.path.basename(code.co_filename)}:{tb.tb_lineno}:{code.co_name}")
             tb = tb.tb_next
         fields["traceback"] = " <- ".join(locations[-30:])
     return fields
@@ -255,11 +235,7 @@ def _json_value(value):
 
 def log_format():
     """Return the supported container formatter, defaulting safely to console."""
-    return (
-        "json"
-        if os.environ.get("LOG_FORMAT", "console").strip().lower() == "json"
-        else "console"
-    )
+    return "json" if os.environ.get("LOG_FORMAT", "console").strip().lower() == "json" else "console"
 
 
 class ConsoleFormatter(logging.Formatter):
@@ -312,9 +288,7 @@ class JsonFormatter(logging.Formatter):
 
 
 def formatter_for(service=None):
-    return (
-        JsonFormatter(service) if log_format() == "json" else ConsoleFormatter(service)
-    )
+    return JsonFormatter(service) if log_format() == "json" else ConsoleFormatter(service)
 
 
 class SafeStreamHandler(logging.StreamHandler):
@@ -330,10 +304,7 @@ class FrameworkFilter(logging.Filter):
     def filter(self, record):
         # These request exceptions are owned by the ASGI boundary; keep startup,
         # worker and other framework errors, but don't repeat each request trace.
-        return not (
-            record.name == "uvicorn.error"
-            and record.getMessage().startswith("Exception in ASGI application")
-        )
+        return not (record.name == "uvicorn.error" and record.getMessage().startswith("Exception in ASGI application"))
 
 
 def configure(service):
@@ -384,11 +355,7 @@ def get_logger(name):
 
 def log_event(logger, level, event, message, **fields):
     exc_info = fields.pop("exc_info", None)
-    level = (
-        getattr(logging, level.upper(), logging.INFO)
-        if isinstance(level, str)
-        else level
-    )
+    level = getattr(logging, level.upper(), logging.INFO) if isinstance(level, str) else level
     logger.log(
         level,
         message,
@@ -450,9 +417,7 @@ class Summary:
 
     def _start(self):
         if self.thread is None and not self.stop.is_set():
-            self.thread = threading.Thread(
-                target=self._run, name="log-summary", daemon=True
-            )
+            self.thread = threading.Thread(target=self._run, name="log-summary", daemon=True)
             self.thread.start()
 
     def _run(self):
@@ -470,19 +435,11 @@ class Summary:
 
     def failure(self, key, message, **fields):
         level = fields.pop("level", "WARNING")
-        severity = (
-            getattr(logging, level.upper(), logging.WARNING)
-            if isinstance(level, str)
-            else level
-        )
+        severity = getattr(logging, level.upper(), logging.WARNING) if isinstance(level, str) else level
         with self.lock:
             self._start()
             overflow = key not in self.last_error and len(self.last_error) >= 64
-            key = (
-                ("other.ERROR" if severity >= logging.ERROR else "other.WARNING")
-                if overflow
-                else key
-            )
+            key = ("other.ERROR" if severity >= logging.ERROR else "other.WARNING") if overflow else key
             now = time.monotonic()
             first = (key not in self.errors or overflow) and now - self.last_error.get(
                 key, float("-inf")
@@ -507,10 +464,7 @@ class Summary:
         with self.lock:
             count = self.errors.pop(key, 0)
             now = time.monotonic()
-            emit = (
-                count
-                and now - self.last_recovery.get(key, float("-inf")) >= self.interval
-            )
+            emit = count and now - self.last_recovery.get(key, float("-inf")) >= self.interval
             if emit:
                 self.last_recovery[key] = now
         if emit:
@@ -574,9 +528,7 @@ class RequestLoggingMiddleware:
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
         headers = dict(scope.get("headers", []))
-        token = bind_context(
-            request_id=request_id(headers.get(b"x-request-id", b"").decode("latin1"))
-        )
+        token = bind_context(request_id=request_id(headers.get(b"x-request-id", b"").decode("latin1")))
         status, raised = 500, False
         started = time.monotonic()
         route = self._route(scope)
@@ -584,11 +536,7 @@ class RequestLoggingMiddleware:
         def resource_context():
             # Set by trusted route handlers, never copied from request payloads.
             fields = scope.get("state", {}).get("mlops_log_context", {})
-            return {
-                key: fields[key]
-                for key in ("tenant_id", "project_id", "model_version_id")
-                if key in fields
-            }
+            return {key: fields[key] for key in ("tenant_id", "project_id", "model_version_id") if key in fields}
 
         async def response_send(message):
             nonlocal status

@@ -26,9 +26,7 @@ def upload_presigned_url(source, uri, requests_module, log):
     with open(source, "rb") as handle:
         response = requests_module.put(uri, data=handle, timeout=300)
     if response.status_code not in (200, 201, 204):
-        raise RuntimeError(
-            f"Presigned PUT upload failed with HTTP status {response.status_code}"
-        )
+        raise RuntimeError(f"Presigned PUT upload failed with HTTP status {response.status_code}")
 
 
 def request_output_upload_url(endpoint, capability, requests_module):
@@ -41,9 +39,7 @@ def request_output_upload_url(endpoint, capability, requests_module):
         timeout=30,
     )
     if response.status_code != 200:
-        raise RuntimeError(
-            f"Output upload URL request failed with HTTP status {response.status_code}."
-        )
+        raise RuntimeError(f"Output upload URL request failed with HTTP status {response.status_code}.")
     upload_url = str(response.json().get("upload_url", "")).strip()
     validate_presigned_url(upload_url)
     return upload_url
@@ -61,9 +57,7 @@ def safe_extract_zip(zip_path, destination):
         archive.extractall(destination)
 
 
-def install_requirements(
-    requirements_path, *, subprocess_module, python_executable, source_dir, detail, log
-):
+def install_requirements(requirements_path, *, subprocess_module, python_executable, source_dir, detail, log):
     if not requirements_path.exists():
         return
     log("Installing requirements.txt")
@@ -79,6 +73,4 @@ def install_requirements(
     for line in (result.stderr or "").splitlines():
         detail(line)
     if result.returncode != 0:
-        raise RuntimeError(
-            f"pip install -r requirements.txt failed with exit code {result.returncode}"
-        )
+        raise RuntimeError(f"pip install -r requirements.txt failed with exit code {result.returncode}")

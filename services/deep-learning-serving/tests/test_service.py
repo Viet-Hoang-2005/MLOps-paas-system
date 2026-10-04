@@ -20,9 +20,7 @@ def test_load_runtime_model_uses_resolved_artifact(monkeypatch, tmp_path):
 
 
 def test_constructor_handles_load_failure(monkeypatch):
-    monkeypatch.setattr(
-        index, "load_runtime_model", Mock(side_effect=RuntimeError("bad"))
-    )
+    monkeypatch.setattr(index, "load_runtime_model", Mock(side_effect=RuntimeError("bad")))
     service = index.DeepLearningModelService()
     assert service.model is None
 

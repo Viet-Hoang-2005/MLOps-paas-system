@@ -21,7 +21,8 @@ def issue_callback_token(deployment_id):
     expires = int(time.time()) + CALLBACK_TTL_SECONDS
     signature = hmac.new(
         _key(),
-        f"deployment:{deployment_id}:{expires}".encode(), hashlib.sha256,
+        f"deployment:{deployment_id}:{expires}".encode(),
+        hashlib.sha256,
     ).hexdigest()
     return f"{expires}.{signature}"
 
@@ -35,7 +36,8 @@ def valid_callback_token(token, deployment_id):
             return False
         expected = hmac.new(
             _key(),
-            f"deployment:{deployment_id}:{expires}".encode(), hashlib.sha256,
+            f"deployment:{deployment_id}:{expires}".encode(),
+            hashlib.sha256,
         ).hexdigest()
         return hmac.compare_digest(signature, expected)
     except (ValueError, AttributeError, TypeError):

@@ -5,9 +5,7 @@ import pandas as pd
 from locust import HttpUser, between, events, task
 
 # 1. CẤU HÌNH VÀ NẠP DỮ LIỆU TOÀN CỤC
-ROOT_DIR = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 TEST_CSV_PATH = os.path.join(ROOT_DIR, "data", "test_data.csv")
 
 # Từ điển (Dictionary) theo dõi thống kê kết quả dự đoán
@@ -52,9 +50,7 @@ class NIDSTestUser(HttpUser):
         payload = {"features": features}
 
         # Bắn request POST đến API
-        with self.client.post(
-            "/predict", json=payload, catch_response=True
-        ) as response:
+        with self.client.post("/predict", json=payload, catch_response=True) as response:
             if response.status_code == 200:
                 result = response.json()
                 predicted_label = result.get("prediction")
@@ -64,9 +60,7 @@ class NIDSTestUser(HttpUser):
                     response.success()
                 else:
                     prediction_stats[actual_label]["wrong"] += 1
-                    response.failure(
-                        f"Wrong: Actual {actual_label} - Predicted {predicted_label}"
-                    )
+                    response.failure(f"Wrong: Actual {actual_label} - Predicted {predicted_label}")
             else:
                 response.failure(f"Server Error: HTTP {response.status_code}")
 

@@ -18,9 +18,7 @@ def log_capture(monkeypatch, caplog):
     return writer, caplog
 
 
-@pytest.mark.parametrize(
-    "delivered,level", [(True, logging.DEBUG), (False, logging.INFO)]
-)
+@pytest.mark.parametrize("delivered,level", [(True, logging.DEBUG), (False, logging.INFO)])
 def test_detail_delivery_controls_container_level(log_capture, delivered, level):
     writer, caplog = log_capture
     writer.return_value = delivered
@@ -32,15 +30,11 @@ def test_detail_delivery_controls_container_level(log_capture, delivered, level)
 def test_no_redis_and_failed_redis_keep_sanitized_output_at_info(monkeypatch, caplog):
     logger = logging.Logger("training-fallback-test", level=logging.DEBUG)
     logger.addHandler(caplog.handler)
-    monkeypatch.setattr(
-        runner, "runtime_log", RuntimeLog(logger, writer=runner.log_to_redis)
-    )
+    monkeypatch.setattr(runner, "runtime_log", RuntimeLog(logger, writer=runner.log_to_redis))
     runner.log("epoch without Redis")
     monkeypatch.setenv("TRAINING_JOB_ID", "job-test")
     monkeypatch.setenv("REDIS_URL", "redis://unit")
-    monkeypatch.setattr(
-        runner.redis, "from_url", Mock(side_effect=RuntimeError("offline"))
-    )
+    monkeypatch.setattr(runner.redis, "from_url", Mock(side_effect=RuntimeError("offline")))
     runner.log("download https://storage.test/model?X-Amz-Signature=fixture-signature")
     assert [record.levelno for record in caplog.records] == [logging.INFO, logging.INFO]
     assert "fixture-signature" not in caplog.text
@@ -99,9 +93,7 @@ def test_training_stream_preserves_metric_input_and_sanitizes_display(
     assert any("pip warning" in record.getMessage() for record in caplog.records)
 
 
-def test_stderr_metric_text_does_not_become_stdout_protocol(
-    monkeypatch, runner_workspace, log_capture, capsys
-):
+def test_stderr_metric_text_does_not_become_stdout_protocol(monkeypatch, runner_workspace, log_capture, capsys):
     (runner.SOURCE_DIR / "train.py").write_text("pass", encoding="utf-8")
     marker = 'METRIC_JSON:{"accuracy":0.2}\n'
     process = Mock(stdout=io.StringIO(""), stderr=io.StringIO(marker), returncode=0)
@@ -113,9 +105,7 @@ def test_stderr_metric_text_does_not_become_stdout_protocol(
     assert capsys.readouterr().out == ""
 
 
-def test_pip_stderr_is_detail_not_error(
-    monkeypatch, runner_workspace, log_capture, tmp_path
-):
+def test_pip_stderr_is_detail_not_error(monkeypatch, runner_workspace, log_capture, tmp_path):
     writer, caplog = log_capture
     writer.return_value = True
     requirements = tmp_path / "requirements.txt"
@@ -123,11 +113,7 @@ def test_pip_stderr_is_detail_not_error(
     monkeypatch.setattr(
         runner.subprocess,
         "run",
-        Mock(
-            return_value=subprocess.CompletedProcess(
-                [], 0, "installed\n", "pip warning\n"
-            )
-        ),
+        Mock(return_value=subprocess.CompletedProcess([], 0, "installed\n", "pip warning\n")),
     )
     runner.install_requirements(requirements)
     assert all(record.levelno == logging.DEBUG for record in caplog.records)
@@ -144,11 +130,7 @@ def test_execution_events_and_context_reset(monkeypatch, failed):
     reset = Mock()
     monkeypatch.setattr(runner, "reset_context", reset)
     monkeypatch.setenv("TRAINING_JOB_ID", "job-test")
-    run = Mock(
-        side_effect=RuntimeError("Authorization: Bearer fixture-failure")
-        if failed
-        else None
-    )
+    run = Mock(side_effect=RuntimeError("Authorization: Bearer fixture-failure") if failed else None)
     monkeypatch.setattr(runner, "_run", run)
     if failed:
         with pytest.raises(RuntimeError):

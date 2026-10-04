@@ -40,17 +40,11 @@ def test_worker_reconfigures_logging_and_load_failure_omits_sensitive_details(
 def test_load_start_does_not_log_model_path(monkeypatch):
     event = Mock()
     monkeypatch.setattr(index, "log_event", event)
-    monkeypatch.setattr(
-        index, "download_model_artifact", lambda *_: "private-artifact-path"
-    )
+    monkeypatch.setattr(index, "download_model_artifact", lambda *_: "private-artifact-path")
     monkeypatch.setattr(index, "resolve_mlflow_model_dir", lambda path: path)
     monkeypatch.setattr(index.mlflow.pyfunc, "load_model", lambda _: "model")
-    assert (
-        index.load_runtime_model("version", "https://private/?token=hidden") == "model"
-    )
-    event.assert_called_once_with(
-        index.logger, "INFO", "model_load_started", "Loading deep learning model"
-    )
+    assert index.load_runtime_model("version", "https://private/?token=hidden") == "model"
+    event.assert_called_once_with(index.logger, "INFO", "model_load_started", "Loading deep learning model")
 
 
 def test_only_duplicate_bentoml_request_exceptions_are_filtered():
@@ -81,9 +75,7 @@ def test_only_duplicate_bentoml_request_exceptions_are_filtered():
         reset_context(token)
 
 
-def test_bentoml_http_failure_is_logged_without_framework_duplicate(
-    monkeypatch, caplog
-):
+def test_bentoml_http_failure_is_logged_without_framework_duplicate(monkeypatch, caplog):
     from starlette.testclient import TestClient
 
     model = Mock()
@@ -93,16 +85,10 @@ def test_bentoml_http_failure_is_logged_without_framework_duplicate(
     caplog.set_level(logging.INFO)
     with TestClient(index.DeepLearningModelService.to_asgi()) as client:
         for _ in range(2):
-            response = client.post(
-                "/predict", json={"payload": {"features": {"x": "feature-payload"}}}
-            )
+            response = client.post("/predict", json={"payload": {"features": {"x": "feature-payload"}}})
             assert response.status_code == 500
         assert client.post("/health", json={}).status_code == 200
-    errors = [
-        record
-        for record in caplog.records
-        if getattr(record, "event", "") == "http.request.failed"
-    ]
+    errors = [record for record in caplog.records if getattr(record, "event", "") == "http.request.failed"]
     assert len(errors) == 2
     assert not any(record.msg == "Exception on %s [%s]" for record in caplog.records)
     assert "feature-payload" not in caplog.text

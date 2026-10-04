@@ -1,9 +1,10 @@
-from django.db import transaction
 from pathlib import PurePosixPath
+
+from django.db import transaction
 from rest_framework.exceptions import ValidationError
-from common.api.exceptions import Conflict
 
 from apps.catalog.models import WorkspaceAsset
+from common.api.exceptions import Conflict
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import workspace_prefix
 

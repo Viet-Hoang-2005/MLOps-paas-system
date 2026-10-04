@@ -170,10 +170,10 @@ if REDIS_CONNECTION_MODE == "sentinel":
             },
         }
     }
+
     def _celery_sentinel_urls(db: int) -> str:
         return ";".join(
-            f"sentinel://:{quote(REDIS_PASSWORD, safe='')}@{host}:{port}/{db}"
-            for host, port in REDIS_SENTINELS
+            f"sentinel://:{quote(REDIS_PASSWORD, safe='')}@{host}:{port}/{db}" for host, port in REDIS_SENTINELS
         )
 
     CELERY_BROKER_URL = _celery_sentinel_urls(3)

@@ -174,9 +174,7 @@ class LoggingTests(unittest.TestCase):
             summary.failure("new-server", "Server failed", level="ERROR")
             self.assertIn("Server failed", self.output.getvalue())
             before = self.output.getvalue().count("Server failed")
-            with patch(
-                "src.logging_utils.time.monotonic", return_value=time.monotonic() + 120
-            ):
+            with patch("src.logging_utils.time.monotonic", return_value=time.monotonic() + 120):
                 summary.failure("another-server", "Server failed", level="ERROR")
             self.assertEqual(self.output.getvalue().count("Server failed"), before + 1)
             self.assertLessEqual(len(summary.last_error), 66)
@@ -303,9 +301,7 @@ class LoggingTests(unittest.TestCase):
     def test_asgi_probe_suppression_and_error_context(self):
         async def app(scope, receive, send):
             self.assertIn("request_id", current_context())
-            await send(
-                {"type": "http.response.start", "status": scope.get("test_status", 200)}
-            )
+            await send({"type": "http.response.start", "status": scope.get("test_status", 200)})
             await send({"type": "http.response.body", "body": b""})
 
         async def noop(*args):

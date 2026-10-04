@@ -45,9 +45,7 @@ def smoke(log_format="console", port=8050):
         deadline = time.monotonic() + 15
         while True:
             try:
-                with urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/health", timeout=0.5
-                ) as response:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=0.5) as response:
                     assert response.read() == b"ready"
                 break
             except (urllib.error.URLError, TimeoutError):
@@ -70,9 +68,7 @@ def smoke(log_format="console", port=8050):
     else:
         assert lines and all(" [INFO]: " in line for line in lines), output
     assert not any("GET /health" in line for line in lines), output
-    print(
-        f"Uvicorn smoke passed: {len(lines)} {log_format} lifecycle lines, no health access log"
-    )
+    print(f"Uvicorn smoke passed: {len(lines)} {log_format} lifecycle lines, no health access log")
 
 
 if __name__ == "__main__":

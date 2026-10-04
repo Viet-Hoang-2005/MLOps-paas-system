@@ -17,10 +17,7 @@ export type ModelFlavor = "sklearn" | "xgboost" | "pytorch" | "tensorflow";
 export type ModelArtifactFormat = "raw" | "mlflow_zip";
 export type ModelLifecycleStatus = "preview" | "registered" | "running";
 export type ModelDeletionState =
-  | "active"
-  | "deleting"
-  | "deleted"
-  | "delete_failed";
+  "active" | "deleting" | "deleted" | "delete_failed";
 
 export interface ActiveModelEndpoint {
   id: ResourceId;

@@ -54,11 +54,7 @@ def test_redis_log_handler_writes_run_scoped_stream(monkeypatch):
     monkeypatch.setattr(main.redis, "from_url", lambda _url: fake)
     handler = main.RedisLogHandler("redis://unit", "run-uuid")
     handler.setFormatter(logging.Formatter("%(message)s"))
-    handler.emit(
-        logging.LogRecord(
-            "drift", logging.INFO, __file__, 1, "running report", (), None
-        )
-    )
+    handler.emit(logging.LogRecord("drift", logging.INFO, __file__, 1, "running report", (), None))
 
     assert fake.calls == [
         ("delete", "drift_logs:run-uuid"),
@@ -87,9 +83,7 @@ def test_load_reference_http_success_and_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(
         main.requests,
         "get",
-        Mock(
-            return_value=SimpleNamespace(status_code=404, content=b"", text="missing")
-        ),
+        Mock(return_value=SimpleNamespace(status_code=404, content=b"", text="missing")),
     )
     with pytest.raises(FileNotFoundError):
         main.load_reference_data()
@@ -127,9 +121,7 @@ def test_load_production_data_insufficient_returns_empty(monkeypatch):
         "create_engine",
         lambda *_: SimpleNamespace(connect=lambda: Context(object())),
     )
-    monkeypatch.setattr(
-        main.pd, "read_sql", lambda *a, **k: pd.DataFrame({"features": [{"a": 1}]})
-    )
+    monkeypatch.setattr(main.pd, "read_sql", lambda *a, **k: pd.DataFrame({"features": [{"a": 1}]}))
     assert main.load_production_data().empty
 
 
@@ -239,9 +231,7 @@ def test_run_drift_analysis_summary(monkeypatch):
             return result
 
     monkeypatch.setattr(main, "Report", FakeReport)
-    monkeypatch.setattr(
-        main, "save_drift_report", lambda *a: {"summary_json_s3_uri": "s3://report"}
-    )
+    monkeypatch.setattr(main, "save_drift_report", lambda *a: {"summary_json_s3_uri": "s3://report"})
     monkeypatch.setattr(main, "TENANT_ID", "t")
     monkeypatch.setattr(main, "PROJECT_ID", "p")
     monkeypatch.setattr(main, "MODEL_VERSION_ID", "v")
@@ -255,9 +245,7 @@ def test_run_drift_analysis_summary(monkeypatch):
 
 def test_run_drift_analysis_requires_common_columns():
     with pytest.raises(ValueError, match="No common columns"):
-        main.run_drift_analysis(
-            pd.DataFrame({"a": [1]}), pd.DataFrame({"b": [1]}), main.ColumnMapping()
-        )
+        main.run_drift_analysis(pd.DataFrame({"a": [1]}), pd.DataFrame({"b": [1]}), main.ColumnMapping())
 
 
 def test_run_drift_analysis_detects_missing_features_and_alerts(monkeypatch):
@@ -363,9 +351,7 @@ def test_save_report_without_upload(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "MODEL_NAME", "m")
     monkeypatch.setattr(main, "TEMP_ROOT", tmp_path)
     monkeypatch.setattr(main, "HTML_UPLOAD_URL", "")
-    artifacts = main.save_drift_report(
-        report, {"metrics": []}, {"dataset_drift": False}
-    )
+    artifacts = main.save_drift_report(report, {"metrics": []}, {"dataset_drift": False})
     assert Path(artifacts["local_summary_json_path"]).exists()
 
 
@@ -415,16 +401,12 @@ def test_main_success_and_failure_paths(monkeypatch):
     monkeypatch.setattr(main, "trigger_django_webhook", webhook)
     assert main.main() == 0
     webhook.assert_called_once()
-    monkeypatch.setattr(
-        main, "load_production_data", Mock(side_effect=RuntimeError("db"))
-    )
+    monkeypatch.setattr(main, "load_production_data", Mock(side_effect=RuntimeError("db")))
     assert main.main() == 1
 
 
 def test_main_invalid_config_and_insufficient_samples(monkeypatch):
-    monkeypatch.setattr(
-        main, "validate_runtime_config", Mock(side_effect=ValueError("bad"))
-    )
+    monkeypatch.setattr(main, "validate_runtime_config", Mock(side_effect=ValueError("bad")))
     assert main.main() == 1
     monkeypatch.setattr(main, "validate_runtime_config", lambda: None)
     monkeypatch.setattr(main, "MIN_SAMPLES", 2)

@@ -284,9 +284,9 @@ export default function CreateDeploymentPage() {
               loading={deploy.isPending}
               disabled={Boolean(
                 deployment.data &&
-                  ["pending", "deploying", "healthy"].includes(
-                    deployment.data.status,
-                  ),
+                ["pending", "deploying", "healthy"].includes(
+                  deployment.data.status,
+                ),
               )}
               onClick={() => deploy.mutate()}
             >

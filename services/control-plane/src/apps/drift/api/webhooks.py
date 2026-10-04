@@ -4,8 +4,8 @@ from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.drift.models import DriftRun
 from apps.catalog.models import ModelProject
+from apps.drift.models import DriftRun
 from apps.drift.services.automatic import request_automatic_drift_runs
 from apps.drift.services.reports import report_artifact_uris
 from common.api.permissions import HasInternalWebhookSecret

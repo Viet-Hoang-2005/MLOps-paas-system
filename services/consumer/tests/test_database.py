@@ -89,31 +89,30 @@ def test_prediction_and_webhook_outbox_share_transaction(monkeypatch):
     assert database.save_prediction_records_and_automatic_drift_signals(frame, signals)
     assert connection.execute.call_count == 2
     prediction_sql = str(connection.execute.call_args_list[0].args[0])
-    assert (
-        "INNER JOIN" in prediction_sql
-        and "ON CONFLICT (public_id) DO NOTHING" in prediction_sql
-    )
+    assert "INNER JOIN" in prediction_sql and "ON CONFLICT (public_id) DO NOTHING" in prediction_sql
     outbox_sql = str(connection.execute.call_args_list[1].args[0])
     assert "'webhook'" in outbox_sql and "'automatic_drift'" in outbox_sql
 
 
 def test_records_preserve_zero_prediction():
-    frame = pd.DataFrame([
-        {
-            "public_id": "00000000-0000-0000-0000-000000000001",
-            "project_id": "00000000-0000-0000-0000-000000000002",
-            "model_version_id": "00000000-0000-0000-0000-000000000003",
-            "features": {"x": 1},
-            "prediction": 0,
-        },
-        {
-            "public_id": "00000000-0000-0000-0000-000000000004",
-            "project_id": "00000000-0000-0000-0000-000000000002",
-            "model_version_id": "00000000-0000-0000-0000-000000000003",
-            "features": {"x": 2},
-            "prediction": 1,
-        },
-    ])
+    frame = pd.DataFrame(
+        [
+            {
+                "public_id": "00000000-0000-0000-0000-000000000001",
+                "project_id": "00000000-0000-0000-0000-000000000002",
+                "model_version_id": "00000000-0000-0000-0000-000000000003",
+                "features": {"x": 1},
+                "prediction": 0,
+            },
+            {
+                "public_id": "00000000-0000-0000-0000-000000000004",
+                "project_id": "00000000-0000-0000-0000-000000000002",
+                "model_version_id": "00000000-0000-0000-0000-000000000003",
+                "features": {"x": 2},
+                "prediction": 1,
+            },
+        ]
+    )
 
     assert [record["prediction"] for record in database._records(frame)] == ["0", "1"]
 

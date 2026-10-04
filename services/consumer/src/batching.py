@@ -64,8 +64,7 @@ def build_automatic_drift_signals(
     model_version_ids = {
         str(record.payload["model_version_id"])
         for record in records
-        if is_production_sample(record.payload)
-        and record.payload.get("model_version_id")
+        if is_production_sample(record.payload) and record.payload.get("model_version_id")
     }
     batch_key = f"{first.topic}:{first.partition}:{first.offset}:{last.offset}"
     return [

@@ -32,9 +32,7 @@ class StreamResponse:
 
 
 def test_presigned_download_and_upload(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        cli.requests, "get", lambda *a, **k: StreamResponse([b"a", b"b"])
-    )
+    monkeypatch.setattr(cli.requests, "get", lambda *a, **k: StreamResponse([b"a", b"b"]))
     destination = tmp_path / "artifact.bin"
     cli.download_presigned_file("http://get", destination)
     assert destination.read_bytes() == b"ab"
@@ -109,14 +107,8 @@ def test_find_model_files_pytorch_and_flavor_resolution(tmp_path):
     assert cli.find_supported_model_file(torch_dir, flavor="pytorch").name == "model.pt"
 
     (torch_dir / "model.pt").unlink()
-    assert (
-        cli.find_supported_model_file(torch_dir, flavor="pytorch").name
-        == "baf_model.pt"
-    )
-    assert (
-        cli.find_supported_model_file(torch_dir, flavor="sklearn").name
-        == "preprocessor.pkl"
-    )
+    assert cli.find_supported_model_file(torch_dir, flavor="pytorch").name == "baf_model.pt"
+    assert cli.find_supported_model_file(torch_dir, flavor="sklearn").name == "preprocessor.pkl"
 
     (torch_dir / "baf_model.pt").unlink()
     with pytest.raises(ValueError, match="no .pt, .pth file was found for pytorch"):
@@ -177,9 +169,7 @@ def test_docker_builders(monkeypatch, tmp_path, builder, base_fragment):
     assert base_fragment in (tmp_path / "Dockerfile").read_text()
     client.login.assert_called_once()
     client.images.push.assert_called_once()
-    assert client.api.build.call_args.kwargs["tag"] == (
-        "registry.example/models/image-project-uuid:build-build-uuid"
-    )
+    assert client.api.build.call_args.kwargs["tag"] == ("registry.example/models/image-project-uuid:build-build-uuid")
 
 
 def test_docker_builder_raises_build_error(monkeypatch, tmp_path):
@@ -192,15 +182,11 @@ def test_docker_builder_raises_build_error(monkeypatch, tmp_path):
 
 def test_parse_conda_pip_requirements(tmp_path):
     conda = tmp_path / "conda.yaml"
-    conda.write_text(
-        "dependencies:\n  - python=3.10\n  - pip:\n      - numpy==1\n      - pandas\n"
-    )
+    conda.write_text("dependencies:\n  - python=3.10\n  - pip:\n      - numpy==1\n      - pandas\n")
     assert cli.parse_conda_pip_requirements(conda) == ["numpy==1", "pandas"]
 
 
-def configure_build(
-    monkeypatch, tmp_path, flavor="sklearn", source_type="manual_upload"
-):
+def configure_build(monkeypatch, tmp_path, flavor="sklearn", source_type="manual_upload"):
     monkeypatch.setenv("FLAVOR", flavor)
     monkeypatch.setenv("SOURCE_TYPE", source_type)
     monkeypatch.setenv("SOURCE_DOWNLOAD_URL", "http://source")
@@ -229,9 +215,7 @@ def stub_package_helpers(monkeypatch):
 def test_read_training_summaries_from_mlops_bundle(tmp_path):
     mlops_dir = tmp_path / "nested" / "_mlops"
     mlops_dir.mkdir(parents=True)
-    (mlops_dir / "metrics.json").write_text(
-        json.dumps({"accuracy": 0.97}), encoding="utf-8"
-    )
+    (mlops_dir / "metrics.json").write_text(json.dumps({"accuracy": 0.97}), encoding="utf-8")
     (mlops_dir / "params.json").write_text(json.dumps({"epochs": 10}), encoding="utf-8")
     (mlops_dir / "model_insights.json").write_text("not-json", encoding="utf-8")
 

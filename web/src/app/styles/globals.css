@@ -1,9 +1,9 @@
-@import '@fontsource/inter/400.css';
-@import '@fontsource/inter/500.css';
-@import '@fontsource/inter/600.css';
-@import '@fontsource/inter/700.css';
-@import 'tailwindcss';
-@import './tokens.css';
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "tailwindcss";
+@import "./tokens.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -19,8 +19,12 @@
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @layer base {
@@ -37,7 +41,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     font-variant-numeric: tabular-nums;
   }
 
@@ -56,7 +60,7 @@
   }
 
   button:not(:disabled),
-  [role='button']:not([aria-disabled='true']) {
+  [role="button"]:not([aria-disabled="true"]) {
     cursor: pointer;
   }
 

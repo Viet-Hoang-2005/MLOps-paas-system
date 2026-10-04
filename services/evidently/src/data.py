@@ -9,16 +9,12 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 
-def load_reference_data(
-    reference_url, model_version_id, temp_root, requests_module, pandas_module, detail
-):
+def load_reference_data(reference_url, model_version_id, temp_root, requests_module, pandas_module, detail):
     if not reference_url:
         raise ValueError("REFERENCE_DATA_URL is not provided")
 
     is_csv = urlparse(reference_url).path.lower().endswith(".csv")
-    local_filename = str(
-        temp_root / f"reference_{model_version_id}.{'csv' if is_csv else 'parquet'}"
-    )
+    local_filename = str(temp_root / f"reference_{model_version_id}.{'csv' if is_csv else 'parquet'}")
     if reference_url.startswith("http"):
         detail("[2/4] Downloading reference data from presigned URL...")
         response = requests_module.get(reference_url)
@@ -70,9 +66,7 @@ def load_production_data(
             params={"model_version_id": str(model_version_id), "lim": max_samples},
         )
     if len(raw_frame) < min_samples:
-        detail(
-            f"Skipping Drift Analysis: Not enough production samples ({len(raw_frame)} < {min_samples})"
-        )
+        detail(f"Skipping Drift Analysis: Not enough production samples ({len(raw_frame)} < {min_samples})")
         return pandas_module.DataFrame()
     if "features" not in raw_frame.columns:
         return pandas_module.DataFrame()
@@ -83,9 +77,7 @@ def load_production_data(
     production_frame = pandas_module.json_normalize(features)
     if "prediction" in raw_frame.columns:
         production_frame["prediction"] = raw_frame["prediction"].values
-    detail(
-        f"-> Production data loaded and JSON normalized: {len(production_frame)} rows"
-    )
+    detail(f"-> Production data loaded and JSON normalized: {len(production_frame)} rows")
     return production_frame
 
 

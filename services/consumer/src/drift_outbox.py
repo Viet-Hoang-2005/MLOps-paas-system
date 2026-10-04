@@ -18,30 +18,20 @@ from src.database import (  # noqa: E402  # Initialize log summaries before data
     reschedule_automatic_drift_signal,
 )
 
-CONTROL_PLANE_AUTOMATIC_DRIFT_WEBHOOK_URL = os.environ.get(
-    "CONTROL_PLANE_AUTOMATIC_DRIFT_WEBHOOK_URL", ""
-).strip()
+CONTROL_PLANE_AUTOMATIC_DRIFT_WEBHOOK_URL = os.environ.get("CONTROL_PLANE_AUTOMATIC_DRIFT_WEBHOOK_URL", "").strip()
 WEBHOOK_SECRET = os.environ.get("CONTROL_PLANE_WEBHOOK_SECRET", "")
-OUTBOX_POLL_SECONDS = max(
-    1, int(os.environ.get("AUTOMATIC_DRIFT_OUTBOX_POLL_SECONDS", "5"))
-)
-OUTBOX_BATCH_SIZE = max(
-    1, int(os.environ.get("AUTOMATIC_DRIFT_OUTBOX_BATCH_SIZE", "50"))
-)
+OUTBOX_POLL_SECONDS = max(1, int(os.environ.get("AUTOMATIC_DRIFT_OUTBOX_POLL_SECONDS", "5")))
+OUTBOX_BATCH_SIZE = max(1, int(os.environ.get("AUTOMATIC_DRIFT_OUTBOX_BATCH_SIZE", "50")))
 OUTBOX_LEASE_SECONDS = max(
     OUTBOX_POLL_SECONDS,
     int(os.environ.get("AUTOMATIC_DRIFT_OUTBOX_LEASE_SECONDS", "60")),
 )
-OUTBOX_RETRY_INITIAL_SECONDS = max(
-    1, int(os.environ.get("AUTOMATIC_DRIFT_OUTBOX_RETRY_INITIAL_SECONDS", "5"))
-)
+OUTBOX_RETRY_INITIAL_SECONDS = max(1, int(os.environ.get("AUTOMATIC_DRIFT_OUTBOX_RETRY_INITIAL_SECONDS", "5")))
 OUTBOX_RETRY_MAX_SECONDS = max(
     OUTBOX_RETRY_INITIAL_SECONDS,
     int(os.environ.get("AUTOMATIC_DRIFT_OUTBOX_RETRY_MAX_SECONDS", "300")),
 )
-REQUEST_TIMEOUT_SECONDS = max(
-    1, int(os.environ.get("AUTOMATIC_DRIFT_OUTBOX_REQUEST_TIMEOUT_SECONDS", "10"))
-)
+REQUEST_TIMEOUT_SECONDS = max(1, int(os.environ.get("AUTOMATIC_DRIFT_OUTBOX_REQUEST_TIMEOUT_SECONDS", "10")))
 
 
 def retry_delay(attempts: int) -> int:
@@ -86,17 +76,13 @@ def drain_once() -> int:
         if success:
             mark_automatic_drift_signal_published(event["id"])
             delivered += 1
-            delivery_summary.record(
-                duration_ms=(time.perf_counter() - started) * 1000, published=1
-            )
+            delivery_summary.record(duration_ms=(time.perf_counter() - started) * 1000, published=1)
             continue
 
         delay = retry_delay(event["attempts"])
         reschedule_automatic_drift_signal(event["id"], event["attempts"], error, delay)
         failed = True
-        delivery_summary.record(
-            success=False, duration_ms=(time.perf_counter() - started) * 1000
-        )
+        delivery_summary.record(success=False, duration_ms=(time.perf_counter() - started) * 1000)
         delivery_summary.failure(
             "delivery",
             "Automatic drift signal delivery failed; retry scheduled",
@@ -110,9 +96,7 @@ def drain_once() -> int:
 
 def run_dispatcher(stop_event: threading.Event) -> None:
     """Drain the outbox until shutdown; unexpected errors terminate supervision."""
-    log_event(
-        logger, "INFO", "drift_dispatcher_started", "Automatic drift dispatcher started"
-    )
+    log_event(logger, "INFO", "drift_dispatcher_started", "Automatic drift dispatcher started")
     try:
         _dispatch_until_stopped(stop_event)
     finally:

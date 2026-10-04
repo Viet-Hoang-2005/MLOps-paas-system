@@ -84,9 +84,7 @@ def init_db():
             },
         ).one()
     if not all(tables):
-        raise RuntimeError(
-            "Control Plane migrations have not created production/outbox tables yet."
-        )
+        raise RuntimeError("Control Plane migrations have not created production/outbox tables yet.")
     log_event(
         logger,
         "INFO",
@@ -98,11 +96,7 @@ def init_db():
 def _records(frame: pd.DataFrame) -> list[dict]:
     records = []
     for row in frame.to_dict("records"):
-        if (
-            not row.get("public_id")
-            or not row.get("project_id")
-            or not row.get("model_version_id")
-        ):
+        if not row.get("public_id") or not row.get("project_id") or not row.get("model_version_id"):
             continue
         records.append(
             {
@@ -154,9 +148,7 @@ def _signals(signals: list[dict[str, str]]) -> list[dict]:
             "public_id": str(uuid.uuid4()),
             "idempotency_key": signal["idempotency_key"],
             "model_version_id": signal["model_version_id"],
-            "payload": '{"model_version_id": "'
-            + signal["model_version_id"].replace('"', "")
-            + '"}',
+            "payload": '{"model_version_id": "' + signal["model_version_id"].replace('"', "") + '"}',
         }
         for signal in signals
     ]
@@ -169,9 +161,7 @@ def save_prediction_records_and_automatic_drift_signals(
     started = time.perf_counter()
     if engine_rw is None:
         persistence_summary.record(success=False)
-        persistence_summary.failure(
-            "write", "Database engine unavailable for persistence"
-        )
+        persistence_summary.failure("write", "Database engine unavailable for persistence")
         return False
     try:
         records = _records(predictions)
@@ -182,13 +172,7 @@ def save_prediction_records_and_automatic_drift_signals(
                     result = conn.execute(PREDICTION_INSERT, record)
                     if result.rowcount:
                         inserted_versions.add(record["model_version_id"])
-            outbox_rows = _signals(
-                [
-                    signal
-                    for signal in signals
-                    if signal["model_version_id"] in inserted_versions
-                ]
-            )
+            outbox_rows = _signals([signal for signal in signals if signal["model_version_id"] in inserted_versions])
             if outbox_rows:
                 conn.execute(OUTBOX_INSERT, outbox_rows)
         persistence_summary.record(
@@ -200,9 +184,7 @@ def save_prediction_records_and_automatic_drift_signals(
         persistence_summary.recovery("write")
         return True
     except Exception as exc:
-        persistence_summary.record(
-            success=False, duration_ms=(time.perf_counter() - started) * 1000
-        )
+        persistence_summary.record(success=False, duration_ms=(time.perf_counter() - started) * 1000)
         persistence_summary.failure(
             "write",
             "Prediction and automatic-drift transaction failed",
@@ -232,10 +214,7 @@ def claim_automatic_drift_signals(limit: int, lease_seconds: int) -> list[dict]:
         """),
             {"limit": limit, "lease_seconds": lease_seconds},
         ).mappings()
-        return [
-            dict(row) | {"model_version_id": dict(row)["payload"]["model_version_id"]}
-            for row in rows
-        ]
+        return [dict(row) | {"model_version_id": dict(row)["payload"]["model_version_id"]} for row in rows]
 
 
 def mark_automatic_drift_signal_published(event_id: int) -> None:
@@ -250,9 +229,7 @@ def mark_automatic_drift_signal_published(event_id: int) -> None:
         )
 
 
-def reschedule_automatic_drift_signal(
-    event_id: int, attempts: int, error: str, delay_seconds: int
-) -> None:
+def reschedule_automatic_drift_signal(event_id: int, attempts: int, error: str, delay_seconds: int) -> None:
     if engine_rw is None:
         return
     with engine_rw.begin() as conn:

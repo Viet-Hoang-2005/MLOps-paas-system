@@ -9,17 +9,11 @@ from src.logging_utils import RequestLoggingMiddleware, current_context
 
 
 def test_worker_installs_request_logging():
-    middleware = next(
-        item
-        for item in index.app.user_middleware
-        if item.cls is RequestLoggingMiddleware
-    )
+    middleware = next(item for item in index.app.user_middleware if item.cls is RequestLoggingMiddleware)
     assert middleware.kwargs["routes"] is index.app.router.routes
 
 
-def test_model_load_failure_and_recovery_omit_artifact_and_features(
-    monkeypatch, tmp_path
-):
+def test_model_load_failure_and_recovery_omit_artifact_and_features(monkeypatch, tmp_path):
     summary, event = Mock(), Mock()
     model = SimpleNamespace(metadata=SimpleNamespace(signature=None))
     loader = Mock(
@@ -40,13 +34,9 @@ def test_model_load_failure_and_recovery_omit_artifact_and_features(
     loaded = loading.load_model_from_uri("v", "https://private/?token=hidden")
     assert loaded["model"] is model
     assert loading.load_model_from_uri("v", "https://private/?token=hidden") is loaded
-    summary.failure.assert_called_once_with(
-        "load", "Model artifact load failed", error_type="RuntimeError"
-    )
+    summary.failure.assert_called_once_with("load", "Model artifact load failed", error_type="RuntimeError")
     summary.recovery.assert_called_once_with("load")
-    event.assert_called_once_with(
-        loading.logger, "INFO", "model_loaded", "Model artifact loaded"
-    )
+    event.assert_called_once_with(loading.logger, "INFO", "model_loaded", "Model artifact loaded")
     assert "hidden" not in str(summary.mock_calls + event.mock_calls)
     assert "feature-payload" not in str(summary.mock_calls + event.mock_calls)
 

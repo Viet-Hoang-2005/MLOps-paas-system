@@ -7,8 +7,8 @@ from django.utils import timezone
 
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.cache import invalidate_model_server_cache
-from apps.deployment.services.logs import append_deployment_log, reset_deployment_logs
 from apps.deployment.services.completion import complete_build
+from apps.deployment.services.logs import append_deployment_log, reset_deployment_logs
 from apps.observability.services.outbox import enqueue_event
 from apps.registry.services.versions import register_successful_build
 from common.logging import failure_reported, record_transition

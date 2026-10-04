@@ -7,7 +7,6 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import mlflow
 import pandas as pd
 import redis
 import requests
@@ -29,6 +28,8 @@ from src.logging_utils import (
 )
 from urllib3.util.retry import Retry
 
+import mlflow
+
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(dotenv_path=os.path.join(ROOT_DIR, ".env"))
 
@@ -46,9 +47,7 @@ MODEL_NAME = os.getenv("MODEL_NAME", PROJECT_ID)
 REFERENCE_DATA_URL = os.getenv("REFERENCE_DATA_URL")
 MODEL_URI = os.getenv("MODEL_URI", f"models:/{MODEL_NAME}/Production")
 CONTROL_PLANE_WEBHOOK_URL = os.getenv("CONTROL_PLANE_WEBHOOK_URL", "")
-CONTROL_PLANE_WEBHOOK_SECRET = os.getenv(
-    "CONTROL_PLANE_WEBHOOK_SECRET", "super-secret-key"
-)
+CONTROL_PLANE_WEBHOOK_SECRET = os.getenv("CONTROL_PLANE_WEBHOOK_SECRET", "super-secret-key")
 HTML_S3_URI = os.getenv("HTML_S3_URI", "")
 REPORT_JSON_S3_URI = os.getenv("REPORT_JSON_S3_URI", "")
 SUMMARY_JSON_S3_URI = os.getenv("SUMMARY_JSON_S3_URI", "")
@@ -183,9 +182,7 @@ def get_column_mapping(reference_df, production_df):
                     column_mapping.numerical_features = num_cols
                     column_mapping.categorical_features = cat_cols
                     has_signature = True
-                    runtime_log.detail(
-                        f"-> MLflow Signature: {len(num_cols)} numerical, {len(cat_cols)} categorical."
-                    )
+                    runtime_log.detail(f"-> MLflow Signature: {len(num_cols)} numerical, {len(cat_cols)} categorical.")
         except Exception as e:
             runtime_log.event(
                 logging.WARNING,
@@ -196,9 +193,7 @@ def get_column_mapping(reference_df, production_df):
 
     # Fallback: Auto-infer feature types from actual DataFrame structure
     if not has_signature:
-        runtime_log.detail(
-            "-> Fallback: Auto-infer feature types from actual DataFrame structure..."
-        )
+        runtime_log.detail("-> Fallback: Auto-infer feature types from actual DataFrame structure...")
         ignore_cols = {
             "prediction",
             "target",
@@ -214,29 +209,19 @@ def get_column_mapping(reference_df, production_df):
         }
         feature_cols = [c for c in production_df.columns if c not in ignore_cols]
         num_cols = (
-            production_df[feature_cols]
-            .select_dtypes(include=["int64", "float64", "int32", "float32"])
-            .columns.tolist()
+            production_df[feature_cols].select_dtypes(include=["int64", "float64", "int32", "float32"]).columns.tolist()
         )
-        cat_cols = (
-            production_df[feature_cols]
-            .select_dtypes(include=["object", "category", "bool"])
-            .columns.tolist()
-        )
+        cat_cols = production_df[feature_cols].select_dtypes(include=["object", "category", "bool"]).columns.tolist()
         column_mapping.numerical_features = num_cols
         column_mapping.categorical_features = cat_cols
-        runtime_log.detail(
-            f"Column: {len(num_cols)} numerical, {len(cat_cols)} categorical."
-        )
+        runtime_log.detail(f"Column: {len(num_cols)} numerical, {len(cat_cols)} categorical.")
 
     if "prediction" in production_df.columns:
         if "prediction" not in reference_df.columns:
             for cand in ["target", "Target", "label", "Label", "class", "Class"]:
                 if cand in reference_df.columns:
                     reference_df["prediction"] = reference_df[cand].values
-                    runtime_log.detail(
-                        f"Mapped column '{cand}' of Reference to 'prediction'."
-                    )
+                    runtime_log.detail(f"Mapped column '{cand}' of Reference to 'prediction'.")
                     break
         if "prediction" in reference_df.columns:
             column_mapping.prediction = "prediction"
@@ -256,9 +241,7 @@ def filter_column_mapping(column_mapping, common_cols):
 
 # 5. Phân tích Data drift & Data Quality (Evidently 0.4.15)
 def run_drift_analysis(reference_df, production_df, column_mapping):
-    runtime_log.detail(
-        "[4/4] Running Evidently AI Data Drift & Data Quality analysis..."
-    )
+    runtime_log.detail("[4/4] Running Evidently AI Data Drift & Data Quality analysis...")
 
     ignore_cols = {
         "prediction",
@@ -285,10 +268,7 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
 
     # 1. Xác định tập đặc trưng kỳ vọng từ Reference Data / Column Mapping
     if column_mapping.numerical_features or column_mapping.categorical_features:
-        expected_features = set(
-            (column_mapping.numerical_features or [])
-            + (column_mapping.categorical_features or [])
-        )
+        expected_features = set((column_mapping.numerical_features or []) + (column_mapping.categorical_features or []))
     else:
         expected_features = set(c for c in reference_df.columns if c not in ignore_cols)
 
@@ -306,16 +286,12 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
             count=len(missing_features),
         )
     if extra_features:
-        runtime_log.detail(
-            f"Production data contains {len(extra_features)} extra features"
-        )
+        runtime_log.detail(f"Production data contains {len(extra_features)} extra features")
 
     # 3. Lấy các cột chung để chạy kiểm định thống kê Evidently
     common_cols = [col for col in reference_df.columns if col in production_df.columns]
     if len(common_cols) == 0:
-        raise ValueError(
-            "No common columns found between reference and production datasets."
-        )
+        raise ValueError("No common columns found between reference and production datasets.")
 
     # 4. Kiểm tra tỷ lệ giá trị null bất thường trên các cột chung
     high_null_features = []
@@ -323,9 +299,7 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
         if col not in ignore_cols and col in production_df.columns:
             null_rate = float(production_df[col].isnull().mean())
             if null_rate >= 0.20:
-                high_null_features.append(
-                    {"feature": col, "null_rate": round(null_rate, 4)}
-                )
+                high_null_features.append({"feature": col, "null_rate": round(null_rate, 4)})
 
     if high_null_features:
         runtime_log.event(
@@ -372,26 +346,16 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
             stat_drifted_feature_names.append(col_name)
 
     # 5. Tổng hợp độ trôi dạt tổng thể (Statistical Drift + Missing Features)
-    all_drifted_features = sorted(
-        list(set(stat_drifted_feature_names) | set(missing_features))
-    )
-    total_expected_count = (
-        len(expected_features) if expected_features else len(common_cols)
-    )
+    all_drifted_features = sorted(list(set(stat_drifted_feature_names) | set(missing_features)))
+    total_expected_count = len(expected_features) if expected_features else len(common_cols)
     total_drifted_count = len(all_drifted_features)
-    effective_drift_share = (
-        (total_drifted_count / total_expected_count)
-        if total_expected_count > 0
-        else 0.0
-    )
+    effective_drift_share = (total_drifted_count / total_expected_count) if total_expected_count > 0 else 0.0
 
     has_schema_mismatch = len(missing_features) > 0
     dataset_drift = (effective_drift_share >= DRIFT_THRESHOLD) or has_schema_mismatch
 
     data_quality = {
-        "status": "alert"
-        if has_schema_mismatch
-        else ("warning" if high_null_features else "healthy"),
+        "status": "alert" if has_schema_mismatch else ("warning" if high_null_features else "healthy"),
         "has_schema_mismatch": has_schema_mismatch,
         "missing_features": missing_features,
         "missing_features_count": len(missing_features),
@@ -449,9 +413,7 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
 # 6. Lưu báo cáo drift
 def save_drift_report(report, result_dict, summary):
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    report_dir = str(
-        TEMP_ROOT / "drift_reports" / str(TENANT_ID) / str(MODEL_NAME) / run_id
-    )
+    report_dir = str(TEMP_ROOT / "drift_reports" / str(TENANT_ID) / str(MODEL_NAME) / run_id)
     os.makedirs(report_dir, exist_ok=True)
 
     html_path = os.path.join(report_dir, "report.html")
@@ -489,9 +451,7 @@ def save_drift_report(report, result_dict, summary):
         if upload_url:
             try:
                 with open(local_path, "rb") as f:
-                    resp = requests.put(
-                        upload_url, data=f, headers={"Content-Type": content_type}
-                    )
+                    resp = requests.put(upload_url, data=f, headers={"Content-Type": content_type})
                     resp.raise_for_status()
                 uploaded_count += 1
             except Exception as e:
@@ -511,9 +471,7 @@ def save_drift_report(report, result_dict, summary):
             "html_url": HTML_PUBLIC_URL,
         }
     )
-    runtime_log.detail(
-        f"Drift report upload attempts finished: {uploaded_count}/{len(uploads)} files uploaded."
-    )
+    runtime_log.detail(f"Drift report upload attempts finished: {uploaded_count}/{len(uploads)} files uploaded.")
 
     summary_with_artifacts = {**summary, "report_artifacts": artifacts}
     with open(summary_json_path, "w", encoding="utf-8") as fp:

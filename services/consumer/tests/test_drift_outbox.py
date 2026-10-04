@@ -16,9 +16,7 @@ def test_deliver_posts_internal_idempotent_signal(monkeypatch):
     post = Mock(return_value=SimpleNamespace(status_code=202))
     monkeypatch.setattr(dispatcher.requests, "post", post)
 
-    assert dispatcher.deliver(
-        {"model_version_id": "version-1", "idempotency_key": "signal-1"}
-    ) == (True, "")
+    assert dispatcher.deliver({"model_version_id": "version-1", "idempotency_key": "signal-1"}) == (True, "")
     post.assert_called_once_with(
         "http://control-plane/internal/webhooks/automatic-drift/",
         headers={
@@ -33,9 +31,7 @@ def test_deliver_posts_internal_idempotent_signal(monkeypatch):
 
 def test_deliver_rejects_missing_configuration(monkeypatch):
     monkeypatch.setattr(dispatcher, "CONTROL_PLANE_AUTOMATIC_DRIFT_WEBHOOK_URL", "")
-    assert dispatcher.deliver(
-        {"model_version_id": "version-1", "idempotency_key": "signal-1"}
-    ) == (
+    assert dispatcher.deliver({"model_version_id": "version-1", "idempotency_key": "signal-1"}) == (
         False,
         "CONTROL_PLANE_AUTOMATIC_DRIFT_WEBHOOK_URL is not configured",
     )
@@ -56,9 +52,7 @@ def test_drain_marks_only_successful_signal_published(monkeypatch):
             "attempts": 2,
         },
     ]
-    monkeypatch.setattr(
-        dispatcher, "claim_automatic_drift_signals", lambda *_args: signals
-    )
+    monkeypatch.setattr(dispatcher, "claim_automatic_drift_signals", lambda *_args: signals)
     monkeypatch.setattr(
         dispatcher,
         "deliver",
@@ -100,9 +94,7 @@ def test_dispatcher_retries_expected_database_errors(monkeypatch):
 def test_dispatcher_does_not_hide_unexpected_errors(monkeypatch):
     stop_event = Mock()
     stop_event.is_set.return_value = False
-    monkeypatch.setattr(
-        dispatcher, "drain_once", Mock(side_effect=RuntimeError("programming error"))
-    )
+    monkeypatch.setattr(dispatcher, "drain_once", Mock(side_effect=RuntimeError("programming error")))
 
     with pytest.raises(RuntimeError, match="programming error"):
         dispatcher.run_dispatcher(stop_event)

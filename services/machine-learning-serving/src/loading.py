@@ -83,9 +83,7 @@ def load_label_mapping(source_dir: Path, mlflow_model_dir: Path) -> dict | None:
     return None
 
 
-def load_model_from_uri(
-    model_version_id: str, model_uri: str, version_marker: str = "latest"
-) -> dict[str, Any]:
+def load_model_from_uri(model_version_id: str, model_uri: str, version_marker: str = "latest") -> dict[str, Any]:
     cached = MODEL_CACHE.get(model_version_id)
     if cached and cached.get("version_marker") == version_marker:
         return cached
@@ -98,26 +96,16 @@ def load_model_from_uri(
         mlflow_model_dir = resolve_mlflow_model_dir(source_dir)
         pyfunc_model = mlflow.pyfunc.load_model(str(mlflow_model_dir))
         signature = pyfunc_model.metadata.signature
-        expected_features = (
-            [inp.name for inp in signature.inputs]
-            if signature and signature.inputs
-            else None
-        )
+        expected_features = [inp.name for inp in signature.inputs] if signature and signature.inputs else None
         float64_features = (
-            [inp.name for inp in signature.inputs if _is_double_column(inp)]
-            if signature and signature.inputs
-            else []
+            [inp.name for inp in signature.inputs if _is_double_column(inp)] if signature and signature.inputs else []
         )
 
         label_mapping = load_label_mapping(source_dir, mlflow_model_dir)
 
     except Exception as exc:
-        load_summary.failure(
-            "load", "Model artifact load failed", error_type=type(exc).__name__
-        )
-        raise HTTPException(
-            status_code=503, detail=f"Unable to load model artifact: {exc}"
-        )
+        load_summary.failure("load", "Model artifact load failed", error_type=type(exc).__name__)
+        raise HTTPException(status_code=503, detail=f"Unable to load model artifact: {exc}")
 
     try:
         raw_model = None
@@ -137,10 +125,7 @@ def load_model_from_uri(
                     raw_model.n_classes_ = len(getattr(raw_model, "classes_", [0, 1]))
 
         if not expected_features and raw_model:
-            if (
-                hasattr(raw_model, "feature_names_in_")
-                and getattr(raw_model, "feature_names_in_", None) is not None
-            ):
+            if hasattr(raw_model, "feature_names_in_") and getattr(raw_model, "feature_names_in_", None) is not None:
                 expected_features = list(raw_model.feature_names_in_)
             elif hasattr(raw_model, "get_booster"):
                 expected_features = raw_model.get_booster().feature_names

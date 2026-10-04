@@ -2,8 +2,9 @@ import sys
 from types import ModuleType
 from unittest.mock import Mock
 
-import mlflow
 import pytest
+
+import mlflow
 
 # These tests exercise packaging/dispatch, not ML framework initialization.
 # Keep optional native runtimes out of this isolated service test process.

@@ -3,6 +3,7 @@ from typing import cast
 
 from celery.signals import task_postrun, task_prerun
 from prometheus_client import Counter, Histogram
+
 from common.redis_client import redis_client
 
 API_REQUESTS = Counter(

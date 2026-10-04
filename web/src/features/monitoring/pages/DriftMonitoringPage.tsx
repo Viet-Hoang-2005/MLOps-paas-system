@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { Navigate, useParams, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Navigate,
+  useParams,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import { RouteFallback } from "@/app/router/RouteFallback";
 import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";

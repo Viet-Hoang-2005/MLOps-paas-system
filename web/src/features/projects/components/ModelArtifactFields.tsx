@@ -58,7 +58,10 @@ const packageExamples: Record<ModelFlavor, string[]> = {
   ],
 };
 
-export function ModelArtifactFields({ form, setField }: ModelArtifactFieldsProps) {
+export function ModelArtifactFields({
+  form,
+  setField,
+}: ModelArtifactFieldsProps) {
   const { t } = useTranslation("deployments");
   const flavorOptions: Array<{
     value: ModelFlavor;
@@ -178,7 +181,9 @@ export function ModelArtifactFields({ form, setField }: ModelArtifactFieldsProps
                   form.label_mapping_file?.name ||
                   t("uploadFlow.build.attachments.labelMapping")
                 }
-                subtitle={t("uploadFlow.build.attachments.labelMappingSubtitle")}
+                subtitle={t(
+                  "uploadFlow.build.attachments.labelMappingSubtitle",
+                )}
                 hint={t("uploadFlow.build.attachments.labelMappingIndicators")}
                 onChange={(file) => setField("label_mapping_file", file)}
               />

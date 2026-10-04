@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
@@ -8,7 +10,6 @@ from infrastructure.execution.image_references import repository_from_reference
 from infrastructure.execution.image_registry import image_registry_for
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import version_prefix
-from contextlib import contextmanager
 
 
 @contextmanager

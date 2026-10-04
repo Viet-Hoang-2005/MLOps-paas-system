@@ -19,14 +19,10 @@ def build_image(
     harbor_pass = environment.get("HARBOR_PASSWORD", "").strip()
     if harbor_url and harbor_user and harbor_pass:
         detail(f"Logging into Harbor registry at {harbor_url}...")
-        docker_client.login(
-            username=harbor_user, password=harbor_pass, registry=harbor_url
-        )
+        docker_client.login(username=harbor_user, password=harbor_pass, registry=harbor_url)
 
     base_image = (
-        f"{harbor_url}/mlops-paas/{serving_image}:latest"
-        if harbor_url
-        else f"mlops-paas-{serving_image}:latest"
+        f"{harbor_url}/mlops-paas/{serving_image}:latest" if harbor_url else f"mlops-paas-{serving_image}:latest"
     )
     dockerfile_content = f"""FROM {base_image}
 USER root
@@ -42,31 +38,18 @@ COPY model /app/model_artifact
         encoding="utf-8",
     )
     image_tag = image_reference(build_id)
-    detail(
-        f"Building {image_label}Docker image {image_tag} from workspace {workspace}..."
-    )
-    for line in docker_client.api.build(
-        path=str(workspace), tag=image_tag, rm=True, decode=True
-    ):
+    detail(f"Building {image_label}Docker image {image_tag} from workspace {workspace}...")
+    for line in docker_client.api.build(path=str(workspace), tag=image_tag, rm=True, decode=True):
         if "stream" in line:
             detail(line["stream"].strip())
         elif "errorDetail" in line:
-            raise RuntimeError(
-                line["errorDetail"].get("message", "Unknown Docker build error")
-            )
+            raise RuntimeError(line["errorDetail"].get("message", "Unknown Docker build error"))
     detail(f"{image_label}Docker image {image_tag} built successfully!")
-    if (
-        harbor_url
-        and harbor_user
-        and harbor_pass
-        and image_tag.startswith(f"{harbor_url}/")
-    ):
+    if harbor_url and harbor_user and harbor_pass and image_tag.startswith(f"{harbor_url}/"):
         detail(f"Pushing {image_label}image {image_tag} to Harbor...")
         for line in docker_client.images.push(image_tag, stream=True, decode=True):
             if "status" in line:
                 detail(line.get("status", ""))
             elif "errorDetail" in line:
-                raise RuntimeError(
-                    line["errorDetail"].get("message", "Failed to push image to Harbor")
-                )
+                raise RuntimeError(line["errorDetail"].get("message", "Failed to push image to Harbor"))
         detail(f"{image_label}image successfully pushed to Harbor!")

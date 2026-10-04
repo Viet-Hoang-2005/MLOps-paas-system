@@ -1,7 +1,8 @@
 from django.db import IntegrityError, transaction
-from common.api.exceptions import Conflict
+
 from apps.catalog.models import ModelProject
 from apps.deployment.services.cache import invalidate_model_server_cache
+from common.api.exceptions import Conflict
 
 
 def save_project_metadata(*, actor, validated_data, project=None, storage=None):

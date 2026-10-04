@@ -264,8 +264,8 @@ def test_registration_failure_removes_partial_snapshot_and_can_retry(project):
 
 
 def test_training_build_provenance_survives_source_job_deletion(project):
-    from apps.training.models import TrainingJob, TrainingOutput
     from apps.deployment.services.builds import request_training_build
+    from apps.training.models import TrainingJob, TrainingOutput
 
     storage = MemoryStorage()
     code = storage.put("input/code.zip", SimpleUploadedFile("code.zip", b"code"), "application/zip")
@@ -371,9 +371,9 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
 
 
 def test_training_retry_preserves_frozen_inputs_not_updated_workspace(project, monkeypatch):
+    from apps.catalog.models import WorkspaceAsset
     from apps.training.models import TrainingJob
     from apps.training.services.jobs import retry_job
-    from apps.catalog.models import WorkspaceAsset
 
     storage = MemoryStorage()
     inputs = {}

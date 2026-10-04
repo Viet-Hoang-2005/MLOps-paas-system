@@ -6,6 +6,7 @@ from typing import Any
 from urllib.parse import quote_plus
 
 from sqlalchemy import create_engine, text
+
 from src.logging_utils import Summary, get_logger
 
 cache_summary = Summary(get_logger(__name__), "registry_cache_summary")

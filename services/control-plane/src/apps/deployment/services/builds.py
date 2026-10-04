@@ -1,13 +1,13 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
-from apps.deployment.models import Build, BuildInputAsset
 from apps.catalog.models import ModelPreview
-from common.api.exceptions import Conflict
+from apps.deployment.models import Build, BuildInputAsset
 from apps.deployment.tasks import cancel_build, execute_build
+from common.api.exceptions import Conflict
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import build_input_prefix, build_prefix
 

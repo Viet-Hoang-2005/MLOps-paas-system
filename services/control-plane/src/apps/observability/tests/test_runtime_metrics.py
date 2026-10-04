@@ -1,5 +1,5 @@
-from unittest.mock import Mock
 import uuid
+from unittest.mock import Mock
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -7,8 +7,8 @@ from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment
-from apps.registry.models import ModelVersion
 from apps.observability.services.runtime_metrics import runtime_metrics
+from apps.registry.models import ModelVersion
 from infrastructure.docker_metrics import DockerMetricsClient, parse_stats
 from infrastructure.local_request_metrics import LocalRequestCounterClient
 
@@ -84,13 +84,13 @@ def test_production_metrics_join_owned_kubernetes_pods(deployment, settings):
     for query in queries[:2]:
         assert 'namespace="mlops-model-runtimes"' in query
         assert 'container="model-server"' in query
-        assert '* on (namespace,pod) group_left()' in query
-        assert 'max by (namespace,pod) (kube_pod_labels{' in query
+        assert "* on (namespace,pod) group_left()" in query
+        assert "max by (namespace,pod) (kube_pod_labels{" in query
         assert f'label_mlops_io_deployment_id="{deployment.public_id}"' in query
         assert f'label_mlops_io_tenant_id="{project.owner.tenant_id}"' in query
         assert f'label_mlops_io_project_id="{project.public_id}"' in query
         assert f'label_mlops_io_model_version_id="{deployment.version.public_id}"' in query
-        assert 'max by (namespace,pod,container)' in query
+        assert "max by (namespace,pod,container)" in query
         assert "container_label_" not in query
     assert "[2m]" in queries[0]
     assert "/ 1048576" in queries[1]

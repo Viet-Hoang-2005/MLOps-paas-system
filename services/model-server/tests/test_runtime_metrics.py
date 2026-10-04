@@ -27,6 +27,7 @@ async def test_counter_failure_never_changes_prediction():
 @pytest.mark.parametrize("failed", [False, True])
 async def test_gateway_counts_authorized_ids_even_when_prediction_fails(monkeypatch, failed):
     from fastapi import HTTPException
+
     from src import api
 
     client = AsyncMock()

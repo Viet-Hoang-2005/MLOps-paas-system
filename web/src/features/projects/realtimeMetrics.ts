@@ -17,7 +17,9 @@ const finite = (value: number | null | undefined) =>
     : null;
 
 // Per mounted query observer: no browser storage, timer, or persisted history.
-export function createRealtimeSession(initialDeploymentId: string | null = null) {
+export function createRealtimeSession(
+  initialDeploymentId: string | null = null,
+) {
   let deploymentId: string | null = initialDeploymentId;
   let points: RealtimePoint[] = [];
   let previous: RuntimeMetricsResponse["snapshot"] = null;

@@ -63,17 +63,13 @@ def test_drift_signals_are_deduplicated_and_replay_safe():
 def test_flush_persists_before_offset_commit(monkeypatch):
     consumer = FakeConsumer()
     persist = Mock(return_value=True)
-    monkeypatch.setattr(
-        main, "save_prediction_records_and_automatic_drift_signals", persist
-    )
+    monkeypatch.setattr(main, "save_prediction_records_and_automatic_drift_signals", persist)
 
     assert main.flush_batch(consumer, [record(offset=41)])
     assert consumer.commits[0][0][0].offset == 42
     frame, signals = persist.call_args.args
     assert list(frame) == list(PREDICTION_RECORD_COLUMNS)
-    assert signals[0]["idempotency_key"].endswith(
-        ":41:41:00000000-0000-0000-0000-000000000003"
-    )
+    assert signals[0]["idempotency_key"].endswith(":41:41:00000000-0000-0000-0000-000000000003")
 
 
 def test_flush_does_not_commit_when_transaction_fails(monkeypatch):

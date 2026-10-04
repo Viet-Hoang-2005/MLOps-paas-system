@@ -1,21 +1,21 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useBlocker, useNavigate, useParams } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 import {
   createPreviewProject,
   updatePreview,
 } from "@/features/projects/api/previewApi";
+import { CodeDataFields } from "@/features/projects/components/CodeDataFields";
+import { ModelArtifactFields } from "@/features/projects/components/ModelArtifactFields";
+import { ModelMetadataFields } from "@/features/projects/components/ModelMetadataFields";
 import { usePreview } from "@/features/projects/hooks/usePreview";
 import { catalogQueryKeys } from "@/features/projects/queryKeys";
 import type { ModelBuildFormValues } from "@/features/projects/types";
-import { ModelArtifactFields } from "@/features/projects/components/ModelArtifactFields";
-import { CodeDataFields } from "@/features/projects/components/CodeDataFields";
-import { ModelMetadataFields } from "@/features/projects/components/ModelMetadataFields";
-import { PageHeader } from "@/shared/components/PageHeader";
+import { getApiErrorMessage } from "@/shared/api/errors";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { getApiErrorMessage } from "@/shared/api/errors";
+import { PageHeader } from "@/shared/components/PageHeader";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useBlocker, useNavigate, useParams } from "react-router-dom";
 
 const emptyForm: ModelBuildFormValues = {
   name: "",
@@ -162,7 +162,9 @@ export default function ProjectFormPage() {
             fullWidth
             loading={save.isPending}
             disabled={
-              modelId ? !preview.data : !form.name.trim() || !form.source_artifact
+              modelId
+                ? !preview.data
+                : !form.name.trim() || !form.source_artifact
             }
           >
             {t("workflow.savePreview")}

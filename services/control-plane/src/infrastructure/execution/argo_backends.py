@@ -9,12 +9,12 @@ from infrastructure.http import HttpClient
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import build_prefix, drift_run_prefix
 
+from .build_inputs import label_mapping_input
 from .image_references import (
     build_image_tag,
     image_repository,
     immutable_image_reference,
 )
-from .build_inputs import label_mapping_input
 
 
 class _ArgoBackend:

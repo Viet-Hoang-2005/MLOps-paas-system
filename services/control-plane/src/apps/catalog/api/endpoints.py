@@ -6,17 +6,17 @@ from rest_framework.views import APIView
 from apps.catalog.models import ModelProject
 from apps.catalog.selectors import project_for_user
 from apps.catalog.services.deletion import request_project_deletion
-from apps.catalog.services.project_metadata import save_project_metadata
 from apps.catalog.services.preview import create_project_preview, save_preview
-from apps.catalog.services.workspace import save_workspace_file, delete_workspace_file
+from apps.catalog.services.project_metadata import save_project_metadata
+from apps.catalog.services.workspace import delete_workspace_file, save_workspace_file
 from apps.deployment.api.serializers import (
     BuildSerializer,
 )
 from apps.deployment.services.builds import request_preview_build
 
 from .serializers import (
-    ModelProjectSerializer,
     ModelPreviewSerializer,
+    ModelProjectSerializer,
     PreviewWriteSerializer,
     ProjectCreateSerializer,
     ProjectMetadataWriteSerializer,

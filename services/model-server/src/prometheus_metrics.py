@@ -1,4 +1,5 @@
 """One scrape aggregates every Uvicorn worker in this pod, not every pod."""
+
 import os
 
 from fastapi.responses import Response

@@ -216,9 +216,11 @@ export const deployEn = {
       },
       attachments: {
         labelMapping: "Choose label mapping (.json, .pkl)",
-        labelMappingSubtitle: "Mapping classification labels from numbers to letters",
+        labelMappingSubtitle:
+          "Mapping classification labels from numbers to letters",
         labelMappingIndicators: "(0: benign, 1: attack,...)",
-        labelMappingHint: "Mapping classification labels from numbers to letters",
+        labelMappingHint:
+          "Mapping classification labels from numbers to letters",
         inputSchema: "Input schema (.json)",
         inputSchemaSubtitle: "Define input data structures",
         inputSchemaIndicators: "(float, int, string,...)",

@@ -8,7 +8,6 @@ import httpx
 import jwt
 import redis
 import redis.asyncio as async_redis
-from redis.sentinel import Sentinel
 from confluent_kafka import Producer
 from fastapi import (
     BackgroundTasks,
@@ -25,6 +24,8 @@ from fastapi.security import APIKeyHeader
 from jwt.algorithms import RSAAlgorithm
 from prometheus_client import Counter, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
+from redis.sentinel import Sentinel
+
 from src import auth as auth_service
 from src.events import publish_inference_event
 from src.inference import parse_worker_prediction
@@ -39,10 +40,10 @@ from src.logging_utils import (
     reset_context,
 )
 from src.logging_utils import request_id as validated_request_id
-from src.routing import resolve_worker_url
-from src.schemas import InferenceRequest
-from src.runtime_metrics import record_request
 from src.prometheus_metrics import metrics_response
+from src.routing import resolve_worker_url
+from src.runtime_metrics import record_request
+from src.schemas import InferenceRequest
 
 logger = get_logger(__name__)
 publication_summary = Summary(logger, "inference_enqueue_summary")

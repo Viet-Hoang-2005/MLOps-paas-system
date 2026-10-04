@@ -58,7 +58,12 @@ export function useRuntimeLogStream({
 
     const poll = async () => {
       try {
-        const batch = await getRuntimeLogs(activeSource, offset, cursor, controller.signal);
+        const batch = await getRuntimeLogs(
+          activeSource,
+          offset,
+          cursor,
+          controller.signal,
+        );
         if (cancelled) return;
 
         const nextLogs = batch.logs.filter(
@@ -75,7 +80,9 @@ export function useRuntimeLogStream({
               ? [...previous.logs, ...nextLogs].slice(-10000)
               : nextLogs,
           status: batch.status,
-          error: batch.error || (batch.logError ? t("terminal.logsUnavailable") : ""),
+          error:
+            batch.error ||
+            (batch.logError ? t("terminal.logsUnavailable") : ""),
         }));
 
         if (terminalStatusSet.has(batch.status)) {

@@ -7,12 +7,8 @@ import requests
 from dotenv import load_dotenv
 
 # 1. CẤU HÌNH ĐƯỜNG DẪN VÀ ENDPOINT
-ROOT_DIR = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
-TEST_CSV_PATH = os.path.join(
-    ROOT_DIR, "models", "nids-xgboost", "data", "test_data.csv"
-)
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+TEST_CSV_PATH = os.path.join(ROOT_DIR, "models", "nids-xgboost", "data", "test_data.csv")
 
 # Tự động load biến môi trường từ file .env
 load_dotenv(os.path.join(ROOT_DIR, ".env"))
@@ -37,14 +33,10 @@ def api_test_continuous(samples_per_class=1):
         # 3. VÒNG LẶP VÔ HẠN
         while True:
             # Bốc ngẫu nhiên số lượ ng đều nhau cho mỗi nhãn ở mỗi chu kỳ
-            sample_df = df.groupby("Label").sample(
-                n=samples_per_class, random_state=None
-            )
+            sample_df = df.groupby("Label").sample(n=samples_per_class, random_state=None)
 
             # Xáo trộn dữ liệu đã bốc mẫu
-            sample_df = sample_df.sample(frac=1, random_state=None).reset_index(
-                drop=True
-            )
+            sample_df = sample_df.sample(frac=1, random_state=None).reset_index(drop=True)
 
             # Duyệt qua toàn bộ dữ liệu đã bốc mẫu và gửi từng dòng lên API để kiểm tra dự đoán
             for index, row in sample_df.iterrows():
@@ -85,18 +77,12 @@ def api_test_continuous(samples_per_class=1):
                             predicted_label = label_mapping[int(predicted_label)]
 
                         # So sánh dự đoán với nhãn thực tế để đánh giá đúng/sai
-                        status_icon = (
-                            "CORRECT" if predicted_label == actual_label else "WRONG"
-                        )
+                        status_icon = "CORRECT" if predicted_label == actual_label else "WRONG"
 
-                        print(
-                            f"{status_icon} | Predicted: {predicted_label} | Latency: {latency}ms"
-                        )
+                        print(f"{status_icon} | Predicted: {predicted_label} | Latency: {latency}ms")
                         print(f"Probability details: {result.get('probabilities')}")
                     else:
-                        print(
-                            f"API Error (Status {response.status_code}): {response.text}"
-                        )
+                        print(f"API Error (Status {response.status_code}): {response.text}")
 
                 except requests.exceptions.ConnectionError:
                     print("Connection Error: API is not running!")

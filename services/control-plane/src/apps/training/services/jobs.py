@@ -4,6 +4,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 from apps.observability.services.lifecycle import record_training_event
 from apps.training.models import TrainingJob
@@ -15,7 +16,6 @@ from apps.training.tasks import (
     purge_training_job_outputs,
 )
 from common.api.exceptions import Conflict
-from rest_framework.exceptions import ValidationError
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import training_job_prefix
 

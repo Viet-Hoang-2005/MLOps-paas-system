@@ -14,10 +14,7 @@ import type {
 export type TrainingStep = 1 | 2 | 3;
 export type TrainingModelMode = "new" | "existing";
 export type TrainingTransitionState =
-  | "idle"
-  | "saving-metadata"
-  | "saving-source"
-  | "starting-training";
+  "idle" | "saving-metadata" | "saving-source" | "starting-training";
 
 export interface TrainingMetadataForm {
   name: string;

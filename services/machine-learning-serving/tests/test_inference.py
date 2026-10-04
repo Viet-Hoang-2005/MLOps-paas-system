@@ -2,7 +2,6 @@
 
 import numpy as np
 import pytest
-
 from src.inference import run_inference
 
 
@@ -21,9 +20,7 @@ def test_integer_json_number_matches_double_signature():
         "expected_features": ["Destination Port", "label"],
         "float64_features": ["Destination Port"],
     }
-    prediction, confidence = run_inference(
-        loaded, {"label": "BENIGN", "Destination Port": 53}
-    )
+    prediction, confidence = run_inference(loaded, {"label": "BENIGN", "Destination Port": 53})
     assert prediction == 0
     assert confidence is None
 

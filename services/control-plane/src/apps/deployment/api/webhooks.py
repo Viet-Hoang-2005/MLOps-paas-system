@@ -8,14 +8,14 @@ from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.deployment.models import Build, Deployment, Endpoint
 from apps.catalog.models import ModelProject
+from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.services.callbacks import valid_callback_token
+from apps.deployment.services.completion import complete_build
 from apps.deployment.services.logs import append_deployment_log
 from apps.deployment.tasks import _mark_deployment_healthy, cleanup_failed_build_artifacts
 from apps.observability.services.outbox import enqueue_event
-from apps.deployment.services.completion import complete_build
 from common.api.permissions import HasInternalWebhookSecret
 from common.logging import record_transition
 from infrastructure.execution.image_references import temporary_image_reference

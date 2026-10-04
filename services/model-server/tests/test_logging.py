@@ -3,17 +3,14 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+
 from src import api as index
 from src import database
 from src.logging_utils import RequestLoggingMiddleware, current_context
 
 
 def test_gateway_installs_request_logging():
-    middleware = next(
-        item
-        for item in index.app.user_middleware
-        if item.cls is RequestLoggingMiddleware
-    )
+    middleware = next(item for item in index.app.user_middleware if item.cls is RequestLoggingMiddleware)
     assert middleware.kwargs["routes"] is index.app.router.routes
 
 
@@ -39,9 +36,7 @@ def test_publication_summarizes_enqueue_failure_and_recovery_without_payload(
 
     assert summary.record.call_args_list[0].kwargs["success"] is False
     assert summary.record.call_args_list[1].kwargs["records"] == 1
-    summary.failure.assert_called_once_with(
-        "publish", "Inference event enqueue failed", error_type="RuntimeError"
-    )
+    summary.failure.assert_called_once_with("publish", "Inference event enqueue failed", error_type="RuntimeError")
     summary.recovery.assert_called_once_with("publish")
     assert "payload" not in str(summary.mock_calls)
     assert "https://" not in str(summary.mock_calls)
@@ -123,9 +118,7 @@ async def test_gateway_shutdown_closes_summaries_even_if_producer_flush_fails(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("header", [None, "invalid request id", "valid-request-1"])
-async def test_prediction_uses_one_validated_id_and_trusted_context(
-    monkeypatch, header
-):
+async def test_prediction_uses_one_validated_id_and_trusted_context(monkeypatch, header):
     response = Mock(status_code=200)
     response.json.return_value = {"prediction": 1}
     observed = []
@@ -160,9 +153,7 @@ async def test_prediction_uses_one_validated_id_and_trusted_context(
     assert context["project_id"] == "trusted-project"
     assert context["model_version_id"] == "trusted-version"
     assert context["request_id"] == tasks.tasks[0].kwargs["request_id"]
-    assert client.post.call_args.kwargs["headers"] == {
-        "X-Request-ID": context["request_id"]
-    }
+    assert client.post.call_args.kwargs["headers"] == {"X-Request-ID": context["request_id"]}
     assert client.post.call_args.kwargs["json"] == {
         "features": {"tenant_id": "untrusted-feature"},
         "model_version_id": "trusted-version",
@@ -179,9 +170,7 @@ async def test_prediction_uses_one_validated_id_and_trusted_context(
 
 @pytest.mark.asyncio
 async def test_prediction_resets_context_when_route_resolution_fails(monkeypatch):
-    monkeypatch.setattr(
-        index, "resolve_worker_url", Mock(side_effect=HTTPException(503, "unavailable"))
-    )
+    monkeypatch.setattr(index, "resolve_worker_url", Mock(side_effect=HTTPException(503, "unavailable")))
     before = current_context()
     with pytest.raises(HTTPException):
         await index.predict(
@@ -207,9 +196,7 @@ def test_http_failure_keeps_resource_context_after_handler_reset(monkeypatch, ca
             "project_id": "trusted-project",
         }
     }
-    monkeypatch.setattr(
-        index, "resolve_worker_url", Mock(side_effect=HTTPException(503, "unavailable"))
-    )
+    monkeypatch.setattr(index, "resolve_worker_url", Mock(side_effect=HTTPException(503, "unavailable")))
     caplog.set_level(logging.INFO)
     before = current_context()
     with TestClient(app) as client:
@@ -219,11 +206,7 @@ def test_http_failure_keeps_resource_context_after_handler_reset(monkeypatch, ca
             headers={"X-Request-ID": "request-1"},
         )
     assert response.status_code == 503
-    errors = [
-        record
-        for record in caplog.records
-        if getattr(record, "event", "") == "http.request.failed"
-    ]
+    errors = [record for record in caplog.records if getattr(record, "event", "") == "http.request.failed"]
     assert len(errors) == 1
     assert errors[0].tenant_id == "trusted-tenant"
     assert errors[0].project_id == "trusted-project"

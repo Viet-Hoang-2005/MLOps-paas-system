@@ -4,9 +4,9 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from infrastructure.prometheus import PrometheusClient
 from infrastructure.docker_metrics import DockerMetricsClient
 from infrastructure.local_request_metrics import LocalRequestCounterClient
+from infrastructure.prometheus import PrometheusClient
 
 RANGES = {"15m": 900, "1h": 3600, "24h": 86400}
 

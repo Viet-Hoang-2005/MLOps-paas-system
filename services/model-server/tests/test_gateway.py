@@ -6,6 +6,7 @@ import httpx
 import jwt
 import pytest
 from fastapi import BackgroundTasks, HTTPException
+
 from src import api as index
 from src import database
 from src.routing import serving_engine_for_flavor
@@ -97,14 +98,10 @@ async def test_access_public_and_api_key(monkeypatch):
     version = str(uuid.uuid4())
     record = {"tenant_id": "t", "access_mode": "public", "project_pk": 1}
     monkeypatch.setattr(index, "get_model_version_record", lambda *a, **k: record)
-    assert (await index.verify_model_access(version, None, None))[
-        "auth_type"
-    ] == "public"
+    assert (await index.verify_model_access(version, None, None))["auth_type"] == "public"
     record["access_mode"] = "private"
     monkeypatch.setattr(index, "verify_project_api_key", lambda *_: {"tenant_id": "t"})
-    assert (await index.verify_model_access(version, "key", None))[
-        "auth_type"
-    ] == "api_key"
+    assert (await index.verify_model_access(version, "key", None))["auth_type"] == "api_key"
 
 
 @pytest.mark.asyncio
@@ -116,9 +113,7 @@ async def test_access_api_key_invalid_and_cross_tenant(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         await index.verify_model_access(version, "bad", None)
     assert exc.value.status_code == 401
-    monkeypatch.setattr(
-        index, "verify_project_api_key", lambda *_: {"tenant_id": "other"}
-    )
+    monkeypatch.setattr(index, "verify_project_api_key", lambda *_: {"tenant_id": "other"})
     with pytest.raises(HTTPException) as exc:
         await index.verify_model_access(version, "key", None)
     assert exc.value.status_code == 403
@@ -135,9 +130,7 @@ async def test_access_jwt_success_missing_and_tenant_mismatch(monkeypatch):
     monkeypatch.setattr(index.jwt, "get_unverified_header", lambda token: {"kid": "k"})
     monkeypatch.setattr(index, "get_public_key", AsyncMock(return_value="public"))
     monkeypatch.setattr(index.jwt, "decode", lambda *a, **k: {"tenant_id": "t"})
-    assert (await index.verify_model_access(version, None, "Bearer token"))[
-        "auth_type"
-    ] == "jwt"
+    assert (await index.verify_model_access(version, None, "Bearer token"))["auth_type"] == "jwt"
     monkeypatch.setattr(index.jwt, "decode", lambda *a, **k: {"tenant_id": "other"})
     with pytest.raises(HTTPException) as exc:
         await index.verify_model_access(version, None, "Bearer token")
@@ -155,15 +148,11 @@ async def test_access_jwt_missing_kid_expired_and_invalid(monkeypatch):
     assert exc.value.status_code == 401
     monkeypatch.setattr(index.jwt, "get_unverified_header", lambda token: {"kid": "k"})
     monkeypatch.setattr(index, "get_public_key", AsyncMock(return_value="public"))
-    monkeypatch.setattr(
-        index.jwt, "decode", Mock(side_effect=jwt.ExpiredSignatureError())
-    )
+    monkeypatch.setattr(index.jwt, "decode", Mock(side_effect=jwt.ExpiredSignatureError()))
     with pytest.raises(HTTPException) as exc:
         await index.verify_model_access(version, None, "Bearer token")
     assert exc.value.status_code == 401
-    monkeypatch.setattr(
-        index.jwt, "decode", Mock(side_effect=jwt.InvalidTokenError("bad"))
-    )
+    monkeypatch.setattr(index.jwt, "decode", Mock(side_effect=jwt.InvalidTokenError("bad")))
     with pytest.raises(HTTPException) as exc:
         await index.verify_model_access(version, None, "Bearer token")
     assert exc.value.status_code == 401
@@ -171,19 +160,11 @@ async def test_access_jwt_missing_kid_expired_and_invalid(monkeypatch):
 
 def test_resolve_worker_url_local_and_kubernetes(monkeypatch):
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
-    assert (
-        index.resolve_worker_url({"flavor": "xgboost"}, "/predict")
-        == "http://machine-learning-serving:5001/predict"
-    )
-    assert (
-        index.resolve_worker_url({"flavor": "pytorch"}, "/health")
-        == "http://deep-learning-serving:5002/health"
-    )
+    assert index.resolve_worker_url({"flavor": "xgboost"}, "/predict") == "http://machine-learning-serving:5001/predict"
+    assert index.resolve_worker_url({"flavor": "pytorch"}, "/health") == "http://deep-learning-serving:5002/health"
     monkeypatch.setenv("KUBERNETES_SERVICE_HOST", "yes")
     assert (
-        index.resolve_worker_url(
-            {"flavor": "tensorflow", "endpoint_container_name": "worker"}, "/predict"
-        )
+        index.resolve_worker_url({"flavor": "tensorflow", "endpoint_container_name": "worker"}, "/predict")
         == "http://worker-svc.mlops-model-runtimes.svc.cluster.local:5002/predict"
     )
     with pytest.raises(HTTPException) as exc:
@@ -312,9 +293,7 @@ async def test_predict_upstream_and_network_errors(monkeypatch):
     )
     assert response.status_code == 422
     request_error = httpx.RequestError("down", request=Mock())
-    monkeypatch.setattr(
-        index.httpx, "AsyncClient", lambda **kw: FakeAsyncClient(post=request_error)
-    )
+    monkeypatch.setattr(index.httpx, "AsyncClient", lambda **kw: FakeAsyncClient(post=request_error))
     with pytest.raises(HTTPException) as exc:
         await index.predict(
             "v",
@@ -359,9 +338,7 @@ async def test_predict_network_error_evicts_cache_and_returns_409_if_stopped(
     monkeypatch.setattr(index, "redis_client", fake_redis)
 
     request_error = httpx.RequestError("Connection refused", request=Mock())
-    monkeypatch.setattr(
-        index.httpx, "AsyncClient", lambda **kw: FakeAsyncClient(post=request_error)
-    )
+    monkeypatch.setattr(index.httpx, "AsyncClient", lambda **kw: FakeAsyncClient(post=request_error))
 
     stopped_db_record = {
         "id": "v-stopped",
@@ -371,9 +348,7 @@ async def test_predict_network_error_evicts_cache_and_returns_409_if_stopped(
         "endpoint_container_name": None,
         "deployment_status": "stopped",
     }
-    monkeypatch.setattr(
-        index, "_fetch_model_version_from_db", lambda vid: stopped_db_record
-    )
+    monkeypatch.setattr(index, "_fetch_model_version_from_db", lambda vid: stopped_db_record)
 
     with pytest.raises(HTTPException) as exc:
         await index.predict(

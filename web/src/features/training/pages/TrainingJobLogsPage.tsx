@@ -20,7 +20,7 @@ export default function TrainingJobLogsPage() {
     refreshLogs,
   } = useTrainingJobDetailContext();
   const stream = useRuntimeLogStream({
-    source: {kind: "training", id: job.id},
+    source: { kind: "training", id: job.id },
     terminalStatuses: TERMINAL_STATUSES,
   });
 
@@ -44,14 +44,15 @@ export default function TrainingJobLogsPage() {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => { stream.refresh(); void refreshLogs(); }}
+            onClick={() => {
+              stream.refresh();
+              void refreshLogs();
+            }}
             disabled={refreshingSection === "logs"}
             icon={
               <RefreshCw
                 className={`h-3 w-3 ${
-                  refreshingSection === "logs"
-                    ? "animate-spin"
-                    : ""
+                  refreshingSection === "logs" ? "animate-spin" : ""
                 }`}
               />
             }

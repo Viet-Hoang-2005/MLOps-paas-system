@@ -7,6 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint . && node scripts/check-architecture.mjs && node scripts/check-i18n.mjs && node scripts/check-colors.mjs && node scripts/check-radii.mjs && node scripts/check-typography.mjs",
+    "lint:fix": "eslint --fix .",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
+    "format:all": "prettier --write \"src/**/*.{ts,tsx,css,json}\" && eslint --fix .",
     "preview": "vite preview",
     "test:workflow": "node scripts/test-workflow-navigation.mjs",
     "test:metrics": "node scripts/test-runtime-metrics.mjs"
@@ -59,6 +63,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
     "postcss": "^8.5.14",
+    "prettier": "^3.9.9",
     "tailwindcss": "^4.3.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",

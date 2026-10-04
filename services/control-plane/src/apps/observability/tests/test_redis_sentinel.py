@@ -10,7 +10,9 @@ class RedisSentinelClientTests(SimpleTestCase):
         redis_client.cache_clear()
         super().tearDown()
 
-    @override_settings(REDIS_CONNECTION_MODE="direct", REDIS_URL="redis://local:6379/1", CELERY_BROKER_URL="redis://local:6379/3")
+    @override_settings(
+        REDIS_CONNECTION_MODE="direct", REDIS_URL="redis://local:6379/1", CELERY_BROKER_URL="redis://local:6379/3"
+    )
     @patch("common.redis_client.Redis.from_url")
     def test_direct_mode_uses_separate_database_for_celery_queue(self, from_url):
         redis_client.cache_clear()

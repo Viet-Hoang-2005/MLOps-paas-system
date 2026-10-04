@@ -19,9 +19,7 @@ logger = get_logger(__name__)
 
 
 def _keep_bentoml_operational_log(record):
-    return not (
-        record.msg == "Exception on %s [%s]" and current_context().get("request_id")
-    )
+    return not (record.msg == "Exception on %s [%s]" and current_context().get("request_id"))
 
 
 def load_runtime_model(model_version_id: str, model_uri: str | None):
@@ -43,15 +41,9 @@ def load_runtime_model(model_version_id: str, model_uri: str | None):
 class DeepLearningModelService:
     def __init__(self):
         configure("deep-learning-serving")
-        get_logger("bentoml._internal.server.http_app").addFilter(
-            _keep_bentoml_operational_log
-        )
+        get_logger("bentoml._internal.server.http_app").addFilter(_keep_bentoml_operational_log)
         model_version_id = os.environ.get("MODEL_VERSION_ID")
-        resolved_id = (
-            model_version_id
-            if model_version_id and model_version_id != "unknown"
-            else "unknown"
-        )
+        resolved_id = model_version_id if model_version_id and model_version_id != "unknown" else "unknown"
         try:
             self.model = load_runtime_model(resolved_id, os.environ.get("MODEL_URI"))
             log_event(logger, "INFO", "model_loaded", "Deep learning model loaded")
@@ -71,9 +63,7 @@ class DeepLearningModelService:
             raise RuntimeError("Model failed to load at startup")
         prediction, payload_version_id = run_inference(self.model, payload)
         model_version_id = (
-            payload_version_id
-            if payload_version_id != "unknown"
-            else os.environ.get("MODEL_VERSION_ID", "unknown")
+            payload_version_id if payload_version_id != "unknown" else os.environ.get("MODEL_VERSION_ID", "unknown")
         )
         return {
             "success": True,

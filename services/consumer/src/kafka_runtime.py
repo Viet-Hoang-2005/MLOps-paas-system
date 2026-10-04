@@ -35,13 +35,9 @@ broker_summary = Summary(logger, "broker_poll_summary")
 
 REDPANDA_BROKERS = os.environ.get("REDPANDA_BROKERS", "localhost:19092")
 KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "mlops_paas_production_data")
-KAFKA_TOPIC_RETRY_SECONDS = max(
-    1, int(os.environ.get("KAFKA_TOPIC_RETRY_SECONDS", "5"))
-)
+KAFKA_TOPIC_RETRY_SECONDS = max(1, int(os.environ.get("KAFKA_TOPIC_RETRY_SECONDS", "5")))
 KAFKA_BATCH_SIZE = max(1, int(os.environ.get("KAFKA_BATCH_SIZE", "500")))
-KAFKA_DB_RETRY_INITIAL_SECONDS = max(
-    1, int(os.environ.get("KAFKA_DB_RETRY_INITIAL_SECONDS", "5"))
-)
+KAFKA_DB_RETRY_INITIAL_SECONDS = max(1, int(os.environ.get("KAFKA_DB_RETRY_INITIAL_SECONDS", "5")))
 KAFKA_DB_RETRY_MAX_SECONDS = max(
     KAFKA_DB_RETRY_INITIAL_SECONDS,
     int(os.environ.get("KAFKA_DB_RETRY_MAX_SECONDS", "60")),
@@ -95,9 +91,7 @@ def _commit_batch_offset(consumer, record: KafkaRecord) -> bool:
     try:
         committed_offsets = consumer.commit(offsets=[next_offset], asynchronous=False)
     except Exception as exc:
-        commit_summary.record(
-            success=False, duration_ms=(time.perf_counter() - started) * 1000
-        )
+        commit_summary.record(success=False, duration_ms=(time.perf_counter() - started) * 1000)
         commit_summary.failure(
             failure_key,
             "Kafka offset commit failed",
@@ -107,13 +101,9 @@ def _commit_batch_offset(consumer, record: KafkaRecord) -> bool:
         )
         return False
 
-    failures = [
-        offset for offset in committed_offsets or [] if getattr(offset, "error", None)
-    ]
+    failures = [offset for offset in committed_offsets or [] if getattr(offset, "error", None)]
     if failures:
-        commit_summary.record(
-            success=False, duration_ms=(time.perf_counter() - started) * 1000
-        )
+        commit_summary.record(success=False, duration_ms=(time.perf_counter() - started) * 1000)
         commit_summary.failure(
             failure_key,
             "Kafka offset commit returned errors",
@@ -122,9 +112,7 @@ def _commit_batch_offset(consumer, record: KafkaRecord) -> bool:
             count=len(failures),
         )
         return False
-    commit_summary.record(
-        duration_ms=(time.perf_counter() - started) * 1000, committed=1
-    )
+    commit_summary.record(duration_ms=(time.perf_counter() - started) * 1000, committed=1)
     commit_summary.recovery(failure_key, partition=record.partition)
     return True
 
@@ -135,9 +123,7 @@ def flush_batch(consumer, records: list[KafkaRecord]) -> bool:
         return True
     partitions = {(record.topic, record.partition) for record in records}
     if len(partitions) != 1:
-        raise ValueError(
-            "A Kafka batch must contain records from exactly one partition."
-        )
+        raise ValueError("A Kafka batch must contain records from exactly one partition.")
 
     predictions = build_prediction_records_dataframe(records)
     signals = build_automatic_drift_signals(records)
@@ -159,9 +145,7 @@ def _retry_delay(attempts: int) -> int:
     )
 
 
-def _schedule_retry(
-    consumer, key: tuple[str, int], retries: dict[tuple[str, int], RetryState]
-) -> None:
+def _schedule_retry(consumer, key: tuple[str, int], retries: dict[tuple[str, int], RetryState]) -> None:
     retry = retries.setdefault(key, RetryState())
     retry.attempts += 1
     delay = _retry_delay(retry.attempts)
@@ -220,9 +204,7 @@ def main():
     try:
         consumer = Consumer(conf)
         consumer.subscribe([KAFKA_TOPIC])
-        log_event(
-            logger, "INFO", "consumer_started", "Consumer subscribed and listening"
-        )
+        log_event(logger, "INFO", "consumer_started", "Consumer subscribed and listening")
 
         while RUNNING:
             ensure_outbox_dispatcher_running(dispatcher)
@@ -243,10 +225,7 @@ def main():
             if msg.error():
                 if msg.error().code() == KafkaError._PARTITION_EOF:
                     continue
-                if (
-                    msg.error().code() == KafkaError.UNKNOWN_TOPIC_OR_PART
-                    or msg.error().retriable()
-                ):
+                if msg.error().code() == KafkaError.UNKNOWN_TOPIC_OR_PART or msg.error().retriable():
                     broker_summary.failure(
                         "poll",
                         "Kafka temporarily unavailable",

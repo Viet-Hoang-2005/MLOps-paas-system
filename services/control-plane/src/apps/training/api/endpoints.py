@@ -14,8 +14,8 @@ from apps.training.services.jobs import (
     output_download_url,
     request_job_deletion,
     request_output_purge,
-    submit_job,
     retry_job,
+    submit_job,
 )
 from apps.training.services.logs import training_logs
 from common.api.exceptions import ServiceUnavailable

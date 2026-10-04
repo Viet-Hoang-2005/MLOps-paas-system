@@ -24,9 +24,7 @@ async def test_model_health_states(monkeypatch):
     monkeypatch.setenv("MODEL_URI", "/model")
     monkeypatch.setattr(index, "load_model_from_uri", lambda *_: {"model": object()})
     assert (await index.model_health())["model_loaded"]
-    monkeypatch.setattr(
-        index, "load_model_from_uri", Mock(side_effect=RuntimeError("bad"))
-    )
+    monkeypatch.setattr(index, "load_model_from_uri", Mock(side_effect=RuntimeError("bad")))
     assert "bad" in (await index.model_health())["error"]
 
 

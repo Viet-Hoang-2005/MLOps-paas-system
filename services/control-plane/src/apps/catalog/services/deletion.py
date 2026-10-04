@@ -79,8 +79,8 @@ def run_project_cleanup(project):
 
 
 def _stop_project_jobs(project):
-    from infrastructure.execution import build_backend, training_backend, drift_backend
     from apps.drift.models import DriftRun
+    from infrastructure.execution import build_backend, drift_backend, training_backend
 
     for build in project.builds.exclude(status__in=("ready", "failed", "cancelled")):
         result = build_backend(build.backend).cancel(build)
@@ -117,8 +117,8 @@ def finalize_project_deletion(project, *, storage=None):
         project = ModelProject.objects.select_for_update().get(pk=project.pk)
         from apps.ct import models as ct
         from apps.drift.models import DriftMonitor, DriftRun
-        from apps.registry.models import RegistryAlias
         from apps.observability.models import EventOutbox, LifecycleEvent
+        from apps.registry.models import RegistryAlias
         from common.redis_client import redis_client
 
         aggregates = [

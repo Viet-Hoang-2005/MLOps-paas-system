@@ -31,22 +31,13 @@ def resolve_worker_url(model_record: dict[str, Any], endpoint_path: str) -> str:
             raise HTTPException(
                 status_code=503,
                 detail=(
-                    "Model endpoint is not deployed yet. "
-                    "Please trigger a deployment from the Control Plane first."
+                    "Model endpoint is not deployed yet. Please trigger a deployment from the Control Plane first."
                 ),
             )
-        fallback = (
-            "machine-learning-serving"
-            if serving_engine == "ml"
-            else "deep-learning-serving"
-        )
+        fallback = "machine-learning-serving" if serving_engine == "ml" else "deep-learning-serving"
         return f"http://{fallback}:{target_port}{endpoint_path}"
     if os.environ.get("KUBERNETES_SERVICE_HOST"):
-        service_name = (
-            f"{container_name}-svc"
-            if not container_name.endswith("-svc")
-            else container_name
-        )
+        service_name = f"{container_name}-svc" if not container_name.endswith("-svc") else container_name
         namespace = os.environ.get(
             "MODEL_RUNTIME_NAMESPACE",
             "mlops-model-runtimes",

@@ -1,7 +1,7 @@
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 from src.uvicorn_entrypoint import main, metrics_directory
@@ -31,12 +31,12 @@ print(metrics_response().body.decode())
             output = run_python(scrape, directory)
             assert 'test_predictions_total{tenant_id="tenant-1"} 6.0' in output
             assert output.count('test_predictions_total{tenant_id="tenant-1"}') == 1
-            assert 'test_latency_seconds_count 2.0' in output
-            assert 'test_latency_seconds_sum 1.0' in output
+            assert "test_latency_seconds_count 2.0" in output
+            assert "test_latency_seconds_sum 1.0" in output
     assert not Path(directory).exists()
     with metrics_directory() as restarted:
         assert restarted != directory
-        assert 'test_predictions_total' not in run_python(scrape, restarted)
+        assert "test_predictions_total" not in run_python(scrape, restarted)
         run_python(worker, restarted)
         assert 'test_predictions_total{tenant_id="tenant-1"} 3.0' in run_python(scrape, restarted)
 
