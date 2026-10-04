@@ -9,11 +9,15 @@ import {
   type WorkspaceFile as S3File,
 } from "@/shared/api/catalogApi";
 import { Button } from "@/shared/components/Button";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { CSVEditor } from "@/shared/components/CSVEditor";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
+import { DataViewer } from "@/shared/components/DataViewer";
 import { LazyCodeEditor } from "@/shared/components/LazyCodeEditor";
 import { SourceTree } from "@/shared/components/SourceTree";
-import { toast } from "@/shared/components/toastStore";
+import {
+  buildSourceTree,
+  type CreatingFileState,
+} from "@/shared/types/sourceTreeModel";
+import { toast } from "@/shared/types/toastStore";
 import {
   FilePlus,
   FolderOpen,
@@ -32,7 +36,6 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { buildSourceTree, type CreatingFileState } from "./sourceTreeModel";
 
 export interface SourceEditorProps {
   modelId: string;
@@ -529,7 +532,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(
                 )}
               </div>
             ) : editorType === "csv" || isCsv ? (
-              <CSVEditor
+              <DataViewer
                 initialCsvText={fileContent}
                 onChange={handleEditorChange}
               />
@@ -621,7 +624,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(
           </div>
         </div>
 
-        <ConfirmModal
+        <ConfirmDialog
           open={!!deleteConfirmPath}
           title={t("sourceEditor.deleteTitle")}
           description={

@@ -12,11 +12,9 @@ import {
   Menu,
   Moon,
   Plus,
-  Search,
   Settings,
   Sun,
   UserCircle,
-  X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -31,6 +29,7 @@ import { getProfile } from "@/features/settings/api/profileApi";
 import { settingsQueryKeys } from "@/features/settings/queryKeys";
 import type { UserProfile } from "@/features/settings/types";
 import { Button } from "@/shared/components/Button";
+import { Search } from "@/shared/components/Search";
 
 const getInitials = (profile: UserProfile | null, fallback: string) => {
   const source = profile?.full_name || profile?.email || fallback;
@@ -136,26 +135,15 @@ export default function Header({
               sideOffset={8}
               className="z-50 w-(--radix-popover-trigger-width) rounded-surface border border-border bg-surface p-2 shadow-(--shadow-overlay) animate-fade-in"
             >
-              <div className="relative mb-2">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-color-muted-foreground" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={t("modelSelector.search")}
-                  className="h-10 w-full rounded-surface border border-input bg-surface pl-9 pr-9 text-style-body text-color-foreground outline-none focus:border-primary"
-                  autoFocus
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => setSearch("")}
-                    className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-compact text-color-muted-foreground hover:bg-muted"
-                    aria-label={t("modelSelector.clearSearch")}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
+              <Search
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                onClear={() => setSearch("")}
+                placeholder={t("modelSelector.search")}
+                clearAriaLabel={t("modelSelector.clearSearch")}
+                wrapperClassName="mb-2"
+                autoFocus
+              />
               <div className="max-h-72 overflow-y-auto">
                 {visibleModels.length ? (
                   visibleModels.map((model) => (

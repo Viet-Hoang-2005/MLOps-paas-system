@@ -1,14 +1,13 @@
-import { useEffect, useState } from "react";
-import { Download } from "lucide-react";
-import { useParams, useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
-import { PageHeader } from "@/shared/components/PageHeader";
-import { PageBody } from "@/shared/components/PageBody";
-import { Button } from "@/shared/components/Button";
 import { getDriftReportDownloadUrl } from "@/features/monitoring/api/driftApi";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { toast } from "@/shared/components/toastStore";
+import { Button } from "@/shared/components/Button";
+import { PageBody } from "@/shared/components/PageBody";
+import { PageHeader } from "@/shared/components/PageHeader";
+import { toast } from "@/shared/types/toastStore";
+import { Download, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate, useParams } from "react-router-dom";
 
 export default function DriftReportPage() {
   const { modelId, runId } = useParams<{ modelId: string; runId: string }>();

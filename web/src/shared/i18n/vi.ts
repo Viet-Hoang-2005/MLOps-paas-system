@@ -17,6 +17,8 @@ export const commonVi = {
     collapseSidebar: "Thu gọn sidebar",
     expandGroup: "Mở rộng nhóm",
     collapseGroup: "Thu gọn nhóm",
+    search: "Tìm kiếm",
+    clear: "Xóa",
   },
   navigation: {
     primary: "Điều hướng chính",

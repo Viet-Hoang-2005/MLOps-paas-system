@@ -1,18 +1,18 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import {
   createAPIKey,
   updateAPIKey,
 } from "@/features/api-tokens/api/apiKeysApi";
-import { getApiErrorMessage } from "@/shared/api/errors";
 import { apiTokenQueryKeys } from "@/features/api-tokens/queryKeys";
-import { toast } from "@/shared/components/toastStore";
 import type {
   APIKeyRecord,
   CreatedAPIKeyResponse,
 } from "@/features/api-tokens/types";
+import { getApiErrorMessage } from "@/shared/api/errors";
+import { toast } from "@/shared/types/toastStore";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 export function useApiKeyForm(initialData?: APIKeyRecord | null) {
   const queryClient = useQueryClient();

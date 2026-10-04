@@ -2,14 +2,14 @@ import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { predictWithModelProject } from "@/shared/api/catalogApi";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Button } from "@/shared/components/Button";
-import { CSVEditor } from "@/shared/components/CSVEditor";
 import { CardSummary } from "@/shared/components/Card";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
+import { DataViewer } from "@/shared/components/DataViewer";
 import { FileDropzone } from "@/shared/components/FileDropzone";
 import { PageBody } from "@/shared/components/PageBody";
 import { TerminalViewer } from "@/shared/components/TerminalViewer";
-import { toast } from "@/shared/components/toastStore";
 import { formatNumber } from "@/shared/i18n/formatters";
+import { toast } from "@/shared/types/toastStore";
 import {
   Check,
   Download,
@@ -463,7 +463,7 @@ export default function ModelTestingPage() {
 
   return (
     <>
-      <ConfirmModal
+      <ConfirmDialog
         open={blocker.state === "blocked"}
         title={t("testingPage.leaveTitle")}
         description={t("testingPage.leaveDescription")}
@@ -539,7 +539,7 @@ export default function ModelTestingPage() {
                 {t("testingPage.rowsLoaded", { fileName, count: rows.length })}
               </p>
               <div className="overflow-hidden rounded-surface border border-border h-125">
-                <CSVEditor initialCsvText={csvText} readOnly={true} />
+                <DataViewer initialCsvText={csvText} readOnly={true} />
               </div>
             </div>
 

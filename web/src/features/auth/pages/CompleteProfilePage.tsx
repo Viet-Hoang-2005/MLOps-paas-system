@@ -1,17 +1,17 @@
-import { Link, Navigate, useLocation } from "react-router-dom";
-import { ArrowLeft, Camera, User, Lock, LockKeyhole } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { completeRegistration } from "@/features/auth/api/authApi";
 import { AuthCard } from "@/features/auth/components/AuthCard";
-import { Input, InputPassword } from "@/shared/components/Input";
-import { Button } from "@/shared/components/Button";
-import { AvatarCropModal } from "@/features/settings/components/AvatarCropModal";
-import { AvatarModal } from "@/features/settings/components/AvatarModal";
-import { toast } from "@/shared/components/toastStore";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useForm } from "@/features/auth/hooks/useForm";
-import { completeRegistration } from "@/features/auth/api/authApi";
+import { AvatarCropModal } from "@/features/settings/components/AvatarCropModal";
+import { AvatarModal } from "@/features/settings/components/AvatarModal";
 import { getApiErrorMessage } from "@/shared/api/errors";
+import { Button } from "@/shared/components/Button";
+import { Input, InputPassword } from "@/shared/components/Input";
+import { toast } from "@/shared/types/toastStore";
+import { ArrowLeft, Camera, Lock, LockKeyhole, User } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link, Navigate, useLocation } from "react-router-dom";
 
 interface LocationState {
   registrationToken: string;

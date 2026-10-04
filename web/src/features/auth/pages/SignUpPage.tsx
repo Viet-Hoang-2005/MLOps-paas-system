@@ -1,18 +1,18 @@
+import { requestOTP } from "@/features/auth/api/authApi";
+import { AuthCard } from "@/features/auth/components/AuthCard";
+import { Divider } from "@/features/auth/components/Divider";
+import { OAuthButton } from "@/features/auth/components/OAuthButton";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { startGitHubOAuth } from "@/features/auth/lib/oauth";
+import { getApiErrorMessage } from "@/shared/api/errors";
+import { Button } from "@/shared/components/Button";
+import { Input } from "@/shared/components/Input";
+import { toast } from "@/shared/types/toastStore";
 import { useGoogleLogin } from "@react-oauth/google";
 import { Mail, UserPlus } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { AuthCard } from "@/features/auth/components/AuthCard";
-import { OAuthButton } from "@/features/auth/components/OAuthButton";
-import { Button } from "@/shared/components/Button";
-import { Divider } from "@/features/auth/components/Divider";
-import { Input } from "@/shared/components/Input";
-import { useAuth } from "@/features/auth/hooks/useAuth";
-import { requestOTP } from "@/features/auth/api/authApi";
-import { getApiErrorMessage } from "@/shared/api/errors";
-import { startGitHubOAuth } from "@/features/auth/lib/oauth";
-import { toast } from "@/shared/components/toastStore";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function SignUpPage() {
   const navigate = useNavigate();

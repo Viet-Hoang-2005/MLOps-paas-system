@@ -1,10 +1,10 @@
-import { LoaderCircle } from "lucide-react";
-import { useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getGitHubOAuthConfig } from "@/features/auth/lib/oauth";
-import { toast } from "@/shared/components/toastStore";
+import { toast } from "@/shared/types/toastStore";
+import { LoaderCircle } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 export default function GitHubCallbackPage() {
   const { t } = useTranslation("auth");

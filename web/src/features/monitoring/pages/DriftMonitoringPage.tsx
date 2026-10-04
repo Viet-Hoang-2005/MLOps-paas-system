@@ -36,12 +36,12 @@ import {
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { CardSummary } from "@/shared/components/Card";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { DataTable } from "@/shared/components/DataTable";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageBody } from "@/shared/components/PageBody";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Placeholder } from "@/shared/components/Placeholder";
 import { StepTitle } from "@/shared/components/StepTitle";
+import { Table } from "@/shared/components/Table";
 import { TerminalViewer } from "@/shared/components/TerminalViewer";
 import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
 
@@ -320,7 +320,7 @@ export default function DriftMonitoringPage() {
             />
           )}
           <StepTitle title={t("history")} />
-          <DataTable
+          <Table
             data={results ?? []}
             columns={columns}
             getRowId={(result) => result.id}
@@ -331,7 +331,7 @@ export default function DriftMonitoringPage() {
         </div>
       </PageBody>
 
-      <ConfirmModal
+      <ConfirmDialog
         open={isDeleteModalOpen}
         title={t("deleteTitle")}
         description={t("deleteDescription")}

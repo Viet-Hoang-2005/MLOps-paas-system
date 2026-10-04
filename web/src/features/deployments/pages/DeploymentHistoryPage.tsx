@@ -1,4 +1,3 @@
-import { formatDateTime } from "@/shared/i18n/formatters";
 import { RouteFallback } from "@/app/router/RouteFallback";
 import {
   useBuildHistory,
@@ -10,8 +9,9 @@ import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import type { Build } from "@/features/projects/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Button } from "@/shared/components/Button";
-import { DataTable } from "@/shared/components/DataTable";
 import { PageHeader } from "@/shared/components/PageHeader";
+import { Table } from "@/shared/components/Table";
+import { formatDateTime } from "@/shared/i18n/formatters";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Box } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -133,7 +133,7 @@ export default function DeploymentHistoryPage() {
           )}
         </p>
       )}
-      <DataTable
+      <Table
         columns={columns}
         data={builds.data ?? []}
         loading={builds.isLoading}

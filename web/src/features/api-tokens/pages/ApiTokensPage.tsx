@@ -4,9 +4,9 @@ import type { APIKeyRecord } from "@/features/api-tokens/types";
 import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { DataTable } from "@/shared/components/DataTable";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageHeader } from "@/shared/components/PageHeader";
+import { Table } from "@/shared/components/Table";
 import { formatDateTime } from "@/shared/i18n/formatters";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Edit3, KeyRound, RefreshCw, Trash2 } from "lucide-react";
@@ -153,7 +153,7 @@ export default function DeveloperSettingPage() {
         }
       />
 
-      <DataTable
+      <Table
         columns={columns}
         data={apiKeys}
         getRowId={(key) => key.id}
@@ -171,7 +171,7 @@ export default function DeveloperSettingPage() {
           onCopy={handleCopyCreatedKey}
         />
       )}
-      <ConfirmModal
+      <ConfirmDialog
         open={Boolean(pendingAction)}
         title={
           pendingAction?.kind === "delete"

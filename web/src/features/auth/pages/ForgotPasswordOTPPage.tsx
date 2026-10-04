@@ -1,17 +1,17 @@
-import { useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Mail } from "lucide-react";
-import { AuthCard } from "@/features/auth/components/AuthCard";
-import { Button } from "@/shared/components/Button";
-import { OTPInput } from "@/shared/components/OTPInput";
-import { useCountdown } from "@/features/auth/hooks/useCountdown";
 import {
   forgotPasswordOTP,
   verifyForgotPasswordOTP,
 } from "@/features/auth/api/authApi";
+import { AuthCard } from "@/features/auth/components/AuthCard";
+import { useCountdown } from "@/features/auth/hooks/useCountdown";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { toast } from "@/shared/components/toastStore";
+import { Button } from "@/shared/components/Button";
+import { OTPInput } from "@/shared/components/OTPInput";
+import { toast } from "@/shared/types/toastStore";
+import { ArrowLeft, Mail } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
 interface LocationState {
   email: string;

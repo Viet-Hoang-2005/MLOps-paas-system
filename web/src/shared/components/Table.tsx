@@ -20,7 +20,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "./Button";
 import { Skeleton } from "./Skeleton";
 
-interface DataTableProps<T> {
+interface TableProps<T> {
   data: T[];
   columns: ColumnDef<T>[];
   getRowId?: (row: T) => string;
@@ -30,7 +30,7 @@ interface DataTableProps<T> {
   className?: string;
 }
 
-export function DataTable<T>({
+export function Table<T>({
   data,
   columns,
   getRowId,
@@ -38,7 +38,7 @@ export function DataTable<T>({
   pageSize = 10,
   emptyMessage,
   className = "",
-}: DataTableProps<T>) {
+}: TableProps<T>) {
   const { t } = useTranslation("common");
   const resolvedEmptyMessage = emptyMessage || t("pagination.empty");
   const [sorting, setSorting] = useState<SortingState>([]);

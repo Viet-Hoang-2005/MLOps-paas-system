@@ -44,10 +44,10 @@ import {
   updateModelProject,
 } from "@/shared/api/catalogApi";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { LineSteps } from "@/shared/components/LineSteps";
 import { PageHeader } from "@/shared/components/PageHeader";
-import { toast } from "@/shared/components/toastStore";
+import { toast } from "@/shared/types/toastStore";
 
 const trainingPath = "/dashboard/training";
 const createPath = `${trainingPath}/new`;
@@ -519,7 +519,7 @@ export default function CreateTrainingJobPage() {
 
   return (
     <section className="space-y-6">
-      <ConfirmModal
+      <ConfirmDialog
         open={discardOpen || blocker.state === "blocked"}
         title={t("createFlow.discard.title")}
         description={t("createFlow.discard.description")}

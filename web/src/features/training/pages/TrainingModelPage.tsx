@@ -23,11 +23,11 @@ import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { DataTable } from "@/shared/components/DataTable";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageHeader } from "@/shared/components/PageHeader";
-import { toast } from "@/shared/components/toastStore";
+import { Table } from "@/shared/components/Table";
 import { formatDuration } from "@/shared/lib/formatDuration";
+import { toast } from "@/shared/types/toastStore";
 
 const ACTIVE_STATUSES: TrainingJobStatus[] = [
   "pending",
@@ -469,7 +469,7 @@ export default function TrainingModelPage() {
           </p>
         </div>
       ) : (
-        <DataTable
+        <Table
           data={trainingJobs}
           columns={columns}
           getRowId={(job) => job.id}
@@ -478,7 +478,7 @@ export default function TrainingModelPage() {
         />
       )}
 
-      <ConfirmModal
+      <ConfirmDialog
         open={Boolean(jobToDelete)}
         title={t("delete.title")}
         description={t("delete.description", { job: jobToDelete?.name ?? "" })}

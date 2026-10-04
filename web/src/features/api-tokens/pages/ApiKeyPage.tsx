@@ -1,19 +1,19 @@
-import { Copy } from "lucide-react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useMemo } from "react";
-import { Button } from "@/shared/components/Button";
-import { Input } from "@/shared/components/Input";
 import { ApiModal } from "@/features/api-tokens/components/ApiModal";
 import { useApiKeyForm } from "@/features/api-tokens/hooks/useApiKeyForm";
 import { useApiTokens } from "@/features/api-tokens/hooks/useApiTokens";
 import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
-import { toast } from "@/shared/components/toastStore";
-import type { ColumnDef } from "@tanstack/react-table";
 import type { ModelProject } from "@/features/projects/types";
-import { PageHeader } from "@/shared/components/PageHeader";
+import { Button } from "@/shared/components/Button";
+import { Input } from "@/shared/components/Input";
 import { PageBody } from "@/shared/components/PageBody";
-import { DataTable } from "@/shared/components/DataTable";
+import { PageHeader } from "@/shared/components/PageHeader";
+import { Table } from "@/shared/components/Table";
+import { toast } from "@/shared/types/toastStore";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Copy } from "lucide-react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate, useParams } from "react-router-dom";
 
 export default function ApiKeyPage() {
   const { t } = useTranslation("settings");
@@ -137,7 +137,7 @@ export default function ApiKeyPage() {
               {t("apiKey.scope")}
             </span>
             <div className="rounded-surface border border-border bg-surface overflow-hidden mt-1">
-              <DataTable
+              <Table
                 columns={columns}
                 data={privateModels}
                 getRowId={(model) => model.id}

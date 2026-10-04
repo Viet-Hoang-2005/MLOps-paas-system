@@ -10,7 +10,7 @@ import { catalogQueryKeys } from "@/features/projects/queryKeys";
 import type { ModelBuildFormValues } from "@/features/projects/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Button } from "@/shared/components/Button";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -172,7 +172,7 @@ export default function ProjectFormPage() {
           </Button>
         </div>
       </form>
-      <ConfirmModal
+      <ConfirmDialog
         open={blocker.state === "blocked"}
         title={t("workflow.unsaved")}
         description={t("workflow.leaveHint")}

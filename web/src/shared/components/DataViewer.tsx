@@ -1,19 +1,19 @@
-import { useState, useEffect, useMemo } from "react";
-import Papa from "papaparse";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import Papa from "papaparse";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-interface CSVEditorProps {
+interface DataViewerProps {
   initialCsvText: string;
   onChange?: (csvText: string) => void;
   readOnly?: boolean;
 }
 
-export function CSVEditor({
+export function DataViewer({
   initialCsvText,
   onChange,
   readOnly = false,
-}: CSVEditorProps) {
+}: DataViewerProps) {
   const { t } = useTranslation("common");
   const [data, setData] = useState<string[][]>([]);
   const [page, setPage] = useState(0);

@@ -1,8 +1,8 @@
+import { setGlobalToastCallback } from "@/shared/types/toastStore";
 import * as ToastPrimitive from "@radix-ui/react-toast";
-import { AlertCircle, CheckCircle2, XCircle, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { setGlobalToastCallback } from "./toastStore";
 
 type ToastType = "success" | "error" | "warning";
 interface ToastItem {

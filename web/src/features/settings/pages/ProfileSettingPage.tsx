@@ -2,14 +2,14 @@ import { AvatarCropModal } from "@/features/settings/components/AvatarCropModal"
 import { AvatarModal } from "@/features/settings/components/AvatarModal";
 import { useProfileSettings } from "@/features/settings/hooks/useProfileSettings";
 import type { UserProfile } from "@/features/settings/types";
-import BaseModal from "@/shared/components/BaseModal";
+import BaseDialog from "@/shared/components/BaseDialog";
 import { Button } from "@/shared/components/Button";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { Input, InputPassword } from "@/shared/components/Input";
 import { OTPInput } from "@/shared/components/OTPInput";
 import { PageHeader } from "@/shared/components/PageHeader";
-import { toast } from "@/shared/components/toastStore";
 import { formatDateTime } from "@/shared/i18n/formatters";
+import { toast } from "@/shared/types/toastStore";
 import {
   BriefcaseBusiness,
   Building2,
@@ -522,7 +522,7 @@ export default function ProfileSettingPage() {
         </div>
       </section>
 
-      <ConfirmModal
+      <ConfirmDialog
         open={passwordSendConfirmOpen}
         title={t("profilePage.passwordConfirmTitle")}
         description={t("profilePage.passwordConfirmDescription", {
@@ -535,7 +535,7 @@ export default function ProfileSettingPage() {
       />
 
       {passwordModalStep === "otp" && (
-        <BaseModal
+        <BaseDialog
           title={t("profilePage.verifyOtpTitle")}
           onClose={() => setPasswordModalStep("closed")}
         >
@@ -562,11 +562,11 @@ export default function ProfileSettingPage() {
               {t("profilePage.verifyOtpAction")}
             </Button>
           </div>
-        </BaseModal>
+        </BaseDialog>
       )}
 
       {passwordModalStep === "password" && (
-        <BaseModal
+        <BaseDialog
           title={t("profilePage.setPasswordTitle")}
           onClose={() => setPasswordModalStep("closed")}
         >
@@ -603,10 +603,10 @@ export default function ProfileSettingPage() {
               {t("changePassword")}
             </Button>
           </div>
-        </BaseModal>
+        </BaseDialog>
       )}
 
-      <ConfirmModal
+      <ConfirmDialog
         open={deleteModalOpen}
         title={t("deleteTitle")}
         tone="danger"

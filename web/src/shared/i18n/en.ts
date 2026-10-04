@@ -23,6 +23,8 @@ export const commonEn = {
     collapseSidebar: "Collapse sidebar",
     expandGroup: "Expand group",
     collapseGroup: "Collapse group",
+    search: "Search",
+    clear: "Clear",
   },
   navigation: {
     primary: "Primary navigation",

@@ -1,13 +1,13 @@
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, LockKeyhole } from "lucide-react";
+import { resetForgottenPassword } from "@/features/auth/api/authApi";
 import { AuthCard } from "@/features/auth/components/AuthCard";
+import { useForm } from "@/features/auth/hooks/useForm";
+import { getApiErrorMessage } from "@/shared/api/errors";
 import { Button } from "@/shared/components/Button";
 import { InputPassword } from "@/shared/components/Input";
-import { useForm } from "@/features/auth/hooks/useForm";
-import { resetForgottenPassword } from "@/features/auth/api/authApi";
-import { getApiErrorMessage } from "@/shared/api/errors";
-import { toast } from "@/shared/components/toastStore";
+import { toast } from "@/shared/types/toastStore";
+import { ArrowLeft, LockKeyhole } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
 interface LocationState {
   email: string;

@@ -1,13 +1,13 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Mail, ArrowLeft } from "lucide-react";
-import { AuthCard } from "@/features/auth/components/AuthCard";
-import { Input } from "@/shared/components/Input";
-import { Button } from "@/shared/components/Button";
-import { toast } from "@/shared/components/toastStore";
 import { forgotPasswordOTP } from "@/features/auth/api/authApi";
+import { AuthCard } from "@/features/auth/components/AuthCard";
 import { getApiErrorMessage } from "@/shared/api/errors";
+import { Button } from "@/shared/components/Button";
+import { Input } from "@/shared/components/Input";
+import { toast } from "@/shared/types/toastStore";
+import { ArrowLeft, Mail } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function ForgotPasswordPage() {
   const { t } = useTranslation("auth");

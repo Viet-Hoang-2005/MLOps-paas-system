@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-export default function BaseModal({
+export default function BaseDialog({
   title,
   children,
   onClose,

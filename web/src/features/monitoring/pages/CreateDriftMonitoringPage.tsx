@@ -10,7 +10,7 @@ import {
 import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Button } from "@/shared/components/Button";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { FileDropzone } from "@/shared/components/FileDropzone";
 import { Input } from "@/shared/components/Input";
 import { PageHeader } from "@/shared/components/PageHeader";
@@ -141,7 +141,7 @@ export default function CreateDriftMonitoringPage() {
           {t(monitorId ? "createPage.update" : "createPage.create")}
         </Button>
       </form>
-      <ConfirmModal
+      <ConfirmDialog
         open={blocker.state === "blocked"}
         title={t("unsaved")}
         description={t("leaveHint")}

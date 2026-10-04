@@ -1,17 +1,17 @@
-import { useGoogleLogin } from "@react-oauth/google";
-import { Mail, LockKeyhole } from "lucide-react";
-import { Link } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { AuthCard } from "@/features/auth/components/AuthCard";
-import { OAuthButton } from "@/features/auth/components/OAuthButton";
-import { Button } from "@/shared/components/Button";
-import { Divider } from "@/features/auth/components/Divider";
-import { Input, InputPassword } from "@/shared/components/Input";
-import { useAuth } from "@/features/auth/hooks/useAuth";
-import { startGitHubOAuth } from "@/features/auth/lib/oauth";
-import { toast } from "@/shared/components/toastStore";
-import { useForm } from "@/features/auth/hooks/useForm";
 import AdaptMLLogo from "@/assets/icons/AdaptML.png";
+import { AuthCard } from "@/features/auth/components/AuthCard";
+import { Divider } from "@/features/auth/components/Divider";
+import { OAuthButton } from "@/features/auth/components/OAuthButton";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useForm } from "@/features/auth/hooks/useForm";
+import { startGitHubOAuth } from "@/features/auth/lib/oauth";
+import { Button } from "@/shared/components/Button";
+import { Input, InputPassword } from "@/shared/components/Input";
+import { toast } from "@/shared/types/toastStore";
+import { useGoogleLogin } from "@react-oauth/google";
+import { LockKeyhole, Mail } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 export default function LoginPage() {
   const { t } = useTranslation("auth");

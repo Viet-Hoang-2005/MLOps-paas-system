@@ -1,14 +1,14 @@
-import { useCallback, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
 import {
   loginBaseAuth,
   loginGitHub,
   loginGoogle,
 } from "@/features/auth/api/authApi";
-import { getApiErrorMessage } from "@/shared/api/errors";
-import { toast } from "@/shared/components/toastStore";
 import type { AuthResponse, LoginCredentials } from "@/features/auth/types";
+import { getApiErrorMessage } from "@/shared/api/errors";
+import { toast } from "@/shared/types/toastStore";
+import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 export const getAccessToken = () => localStorage.getItem("access_token");
 export const getRefreshToken = () => localStorage.getItem("refresh_token");

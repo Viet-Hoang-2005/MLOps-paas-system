@@ -15,8 +15,8 @@ import {
 } from "@/shared/api/catalogApi";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Button } from "@/shared/components/Button";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { CSVEditor } from "@/shared/components/CSVEditor";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
+import { DataViewer } from "@/shared/components/DataViewer";
 import { Input } from "@/shared/components/Input";
 import { LazyCodeEditor } from "@/shared/components/LazyCodeEditor";
 import { PageHeader } from "@/shared/components/PageHeader";
@@ -286,12 +286,12 @@ export default function ProjectOverviewPage() {
         ) : reference.isError ? (
           <p role="alert">{t("workflow.failed")}</p>
         ) : reference.data ? (
-          <CSVEditor initialCsvText={reference.data} readOnly />
+          <DataViewer initialCsvText={reference.data} readOnly />
         ) : (
           <p>{t("workflow.noReference")}</p>
         )}
       </section>
-      <ConfirmModal
+      <ConfirmDialog
         open={deleting}
         title={t("workflow.delete")}
         description={t("workflow.deleteHint")}
@@ -305,7 +305,7 @@ export default function ProjectOverviewPage() {
           {getApiErrorMessage(remove.error, t("workflow.failed"))}
         </p>
       )}
-      <ConfirmModal
+      <ConfirmDialog
         open={blocker.state === "blocked"}
         title={t("workflow.unsaved")}
         description={t("workflow.leaveHint")}

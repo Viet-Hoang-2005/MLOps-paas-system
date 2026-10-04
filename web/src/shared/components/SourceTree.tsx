@@ -1,5 +1,3 @@
-import { useState } from "react";
-import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
   ChevronRight,
@@ -8,11 +6,13 @@ import {
   Folder as FolderIcon,
   Play,
 } from "lucide-react";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type {
   CreatingFileState,
   SourceTreeNode,
-} from "@/shared/components/sourceTreeModel";
+} from "@/shared/types/sourceTreeModel";
 
 function InlineTreeInput({ onCommit }: { onCommit: (value: string) => void }) {
   const { t } = useTranslation("projects");

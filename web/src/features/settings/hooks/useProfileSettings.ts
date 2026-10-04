@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import {
   completePasswordChange,
   deleteAccount,
@@ -11,16 +10,17 @@ import {
   updateProfileAvatar,
   verifyPasswordChangeOTP,
 } from "@/features/settings/api/profileApi";
-import { getApiErrorMessage } from "@/shared/api/errors";
 import { settingsQueryKeys } from "@/features/settings/queryKeys";
-import { toast } from "@/shared/components/toastStore";
 import type {
   PasswordModalStep,
   ProfileFormValues,
   UpdateProfileRequest,
   UserProfile,
 } from "@/features/settings/types";
-import { useAuth } from "@/features/auth/hooks/useAuth";
+import { getApiErrorMessage } from "@/shared/api/errors";
+import { toast } from "@/shared/types/toastStore";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export const emptyProfileForm: ProfileFormValues = {

@@ -1,15 +1,15 @@
-import { formatDateTime } from "@/shared/i18n/formatters";
-import { useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import type { ColumnDef } from "@tanstack/react-table";
 import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
 import type { ModelProject } from "@/features/projects/types";
-import { Button } from "@/shared/components/Button";
-import { Badge } from "@/shared/components/Badge";
-import { DataTable } from "@/shared/components/DataTable";
-import { PageHeader } from "@/shared/components/PageHeader";
 import { getApiErrorMessage } from "@/shared/api/errors";
+import { Badge } from "@/shared/components/Badge";
+import { Button } from "@/shared/components/Button";
+import { PageHeader } from "@/shared/components/PageHeader";
+import { Table } from "@/shared/components/Table";
+import { formatDateTime } from "@/shared/i18n/formatters";
+import type { ColumnDef } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 export default function ProjectListPage() {
   const { t, i18n } = useTranslation("projects");
@@ -69,7 +69,7 @@ export default function ProjectListPage() {
           {getApiErrorMessage(projects.error, t("workflow.failed"))}
         </p>
       ) : (
-        <DataTable
+        <Table
           columns={columns}
           data={projects.data?.models ?? []}
           loading={projects.isLoading}

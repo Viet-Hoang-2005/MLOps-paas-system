@@ -41,10 +41,10 @@ import type {
 import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Button } from "@/shared/components/Button";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageTabs } from "@/shared/components/PageTabs";
-import { toast } from "@/shared/components/toastStore";
 import { computeElapsed, formatDuration } from "@/shared/lib/formatDuration";
+import { toast } from "@/shared/types/toastStore";
 
 const ACTIVE_STATUSES: TrainingJobStatus[] = [
   "pending",
@@ -446,7 +446,7 @@ export default function TrainingJobDetailPage() {
         <Outlet context={context} />
       </div>
 
-      <ConfirmModal
+      <ConfirmDialog
         open={deleteJobOpen}
         title={t("delete.title")}
         description={t("delete.description", { job: job.name })}
@@ -456,7 +456,7 @@ export default function TrainingJobDetailPage() {
         onCancel={() => setDeleteJobOpen(false)}
         onConfirm={() => deleteJobMutation.mutate()}
       />
-      <ConfirmModal
+      <ConfirmDialog
         open={deleteOutputsOpen}
         title={t("detail.deleteOutputTitle")}
         description={t("detail.deleteOutputDescription")}

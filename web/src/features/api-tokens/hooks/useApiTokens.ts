@@ -1,17 +1,17 @@
-import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   deleteAPIKey,
   listAPIKeys,
   regenerateAPIKey,
 } from "@/features/api-tokens/api/apiKeysApi";
-import { getApiErrorMessage } from "@/shared/api/errors";
 import { apiTokenQueryKeys } from "@/features/api-tokens/queryKeys";
-import { toast } from "@/shared/components/toastStore";
 import type {
   APIKeyRecord,
   CreatedAPIKeyResponse,
 } from "@/features/api-tokens/types";
+import { getApiErrorMessage } from "@/shared/api/errors";
+import { toast } from "@/shared/types/toastStore";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export function useApiTokens() {

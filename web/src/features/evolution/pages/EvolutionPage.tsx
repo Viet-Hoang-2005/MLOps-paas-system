@@ -13,7 +13,7 @@ import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Select } from "@/shared/components/Select";
 import { formatDateTime } from "@/shared/i18n/formatters";
@@ -161,7 +161,7 @@ export default function EvolutionPage() {
           )}
         </p>
       )}
-      <ConfirmModal
+      <ConfirmDialog
         open={confirm}
         title={t("workflow.deploy")}
         description={t("workflow.deployHint")}

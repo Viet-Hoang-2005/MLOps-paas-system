@@ -6,7 +6,7 @@ import { Button } from "./Button";
 
 type ConfirmTone = "default" | "danger";
 
-interface ConfirmModalProps {
+interface ConfirmDialogProps {
   open: boolean;
   title: string;
   description: ReactNode;
@@ -18,7 +18,7 @@ interface ConfirmModalProps {
   onCancel: () => void;
 }
 
-export function ConfirmModal({
+export function ConfirmDialog({
   open,
   title,
   description,
@@ -28,7 +28,7 @@ export function ConfirmModal({
   loading = false,
   onConfirm,
   onCancel,
-}: ConfirmModalProps) {
+}: ConfirmDialogProps) {
   const { t } = useTranslation("common");
   const resolvedConfirmText = confirmText || t("actions.confirm");
   const resolvedCancelText = cancelText || t("actions.cancel");
@@ -48,7 +48,7 @@ export function ConfirmModal({
     >
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 z-50 bg-overlay animate-fade-in" />
-        <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,32rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-overlay border border-border bg-surface text-color-foreground shadow-[var(--shadow-overlay)] animate-fade-in">
+        <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,32rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-overlay border border-border bg-surface text-color-foreground shadow-(--shadow-overlay) animate-fade-in">
           <div className="flex items-center gap-3 border-b border-border px-5 py-4">
             <span
               className={
