@@ -1,3 +1,28 @@
+import { useTheme } from "@/app/theme/useTheme";
+import {
+  deleteReferenceFile,
+  deleteSourceCodeFile,
+  listReferenceFiles,
+  listSourceCodeFiles,
+  uploadReferenceFile,
+  uploadSourceCodeFile,
+  type WorkspaceFile as S3File,
+} from "@/shared/api/catalogApi";
+import { Button } from "@/shared/components/Button";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { CSVEditor } from "@/shared/components/CSVEditor";
+import { LazyCodeEditor } from "@/shared/components/LazyCodeEditor";
+import { SourceTree } from "@/shared/components/SourceTree";
+import { toast } from "@/shared/components/toastStore";
+import {
+  FilePlus,
+  FolderOpen,
+  FolderPlus,
+  Play,
+  Save,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import {
   forwardRef,
   useEffect,
@@ -7,31 +32,6 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { useTheme } from "@/app/theme/useTheme";
-import { LazyCodeEditor } from "@/shared/components/LazyCodeEditor";
-import {
-  Save,
-  FolderOpen,
-  Upload,
-  Play,
-  FilePlus,
-  FolderPlus,
-  Trash2,
-} from "lucide-react";
-import { CSVEditor } from "@/shared/components/CSVEditor";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { Button } from "@/shared/components/Button";
-import { toast } from "@/shared/components/toastStore";
-import {
-  listSourceCodeFiles,
-  uploadSourceCodeFile,
-  deleteSourceCodeFile,
-  listReferenceFiles,
-  uploadReferenceFile,
-  deleteReferenceFile,
-  type WorkspaceFile as S3File,
-} from "@/shared/api/catalogApi";
-import { SourceTree } from "@/shared/components/SourceTree";
 import { buildSourceTree, type CreatingFileState } from "./sourceTreeModel";
 
 export interface SourceEditorProps {

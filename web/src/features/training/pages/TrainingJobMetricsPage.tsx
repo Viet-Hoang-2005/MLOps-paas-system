@@ -1,17 +1,19 @@
+import { formatDateTime } from "@/shared/i18n/formatters";
+import { formatNumber } from "@/shared/i18n/formatters";
 import type { ReactNode } from "react";
 import { Activity, Cpu, HardDrive, RefreshCw, Rocket } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useTrainingJobDetailContext } from "@/features/training/trainingJobDetailContext";
 
-const formatMetricPercent = (value: number) => `${Math.round(value)}%`;
-const formatMegabytes = (megabytes: number) =>
-  megabytes >= 1024
-    ? `${(megabytes / 1024).toFixed(1)} GB`
-    : `${Math.round(megabytes)} MB`;
-
 export default function TrainingJobMetricsPage() {
-  const { t } = useTranslation("training");
+  const { t, i18n } = useTranslation("training");
+  const formatMetricPercent = (value: number) =>
+    `${formatNumber(Math.round(value), i18n.language)}%`;
+  const formatMegabytes = (megabytes: number) =>
+    megabytes >= 1024
+      ? `${formatNumber(megabytes / 1024, i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} GB`
+      : `${formatNumber(Math.round(megabytes), i18n.language)} MB`;
   const {
     job,
     activeStatuses,
@@ -96,7 +98,9 @@ export default function TrainingJobMetricsPage() {
             <span className="text-style-caption-strong text-color-muted-foreground">
               {latest?.timestamp
                 ? t("detail.metricsPage.sampled", {
-                    time: new Date(latest.timestamp).toLocaleTimeString(),
+                    time: formatDateTime(latest.timestamp, i18n.language, {
+                      timeStyle: "medium",
+                    }),
                   })
                 : t("detail.metricsPage.pending")}
             </span>

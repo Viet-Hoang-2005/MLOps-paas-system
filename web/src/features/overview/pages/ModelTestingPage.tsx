@@ -1,28 +1,29 @@
-import {
-  FileSpreadsheet,
-  Play,
-  Pause,
-  Download,
-  Trash2,
-  SendHorizontal,
-  X,
-  Check,
-  Percent,
-} from "lucide-react";
-import { useRef, useState, useMemo, useEffect } from "react";
-import { useTranslation } from "react-i18next";
-import { useBlocker } from "react-router-dom";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { TerminalViewer } from "@/shared/components/TerminalViewer";
-import { Button } from "@/shared/components/Button";
 import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { predictWithModelProject } from "@/shared/api/catalogApi";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { toast } from "@/shared/components/toastStore";
-import { FileDropzone } from "@/shared/components/FileDropzone";
+import { Button } from "@/shared/components/Button";
 import { CSVEditor } from "@/shared/components/CSVEditor";
 import { CardSummary } from "@/shared/components/Card";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { FileDropzone } from "@/shared/components/FileDropzone";
 import { PageBody } from "@/shared/components/PageBody";
+import { TerminalViewer } from "@/shared/components/TerminalViewer";
+import { toast } from "@/shared/components/toastStore";
+import { formatNumber } from "@/shared/i18n/formatters";
+import {
+  Check,
+  Download,
+  FileSpreadsheet,
+  Pause,
+  Percent,
+  Play,
+  SendHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useBlocker } from "react-router-dom";
 
 const TARGET_COLUMN_NAMES = new Set([
   "label",
@@ -147,7 +148,7 @@ const extractPredictionError = (
 };
 
 export default function ModelTestingPage() {
-  const { t } = useTranslation("overview");
+  const { t, i18n } = useTranslation("overview");
   const { selectedModel } = useModelSelection();
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [csvText, setCsvText] = useState("");
@@ -586,21 +587,21 @@ export default function ModelTestingPage() {
               <div className="grid gap-3 md:grid-cols-4">
                 <CardSummary
                   label={t("testingPage.processed")}
-                  value={`${summary.success + summary.failed}/${rows.length}`}
+                  value={`${formatNumber(summary.success + summary.failed, i18n.language)}/${formatNumber(rows.length, i18n.language)}`}
                   helper={t("testingPage.processedHelper")}
                   tone={testFinished && rows.length > 0 ? "info" : "default"}
                   icon={<SendHorizontal className="h-4 w-4" />}
                 />
                 <CardSummary
                   label={t("testingPage.failed")}
-                  value={String(summary.failed)}
+                  value={formatNumber(summary.failed, i18n.language)}
                   tone={summary.failed ? "error" : "default"}
                   helper={t("testingPage.failedHelper")}
                   icon={<X className="h-4 w-4" />}
                 />
                 <CardSummary
                   label={t("testingPage.successful")}
-                  value={String(summary.success)}
+                  value={formatNumber(summary.success, i18n.language)}
                   tone={summary.success > 0 ? "success" : "default"}
                   helper={t("testingPage.successfulHelper")}
                   icon={<Check className="h-4 w-4" />}

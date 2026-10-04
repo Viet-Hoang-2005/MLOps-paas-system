@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/shared/i18n/formatters";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -46,8 +47,7 @@ export default function ProjectListPage() {
     {
       accessorKey: "updated_at",
       header: t("updated"),
-      cell: ({ row }) =>
-        new Date(row.original.updated_at).toLocaleString(i18n.language),
+      cell: ({ row }) => formatDateTime(row.original.updated_at, i18n.language),
     },
   ];
   return (

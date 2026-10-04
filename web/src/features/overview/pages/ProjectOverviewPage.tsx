@@ -1,5 +1,32 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { RouteFallback } from "@/app/router/RouteFallback";
+import { useTheme } from "@/app/theme/useTheme";
+import { RuntimeMetrics } from "@/features/overview/components/RuntimeMetrics";
+import {
+  useProjectOverview,
+  useRunningSource,
+  useSnapshotText,
+} from "@/features/overview/hooks/useProjectOverview";
+import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
+import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
+import { catalogQueryKeys } from "@/features/projects/queryKeys";
+import {
+  deleteModelProject,
+  updateModelProject,
+} from "@/shared/api/catalogApi";
+import { getApiErrorMessage } from "@/shared/api/errors";
+import { Button } from "@/shared/components/Button";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { CSVEditor } from "@/shared/components/CSVEditor";
+import { Input } from "@/shared/components/Input";
+import { LazyCodeEditor } from "@/shared/components/LazyCodeEditor";
+import { PageHeader } from "@/shared/components/PageHeader";
+import { Select } from "@/shared/components/Select";
+import { TextArea } from "@/shared/components/TextArea";
+import { formatDateTime } from "@/shared/i18n/formatters";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Home } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Navigate,
   useBlocker,
@@ -7,32 +34,6 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { Home } from "lucide-react";
-import { RouteFallback } from "@/app/router/RouteFallback";
-import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
-import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
-import {
-  useProjectOverview,
-  useSnapshotText,
-  useRunningSource,
-} from "@/features/overview/hooks/useProjectOverview";
-import {
-  updateModelProject,
-  deleteModelProject,
-} from "@/shared/api/catalogApi";
-import { catalogQueryKeys } from "@/features/projects/queryKeys";
-import { Button } from "@/shared/components/Button";
-import { Input } from "@/shared/components/Input";
-import { TextArea } from "@/shared/components/TextArea";
-import { Select } from "@/shared/components/Select";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { CSVEditor } from "@/shared/components/CSVEditor";
-import { getApiErrorMessage } from "@/shared/api/errors";
-import { RuntimeMetrics } from "@/features/overview/components/RuntimeMetrics";
-import { PageHeader } from "@/shared/components/PageHeader";
-import { LazyCodeEditor } from "@/shared/components/LazyCodeEditor";
-import { useTheme } from "@/app/theme/useTheme";
 
 const ModelTestingPage = lazy(
   () => import("@/features/overview/pages/ModelTestingPage"),
@@ -40,7 +41,7 @@ const ModelTestingPage = lazy(
 
 export default function ProjectOverviewPage() {
   const { modelId } = useParams();
-  const { t } = useTranslation("overview");
+  const { t, i18n } = useTranslation("overview");
   const { t: tCommon } = useTranslation("common");
   const { selectedModel, loading: isModelLoading } = useModelSelection();
   const { resolvedTheme } = useTheme();
@@ -229,8 +230,8 @@ export default function ProjectOverviewPage() {
             <p>{model.description}</p>
             <p>{model.flavor}</p>
             <p>
-              {new Date(model.created_at).toLocaleString()} ·{" "}
-              {new Date(model.updated_at).toLocaleString()}
+              {formatDateTime(model.created_at, i18n.language)} ·{" "}
+              {formatDateTime(model.updated_at, i18n.language)}
             </p>
             <Select
               value={model.access_mode}

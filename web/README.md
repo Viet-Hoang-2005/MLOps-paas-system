@@ -20,6 +20,7 @@ Quality gates used by CI:
 ```bash
 pnpm lint
 pnpm build
+pnpm test:i18n
 ```
 
 `pnpm lint` runs both ESLint boundary rules and the architecture check for allowed source roots, parent-relative imports, legacy imports, and circular dependencies.
@@ -63,7 +64,9 @@ See [Frontend architecture](docs/frontend-architecture.md) and [Design system](d
 - Status must include text or an icon; color alone is not sufficient.
 - Every interactive control needs a visible `focus-visible` state and a meaningful accessible name.
 - Support `light`, `dark`, and `system` themes. Theme preference is persisted locally.
-- Copy belongs to its feature i18n namespace. New lifecycle/navigation copy includes Vietnamese resources with English fallback for unchanged screens; no language selector is currently shown.
+- Copy belongs to its feature i18n namespace. All ten namespaces have English and Vietnamese resources. The Header language dropdown replaces the standalone New model button; project creation remains in Model Project and the model-selector menu.
+- Language selection uses `adaptml.language` in localStorage, then the first supported browser language, then English. Switching updates UI and HTML `lang` without navigation, reload or clearing forms. Dates/numbers use `vi-VN`/`en-US`; browser timezone stays unchanged. Backend messages, logs, code, CSV, names and UUIDs are not translated.
+- `pnpm test:i18n` tests language selection/storage, registration, resource parity/interpolation/plurals and negative fixtures. `pnpm lint` checks both locale resources and hardcoded UI; the CI frontend entry runs these i18n checks alongside build/ESLint.
 
 ## Manual verification checklist
 
@@ -74,6 +77,9 @@ See [Frontend architecture](docs/frontend-architecture.md) and [Design system](d
 - Evolution snapshot comparison/lineage, Running badge and confirmed deploy; deployment failure keeps the old Running version
 - Drift configure, run, runtime logs, report, and delete
 - Profile, avatar, password, and the separate API Token feature
+- English/Vietnamese on every page, including loading/error/empty states, tables, status badges and confirmation dialogs
+- Change language with a dirty form, open modal or polling job; preserve input, route, selected project and progress. Refresh and logout must preserve the preference; blocked storage must not break switching.
+- Header language menu on mobile (320 px and up), checked selection, keyboard access, tooltip and HTML `lang`; user content and technical logs remain unchanged
 - Light/dark/system at 768 px, 1024 px, and 1440 px
 - Keyboard navigation, visible focus, 200% zoom, WCAG AA contrast, and reduced motion
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Cropper, { type Area, type Point } from "react-easy-crop";
 import { X } from "lucide-react";
+import { createPortal } from "react-dom";
 import { Button } from "@/shared/components/Button";
 import { useTranslation } from "react-i18next";
 
@@ -96,7 +97,9 @@ export function AvatarCropModal({
     }
   };
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay px-4">
       <div className="w-full max-w-xl rounded-surface border border-border bg-surface shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
@@ -158,6 +161,7 @@ export function AvatarCropModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

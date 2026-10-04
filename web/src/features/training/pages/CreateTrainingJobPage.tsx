@@ -1,5 +1,11 @@
 import { Cpu, FileCode2, FileText } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
   Outlet,
@@ -9,14 +15,6 @@ import {
   useSearchParams,
 } from "react-router-dom";
 
-import {
-  createTrainingProject,
-  getModelProject,
-  listModelProjects,
-  listReferenceFiles,
-  listSourceCodeFiles,
-  updateModelProject,
-} from "@/shared/api/catalogApi";
 import type { ModelProject } from "@/features/projects/types";
 import {
   cancelTrainingJob,
@@ -37,6 +35,14 @@ import type {
   TrainingJob,
   TrainingRuntimeCapabilities,
 } from "@/features/training/types";
+import {
+  createTrainingProject,
+  getModelProject,
+  listModelProjects,
+  listReferenceFiles,
+  listSourceCodeFiles,
+  updateModelProject,
+} from "@/shared/api/catalogApi";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { LineSteps } from "@/shared/components/LineSteps";
@@ -136,6 +142,7 @@ export default function CreateTrainingJobPage() {
     [job?.id, project?.id],
   );
 
+  const effectTranslation = useEffectEvent((key: string) => t(key));
   useEffect(() => {
     void Promise.all([listModelProjects(), getTrainingRuntimeCapabilities()])
       .then(([projectResponse, runtime]) => {
@@ -154,10 +161,13 @@ export default function CreateTrainingJobPage() {
       })
       .catch((error) =>
         toast.error(
-          getApiErrorMessage(error, t("createFlow.messages.loadFailed")),
+          getApiErrorMessage(
+            error,
+            effectTranslation("createFlow.messages.loadFailed"),
+          ),
         ),
       );
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     if (!requestedModelId) {
@@ -181,14 +191,17 @@ export default function CreateTrainingJobPage() {
       })
       .catch((error) => {
         toast.error(
-          getApiErrorMessage(error, t("createFlow.messages.projectLoadFailed")),
+          getApiErrorMessage(
+            error,
+            effectTranslation("createFlow.messages.projectLoadFailed"),
+          ),
         );
         navigate(routeFor(1, null, null), { replace: true });
       });
     return () => {
       active = false;
     };
-  }, [currentStep, navigate, requestedModelId, routeFor, t]);
+  }, [currentStep, navigate, requestedModelId, routeFor]);
 
   useEffect(() => {
     if (!requestedJobId) return;
@@ -202,13 +215,16 @@ export default function CreateTrainingJobPage() {
       })
       .catch((error) =>
         toast.error(
-          getApiErrorMessage(error, t("createFlow.messages.jobLoadFailed")),
+          getApiErrorMessage(
+            error,
+            effectTranslation("createFlow.messages.jobLoadFailed"),
+          ),
         ),
       );
     return () => {
       active = false;
     };
-  }, [requestedJobId, requestedModelId, t]);
+  }, [requestedJobId, requestedModelId]);
 
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {

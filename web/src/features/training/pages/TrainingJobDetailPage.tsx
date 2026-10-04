@@ -1,13 +1,5 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
+import { formatDateTime } from "@/shared/i18n/formatters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 import {
   Activity,
   AlertTriangle,
@@ -21,6 +13,15 @@ import {
   Settings,
   Trash2,
 } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useTranslation } from "react-i18next";
+import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import {
   deleteTrainingJob,
@@ -33,17 +34,17 @@ import {
 } from "@/features/training/api/trainingApi";
 import { LiveStatusBadge } from "@/features/training/components/TrainingOverviewSections";
 import { trainingQueryKeys } from "@/features/training/queryKeys";
-import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
 import type {
   TrainingJobDetailContextValue,
   TrainingJobDetailSection,
 } from "@/features/training/trainingJobDetailContext";
+import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { computeElapsed, formatDuration } from "@/shared/lib/formatDuration";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { PageTabs } from "@/shared/components/PageTabs";
 import { toast } from "@/shared/components/toastStore";
+import { computeElapsed, formatDuration } from "@/shared/lib/formatDuration";
 
 const ACTIVE_STATUSES: TrainingJobStatus[] = [
   "pending",
@@ -62,7 +63,7 @@ const DETAIL_SECTIONS: TrainingJobDetailSection[] = [
 const AUTO_SYNC_INTERVAL_MS = 3000;
 
 export default function TrainingJobDetailPage() {
-  const { t } = useTranslation("training");
+  const { t, i18n } = useTranslation("training");
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -423,7 +424,7 @@ export default function TrainingJobDetailPage() {
           </SummaryCell>
           <SummaryCell label={t("detail.overview.updatedAt")}>
             <p className="text-style-section-title font-bold text-color-foreground">
-              {new Date(job.updated_at).toLocaleString()}
+              {formatDateTime(job.updated_at, i18n.language)}
             </p>
           </SummaryCell>
         </div>

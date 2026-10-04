@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/shared/i18n/formatters";
 import {
   AlertTriangle,
   CheckCircle,
@@ -19,7 +20,7 @@ import {
 } from "@/shared/components/ProgressLine";
 
 export default function TrainingJobOverviewPage() {
-  const { t } = useTranslation("training");
+  const { t, i18n } = useTranslation("training");
   const { job, statusLabels } = useTrainingJobDetailContext();
 
   const isCompleted = job.status === "completed";
@@ -52,7 +53,9 @@ export default function TrainingJobOverviewPage() {
   }
 
   const formatTime = (iso?: string | null) =>
-    iso ? new Date(iso).toLocaleString() : t("detail.milestones.unavailable");
+    iso
+      ? formatDateTime(iso, i18n.language)
+      : t("detail.milestones.unavailable");
   const formatDurationDiff = (start?: string | null, end?: string | null) => {
     const elapsed = computeElapsed(start, end ?? undefined);
     return elapsed != null ? formatDuration(elapsed) : undefined;
@@ -194,23 +197,25 @@ export default function TrainingJobOverviewPage() {
           />
           <MetadataRow
             label={t("detail.overview.createdAt")}
-            value={new Date(job.created_at).toLocaleString()}
+            value={formatDateTime(job.created_at, i18n.language)}
           />
           <MetadataRow
             label={t("detail.overview.updatedAt")}
-            value={new Date(job.updated_at).toLocaleString()}
+            value={formatDateTime(job.updated_at, i18n.language)}
           />
           <MetadataRow
             label={t("detail.overview.startedAt")}
             value={
-              job.started_at ? new Date(job.started_at).toLocaleString() : "-"
+              job.started_at
+                ? formatDateTime(job.started_at, i18n.language)
+                : "-"
             }
           />
           <MetadataRow
             label={t("detail.overview.completedAt")}
             value={
               job.completed_at
-                ? new Date(job.completed_at).toLocaleString()
+                ? formatDateTime(job.completed_at, i18n.language)
                 : "-"
             }
           />

@@ -1,6 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
+import {
+  parseResource,
+  validateResourcePair,
+  validateRegistration,
+} from "./i18n-resources.mjs";
 
 const root = path.resolve("src");
 const namespaceFiles = new Map([
@@ -61,6 +66,81 @@ const visitDirectory = (directory) => {
 visitDirectory(root);
 
 const failures = [];
+for (const [namespace, file] of namespaceFiles) {
+  const en = parseResource(fs.readFileSync(file, "utf8"), file);
+  const viFile = file.replace(/en\.ts$/, "vi.ts");
+  if (!fs.existsSync(viFile)) {
+    failures.push(`${namespace}: missing Vietnamese resource`);
+    continue;
+  }
+  const vi = parseResource(fs.readFileSync(viFile, "utf8"), viFile);
+  failures.push(
+    ...en.errors.map((error) => `${namespace}/en: ${error}`),
+    ...vi.errors.map((error) => `${namespace}/vi: ${error}`),
+  );
+  failures.push(...validateResourcePair(en.resource, vi.resource, namespace));
+}
+failures.push(
+  ...validateRegistration(
+    fs.readFileSync(path.join(root, "app", "i18n.ts"), "utf8"),
+  ),
+);
+const dynamicGroups = {
+  common: {
+    statuses: ["preview", "registered", "running"],
+    theme: ["light", "dark", "system"],
+    language: ["en", "vi"],
+  },
+  projects: {
+    workflow: [
+      "preview",
+      "registered",
+      "running",
+      "pending",
+      "queued",
+      "building",
+      "ready",
+      "failed",
+      "cancelled",
+      "registering",
+      "unregistered",
+      "deploying",
+      "deployFailed",
+      "deleting",
+      "delete_failed",
+    ],
+  },
+  training: {
+    "detail.statuses": [
+      "pending",
+      "queued",
+      "uploading",
+      "running",
+      "cancelling",
+      "completed",
+      "failed",
+      "cancelled",
+    ],
+  },
+};
+for (const [namespace, groups] of Object.entries(dynamicGroups))
+  for (const language of ["en", "vi"]) {
+    const file = namespaceFiles
+      .get(namespace)
+      .replace(/en\.ts$/, `${language}.ts`);
+    if (!fs.existsSync(file)) continue;
+    const { resource } = parseResource(fs.readFileSync(file, "utf8"), file);
+    for (const [group, keys] of Object.entries(groups)) {
+      const node = group
+        .split(".")
+        .reduce((value, key) => value?.[key], resource);
+      for (const key of keys)
+        if (typeof node?.[key] !== "string")
+          failures.push(
+            `${namespace}/${language}:${group}.${key}: missing dynamic status key`,
+          );
+    }
+  }
 const translationKeys = new Map();
 const unwrapExpression = (node) => {
   let current = node;

@@ -1,4 +1,10 @@
 export const commonEn = {
+  language: {
+    label: "Language",
+    current: "Language: {{language}}",
+    en: "English",
+    vi: "Tiếng Việt",
+  },
   actions: {
     back: "Back",
     close: "Close",
@@ -9,7 +15,7 @@ export const commonEn = {
     copy: "Copy",
     copied: "Copied",
     createModel: "New model",
-    uploadModel: "Upload your new model",
+    uploadModel: "Create new model project",
     logout: "Logout",
     openNavigation: "Open navigation",
     closeNavigation: "Close navigation",
@@ -55,6 +61,8 @@ export const commonEn = {
     signedIn: "Signed in",
   },
   statuses: {
+    preview: "Preview",
+    running: "Running",
     registered: "registered",
     loading: "Loading...",
     loadingPage: "Loading page",

@@ -1,3 +1,5 @@
+import { formatDateTime } from "@/shared/i18n/formatters";
+import { formatNumber } from "@/shared/i18n/formatters";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useRuntimeMetrics } from "@/features/overview/hooks/useRuntimeMetrics";
@@ -10,7 +12,7 @@ export function RuntimeMetrics({
   projectId: string;
   deploymentId: string;
 }) {
-  const { t } = useTranslation("overview");
+  const { t, i18n } = useTranslation("overview");
   const [window, setWindow] = useState("1h");
   const metrics = useRuntimeMetrics(projectId, deploymentId, window);
   const realtime = metrics.data?.mode !== "history";
@@ -79,7 +81,10 @@ export function RuntimeMetrics({
               {available ? (
                 <>
                   <p className="text-style-metric">
-                    {Number(current).toFixed(2)}
+                    {formatNumber(Number(current), i18n.language, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </p>
                 </>
               ) : (
@@ -107,8 +112,13 @@ export function RuntimeMetrics({
                     />
                   </svg>
                   <p className="text-style-caption text-color-muted-foreground">
-                    {new Date(start * 1000).toLocaleTimeString()} –{" "}
-                    {new Date(values.at(-1)![0] * 1000).toLocaleTimeString()}
+                    {formatDateTime(start * 1000, i18n.language, {
+                      timeStyle: "medium",
+                    })}{" "}
+                    –{" "}
+                    {formatDateTime(values.at(-1)![0] * 1000, i18n.language, {
+                      timeStyle: "medium",
+                    })}
                   </p>
                 </>
               )}

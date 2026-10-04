@@ -1,48 +1,49 @@
-import { useEffect, useState } from "react";
-import {
-  Navigate,
-  useParams,
-  useNavigate,
-  useSearchParams,
-} from "react-router-dom";
 import { RouteFallback } from "@/app/router/RouteFallback";
-import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
-import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
+import { SnapshotMetadata } from "@/features/evolution/components/SnapshotMetadata";
 import {
   useProjectOverview,
   useRunningVersion,
 } from "@/features/overview/hooks/useProjectOverview";
-import { SnapshotMetadata } from "@/features/evolution/components/SnapshotMetadata";
+import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
+import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { Select } from "@/shared/components/Select";
+import { formatDateTime, formatNumber } from "@/shared/i18n/formatters";
+import type { ColumnDef } from "@tanstack/react-table";
 import {
-  Play,
-  Settings,
-  Trash2,
   ExternalLink,
   LineChart,
   Loader2,
+  Play,
+  Settings,
+  Trash2,
 } from "lucide-react";
-import type { ColumnDef } from "@tanstack/react-table";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-
-import { Placeholder } from "@/shared/components/Placeholder";
-import { PageHeader } from "@/shared/components/PageHeader";
-import { PageBody } from "@/shared/components/PageBody";
-import { StepTitle } from "@/shared/components/StepTitle";
-import { CardSummary } from "@/shared/components/Card";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
-import { TerminalViewer } from "@/shared/components/TerminalViewer";
-import { DataTable } from "@/shared/components/DataTable";
-import { Badge } from "@/shared/components/Badge";
-import { Button } from "@/shared/components/Button";
 import {
+  Navigate,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
+
+import {
+  useDeleteDriftMonitoringJob,
   useDriftMonitoringJobs,
   useDriftMonitoringResults,
-  useDeleteDriftMonitoringJob,
   useRunDriftMonitoringJob,
   type DriftMonitoringResult,
 } from "@/features/monitoring/hooks/useDriftMonitoring";
+import { Badge } from "@/shared/components/Badge";
+import { Button } from "@/shared/components/Button";
+import { CardSummary } from "@/shared/components/Card";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { DataTable } from "@/shared/components/DataTable";
+import { PageBody } from "@/shared/components/PageBody";
+import { PageHeader } from "@/shared/components/PageHeader";
+import { Placeholder } from "@/shared/components/Placeholder";
+import { StepTitle } from "@/shared/components/StepTitle";
+import { TerminalViewer } from "@/shared/components/TerminalViewer";
+import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
 
 const DRIFT_TERMINAL_STATUSES = ["completed", "failed", "cancelled"] as const;
 
@@ -170,7 +171,7 @@ export default function DriftMonitoringPage() {
       header: t("runAt"),
       cell: ({ row }) => (
         <span className="whitespace-nowrap text-color-muted-foreground">
-          {new Date(row.original.created_at).toLocaleString(i18n.language)}
+          {formatDateTime(row.original.created_at, i18n.language)}
         </span>
       ),
     },
@@ -181,7 +182,7 @@ export default function DriftMonitoringPage() {
         <span className="font-mono font-semibold">
           {row.original.drift_score == null
             ? t("none")
-            : `${(row.original.drift_score * 100).toFixed(1)}%`}
+            : `${formatNumber(row.original.drift_score * 100, i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`}
         </span>
       ),
     },

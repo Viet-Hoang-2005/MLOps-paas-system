@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  createLucideIcon,
   Laptop,
   LogOut,
   Menu,
@@ -47,13 +48,24 @@ const themeOptions: Array<{ value: ThemeMode; icon: typeof Sun }> = [
   { value: "system", icon: Laptop },
 ];
 
+const VnIcon = createLucideIcon("vn", [
+  ["path", { d: "m3 6 4 12 4-12", key: "v" }],
+  ["path", { d: "M14 18V6l7 12V6", key: "n" }],
+]);
+
+const EnIcon = createLucideIcon("en", [
+  ["path", { d: "M10.5 6H3v12h7.5", key: "e-body" }],
+  ["path", { d: "M3 12h6.5", key: "e-mid" }],
+  ["path", { d: "M14 18V6l7 12V6", key: "n" }],
+]);
+
 export default function Header({
   onOpenNavigation,
 }: {
   onOpenNavigation: () => void;
 }) {
   const navigate = useNavigate();
-  const { t } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
   const { logout } = useAuth();
   const { models, selectedModel, selectModel } = useModelSelection();
   const { mode, resolvedTheme, setMode } = useTheme();
@@ -98,14 +110,14 @@ export default function Header({
         </span>
       </button>
 
-      <div className="mx-3 min-w-0 flex-1 sm:max-w-md lg:absolute lg:left-1/2 lg:top-1/2 lg:w-[min(420px,42vw)] lg:-translate-x-1/2 lg:-translate-y-1/2">
+      <div className="mx-1 min-w-0 flex-1 sm:mx-3 sm:max-w-md lg:absolute lg:left-1/2 lg:top-1/2 lg:w-[min(420px,42vw)] lg:-translate-x-1/2 lg:-translate-y-1/2">
         <Popover.Root open={modelMenuOpen} onOpenChange={setModelMenuOpen}>
           <Popover.Trigger asChild>
             <Button
               variant="secondary"
               size="md"
               fullWidth
-              className="justify-between rounded-surface px-4 text-left text-style-body-strong shadow-sm"
+              className="min-w-0 justify-between rounded-surface px-2 text-left text-style-body-strong shadow-sm sm:px-4"
               aria-label={t("modelSelector.label")}
             >
               <span className="truncate">
@@ -162,8 +174,10 @@ export default function Header({
                           {model.name}
                         </span>
                         <span className="block truncate text-style-caption capitalize text-color-muted-foreground">
-                          {model.lifecycle_status || t("statuses.registered")} ·{" "}
-                          {model.flavor || t("statuses.registered")}
+                          {t(
+                            `statuses.${model.lifecycle_status || "registered"}`,
+                          )}{" "}
+                          · {model.flavor || t("statuses.registered")}
                         </span>
                       </span>
                       {selectedModel?.id === model.id && (
@@ -194,16 +208,58 @@ export default function Header({
         </Popover.Root>
       </div>
 
-      <div className="flex min-w-0 shrink-0 items-center justify-end gap-2 sm:min-w-40 xl:min-w-48">
-        <Button
-          size="icon"
-          aria-label={t("actions.createModel")}
-          title={t("actions.createModel")}
-          icon={<Plus className="h-5 w-5" />}
-          variant="secondary"
-          onClick={() => navigate(routes.newProject)}
-          className="hidden sm:inline-flex"
-        />
+      <div className="flex min-w-0 shrink-0 items-center justify-end gap-1 sm:min-w-40 sm:gap-2 xl:min-w-48">
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <Button
+              size="icon"
+              variant="secondary"
+              icon={
+                (i18n.resolvedLanguage ?? "en").startsWith("vi") ? (
+                  <VnIcon className="h-5 w-5" />
+                ) : (
+                  <EnIcon className="h-5 w-5" />
+                )
+              }
+              aria-label={t("language.current", {
+                language: t(`language.${i18n.resolvedLanguage ?? "en"}`),
+              })}
+              title={t("language.current", {
+                language: t(`language.${i18n.resolvedLanguage ?? "en"}`),
+              })}
+            />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              align="end"
+              sideOffset={8}
+              className="z-50 min-w-44 rounded-surface border border-border bg-surface p-1.5 shadow-(--shadow-overlay) animate-fade-in"
+            >
+              <DropdownMenu.Label className="px-2 py-1.5 text-style-overline uppercase text-color-muted-foreground">
+                {t("language.label")}
+              </DropdownMenu.Label>
+              <DropdownMenu.RadioGroup
+                value={i18n.resolvedLanguage ?? "en"}
+                onValueChange={(value) => {
+                  void i18n.changeLanguage(value);
+                }}
+              >
+                {(["vi", "en"] as const).map((language) => (
+                  <DropdownMenu.RadioItem
+                    key={language}
+                    value={language}
+                    className="flex h-9 items-center gap-2 rounded-compact px-2 text-style-body text-color-foreground outline-none hover:bg-muted focus:bg-muted"
+                  >
+                    <span className="flex-1">{t(`language.${language}`)}</span>
+                    <DropdownMenu.ItemIndicator>
+                      <Check className="h-4 w-4 text-color-primary" />
+                    </DropdownMenu.ItemIndicator>
+                  </DropdownMenu.RadioItem>
+                ))}
+              </DropdownMenu.RadioGroup>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
 
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
@@ -217,8 +273,8 @@ export default function Header({
                   <Sun className="h-5 w-5" />
                 )
               }
-              aria-label={t("theme.current", { mode })}
-              title={t("theme.current", { mode })}
+              aria-label={t("theme.current", { mode: t(`theme.${mode}`) })}
+              title={t("theme.current", { mode: t(`theme.${mode}`) })}
             />
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
@@ -264,7 +320,7 @@ export default function Header({
             <Button
               size="icon"
               variant="secondary"
-              className="group relative ml-2 overflow-hidden rounded-full border border-border bg-surface text-style-body-strong text-color-primary-foreground shadow-sm"
+              className="group relative overflow-hidden rounded-full border border-border bg-surface text-style-body-strong text-color-primary-foreground shadow-sm sm:ml-2"
               aria-label={t("userMenu.open")}
             >
               {profile?.avatar ? (

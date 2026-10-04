@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/shared/i18n/formatters";
 import { RouteFallback } from "@/app/router/RouteFallback";
 import {
   useBuildHistory,
@@ -18,7 +19,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 
 export default function DeploymentHistoryPage() {
   const { modelId } = useParams();
-  const { t } = useTranslation("projects");
+  const { t, i18n } = useTranslation("projects");
   const { t: tCommon } = useTranslation("common");
   const { selectedModel, loading: isModelLoading } = useModelSelection();
   const navigate = useNavigate();
@@ -44,7 +45,7 @@ export default function DeploymentHistoryPage() {
     {
       accessorKey: "created_at",
       header: t("workflow.builtAt"),
-      cell: ({ row }) => new Date(row.original.created_at).toLocaleString(),
+      cell: ({ row }) => formatDateTime(row.original.created_at, i18n.language),
     },
     {
       id: "project",

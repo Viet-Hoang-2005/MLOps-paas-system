@@ -1,35 +1,36 @@
+import { RouteFallback } from "@/app/router/RouteFallback";
+import {
+  deployBuild,
+  getProjectVersions,
+} from "@/features/deployments/api/deployApi";
+import { useBuildHistory } from "@/features/deployments/hooks/useDeploymentFlow";
+import { SnapshotComparison } from "@/features/evolution/components/SnapshotComparison";
+import { SnapshotMetadata } from "@/features/evolution/components/SnapshotMetadata";
+import { evolutionQueryKeys } from "@/features/evolution/queryKeys";
+import { useProjectOverview } from "@/features/overview/hooks/useProjectOverview";
+import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
+import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
+import { getApiErrorMessage } from "@/shared/api/errors";
+import { Badge } from "@/shared/components/Badge";
+import { Button } from "@/shared/components/Button";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { PageHeader } from "@/shared/components/PageHeader";
+import { Select } from "@/shared/components/Select";
+import { formatDateTime } from "@/shared/i18n/formatters";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { GitBranch } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Navigate,
   useNavigate,
   useParams,
   useSearchParams,
 } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { GitBranch } from "lucide-react";
-import { RouteFallback } from "@/app/router/RouteFallback";
-import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
-import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
-import {
-  getProjectVersions,
-  deployBuild,
-} from "@/features/deployments/api/deployApi";
-import { useBuildHistory } from "@/features/deployments/hooks/useDeploymentFlow";
-import { useProjectOverview } from "@/features/overview/hooks/useProjectOverview";
-import { PageHeader } from "@/shared/components/PageHeader";
-import { Button } from "@/shared/components/Button";
-import { Badge } from "@/shared/components/Badge";
-import { Select } from "@/shared/components/Select";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { getApiErrorMessage } from "@/shared/api/errors";
-import { SnapshotMetadata } from "@/features/evolution/components/SnapshotMetadata";
-import { SnapshotComparison } from "@/features/evolution/components/SnapshotComparison";
-import { evolutionQueryKeys } from "@/features/evolution/queryKeys";
 
 export default function EvolutionPage() {
   const { modelId } = useParams();
-  const { t } = useTranslation("projects");
+  const { t, i18n } = useTranslation("projects");
   const { t: tCommon } = useTranslation("common");
   const { selectedModel, loading: isModelLoading } = useModelSelection();
   const navigate = useNavigate();
@@ -84,7 +85,7 @@ export default function EvolutionPage() {
         onChange={(id) => setParams({ versionId: id })}
         options={(versions.data ?? []).map((item) => ({
           value: item.id,
-          label: `v${item.version} · ${new Date(item.registered_at).toLocaleString()}`,
+          label: `v${item.version} · ${formatDateTime(item.registered_at, i18n.language)}`,
         }))}
         placeholder={t("workflow.selectVersion")}
       />

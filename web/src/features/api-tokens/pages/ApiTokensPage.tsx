@@ -1,20 +1,21 @@
-import { Edit3, KeyRound, RefreshCw, Trash2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
-import type { ColumnDef } from "@tanstack/react-table";
-import { Button } from "@/shared/components/Button";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { ApiModal } from "@/features/api-tokens/components/ApiModal";
 import { useApiTokens } from "@/features/api-tokens/hooks/useApiTokens";
-import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
 import type { APIKeyRecord } from "@/features/api-tokens/types";
-import { PageHeader } from "@/shared/components/PageHeader";
-import { DataTable } from "@/shared/components/DataTable";
+import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
 import { Badge } from "@/shared/components/Badge";
+import { Button } from "@/shared/components/Button";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { DataTable } from "@/shared/components/DataTable";
+import { PageHeader } from "@/shared/components/PageHeader";
+import { formatDateTime } from "@/shared/i18n/formatters";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Edit3, KeyRound, RefreshCw, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 export default function DeveloperSettingPage() {
-  const { t } = useTranslation("settings");
+  const { t, i18n } = useTranslation("settings");
   const navigate = useNavigate();
   const { data: modelsData } = useModelProjects();
   const models = modelsData?.models ?? [];
@@ -92,7 +93,7 @@ export default function DeveloperSettingPage() {
       header: t("apiKey.created"),
       cell: ({ row }) => (
         <span className="whitespace-nowrap text-color-muted-foreground">
-          {new Date(row.original.created_at).toLocaleString()}
+          {formatDateTime(row.original.created_at, i18n.language)}
         </span>
       ),
     },

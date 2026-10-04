@@ -1,6 +1,7 @@
-import { ImageUp, Trash2, X } from "lucide-react";
-import { Button } from "@/shared/components/Button";
 import type { AvatarRecord } from "@/features/settings/types";
+import { Button } from "@/shared/components/Button";
+import { ImageUp, Trash2, X } from "lucide-react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 interface AvatarModalProps {
@@ -28,8 +29,9 @@ export function AvatarModal({
 }: AvatarModalProps) {
   const { t } = useTranslation("settings");
   if (!open) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay px-4">
       <div className="w-full max-w-lg rounded-surface border border-border bg-surface shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-2">
@@ -68,6 +70,7 @@ export function AvatarModal({
                 </Button>
                 <Button
                   type="button"
+                  variant="secondary"
                   size="md"
                   icon={<ImageUp className="h-4 w-4" />}
                   onClick={onChange}
@@ -147,6 +150,7 @@ export function AvatarModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

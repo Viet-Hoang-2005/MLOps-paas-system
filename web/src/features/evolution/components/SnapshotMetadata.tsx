@@ -1,8 +1,9 @@
 import type { ModelVersion } from "@/features/projects/types";
 import { useTranslation } from "react-i18next";
+import { formatNumber } from "@/shared/i18n/formatters";
 
 export function SnapshotMetadata({ version }: { version: ModelVersion }) {
-  const { t } = useTranslation("evolution");
+  const { t, i18n } = useTranslation("evolution");
   const sections = [
     { title: t("snapshot.metrics"), value: version.metrics_summary },
     { title: t("snapshot.params"), value: version.params_summary },
@@ -34,7 +35,11 @@ export function SnapshotMetadata({ version }: { version: ModelVersion }) {
                   className="rounded-surface border border-border bg-muted p-4"
                 >
                   <p className="text-style-caption">{name}</p>
-                  <p className="text-style-heading">{String(value)}</p>
+                  <p className="text-style-heading">
+                    {formatNumber(Number(value), i18n.language, {
+                      maximumFractionDigits: 6,
+                    })}
+                  </p>
                 </div>
               ))}
           </div>
@@ -51,7 +56,10 @@ export function SnapshotMetadata({ version }: { version: ModelVersion }) {
             return (
               <div key={`${item.name}-${index}`} className="space-y-1">
                 <p className="text-style-caption">
-                  {item.name}: {item.value}
+                  {item.name}:{" "}
+                  {formatNumber(item.value, i18n.language, {
+                    maximumFractionDigits: 6,
+                  })}
                 </p>
                 <div className="h-3 rounded-compact bg-muted">
                   <div

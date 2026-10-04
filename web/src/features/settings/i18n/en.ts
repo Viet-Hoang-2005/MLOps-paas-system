@@ -123,6 +123,8 @@ export const settingsEn = {
     updateAvatar: "Update avatar",
     email: "Email",
     tenantId: "Tenant ID",
+    copyTenantId: "Copy Tenant ID",
+    tenantIdCopied: "Tenant ID copied to clipboard.",
     provider: "Provider",
     joined: "Joined",
     fullNamePlaceholder: "Enter your full name",

@@ -1,12 +1,14 @@
+import { RouteFallback } from "@/app/router/RouteFallback";
+import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
+import { formatDateTime, formatNumber } from "@/shared/i18n/formatters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { BrainCircuit, Eye, Rocket, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { RouteFallback } from "@/app/router/RouteFallback";
-import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
 
+import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import {
   deleteTrainingJob,
   getTrainingUsage,
@@ -18,15 +20,14 @@ import {
 } from "@/features/training/components/TrainingJobListSections";
 import { trainingQueryKeys } from "@/features/training/queryKeys";
 import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
-import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { formatDuration } from "@/shared/lib/formatDuration";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { DataTable } from "@/shared/components/DataTable";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { toast } from "@/shared/components/toastStore";
+import { formatDuration } from "@/shared/lib/formatDuration";
 
 const ACTIVE_STATUSES: TrainingJobStatus[] = [
   "pending",
@@ -63,7 +64,7 @@ const displayStatus = (job: TrainingJob) => {
 
 export default function TrainingModelPage() {
   const { modelId } = useParams();
-  const { t } = useTranslation("training");
+  const { t, i18n } = useTranslation("training");
   const { t: tCommon } = useTranslation("common");
   const { t: tProjects } = useTranslation("projects");
   const navigate = useNavigate();
@@ -204,7 +205,7 @@ export default function TrainingModelPage() {
             }
           >
             {row.original.started_at
-              ? new Date(row.original.started_at).toLocaleString()
+              ? formatDateTime(row.original.started_at, i18n.language)
               : "—"}
           </button>
         ),
@@ -244,9 +245,11 @@ export default function TrainingModelPage() {
         enableSorting: false,
         cell: ({ row }) => {
           const job = row.original;
-          const memoryGb = (job.memory_mb / 1024).toFixed(
-            job.memory_mb % 1024 === 0 ? 0 : 1,
-          );
+          const digits = job.memory_mb % 1024 === 0 ? 0 : 1;
+          const memoryGb = formatNumber(job.memory_mb / 1024, i18n.language, {
+            minimumFractionDigits: digits,
+            maximumFractionDigits: digits,
+          });
           const gpu =
             job.accelerator_type === "gpu" && job.accelerator_count > 0
               ? ` · GPU ×${job.accelerator_count}`
@@ -316,7 +319,7 @@ export default function TrainingModelPage() {
         },
       },
     ],
-    [navigate, t],
+    [navigate, t, i18n.language],
   );
 
   if (!selectedModel) {
@@ -413,11 +416,17 @@ export default function TrainingModelPage() {
                   tabIndex={0}
                   title={t("statusDistribution.tooltip", {
                     status: t(`table.statuses.${status}`),
-                    percentage: percentage.toFixed(1),
+                    percentage: formatNumber(percentage, i18n.language, {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    }),
                   })}
                   aria-label={t("statusDistribution.tooltip", {
                     status: t(`table.statuses.${status}`),
-                    percentage: percentage.toFixed(1),
+                    percentage: formatNumber(percentage, i18n.language, {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    }),
                   })}
                   className={
                     status === "success"

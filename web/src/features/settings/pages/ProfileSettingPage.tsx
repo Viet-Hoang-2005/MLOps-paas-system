@@ -9,12 +9,15 @@ import { Input, InputPassword } from "@/shared/components/Input";
 import { OTPInput } from "@/shared/components/OTPInput";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { toast } from "@/shared/components/toastStore";
+import { formatDateTime } from "@/shared/i18n/formatters";
 import {
   BriefcaseBusiness,
   Building2,
   CalendarDays,
   Camera,
+  Check,
   ChevronDown,
+  Copy,
   Edit3,
   FileText,
   Fingerprint,
@@ -30,15 +33,34 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-const formatDate = (value: string | undefined, fallback: string) => {
+const formatDate = (
+  value: string | undefined,
+  fallback: string,
+  language: string,
+) => {
   if (!value) return fallback;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, {
+  return formatDateTime(date, language, {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
+};
+
+const formatShortTenantId = (
+  tenantId: string | undefined,
+  fallback: string,
+) => {
+  if (!tenantId) return fallback;
+  if (tenantId.startsWith("T-")) {
+    const parts = tenantId.split("-");
+    return parts.length >= 2 ? `${parts[0]}-${parts[1]}` : tenantId;
+  }
+  if (tenantId.includes("-")) {
+    return tenantId.split("-")[0];
+  }
+  return tenantId.slice(0, 10);
 };
 
 const getInitials = (profile: UserProfile | null, fallback: string) => {
@@ -57,7 +79,7 @@ const readOnlyFieldClass =
 type AvatarModalState = "closed" | "options";
 
 export default function ProfileSettingPage() {
-  const { t } = useTranslation("settings");
+  const { t, i18n } = useTranslation("settings");
   const {
     profile,
     avatarHistory,
@@ -100,6 +122,20 @@ export default function ProfileSettingPage() {
   const [selectingAvatarId, setSelectingAvatarId] = useState<string | null>(
     null,
   );
+  const [copiedTenantId, setCopiedTenantId] = useState(false);
+
+  const handleCopyTenantId = async () => {
+    if (!profile?.tenant_id) return;
+    try {
+      await navigator.clipboard.writeText(profile.tenant_id);
+      setCopiedTenantId(true);
+      toast.success(t("profilePage.tenantIdCopied"));
+      setTimeout(() => setCopiedTenantId(false), 2000);
+    } catch {
+      toast.error(t("apiKey.copyFailed"));
+    }
+  };
+
   const initials = useMemo(
     () => getInitials(profile, t("profilePage.userFallback")),
     [profile, t],
@@ -225,9 +261,28 @@ export default function ProfileSettingPage() {
                 <ReadOnlyRow
                   icon={<Fingerprint className="h-4 w-4" />}
                   label={t("profilePage.tenantId")}
-                  value={
-                    profile?.tenant_id ||
-                    t("statuses.unknown", { ns: "common" })
+                  value={formatShortTenantId(
+                    profile?.tenant_id,
+                    t("statuses.unknown", { ns: "common" }),
+                  )}
+                  action={
+                    profile?.tenant_id ? (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 shrink-0 text-color-muted-foreground hover:text-color-foreground"
+                        aria-label={t("profilePage.copyTenantId")}
+                        title={t("profilePage.copyTenantId")}
+                        icon={
+                          copiedTenantId ? (
+                            <Check className="h-4 w-4 text-color-success" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )
+                        }
+                        onClick={handleCopyTenantId}
+                      />
+                    ) : undefined
                   }
                 />
                 <ReadOnlyRow
@@ -244,6 +299,7 @@ export default function ProfileSettingPage() {
                   value={formatDate(
                     profile?.date_joined,
                     t("statuses.unknown", { ns: "common" }),
+                    i18n.language,
                   )}
                 />
               </div>
@@ -597,22 +653,29 @@ function ReadOnlyRow({
   icon,
   label,
   value,
+  action,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
+  action?: ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-compact bg-muted px-3 py-3">
-      <span className="mt-0.5 text-color-muted-foreground">{icon}</span>
-      <div className="min-w-0">
-        <p className="text-style-overline uppercase text-color-muted-foreground">
-          {label}
-        </p>
-        <p className="truncate text-style-body-strong text-color-foreground">
-          {value}
-        </p>
+    <div className="flex items-center justify-between gap-3 rounded-compact bg-muted px-3 py-3">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="mt-0.5 shrink-0 text-color-muted-foreground">
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <p className="text-style-overline uppercase text-color-muted-foreground">
+            {label}
+          </p>
+          <p className="truncate text-style-body-strong text-color-foreground">
+            {value}
+          </p>
+        </div>
       </div>
+      {action}
     </div>
   );
 }
