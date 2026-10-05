@@ -1,3 +1,4 @@
+import { cn } from "@/shared/lib/cn";
 import { UploadCloud } from "lucide-react";
 
 export function FileDropzone({
@@ -6,15 +7,22 @@ export function FileDropzone({
   subtitle,
   hint,
   onChange,
+  disabled = false,
 }: {
   accept: string;
   title: string;
   subtitle: string;
   hint?: string;
   onChange: (file: File | null) => void;
+  disabled?: boolean;
 }) {
   return (
-    <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-surface border border-dashed border-border bg-muted px-4 text-center hover:border-primary">
+    <label
+      className={cn(
+        "flex min-h-40 flex-col items-center justify-center rounded-surface border border-dashed border-border bg-muted px-4 text-center transition-colors",
+        disabled ? "cursor-default" : "cursor-pointer hover:border-primary",
+      )}
+    >
       <UploadCloud className="mb-3 h-6 w-6 text-color-muted-foreground" />
       <span className="max-w-full truncate text-style-body-strong text-color-foreground">
         {title}
@@ -30,8 +38,13 @@ export function FileDropzone({
       <input
         type="file"
         accept={accept}
+        disabled={disabled}
         className="hidden"
-        onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+        onChange={(event) => {
+          if (!disabled) {
+            onChange(event.target.files?.[0] ?? null);
+          }
+        }}
       />
     </label>
   );

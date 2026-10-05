@@ -28,7 +28,11 @@ def _start_container(docker_client, project, resource, identity_field, **kwargs)
     with transaction.atomic():
         locked = ModelProject.objects.select_for_update().get(pk=project.pk)
         current = type(resource).objects.select_for_update().get(pk=resource.pk)
-        if locked.deletion_state != "active" or current.status in {"cancelled", "cancelling", "stopped", "failed"}:
+        if (
+            locked.deletion_state != "active"
+            or getattr(current, "deletion_state", "active") != "active"
+            or current.status in {"cancelled", "cancelling", "stopped", "failed"}
+        ):
             raise Conflict("The task or project has been cancelled.")
         container = docker_client.run(**kwargs)
         setattr(resource, identity_field, container.id)

@@ -10,6 +10,10 @@ export const getBuild = async (id: string): Promise<Build> =>
   (await apiClient.get<Build>(controlPlaneURL(`/builds/${id}/`))).data;
 export const cancelBuildById = async (id: string): Promise<Build> =>
   (await apiClient.post<Build>(controlPlaneURL(`/builds/${id}/cancel/`))).data;
+export const rebuildById = async (id: string): Promise<Build> =>
+  (await apiClient.post<Build>(controlPlaneURL(`/builds/${id}/rebuild/`))).data;
+export const deleteBuildById = async (id: string): Promise<Build> =>
+  (await apiClient.delete<Build>(controlPlaneURL(`/builds/${id}/`))).data;
 export const listProjectBuilds = async (id: string): Promise<Build[]> =>
   (await apiClient.get<Build[]>(controlPlaneURL(`/models/${id}/builds/`))).data;
 export const deployBuild = async (id: string): Promise<Deployment> =>

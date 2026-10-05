@@ -63,7 +63,7 @@ def register_successful_build(
     with _registration_storage(storage) as storage, transaction.atomic():
         project = type(build.project).objects.select_for_update().get(pk=build.project_id)
         build = type(build).objects.select_for_update().select_related("project", "project__owner").get(pk=build.pk)
-        if build.status != "ready" or project.deletion_state != "active":
+        if build.status != "ready" or project.deletion_state != "active" or build.deletion_state != "active":
             raise ValidationError({"build": "Only successful builds of active projects can be registered."})
         if build.version_id:
             return build

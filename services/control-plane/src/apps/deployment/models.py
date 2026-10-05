@@ -31,6 +31,12 @@ class Build(models.Model):
         choices=tuple((value, value.title()) for value in ("unregistered", "registering", "registered", "failed")),
     )
     registration_error = models.TextField(blank=True)
+    deletion_state = models.CharField(
+        max_length=20,
+        default="active",
+        choices=(("active", "Active"), ("deleting", "Deleting"), ("delete_failed", "Delete Failed")),
+    )
+    deletion_error = models.TextField(blank=True)
     metrics_summary = models.JSONField(default=dict, blank=True)
     params_summary = models.JSONField(default=dict, blank=True)
     insights_summary = models.JSONField(default=dict, blank=True)
@@ -47,6 +53,7 @@ class Build(models.Model):
     error_message = models.TextField(blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    execution_completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

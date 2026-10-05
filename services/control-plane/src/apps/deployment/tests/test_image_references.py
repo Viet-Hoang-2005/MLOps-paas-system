@@ -172,3 +172,30 @@ def test_harbor_client_moves_tag_left_on_orphaned_artifact(settings):
         ("DELETE", "/v1/tags/v1"),
         ("POST", "/sha256%3Anew/tags"),
     ]
+
+
+def test_harbor_build_cleanup_keeps_artifact_shared_with_version(settings):
+    settings.HARBOR_REGISTRY_URL = "registry.example"
+    http, calls = _harbor_http({("GET", "/build-job"): [{"tags": [{"name": "build-job"}, {"name": "v1"}]}]})
+    uri = "registry.example/user-images/image-project:build-job"
+    assert HarborClient(http=http).delete_build_image(uri) == "deleted"
+    assert calls == [("GET", "/build-job"), ("DELETE", "/build-job/tags/build-job")]
+
+
+def test_harbor_build_cleanup_removes_unshared_artifact(settings):
+    settings.HARBOR_REGISTRY_URL = "registry.example"
+    http, calls = _harbor_http({("GET", "/build-job"): [{"tags": [{"name": "build-job"}]}]})
+    assert (
+        HarborClient(http=http).delete_build_image("registry.example/user-images/image-project:build-job") == "deleted"
+    )
+    assert calls == [("GET", "/build-job"), ("DELETE", "/build-job")]
+
+
+def test_harbor_build_cleanup_missing_image_is_idempotent(settings):
+    settings.HARBOR_REGISTRY_URL = "registry.example"
+    http, calls = _harbor_http({("GET", "/build-job"): [404]})
+    assert (
+        HarborClient(http=http).delete_build_image("registry.example/user-images/image-project:build-job")
+        == "already-absent"
+    )
+    assert calls == [("GET", "/build-job")]

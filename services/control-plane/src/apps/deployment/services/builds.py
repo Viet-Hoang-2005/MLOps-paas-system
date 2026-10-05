@@ -27,6 +27,8 @@ def request_training_build(*, job, backend, storage=None):
             raise ValidationError({"job": "Training outputs have been deleted."})
         existing = job.builds.filter(status__in=("pending", "queued", "building")).first()
         if existing:
+            if existing.deletion_state != "active":
+                raise Conflict("Wait for the previous training build cleanup to finish.")
             return existing, False
         output = job.outputs.filter(kind="model").order_by("-created_at").first()
         if not output or not output.s3_uri:
@@ -159,4 +161,42 @@ def request_cancel(build):
         build.status = "cancelled"
         build.save(update_fields=["status", "updated_at"])
         transaction.on_commit(lambda: cancel_build.delay(str(build.public_id)))
+    return build
+
+
+def request_rebuild(build, *, backend, storage=None):
+    """Start a new attempt from the current Preview or the original training output."""
+    with transaction.atomic():
+        project = type(build.project).objects.select_for_update().get(pk=build.project_id)
+        build = Build.objects.select_for_update().get(pk=build.pk)
+        if build.deletion_state != "active" or project.deletion_state != "active":
+            raise Conflict("This build or project is being deleted.")
+        if build.status not in {"ready", "failed", "cancelled"} or build.registration_status == "registering":
+            raise Conflict("Wait for this build and registration to finish before rebuilding.")
+        if build.source_job_reference or build.source_job_id:
+            if not build.source_job_id:
+                raise Conflict("The original training job has been deleted. Choose a new build source.")
+            result, _ = request_training_build(job=build.source_job, backend=backend, storage=storage)
+            return result
+        return request_preview_build(
+            project=project, revision=project.preview.revision, backend=backend, storage=storage
+        )
+
+
+def request_build_deletion(build):
+    from apps.deployment.tasks import delete_build
+
+    with transaction.atomic():
+        project = type(build.project).objects.select_for_update().get(pk=build.project_id)
+        build = Build.objects.select_for_update().get(pk=build.pk)
+        if project.deletion_state != "active":
+            raise Conflict("This project is already being deleted.")
+        if build.version_id or build.registration_status in {"registered", "registering"} or build.deployments.exists():
+            raise Conflict("A registered or registering build cannot be deleted from build history.")
+        if build.deletion_state == "deleting":
+            return build
+        build.deletion_state = "deleting"
+        build.deletion_error = ""
+        build.save(update_fields=["deletion_state", "deletion_error", "updated_at"])
+        transaction.on_commit(lambda: delete_build.delay(str(build.public_id)))
     return build

@@ -16,6 +16,9 @@ interface ModelArtifactFieldsProps {
     field: K,
     value: BuildInputForm[K],
   ) => void;
+  existingArtifactName?: string;
+  existingAssets?: Record<string, string>;
+  readOnly?: boolean;
 }
 
 const rawExtensions: Record<ModelFlavor, string[]> = {
@@ -61,6 +64,9 @@ const packageExamples: Record<ModelFlavor, string[]> = {
 export function ModelArtifactFields({
   form,
   setField,
+  existingArtifactName,
+  existingAssets,
+  readOnly = false,
 }: ModelArtifactFieldsProps) {
   const { t } = useTranslation("deployments");
   const flavorOptions: Array<{
@@ -107,6 +113,16 @@ export function ModelArtifactFields({
     }
   };
 
+  const hasAdvancedAssets = Boolean(
+    existingAssets &&
+      (existingAssets.label_mapping ||
+        existingAssets.input_schema ||
+        existingAssets.metrics ||
+        existingAssets.params ||
+        existingAssets.model_insights ||
+        existingAssets.feature_importance),
+  );
+
   return (
     <div className="flex flex-col gap-8">
       <section className="space-y-5">
@@ -116,6 +132,7 @@ export function ModelArtifactFields({
         />
         <Picker
           value={form.flavor}
+          disabled={readOnly}
           onChange={(value) => setField("flavor", value)}
           options={flavorOptions}
         />
@@ -131,6 +148,7 @@ export function ModelArtifactFields({
           />
           <Switch
             value={form.artifact_format}
+            disabled={readOnly}
             onChange={(value) => selectFormat(value as ModelArtifactFormat)}
             options={[
               { value: "raw", title: t("uploadFlow.build.raw") },
@@ -141,8 +159,10 @@ export function ModelArtifactFields({
         </div>
         <FileDropzone
           accept={extensions.join(",")}
+          disabled={readOnly}
           title={
             form.source_artifact?.name ||
+            existingArtifactName ||
             (form.artifact_format === "mlflow_zip"
               ? t("uploadFlow.build.choosePackage")
               : t("uploadFlow.build.chooseRaw"))
@@ -170,15 +190,20 @@ export function ModelArtifactFields({
             </pre>
           </div>
         ) : (
-          <details className="space-y-4 rounded-surface border border-border p-4">
+          <details
+            open={hasAdvancedAssets ? true : undefined}
+            className="space-y-4 rounded-surface border border-border p-4"
+          >
             <summary className="cursor-pointer text-style-body-strong">
               {t("advancedArtifacts")}
             </summary>
             <div className="grid gap-4 md:grid-cols-2">
               <FileDropzone
                 accept=".pkl,.json"
+                disabled={readOnly}
                 title={
                   form.label_mapping_file?.name ||
+                  existingAssets?.label_mapping ||
                   t("uploadFlow.build.attachments.labelMapping")
                 }
                 subtitle={t(
@@ -189,8 +214,10 @@ export function ModelArtifactFields({
               />
               <FileDropzone
                 accept=".json"
+                disabled={readOnly}
                 title={
                   form.input_schema_file?.name ||
+                  existingAssets?.input_schema ||
                   t("uploadFlow.build.attachments.inputSchema")
                 }
                 subtitle={t("uploadFlow.build.attachments.inputSchemaSubtitle")}
@@ -201,8 +228,10 @@ export function ModelArtifactFields({
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <FileDropzone
                 accept=".json"
+                disabled={readOnly}
                 title={
                   form.metrics_file?.name ||
+                  existingAssets?.metrics ||
                   t("uploadFlow.build.attachments.metrics")
                 }
                 subtitle={t("uploadFlow.build.attachments.metricsSubtitle")}
@@ -211,8 +240,10 @@ export function ModelArtifactFields({
               />
               <FileDropzone
                 accept=".json"
+                disabled={readOnly}
                 title={
                   form.params_file?.name ||
+                  existingAssets?.params ||
                   t("uploadFlow.build.attachments.params")
                 }
                 subtitle={t("uploadFlow.build.attachments.paramsSubtitle")}
@@ -221,8 +252,10 @@ export function ModelArtifactFields({
               />
               <FileDropzone
                 accept=".json"
+                disabled={readOnly}
                 title={
                   form.model_insights_file?.name ||
+                  existingAssets?.model_insights ||
                   t("uploadFlow.build.attachments.insights")
                 }
                 subtitle={t("uploadFlow.build.attachments.insightsSubtitle")}
@@ -231,8 +264,10 @@ export function ModelArtifactFields({
               />
               <FileDropzone
                 accept=".json"
+                disabled={readOnly}
                 title={
                   form.feature_importance_file?.name ||
+                  existingAssets?.feature_importance ||
                   t("uploadFlow.build.attachments.featureImportance")
                 }
                 subtitle={t(
@@ -257,6 +292,7 @@ export function ModelArtifactFields({
         />
         <FileDropzone
           accept=".txt,text/plain"
+          disabled={readOnly}
           title={
             form.requirements_file?.name ||
             t("uploadFlow.build.requirementsFile")
@@ -272,6 +308,7 @@ export function ModelArtifactFields({
         />
         <TextArea
           id="build-requirements"
+          readOnly={readOnly}
           value={form.requirements_text}
           onChange={(value) => setField("requirements_text", value)}
           placeholder={"scikit-learn==1.7.2\npandas==2.2.1\nnumpy==1.26.4"}

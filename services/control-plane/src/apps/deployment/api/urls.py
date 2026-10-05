@@ -6,6 +6,7 @@ from .endpoints import (
     BuildListEndpoint,
     BuildLogsEndpoint,
     BuildRegisterEndpoint,
+    BuildRebuildEndpoint,
     DeploymentDetailEndpoint,
     DeploymentListCreateEndpoint,
     DeploymentLogsEndpoint,
@@ -20,6 +21,7 @@ build_patterns = [
     path("<uuid:build_id>/cancel/", BuildCancelEndpoint.as_view(), name="build-cancel"),
     path("<uuid:build_id>/logs/", BuildLogsEndpoint.as_view(), name="build-logs"),
     path("<uuid:build_id>/register/", BuildRegisterEndpoint.as_view(), name="build-register"),
+    path("<uuid:build_id>/rebuild/", BuildRebuildEndpoint.as_view(), name="build-rebuild"),
 ]
 deployment_patterns = [
     path("", DeploymentListCreateEndpoint.as_view(), name="deployment-list"),

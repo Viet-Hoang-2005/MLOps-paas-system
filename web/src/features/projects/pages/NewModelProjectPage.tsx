@@ -10,6 +10,7 @@ import { catalogQueryKeys } from "@/features/projects/queryKeys";
 import type { ModelBuildFormValues } from "@/features/projects/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Button } from "@/shared/components/Button";
+import { Callout } from "@/shared/components/Callout";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -29,7 +30,7 @@ const emptyForm: ModelBuildFormValues = {
   reference_data_file: null,
 };
 
-export default function ProjectFormPage() {
+export default function NewModelProjectPage() {
   const { modelId } = useParams();
   const { t } = useTranslation("projects");
   const navigate = useNavigate();
@@ -37,9 +38,14 @@ export default function ProjectFormPage() {
   const preview = usePreview(modelId);
   const [form, setForm] = useState(emptyForm);
   const [dirty, setDirty] = useState(false);
-  const [removed, setRemoved] = useState<string[]>([]);
   const allowExit = useRef(false);
   const initialized = useRef(false);
+
+  const existingArtifact = preview.data?.assets.find(
+    (asset) => asset.kind === "source_artifact",
+  );
+  const hasArtifact = Boolean(form.source_artifact || existingArtifact);
+
   useEffect(() => {
     if (!preview.data || initialized.current) return;
     const data = preview.data;
@@ -66,7 +72,7 @@ export default function ProjectFormPage() {
   const save = useMutation({
     mutationFn: async () => {
       if (modelId) {
-        await updatePreview(modelId, preview.data!.revision, form, removed);
+        await updatePreview(modelId, preview.data!.revision, form);
         return modelId;
       }
       return (await createPreviewProject(form)).id;
@@ -81,7 +87,7 @@ export default function ProjectFormPage() {
     },
   });
   return (
-    <div className="space-y-6 pb-6">
+    <div className="space-y-6">
       <PageHeader
         title={t(modelId ? "workflow.editPreview" : "workflow.newProject")}
         back
@@ -95,31 +101,7 @@ export default function ProjectFormPage() {
       >
         <div className="space-y-8 rounded-surface border border-border bg-surface p-6">
           {modelId ? (
-            <>
-              <p>{t("workflow.editHint")}</p>
-              <ul className="space-y-2 text-style-caption text-color-muted-foreground">
-                {preview.data?.assets.map((asset) => (
-                  <li key={asset.kind}>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={removed.includes(asset.kind)}
-                        onChange={(event) => {
-                          setRemoved((current) =>
-                            event.target.checked
-                              ? [...current, asset.kind]
-                              : current.filter((kind) => kind !== asset.kind),
-                          );
-                          setDirty(true);
-                        }}
-                      />
-                      {t("workflow.removeAsset")}: {asset.kind} · {asset.name}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-              <hr className="border-border" />
-            </>
+            <Callout variant="info" title={t("workflow.editHint")} />
           ) : (
             <>
               <ModelMetadataFields
@@ -132,6 +114,7 @@ export default function ProjectFormPage() {
           <ModelArtifactFields
             form={form}
             setField={(field, value) => setField(field, value)}
+            existingArtifactName={existingArtifact?.name}
           />
           <hr className="border-border" />
           <CodeDataFields
@@ -164,7 +147,7 @@ export default function ProjectFormPage() {
             loading={save.isPending}
             disabled={
               modelId
-                ? !preview.data
+                ? !preview.data || !hasArtifact
                 : !form.name.trim() || !form.source_artifact
             }
           >
@@ -179,6 +162,7 @@ export default function ProjectFormPage() {
         onConfirm={() => blocker.state === "blocked" && blocker.proceed()}
         onCancel={() => blocker.state === "blocked" && blocker.reset()}
       />
+      <div className="h-0.5 shrink-0" aria-hidden="true" />
     </div>
   );
 }

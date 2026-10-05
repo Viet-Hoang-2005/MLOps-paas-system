@@ -123,6 +123,27 @@ class HarborClient:
             raise
         return "deleted"
 
+    def delete_build_image(self, image_uri):
+        """Remove the build tag, retaining any artifact shared with another tag."""
+        if not self.enabled:
+            raise RuntimeError("Harbor image cleanup requires HARBOR_REGISTRY_URL.")
+        project, repository, tag = self._parse_image_uri(image_uri)
+        if not tag.startswith("build-"):
+            raise ValueError("Build cleanup requires a temporary build tag.")
+        url = (
+            f"{self.base_url}/api/v2.0/projects/{quote(project, safe='')}/repositories/"
+            f"{quote(repository, safe='')}/artifacts/{quote(tag, safe='')}"
+        )
+        try:
+            artifact = self.http.request("GET", url, auth=(settings.HARBOR_USERNAME, settings.HARBOR_PASSWORD)).json()
+        except HTTPError as exc:
+            if getattr(exc.response, "status_code", None) == 404:
+                return "already-absent"
+            raise
+        if any(item.get("name") != tag for item in artifact.get("tags") or []):
+            return self.delete_tag(image_uri, tag)
+        return self.delete_artifact(image_uri)
+
     def repositories(self, project):
         if not self.enabled:
             return []

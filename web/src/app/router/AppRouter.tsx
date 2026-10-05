@@ -37,17 +37,17 @@ const DashboardLayout = lazy(() => import("@/app/layouts/DashboardLayout"));
 const NotificationsPage = lazy(
   () => import("@/features/notifications/pages/NotificationsPage"),
 );
-const ProjectListPage = lazy(
-  () => import("@/features/projects/pages/ProjectListPage"),
+const ModelProjectPage = lazy(
+  () => import("@/features/projects/pages/ModelProjectPage"),
 );
-const ProjectFormPage = lazy(
-  () => import("@/features/projects/pages/ProjectFormPage"),
+const NewModelProjectPage = lazy(
+  () => import("@/features/projects/pages/NewModelProjectPage"),
 );
 const ProjectOverviewPage = lazy(
   () => import("@/features/overview/pages/ProjectOverviewPage"),
 );
-const DeploymentHistoryPage = lazy(
-  () => import("@/features/deployments/pages/DeploymentHistoryPage"),
+const DeploymentPage = lazy(
+  () => import("@/features/deployments/pages/DeploymentPage"),
 );
 const CreateDeploymentPage = lazy(
   () => import("@/features/deployments/pages/CreateDeploymentPage"),
@@ -139,12 +139,12 @@ const router = createBrowserRouter(
         }
       >
         <Route index element={<Navigate to="projects" replace />} />
-        <Route path="projects" element={<ProjectListPage />} />
-        <Route path="projects/new" element={<ProjectFormPage />} />
+        <Route path="projects" element={<ModelProjectPage />} />
+        <Route path="projects/new" element={<NewModelProjectPage />} />
         <Route path="projects/:modelId" element={<ProjectRouteBoundary />}>
-          <Route path="edit" element={<ProjectFormPage />} />
+          <Route path="edit" element={<NewModelProjectPage />} />
           <Route path="overview" element={<ProjectOverviewPage />} />
-          <Route path="deployment" element={<DeploymentHistoryPage />} />
+          <Route path="deployment" element={<DeploymentPage />} />
           <Route path="monitoring" element={<DriftMonitoringPage />} />
           <Route
             path="monitoring/report/:runId"
@@ -154,7 +154,7 @@ const router = createBrowserRouter(
           <Route path="evolution" element={<EvolutionPage />} />
         </Route>
         <Route path="overview" element={<ProjectOverviewPage />} />
-        <Route path="deployment" element={<DeploymentHistoryPage />} />
+        <Route path="deployment" element={<DeploymentPage />} />
         <Route path="monitoring" element={<DriftMonitoringPage />} />
         <Route path="training" element={<TrainingModelPage />} />
         <Route path="evolution" element={<EvolutionPage />} />

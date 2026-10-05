@@ -11,6 +11,7 @@ export interface ButtonProps
   fullWidth?: boolean;
   loading?: boolean;
   icon?: ReactNode;
+  border?: boolean;
 }
 
 export function Button({
@@ -19,6 +20,7 @@ export function Button({
   size,
   fullWidth = false,
   loading = false,
+  border = true,
   icon,
   children,
   className,
@@ -35,6 +37,14 @@ export function Button({
       className={cn(
         buttonVariants({ variant, size }),
         fullWidth && "w-full",
+        !border && [
+          "group border-transparent bg-transparent shadow-none transition-all duration-150 hover:border-transparent hover:bg-surface-hover active:border-transparent active:bg-surface-active disabled:border-transparent disabled:bg-transparent",
+          variant === "danger"
+            ? "text-color-danger hover:text-color-danger-hover active:text-color-danger-active"
+            : variant === "primary"
+              ? "text-color-primary hover:text-color-primary-hover active:text-color-primary-active"
+              : "text-color-muted-foreground hover:text-color-foreground active:text-color-foreground",
+        ],
         className,
       )}
       {...props}
@@ -45,7 +55,14 @@ export function Button({
           aria-hidden="true"
         />
       ) : icon ? (
-        <span className="shrink-0" aria-hidden="true">
+        <span
+          className={cn(
+            "shrink-0",
+            !border &&
+              "transition-transform duration-150 group-hover:scale-110 group-active:scale-95",
+          )}
+          aria-hidden="true"
+        >
           {icon}
         </span>
       ) : null}

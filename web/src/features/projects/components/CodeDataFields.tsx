@@ -6,6 +6,9 @@ import type { CodeDataForm, ModelProject } from "@/features/projects/types";
 interface CodeDataFieldsProps {
   form: CodeDataForm;
   project?: ModelProject | null;
+  existingSourceCodeName?: string;
+  existingReferenceDataName?: string;
+  readOnly?: boolean;
   setField: <K extends keyof CodeDataForm>(
     field: K,
     value: CodeDataForm[K],
@@ -15,6 +18,9 @@ interface CodeDataFieldsProps {
 export function CodeDataFields({
   form,
   project,
+  existingSourceCodeName,
+  existingReferenceDataName,
+  readOnly = false,
   setField,
 }: CodeDataFieldsProps) {
   const { t } = useTranslation("deployments");
@@ -26,8 +32,10 @@ export function CodeDataFields({
       />
       <FileDropzone
         accept=".zip,.py"
+        disabled={readOnly}
         title={
           form.source_code_file?.name ||
+          existingSourceCodeName ||
           project?.source_code?.name ||
           t("uploadFlow.metadata.sourceCode")
         }
@@ -36,8 +44,10 @@ export function CodeDataFields({
       />
       <FileDropzone
         accept=".zip,.csv,.parquet"
+        disabled={readOnly}
         title={
           form.reference_data_file?.name ||
+          existingReferenceDataName ||
           project?.reference_data?.name ||
           t("uploadFlow.metadata.referenceData")
         }

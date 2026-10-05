@@ -35,6 +35,7 @@ HTTP Request
 - Late callbacks must never revive cancelled or deleting resources (return HTTP 200 no-op).
 - Lock project before Preview/Build/job when coordinating deletion or snapshots; dispatch after commit. Normal new project requires artifact, training-created project does not. No legacy upload/backfill compatibility in the clean local workflow.
 - Keep raw/package artifact, requirements, source/reference and Advanced assets immutable across Build → Register; training retry uses original snapshots, not current workspace. Only registered versions deploy, and failed deployments retain old Running.
+- Build history Re-build creates a new attempt from current Preview or original training output. DELETE persists a cleanup tombstone, blocks registration, and removes only unregistered build-scoped images/objects before hard deletion; dispatched Argo builds wait for a trusted terminal reporter. See `docs/dev/build-history-actions.md`.
 
 ## Runtime Logs Architecture
 

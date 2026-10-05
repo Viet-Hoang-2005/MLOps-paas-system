@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
-import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { NavLink } from "react-router-dom";
 
 export type PageTab = {
   label: string;
@@ -40,7 +40,7 @@ export function PageTabs({ tabs }: PageTabsProps) {
                   ].join(" ")
                 }
               >
-                {Icon && <Icon className="h-4 w-4 shrink-0" />}
+                {Icon && <Icon className="h-4 w-4 shrink-0 -translate-y-0.5" />}
                 <span className="whitespace-nowrap">{tab.label}</span>
               </NavLink>
             );
@@ -58,7 +58,7 @@ export function PageTabs({ tabs }: PageTabsProps) {
                   : "border-transparent text-color-muted-foreground hover:border-border hover:text-color-foreground",
               ].join(" ")}
             >
-              {Icon && <Icon className="h-4 w-4 shrink-0" />}
+              {Icon && <Icon className="h-4 w-4 shrink-0 -translate-y-0.5" />}
               <span className="whitespace-nowrap">{tab.label}</span>
             </button>
           );

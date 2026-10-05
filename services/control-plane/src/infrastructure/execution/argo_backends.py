@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db import transaction
 
 from apps.deployment.models import Endpoint
 from apps.deployment.services.callbacks import issue_callback_token
@@ -48,31 +49,37 @@ class ArgoBuildBackend(_ArgoBackend):
         )
         build.package_uri = package_uri
         build.save(update_fields=["package_uri", "updated_at"])
-        return self.trigger(
-            {
-                "build_id": str(build.public_id),
-                "project_id": str(project.public_id),
-                "tenant_id": project.owner.tenant_id,
-                "image_repository": image_repository(
-                    project.public_id,
-                    registry=settings.HARBOR_REGISTRY_URL,
-                    registry_project=settings.HARBOR_USER_PROJECT,
-                ),
-                "image_tag": build_image_tag(build.public_id),
-                "flavor": build.flavor,
-                "task_type": "TEST_ZIP" if build.artifact_format == "mlflow_zip" else "BUILD",
-                "requirements_text": build.requirements_snapshot,
-                "source_artifact_name": source.name,
-                "source_type": "training_job" if build.source_job_id else "manual_upload",
-                "source_download_url": self.storage.presigned_get(source_uri, 14400),
-                "label_mapping_download_url": label_mapping_url,
-                "label_mapping_filename": label_mapping_filename,
-                "output_upload_url": self.storage.presigned_put(package_uri, 14400),
-                "control_plane_webhook_url": (
-                    f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/builds/{build.public_id}/"
-                ),
-            }
-        )
+        payload = {
+            "build_id": str(build.public_id),
+            "project_id": str(project.public_id),
+            "tenant_id": project.owner.tenant_id,
+            "image_repository": image_repository(
+                project.public_id,
+                registry=settings.HARBOR_REGISTRY_URL,
+                registry_project=settings.HARBOR_USER_PROJECT,
+            ),
+            "image_tag": build_image_tag(build.public_id),
+            "flavor": build.flavor,
+            "task_type": "TEST_ZIP" if build.artifact_format == "mlflow_zip" else "BUILD",
+            "requirements_text": build.requirements_snapshot,
+            "source_artifact_name": source.name,
+            "source_type": "training_job" if build.source_job_id else "manual_upload",
+            "source_download_url": self.storage.presigned_get(source_uri, 14400),
+            "label_mapping_download_url": label_mapping_url,
+            "label_mapping_filename": label_mapping_filename,
+            "output_upload_url": self.storage.presigned_put(package_uri, 14400),
+            "control_plane_webhook_url": (
+                f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/builds/{build.public_id}/"
+            ),
+        }
+        from common.api.exceptions import Conflict
+
+        with transaction.atomic():
+            locked_project = type(project).objects.select_for_update().get(pk=project.pk)
+            current = type(build).objects.select_for_update().get(pk=build.pk)
+            if locked_project.deletion_state != "active" or current.deletion_state != "active":
+                raise Conflict("The build or project is being deleted.")
+            return self.trigger(payload)
 
     def cancel(self, build):
         return None

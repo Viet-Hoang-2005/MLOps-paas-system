@@ -13,6 +13,7 @@ from apps.observability.services.outbox import enqueue_event
 from apps.registry.services.versions import register_successful_build
 from common.logging import failure_reported, record_transition
 from infrastructure.execution import build_backend, deployment_backend
+from infrastructure.execution.build_cleanup import stop_build_for_deletion
 from infrastructure.execution.image_cleanup import BuildImageCleaner
 from infrastructure.execution.image_references import temporary_image_reference
 from infrastructure.storage import S3Storage
@@ -58,8 +59,16 @@ def _mark_deployment_healthy(deployment):
 
 @shared_task(bind=True)
 def execute_build(self, build_id):
+    candidate = Build.objects.filter(public_id=build_id).first()
+    if not candidate:
+        return "not_found"
     with transaction.atomic():
+        from apps.catalog.models import ModelProject
+
+        ModelProject.objects.select_for_update().get(pk=candidate.project_id)
         build = Build.objects.select_for_update().select_related("project", "project__owner").get(public_id=build_id)
+        if build.deletion_state != "active":
+            return "deleting"
         if build.status in {"ready", "cancelled", "failed"}:
             return build.status
         if build.project.deletion_state != "active":
@@ -77,6 +86,9 @@ def execute_build(self, build_id):
     try:
         result = build_backend(build.backend).run(build)
     except Exception as exc:
+        if not Build.objects.filter(pk=build.pk, deletion_state="active").exists():
+            Build.objects.filter(pk=build.pk).update(status="cancelled", completed_at=timezone.now())
+            return "cancelled"
         already_failed = Build.objects.filter(pk=build.pk, status="failed").exists()
         Build.objects.filter(pk=build.pk).exclude(status__in=("cancelled", "ready")).update(
             status="failed", error_message=str(exc)[:12000], completed_at=timezone.now()
@@ -97,6 +109,8 @@ def execute_build(self, build_id):
     if isinstance(result, dict) and result.get("dispatched"):
         record_transition(build, "building", phase="dispatched")
         return "building"
+    if not Build.objects.filter(pk=build.pk).exists():
+        return "deleted"
     build.refresh_from_db()
     completed_locally = build.status != "ready"
     if build.status not in {"ready", "cancelled", "failed"}:
@@ -132,7 +146,9 @@ def register_build(build_id):
 
 @shared_task(bind=True)
 def cancel_build(self, build_id):
-    build = Build.objects.select_related("project").get(public_id=build_id)
+    build = Build.objects.select_related("project").filter(public_id=build_id).first()
+    if not build or build.deletion_state != "active":
+        return "deleting"
     build_backend(build.backend).cancel(build)
     Build.objects.filter(pk=build.pk).update(status="cancelled", completed_at=timezone.now())
     record_transition(build, "cancelled")
@@ -145,9 +161,12 @@ def cleanup_failed_build_artifacts(self, build_id, delete_image=False):
     build = (
         Build.objects.select_related("project", "project__owner")
         .prefetch_related("input_assets")
-        .get(public_id=build_id)
+        .filter(public_id=build_id)
+        .first()
     )
-    if build.status == "ready":
+    if not build:
+        return "not_found"
+    if build.status == "ready" or build.deletion_state != "active" or build.version_id:
         return "retained"
     if delete_image and build.image_uri:
         BuildImageCleaner().delete(build)
@@ -155,6 +174,53 @@ def cleanup_failed_build_artifacts(self, build_id, delete_image=False):
     storage.delete_prefix(build_prefix(build.project.owner.tenant_id, build.project.public_id, build.public_id))
     build.input_assets.update(s3_uri="", purged_at=timezone.now())
     return "purged"
+
+
+@shared_task(bind=True, max_retries=5)
+def delete_build(self, build_id):
+    """Keep the tombstone until external cleanup succeeds; repeated DELETE retries it."""
+    from apps.catalog.models import ModelProject
+
+    candidate = Build.objects.filter(public_id=build_id).first()
+    if not candidate:
+        return "deleted"
+    try:
+        with transaction.atomic():
+            ModelProject.objects.select_for_update().get(pk=candidate.project_id)
+            build = (
+                Build.objects.select_for_update().select_related("project__owner").filter(public_id=build_id).first()
+            )
+            if not build:
+                return "deleted"
+            if build.deletion_state == "active":
+                return "retained"
+            if (
+                build.version_id
+                or build.registration_status in {"registering", "registered"}
+                or build.deployments.exists()
+            ):
+                raise RuntimeError("Registered builds must be retained.")
+            stop_build_for_deletion(build)
+            # Use the server-generated build tag even if the runner failed before
+            # reporting image_uri. Never delete a caller-supplied repository/digest.
+            build.image_uri = temporary_image_reference(
+                build.project.public_id,
+                build.public_id,
+                registry=settings.HARBOR_REGISTRY_URL if build.backend == "argo" else "",
+                registry_project=settings.HARBOR_USER_PROJECT,
+            )
+            BuildImageCleaner().delete(build)
+            S3Storage().delete_prefix(
+                f"{build_prefix(build.project.owner.tenant_id, build.project.public_id, build.public_id).rstrip('/')}/"
+            )
+            build.delete()
+        return "deleted"
+    except Exception as exc:
+        Build.objects.filter(public_id=build_id).update(
+            deletion_state="delete_failed", deletion_error="Build cleanup failed; retry Delete or check worker logs."
+        )
+        logger.warning("Build cleanup failed for %s (%s).", build_id, type(exc).__name__)
+        raise self.retry(exc=exc, countdown=min(10 * 2**self.request.retries, 120)) from exc
 
 
 @shared_task(

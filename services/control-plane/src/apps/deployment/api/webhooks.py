@@ -14,7 +14,7 @@ from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.services.callbacks import valid_callback_token
 from apps.deployment.services.completion import complete_build
 from apps.deployment.services.logs import append_deployment_log
-from apps.deployment.tasks import _mark_deployment_healthy, cleanup_failed_build_artifacts
+from apps.deployment.tasks import _mark_deployment_healthy, cleanup_failed_build_artifacts, delete_build
 from apps.observability.services.outbox import enqueue_event
 from common.api.permissions import HasInternalWebhookSecret
 from common.logging import record_transition
@@ -98,12 +98,20 @@ class BuildWebhookEndpoint(APIView):
         candidate = get_object_or_404(Build, public_id=build_id)
         ModelProject.objects.select_for_update().get(pk=candidate.project_id)
         build = (
-            Build.objects.select_for_update()
+            # The project is already locked; version is nullable, so PostgreSQL
+            # must not lock the nullable side of its LEFT OUTER JOIN.
+            Build.objects.select_for_update(of=("self",))
             .select_related("project", "project__owner", "version")
             .get(pk=candidate.pk)
         )
         incoming = str(request.data.get("status", "")).lower()
+        if incoming not in {"success", "succeeded", "ready", "completed", "failed", "error"}:
+            return Response({"detail": "A terminal build result is required."}, status=400)
+        build.execution_completed_at = timezone.now()
+        build.save(update_fields=["execution_completed_at"])
         if build.status in {"ready", "failed", "cancelled"}:
+            if build.deletion_state != "active":
+                transaction.on_commit(lambda: delete_build.delay(str(build.public_id)))
             return Response(
                 {
                     "status": build.status,
@@ -111,8 +119,6 @@ class BuildWebhookEndpoint(APIView):
                     "duplicate": True,
                 }
             )
-        if incoming not in {"success", "succeeded", "ready", "completed", "failed", "error"}:
-            return Response({"detail": "A terminal build result is required."}, status=400)
         if incoming in {"success", "succeeded", "ready", "completed"}:
             project = build.project
             image_uri = str(
@@ -125,7 +131,7 @@ class BuildWebhookEndpoint(APIView):
                 )
             )
             image_digest = str(request.data.get("image_digest", ""))[:255]
-            if project.deletion_state != "active":
+            if project.deletion_state != "active" or build.deletion_state != "active":
                 build.status = "cancelled"
                 build.image_uri = image_uri
                 build.image_digest = image_digest
@@ -134,7 +140,10 @@ class BuildWebhookEndpoint(APIView):
                 build.save(
                     update_fields=["status", "image_uri", "image_digest", "error_message", "completed_at", "updated_at"]
                 )
-                transaction.on_commit(lambda: cleanup_failed_build_artifacts.delay(str(build.public_id), True))
+                if build.deletion_state != "active":
+                    transaction.on_commit(lambda: delete_build.delay(str(build.public_id)))
+                else:
+                    transaction.on_commit(lambda: cleanup_failed_build_artifacts.delay(str(build.public_id), True))
             else:
                 build.package_uri = str(request.data.get("package_uri") or build.package_uri)
                 build.save(update_fields=["package_uri", "updated_at"])
@@ -160,9 +169,12 @@ class BuildWebhookEndpoint(APIView):
             build.save(
                 update_fields=["status", "image_uri", "image_digest", "error_message", "completed_at", "updated_at"]
             )
-            transaction.on_commit(
-                lambda: cleanup_failed_build_artifacts.delay(str(build.public_id), bool(build.image_uri))
-            )
+            if build.deletion_state != "active":
+                transaction.on_commit(lambda: delete_build.delay(str(build.public_id)))
+            else:
+                transaction.on_commit(
+                    lambda: cleanup_failed_build_artifacts.delay(str(build.public_id), bool(build.image_uri))
+                )
         record_transition(
             build,
             build.status,

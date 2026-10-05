@@ -13,6 +13,7 @@ export interface PickerProps<T> {
   onChange: (value: T) => void;
   options: PickerOption<T>[];
   className?: string;
+  disabled?: boolean;
 }
 
 export function Picker<T extends string | number>({
@@ -21,6 +22,7 @@ export function Picker<T extends string | number>({
   onChange,
   options,
   className,
+  disabled = false,
 }: PickerProps<T>) {
   const content = (
     <div className={cn("grid gap-4 sm:grid-cols-2", className)}>
@@ -28,12 +30,15 @@ export function Picker<T extends string | number>({
         <button
           key={String(option.value)}
           type="button"
+          disabled={disabled}
           onClick={() => onChange(option.value)}
           className={cn(
             "rounded-control border p-4 text-left transition-colors",
             value === option.value
               ? "border-primary bg-primary-subtle text-color-foreground"
               : "border-border bg-surface text-color-foreground hover:border-primary",
+            disabled &&
+              "cursor-not-allowed opacity-60 hover:border-border pointer-events-none",
           )}
         >
           <span className="text-style-heading">{option.title}</span>

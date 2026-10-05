@@ -16,7 +16,9 @@ def complete_build(
         build = Build.objects.select_for_update().select_related("project").get(pk=build.pk)
         if build.status in {"ready", "cancelled", "failed"}:
             return build
-        build.status = "ready" if build.project.deletion_state == "active" else "cancelled"
+        build.status = (
+            "ready" if build.project.deletion_state == "active" and build.deletion_state == "active" else "cancelled"
+        )
         build.image_uri = image_uri
         build.image_digest = image_digest
         build.package_uri = package_uri or build.package_uri
@@ -26,6 +28,7 @@ def complete_build(
         if requirements is not None:
             build.requirements_snapshot = requirements
         build.completed_at = timezone.now()
+        build.execution_completed_at = build.completed_at
         build.save()
     return build
 
@@ -37,7 +40,7 @@ def request_registration(build):
     with transaction.atomic():
         ModelProject.objects.select_for_update().get(pk=build.project_id)
         build = Build.objects.select_for_update().select_related("project").get(pk=build.pk)
-        if build.status != "ready" or build.project.deletion_state != "active":
+        if build.status != "ready" or build.project.deletion_state != "active" or build.deletion_state != "active":
             raise Conflict("Only a successful build can be registered.")
         if build.version_id or (
             build.registration_status == "registering" and build.updated_at > timezone.now() - timedelta(minutes=10)

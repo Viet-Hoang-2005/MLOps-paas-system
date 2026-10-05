@@ -53,8 +53,11 @@ export async function createPreviewProject(
   data.append("name", form.name);
   data.append("description", form.description);
   data.append("access_mode", form.access_mode);
-  return (await apiClient.post<ModelProject>(controlPlaneURL("/models/"), data))
-    .data;
+  return (
+    await apiClient.post<ModelProject>(controlPlaneURL("/models/"), data, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+  ).data;
 }
 
 export async function updatePreview(
@@ -70,6 +73,7 @@ export async function updatePreview(
     await apiClient.patch<ModelPreview>(
       controlPlaneURL(`/models/${id}/preview/`),
       data,
+      { headers: { "Content-Type": "multipart/form-data" } },
     )
   ).data;
 }

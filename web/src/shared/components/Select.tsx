@@ -1,11 +1,13 @@
-import { useState } from "react";
-import * as Popover from "@radix-ui/react-popover";
-import { ChevronDown, Check } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
+import * as Popover from "@radix-ui/react-popover";
+import { Check, ChevronDown } from "lucide-react";
+import type { ReactNode } from "react";
+import { useState } from "react";
 
 export interface SelectOption {
   value: string;
-  label: string;
+  label: ReactNode;
+  badge?: ReactNode;
 }
 
 export interface SelectProps {
@@ -40,12 +42,17 @@ export function Select({
             !selectedOption
               ? "text-color-foreground-subtle"
               : "text-color-foreground",
+            disabled &&
+              "cursor-not-allowed opacity-60 hover:border-input pointer-events-none",
             className,
           )}
         >
-          <span className="truncate">
-            {selectedOption?.label || placeholder}
-          </span>
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <span className="truncate">
+              {selectedOption?.label || placeholder}
+            </span>
+            {selectedOption?.badge}
+          </div>
           <ChevronDown className="h-4 w-4 shrink-0 text-color-foreground-subtle" />
         </button>
       </Popover.Trigger>
@@ -66,9 +73,12 @@ export function Select({
                 }}
                 className="flex min-h-10 w-full items-center justify-between gap-3 rounded-compact px-3 py-2 text-left hover:bg-surface-hover active:bg-surface-active"
               >
-                <span className="block truncate text-style-body-strong text-color-foreground">
-                  {option.label}
-                </span>
+                <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                  <span className="block truncate text-style-body-strong text-color-foreground">
+                    {option.label}
+                  </span>
+                  {option.badge}
+                </div>
                 {value === option.value && (
                   <Check className="h-4 w-4 shrink-0 text-color-primary" />
                 )}

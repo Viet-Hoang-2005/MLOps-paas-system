@@ -27,6 +27,8 @@ class BuildSerializer(serializers.ModelSerializer):
             "preview_revision",
             "registration_status",
             "registration_error",
+            "deletion_state",
+            "deletion_error",
             "celery_task_id",
             "external_build_id",
             "image_uri",

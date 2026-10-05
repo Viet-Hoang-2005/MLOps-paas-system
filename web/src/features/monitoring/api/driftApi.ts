@@ -50,6 +50,7 @@ export const createDriftMonitoringJob = async (
     await apiClient.post<DriftMonitoringJob>(
       controlPlaneURL("/drift-monitors/"),
       data,
+      { headers: { "Content-Type": "multipart/form-data" } },
     )
   ).data;
 };

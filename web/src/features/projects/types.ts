@@ -84,6 +84,8 @@ export interface Build {
   preview_revision: number | null;
   registration_status: "unregistered" | "registering" | "registered" | "failed";
   registration_error: string;
+  deletion_state: "active" | "deleting" | "delete_failed";
+  deletion_error: string;
   id: ResourceId;
   project_id: ResourceId;
   version_id: ResourceId | null;

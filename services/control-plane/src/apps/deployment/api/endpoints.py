@@ -11,7 +11,7 @@ from apps.deployment.selectors import (
     endpoint_for_user,
     endpoints_for_user,
 )
-from apps.deployment.services.builds import request_cancel
+from apps.deployment.services.builds import request_build_deletion, request_cancel, request_rebuild
 from apps.deployment.services.deployments import endpoint_logs, request_deployment, request_stop
 from apps.deployment.services.logs import build_logs, deployment_logs
 from infrastructure.runtime_logs import runtime_log_page
@@ -26,13 +26,23 @@ class BuildListEndpoint(generics.ListAPIView):
         return builds_for_user(self.request.user)
 
 
-class BuildDetailEndpoint(generics.RetrieveAPIView):
+class BuildDetailEndpoint(generics.RetrieveDestroyAPIView):
     serializer_class = BuildSerializer
     lookup_field = "public_id"
     lookup_url_kwarg = "build_id"
 
     def get_queryset(self):
         return builds_for_user(self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        build = request_build_deletion(self.get_object())
+        return Response(BuildSerializer(build).data, status=status.HTTP_202_ACCEPTED)
+
+
+class BuildRebuildEndpoint(APIView):
+    def post(self, request, build_id):
+        build = request_rebuild(build_for_user(request.user, build_id), backend=settings.BUILD_BACKEND)
+        return Response(BuildSerializer(build).data, status=status.HTTP_201_CREATED)
 
 
 class BuildRegisterEndpoint(APIView):
