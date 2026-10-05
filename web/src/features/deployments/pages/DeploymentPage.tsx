@@ -1,5 +1,10 @@
 import { RouteFallback } from "@/app/router/RouteFallback";
 import {
+  buildDeploymentPath,
+  runDeploymentPath,
+} from "@/features/deployments/navigation";
+import { isDeployableBuild } from "@/features/deployments/deploymentEligibility";
+import {
   canDeleteBuild,
   canRebuild,
 } from "@/features/deployments/buildActions";
@@ -33,7 +38,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 
-export default function DeploymentHistoryPage() {
+export default function DeploymentPage() {
   const { modelId } = useParams();
   const { t, i18n } = useTranslation("projects");
   const { t: tCommon } = useTranslation("common");
@@ -58,7 +63,10 @@ export default function DeploymentHistoryPage() {
         onSuccess: (build) => {
           setAction(null);
           navigate(
-            `/dashboard/deployments/new?projectId=${build.project_id}&buildId=${build.id}`,
+            buildDeploymentPath({
+              projectId: build.project_id,
+              buildId: build.id,
+            }),
           );
         },
       });
@@ -73,7 +81,12 @@ export default function DeploymentHistoryPage() {
           type="button"
           className="text-color-primary"
           onClick={() =>
-            navigate(`/dashboard/deployments/new?buildId=${row.original.id}`)
+            navigate(
+              buildDeploymentPath({
+                projectId: row.original.project_id,
+                buildId: row.original.id,
+              }),
+            )
           }
         >
           {row.original.id}
@@ -143,6 +156,19 @@ export default function DeploymentHistoryPage() {
           ["registering", "registered"].includes(build.registration_status);
         return (
           <div className="flex flex-wrap items-center gap-1">
+            {isDeployableBuild(build, build.project_id) && (
+              <Button
+                size="icon"
+                variant="secondary"
+                border={false}
+                icon={<Play className="h-4 w-4" />}
+                title={t("workflow.openRunDeployment")}
+                aria-label={t("workflow.openRunDeployment")}
+                onClick={() =>
+                  navigate(runDeploymentPath(build.project_id, build.id))
+                }
+              />
+            )}
             <Button
               size="icon"
               variant="secondary"
@@ -242,11 +268,7 @@ export default function DeploymentHistoryPage() {
         <Button
           size="md"
           icon={<Play className="h-4 w-4" />}
-          onClick={() =>
-            navigate(
-              `/dashboard/deployments/new${modelId ? `?projectId=${modelId}` : ""}`,
-            )
-          }
+          onClick={() => navigate(buildDeploymentPath({ projectId: modelId }))}
         >
           {t("workflow.deploy")}
         </Button>

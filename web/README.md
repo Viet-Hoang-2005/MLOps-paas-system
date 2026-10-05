@@ -33,6 +33,17 @@ cleans unregistered builds and their images, never Evolution versions. Run
 `pnpm test:build-actions` for button eligibility tests. See the
 [build history actions contract](../docs/dev/build-history-actions.md).
 
+Deployment has two pages: `/dashboard/deployment/build/new?projectId=<uuid>`
+selects Preview/Training, builds, and explicitly registers the immutable snapshot.
+The Build URL also keeps `source/jobId` or `buildId` to restore selection/logs.
+Registration polling continues until the API confirms `registered` and `version_id`,
+then opens `/dashboard/deployment/run/<projectId>/<buildId>` without deploying.
+Run's Terminal Deploy button creates the deployment; `?deploymentId=<uuid>` restores
+its status/logs on reload. Version selection changes the Build in the route.
+Evolution and registered history actions only open Run, never start a deployment.
+Run refuses unregistered/deleting builds and mismatched project/version/attempt IDs.
+`pnpm test:deployment-flow` covers navigation, eligibility and action boundaries.
+
 Local Overview metrics use Docker SDK CPU/RAM snapshots and a short-lived shared gateway counter for RPS. Polling runs every 5 seconds while foregrounded; at most 60 samples/5 minutes are held in page memory, not localStorage or a history database. Leaving, refreshing or changing the Running deployment resets the window. `pnpm test:metrics` covers buffering, counter resets and gaps. Production retains Prometheus history mode.
 
 ## Source architecture

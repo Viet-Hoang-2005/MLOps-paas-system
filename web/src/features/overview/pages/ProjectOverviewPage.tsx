@@ -1,4 +1,5 @@
 import { RouteFallback } from "@/app/router/RouteFallback";
+import { buildDeploymentPath } from "@/features/deployments/navigation";
 import { useTheme } from "@/app/theme/useTheme";
 import { RuntimeMetrics } from "@/features/overview/components/RuntimeMetrics";
 import {
@@ -217,7 +218,7 @@ export default function ProjectOverviewPage() {
             <Button
               size="md"
               onClick={() =>
-                navigate(`/dashboard/deployments/new?projectId=${modelId}`)
+                navigate(buildDeploymentPath({ projectId: modelId }))
               }
             >
               {t("workflow.deploy")}

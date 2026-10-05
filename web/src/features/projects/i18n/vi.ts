@@ -98,9 +98,26 @@ export const projectsVi = {
     buildCancelled: "Đã hủy quá trình build image",
     registrationFailed: "Đăng ký mô hình thất bại",
     register: "Đăng ký mô hình",
+    registerSuccess: "Đăng ký mô hình thành công",
+    registerFailed: "Đăng ký mô hình thất bại",
     continue: "Tiếp tục triển khai",
     newBuild: "tạo image mới",
     createDeployment: "Tạo bản triển khai",
+    buildDeployment: "Xây dựng Image",
+    runDeployment: "Chạy triển khai",
+    openRunDeployment: "Mở trang triển khai",
+    openBuild: "Mở tác vụ tạo image",
+    openOverview: "Mở tổng quan",
+    invalidBuildProject:
+      "Tác vụ tạo image hoặc triển khai không thuộc dự án và phiên bản này.",
+    registeredBuildRequired:
+      "Chọn tác vụ tạo image thành công, đã đăng ký và không đang bị xóa.",
+    runNotEligible: "Không thể bắt đầu bản triển khai này.",
+    unconfirmedHint:
+      "Chưa xác nhận kết quả. Kiểm tra runtime, xử lý hoặc dừng bản triển khai này trước khi tạo bản khác.",
+    deploymentBusyHint:
+      "Dự án còn bản triển khai đang chờ, đang chạy hoặc chưa xác nhận. Chờ hoàn tất hoặc xử lý bản đó trước khi tạo bản khác.",
+    logsUnavailable: "Không thể tải log",
     selectModels: "Chọn model",
     previewBadge: "Preview",
     trainedBadge: "Trained",

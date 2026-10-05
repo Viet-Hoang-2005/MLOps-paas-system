@@ -98,9 +98,26 @@ export const catalogEn = {
     buildCancelled: "Build was cancelled",
     registrationFailed: "Registration failed",
     register: "Register model",
+    registerSuccess: "Model registered successfully",
+    registerFailed: "Failed to register model",
     continue: "Continue to Deploy",
     newBuild: "New build",
     createDeployment: "Create deployment",
+    buildDeployment: "Build Image",
+    runDeployment: "Run deployment",
+    openRunDeployment: "Open deployment",
+    openBuild: "Open build",
+    openOverview: "Open overview",
+    invalidBuildProject:
+      "The build or deployment does not belong to this project and version.",
+    registeredBuildRequired:
+      "Choose a successful, registered build that is not being deleted.",
+    runNotEligible: "This deployment cannot be started.",
+    unconfirmedHint:
+      "The result is unconfirmed. Check the runtime and resolve or stop this deployment before starting another.",
+    deploymentBusyHint:
+      "This project has a pending, deploying or unconfirmed deployment. Wait for it to finish or resolve it before starting another.",
+    logsUnavailable: "Logs unavailable",
     selectModels: "Select models",
     previewBadge: "Preview",
     trainedBadge: "Trained",

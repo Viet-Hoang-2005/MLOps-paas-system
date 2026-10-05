@@ -49,8 +49,11 @@ const ProjectOverviewPage = lazy(
 const DeploymentPage = lazy(
   () => import("@/features/deployments/pages/DeploymentPage"),
 );
-const CreateDeploymentPage = lazy(
-  () => import("@/features/deployments/pages/CreateDeploymentPage"),
+const BuildDeploymentPage = lazy(
+  () => import("@/features/deployments/pages/BuildDeploymentPage"),
+);
+const RunDeploymentPage = lazy(
+  () => import("@/features/deployments/pages/RunDeploymentPage"),
 );
 const TrainingModelPage = lazy(
   () => import("@/features/training/pages/TrainingModelPage"),
@@ -158,7 +161,11 @@ const router = createBrowserRouter(
         <Route path="monitoring" element={<DriftMonitoringPage />} />
         <Route path="training" element={<TrainingModelPage />} />
         <Route path="evolution" element={<EvolutionPage />} />
-        <Route path="deployments/new" element={<CreateDeploymentPage />} />
+        <Route path="deployment/build/new" element={<BuildDeploymentPage />} />
+        <Route
+          path="deployment/run/:projectId/:buildId"
+          element={<RunDeploymentPage />}
+        />
         <Route path="monitoring/new" element={<CreateDriftMonitoringPage />} />
         <Route
           path="monitoring/:monitorId/edit"

@@ -1,9 +1,8 @@
 import { RouteFallback } from "@/app/router/RouteFallback";
-import {
-  deployBuild,
-  getProjectVersions,
-} from "@/features/deployments/api/deployApi";
+import { getProjectVersions } from "@/features/deployments/api/deployApi";
 import { useBuildHistory } from "@/features/deployments/hooks/useDeploymentFlow";
+import { runDeploymentPath } from "@/features/deployments/navigation";
+import { isDeployableBuild } from "@/features/deployments/deploymentEligibility";
 import { SnapshotComparison } from "@/features/evolution/components/SnapshotComparison";
 import { SnapshotMetadata } from "@/features/evolution/components/SnapshotMetadata";
 import { evolutionQueryKeys } from "@/features/evolution/queryKeys";
@@ -13,13 +12,11 @@ import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
-import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Select } from "@/shared/components/Select";
 import { formatDateTime } from "@/shared/i18n/formatters";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { GitBranch } from "lucide-react";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Navigate,
@@ -35,7 +32,6 @@ export default function EvolutionPage() {
   const { selectedModel, loading: isModelLoading } = useModelSelection();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const [confirm, setConfirm] = useState(false);
   const versions = useQuery({
     queryKey: evolutionQueryKeys.versions(modelId ?? ""),
     queryFn: () => getProjectVersions(modelId!),
@@ -49,13 +45,6 @@ export default function EvolutionPage() {
   const build = builds.data?.find(
     (item) => item.version_id === version?.id && item.status === "ready",
   );
-  const deploy = useMutation({
-    mutationFn: () => deployBuild(build!.id),
-    onSuccess: (deployment) =>
-      navigate(
-        `/dashboard/deployments/new?projectId=${modelId}&buildId=${build!.id}&step=deploy&deploymentId=${deployment.id}`,
-      ),
-  });
   if (!modelId) {
     if (isModelLoading) return <RouteFallback />;
     if (selectedModel) {
@@ -144,31 +133,20 @@ export default function EvolutionPage() {
             {version.requirements_snapshot}
           </pre>
           <Button
-            disabled={!build || deploy.isPending}
-            onClick={() => setConfirm(true)}
+            disabled={!isDeployableBuild(build, modelId)}
+            onClick={() => navigate(runDeploymentPath(modelId, build!.id))}
           >
-            {t("workflow.deploy")}
+            {t("workflow.openRunDeployment")}
           </Button>
         </section>
       ) : (
         <p>{t("workflow.noVersions")}</p>
       )}
-      {(versions.error || deploy.error) && (
+      {versions.error && (
         <p role="alert">
-          {getApiErrorMessage(
-            versions.error || deploy.error,
-            t("workflow.failed"),
-          )}
+          {getApiErrorMessage(versions.error, t("workflow.failed"))}
         </p>
       )}
-      <ConfirmDialog
-        open={confirm}
-        title={t("workflow.deploy")}
-        description={t("workflow.deployHint")}
-        loading={deploy.isPending}
-        onConfirm={() => deploy.mutate()}
-        onCancel={() => setConfirm(false)}
-      />
     </div>
   );
 }

@@ -1,23 +1,27 @@
 import {
   cancelBuildById,
-  deployBuild,
   rebuildById,
 } from "@/features/deployments/api/deployApi";
 import {
   buildPreview,
   buildTraining,
-  registerBuild,
 } from "@/features/deployments/api/lifecycleApi";
 import {
   deploymentFlowKeys,
   useBuild,
   useBuildTrainingSources,
-  useDeployment,
 } from "@/features/deployments/hooks/useDeploymentFlow";
 import { CodeDataFields } from "@/features/projects/components/CodeDataFields";
 import { ModelArtifactFields } from "@/features/projects/components/ModelArtifactFields";
 import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
 import { usePreview } from "@/features/projects/hooks/usePreview";
+import { canRebuild } from "@/features/deployments/buildActions";
+import { isRegisteredBuild } from "@/features/deployments/deploymentEligibility";
+import { useBuildRegistration } from "@/features/deployments/hooks/useBuildRegistration";
+import {
+  buildDeploymentPath,
+  runDeploymentPath,
+} from "@/features/deployments/navigation";
 import type { BuildInputForm, CodeDataForm } from "@/features/projects/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
@@ -29,11 +33,16 @@ import { TerminalViewer } from "@/shared/components/TerminalViewer";
 import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pause, Play, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 
-export default function CreateDeploymentPage() {
+export default function BuildDeploymentPage() {
+  const [params] = useSearchParams();
+  return <BuildDeploymentContent key={params.toString()} />;
+}
+
+function BuildDeploymentContent() {
   const { t } = useTranslation("projects");
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -41,45 +50,35 @@ export default function CreateDeploymentPage() {
   const projects = useModelProjects();
   const buildId = params.get("buildId");
   const build = useBuild(buildId);
-  const [selectedModelKey, setSelectedModelKey] = useState<string>("");
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const activeProjectId =
-    build.data?.project_id ||
-    selectedProjectId ||
-    params.get("projectId") ||
-    "";
-  const activeModelKey =
-    selectedModelKey ||
-    (build.data?.source_job_id
-      ? `training:${build.data.project_id}:${build.data.source_job_id}`
+    build.data?.project_id || params.get("projectId") || "";
+  const activeModelKey = build.data?.source_job_id
+    ? `training:${build.data.project_id}:${build.data.source_job_id}`
+    : params.get("source") === "training" &&
+        params.get("jobId") &&
+        activeProjectId
+      ? `training:${activeProjectId}:${params.get("jobId")}`
       : activeProjectId
         ? `preview:${activeProjectId}`
-        : "");
+        : "";
   const preview = usePreview(activeProjectId);
   const jobs = useBuildTrainingSources();
+  const projectMismatch = Boolean(
+    build.data &&
+    params.get("projectId") &&
+    params.get("projectId") !== build.data.project_id,
+  );
   const source = activeModelKey.startsWith("training:")
     ? "training"
     : "preview";
   const jobId = source === "training" ? activeModelKey.split(":")[2] : "";
 
-  const deploying =
-    params.get("step") === "deploy" && Boolean(build.data?.version_id);
-  const deployment = useDeployment(params.get("deploymentId"));
   const logs = useRuntimeLogStream({
     source:
-      deploying && deployment.data
-        ? { kind: "deployment", id: deployment.data.id }
-        : buildId
-          ? { kind: "build", id: buildId }
-          : null,
-    terminalStatuses: [
-      "ready",
-      "healthy",
-      "failed",
-      "cancelled",
-      "stopped",
-      "unconfirmed",
-    ],
+      build.data && buildId && !projectMismatch
+        ? { kind: "build", id: buildId }
+        : null,
+    terminalStatuses: ["ready", "failed", "cancelled"],
   });
 
   const modelOptions = useMemo<SelectOption[]>(() => {
@@ -120,30 +119,35 @@ export default function CreateDeploymentPage() {
   }, [projects.data?.models, jobs.data?.training_jobs, t]);
 
   const handleModelChange = (value: string) => {
-    setSelectedModelKey(value);
-    const next = new URLSearchParams(params);
-    next.delete("buildId");
-    next.delete("step");
-    next.delete("deploymentId");
-    if (value.startsWith("preview:")) {
-      const pId = value.replace("preview:", "");
-      setSelectedProjectId(pId);
-      next.set("projectId", pId);
-    } else if (value.startsWith("training:")) {
-      const [, pId] = value.split(":");
-      setSelectedProjectId(pId);
-      next.set("projectId", pId);
-    }
-    setParams(next);
+    const [kind, projectId, trainingId] = value.split(":");
+    navigate(
+      buildDeploymentPath({
+        projectId,
+        source: kind === "training" ? "training" : "preview",
+        jobId: trainingId,
+      }),
+    );
   };
 
   const selectedJob = useMemo(() => {
     if (source !== "training" || !jobId) return null;
-    return (jobs.data?.training_jobs ?? []).find((j) => j.id === jobId) || null;
-  }, [source, jobId, jobs.data?.training_jobs]);
+    return (
+      (jobs.data?.training_jobs ?? []).find(
+        (j) => j.id === jobId && j.project_id === activeProjectId,
+      ) || null
+    );
+  }, [source, jobId, activeProjectId, jobs.data?.training_jobs]);
 
   const previewAssets = preview.data?.assets;
   const existingAssets = useMemo(() => {
+    if (build.data) {
+      const map: Record<string, string> = {};
+      for (const asset of build.data.input_assets) {
+        map[asset.kind === "training_output" ? "source_artifact" : asset.kind] =
+          asset.name;
+      }
+      return map;
+    }
     if (source === "preview" && previewAssets) {
       const map: Record<string, string> = {};
       previewAssets.forEach((asset) => {
@@ -171,13 +175,22 @@ export default function CreateDeploymentPage() {
       return map;
     }
     return {};
-  }, [source, previewAssets, selectedJob]);
+  }, [build.data, source, previewAssets, selectedJob]);
 
   const previewFlavor = preview.data?.flavor;
   const previewFormat = preview.data?.artifact_format;
   const previewReqs = preview.data?.requirements_text;
 
   const modelForm = useMemo<BuildInputForm>(() => {
+    if (build.data) {
+      return {
+        flavor: build.data.flavor,
+        artifact_format:
+          build.data.artifact_format === "mlflow_zip" ? "mlflow_zip" : "raw",
+        requirements_text: build.data.requirements_snapshot,
+        source_artifact: null,
+      };
+    }
     if (source === "training" && selectedJob) {
       return {
         flavor: selectedJob.model_flavor || "sklearn",
@@ -196,7 +209,14 @@ export default function CreateDeploymentPage() {
       source_code_file: null,
       reference_data_file: null,
     };
-  }, [source, selectedJob, previewFlavor, previewFormat, previewReqs]);
+  }, [
+    build.data,
+    source,
+    selectedJob,
+    previewFlavor,
+    previewFormat,
+    previewReqs,
+  ]);
 
   const codeDataForm = useMemo<CodeDataForm>(
     () => ({
@@ -213,16 +233,12 @@ export default function CreateDeploymentPage() {
         : source === "training"
           ? buildTraining(jobId)
           : buildPreview(activeProjectId, preview.data!.revision),
-    onSuccess: (result) =>
-      setParams({ projectId: activeProjectId, buildId: result.id }),
-  });
-
-  const register = useMutation({
-    mutationFn: () => registerBuild(buildId!),
-    onSuccess: async () => {
-      await client.invalidateQueries({
-        queryKey: deploymentFlowKeys.build(buildId!),
+    onSuccess: (result) => {
+      client.setQueryData(deploymentFlowKeys.build(result.id), result);
+      void client.invalidateQueries({
+        queryKey: deploymentFlowKeys.history(result.project_id),
       });
+      setParams({ projectId: result.project_id, buildId: result.id });
     },
   });
 
@@ -234,38 +250,17 @@ export default function CreateDeploymentPage() {
       }),
   });
 
-  const registrationHandled = useRef<string | null>(null);
-  useEffect(() => {
-    if (
-      register.isSuccess &&
-      build.data?.version_id &&
-      registrationHandled.current !== buildId
-    ) {
-      registrationHandled.current = buildId;
-      const next = new URLSearchParams(params);
-      next.set("step", "deploy");
-      setParams(next);
-    }
-  }, [register.isSuccess, build.data?.version_id, buildId, params, setParams]);
-
-  const deploy = useMutation({
-    mutationFn: () => deployBuild(buildId!),
-    onSuccess: (result) =>
-      setParams({
-        projectId: activeProjectId,
-        buildId: buildId!,
-        step: "deploy",
-        deploymentId: result.id,
-      }),
-  });
-
+  const register = useBuildRegistration(buildId, activeProjectId);
+  const isRegistering =
+    register.isPending || build.data?.registration_status === "registering";
   const error =
     start.error ||
     cancel.error ||
-    register.error ||
-    deploy.error ||
     build.error ||
-    deployment.error;
+    register.error ||
+    projects.error ||
+    jobs.error ||
+    (source === "preview" && !buildId ? preview.error : null);
 
   const isBuilding =
     start.isPending ||
@@ -279,9 +274,11 @@ export default function CreateDeploymentPage() {
   );
 
   const buildButtonDisabled =
+    isRegistering ||
+    Boolean(buildId && (!build.data || !canRebuild(build.data))) ||
     !activeProjectId ||
     (source === "training"
-      ? !jobId
+      ? !selectedJob?.output_available
       : !preview.data?.assets?.some(
           (asset) => asset.kind === "source_artifact",
         ));
@@ -308,7 +305,11 @@ export default function CreateDeploymentPage() {
         icon: <Pause className="h-4 w-4" />,
         type: "danger" as const,
         loading: cancel.isPending,
-        disabled: cancel.isPending,
+        disabled:
+          cancel.isPending ||
+          !buildId ||
+          start.isPending ||
+          build.data?.deletion_state !== "active",
         onClick: () => cancel.mutate(),
       }
     : isFinished
@@ -329,9 +330,30 @@ export default function CreateDeploymentPage() {
           onClick: () => start.mutate(),
         };
 
+  if (projectMismatch) {
+    return (
+      <Callout
+        variant="danger"
+        title={t("workflow.notFound")}
+        description={t("workflow.invalidBuildProject")}
+      />
+    );
+  }
+  if (
+    register.isSuccess &&
+    isRegisteredBuild(build.data) &&
+    build.data?.deletion_state === "active"
+  ) {
+    return (
+      <Navigate
+        to={runDeploymentPath(build.data.project_id, build.data.id)}
+        replace
+      />
+    );
+  }
   return (
     <div className="flex min-h-full w-full flex-1 flex-col space-y-6">
-      <PageHeader title={t("workflow.createDeployment")} back />
+      <PageHeader title={t("workflow.buildDeployment")} back />
 
       <section className="flex flex-1 flex-col space-y-6 rounded-surface border border-border bg-surface p-6">
         <Select
@@ -339,7 +361,9 @@ export default function CreateDeploymentPage() {
           onChange={handleModelChange}
           placeholder={t("workflow.selectModels")}
           options={modelOptions}
-          disabled={isBuilding}
+          disabled={
+            isBuilding || isRegistering || Boolean(buildId && !build.data)
+          }
         />
 
         {Boolean(activeModelKey && activeProjectId) && (
@@ -426,12 +450,6 @@ export default function CreateDeploymentPage() {
             description={logs.error}
           />
         )}
-
-        {deploying && (
-          <p className="text-style-caption text-color-foreground-muted">
-            {build.data?.version_number} · {build.data?.image_uri}
-          </p>
-        )}
       </section>
 
       <div className="grid grid-cols-2 gap-4">
@@ -444,21 +462,17 @@ export default function CreateDeploymentPage() {
           {t("workflow.cancel")}
         </Button>
 
-        {deploying || build.data?.version_id ? (
+        {isRegisteredBuild(build.data) ? (
           <Button
             type="button"
             variant="primary"
             fullWidth
-            loading={deploy.isPending}
-            disabled={Boolean(
-              deployment.data &&
-              ["pending", "deploying", "healthy"].includes(
-                deployment.data.status,
-              ),
-            )}
-            onClick={() => deploy.mutate()}
+            disabled={build.data?.deletion_state !== "active"}
+            onClick={() =>
+              navigate(runDeploymentPath(activeProjectId, buildId!))
+            }
           >
-            {t("workflow.deploy")}
+            {t("workflow.openRunDeployment")}
           </Button>
         ) : (
           <Button
@@ -466,11 +480,13 @@ export default function CreateDeploymentPage() {
             variant="primary"
             fullWidth
             loading={
-              register.isPending ||
-              build.data?.registration_status === "registering"
+              isRegistering || build.data?.registration_status === "registering"
             }
             disabled={
-              build.data?.status !== "ready" || Boolean(build.data?.version_id)
+              build.data?.status !== "ready" ||
+              Boolean(build.data?.version_id) ||
+              isRegistering ||
+              build.data?.deletion_state !== "active"
             }
             onClick={() => register.mutate()}
           >

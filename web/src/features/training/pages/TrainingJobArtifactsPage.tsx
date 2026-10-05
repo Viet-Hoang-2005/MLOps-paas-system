@@ -2,6 +2,7 @@ import { Download, Rocket, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useTrainingJobDetailContext } from "@/features/training/trainingJobDetailContext";
+import { buildDeploymentPath } from "@/features/deployments/navigation";
 import { Button } from "@/shared/components/Button";
 import { PageBody } from "@/shared/components/PageBody";
 
@@ -12,17 +13,18 @@ export default function TrainingJobArtifactsPage() {
     useTrainingJobDetailContext();
   const build = job.registration_build;
   const openBuild = () => {
-    const query = new URLSearchParams({
-      projectId: job.project_id,
-      source: "training",
-      jobId: job.id,
-    });
-    if (
-      build &&
-      ["pending", "queued", "building", "ready"].includes(build.status)
-    )
-      query.set("buildId", build.id);
-    navigate(`/dashboard/deployments/new?${query}`);
+    navigate(
+      buildDeploymentPath({
+        projectId: job.project_id,
+        source: "training",
+        jobId: job.id,
+        buildId:
+          build &&
+          ["pending", "queued", "building", "ready"].includes(build.status)
+            ? build.id
+            : undefined,
+      }),
+    );
   };
   return (
     <div className="space-y-6">
