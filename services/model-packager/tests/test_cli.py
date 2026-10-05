@@ -116,17 +116,20 @@ def test_find_model_files_pytorch_and_flavor_resolution(tmp_path):
 
 
 def test_webhook_headers_and_post(monkeypatch):
+    monkeypatch.setattr("src.io.time.sleep", Mock())
     monkeypatch.setenv("CONTROL_PLANE_WEBHOOK_SECRET", "secret")
     assert cli.webhook_headers() == {"X-Control-Plane-Secret": "secret"}
     post = Mock(return_value=SimpleNamespace(status_code=200, text=""))
     monkeypatch.setattr(cli.requests, "post", post)
     cli.post_webhook("http://callback", {"status": "success"})
-    assert post.call_args.kwargs["headers"] == {"X-Control-Plane-Secret": "secret"}
+    assert post.call_args.kwargs["headers"]["X-Control-Plane-Secret"] == "secret"
+    assert post.call_args.kwargs["headers"]["Idempotency-Key"].startswith("build-")
     post.return_value = SimpleNamespace(status_code=500, text="bad")
-    with pytest.raises(RuntimeError, match="HTTP 500"):
+    with pytest.raises(RuntimeError, match="could not be delivered"):
         cli.post_webhook("http://callback", {})
     post.reset_mock()
-    cli.post_webhook("", {})
+    with pytest.raises(RuntimeError, match="URL is required"):
+        cli.post_webhook("", {})
     post.assert_not_called()
 
 

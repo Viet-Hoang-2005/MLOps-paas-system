@@ -4,7 +4,6 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - celery.yaml
-  - runtime-health.yaml
   - service.yaml
   - hpa.yaml
   - configmap.yaml

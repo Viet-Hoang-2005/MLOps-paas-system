@@ -160,7 +160,12 @@ def test_deletion_blocks_registration_and_queued_execution(project, monkeypatch)
 def test_local_cleanup_removes_only_known_build_container(project, monkeypatch):
     build = Build.objects.create(project=project, flavor="sklearn", backend="docker")
     client = Mock()
-    monkeypatch.setattr("infrastructure.execution.build_cleanup.DockerClient", lambda: SimpleNamespace(client=client))
+    monkeypatch.setattr("infrastructure.execution.local_containers.DockerClient", lambda **kwargs: SimpleNamespace(client=client))
+    client.containers.get.return_value.id = "build-container"
+    client.containers.get.return_value.attrs = {"Config": {"Labels": {
+        "mlops_project_id": str(project.public_id), "mlops_tenant_id": str(project.owner.tenant_id),
+        "mlops_build_id": str(build.public_id),
+    }}}
     stop_build_for_deletion(build)
     client.containers.get.assert_called_once_with(f"build-{build.public_id}")
     client.containers.get.return_value.remove.assert_called_once_with(force=True)

@@ -5,7 +5,7 @@ from urllib.parse import quote
 from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
 
-from common.env import env, env_identifier, env_int, env_list
+from common.env import env, env_bool, env_identifier, env_int, env_list
 
 SERVICE_ROOT = Path(__file__).resolve().parents[3]
 BASE_DIR = SERVICE_ROOT / "src"
@@ -199,6 +199,11 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 RUNTIME_HEALTH_INTERVAL_SECONDS = 15
 RUNTIME_HEALTH_STALE_SECONDS = 45
 CELERY_TASK_DEFAULT_QUEUE = "celery"
+LOCAL_EXECUTION_WATCH_ENABLED = env_bool("LOCAL_EXECUTION_WATCH_ENABLED", False)
+LOCAL_EXECUTION_POLL_SECONDS = 5
+LOCAL_BUILD_TIMEOUT_SECONDS = env_int("LOCAL_BUILD_TIMEOUT_SECONDS", 43200)
+LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS = env_int("LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS", 90)
+LOCAL_BUILD_CALLBACK_GRACE_SECONDS = 30
 CELERY_TASK_ROUTES = {
     "apps.deployment.health_tasks.scan_runtime_health": {"queue": "runtime-health"},
     "apps.deployment.health_tasks.probe_runtime_health": {"queue": "runtime-health"},
@@ -210,6 +215,12 @@ CELERY_BEAT_SCHEDULE = {
         "options": {"queue": "runtime-health", "expires": 15},
     },
 }
+if LOCAL_EXECUTION_WATCH_ENABLED:
+    CELERY_BEAT_SCHEDULE["local-execution-scan"] = {
+        "task": "apps.deployment.execution_tasks.scan_local_executions",
+        "schedule": LOCAL_EXECUTION_POLL_SECONDS,
+        "options": {"queue": "celery", "expires": 10},
+    }
 CONTROL_PLANE_WEBHOOK_SECRET = env("CONTROL_PLANE_WEBHOOK_SECRET", "local-webhook-secret")
 ARGO_EVENTS_WEBHOOK_TOKEN = env("ARGO_EVENTS_WEBHOOK_TOKEN", "")
 CONTROL_PLANE_INTERNAL_URL = str(env("CONTROL_PLANE_INTERNAL_URL", "http://control-plane:8000")).rstrip("/")

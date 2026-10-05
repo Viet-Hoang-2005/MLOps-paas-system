@@ -1,12 +1,10 @@
 import base64
 import os
-import time
 
 import docker
 import docker.errors
 from django.conf import settings
 from django.db import transaction
-from django.utils import timezone
 
 from apps.deployment.models import Endpoint
 from apps.training.services.capabilities import issue_capability
@@ -19,6 +17,7 @@ from infrastructure.storage.paths import build_prefix, drift_run_prefix
 
 from .build_inputs import label_mapping_input
 from .image_references import build_image_tag, image_repository, immutable_image_reference
+from .local_containers import remove_container, start_container
 
 
 def _start_container(docker_client, project, resource, identity_field, **kwargs):
@@ -47,17 +46,6 @@ def _logging_environment():
         "LOG_FORMAT": os.environ.get("LOG_FORMAT") or "console",
         "LOG_SUMMARY_INTERVAL_SECONDS": os.environ.get("LOG_SUMMARY_INTERVAL_SECONDS") or "60",
     }
-
-
-def _wait_and_cleanup(container):
-    result = container.wait()
-    logs = container.logs(stdout=True, stderr=True).decode("utf-8", errors="replace")
-    if result.get("StatusCode") == 0:
-        try:
-            container.remove()
-        except docker.errors.NotFound:
-            pass
-    return result.get("StatusCode", 1), logs
 
 
 class DockerBuildBackend:
@@ -106,30 +94,20 @@ class DockerBuildBackend:
             "HARBOR_PASSWORD": settings.HARBOR_PASSWORD,
             "REDIS_URL": settings.REDIS_URL,
         }
-        container = _start_container(
+        container = start_container(
             self.docker,
-            project,
             build,
-            "external_build_id",
+            "build",
             image="mlops-paas-model-packager",
             name=f"build-{build.public_id}",
             environment=environment,
             network=settings.DOCKER_NETWORK_NAME,
             volumes={"/var/run/docker.sock": {"bind": "/var/run/docker.sock", "mode": "rw"}},
         )
-        build.external_build_id = container.id
-        build.save(update_fields=["external_build_id", "updated_at"])
-        status_code, logs = _wait_and_cleanup(container)
-        if status_code:
-            raise RuntimeError(logs[-12000:])
-        return logs
+        return {"dispatched": True, "container_id": container.id}
 
     def cancel(self, build):
-        if build.external_build_id:
-            try:
-                self.docker.client.containers.get(build.external_build_id).kill()
-            except docker.errors.NotFound:
-                pass
+        remove_container(build, "build", self.docker.client)
 
 
 class DockerTrainingBackend:
@@ -260,11 +238,10 @@ class DockerDeploymentBackend:
             "mlops_tenant_id": str(project.owner.tenant_id),
         }
         self._log(f"Creating runtime container {container_name}.")
-        container = _start_container(
+        container = start_container(
             self.docker,
-            project,
             deployment,
-            "external_deployment_id",
+            "deploy",
             image=image,
             name=container_name,
             environment={
@@ -290,32 +267,11 @@ class DockerDeploymentBackend:
                 "health_status": "unknown",
             },
         )
-        self._log("Runtime container created; waiting for model worker health endpoint.")
-        deadline = time.monotonic() + 90
-        while time.monotonic() < deadline:
-            healthy, metadata = self.health(deployment)
-            if healthy:
-                self._log("Model worker health endpoint responded successfully.")
-                endpoint.health_status = "healthy"
-                endpoint.last_checked_at = timezone.now()
-                endpoint.save(update_fields=["health_status", "last_checked_at", "updated_at"])
-                return endpoint
-            detail = metadata.get("message") or metadata.get("error") or metadata.get("detail")
-            suffix = f" Reason: {detail}" if detail else ""
-            self._log(f"Model worker is not healthy yet.{suffix} Checking again in 5 seconds.")
-            time.sleep(5)
-        try:
-            container.remove(force=True)
-        except docker.errors.DockerException as exc:
-            self._log(f"Unable to remove the unhealthy runtime container: {exc}")
-        raise RuntimeError("Endpoint did not become healthy before timeout.")
+        self._log("Runtime container created; readiness will be checked asynchronously.")
+        return endpoint
 
     def stop(self, deployment):
-        if deployment.external_deployment_id:
-            try:
-                self.docker.client.containers.get(deployment.external_deployment_id).remove(force=True)
-            except docker.errors.NotFound:
-                pass
+        remove_container(deployment, "deploy", self.docker.client)
 
     def health(self, deployment):
         endpoint = getattr(deployment, "endpoint", None)

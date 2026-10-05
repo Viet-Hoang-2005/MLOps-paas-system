@@ -13,7 +13,7 @@ from rest_framework.test import APIClient
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.runtime_health import dispatch_health_checks, effective_health, probe_running_health
-from apps.deployment.tasks import _mark_deployment_succeeded, check_deployment_health
+from apps.deployment.tasks import _mark_deployment_succeeded
 from apps.registry.models import ModelVersion
 from infrastructure.runtime_health import RuntimeHealthProbe
 
@@ -150,7 +150,6 @@ def test_readiness_and_delayed_completion_cannot_revive_terminal_deployment(runt
     _, deployment, _ = runtime
     Deployment.objects.filter(pk=deployment.pk).update(status=status)
     assert _mark_deployment_succeeded(deployment) is False
-    assert check_deployment_health.run(str(deployment.public_id)) == status
     deployment.refresh_from_db()
     assert deployment.status == status
 
@@ -232,11 +231,14 @@ def test_readiness_timeout_fails_candidate_and_preserves_running(runtime, monkey
     monkeypatch.setattr("apps.deployment.tasks.deployment_backend", lambda _: Mock(health=Mock(return_value=(False, {}))))
     for name in ("invalidate_model_server_cache", "append_deployment_log"):
         monkeypatch.setattr(f"apps.deployment.tasks.{name}", Mock())
-    check_deployment_health.push_request(retries=30)
-    try:
-        assert check_deployment_health.run(str(candidate.public_id)) == "failed"
-    finally:
-        check_deployment_health.pop_request()
+    from apps.deployment.services.local_execution import check_execution
+    token = uuid.uuid4()
+    Deployment.objects.filter(pk=candidate.pk).update(
+        execution_check_token=token, execution_check_lease_until=timezone.now() + timedelta(seconds=30),
+        execution_deadline_at=timezone.now() - timedelta(seconds=1),
+    )
+    assert check_execution("deploy", str(candidate.public_id), str(token), inspector=Mock(return_value=Mock(
+        attrs={"State": {"Status": "running"}})), remover=Mock()) == "waiting"
     project.refresh_from_db()
     candidate.refresh_from_db()
     assert project.active_deployment_id == running.pk

@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 from celery import shared_task
 from django.conf import settings
@@ -7,8 +8,8 @@ from django.utils import timezone
 
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.health_tasks import probe_runtime_health, scan_runtime_health  # noqa: F401
+from apps.deployment.execution_tasks import check_local_execution, scan_local_executions  # noqa: F401
 from apps.deployment.services.cache import invalidate_model_server_cache
-from apps.deployment.services.completion import complete_build
 from apps.deployment.services.logs import append_deployment_log, reset_deployment_logs
 from apps.observability.services.outbox import enqueue_event
 from apps.registry.services.versions import register_successful_build
@@ -84,6 +85,11 @@ def execute_build(self, build_id):
         build.celery_task_id = self.request.id or build.celery_task_id
         build.error_message = ""
         build.save(update_fields=["status", "started_at", "celery_task_id", "error_message", "updated_at"])
+        if build.backend == "docker":
+            Build.objects.filter(pk=build.pk).update(
+                execution_deadline_at=build.execution_deadline_at or timezone.now() + timedelta(seconds=settings.LOCAL_BUILD_TIMEOUT_SECONDS),
+                next_execution_check_at=timezone.now(),
+            )
         record_transition(build, "building")
     try:
         result = build_backend(build.backend).run(build)
@@ -109,24 +115,12 @@ def execute_build(self, build_id):
         cleanup_failed_build_artifacts.delay(str(build.public_id), False)
         raise
     if isinstance(result, dict) and result.get("dispatched"):
+        build.refresh_from_db()
+        if build.status != "building":
+            return build.status
         record_transition(build, "building", phase="dispatched")
         return "building"
-    if not Build.objects.filter(pk=build.pk).exists():
-        return "deleted"
-    build.refresh_from_db()
-    completed_locally = build.status != "ready"
-    if build.status not in {"ready", "cancelled", "failed"}:
-        image_uri = build.image_uri or temporary_image_reference(
-            build.project.public_id,
-            build.public_id,
-            registry=settings.HARBOR_REGISTRY_URL if build.backend == "argo" else "",
-            registry_project=settings.HARBOR_USER_PROJECT,
-        )
-        build = complete_build(build, image_uri=image_uri, image_digest=build.image_digest)
-    Build.objects.filter(pk=build.pk).update(logs=str(result)[-20000:], completed_at=timezone.now())
-    if completed_locally:
-        record_transition(build, build.status)
-    return build.status
+    raise RuntimeError("Build backend must return a dispatched execution.")
 
 
 @shared_task
@@ -170,6 +164,9 @@ def cleanup_failed_build_artifacts(self, build_id, delete_image=False):
         return "not_found"
     if build.status == "ready" or build.deletion_state != "active" or build.version_id:
         return "retained"
+    if build.backend == "docker" and build.next_execution_check_at:
+        # The watcher must stop/observe the runner before outputs are removed.
+        return "waiting-for-execution"
     if delete_image and build.image_uri:
         BuildImageCleaner().delete(build)
     storage = S3Storage()
@@ -252,6 +249,11 @@ def execute_deployment(self, deployment_id):
         deployment.celery_task_id = self.request.id or deployment.celery_task_id
         deployment.error_message = ""
         deployment.save(update_fields=["status", "celery_task_id", "error_message", "updated_at"])
+        if deployment.backend == "docker":
+            Deployment.objects.filter(pk=deployment.pk).update(
+                execution_deadline_at=deployment.execution_deadline_at or timezone.now() + timedelta(seconds=settings.LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS),
+                next_execution_check_at=timezone.now(),
+            )
         record_transition(deployment, "deploying")
     if starting:
         reset_deployment_logs(deployment, "Starting deployment process.")
@@ -294,14 +296,8 @@ def execute_deployment(self, deployment_id):
         return deployment.status
     append_deployment_log(deployment, "Runtime resource dispatched; waiting for readiness confirmation.")
     record_transition(deployment, "deploying", phase="dispatched")
-    if endpoint.health_status == "healthy":
-        _mark_deployment_succeeded(deployment)
-        deployment.refresh_from_db()
-        return deployment.status
     if deployment.backend == "argo":
         mark_deployment_unconfirmed.apply_async(args=[str(deployment.public_id)], countdown=33 * 60)
-    else:
-        check_deployment_health.apply_async(args=[str(deployment.public_id)], countdown=10)
     return "deploying"
 
 
@@ -325,36 +321,6 @@ def mark_deployment_unconfirmed(deployment_id):
             payload={"deployment_id": str(deployment.public_id), "status": "unconfirmed"},
         )
     return "unconfirmed"
-
-
-@shared_task(bind=True, max_retries=30)
-def check_deployment_health(self, deployment_id):
-    deployment = Deployment.objects.select_related("version", "build").get(public_id=deployment_id)
-    if deployment.status != "deploying":
-        return deployment.status
-    healthy, metadata = deployment_backend(deployment.backend).health(deployment)
-    Endpoint.objects.filter(deployment=deployment, deployment__status="deploying").update(
-        health_status="healthy" if healthy else "unhealthy",
-        last_checked_at=timezone.now(),
-        metadata=metadata,
-    )
-    if healthy:
-        _mark_deployment_succeeded(deployment)
-        deployment.refresh_from_db()
-        return deployment.status
-    if self.request.retries >= self.max_retries:
-        invalidate_model_server_cache(str(deployment.version.public_id))
-        changed = Deployment.objects.filter(pk=deployment.pk, status="deploying").update(
-            status="failed", error_message="Endpoint readiness check timed out."
-        )
-        if not changed:
-            deployment.refresh_from_db()
-            return deployment.status
-        append_deployment_log(deployment, "Endpoint readiness check timed out.")
-        record_transition(deployment, "failed", reason="Endpoint readiness check timed out")
-        return "failed"
-    append_deployment_log(deployment, "Endpoint is not healthy yet; retrying health check.")
-    raise self.retry(countdown=min(10 + self.request.retries * 2, 60))
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)

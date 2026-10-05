@@ -1,4 +1,7 @@
 from types import SimpleNamespace
+from unittest.mock import Mock
+
+import docker.errors
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -28,10 +31,15 @@ class RecordingStorage:
 
 class SuccessfulContainer:
     id = "packager-container"
+    attrs = {"State": {"Status": "running"}}
+
+    @staticmethod
+    def reload():
+        pass
 
     @staticmethod
     def wait():
-        return {"StatusCode": 0}
+        raise AssertionError("Dispatch must not wait for the runner.")
 
     @staticmethod
     def logs(stdout=True, stderr=True):
@@ -46,6 +54,8 @@ class SuccessfulContainer:
 class RecordingDocker:
     def __init__(self):
         self.environment = None
+        self.client = Mock()
+        self.client.containers.get.side_effect = docker.errors.NotFound("absent")
 
     def run(self, **kwargs):
         self.environment = kwargs["environment"]
@@ -71,7 +81,7 @@ def test_docker_build_backend_uses_build_input_s3_uri():
     storage = RecordingStorage()
     docker = RecordingDocker()
 
-    assert DockerBuildBackend(docker_client=docker, storage=storage).run(build) == "build complete"
+    assert DockerBuildBackend(docker_client=docker, storage=storage).run(build) == {"dispatched": True, "container_id": "packager-container"}
     assert storage.downloaded_uri == asset.s3_uri
     assert docker.environment["SOURCE_DOWNLOAD_URL"] == "https://storage.example/download"
     assert docker.environment["PROJECT_ID"] == str(build.project.public_id)

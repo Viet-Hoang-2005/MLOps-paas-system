@@ -151,6 +151,7 @@ def test_docker_details_are_sanitized_debug(monkeypatch, tmp_path, caplog):
 
 
 def test_webhook_error_omits_arbitrary_response_body(monkeypatch):
+    monkeypatch.setattr("src.io.time.sleep", Mock())
     monkeypatch.setattr(
         cli.requests,
         "post",
@@ -158,4 +159,4 @@ def test_webhook_error_omits_arbitrary_response_body(monkeypatch):
     )
     with pytest.raises(RuntimeError) as error:
         cli.post_webhook("https://callback.test/build", {})
-    assert str(error.value) == "Build webhook failed with HTTP 500"
+    assert str(error.value) == "Build result callback could not be delivered."

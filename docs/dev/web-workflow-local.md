@@ -15,9 +15,9 @@ Compose có tên container cố định nên stack mới không thể chạy son
 3. Dừng client rồi tạo lại stack bằng code mới:
 
    ```bash
-   docker compose stop control-plane celery-worker celery-beat celery-health-worker consumer model-server
+   docker compose stop control-plane celery-worker celery-beat consumer model-server
    docker compose build model-packager training-runner evidently machine-learning-serving deep-learning-serving
-   docker compose up -d --build postgres schema-init redis redpanda redpanda-init mlflow control-plane celery-worker celery-beat celery-health-worker model-server consumer traefik
+   docker compose up -d --build postgres schema-init redis redpanda redpanda-init mlflow control-plane celery-worker celery-beat model-server consumer traefik
    docker compose config --quiet
    docker compose logs --tail 80 control-plane celery-worker
    ```
@@ -108,3 +108,10 @@ Deployment lifecycle dùng `succeeded/failed`, độc lập với API Health
 `unknown/healthy/unhealthy`. Beat và queue `runtime-health` kiểm tra cả khi Web đóng;
 quan sát quá 45 giây hiển thị unknown, không đổi phiên bản Running.
 Xem [runbook](runtime-health.md).
+
+## Detached Build and Deploy
+
+Apply deployment migration `0008` and restart the existing application/Celery
+processes when rolling out the local asynchronous execution refactor. The existing
+Beat schedules Docker execution checks; do not omit it. There is no new service
+or frontend route. See [local-async-execution.md](local-async-execution.md).

@@ -83,7 +83,7 @@ services:
     networks:
       - mlops_paas_network
 
-  # 1.1 Celery Worker for Django Control Plane
+  # 1.1 Local worker shares orchestration and runtime-health execution slots.
   celery-worker:
     build:
       context: ./services/control-plane
@@ -116,6 +116,8 @@ services:
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
       AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-}
       EXECUTION_BACKEND: ${EXECUTION_BACKEND:-docker}
+      LOCAL_BUILD_TIMEOUT_SECONDS: ${LOCAL_BUILD_TIMEOUT_SECONDS:-43200}
+      LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS: ${LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS:-90}
       BUILD_BACKEND: ${BUILD_BACKEND:-}
       DEPLOYMENT_BACKEND: ${DEPLOYMENT_BACKEND:-}
       TRAINING_BACKEND: ${TRAINING_BACKEND:-}
@@ -136,7 +138,7 @@ services:
     volumes:
       - ./services/control-plane:/app
       - /var/run/docker.sock:/var/run/docker.sock
-    command: celery -A config worker -Q celery --concurrency=2
+    command: sh -c "until python manage.py migrate --check; do sleep 2; done; exec celery -A config worker -Q celery,runtime-health --concurrency=2"
     depends_on:
       control-plane:
         condition: service_started
@@ -145,8 +147,8 @@ services:
     networks:
       - mlops_paas_network
 
-  # Runtime health is independent of long build/training tasks.
-  celery-health-worker: &health-process
+  # 1.2 Singleton scheduler; the local worker consumes both scheduled task queues.
+  celery-beat:
     build:
       context: ./services/control-plane
       dockerfile: Dockerfile
@@ -169,9 +171,10 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/3
       CELERY_RESULT_BACKEND: redis://redis:6379/4
       REDIS_URL: redis://redis:6379/1
+      LOCAL_EXECUTION_WATCH_ENABLED: "true"
     volumes:
       - ./services/control-plane:/app
-    command: sh -c "until python manage.py migrate --check; do sleep 2; done; exec celery -A config worker -Q runtime-health --concurrency=2"
+    command: sh -c "until python manage.py migrate --check; do sleep 2; done; exec celery -A config beat --schedule=/tmp/celerybeat-schedule"
     depends_on:
       control-plane:
         condition: service_started
@@ -179,10 +182,6 @@ services:
         condition: service_started
     networks:
       - mlops_paas_network
-
-  celery-beat:
-    <<: *health-process
-    command: sh -c "until python manage.py migrate --check; do sleep 2; done; exec celery -A config beat --schedule=/tmp/celerybeat-schedule"
 
   # 2. Model Server API Gateway
   model-server:

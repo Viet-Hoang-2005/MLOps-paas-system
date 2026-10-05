@@ -108,9 +108,12 @@ class BuildWebhookEndpoint(APIView):
         incoming = str(request.data.get("status", "")).lower()
         if incoming not in {"success", "succeeded", "ready", "completed", "failed", "error"}:
             return Response({"detail": "A terminal build result is required."}, status=400)
-        build.execution_completed_at = timezone.now()
-        build.save(update_fields=["execution_completed_at"])
+        if request.data.get("build_id") and str(request.data["build_id"]) != str(build.public_id):
+            return Response({"detail": "Build identity does not match the callback path."}, status=400)
         if build.status in {"ready", "failed", "cancelled"}:
+            if build.backend == "argo":
+                build.execution_completed_at = timezone.now()
+                build.save(update_fields=["execution_completed_at"])
             if build.deletion_state != "active":
                 transaction.on_commit(lambda: delete_build.delay(str(build.public_id)))
             return Response(
@@ -120,6 +123,21 @@ class BuildWebhookEndpoint(APIView):
                     "duplicate": True,
                 }
             )
+        if build.backend == "docker" and incoming in {"success", "succeeded", "ready", "completed"}:
+            expected_image = temporary_image_reference(build.project.public_id, build.public_id)
+            if (
+                request.data.get("image_uri") != expected_image
+                or not re.fullmatch(r"sha256:[a-f0-9]{64}", str(request.data.get("image_digest", "")))
+                or not isinstance(request.data.get("package_manifest"), dict)
+                or not request.data.get("package_manifest")
+                or not build.package_uri
+                or request.data.get("package_uri", build.package_uri) != build.package_uri
+            ):
+                return Response({"detail": "A valid build-scoped image, digest and package manifest are required."}, status=400)
+        if build.backend == "docker" and build.execution_deadline_at and build.execution_deadline_at <= timezone.now():
+            return Response({"detail": "Build result arrived after the execution deadline."}, status=409)
+        build.execution_completed_at = timezone.now()
+        build.save(update_fields=["execution_completed_at"])
         if incoming in {"success", "succeeded", "ready", "completed"}:
             project = build.project
             image_uri = str(

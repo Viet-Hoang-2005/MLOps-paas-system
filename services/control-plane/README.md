@@ -209,7 +209,7 @@ Workflow mới dùng Project + Preview 1–1, snapshot Build/Version bất biế
 
 ```bash
 # Khởi động Control Plane và Celery Worker ở chế độ nền
-docker compose up -d control-plane celery-worker celery-beat celery-health-worker
+docker compose up -d control-plane celery-worker celery-beat
 
 # Xem logs trực tiếp của Control Plane
 docker compose logs -f control-plane

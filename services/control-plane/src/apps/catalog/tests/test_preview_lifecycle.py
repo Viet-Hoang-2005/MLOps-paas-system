@@ -364,6 +364,21 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
 
     monkeypatch.setattr("apps.deployment.tasks.deployment_backend", lambda backend: SimpleNamespace(deploy=ready))
     execute_deployment(deployed.data["id"])
+    from apps.deployment.models import Deployment
+    from apps.deployment.services.local_execution import check_execution
+    import uuid
+    from datetime import timedelta
+    from django.utils import timezone
+    from unittest.mock import Mock
+
+    candidate = Deployment.objects.get(public_id=deployed.data["id"])
+    token = uuid.uuid4()
+    Deployment.objects.filter(pk=candidate.pk).update(
+        execution_check_token=token, execution_check_lease_until=timezone.now() + timedelta(seconds=30),
+    )
+    assert check_execution("deploy", str(candidate.public_id), str(token),
+        inspector=Mock(return_value=Mock(attrs={"State": {"Status": "running"}})),
+        remover=Mock(), probe=Mock(check=Mock(return_value="healthy"))) == "succeeded"
     overview = client.get(f"/api/models/{id}/")
     assert overview.data["lifecycle_status"] == "running"
     assert overview.data["active_endpoint"]["version_id"] == str(build.version.public_id)

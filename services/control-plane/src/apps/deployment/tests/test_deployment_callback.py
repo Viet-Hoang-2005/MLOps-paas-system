@@ -76,9 +76,8 @@ def test_argo_dispatch_schedules_only_one_result_deadline(deployment, monkeypatc
     backend = Mock(deploy=Mock(return_value=deployment.endpoint))
     monkeypatch.setattr("apps.deployment.tasks.deployment_backend", lambda _: backend)
     deadline = Mock()
-    health = Mock()
     monkeypatch.setattr("apps.deployment.tasks.mark_deployment_unconfirmed.apply_async", deadline)
-    monkeypatch.setattr("apps.deployment.tasks.check_deployment_health.apply_async", health)
     assert execute_deployment.run(str(deployment.public_id)) == "deploying"
     deadline.assert_called_once_with(args=[str(deployment.public_id)], countdown=33 * 60)
-    health.assert_not_called()
+    deployment.refresh_from_db()
+    assert deployment.next_execution_check_at is None

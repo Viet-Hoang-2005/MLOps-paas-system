@@ -2,6 +2,9 @@
 
 import tarfile
 import zipfile
+import hashlib
+import json
+import time
 
 
 def download_presigned_file(download_url, destination, requests_module, detail):
@@ -54,7 +57,20 @@ def safe_extract_zip(archive_path, destination):
 
 def post_webhook(webhook_url, payload, requests_module, headers):
     if not webhook_url:
-        return
-    response = requests_module.post(webhook_url, json=payload, headers=headers, timeout=10)
-    if response.status_code >= 400:
-        raise RuntimeError(f"Build webhook failed with HTTP {response.status_code}")
+        raise RuntimeError("Build callback URL is required.")
+    key = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+    delivery_headers = {**headers, "Idempotency-Key": f"build-{payload.get('build_id', '')}-{key}"}
+    for attempt in range(3):
+        try:
+            response = requests_module.post(webhook_url, json=payload, headers=delivery_headers,
+                timeout=(2, 5), allow_redirects=False)
+            if 200 <= response.status_code < 300:
+                return
+            retry = response.status_code == 429 or response.status_code >= 500
+        except Exception:
+            retry = True
+        if not retry or attempt == 2:
+            break
+        time.sleep(2**attempt)
+    # Never expose request headers, callback URL or payload through exceptions.
+    raise RuntimeError("Build result callback could not be delivered.")

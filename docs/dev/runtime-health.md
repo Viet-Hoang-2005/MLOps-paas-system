@@ -19,11 +19,16 @@ succeeded, không fallback image mẫu/version khác; health không tự chuyể
 
 - celery-beat: một scheduler, scan mỗi 15 giây. K8s một replica, Recreate; không
   scale Beat hoặc chạy thêm worker với -B.
-- celery-health-worker: queue runtime-health, concurrency 2. Worker build/training
-  chỉ consume celery, không giữ hết slot health bằng task dài.
+- Production: celery-health-worker consume queue runtime-health, concurrency 2.
+  Worker build/training chỉ consume celery để tách slot health.
+- Local: celery-worker consume cả celery và runtime-health, concurrency 2 dùng
+  chung. Không có container celery-health-worker riêng; task health có thể chờ
+  khi worker bận. Beat vẫn riêng và còn lên lịch scan Build/Deploy mỗi 5 giây.
 
-Cùng image, config.settings.health chỉ cần Django key, DB/broker credentials.
-Không Docker socket, AWS/Harbor credentials hoặc Kubernetes token. Probe HTTP đến
+Cùng image; Beat và health worker production dùng config.settings.health, chỉ cần
+Django key, DB/broker credentials. Hai process này không có Docker socket,
+AWS/Harbor credentials hoặc Kubernetes token. Local dùng worker orchestration
+hiện có (config.settings.local), không cấp thêm credential hay mount. Probe HTTP đến
 ứng dụng runtime, không Docker stats, Pod phase hay gateway công khai. Metrics riêng.
 
 Scanner chọn Running succeeded của project active. Lease PostgreSQL 30 giây. Token
@@ -61,11 +66,11 @@ migrate DB đang chạy. Sau khi chuẩn bị DB/broker sạch và .env hợp l�
 
 ```bash
 docker compose config --quiet
-docker compose up -d --build control-plane celery-worker celery-beat celery-health-worker model-server
-docker compose logs --tail 80 celery-beat celery-health-worker
+docker compose up -d --build control-plane celery-worker celery-beat model-server
+docker compose logs --tail 80 celery-beat celery-worker
 ```
 
-Control Plane migrate như hiện có; hai process health chờ migrate --check, không tự
+Control Plane migrate như hiện có; worker và Beat chờ migrate --check, không tự
 migrate. Production dùng migration hook của Control Plane Application.
 
 Smoke thủ công trên runtime test riêng:
@@ -74,7 +79,8 @@ Smoke thủ công trên runtime test riêng:
 2. Đóng Web >30 giây: DB/API timestamp vẫn tiến lên.
 3. Pause rồi unpause runtime test: health unhealthy → healthy, lifecycle succeeded
    và Running không đổi. Không gọi stop lifecycle cho phép thử phục hồi này.
-4. Tắt health worker >45 giây: API/Web unknown, không giả thành runtime lỗi.
+4. Tắt celery-worker local >45 giây (production: health worker): API/Web unknown,
+   không giả thành runtime lỗi. Local cũng tạm ngừng các task orchestration.
 5. Stop qua Control Plane: Running null, health unknown, không probe tiếp theo.
 6. Candidate readiness fail: giữ Running cũ; kiểm tra EN/VI, terminal kết thúc
    succeeded/failed/unconfirmed, không lifecycle healthy.

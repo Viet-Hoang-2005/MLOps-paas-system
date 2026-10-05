@@ -3,7 +3,17 @@ import uuid
 from django.db import models
 
 
-class Build(models.Model):
+class ExecutionWatch(models.Model):
+    execution_deadline_at = models.DateTimeField(null=True, blank=True)
+    next_execution_check_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    execution_check_token = models.UUIDField(null=True, blank=True, editable=False)
+    execution_check_lease_until = models.DateTimeField(null=True, blank=True, editable=False)
+
+    class Meta:
+        abstract = True
+
+
+class Build(ExecutionWatch):
     STATUSES = tuple(
         (value, value.replace("_", " ").title())
         for value in ("pending", "queued", "building", "ready", "failed", "cancelled")
@@ -54,6 +64,7 @@ class Build(models.Model):
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     execution_completed_at = models.DateTimeField(null=True, blank=True)
+    callback_wait_until = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -105,7 +116,7 @@ class BuildInputAsset(models.Model):
         return f"{self.build.public_id}/{self.kind}/{self.name}"
 
 
-class Deployment(models.Model):
+class Deployment(ExecutionWatch):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         DEPLOYING = "deploying", "Deploying"

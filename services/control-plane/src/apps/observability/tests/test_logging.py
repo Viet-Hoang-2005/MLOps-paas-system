@@ -397,7 +397,7 @@ def test_build_task_does_not_repeat_callback_ready(project, monkeypatch, django_
     def callback_then_return(resource):
         Build.objects.filter(pk=resource.pk).update(status="ready")
         app_logging.record_transition(resource, "ready", source="webhook")
-        return "runtime output"
+        return {"dispatched": True}
 
     monkeypatch.setattr("apps.deployment.tasks.build_backend", lambda _: SimpleNamespace(run=callback_then_return))
     emitted = Mock()
