@@ -56,6 +56,14 @@ Các route Web bắt đầu ở `/dashboard/projects`. Trang chính theo `/dashb
 
 Preview thay đổi không ảnh hưởng snapshot đang Running. Build thành công chỉ bật Register; Register xong mới mở bước Deploy. Deployment mới chỉ trở thành Running sau readiness; lỗi không thay bản đang phục vụ. Khi chuyển Running, monitor cũ ngừng auto-trigger và giữ lịch sử; tạo monitor mới thủ công.
 
+### Evolution workspace
+
+- Timeline đăng ký theo thời gian, badge Running lấy từ active deployment `succeeded`, độc lập với API Health và registry stage.
+- `versionId` và `tab=details|insights|metrics|history` nằm trong query string. Không truyền version thì ưu tiên Running, sau đó phiên bản mới nhất; ID không hợp lệ không fallback.
+- Details hiển thị Build/Image, nguồn Training/Preview, artifact, requirements, parameters và drift summary của đúng version. Insights/metrics/history chỉ dùng snapshot và event thực tế từ API registry hiện có; metric tổng hợp không được dựng thành lịch sử.
+- Compare hiển thị hai snapshot cùng project và chênh lệch số (phải trừ trái), không kết luận phiên bản tốt hơn. Open deployment chỉ mở `/dashboard/deployment/run/<project>/<build>` của Build đủ điều kiện, không tự deploy hoặc thay Running.
+- Kiểm tra: `pnpm lint`, `pnpm build`, `pnpm test:evolution` và `pnpm test:workflow`. Smoke light/dark, EN/VI, mobile, timeline/tab bằng bàn phím, modal focus, F5/Back/Forward và đổi project.
+
 ## Quan sát local
 
 - Local không chạy Prometheus/cAdvisor, không có volume metric hoặc collector nền.

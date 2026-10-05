@@ -3,6 +3,9 @@ import type {
   RegistryDeployabilityStatus,
   RegistryModelInsightsSummary,
   RegistryStage,
+  VersionArtifact,
+  VersionMetric,
+  VersionEvent,
 } from "@/features/evolution/types";
 
 export type ModelAccessMode = "private" | "public";
@@ -77,7 +80,9 @@ export interface ModelVersion {
   metrics_summary: Record<string, unknown>;
   params_summary: Record<string, unknown>;
   insights_summary: RegistryModelInsightsSummary;
-  artifacts: Array<{ id: ResourceId; kind: string; name: string; uri: string }>;
+  artifacts: VersionArtifact[];
+  metrics: VersionMetric[];
+  events: VersionEvent[];
   registered_at: string;
 }
 

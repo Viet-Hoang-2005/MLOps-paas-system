@@ -13,6 +13,7 @@ export interface ChartProps {
   emptyText?: string;
   height?: number;
   className?: string;
+  allowNegative?: boolean;
 }
 
 export function Chart({
@@ -22,6 +23,7 @@ export function Chart({
   emptyText = "No data",
   height = 140,
   className,
+  allowNegative = false,
 }: ChartProps) {
   const gradientId = useId();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -41,12 +43,14 @@ export function Chart({
     let maxVal = Math.max(...values);
 
     if (minVal === maxVal) {
-      minVal = Math.max(0, minVal - 1);
+      minVal = allowNegative ? minVal - 1 : Math.max(0, minVal - 1);
       maxVal = maxVal + 1;
     }
 
     const valueRange = maxVal - minVal;
-    const yMin = Math.max(0, minVal - valueRange * 0.05);
+    const yMin = allowNegative
+      ? minVal - valueRange * 0.05
+      : Math.max(0, minVal - valueRange * 0.05);
     const yMax = maxVal + valueRange * 0.05;
 
     const minTime = validPoints[0].timestamp;
@@ -98,7 +102,7 @@ export function Chart({
       minTime,
       maxTime,
     };
-  }, [validPoints, height]);
+  }, [validPoints, height, allowNegative]);
 
   if (!chartGeometry || validPoints.length < 2) {
     return (
@@ -148,7 +152,9 @@ export function Chart({
   };
 
   return (
-    <div className={cn("relative flex flex-col space-y-1 select-none", className)}>
+    <div
+      className={cn("relative flex flex-col space-y-1 select-none", className)}
+    >
       <div className="relative">
         <svg
           viewBox={`0 0 ${vbWidth} ${vbHeight}`}
@@ -268,4 +274,3 @@ export function Chart({
     </div>
   );
 }
-

@@ -86,6 +86,7 @@ failures.push(
   ),
 );
 const dynamicGroups = {
+  evolution: { workspace: ["details", "insights", "metrics", "history"] },
   common: {
     statuses: ["preview", "registered", "running"],
     theme: ["light", "dark", "system"],

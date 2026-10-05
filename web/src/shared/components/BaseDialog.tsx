@@ -9,6 +9,8 @@ export interface BaseDialogProps {
   children: ReactNode;
   onClose: () => void;
   className?: string;
+  description?: string;
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 export default function BaseDialog({
@@ -16,6 +18,8 @@ export default function BaseDialog({
   children,
   onClose,
   className,
+  description,
+  onCloseAutoFocus,
 }: BaseDialogProps) {
   const { t } = useTranslation("common");
   return (
@@ -23,6 +27,7 @@ export default function BaseDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-overlay animate-fade-in" />
         <Dialog.Content
+          onCloseAutoFocus={onCloseAutoFocus}
           className={cn(
             "fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[min(92vw,34rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-overlay border border-border bg-surface shadow-(--shadow-overlay) animate-fade-in",
             className,
@@ -39,7 +44,14 @@ export default function BaseDialog({
               <X className="h-4 w-4" />
             </Dialog.Close>
           </div>
-          <div className="p-5">{children}</div>
+          <div className="p-5">
+            {description && (
+              <Dialog.Description className="mb-5 text-style-body text-color-muted-foreground">
+                {description}
+              </Dialog.Description>
+            )}
+            {children}
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
