@@ -64,6 +64,8 @@ def test_fetch_model_version_normalizes_values(monkeypatch):
     query = str(conn.execute.call_args.args[0])
     assert "version.flavor" in query
     assert "d.id = project.active_deployment_id" in query
+    assert "d.status = 'succeeded'" in query
+    assert "project.deletion_state = 'active'" in query
     assert "project.model_type" not in query
     mappings.first.return_value = None
     assert database._fetch_model_version_from_db("missing") is None

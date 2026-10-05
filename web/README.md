@@ -48,6 +48,13 @@ Local Overview metrics use Docker SDK CPU/RAM snapshots and a short-lived shared
 
 ## Source architecture
 
+API Health is separate from Deployment lifecycle: `succeeded` completes a deploy,
+while ongoing health is `healthy/unhealthy/unknown`. Overview polls saved observations,
+not the runtime directly. Stale observations (>45 seconds) or Control Plane read
+errors show unknown without removing Running. `pnpm test:health` checks freshness
+and terminal status contracts. See [runtime health](../docs/dev/runtime-health.md).
+
+
 ```text
 src/
   main.tsx   application entry point

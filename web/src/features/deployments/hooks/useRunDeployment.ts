@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { deployBuild } from "@/features/deployments/api/deployApi";
 import {
@@ -33,6 +34,21 @@ export function useRunDeployment(
   const selected = deploymentId
     ? requested.data
     : attempts.data?.find((item) => item.build_id === buildId);
+  const selectedId = selected?.id;
+  const selectedStatus = selected?.status;
+  useEffect(() => {
+    if (
+      selectedId &&
+      selectedStatus &&
+      ["succeeded", "failed", "stopped", "unconfirmed"].includes(selectedStatus)
+    ) {
+      // Overview intentionally stops health polling without Running. A deploy
+      // result must therefore refresh its pointer, even on the first deployment.
+      void client.invalidateQueries({
+        queryKey: overviewQueryKeys.detail(projectId),
+      });
+    }
+  }, [client, projectId, selectedId, selectedStatus]);
   const mismatch = Boolean(
     (build.data && build.data.project_id !== projectId) ||
     (build.data && selected && !deploymentMatchesBuild(selected, build.data)),
@@ -60,8 +76,7 @@ export function useRunDeployment(
   const running = Boolean(
     build.data?.version_id &&
     project.data?.active_endpoint?.version_id === build.data.version_id &&
-    project.data.active_endpoint.deployment_status === "healthy" &&
-    project.data.active_endpoint.health_status === "healthy",
+    project.data.active_endpoint.deployment_status === "succeeded",
   );
   const canDeploy =
     eligible && !loading && !error && !mismatch && !busy && !running;

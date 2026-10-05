@@ -193,6 +193,46 @@ def validate(context: ValidationContext) -> list[str]:
     )
     if workflow_namespaces != ["mlops-execution", "argo"]:
         errors.append("Argo Workflows must watch only mlops-execution and argo")
+    errors.extend(validate_runtime_health_processes(control_plane))
+    return errors
+
+
+def validate_runtime_health_processes(resources: list[dict]) -> list[str]:
+    """Background observers have DB/broker access, never execution credentials."""
+    errors = []
+    names = {
+        "mlops-paas-celery-beat": "beat",
+        "mlops-paas-celery-health-worker": "worker",
+    }
+    allowed_secrets = {"DB_USER", "DB_PASSWORD", "DJANGO_SECRET_KEY", "REDIS_PASSWORD", "REDIS_SENTINEL_PASSWORD"}
+    for name, process in names.items():
+        deployment = find_resource(resources, "Deployment", name)
+        spec = deployment.get("spec") or {}
+        pod = ((spec.get("template") or {}).get("spec") or {})
+        containers = pod.get("containers") or []
+        if not deployment or spec.get("replicas") != 1 or pod.get("automountServiceAccountToken") is not False:
+            errors.append(f"{name} must use one replica and disable service account token mounting")
+        if process == "beat" and (spec.get("strategy") or {}).get("type") != "Recreate":
+            errors.append("runtime health Beat must use Recreate to prevent duplicate schedulers")
+        if pod.get("serviceAccountName") not in {None, "default"} or any(v.get("hostPath") for v in pod.get("volumes") or []):
+            errors.append(f"{name} must not receive execution service accounts or host mounts")
+        for container in containers:
+            args = container.get("args") or []
+            if process not in args:
+                errors.append(f"{name} must run Celery {process}")
+            if process == "worker" and ("runtime-health" not in args or "--concurrency=2" not in args):
+                errors.append("health worker must consume only runtime-health with concurrency 2")
+            if any(ref.get("secretRef") for ref in container.get("envFrom") or []):
+                errors.append(f"{name} must not mount a broad environment Secret")
+            for env in container.get("env") or []:
+                key = env.get("name") or ""
+                if any(word in key for word in ("AWS_", "HARBOR_", "JWT_", "WEBHOOK", "DOCKER_HOST")):
+                    errors.append(f"{name} receives unnecessary credential/configuration {key}")
+                secret = (env.get("valueFrom") or {}).get("secretKeyRef")
+                if secret and (key not in allowed_secrets or secret.get("name") != "celery-worker-secret" or secret.get("key") != key):
+                    errors.append(f"{name} must read only scoped DB/broker secret keys")
+            if not any(env.get("name") == "DJANGO_SETTINGS_MODULE" and env.get("value") == "config.settings.health" for env in container.get("env") or []):
+                errors.append(f"{name} must use credential-minimal health settings")
     return errors
 
 

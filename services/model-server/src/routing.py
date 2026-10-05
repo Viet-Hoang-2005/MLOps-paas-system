@@ -18,24 +18,11 @@ def resolve_worker_url(model_record: dict[str, Any], endpoint_path: str) -> str:
     target_port = 5001 if serving_engine == "ml" else 5002
     container_name = model_record.get("endpoint_container_name")
     deployment_status = model_record.get("deployment_status")
-    if not container_name:
-        if deployment_status in {"stopped", "failed", "unhealthy"}:
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    f"Model deployment is not active (current status: '{deployment_status}'). "
-                    "Please deploy the model from the Control Plane first."
-                ),
-            )
-        if os.environ.get("KUBERNETES_SERVICE_HOST"):
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "Model endpoint is not deployed yet. Please trigger a deployment from the Control Plane first."
-                ),
-            )
-        fallback = "machine-learning-serving" if serving_engine == "ml" else "deep-learning-serving"
-        return f"http://{fallback}:{target_port}{endpoint_path}"
+    if deployment_status != "succeeded" or not container_name:
+        raise HTTPException(
+            status_code=409,
+            detail="Model has no active succeeded deployment. Deploy the model from the Control Plane first.",
+        )
     if os.environ.get("KUBERNETES_SERVICE_HOST"):
         service_name = f"{container_name}-svc" if not container_name.endswith("-svc") else container_name
         namespace = os.environ.get(

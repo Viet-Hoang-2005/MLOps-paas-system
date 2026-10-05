@@ -133,7 +133,7 @@ spec:
                         command:
                           - python
                           - -c
-                          - 'import json,os,sys,urllib.request; r=urllib.request.Request("http://127.0.0.1:"+os.environ["MODEL_HEALTH_PORT"]+"/health",data=b"{}" if os.environ["MODEL_HEALTH_TYPE"]=="dl" else None,headers={"Content-Type":"application/json"}); p=json.load(urllib.request.urlopen(r,timeout=3)); sys.exit(0 if p.get("model_loaded") is True and p.get("status")!="unhealthy" else 1)'
+                          - 'import json,os,sys,urllib.request; r=urllib.request.Request("http://127.0.0.1:"+os.environ["MODEL_HEALTH_PORT"]+"/health",data=b"{}" if os.environ["MODEL_HEALTH_TYPE"]=="dl" else None,headers={"Content-Type":"application/json"}); p=json.load(urllib.request.urlopen(r,timeout=3)); sys.exit(0 if p.get("model_loaded") is True and p.get("status")=="healthy" and p.get("project_id")==os.environ["PROJECT_ID"] and p.get("model_version_id")==os.environ["MODEL_VERSION_ID"] else 1)'
                       periodSeconds: 10
                       timeoutSeconds: 5
                       failureThreshold: 150
@@ -142,7 +142,7 @@ spec:
                         command:
                           - python
                           - -c
-                          - 'import json,os,sys,urllib.request; r=urllib.request.Request("http://127.0.0.1:"+os.environ["MODEL_HEALTH_PORT"]+"/health",data=b"{}" if os.environ["MODEL_HEALTH_TYPE"]=="dl" else None,headers={"Content-Type":"application/json"}); p=json.load(urllib.request.urlopen(r,timeout=3)); sys.exit(0 if p.get("model_loaded") is True and p.get("status")!="unhealthy" else 1)'
+                          - 'import json,os,sys,urllib.request; r=urllib.request.Request("http://127.0.0.1:"+os.environ["MODEL_HEALTH_PORT"]+"/health",data=b"{}" if os.environ["MODEL_HEALTH_TYPE"]=="dl" else None,headers={"Content-Type":"application/json"}); p=json.load(urllib.request.urlopen(r,timeout=3)); sys.exit(0 if p.get("model_loaded") is True and p.get("status")=="healthy" and p.get("project_id")==os.environ["PROJECT_ID"] and p.get("model_version_id")==os.environ["MODEL_VERSION_ID"] else 1)'
                       periodSeconds: 10
                       timeoutSeconds: 5
                 volumes:

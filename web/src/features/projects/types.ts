@@ -6,11 +6,13 @@ import type {
 } from "@/features/evolution/types";
 
 export type ModelAccessMode = "private" | "public";
+export type ApiHealthStatus = "unknown" | "healthy" | "unhealthy";
 export type ModelEndpointStatus =
   | "not_deployed"
   | "deploying"
   | "healthy"
   | "unhealthy"
+  | "unknown"
   | "deploy_failed"
   | "stopped";
 export type ModelFlavor = "sklearn" | "xgboost" | "pytorch" | "tensorflow";
@@ -26,8 +28,9 @@ export interface ActiveModelEndpoint {
   version_number: string;
   url: string;
   health_url: string;
-  health_status: string;
+  health_status: ApiHealthStatus;
   deployment_status: Deployment["status"];
+  registration_status: Build["registration_status"];
   last_checked_at: string | null;
 }
 
@@ -112,8 +115,7 @@ export interface Deployment {
   status:
     | "pending"
     | "deploying"
-    | "healthy"
-    | "unhealthy"
+    | "succeeded"
     | "failed"
     | "stopped"
     | "unconfirmed";
@@ -126,7 +128,7 @@ export interface Endpoint {
   version_id: ResourceId;
   public_url: string;
   internal_url: string;
-  health_status: string;
+  health_status: ApiHealthStatus;
 }
 
 export interface ModelProjectFormValues {

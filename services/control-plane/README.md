@@ -209,7 +209,7 @@ Workflow mới dùng Project + Preview 1–1, snapshot Build/Version bất biế
 
 ```bash
 # Khởi động Control Plane và Celery Worker ở chế độ nền
-docker compose up -d control-plane celery-worker
+docker compose up -d control-plane celery-worker celery-beat celery-health-worker
 
 # Xem logs trực tiếp của Control Plane
 docker compose logs -f control-plane
@@ -340,3 +340,10 @@ Metric runtime local dùng `infrastructure/docker_metrics.py` đọc CPU/RAM b�
 > Biến môi trường `REDIS_CONNECTION_MODE` quyết định phương thức kết nối:
 > - `direct`: Sử dụng kết nối đơn trực tiếp (dùng cho Docker Compose local qua `REDIS_URL`).
 > - `sentinel`: Sử dụng cho cụm Redis HA trên K3s sản xuất. Khi chọn chế độ này, bắt buộc phải cung cấp đủ các biến `REDIS_SENTINEL_HOSTS` (tối thiểu 3 node), `REDIS_SENTINEL_MASTER_NAME`, `REDIS_PASSWORD` và `REDIS_SENTINEL_PASSWORD`.
+
+## Runtime health contract
+
+Deployment lifecycle dùng `succeeded/failed`, độc lập với API Health
+`unknown/healthy/unhealthy`. Beat và queue `runtime-health` kiểm tra cả khi Web đóng;
+quan sát quá 45 giây hiển thị unknown, không đổi phiên bản Running.
+Xem [runbook](../../docs/dev/runtime-health.md).

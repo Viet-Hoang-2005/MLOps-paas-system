@@ -89,7 +89,7 @@ def test_finalization_deletes_project_s3_prefix_and_database_rows(monkeypatch):
         status="ready",
         image_uri=f"image-{project.public_id}:v1",
     )
-    deployment = Deployment.objects.create(version=version, build=build, status="healthy")
+    deployment = Deployment.objects.create(version=version, build=build, status="succeeded")
     endpoint = Endpoint.objects.create(
         deployment=deployment,
         public_url="http://example.test",

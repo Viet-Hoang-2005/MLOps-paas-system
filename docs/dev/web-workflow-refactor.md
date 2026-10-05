@@ -396,3 +396,10 @@ Phụ thuộc các giai đoạn trước.
 - Compose config và Git whitespace check được chạy; không apply production, commit/push, reset volume hoặc restart container cũ.
 
 Giới hạn: chưa chạy build/predict/training/Evidently với Docker/S3 thật sau refactor, chưa xác nhận Docker stats realtime trên Docker Desktop, chưa nghiệm thu UI bằng trình duyệt. Đây không phải báo cáo nghiệm thu production.
+
+## Runtime health contract
+
+Deployment lifecycle dùng `succeeded/failed`, độc lập với API Health
+`unknown/healthy/unhealthy`. Beat và queue `runtime-health` kiểm tra cả khi Web đóng;
+quan sát quá 45 giây hiển thị unknown, không đổi phiên bản Running.
+Xem [runbook](runtime-health.md).

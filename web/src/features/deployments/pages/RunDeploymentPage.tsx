@@ -45,13 +45,7 @@ function RunDeploymentContent({
       run.eligible && !run.mismatch && run.selected
         ? { kind: "deployment", id: run.selected.id }
         : null,
-    terminalStatuses: [
-      "healthy",
-      "failed",
-      "unhealthy",
-      "stopped",
-      "unconfirmed",
-    ],
+    terminalStatuses: ["succeeded", "failed", "stopped", "unconfirmed"],
   });
   const attemptStatus =
     deploymentStatuses[run.selected?.status ?? "not_deployed"];
@@ -148,7 +142,7 @@ function RunDeploymentContent({
           <Callout
             variant="success"
             title={t("workflow.running")}
-            description={t("workflow.deployHealthy")}
+            description={t("workflow.deploySucceeded")}
           />
         )}
         {run.selected?.status === "unconfirmed" && (
@@ -158,16 +152,15 @@ function RunDeploymentContent({
             description={t("workflow.unconfirmedHint")}
           />
         )}
-        {run.selected &&
-          ["failed", "unhealthy"].includes(run.selected.status) && (
-            <Callout
-              variant="danger"
-              title={t(attemptStatus.label)}
-              description={
-                run.selected.error_message || t("workflow.deployFailed")
-              }
-            />
-          )}
+        {run.selected && run.selected.status === "failed" && (
+          <Callout
+            variant="danger"
+            title={t(attemptStatus.label)}
+            description={
+              run.selected.error_message || t("workflow.deployFailed")
+            }
+          />
+        )}
         {error && (
           <Callout
             variant="danger"

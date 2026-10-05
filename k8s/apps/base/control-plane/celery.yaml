@@ -22,7 +22,7 @@ spec:
           image: mlops-paas-control-plane
           imagePullPolicy: IfNotPresent
           command: ["celery"]
-          args: ["-A", "config", "worker", "--concurrency=2"]
+          args: ["-A", "config", "worker", "-Q", "celery", "--concurrency=2"]
           env:
             - name: DB_USER
               valueFrom:

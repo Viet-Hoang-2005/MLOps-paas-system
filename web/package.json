@@ -13,7 +13,8 @@
     "format:all": "prettier --write \"src/**/*.{ts,tsx,css,json}\" && eslint --fix .",
     "preview": "vite preview",
     "test:workflow": "node scripts/test-workflow-navigation.mjs",
-    "test:metrics": "node scripts/test-runtime-metrics.mjs"
+    "test:metrics": "node scripts/test-runtime-metrics.mjs",
+    "test:health": "node scripts/test-runtime-health.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",

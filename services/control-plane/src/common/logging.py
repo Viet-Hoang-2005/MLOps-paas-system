@@ -37,6 +37,7 @@ def _lifecycle_message(event):
         "running": "started",
         "ready": "completed successfully",
         "completed": "completed successfully",
+        "succeeded": "completed successfully",
         "healthy": "is healthy",
         "unhealthy": "is unhealthy",
         "failed": "failed",

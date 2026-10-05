@@ -1,4 +1,5 @@
 from apps.deployment.models import Build
+from apps.deployment.services.runtime_health import effective_health
 from apps.drift.models import DriftRun
 from apps.training.models import TrainingJob
 from infrastructure.prometheus import PrometheusClient
@@ -17,7 +18,7 @@ def model_observability(project, prometheus=None):
         "deployment": _resource(latest_deployment),
         "endpoint": {
             "id": str(endpoint.public_id),
-            "health_status": endpoint.health_status,
+            "health_status": effective_health(endpoint),
             "public_url": endpoint.public_url,
             "last_checked_at": endpoint.last_checked_at,
         }

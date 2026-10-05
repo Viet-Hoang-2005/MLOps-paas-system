@@ -52,7 +52,7 @@ def deployment(db):
     project = ModelProject.objects.create(owner=owner, name="Metrics project")
     version = ModelVersion.objects.create(project=project, version="1")
     build = Build.objects.create(project=project, version=version)
-    current = Deployment.objects.create(version=version, build=build, backend="docker", status="healthy")
+    current = Deployment.objects.create(version=version, build=build, backend="docker", status="succeeded")
     project.active_deployment = current
     project.save()
     return current

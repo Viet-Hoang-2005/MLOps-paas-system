@@ -69,11 +69,11 @@ def _fetch_model_version_from_db(version_id: str) -> dict[str, Any] | None:
         INNER JOIN identity_customuser AS users ON users.id = project.owner_id
         LEFT JOIN LATERAL (
             SELECT d.* FROM deployment_deployment AS d
-            WHERE d.version_id = version.id AND d.id = project.active_deployment_id AND d.status IN ('healthy', 'unhealthy')
+            WHERE d.version_id = version.id AND d.id = project.active_deployment_id AND d.status = 'succeeded'
             ORDER BY d.created_at DESC LIMIT 1
         ) AS deployment ON TRUE
         LEFT JOIN deployment_endpoint AS endpoint ON endpoint.deployment_id = deployment.id
-        WHERE version.public_id = :version_id AND project.is_active = TRUE
+        WHERE version.public_id = :version_id AND project.is_active = TRUE AND project.deletion_state = 'active'
         LIMIT 1
     """)
     with model_registry_engine.connect() as connection:

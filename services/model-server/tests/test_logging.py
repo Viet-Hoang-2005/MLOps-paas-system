@@ -135,6 +135,8 @@ async def test_prediction_uses_one_validated_id_and_trusted_context(monkeypatch,
         "id": "trusted-version",
         "project_id": "trusted-project",
         "tenant_id": "trusted-tenant",
+        "endpoint_container_name": "runtime",
+        "deployment_status": "succeeded",
     }
     headers = [] if header is None else [(b"x-request-id", header.encode())]
     request = Request({"type": "http", "headers": headers})

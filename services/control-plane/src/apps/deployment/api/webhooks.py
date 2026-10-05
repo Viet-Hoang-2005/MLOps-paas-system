@@ -14,7 +14,7 @@ from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.services.callbacks import valid_callback_token
 from apps.deployment.services.completion import complete_build
 from apps.deployment.services.logs import append_deployment_log
-from apps.deployment.tasks import _mark_deployment_healthy, cleanup_failed_build_artifacts, delete_build
+from apps.deployment.tasks import _mark_deployment_succeeded, cleanup_failed_build_artifacts, delete_build
 from apps.observability.services.outbox import enqueue_event
 from common.api.permissions import HasInternalWebhookSecret
 from common.logging import record_transition
@@ -55,7 +55,7 @@ class DeploymentWebhookEndpoint(APIView):
             )
             if deployment.backend != "argo":
                 return Response({"detail": "This deployment does not use Argo."}, status=409)
-            if deployment.status in {"healthy", "failed", "stopped"}:
+            if deployment.status in {"succeeded", "failed", "stopped"}:
                 return Response({"status": deployment.status, "duplicate": True})
             if deployment.version.project.deletion_state != "active":
                 return Response({"status": deployment.status, "ignored": True})
@@ -64,8 +64,9 @@ class DeploymentWebhookEndpoint(APIView):
             deployment.external_deployment_id = workflow
             deployment.save(update_fields=["external_deployment_id", "updated_at"])
             if incoming == "succeeded":
-                _mark_deployment_healthy(deployment)
-                result = "healthy"
+                _mark_deployment_succeeded(deployment)
+                deployment.refresh_from_db()
+                result = deployment.status
             else:
                 result = "failed"
                 deployment.status = result

@@ -1,7 +1,9 @@
 import { RouteFallback } from "@/app/router/RouteFallback";
-import { buildDeploymentPath } from "@/features/deployments/navigation";
 import { useTheme } from "@/app/theme/useTheme";
-import { RuntimeMetrics } from "@/features/overview/components/RuntimeMetrics";
+import { buildDeploymentPath } from "@/features/deployments/navigation";
+import { ModelPredictionsTesting } from "@/features/overview/components/ModelPredictionsTesting";
+import { ModelStatusLine } from "@/features/overview/components/ModelStatusLine";
+import { ResourceUsageChart } from "@/features/overview/components/ResourceUsageChart";
 import {
   useProjectOverview,
   useRunningSource,
@@ -37,7 +39,7 @@ import {
   Settings2,
   Trash2,
 } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Navigate,
@@ -45,10 +47,6 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
-
-const ModelTestingPage = lazy(
-  () => import("@/features/overview/pages/ModelTestingPage"),
-);
 
 export default function ProjectOverviewPage() {
   const { modelId } = useParams();
@@ -72,6 +70,7 @@ export default function ProjectOverviewPage() {
   );
   const [editMetadataOpen, setEditMetadataOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
   const update = useMutation({
     mutationFn: async (payload: {
       name: string;
@@ -84,6 +83,7 @@ export default function ProjectOverviewPage() {
       await client.invalidateQueries({ queryKey: catalogQueryKeys.projects() });
     },
   });
+
   const remove = useMutation({
     mutationFn: () => deleteModelProject(modelId!),
     onSuccess: async () => {
@@ -91,6 +91,7 @@ export default function ProjectOverviewPage() {
       navigate("/dashboard/projects");
     },
   });
+
   if (!modelId) {
     if (isModelLoading) return <RouteFallback />;
     if (selectedModel) {
@@ -112,14 +113,18 @@ export default function ProjectOverviewPage() {
       </div>
     );
   }
-  if (project.isError)
+
+  if (project.isError && !model)
     return (
       <p role="alert">
         {getApiErrorMessage(project.error, t("workflow.failed"))}
       </p>
     );
+
   if (!model) return <p>{t("workflow.loading")}</p>;
-  const hasRunning = Boolean(model.active_endpoint);
+
+  const hasRunning = model.active_endpoint?.deployment_status === "succeeded";
+
   return (
     <div className="flex w-full flex-1 flex-col space-y-6">
       <PageHeader title={tCommon("navigation.home")} />
@@ -178,6 +183,7 @@ export default function ProjectOverviewPage() {
           </p>
         )}
       </section>
+
       <div className="border-b border-border">
         <PageTabs
           tabs={[
@@ -208,10 +214,11 @@ export default function ProjectOverviewPage() {
           ]}
         />
       </div>
+
       {tab !== "information" && !hasRunning ? (
         <Placeholder
           title={tCommon("navigation.deployment")}
-          description={t("workflow.noRunning")}
+          description={`${t("workflow.noRunning")} ${t("workflow.healthNotChecked")}`}
           icon={<Box className="h-6 w-6" />}
           showModelName={false}
           action={
@@ -225,6 +232,15 @@ export default function ProjectOverviewPage() {
             </Button>
           }
         />
+      ) : tab === "deployment" ? (
+        <div role="tabpanel" className="space-y-6">
+          <ModelStatusLine model={model} healthUnavailable={project.isError} />
+          <ResourceUsageChart
+            projectId={modelId!}
+            deploymentId={model.active_endpoint?.deployment_id ?? ""}
+          />
+          <ModelPredictionsTesting model={model} />
+        </div>
       ) : (
         <section
           role="tabpanel"
@@ -254,22 +270,6 @@ export default function ProjectOverviewPage() {
                 ]}
               />
             </>
-          ) : tab === "deployment" ? (
-            <>
-              <p>
-                {t("workflow.health")}: {model.active_endpoint?.health_status}
-              </p>
-              <code className="block break-all text-style-code-sm">
-                {model.endpoint_url}
-              </code>
-              <RuntimeMetrics
-                projectId={modelId!}
-                deploymentId={model.active_endpoint?.deployment_id ?? ""}
-              />
-              <Suspense fallback={<p>{t("workflow.loading")}</p>}>
-                <ModelTestingPage />
-              </Suspense>
-            </>
           ) : tab === "code" ? (
             source.isError ? (
               <p role="alert">{t("workflow.failed")}</p>
@@ -293,6 +293,7 @@ export default function ProjectOverviewPage() {
           )}
         </section>
       )}
+
       <ConfirmDialog
         open={deleting}
         title={t("workflow.delete")}

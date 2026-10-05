@@ -160,16 +160,16 @@ async def test_access_jwt_missing_kid_expired_and_invalid(monkeypatch):
 
 def test_resolve_worker_url_local_and_kubernetes(monkeypatch):
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
-    assert index.resolve_worker_url({"flavor": "xgboost"}, "/predict") == "http://machine-learning-serving:5001/predict"
-    assert index.resolve_worker_url({"flavor": "pytorch"}, "/health") == "http://deep-learning-serving:5002/health"
+    assert index.resolve_worker_url({"flavor": "xgboost", "deployment_status": "succeeded", "endpoint_container_name": "worker"}, "/predict") == "http://worker:5001/predict"
+    assert index.resolve_worker_url({"flavor": "pytorch", "deployment_status": "succeeded", "endpoint_container_name": "worker"}, "/health") == "http://worker:5002/health"
     monkeypatch.setenv("KUBERNETES_SERVICE_HOST", "yes")
     assert (
-        index.resolve_worker_url({"flavor": "tensorflow", "endpoint_container_name": "worker"}, "/predict")
+        index.resolve_worker_url({"flavor": "tensorflow", "deployment_status": "succeeded", "endpoint_container_name": "worker"}, "/predict")
         == "http://worker-svc.mlops-model-runtimes.svc.cluster.local:5002/predict"
     )
     with pytest.raises(HTTPException) as exc:
         index.resolve_worker_url({"flavor": "sklearn"}, "/predict")
-    assert exc.value.status_code == 503
+    assert exc.value.status_code == 409
 
 
 def test_serving_engine_is_derived_from_version_flavor():
@@ -209,7 +209,7 @@ def test_send_to_redpanda_payload_and_failure(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_health_proxy_success_and_failure(monkeypatch):
-    token = {"model_record": {"flavor": "sklearn", "endpoint_container_name": "worker"}}
+    token = {"model_record": {"flavor": "sklearn", "deployment_status": "succeeded", "endpoint_container_name": "worker"}}
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
     monkeypatch.setattr(
         index.httpx,
@@ -239,6 +239,7 @@ async def test_predict_proxy_success_and_background_event(monkeypatch):
         "tenant_id": "t",
         "flavor": "xgboost",
         "endpoint_container_name": "worker",
+        "deployment_status": "succeeded",
     }
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
     monkeypatch.setattr(
@@ -277,6 +278,7 @@ async def test_predict_upstream_and_network_errors(monkeypatch):
         "tenant_id": "t",
         "flavor": "xgboost",
         "endpoint_container_name": "worker",
+        "deployment_status": "succeeded",
     }
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
     monkeypatch.setattr(
@@ -331,7 +333,7 @@ async def test_predict_network_error_evicts_cache_and_returns_409_if_stopped(
         "tenant_id": "t",
         "flavor": "sklearn",
         "endpoint_container_name": "worker-stopped",
-        "deployment_status": "healthy",
+        "deployment_status": "succeeded",
     }
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
     fake_redis = Mock()
@@ -374,3 +376,18 @@ def test_resolve_worker_url_rejects_stopped_deployment(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         index.resolve_worker_url(stopped_record, "/predict")
     assert exc.value.status_code == 409
+
+
+@pytest.mark.parametrize("status", [None, "pending", "deploying", "failed", "stopped", "unconfirmed", "healthy"])
+def test_only_succeeded_runtime_can_be_resolved_without_fallback(monkeypatch, status):
+    monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
+    record = {"deployment_status": status, "flavor": "xgboost", "endpoint_container_name": "runtime"}
+    with pytest.raises(HTTPException) as error:
+        index.resolve_worker_url(record, "/predict")
+    assert error.value.status_code == 409
+
+
+def test_runtime_health_is_not_a_routing_or_version_selection_gate(monkeypatch):
+    monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
+    record = {"deployment_status": "succeeded", "health_status": "unhealthy", "flavor": "xgboost", "endpoint_container_name": "runtime"}
+    assert index.resolve_worker_url(record, "/predict") == "http://runtime:5001/predict"

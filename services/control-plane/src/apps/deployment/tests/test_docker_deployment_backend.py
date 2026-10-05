@@ -9,17 +9,15 @@ from apps.registry.models import ModelVersion
 from infrastructure.execution.docker_backends import DockerDeploymentBackend
 
 
-class HealthyResponse:
-    @staticmethod
-    def json():
-        return {"status": "healthy", "model_loaded": True}
-
-
 class HealthyHttpClient:
+    def __init__(self, version):
+        self.version = version
+
     def request(self, method, url):
         assert method == "GET"
         assert url.endswith(":5001/health")
-        return HealthyResponse()
+        return SimpleNamespace(json=lambda: {"status": "healthy", "model_loaded": True,
+            "project_id": str(self.version.project.public_id), "model_version_id": str(self.version.public_id)})
 
 
 class RecordingDockerClient:
@@ -49,7 +47,7 @@ def test_local_deployment_uses_embedded_model_artifact_and_becomes_healthy(monke
     deployment = Deployment.objects.create(version=version, build=build, status="deploying")
     docker = RecordingDockerClient()
 
-    endpoint = DockerDeploymentBackend(docker_client=docker, http=HealthyHttpClient()).deploy(deployment)
+    endpoint = DockerDeploymentBackend(docker_client=docker, http=HealthyHttpClient(version)).deploy(deployment)
 
     assert docker.kwargs["environment"] == {
         "LOG_FORMAT": "console",
@@ -72,7 +70,7 @@ def test_health_requires_healthy_payload_status():
             return SimpleNamespace(json=lambda: {"status": "unhealthy", "model_loaded": True})
 
     endpoint = SimpleNamespace(internal_url="http://worker:5001")
-    deployment = SimpleNamespace(endpoint=endpoint)
+    deployment = SimpleNamespace(endpoint=endpoint, version=SimpleNamespace(flavor="xgboost", public_id="v", project=SimpleNamespace(public_id="p")))
 
     healthy, payload = DockerDeploymentBackend(
         docker_client=SimpleNamespace(),

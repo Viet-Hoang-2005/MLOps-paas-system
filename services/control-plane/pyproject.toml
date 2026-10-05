@@ -14,6 +14,7 @@ ignore = ["DJ001"]
 "src/config/settings/local.py" = ["F403", "F405"]
 "src/config/settings/production.py" = ["F403", "F405"]
 "src/config/settings/test.py" = ["F403", "F405"]
+"src/config/settings/health.py" = ["F403", "F405"]
 
 [tool.mypy]
 python_version = "3.10"

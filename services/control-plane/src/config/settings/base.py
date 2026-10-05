@@ -196,6 +196,20 @@ CELERY_TASK_TIME_LIMIT = env_int("CELERY_TASK_TIME_LIMIT", 43200)
 CELERY_TASK_SOFT_TIME_LIMIT = env_int("CELERY_TASK_SOFT_TIME_LIMIT", 42600)
 CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+RUNTIME_HEALTH_INTERVAL_SECONDS = 15
+RUNTIME_HEALTH_STALE_SECONDS = 45
+CELERY_TASK_DEFAULT_QUEUE = "celery"
+CELERY_TASK_ROUTES = {
+    "apps.deployment.health_tasks.scan_runtime_health": {"queue": "runtime-health"},
+    "apps.deployment.health_tasks.probe_runtime_health": {"queue": "runtime-health"},
+}
+CELERY_BEAT_SCHEDULE = {
+    "runtime-health-scan": {
+        "task": "apps.deployment.health_tasks.scan_runtime_health",
+        "schedule": RUNTIME_HEALTH_INTERVAL_SECONDS,
+        "options": {"queue": "runtime-health", "expires": 15},
+    },
+}
 CONTROL_PLANE_WEBHOOK_SECRET = env("CONTROL_PLANE_WEBHOOK_SECRET", "local-webhook-secret")
 ARGO_EVENTS_WEBHOOK_TOKEN = env("ARGO_EVENTS_WEBHOOK_TOKEN", "")
 CONTROL_PLANE_INTERNAL_URL = str(env("CONTROL_PLANE_INTERNAL_URL", "http://control-plane:8000")).rstrip("/")

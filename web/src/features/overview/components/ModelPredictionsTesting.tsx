@@ -1,15 +1,6 @@
-import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
-import { predictWithModelProject } from "@/shared/api/catalogApi";
-import { getApiErrorMessage } from "@/shared/api/errors";
-import { Button } from "@/shared/components/Button";
-import { CardSummary } from "@/shared/components/Card";
-import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
-import { DataViewer } from "@/shared/components/DataViewer";
-import { FileDropzone } from "@/shared/components/FileDropzone";
-import { PageBody } from "@/shared/components/PageBody";
-import { TerminalViewer } from "@/shared/components/TerminalViewer";
-import { formatNumber } from "@/shared/i18n/formatters";
-import { toast } from "@/shared/types/toastStore";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useBlocker } from "react-router-dom";
 import {
   Check,
   Download,
@@ -21,9 +12,18 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { useBlocker } from "react-router-dom";
+import type { ModelProject } from "@/features/projects/types";
+import { predictWithModelProject } from "@/shared/api/catalogApi";
+import { getApiErrorMessage } from "@/shared/api/errors";
+import { Button } from "@/shared/components/Button";
+import { CardSummary } from "@/shared/components/Card";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
+import { DataViewer } from "@/shared/components/DataViewer";
+import { FileDropzone } from "@/shared/components/FileDropzone";
+import { StepTitle } from "@/shared/components/StepTitle";
+import { TerminalViewer } from "@/shared/components/TerminalViewer";
+import { formatNumber } from "@/shared/i18n/formatters";
+import { toast } from "@/shared/types/toastStore";
 
 const TARGET_COLUMN_NAMES = new Set([
   "label",
@@ -147,9 +147,8 @@ const extractPredictionError = (
   };
 };
 
-export default function ModelTestingPage() {
+export function ModelPredictionsTesting({ model }: { model: ModelProject }) {
   const { t, i18n } = useTranslation("overview");
-  const { selectedModel } = useModelSelection();
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [csvText, setCsvText] = useState("");
   const [fileName, setFileName] = useState("");
@@ -247,7 +246,7 @@ export default function ModelTestingPage() {
   };
 
   const runTesting = async () => {
-    if (!selectedModel) {
+    if (!model) {
       toast.warning(t("testingPage.modelRequired"));
       return;
     }
@@ -255,7 +254,8 @@ export default function ModelTestingPage() {
       toast.warning(t("testingPage.csvRequired"));
       return;
     }
-    if (!selectedModel.endpoint_url) {
+    const endpointUrl = model.endpoint_url || model.active_endpoint?.url;
+    if (!endpointUrl) {
       toast.error(t("testingPage.endpointRequired"));
       return;
     }
@@ -291,14 +291,15 @@ export default function ModelTestingPage() {
         makeLog(
           "info",
           t("testingPage.selectedModel", {
-            name: selectedModel.name,
-            version: selectedModel.version || "v1",
+            name: model.name,
+            version:
+              model.version || model.active_endpoint?.version_number || "v1",
           }),
         ),
         makeLog(
           "info",
           t("testingPage.endpointLog", {
-            endpoint: selectedModel.endpoint_url,
+            endpoint: endpointUrl,
           }),
         ),
         makeLog("info", t("testingPage.running", { count: rows.length })),
@@ -337,10 +338,7 @@ export default function ModelTestingPage() {
       if (expectedLabel !== undefined) currentSummary.withExpected += 1;
 
       try {
-        const response = await predictWithModelProject(
-          selectedModel.endpoint_url,
-          features,
-        );
+        const response = await predictWithModelProject(endpointUrl, features);
         const prediction = formatPrediction(response.prediction);
         const confidence =
           response.confidence == null
@@ -476,19 +474,9 @@ export default function ModelTestingPage() {
           blocker.reset?.();
         }}
       />
-      <PageBody className="p-6 h-full">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
-          <div>
-            <h2 className="text-style-section-title font-bold text-color-foreground">
-              {t("testingPage.title")}
-            </h2>
-            <p className="mt-1 text-style-body text-color-muted-foreground">
-              {t("testingPage.description", {
-                model:
-                  selectedModel?.name ?? t("testingPage.selectedModelFallback"),
-              })}
-            </p>
-          </div>
+      <section className="space-y-6 rounded-surface border border-border bg-surface p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <StepTitle title={t("testingPage.title")} className="mb-0" />
           <div className="flex gap-3">
             {rows.length > 0 && (
               <>
@@ -552,8 +540,7 @@ export default function ModelTestingPage() {
                   <p className="mt-1 text-style-body text-color-muted-foreground">
                     {t("testingPage.runDescription", {
                       model:
-                        selectedModel?.name ??
-                        t("testingPage.selectedModelFallback"),
+                        model.name || t("testingPage.selectedModelFallback"),
                     })}
                   </p>
                 </div>
@@ -638,7 +625,7 @@ export default function ModelTestingPage() {
             </div>
           </div>
         )}
-      </PageBody>
+      </section>
     </>
   );
 }

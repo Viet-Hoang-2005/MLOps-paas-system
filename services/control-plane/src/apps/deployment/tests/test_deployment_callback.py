@@ -37,14 +37,14 @@ def report(deployment, phase="Succeeded", token=None):
 
 
 def test_reporter_confirms_readiness_and_replay_is_idempotent(deployment):
-    assert report(deployment).data["status"] == "healthy"
+    assert report(deployment).data["status"] == "succeeded"
     deployment.refresh_from_db()
     assert deployment.deployed_at is not None
     assert deployment.endpoint.health_status == "healthy"
     assert deployment.external_deployment_id == "deploy-model-job-test"
     assert report(deployment, "Failed").data["duplicate"] is True
     deployment.refresh_from_db()
-    assert deployment.status == "healthy"
+    assert deployment.status == "succeeded"
 
 
 def test_reporter_rejects_missing_wrong_resource_expired_token(deployment, monkeypatch):
@@ -68,8 +68,8 @@ def test_failure_and_stopped_result_cannot_be_revived(deployment):
 
 def test_timeout_is_unconfirmed_and_late_valid_callback_is_accepted(deployment):
     assert mark_deployment_unconfirmed(str(deployment.public_id)) == "unconfirmed"
-    assert report(deployment).data["status"] == "healthy"
-    assert mark_deployment_unconfirmed(str(deployment.public_id)) == "healthy"
+    assert report(deployment).data["status"] == "succeeded"
+    assert mark_deployment_unconfirmed(str(deployment.public_id)) == "succeeded"
 
 
 def test_argo_dispatch_schedules_only_one_result_deadline(deployment, monkeypatch):

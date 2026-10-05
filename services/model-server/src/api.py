@@ -423,19 +423,19 @@ async def _predict(
             fresh_record = None
 
         if fresh_record and (
-            fresh_record.get("deployment_status") in {"stopped", "failed", "unhealthy"}
+            fresh_record.get("deployment_status") != "succeeded"
             or not fresh_record.get("endpoint_container_name")
         ):
             current_status = fresh_record.get("deployment_status") or "stopped"
             raise HTTPException(
                 status_code=409,
                 detail=f"Model deployment is not active (current status: '{current_status}'). Serving container is stopped or unavailable.",
-            )
+            ) from exc
 
         raise HTTPException(
             status_code=503,
             detail=f"Service Unavailable: Cannot reach model serving pod ({exc}). Routing cache invalidated.",
-        )
+        ) from exc
     except Exception as exc:
         paas_predictions_counter.labels(
             tenant_id=tenant_id,
@@ -443,7 +443,7 @@ async def _predict(
             model_version_id=resolved_model_version_id,
             status="error_500",
         ).inc()
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     finally:
         paas_latency_histogram.labels(
             tenant_id=tenant_id,

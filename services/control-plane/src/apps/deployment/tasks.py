@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.deployment.models import Build, Deployment, Endpoint
+from apps.deployment.health_tasks import probe_runtime_health, scan_runtime_health  # noqa: F401
 from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.services.completion import complete_build
 from apps.deployment.services.logs import append_deployment_log, reset_deployment_logs
@@ -22,18 +23,18 @@ from infrastructure.storage.paths import build_prefix
 logger = logging.getLogger(__name__)
 
 
-def _mark_deployment_healthy(deployment):
+def _mark_deployment_succeeded(deployment):
     from apps.catalog.models import ModelProject
     from apps.drift.models import DriftMonitor
 
     with transaction.atomic():
         project = ModelProject.objects.select_for_update().get(pk=deployment.version.project_id)
-        deployment = Deployment.objects.select_for_update().get(pk=deployment.pk)
-        if project.deletion_state != "active" or deployment.status in {"stopped", "failed"}:
-            return
+        deployment = Deployment.objects.select_for_update(of=("self",)).get(pk=deployment.pk)
+        if not project.is_active or project.deletion_state != "active" or deployment.status not in {"deploying", "unconfirmed"}:
+            return False
         old_id = project.active_deployment_id
         Deployment.objects.filter(pk=deployment.pk).update(
-            status="healthy", deployed_at=timezone.now(), error_message=""
+            status="succeeded", deployed_at=timezone.now(), error_message=""
         )
         Endpoint.objects.filter(deployment=deployment).update(health_status="healthy", last_checked_at=timezone.now())
         project.active_deployment = deployment
@@ -46,15 +47,16 @@ def _mark_deployment_healthy(deployment):
             transaction.on_commit(lambda: invalidate_model_server_cache(str(old.version.public_id)))
             transaction.on_commit(lambda: stop_deployment.delay(str(old.public_id)))
     invalidate_model_server_cache(str(deployment.version.public_id))
-    append_deployment_log(deployment, "Endpoint passed health checks; deployment is healthy.")
-    record_transition(deployment, "healthy")
+    append_deployment_log(deployment, "Runtime passed readiness checks; deployment succeeded.")
+    record_transition(deployment, "succeeded")
     enqueue_event(
         topic="deployment.events",
         aggregate_type="deployment",
         aggregate_id=deployment.public_id,
         event_type="deployment.changed",
-        payload={"deployment_id": str(deployment.public_id), "status": "healthy"},
+        payload={"deployment_id": str(deployment.public_id), "status": "succeeded"},
     )
+    return True
 
 
 @shared_task(bind=True)
@@ -227,13 +229,17 @@ def delete_build(self, build_id):
     bind=True, autoretry_for=(ConnectionError, TimeoutError), retry_backoff=True, retry_jitter=True, max_retries=5
 )
 def execute_deployment(self, deployment_id):
+    from apps.catalog.models import ModelProject
+
+    candidate = Deployment.objects.select_related("version").get(public_id=deployment_id)
     with transaction.atomic():
+        ModelProject.objects.select_for_update().get(pk=candidate.version.project_id)
         deployment = (
-            Deployment.objects.select_for_update()
+            Deployment.objects.select_for_update(of=("self",))
             .select_related("version", "version__project", "version__project__owner", "build")
             .get(public_id=deployment_id)
         )
-        if deployment.status in {"healthy", "stopped"}:
+        if deployment.status in {"succeeded", "failed", "stopped", "unconfirmed"}:
             return deployment.status
         if deployment.version.project.deletion_state != "active":
             deployment.status = "stopped"
@@ -256,7 +262,12 @@ def execute_deployment(self, deployment_id):
         endpoint = backend.deploy(deployment)
     except Exception as exc:
         invalidate_model_server_cache(str(deployment.version.public_id))
-        Deployment.objects.filter(pk=deployment.pk).update(status="failed", error_message=str(exc)[:12000])
+        changed = Deployment.objects.filter(pk=deployment.pk, status="deploying").update(
+            status="failed", error_message=str(exc)[:12000]
+        )
+        if not changed:
+            deployment.refresh_from_db()
+            return deployment.status
         record_transition(
             deployment,
             "failed",
@@ -272,13 +283,21 @@ def execute_deployment(self, deployment_id):
         invalidate_model_server_cache(str(deployment.version.public_id))
         Deployment.objects.filter(pk=deployment.pk).update(status="stopped", stopped_at=timezone.now())
         Endpoint = type(endpoint)
-        Endpoint.objects.filter(pk=endpoint.pk).update(health_status="stopped")
+        Endpoint.objects.filter(pk=endpoint.pk).update(
+            health_status="unknown", last_checked_at=None, health_check_token=None, health_check_lease_until=None,
+        )
         return "stopped"
+    deployment.refresh_from_db()
+    if deployment.status in {"succeeded", "failed", "stopped", "unconfirmed"}:
+        if deployment.status == "stopped":
+            backend.stop(deployment)
+        return deployment.status
     append_deployment_log(deployment, "Runtime resource dispatched; waiting for readiness confirmation.")
     record_transition(deployment, "deploying", phase="dispatched")
     if endpoint.health_status == "healthy":
-        _mark_deployment_healthy(deployment)
-        return "healthy"
+        _mark_deployment_succeeded(deployment)
+        deployment.refresh_from_db()
+        return deployment.status
     if deployment.backend == "argo":
         mark_deployment_unconfirmed.apply_async(args=[str(deployment.public_id)], countdown=33 * 60)
     else:
@@ -311,25 +330,29 @@ def mark_deployment_unconfirmed(deployment_id):
 @shared_task(bind=True, max_retries=30)
 def check_deployment_health(self, deployment_id):
     deployment = Deployment.objects.select_related("version", "build").get(public_id=deployment_id)
-    if deployment.status in {"healthy", "failed", "stopped"}:
+    if deployment.status != "deploying":
         return deployment.status
     healthy, metadata = deployment_backend(deployment.backend).health(deployment)
-    Endpoint.objects.filter(deployment=deployment).update(
-        health_status="healthy" if healthy else "unknown",
+    Endpoint.objects.filter(deployment=deployment, deployment__status="deploying").update(
+        health_status="healthy" if healthy else "unhealthy",
         last_checked_at=timezone.now(),
         metadata=metadata,
     )
     if healthy:
-        _mark_deployment_healthy(deployment)
-        return "healthy"
+        _mark_deployment_succeeded(deployment)
+        deployment.refresh_from_db()
+        return deployment.status
     if self.request.retries >= self.max_retries:
         invalidate_model_server_cache(str(deployment.version.public_id))
-        Deployment.objects.filter(pk=deployment.pk).update(
-            status="unhealthy", error_message="Endpoint health check timed out."
+        changed = Deployment.objects.filter(pk=deployment.pk, status="deploying").update(
+            status="failed", error_message="Endpoint readiness check timed out."
         )
-        append_deployment_log(deployment, "Endpoint health check timed out.")
-        record_transition(deployment, "unhealthy", reason="Endpoint health check timed out")
-        return "unhealthy"
+        if not changed:
+            deployment.refresh_from_db()
+            return deployment.status
+        append_deployment_log(deployment, "Endpoint readiness check timed out.")
+        record_transition(deployment, "failed", reason="Endpoint readiness check timed out")
+        return "failed"
     append_deployment_log(deployment, "Endpoint is not healthy yet; retrying health check.")
     raise self.retry(countdown=min(10 + self.request.retries * 2, 60))
 
@@ -339,7 +362,9 @@ def stop_deployment(self, deployment_id):
     deployment = Deployment.objects.select_related("version", "build").get(public_id=deployment_id)
     deployment_backend(deployment.backend).stop(deployment)
     Deployment.objects.filter(pk=deployment.pk).update(status="stopped", stopped_at=timezone.now())
-    Endpoint.objects.filter(deployment=deployment).update(health_status="stopped", last_checked_at=timezone.now())
+    Endpoint.objects.filter(deployment=deployment).update(
+        health_status="unknown", last_checked_at=None, health_check_token=None, health_check_lease_until=None
+    )
     from apps.catalog.models import ModelProject
 
     ModelProject.objects.filter(active_deployment=deployment).update(active_deployment=None)

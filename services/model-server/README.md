@@ -231,3 +231,10 @@ python -m pytest --cov=src --cov-report=term-missing
 > [!NOTE]
 > **Bộ Đệm và Invalidation Cache:**
 > Khi thông tin phiên bản mô hình hoặc cấu hình triển khai được cập nhật tại Control Plane, cache trên Redis sẽ tự động bị xóa (invalidation). Nếu kết nối tới Redis bị gián đoạn, Gateway sẽ fallback an toàn về truy vấn PostgreSQL trực tiếp.
+
+## Runtime health contract
+
+Deployment lifecycle dùng `succeeded/failed`, độc lập với API Health
+`unknown/healthy/unhealthy`. Beat và queue `runtime-health` kiểm tra cả khi Web đóng;
+quan sát quá 45 giây hiển thị unknown, không đổi phiên bản Running.
+Xem [runbook](../../docs/dev/runtime-health.md).

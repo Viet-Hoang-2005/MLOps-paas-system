@@ -18,7 +18,13 @@ export const useProjectOverview = (id?: string) =>
     queryKey: overviewQueryKeys.detail(id ?? ""),
     queryFn: () => getModelProject(id!),
     enabled: Boolean(id),
-    refetchInterval: 5000,
+    refetchInterval: (query) =>
+      query.state.data?.active_endpoint?.deployment_status === "succeeded"
+        ? 5000
+        : false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    retry: false,
   });
 
 export const useSnapshotText = (url?: string, snapshotId?: string) =>

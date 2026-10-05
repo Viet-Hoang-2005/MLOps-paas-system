@@ -121,9 +121,15 @@ class DeploymentSerializer(serializers.ModelSerializer):
 
 
 class EndpointSerializer(serializers.ModelSerializer):
+    health_status = serializers.SerializerMethodField()
     id = serializers.UUIDField(source="public_id", read_only=True)
     deployment_id = serializers.UUIDField(source="deployment.public_id", read_only=True)
     version_id = serializers.UUIDField(source="deployment.version.public_id", read_only=True)
+
+    def get_health_status(self, endpoint):
+        from apps.deployment.services.runtime_health import effective_health
+
+        return effective_health(endpoint)
 
     class Meta:
         model = Endpoint

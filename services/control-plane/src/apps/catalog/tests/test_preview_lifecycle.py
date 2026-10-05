@@ -11,7 +11,7 @@ from apps.catalog.services.preview import save_preview
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.builds import request_preview_build
 from apps.deployment.services.completion import complete_build, request_registration
-from apps.deployment.tasks import _mark_deployment_healthy
+from apps.deployment.tasks import _mark_deployment_succeeded
 from apps.drift.models import DriftMonitor
 from apps.drift.services.monitors import create_monitor
 from apps.observability.services.runtime_metrics import runtime_metrics
@@ -162,7 +162,7 @@ def test_new_and_training_project_artifact_contract_and_tenant_scope(project):
 def running(project, version_name="1"):
     version = ModelVersion.objects.create(project=project, version=version_name, flavor="xgboost")
     build = Build.objects.create(project=project, version=version, flavor="xgboost", status="ready")
-    deployment = Deployment.objects.create(version=version, build=build, status="healthy")
+    deployment = Deployment.objects.create(version=version, build=build, status="succeeded")
     Endpoint.objects.create(deployment=deployment, public_url="http://gateway.test", health_status="healthy")
     project.active_deployment = deployment
     project.save()
@@ -177,7 +177,7 @@ def test_running_handoff_disables_old_monitor_and_stops_old_after_commit(
     version = ModelVersion.objects.create(project=project, version="2", flavor="xgboost")
     build = Build.objects.create(project=project, version=version, flavor="xgboost", status="ready")
     candidate = Deployment.objects.create(version=version, build=build, status="failed")
-    _mark_deployment_healthy(candidate)
+    _mark_deployment_succeeded(candidate)
     project.refresh_from_db()
     assert project.active_deployment_id == old.pk
     candidate.status = "deploying"
@@ -188,7 +188,7 @@ def test_running_handoff_disables_old_monitor_and_stops_old_after_commit(
     monkeypatch.setattr("apps.deployment.tasks.append_deployment_log", lambda *args: None)
     monkeypatch.setattr("apps.observability.services.outbox._publish_pending", lambda: None)
     with django_capture_on_commit_callbacks(execute=True):
-        _mark_deployment_healthy(candidate)
+        _mark_deployment_succeeded(candidate)
     project.refresh_from_db()
     monitor.refresh_from_db()
     assert project.active_deployment_id == candidate.pk

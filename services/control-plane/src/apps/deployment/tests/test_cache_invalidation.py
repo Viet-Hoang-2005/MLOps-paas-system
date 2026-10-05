@@ -7,7 +7,7 @@ from redis.exceptions import RedisError
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services import cache as cache_service
-from apps.deployment.tasks import _mark_deployment_healthy, stop_deployment
+from apps.deployment.tasks import _mark_deployment_succeeded, stop_deployment
 from apps.registry.models import ModelVersion
 
 
@@ -38,31 +38,31 @@ class CacheInvalidationTests(TestCase):
         self.assertFalse(cache_service.invalidate_model_server_cache(""))
         self.assertFalse(cache_service.invalidate_model_server_cache(None))
 
-    def test_mark_deployment_healthy_invalidates_cache(self):
+    def test_mark_deployment_succeeded_invalidates_cache(self):
         owner = get_user_model().objects.create_user("healthy-owner@example.com", "password123")
         project = ModelProject.objects.create(owner=owner, name="healthy project")
         version = ModelVersion.objects.create(project=project, version="1")
         build = Build.objects.create(project=project, version=version, flavor="sklearn", status="ready")
         deployment = Deployment.objects.create(version=version, build=build, backend="docker", status="deploying")
-        Endpoint.objects.create(deployment=deployment, runtime_name="runtime-test", health_status="deploying")
+        Endpoint.objects.create(deployment=deployment, runtime_name="runtime-test", health_status="unknown")
 
         invalidated_ids = []
         with patch(
             "apps.deployment.tasks.invalidate_model_server_cache",
             side_effect=lambda version_id: invalidated_ids.append(version_id),
         ):
-            _mark_deployment_healthy(deployment)
+            _mark_deployment_succeeded(deployment)
 
         self.assertIn(str(version.public_id), invalidated_ids)
         deployment.refresh_from_db()
-        self.assertEqual(deployment.status, "healthy")
+        self.assertEqual(deployment.status, "succeeded")
 
     def test_stop_deployment_invalidates_cache(self):
         owner = get_user_model().objects.create_user("stop-owner@example.com", "password123")
         project = ModelProject.objects.create(owner=owner, name="stop project")
         version = ModelVersion.objects.create(project=project, version="1")
         build = Build.objects.create(project=project, version=version, flavor="sklearn", status="ready")
-        deployment = Deployment.objects.create(version=version, build=build, backend="docker", status="healthy")
+        deployment = Deployment.objects.create(version=version, build=build, backend="docker", status="succeeded")
 
         invalidated_ids = []
         fake_backend = Mock()

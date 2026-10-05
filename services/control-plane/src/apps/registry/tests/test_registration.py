@@ -79,7 +79,7 @@ def routable_version(db):
     project = ModelProject.objects.create(owner=user, name="Routable")
     version = ModelVersion.objects.create(project=project, version="1")
     build = Build.objects.create(project=project, version=version, flavor="sklearn", status="ready")
-    deployment = Deployment.objects.create(version=version, build=build, status="healthy")
+    deployment = Deployment.objects.create(version=version, build=build, status="succeeded")
     project.active_deployment = deployment
     project.save(update_fields=["active_deployment"])
     Endpoint.objects.create(
@@ -103,11 +103,11 @@ def test_predict_version_proxies_to_healthy_endpoint(routable_version):
     assert http.calls == [("POST", "http://worker:3000/predict", {"json": {"features": {"value": 1}}})]
 
 
-def test_predict_version_rejects_version_without_healthy_endpoint(routable_version):
+def test_predict_version_rejects_version_without_running_deployment(routable_version):
     _, version = routable_version
-    Endpoint.objects.update(health_status="unhealthy")
+    Deployment.objects.update(status="stopped")
 
-    with pytest.raises(ValidationError, match="no healthy endpoint"):
+    with pytest.raises(ValidationError, match="no Running succeeded deployment"):
         predict_version(version=version, payload={}, http=FakeHttpClient())
 
 
@@ -120,3 +120,12 @@ def test_predict_alias_resolves_alias_and_rejects_missing_alias(routable_version
 
     with pytest.raises(NotFound, match="does not exist"):
         predict_alias(project=project, alias_name="missing", payload={}, http=FakeHttpClient())
+
+
+def test_prediction_observation_does_not_change_running_routing(routable_version):
+    project, version = routable_version
+    Endpoint.objects.update(health_status="unhealthy")
+    result = predict_version(version=version, payload={}, http=FakeHttpClient())
+    assert result["success"] is True
+    project.refresh_from_db()
+    assert project.active_deployment.status == "succeeded"

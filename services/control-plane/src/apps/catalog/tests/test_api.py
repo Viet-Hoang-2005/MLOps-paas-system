@@ -76,7 +76,7 @@ def test_project_list_returns_metadata_image_ready_and_deployed_lifecycle_status
         status="ready",
     )
     deployed_project.active_deployment = Deployment.objects.create(
-        version=deployed_version, build=deployed_build, status="healthy"
+        version=deployed_version, build=deployed_build, status="succeeded"
     )
     deployed_project.save(update_fields=["active_deployment"])
 
@@ -99,7 +99,7 @@ def test_project_list_returns_latest_active_endpoint_for_the_owner():
     project = ModelProject.objects.create(owner=owner, name="NIDS")
     version = ModelVersion.objects.create(project=project, version="1")
     build = Build.objects.create(project=project, version=version, flavor="xgboost", status="ready")
-    deployment = Deployment.objects.create(version=version, build=build, status="healthy")
+    deployment = Deployment.objects.create(version=version, build=build, status="succeeded")
     project.active_deployment = deployment
     project.save(update_fields=["active_deployment"])
     endpoint = Endpoint.objects.create(
@@ -121,7 +121,8 @@ def test_project_list_returns_latest_active_endpoint_for_the_owner():
         "version_number": version.version,
         "url": f"{endpoint.public_url}/predict",
         "health_url": f"{endpoint.public_url}/health",
-        "health_status": "healthy",
-        "deployment_status": "healthy",
+        "health_status": "unknown",
+        "deployment_status": "succeeded",
+        "registration_status": "unregistered",
         "last_checked_at": None,
     }

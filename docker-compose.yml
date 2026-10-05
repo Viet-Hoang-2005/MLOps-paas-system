@@ -136,7 +136,7 @@ services:
     volumes:
       - ./services/control-plane:/app
       - /var/run/docker.sock:/var/run/docker.sock
-    command: celery -A config worker --concurrency=2
+    command: celery -A config worker -Q celery --concurrency=2
     depends_on:
       control-plane:
         condition: service_started
@@ -144,6 +144,45 @@ services:
         condition: service_started
     networks:
       - mlops_paas_network
+
+  # Runtime health is independent of long build/training tasks.
+  celery-health-worker: &health-process
+    build:
+      context: ./services/control-plane
+      dockerfile: Dockerfile
+    image: mlops-paas-control-plane
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: 1
+      LOG_FORMAT: ${LOG_FORMAT:-console}
+      LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
+      PYTHONPATH: /app/src
+      DJANGO_SETTINGS_MODULE: config.settings.health
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-local-dev-change-me}
+      DB_HOST_RW: postgres
+      DB_HOST_RO: postgres
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME}
+      DB_SCHEMA: ${DB_SCHEMA:-control_plane}
+      CELERY_BROKER_URL: redis://redis:6379/3
+      CELERY_RESULT_BACKEND: redis://redis:6379/4
+      REDIS_URL: redis://redis:6379/1
+    volumes:
+      - ./services/control-plane:/app
+    command: sh -c "until python manage.py migrate --check; do sleep 2; done; exec celery -A config worker -Q runtime-health --concurrency=2"
+    depends_on:
+      control-plane:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - mlops_paas_network
+
+  celery-beat:
+    <<: *health-process
+    command: sh -c "until python manage.py migrate --check; do sleep 2; done; exec celery -A config beat --schedule=/tmp/celerybeat-schedule"
 
   # 2. Model Server API Gateway
   model-server:

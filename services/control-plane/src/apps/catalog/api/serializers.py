@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.catalog.models import ModelPreview, ModelProject, PreviewAsset, WorkspaceAsset
+from apps.deployment.services.runtime_health import effective_health
 from common.api.exceptions import Conflict
 from infrastructure.storage import S3Storage
 
@@ -91,8 +92,9 @@ class ModelProjectSerializer(serializers.ModelSerializer):
                 "version_number": deployment.version.version,
                 "url": prediction_url,
                 "health_url": health_url,
-                "health_status": endpoint.health_status,
+                "health_status": effective_health(endpoint),
                 "deployment_status": deployment.status,
+                "registration_status": deployment.build.registration_status,
                 "last_checked_at": endpoint.last_checked_at,
             }
         return None

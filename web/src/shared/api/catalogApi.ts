@@ -36,11 +36,15 @@ const toModelProject = (project: ModelProject): ModelProject => {
     endpoint?.deployment_status === "deploying" ||
     endpoint?.deployment_status === "pending"
       ? "deploying"
-      : endpoint?.health_status === "healthy"
-        ? "healthy"
-        : endpoint
-          ? "unhealthy"
-          : "not_deployed";
+      : endpoint?.deployment_status === "stopped"
+        ? "stopped"
+        : endpoint?.deployment_status === "failed"
+          ? "deploy_failed"
+          : endpoint?.deployment_status === "succeeded"
+            ? endpoint.health_status
+            : endpoint
+              ? "unknown"
+              : "not_deployed";
   return {
     ...project,
     version: endpoint?.version_number,

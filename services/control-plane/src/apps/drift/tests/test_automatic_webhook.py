@@ -17,7 +17,7 @@ def _monitor_fixture():
     project = ModelProject.objects.create(owner=owner, name="automatic drift")
     version = ModelVersion.objects.create(project=project, version="1")
     build = Build.objects.create(project=project, version=version, status="ready")
-    project.active_deployment = Deployment.objects.create(version=version, build=build, status="healthy")
+    project.active_deployment = Deployment.objects.create(version=version, build=build, status="succeeded")
     project.save(update_fields=["active_deployment"])
     asset = WorkspaceAsset.objects.create(
         project=project,

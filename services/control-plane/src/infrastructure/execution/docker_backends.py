@@ -13,6 +13,7 @@ from apps.training.services.capabilities import issue_capability
 from apps.training.services.storage_scope import validate_training_uri
 from infrastructure.docker import DockerClient
 from infrastructure.http import HttpClient
+from infrastructure.runtime_health import healthy_payload
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import build_prefix, drift_run_prefix
 
@@ -321,10 +322,11 @@ class DockerDeploymentBackend:
         if not endpoint:
             return False, {"status": "missing"}
         try:
-            response = self.http.request("GET", f"{endpoint.internal_url}/health")
+            method = "POST" if deployment.version.flavor in {"pytorch", "tensorflow"} else "GET"
+            response = self.http.request(method, f"{endpoint.internal_url}/health", **({"json": {}} if method == "POST" else {}))
             payload = response.json()
-            healthy = payload.get("model_loaded", payload.get("status") == "healthy")
-            return bool(healthy and payload.get("status") != "unhealthy"), payload
+            healthy = healthy_payload(payload, project_id=deployment.version.project.public_id, version_id=deployment.version.public_id)
+            return healthy, payload if isinstance(payload, dict) else {"status": "unhealthy"}
         except Exception as exc:
             return False, {"status": "unhealthy", "detail": str(exc)}
 

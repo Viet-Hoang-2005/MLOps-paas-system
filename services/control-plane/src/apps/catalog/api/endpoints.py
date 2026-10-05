@@ -32,7 +32,7 @@ class ModelProjectListCreateEndpoint(generics.ListCreateAPIView):
         return (
             ModelProject.objects.filter(owner=self.request.user)
             .exclude(deletion_state="deleted")
-            .select_related("preview", "active_deployment__version", "active_deployment__endpoint")
+            .select_related("preview", "active_deployment__version", "active_deployment__endpoint", "active_deployment__build")
             .prefetch_related("workspace_assets", "versions__deployments__endpoint", "builds")
         )
 
@@ -52,7 +52,7 @@ class ModelProjectDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
         return (
             ModelProject.objects.filter(owner=self.request.user)
             .exclude(deletion_state="deleted")
-            .select_related("preview", "active_deployment__version", "active_deployment__endpoint")
+            .select_related("preview", "active_deployment__version", "active_deployment__endpoint", "active_deployment__build")
             .prefetch_related("workspace_assets", "versions__deployments__endpoint", "builds")
         )
 
