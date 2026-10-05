@@ -475,8 +475,14 @@ export function ModelPredictionsTesting({ model }: { model: ModelProject }) {
         }}
       />
       <section className="space-y-6 rounded-surface border border-border bg-surface p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <StepTitle title={t("testingPage.title")} className="mb-0" />
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <StepTitle
+            title={t("testingPage.title")}
+            subtitle={t("testingPage.description", {
+              model: model.name || t("testingPage.selectedModelFallback"),
+            })}
+            className="mb-0"
+          />
           <div className="flex gap-3">
             {rows.length > 0 && (
               <>

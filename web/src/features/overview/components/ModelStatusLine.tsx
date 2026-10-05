@@ -96,10 +96,26 @@ export function ModelStatusLine({
     }
   };
 
+  const healthSubtitle = `${
+    healthUnavailable
+      ? t("workflow.healthUnavailable")
+      : monitoring
+        ? t("workflow.healthMonitoringHint")
+        : t("workflow.healthNotChecked")
+  }${
+    model.active_endpoint?.last_checked_at
+      ? ` · ${t("workflow.healthLastChecked", { time: formatDateTime(model.active_endpoint.last_checked_at, i18n.language) })}`
+      : ""
+  }`;
+
   return (
     <section className="space-y-6 rounded-surface border border-border bg-surface p-6">
-      <div className="flex items-center justify-between">
-        <StepTitle title={t("workflow.modelStatus")} className="mb-0" />
+      <div className="flex items-start justify-between gap-4">
+        <StepTitle
+          title={t("workflow.modelStatus")}
+          subtitle={healthSubtitle}
+          className="mb-0"
+        />
         <Badge
           variant={
             healthStatus === "healthy"
@@ -115,20 +131,6 @@ export function ModelStatusLine({
             : t("workflow.healthNotChecked")}
         </Badge>
       </div>
-
-      <p
-        className="text-style-caption text-color-muted-foreground"
-        role="status"
-      >
-        {healthUnavailable
-          ? t("workflow.healthUnavailable")
-          : monitoring
-            ? t("workflow.healthMonitoringHint")
-            : t("workflow.healthNotChecked")}
-        {model.active_endpoint?.last_checked_at
-          ? ` · ${t("workflow.healthLastChecked", { time: formatDateTime(model.active_endpoint.last_checked_at, i18n.language) })}`
-          : ""}
-      </p>
 
       <div className="overflow-x-auto pb-2">
         <ProgressLine steps={modelStatusSteps} />

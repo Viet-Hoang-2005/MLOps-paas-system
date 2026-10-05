@@ -1,6 +1,5 @@
 import { RouteFallback } from "@/app/router/RouteFallback";
 import { deploymentStatuses } from "@/features/deployments/buildHistoryStatus";
-import { isDeployableBuild } from "@/features/deployments/deploymentEligibility";
 import { useRunDeployment } from "@/features/deployments/hooks/useRunDeployment";
 import {
   buildDeploymentPath,
@@ -10,8 +9,8 @@ import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { Callout } from "@/shared/components/Callout";
+import { CardSummary } from "@/shared/components/Card";
 import { PageHeader } from "@/shared/components/PageHeader";
-import { Select } from "@/shared/components/Select";
 import { TerminalViewer } from "@/shared/components/TerminalViewer";
 import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
 import { Play } from "lucide-react";
@@ -49,13 +48,17 @@ function RunDeploymentContent({
   });
   const attemptStatus =
     deploymentStatuses[run.selected?.status ?? "not_deployed"];
-  const options = (run.history.data ?? [])
-    .filter((build) => isDeployableBuild(build, projectId))
-    .map((build) => ({
-      value: build.id,
-      label: `v${build.version_number} · ${build.id}`,
-    }));
   const error = run.error || run.deploy.error;
+  const isDeploySuccess = Boolean(
+    run.running || run.selected?.status === "succeeded",
+  );
+  const modelLifecycleStatus = run.project.data?.lifecycle_status;
+  const modelStatusTone =
+    modelLifecycleStatus === "running"
+      ? "success"
+      : modelLifecycleStatus === "registered"
+        ? "info"
+        : "neutral";
   if (run.loading && !run.build.data) return <RouteFallback />;
   if (run.mismatch || run.error || (!run.loading && !run.eligible)) {
     return (
@@ -84,26 +87,40 @@ function RunDeploymentContent({
   return (
     <div className="flex min-h-full w-full flex-1 flex-col space-y-6">
       <PageHeader title={t("workflow.runDeployment")} back />
-      <section className="flex flex-1 flex-col space-y-6 rounded-surface border border-border bg-surface p-6">
-        <h2 className="text-style-heading">{run.project.data?.name}</h2>
-        <Select
-          value={buildId}
-          options={options}
-          placeholder={t("workflow.selectVersion")}
-          disabled={run.loading || run.deploy.isPending || Boolean(run.busy)}
-          onChange={(id) => navigate(runDeploymentPath(projectId, id))}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <CardSummary
+          label={t("workflow.modelName")}
+          value={run.project.data?.name || "-"}
         />
-        <dl className="space-y-2 break-all">
-          <dt className="text-style-caption-strong">{t("workflow.buildId")}</dt>
-          <dd className="text-style-code-sm">{buildId}</dd>
-          <dt className="text-style-caption-strong">
-            {t("workflow.readyImageUri")}
-          </dt>
-          <dd className="text-style-code-sm">{run.build.data?.image_uri}</dd>
-        </dl>
+        <CardSummary
+          label={t("workflow.frameworkFlavor")}
+          value={run.build.data?.flavor || run.project.data?.flavor || "-"}
+        />
+        <CardSummary
+          label={t("workflow.modelStatus")}
+          value={
+            <Badge variant={modelStatusTone}>
+              {modelLifecycleStatus
+                ? t(`workflow.${modelLifecycleStatus}`, {
+                    defaultValue: modelLifecycleStatus,
+                  })
+                : "-"}
+            </Badge>
+          }
+        />
+        <CardSummary
+          label={t("workflow.deploymentStatus")}
+          value={
+            <Badge variant={attemptStatus.tone}>{t(attemptStatus.label)}</Badge>
+          }
+        />
+      </div>
+
+      <div className="flex flex-1 flex-col space-y-4">
         <TerminalViewer
-          className="flex flex-1 flex-col min-h-72"
-          bodyClassName="flex-1 min-h-72 h-full"
+          className="flex flex-1 flex-col min-h-80"
+          bodyClassName="flex-1 min-h-64 h-full"
           logs={logs.logs}
           badge={
             <Badge variant={attemptStatus.tone}>{t(attemptStatus.label)}</Badge>
@@ -175,22 +192,26 @@ function RunDeploymentContent({
             description={logs.error}
           />
         )}
-      </section>
-      <div className="flex flex-wrap gap-3">
+      </div>
+      <div className="grid grid-cols-2 gap-4">
         <Button
+          type="button"
           variant="secondary"
+          fullWidth
+          onClick={() => navigate(buildDeploymentPath({ projectId, buildId }))}
+        >
+          {t("workflow.back")}
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          fullWidth
+          disabled={!isDeploySuccess}
           onClick={() =>
             navigate(`/dashboard/projects/${projectId}/deployment`)
           }
         >
-          {t("workflow.deployment")}
-        </Button>
-        <Button
-          variant="primary"
-          disabled={!run.running}
-          onClick={() => navigate(`/dashboard/projects/${projectId}/overview`)}
-        >
-          {t("workflow.openOverview")}
+          {t("workflow.finish")}
         </Button>
       </div>
     </div>

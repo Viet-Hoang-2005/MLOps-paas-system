@@ -268,7 +268,7 @@ export default function DeploymentPage() {
         <Button
           size="md"
           icon={<Play className="h-4 w-4" />}
-          onClick={() => navigate(buildDeploymentPath({ projectId: modelId }))}
+          onClick={() => navigate(buildDeploymentPath())}
         >
           {t("workflow.deploy")}
         </Button>

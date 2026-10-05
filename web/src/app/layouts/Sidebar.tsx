@@ -75,6 +75,7 @@ export default function Sidebar({
     to: routes.projects,
     icon: Bot,
     match: routes.projects,
+    iconClassName: "-translate-y-0.5",
   };
 
   const modelItems = sectionItems.map((item) => ({
@@ -131,6 +132,8 @@ export default function Sidebar({
       "section" in item
         ? isItemActive(item.key, item.section)
         : isItemActive(item.key, undefined, item.match);
+    const iconClassName =
+      "iconClassName" in item ? item.iconClassName : undefined;
     return (
       <NavLink
         key={item.key}
@@ -139,7 +142,7 @@ export default function Sidebar({
         className={itemClass(active)}
         title={collapsed ? t(`navigation.${item.key}`) : undefined}
       >
-        <Icon className="h-5 w-5 shrink-0" />
+        <Icon className={cn("h-5 w-5 shrink-0", iconClassName)} />
         <span className={labelClass}>{t(`navigation.${item.key}`)}</span>
       </NavLink>
     );

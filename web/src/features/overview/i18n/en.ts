@@ -3,7 +3,7 @@ export const overviewEn = {
     pending: "Pending",
     queued: "Queued",
     building: "Building",
-    ready: "Build successful only",
+    ready: "Build successful",
     failed: "Failed",
     cancelled: "Cancelled",
     registering: "Registering",
@@ -62,9 +62,11 @@ export const overviewEn = {
     stepBuildImageHelper: "Container image built",
     stepRegisterModel: "Register model",
     stepRegisterModelHelper: "Snapshot registered in Evolution",
-    healthMonitoringHint: "Runtime checked continuously every 15 seconds; this page refreshes every 5 seconds.",
+    healthMonitoringHint:
+      "Runtime checked continuously every 15 seconds; this page refreshes every 5 seconds.",
     healthLastChecked: "Last checked: {{time}}",
-    healthUnavailable: "Cannot read health from Control Plane. Current API health is unknown.",
+    healthUnavailable:
+      "Cannot read health from Control Plane. Current API health is unknown.",
     healthNotChecked: "Not checked — deployment stopped or not deployed",
     stepApiHealth: "API Health",
     apiUrl: "API URL",

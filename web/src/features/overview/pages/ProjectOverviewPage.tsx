@@ -222,12 +222,7 @@ export default function ProjectOverviewPage() {
           icon={<Box className="h-6 w-6" />}
           showModelName={false}
           action={
-            <Button
-              size="md"
-              onClick={() =>
-                navigate(buildDeploymentPath({ projectId: modelId }))
-              }
-            >
+            <Button size="md" onClick={() => navigate(buildDeploymentPath())}>
               {t("workflow.deploy")}
             </Button>
           }

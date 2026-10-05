@@ -6,22 +6,22 @@ import {
   buildPreview,
   buildTraining,
 } from "@/features/deployments/api/lifecycleApi";
+import { canRebuild } from "@/features/deployments/buildActions";
+import { isRegisteredBuild } from "@/features/deployments/deploymentEligibility";
+import { useBuildRegistration } from "@/features/deployments/hooks/useBuildRegistration";
 import {
   deploymentFlowKeys,
   useBuild,
   useBuildTrainingSources,
 } from "@/features/deployments/hooks/useDeploymentFlow";
-import { CodeDataFields } from "@/features/projects/components/CodeDataFields";
-import { ModelArtifactFields } from "@/features/projects/components/ModelArtifactFields";
-import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
-import { usePreview } from "@/features/projects/hooks/usePreview";
-import { canRebuild } from "@/features/deployments/buildActions";
-import { isRegisteredBuild } from "@/features/deployments/deploymentEligibility";
-import { useBuildRegistration } from "@/features/deployments/hooks/useBuildRegistration";
 import {
   buildDeploymentPath,
   runDeploymentPath,
 } from "@/features/deployments/navigation";
+import { CodeDataFields } from "@/features/projects/components/CodeDataFields";
+import { ModelArtifactFields } from "@/features/projects/components/ModelArtifactFields";
+import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
+import { usePreview } from "@/features/projects/hooks/usePreview";
 import type { BuildInputForm, CodeDataForm } from "@/features/projects/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
@@ -31,6 +31,7 @@ import { PageHeader } from "@/shared/components/PageHeader";
 import { Select, type SelectOption } from "@/shared/components/Select";
 import { TerminalViewer } from "@/shared/components/TerminalViewer";
 import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
+import { toast } from "@/shared/types/toastStore";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { useMemo } from "react";
@@ -119,6 +120,10 @@ function BuildDeploymentContent() {
   }, [projects.data?.models, jobs.data?.training_jobs, t]);
 
   const handleModelChange = (value: string) => {
+    if (!value) {
+      navigate(buildDeploymentPath(), { replace: true });
+      return;
+    }
     const [kind, projectId, trainingId] = value.split(":");
     navigate(
       buildDeploymentPath({
@@ -126,6 +131,7 @@ function BuildDeploymentContent() {
         source: kind === "training" ? "training" : "preview",
         jobId: trainingId,
       }),
+      { replace: true },
     );
   };
 
@@ -399,11 +405,7 @@ function BuildDeploymentContent() {
           <Callout
             variant="success"
             title={t("workflow.buildCompleted")}
-            description={
-              build.data.image_uri
-                ? `${t("workflow.readyImageUri")}: ${build.data.image_uri}`
-                : t("workflow.buildReadyHint")
-            }
+            description={t("workflow.buildReadyHint")}
           />
         )}
 
@@ -488,7 +490,19 @@ function BuildDeploymentContent() {
               isRegistering ||
               build.data?.deletion_state !== "active"
             }
-            onClick={() => register.mutate()}
+            onClick={() =>
+              register.mutate(undefined, {
+                onSuccess: () => {
+                  toast.success(t("workflow.registerSuccess"));
+                  navigate(runDeploymentPath(activeProjectId, buildId!));
+                },
+                onError: (err) => {
+                  toast.error(
+                    getApiErrorMessage(err, t("workflow.registerFailed")),
+                  );
+                },
+              })
+            }
           >
             {t("workflow.register")}
           </Button>

@@ -37,19 +37,10 @@ function AnsiLogLine({ log }: { log: string }) {
 }
 
 export type TerminalButtonType =
-  | "primary"
-  | "secondary"
-  | "info"
-  | "success"
-  | "warning"
-  | "danger";
+  "primary" | "secondary" | "info" | "success" | "warning" | "danger";
 
 export type TerminalActionTone =
-  | "default"
-  | "start"
-  | "warning"
-  | "danger"
-  | "success";
+  "default" | "start" | "warning" | "danger" | "success";
 
 const toneToVariantMap: Record<TerminalActionTone, TerminalButtonType> = {
   default: "secondary",
@@ -64,8 +55,7 @@ const terminalButtonVariants: Record<TerminalButtonType, string> = {
     "border-border bg-surface text-color-foreground shadow-sm hover:border-border-strong hover:bg-surface-hover active:bg-surface-active",
   primary:
     "border-primary bg-surface text-color-primary shadow-sm hover:border-primary-hover hover:bg-surface-hover active:bg-surface-active",
-  info:
-    "border-info bg-surface text-color-info shadow-sm hover:border-info-hover hover:bg-surface-hover active:bg-surface-active",
+  info: "border-info bg-surface text-color-info shadow-sm hover:border-info-hover hover:bg-surface-hover active:bg-surface-active",
   success:
     "border-success bg-surface text-color-success shadow-sm hover:border-success-hover hover:bg-surface-hover active:bg-surface-active",
   warning:
@@ -83,8 +73,10 @@ function isTerminalButtonType(value: unknown): value is TerminalButtonType {
   );
 }
 
-export interface TerminalButtonProps
-  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type"> {
+export interface TerminalButtonProps extends Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "type"
+> {
   type?: TerminalButtonType | "button" | "submit" | "reset";
   variant?: TerminalButtonType;
   tone?: TerminalActionTone;
@@ -194,7 +186,7 @@ export function TerminalViewer({
     >
       <div className="flex min-h-13 shrink-0 items-center border-b border-terminal-border bg-terminal-header px-4 py-3">
         <Terminal className="mr-2 h-4 w-4 shrink-0 text-color-terminal-muted" />
-        <span className="truncate font-mono text-style-code-sm text-color-terminal-foreground">
+        <span className="truncate font-mono text-style-code-lg text-color-terminal-foreground">
           {title ?? t("terminal.title")}
         </span>
         {badge && <div className="ml-2.5 flex items-center">{badge}</div>}

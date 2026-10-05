@@ -153,6 +153,7 @@ services:
       context: ./services/control-plane
       dockerfile: Dockerfile
     image: mlops-paas-control-plane
+    container_name: celery_beat
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: 1
