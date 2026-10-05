@@ -234,7 +234,8 @@ Evolution chỉ hiển thị snapshot đã đăng ký, gồm lineage, metadata, 
 - Metrics, params, insights và feature importance đọc từ snapshot Running; chỉ hiển thị phần có dữ liệu.
 - Bên dưới giữ lịch sử drift, log và report; ghi rõ version của từng run.
 - Create Drift Monitoring có selector riêng chỉ nhận project có Running hợp lệ.
-- Dùng reference snapshot của version; nếu thiếu, cho upload CSV riêng và snapshot cho monitor, không sửa Preview/version.
+- Dùng reference snapshot của version; nếu thiếu, cho upload CSV tại Create Drift Monitor. Lưu thành `ModelArtifact(reference_data)` của version và bản sao riêng cho monitor. Đây là ngoại lệ bổ sung một lần cho metadata reference của version; không sửa Preview, Build input, model artifact hay image. Nếu reference đã có thì không cho thay thế.
+- Production preview dùng GET `production-data/?limit=100&version_id=<version>`; tối đa 100 hàng mới nhất của version được chọn. API mặc định 100, hỗ trợ limit 1–10000 và không trả quá số bản ghi hiện có.
 - Khi đổi Running, monitor cũ ngừng tạo run tự động; lịch sử vẫn xem được. Người dùng tạo monitor mới thủ công.
 - Kiểm tra lại Running lúc submit để tránh tạo monitor nhầm version nếu deployment vừa thay đổi.
 

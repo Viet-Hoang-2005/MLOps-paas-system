@@ -37,7 +37,7 @@ export function Select({
           type="button"
           disabled={disabled}
           className={cn(
-            "flex h-14 w-full items-center justify-between gap-3 rounded-control border bg-surface px-4 text-left text-style-body-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20",
+            "flex h-14 w-full items-center justify-between gap-3 rounded-surface border bg-surface px-4 text-left text-style-body-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20",
             open ? "border-ring" : "border-input hover:border-input-hover",
             !selectedOption
               ? "text-color-foreground-subtle"

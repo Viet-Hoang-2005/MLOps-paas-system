@@ -3,7 +3,7 @@ export const monitoringVi = {
   leaveHint: "Rời trang và bỏ cấu hình chưa lưu?",
   selectProject: "Chọn Dự án mô hình đang chạy",
   referenceSnapshotHint:
-    "CSV được đóng băng riêng cho cấu hình giám sát, không sửa Bản nháp hoặc phiên bản đã đăng ký.",
+    "Nếu phiên bản Đang chạy chưa có CSV tham chiếu, hãy tải lên tại đây. Khi lưu, CSV được bổ sung vào phiên bản đó trong Phiên bản mô hình và sao chép riêng cho monitor. Bản nháp không thay đổi.",
   usingVersionReference:
     "Dùng bản chụp CSV tham chiếu của phiên bản Đang chạy.",
   runningDriftOnly:
@@ -45,6 +45,11 @@ export const monitoringVi = {
     "Bạn có chắc muốn xóa cấu hình? Không thể hoàn tác thao tác này.",
   deleteConfirm: "Xóa",
   createPage: {
+    invalidReference: "Tải lên CSV không rỗng, tối đa 10 MiB.",
+    referenceUploadHint: "CSV UTF-8 có tiêu đề và dòng dữ liệu, tối đa 10 MiB.",
+    monitorReferenceLocked:
+      "Không thể thay thế bản chụp dữ liệu tham chiếu của monitor này.",
+    previewLoadFailed: "Không thể tải bản xem trước CSV.",
     editTitle: "Chỉnh sửa giám sát",
     createTitle: "Tạo cấu hình giám sát",
     back: "Quay lại Giám sát lệch dữ liệu",
@@ -58,7 +63,7 @@ export const monitoringVi = {
       "Chọn số dự đoán production mới cần ghi nhận trước khi tự động kiểm tra lệch dữ liệu.",
     previewTitle: "Xem trước dữ liệu production",
     previewDescription:
-      "Xem 100 bản ghi production mới nhất sẽ dùng cho báo cáo sau.",
+      "Xem tối đa 100 bản ghi production mới nhất của phiên bản mô hình này. Nếu chưa đủ dữ liệu, chỉ hiển thị số bản ghi hiện có.",
     loadingProduction: "Đang tải dữ liệu production…",
     productionLoadFailed: "Không thể tải dữ liệu production.",
     productionEmpty: "Chưa có dữ liệu production.",

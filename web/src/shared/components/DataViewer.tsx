@@ -73,6 +73,7 @@ export function DataViewer({
           </span>
           <div className="flex items-center gap-1">
             <button
+              type="button"
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
               className="rounded-surface p-1 hover:bg-muted disabled:opacity-50"
@@ -81,6 +82,7 @@ export function DataViewer({
               <ArrowLeft className="w-4 h-4" />
             </button>
             <button
+              type="button"
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
               className="rounded-surface p-1 hover:bg-muted disabled:opacity-50"

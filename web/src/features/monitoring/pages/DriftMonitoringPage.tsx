@@ -153,9 +153,7 @@ export default function DriftMonitoringPage() {
           action={
             <Button
               size="md"
-              onClick={() =>
-                navigate(`/dashboard/monitoring/new?projectId=${modelId}`)
-              }
+              onClick={() => navigate(`/dashboard/monitoring/new`)}
             >
               {t("createMonitoring")}
             </Button>

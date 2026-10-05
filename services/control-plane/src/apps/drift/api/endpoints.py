@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 
 from apps.drift.selectors import monitor_for_user, monitors_for_user, run_for_user
 from apps.drift.services.logs import drift_run_logs
+from apps.drift.services.monitors import reference_download_url
 from apps.drift.services.reports import report_uri_for_run
 from apps.drift.services.runs import request_run
 from common.api.exceptions import Conflict
@@ -40,6 +41,12 @@ class DriftRunEndpoint(APIView):
         monitor = monitor_for_user(request.user, monitor_id)
         run = request_run(monitor, request.headers.get("Idempotency-Key"))
         return Response(DriftRunSerializer(run).data, status=status.HTTP_202_ACCEPTED)
+
+
+class DriftMonitorReferenceURLEndpoint(APIView):
+    def get(self, request, monitor_id):
+        monitor = monitor_for_user(request.user, monitor_id)
+        return Response({"url": reference_download_url(monitor)})
 
 
 class DriftRunLogsEndpoint(APIView):

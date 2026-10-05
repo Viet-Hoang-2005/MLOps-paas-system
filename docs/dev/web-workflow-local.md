@@ -46,7 +46,8 @@ Compose có tên container cố định nên stack mới không thể chạy son
 | Register | `POST /api/builds/<build>/register/`; async, idempotent, không tự deploy |
 | Deploy | `POST /api/deployments/` với Build đã đăng ký; theo dõi deployment UUID |
 | Snapshot source | `GET /api/models/<project>/running-source/` chỉ đọc version Running |
-| Drift monitor | `POST /api/drift-monitors/`; chỉ version Running, CSV riêng nếu version không có reference |
+| Drift monitor | `POST /api/drift-monitors/`; chỉ version Running. CSV thiếu được bổ sung một lần vào version và sao chép riêng cho monitor; reference đã có không được thay thế |
+| Production preview | `GET /api/models/<project>/production-data/?limit=100&version_id=<version>`; tenant/project/version scoped, trả tối đa số hàng đang có |
 | Training retry | `POST /api/training-jobs/<job>/retry/`; tạo job mới từ input bất biến, không đọc workspace hiện tại |
 | Metric local | `GET /api/observability/models/<project>/runtime-metrics/`; snapshot realtime, không có lịch sử |
 | Delete project | `DELETE /api/models/<project>/`; async hard cleanup, lỗi giữ `delete_failed` để retry |
@@ -74,7 +75,7 @@ Nếu stack local đã có hai container metric cũ, kiểm kê rồi dừng/xó
 3. Sửa Preview trong lúc Running: Code/Data vẫn là snapshot cũ; deploy bản mới thành công mới chuyển.
 4. Training project chưa artifact → Set as Reference → training → Build → Register → Deploy; đổi/xóa workspace không làm đổi input retry.
 5. Deployment lỗi: runtime cũ còn phục vụ; registration/cleanup lỗi có thể retry.
-6. Drift dùng reference của version hoặc CSV riêng → Evidently hoàn tất → report mở được; lịch sử version cũ còn nguyên.
+6. Drift dùng reference của version; nếu thiếu, upload CSV để bổ sung một lần vào version và tạo bản sao riêng cho monitor → Evidently hoàn tất → report mở được; Preview và lịch sử version cũ còn nguyên.
 7. CPU/RAM/RPS có mẫu realtime thật, không lẫn deployment; mất Docker/Redis hiển thị thiếu dữ liệu; F5/đổi deployment bắt đầu cửa sổ mới.
 8. Hard delete chỉ dọn runtime/job/image/object/cache/DB của project chọn; project khác không bị ảnh hưởng.
 9. F5/deep link/Header/dirty form; light/dark, keyboard và mobile/tablet/desktop.

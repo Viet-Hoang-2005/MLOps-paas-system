@@ -1,11 +1,15 @@
 from apps.production.models import PredictionRecord
+from django.shortcuts import get_object_or_404
 
 
-def latest_production_data(project, limit=None, **_ignored):
+def latest_production_data(project, limit=100, version_id=None):
     """Return the six stable frontend fields from the owned production table."""
     records = (
         PredictionRecord.objects.filter(project=project).select_related("model_version").order_by("-observed_at", "-id")
     )
+    if version_id is not None:
+        version = get_object_or_404(project.versions, public_id=version_id)
+        records = records.filter(model_version=version)
     if limit is not None:
         records = records[:limit]
     return [

@@ -86,10 +86,10 @@ export function useRunDriftMonitoringJob() {
   });
 }
 
-export function useProductionData(modelId?: string) {
+export function useProductionData(modelId?: string, versionId?: string) {
   return useQuery({
-    queryKey: driftQueryKeys.productionData(modelId ?? ""),
-    queryFn: () => listProductionData(modelId!, 100),
+    queryKey: driftQueryKeys.productionData(modelId ?? "", versionId, 100),
+    queryFn: () => listProductionData(modelId!, 100, versionId),
     enabled: Boolean(modelId),
   });
 }

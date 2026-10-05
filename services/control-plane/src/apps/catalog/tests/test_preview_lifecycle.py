@@ -196,7 +196,7 @@ def test_running_handoff_disables_old_monitor_and_stops_old_after_commit(
     assert stopped == [str(old.public_id)]
 
 
-def test_monitor_csv_is_private_snapshot_not_version_mutation(project):
+def test_monitor_csv_fills_missing_version_reference_but_not_preview(project):
     deployment = running(project)
     storage = MemoryStorage()
     monitor = create_monitor(
@@ -209,7 +209,9 @@ def test_monitor_csv_is_private_snapshot_not_version_mutation(project):
         storage=storage,
     )
     assert storage.read(monitor.reference_uri) == b"a\n1\n"
-    assert not deployment.version.artifacts.filter(kind="reference_data").exists()
+    artifact = deployment.version.artifacts.get(kind="reference_data")
+    assert storage.read(artifact.uri) == b"a\n1\n"
+    assert artifact.uri != monitor.reference_uri
     assert not project.preview.assets.exists()
 
 

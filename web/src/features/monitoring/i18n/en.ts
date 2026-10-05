@@ -3,7 +3,7 @@ export const driftEn = {
   leaveHint: "Leave and discard this monitor configuration?",
   selectProject: "Select a Running model project",
   referenceSnapshotHint:
-    "The reference is frozen for this monitor. It does not modify Preview or the registered version.",
+    "If the Running version has no reference CSV, upload one here. Saving adds it to that version in Evolution and freezes a separate copy for this monitor. Preview is unchanged.",
   usingVersionReference: "Using the Running version's reference snapshot.",
   runningDriftOnly:
     "Data drift only. Archived monitors retain their version history; create a new monitor after changing Running.",
@@ -43,6 +43,12 @@ export const driftEn = {
     "Are you sure you want to delete this configuration? This action cannot be undone.",
   deleteConfirm: "Delete",
   createPage: {
+    invalidReference: "Upload a nonempty CSV file, at most 10 MiB.",
+    referenceUploadHint:
+      "UTF-8 CSV with a header and data rows, at most 10 MiB.",
+    monitorReferenceLocked:
+      "This monitor's reference snapshot cannot be replaced.",
+    previewLoadFailed: "Unable to load the CSV preview.",
     editTitle: "Edit drift monitor",
     createTitle: "Create drift monitor",
     back: "Back to drift monitoring",
@@ -51,12 +57,12 @@ export const driftEn = {
       "Select or upload a baseline CSV file to use when detecting data drift.",
     referenceData: "Reference data",
     setReference: "Set as reference",
-    thresholdTitle: "Set the trigger threshold",
+    thresholdTitle: "Set the trigger threshold (Records)",
     thresholdDescription:
       "Choose how many new production predictions must be logged before an automatic drift check starts.",
     previewTitle: "Production data preview",
     previewDescription:
-      "Preview the latest 100 production records that will be used in future drift reports.",
+      "Preview up to 100 of the latest production records for this model version. Fewer rows are shown if fewer are available.",
     loadingProduction: "Loading production data…",
     productionLoadFailed: "Unable to load production data.",
     productionEmpty: "No production data is available yet.",

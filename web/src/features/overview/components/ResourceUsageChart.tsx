@@ -75,25 +75,17 @@ export function ResourceUsageChart({
               className="flex flex-col justify-between rounded-surface border border-border bg-muted/20 p-4"
             >
               <div>
-                <h4 className="text-style-body-strong text-color-foreground">
+                <h4 className="text-style-heading text-color-foreground">
                   {t(`workflow.metric_${key}`)}
                 </h4>
-                {available ? (
-                  <p className="text-style-metric text-color-foreground">
-                    {formatNumber(Number(current), i18n.language, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </p>
-                ) : (
-                  <p className="text-style-body text-color-muted-foreground">
-                    {t(
-                      metrics.isError || metrics.data?.status === "unavailable"
-                        ? "workflow.unavailable"
-                        : "workflow.noData",
-                    )}
-                  </p>
-                )}
+                <p className="text-style-metric text-color-foreground">
+                  {available
+                    ? formatNumber(Number(current), i18n.language, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    : "–"}
+                </p>
               </div>
 
               <div className="mt-4">

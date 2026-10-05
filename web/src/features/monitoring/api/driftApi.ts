@@ -1,6 +1,7 @@
 import { apiClient } from "@/shared/api/client";
 import { controlPlaneURL } from "@/shared/api/config";
 import { fetchAllPages } from "@/shared/api/pagination";
+import { downloadText } from "@/shared/api/files";
 import type {
   DriftMonitoringJob,
   DriftMonitoringResult,
@@ -11,13 +12,25 @@ import type {
 export const listProductionData = async (
   projectId: string,
   limit?: number,
+  versionId?: string,
 ): Promise<ProductionDataRecord[]> =>
   (
     await apiClient.get<ProductionDataRecord[]>(
       controlPlaneURL(`/models/${projectId}/production-data/`),
-      { params: limit === undefined ? undefined : { limit } },
+      { params: { limit: limit ?? 100, version_id: versionId } },
     )
   ).data;
+
+export const getMonitorReferenceText = async (
+  id: string,
+  signal?: AbortSignal,
+): Promise<string> => {
+  const { data } = await apiClient.get<{ url: string }>(
+    controlPlaneURL(`/drift-monitors/${id}/reference-url/`),
+    { signal },
+  );
+  return downloadText(data.url, signal);
+};
 
 export const listDriftMonitoringJobs = async (
   modelId: string,

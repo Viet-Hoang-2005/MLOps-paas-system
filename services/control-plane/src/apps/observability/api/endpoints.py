@@ -75,5 +75,6 @@ class ProductionDataEndpoint(APIView):
             latest_production_data(
                 project,
                 limit=serializer.validated_data.get("limit"),
+                version_id=serializer.validated_data.get("version_id"),
             )
         )
