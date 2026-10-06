@@ -43,7 +43,7 @@ export function CodeDataFields({
         onChange={(file) => setField("source_code_file", file)}
       />
       <FileDropzone
-        accept=".zip,.csv,.parquet"
+        accept=".csv"
         disabled={readOnly}
         title={
           form.reference_data_file?.name ||

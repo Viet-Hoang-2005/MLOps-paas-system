@@ -54,6 +54,25 @@ def test_add_supplemental_source_code_allowed_when_source_artifact_present(versi
 
 
 @pytest.mark.django_db
+def test_add_supplemental_reference_csv(version_with_model_source):
+    _, version, user = version_with_model_source
+    storage = MemoryStorage()
+    csv_file = SimpleUploadedFile("reference.csv", b"feature,label\n1,normal\n", "text/csv")
+
+    updated_version = add_supplemental_artifacts(
+        version=version,
+        actor=user,
+        reference_data_file=csv_file,
+        storage=storage,
+    )
+
+    artifact = updated_version.artifacts.get(kind="reference_data")
+    assert artifact.name == "reference.csv"
+    assert artifact.metadata["format"] == "csv"
+    assert storage.objects[artifact.uri] == b"feature,label\n1,normal\n"
+
+
+@pytest.mark.django_db
 def test_add_supplemental_artifact_cleans_up_storage_on_failure(version_with_model_source):
     project, version, user = version_with_model_source
     storage = MemoryStorage()

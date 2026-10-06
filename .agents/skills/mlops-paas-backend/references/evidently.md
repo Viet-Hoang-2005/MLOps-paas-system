@@ -9,7 +9,7 @@ The Evidently runner (`services/evidently/`) performs statistical data and predi
    - Queries production inference records via `DB_HOST_RO` using a read-only database user.
    - Never writes or executes DDL on the primary database.
 3. **Data Preparation & Guard Checks:**
-   - Downloads reference dataset from S3 (`REFERENCE_DATA_URL`) supporting CSV and Parquet.
+   - Downloads reference dataset from S3 (`REFERENCE_DATA_URL`) supporting CSV.
    - Queries up to `MAX_SAMPLES` production observations from `production_predictionrecord`.
    - If production samples are below `MIN_SAMPLES` (default: 100), reports controlled `insufficient_samples` status without crashing.
    - Flattens JSONB `features` into clean tabular data and derives `ColumnMapping` matching MLflow Model Signatures.

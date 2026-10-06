@@ -188,7 +188,7 @@ export const deployEn = {
       sourceCode: "Choose source code",
       sourceHint: "Optional .py or .zip",
       referenceData: "Choose reference data",
-      referenceHint: "Optional .csv, .parquet, or .zip",
+      referenceHint: "Optional .csv",
     },
     build: {
       flavorTitle: "Framework flavor",

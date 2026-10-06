@@ -1,11 +1,10 @@
 pydantic==1.10.13
 evidently==0.4.15
 numpy<2.0.0
-pandas[parquet]==2.0.3
+pandas==2.0.3
 sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 requests>=2.32.0
 python-dotenv==1.0.1
 redis==5.0.3
-pyarrow==15.0.2
 mlflow==2.13.2

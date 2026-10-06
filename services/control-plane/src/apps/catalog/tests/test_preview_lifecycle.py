@@ -39,8 +39,11 @@ class MemoryStorage:
             raise RuntimeError("storage unavailable")
         return self.put(key, SimpleUploadedFile(key, self.objects[uri]), "application/octet-stream")
 
-    def read(self, uri):
-        return self.objects[uri]
+    def read(self, uri, max_bytes=4 * 1024 * 1024):
+        value = self.objects[uri]
+        if len(value) > max_bytes:
+            raise ValueError("Object exceeds the allowed read size.")
+        return value
 
     @staticmethod
     def parse_uri(uri):

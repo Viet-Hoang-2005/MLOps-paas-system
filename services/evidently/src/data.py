@@ -13,8 +13,7 @@ def load_reference_data(reference_url, model_version_id, temp_root, requests_mod
     if not reference_url:
         raise ValueError("REFERENCE_DATA_URL is not provided")
 
-    is_csv = urlparse(reference_url).path.lower().endswith(".csv")
-    local_filename = str(temp_root / f"reference_{model_version_id}.{'csv' if is_csv else 'parquet'}")
+    local_filename = str(temp_root / f"reference_{model_version_id}.csv")
     if reference_url.startswith("http"):
         detail("[2/4] Downloading reference data from presigned URL...")
         response = requests_module.get(reference_url)
@@ -25,11 +24,7 @@ def load_reference_data(reference_url, model_version_id, temp_root, requests_mod
     else:
         local_filename = reference_url
 
-    frame = (
-        pandas_module.read_csv(local_filename)
-        if local_filename.endswith(".csv")
-        else pandas_module.read_parquet(local_filename)
-    )
+    frame = pandas_module.read_csv(local_filename)
     detail(f"-> Reference data loaded: {len(frame)} rows")
     return frame
 

@@ -52,7 +52,7 @@ export const evolutionVi = {
     uploadSourceHint: "Tải lên script Python chính (.py, tối đa 5 MB).",
     addReferenceData: "Bổ sung dữ liệu tham chiếu",
     uploadRefHint:
-      "Tải lên dữ liệu tham chiếu dạng bảng (.csv hoặc .parquet, tối đa 100 MB).",
+      "Tải lên dữ liệu tham chiếu dạng bảng (.csv, tối đa 100 MB).",
     previewDataset: "Xem trước dữ liệu tham chiếu",
     previewDatasetTitle: "Xem trước dữ liệu ({{name}})",
     immutableBadge: "Bất biến",
@@ -66,11 +66,11 @@ export const evolutionVi = {
     formatErrorSource: "Chỉ hỗ trợ tệp .py cho mã nguồn.",
     sizeErrorRef: "Tệp dữ liệu tham chiếu phải nhỏ hơn 100 MB.",
     formatErrorRef:
-      "Chỉ hỗ trợ tệp .csv hoặc .parquet cho dữ liệu tham chiếu.",
+      "Chỉ hỗ trợ tệp .csv cho dữ liệu tham chiếu.",
     previewEmpty: "Không có dòng nào trong bản xem trước",
     clear: "Xóa chọn",
     selectSourceFile: "Chọn tệp .py",
-    selectRefFile: "Chọn tệp CSV / Parquet",
+    selectRefFile: "Chọn tệp CSV",
     status: "Trạng thái",
     formatLabel: "Định dạng:",
     nullValue: "null",

@@ -71,9 +71,6 @@ export function useDriftMonitorForm(
     queryKey: driftQueryKeys.uploadPreview(upload?.id ?? ""),
     queryFn: async () => {
       if (!reference) return "";
-      if (reference.name.toLowerCase().endsWith(".parquet")) {
-        return "PARQUET_PREVIEW";
-      }
       return await reference.text();
     },
     enabled: Boolean(reference),
@@ -166,7 +163,7 @@ export function useDriftMonitorForm(
       if (!file) return;
       const lower = file.name.toLowerCase();
       if (
-        (!lower.endsWith(".csv") && !lower.endsWith(".parquet")) ||
+        !lower.endsWith(".csv") ||
         !file.size ||
         file.size > MAX_REFERENCE_BYTES
       ) {

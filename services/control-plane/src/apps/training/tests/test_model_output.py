@@ -74,7 +74,7 @@ def test_get_and_patch_model_output_flow(completed_training_job, monkeypatch):
 
     job.refresh_from_db()
     assert job.output_revision == 2
-    assert job.entry_point == "custom.py"
+    assert job.entry_point == "train.py"
 
     # 3. GET reference preview
     prev_res = client.get(f"/api/training-jobs/{job.public_id}/reference-preview/")
@@ -94,3 +94,32 @@ def test_get_and_patch_model_output_flow(completed_training_job, monkeypatch):
     )
     assert conflict_res.status_code == 409
 
+
+@pytest.mark.django_db
+def test_model_output_mutation_requires_valid_revision(completed_training_job, monkeypatch):
+    _, job, user = completed_training_job
+    storage = MemoryStorage()
+    monkeypatch.setattr("apps.training.services.outputs.S3Storage", lambda: storage)
+    client = APIClient()
+    client.force_authenticate(user)
+
+    missing = client.patch(
+        f"/api/training-jobs/{job.public_id}/model-output/",
+        {"source_code_file": SimpleUploadedFile("main.py", b"print(1)\n", "text/x-python")},
+        format="multipart",
+    )
+    invalid = client.patch(
+        f"/api/training-jobs/{job.public_id}/model-output/",
+        {
+            "output_revision": "not-a-number",
+            "source_code_file": SimpleUploadedFile("main.py", b"print(1)\n", "text/x-python"),
+        },
+        format="multipart",
+    )
+
+    assert missing.status_code == 400
+    assert invalid.status_code == 400
+    job.refresh_from_db()
+    assert job.output_revision == 1
+    assert job.entry_point == "train.py"
+    assert not job.outputs.filter(kind="source_code").exists()

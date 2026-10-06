@@ -11,6 +11,7 @@ from apps.catalog.artifact_types import validate_source_artifact
 from apps.catalog.models import ModelPreview, PreviewAsset
 from common.api.exceptions import Conflict
 from common.validation.artifacts import (
+    MAX_REFERENCE_DATA_BYTES,
     parse_reference_preview,
     validate_reference_data_file,
     validate_source_code_file,
@@ -47,8 +48,8 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
             validate_source_code_file(uploaded["source_code"])
 
         if "reference_data" in uploaded:
-            _, fmt = validate_reference_data_file(uploaded["reference_data"])
-            uploaded["reference_data"].content_type = "text/csv" if fmt == "csv" else "application/vnd.apache.parquet"
+            validate_reference_data_file(uploaded["reference_data"])
+            uploaded["reference_data"].content_type = "text/csv"
 
         if "label_mapping" in uploaded and Path(uploaded["label_mapping"].name).suffix.lower() not in {".json", ".pkl"}:
             raise ValidationError({"label_mapping_file": "Unsupported file format."})
@@ -125,9 +126,8 @@ def get_preview_reference_preview(project, storage=None) -> dict:
     if not asset or not asset.s3_uri:
         raise ValidationError({"reference_data": "This project preview does not have a reference dataset."})
     try:
-        raw = storage.read(asset.s3_uri)
+        raw = storage.read(asset.s3_uri, max_bytes=MAX_REFERENCE_DATA_BYTES)
     except Exception as exc:
         raise ValidationError({"reference_data": "Could not read reference data from storage."}) from exc
 
     return parse_reference_preview(raw, asset.name, max_rows=100)
-

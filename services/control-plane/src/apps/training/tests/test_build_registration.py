@@ -104,6 +104,22 @@ def test_training_build_requires_completed_output():
 
 
 @pytest.mark.django_db
+def test_training_build_api_requires_valid_output_revision():
+    job = completed_job("training-build-revision@example.com")
+    client = APIClient()
+    client.force_authenticate(job.project.owner)
+
+    missing = client.post(f"/api/training-jobs/{job.public_id}/build/", {}, format="json")
+    invalid = client.post(
+        f"/api/training-jobs/{job.public_id}/build/", {"output_revision": "invalid"}, format="json"
+    )
+
+    assert missing.status_code == 400
+    assert invalid.status_code == 400
+    assert not job.builds.exists()
+
+
+@pytest.mark.django_db
 def test_successful_training_build_creates_one_version_with_summaries():
     job = completed_job("training-register@example.com")
     build = Build.objects.create(

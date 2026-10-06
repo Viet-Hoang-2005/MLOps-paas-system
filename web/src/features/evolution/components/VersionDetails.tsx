@@ -127,7 +127,7 @@ export function VersionDetails({
     if (!file) return;
 
     const lower = file.name.toLowerCase();
-    if (!lower.endsWith(".csv") && !lower.endsWith(".parquet")) {
+    if (!lower.endsWith(".csv")) {
       toast.error(t("workspace.formatErrorRef"));
       e.target.value = "";
       return;
@@ -303,7 +303,7 @@ export function VersionDetails({
                 <input
                   type="file"
                   ref={refFileInputRef}
-                  accept=".csv,.parquet"
+                  accept=".csv"
                   className="hidden"
                   onChange={handleRefFileSelect}
                 />

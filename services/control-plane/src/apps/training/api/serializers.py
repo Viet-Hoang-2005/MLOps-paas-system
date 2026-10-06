@@ -31,6 +31,10 @@ class TrainingJobEventSerializer(serializers.ModelSerializer):
         fields = ("id", "event_type", "message", "metadata", "created_at")
 
 
+class TrainingJobBuildRequestSerializer(serializers.Serializer):
+    output_revision = serializers.IntegerField(min_value=1)
+
+
 class TrainingJobSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="public_id", read_only=True)
     project_id = serializers.UUIDField(source="project.public_id", read_only=True)
@@ -180,4 +184,3 @@ class TrainingBuildSerializer(serializers.Serializer):
     @staticmethod
     def get_source_job_id(instance):
         return instance.source_job_reference or (instance.source_job.public_id if instance.source_job_id else None)
-

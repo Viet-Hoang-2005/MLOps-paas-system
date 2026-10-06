@@ -8,6 +8,7 @@ from apps.deployment.models import Build
 from apps.deployment.services.builds import request_training_build
 from apps.observability.services.lifecycle import events_for_aggregate
 from apps.training.selectors import job_for_user, jobs_for_user
+from apps.training.api.serializers import TrainingJobBuildRequestSerializer
 from apps.training.services.jobs import (
     cancel_job,
     create_job,
@@ -132,9 +133,12 @@ class TrainingJobDownloadEndpoint(APIView):
 
 class TrainingJobBuildEndpoint(APIView):
     def post(self, request, job_id):
+        job = job_for_user(request.user, job_id)
+        request_serializer = TrainingJobBuildRequestSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
         build, created = request_training_build(
-            job=job_for_user(request.user, job_id),
-            output_revision=request.data.get("output_revision"),
+            job=job,
+            output_revision=request_serializer.validated_data["output_revision"],
             backend=settings.BUILD_BACKEND,
         )
         response_status = status.HTTP_201_CREATED if created else status.HTTP_200_OK

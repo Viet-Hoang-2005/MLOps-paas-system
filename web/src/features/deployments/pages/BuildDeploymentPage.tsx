@@ -242,7 +242,7 @@ function BuildDeploymentContent() {
       buildId
         ? rebuildById(buildId)
         : source === "training"
-          ? buildTraining(jobId, selectedJob?.output_revision)
+          ? buildTraining(jobId, selectedJob!.output_revision)
           : buildPreview(activeProjectId, preview.data!.revision),
     onSuccess: (result) => {
       client.setQueryData(deploymentFlowKeys.build(result.id), result);

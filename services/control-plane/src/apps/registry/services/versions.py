@@ -6,6 +6,7 @@ from rest_framework.exceptions import ValidationError
 from apps.observability.services.lifecycle import record_registry_event
 from apps.observability.services.outbox import enqueue_event
 from apps.registry.models import ModelArtifact, ModelMetric, ModelVersion
+from common.validation.artifacts import MAX_REFERENCE_DATA_BYTES
 from infrastructure.execution.image_references import repository_from_reference
 from infrastructure.execution.image_registry import image_registry_for
 from infrastructure.storage import S3Storage
@@ -265,8 +266,8 @@ def add_supplemental_artifacts(*, version, actor, source_code_file=None, referen
             if reference_data_file:
                 if version.artifacts.filter(kind="reference_data").exists():
                     raise Conflict("This version already has a reference data artifact and cannot be replaced.")
-                filename, fmt = validate_reference_data_file(reference_data_file)
-                content_type = "text/csv" if fmt == "csv" else "application/vnd.apache.parquet"
+                filename, _ = validate_reference_data_file(reference_data_file)
+                content_type = "text/csv"
                 key = f"{prefix}/artifacts/supplemental/reference/{filename}"
                 stored = storage.put(key, reference_data_file, content_type)
                 uploaded_uris.append(stored.uri)
@@ -280,7 +281,7 @@ def add_supplemental_artifacts(*, version, actor, source_code_file=None, referen
                     content_type=content_type,
                     metadata={
                         "provenance": "supplemental_upload",
-                        "format": fmt,
+                        "format": "csv",
                         "uploaded_by": getattr(actor, "username", "system"),
                         "uploaded_at": timezone.now().isoformat(),
                     },
@@ -290,7 +291,7 @@ def add_supplemental_artifacts(*, version, actor, source_code_file=None, referen
                     actor=actor,
                     event_type="artifact_added",
                     message=f"Added supplemental reference data {filename}",
-                    metadata={"kind": "reference_data", "name": filename, "format": fmt},
+                    metadata={"kind": "reference_data", "name": filename, "format": "csv"},
                 )
     except Exception:
         for uri in uploaded_uris:
@@ -311,7 +312,7 @@ def get_version_reference_preview(version, storage=None) -> dict:
     if not artifact or not artifact.uri:
         raise ValidationError({"reference_data": "This version does not have a reference dataset."})
     try:
-        raw = storage.read(artifact.uri)
+        raw = storage.read(artifact.uri, max_bytes=MAX_REFERENCE_DATA_BYTES)
     except Exception as exc:
         raise ValidationError({"reference_data": "Could not read reference data from storage."}) from exc
 

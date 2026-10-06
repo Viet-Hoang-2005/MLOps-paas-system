@@ -53,7 +53,7 @@ export const registryEn = {
     uploadSourceHint: "Upload a main Python script (.py, max 5 MB).",
     addReferenceData: "Add Supplemental Reference Data",
     uploadRefHint:
-      "Upload reference tabular dataset (.csv or .parquet, max 100 MB).",
+      "Upload reference tabular dataset (.csv, max 100 MB).",
     previewDataset: "Preview Reference Dataset",
     previewDatasetTitle: "Preview Dataset ({{name}})",
     immutableBadge: "Immutable",
@@ -67,11 +67,11 @@ export const registryEn = {
     formatErrorSource: "Only .py files are supported for source code.",
     sizeErrorRef: "Reference data file must be smaller than 100 MB.",
     formatErrorRef:
-      "Only .csv or .parquet files are supported for reference data.",
+      "Only .csv files are supported for reference data.",
     previewEmpty: "No rows available in preview",
     clear: "Clear",
     selectSourceFile: "Select .py file",
-    selectRefFile: "Select CSV / Parquet",
+    selectRefFile: "Select CSV file",
     status: "Status",
     formatLabel: "Format:",
     nullValue: "null",

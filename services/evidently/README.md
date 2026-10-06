@@ -64,7 +64,7 @@ Sau khi một mô hình học máy được triển khai lên môi trường s�
 |---|---|
 | **`src/main.py`** | Entrypoint mỏng khởi chạy ứng dụng và xử lý mã lỗi thoát an toàn. |
 | **`src/application.py`** | Điều phối toàn bộ vòng đời phiên phân tích trôi dạt (`main`): kiểm tra tham số môi trường, phối hợp các module tải dữ liệu, phân tích, xuất báo cáo và gửi webhook callback. |
-| **`src/data.py`** | Tầng truy xuất và chuẩn hóa dữ liệu: tải dataset tham chiếu từ S3 (hỗ trợ CSV và Parquet), truy vấn bản ghi suy luận từ cơ sở dữ liệu PostgreSQL, làm phẳng cấu trúc `features` JSONB và đính kèm cột `prediction`. |
+| **`src/data.py`** | Tầng truy xuất và chuẩn hóa dữ liệu: tải dataset tham chiếu từ S3 (hỗ trợ CSV), truy vấn bản ghi suy luận từ cơ sở dữ liệu PostgreSQL, làm phẳng cấu trúc `features` JSONB và đính kèm cột `prediction`. |
 | **`src/analysis.py`** | Nhân phân tích thống kê: cấu hình `ColumnMapping`, áp dụng `DataDriftPreset` của Evidently AI, tính toán số lượng đặc trưng trôi dạt và tỷ lệ `drift_share`. |
 | **`src/reporting.py`** | Tầng sinh và xuất bản báo cáo: tạo file HTML tương tác, xuất dữ liệu JSON chi tiết và tóm tắt JSON, thực hiện upload lên S3 qua Presigned PUT URLs. |
 | **`src/config.py`** | Quản lý các biến môi trường, ngưỡng `DRIFT_THRESHOLD` (mặc định: `0.6`), giới hạn số lượng mẫu (`MIN_SAMPLES`, `MAX_SAMPLES`). |
@@ -78,7 +78,7 @@ Sau khi một mô hình học máy được triển khai lên môi trường s�
    - Dịch vụ khởi động, đọc bộ 4 định danh: `TENANT_ID`, `PROJECT_ID`, `MODEL_VERSION_ID`, `DRIFT_RUN_ID`.
    - Kết nối tới Redis để sẵn sàng stream log thời gian thực (`drift_logs:{run_id}`).
 2. **Nạp và Chuẩn bị Dữ liệu:**
-   - **Dữ liệu tham chiếu (Reference Data):** Tải file từ `REFERENCE_DATA_URL` (hỗ trợ CSV/Parquet) về thư mục tạm, chuyển đổi thành Pandas DataFrame.
+   - **Dữ liệu tham chiếu (Reference Data):** Tải file từ `REFERENCE_DATA_URL` (hỗ trợ CSV) về thư mục tạm, chuyển đổi thành Pandas DataFrame.
    - **Dữ liệu sản xuất (Current Data):** Kết nối tới PostgreSQL thông qua tài khoản Read-Only (`DB_HOST_RO`), truy vấn tối đa `MAX_SAMPLES` bản ghi suy luận gần nhất của `model_version_id`.
 3. **Kiểm tra Điều kiện Tiên quyết (Guard Checks):**
    - Nếu số lượng bản ghi sản xuất thu thập được nhỏ hơn `MIN_SAMPLES` (mặc định 100 mẫu), hệ thống đánh dấu trạng thái `insufficient_samples` một cách có kiểm soát và báo cáo về Control Plane, không làm sập tiến trình.

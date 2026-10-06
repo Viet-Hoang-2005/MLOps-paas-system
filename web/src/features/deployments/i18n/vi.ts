@@ -193,7 +193,7 @@ export const deploymentsVi = {
       sourceCode: "Chọn mã nguồn",
       sourceHint: "Không bắt buộc: .py hoặc .zip",
       referenceData: "Chọn dữ liệu tham chiếu",
-      referenceHint: "Không bắt buộc: .csv, .parquet hoặc .zip",
+      referenceHint: "Không bắt buộc: .csv",
     },
     build: {
       flavorTitle: "Framework mô hình",

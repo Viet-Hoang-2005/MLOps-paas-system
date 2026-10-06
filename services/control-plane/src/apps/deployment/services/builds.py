@@ -8,6 +8,7 @@ from apps.catalog.models import ModelPreview
 from apps.deployment.models import Build, BuildInputAsset
 from apps.deployment.tasks import cancel_build, execute_build
 from common.api.exceptions import Conflict
+from common.validation.revisions import validate_output_revision
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import build_input_prefix, build_prefix
 
@@ -25,7 +26,8 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
             raise ValidationError({"job": "Training must complete successfully before it can be registered."})
         if job.outputs_purged_at is not None:
             raise ValidationError({"job": "Training outputs have been deleted."})
-        if output_revision is not None and int(output_revision) != job.output_revision:
+        expected_revision = validate_output_revision(output_revision, required=False)
+        if expected_revision is not None and expected_revision != job.output_revision:
             raise Conflict("Training output changed in another session. Reload before building.")
 
         existing = job.builds.filter(status__in=("pending", "queued", "building")).first()

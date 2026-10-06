@@ -230,7 +230,7 @@ export default function TrainingJobArtifactsPage() {
     if (!file) return;
 
     const lower = file.name.toLowerCase();
-    if (!lower.endsWith(".csv") && !lower.endsWith(".parquet")) {
+    if (!lower.endsWith(".csv")) {
       toast.error(t("detail.artifactPage.formatErrorRef"));
       e.target.value = "";
       return;
@@ -744,7 +744,7 @@ export default function TrainingJobArtifactsPage() {
             <input
               type="file"
               ref={refFileInputRef}
-              accept=".csv,.parquet"
+              accept=".csv"
               className="hidden"
               onChange={handleRefFileChange}
             />

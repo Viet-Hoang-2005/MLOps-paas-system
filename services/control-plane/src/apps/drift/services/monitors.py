@@ -8,6 +8,7 @@ from apps.drift.models import DriftMonitor
 from apps.registry.models import ModelArtifact, ModelVersion
 from common.api.exceptions import Conflict
 from common.validation.artifacts import (
+    MAX_REFERENCE_DATA_BYTES,
     parse_reference_preview,
     validate_reference_data_file,
 )
@@ -43,7 +44,7 @@ def get_monitor_reference_preview(monitor, storage=None) -> dict:
     if not monitor.reference_uri:
         raise ValidationError({"reference_file": "This monitor does not have a reference snapshot."})
     try:
-        raw = storage.read(monitor.reference_uri)
+        raw = storage.read(monitor.reference_uri, max_bytes=MAX_REFERENCE_DATA_BYTES)
     except Exception as exc:
         raise ValidationError({"reference_file": "Could not read reference data from storage."}) from exc
     return parse_reference_preview(raw, monitor.reference_name or "reference.csv", max_rows=100)
@@ -75,8 +76,8 @@ def create_monitor(*, data, backend, storage=None):
             if upload and artifact:
                 raise Conflict("This version already has reference data. It cannot be replaced from monitoring.")
             if upload:
-                name, fmt = validate_reference_data_file(upload)
-                content_type = "text/csv" if fmt == "csv" else "application/vnd.apache.parquet"
+                name, _ = validate_reference_data_file(upload)
+                content_type = "text/csv"
                 key = (
                     f"{version_prefix(project.owner.tenant_id, project.public_id, version.public_id)}"
                     f"/artifacts/reference_data/{public_id}/{name}"
@@ -91,10 +92,10 @@ def create_monitor(*, data, backend, storage=None):
                     checksum=stored.checksum,
                     size_bytes=stored.size_bytes,
                     content_type=content_type,
-                    metadata={"source": "drift_monitor", "monitor_id": str(public_id), "format": fmt},
+                    metadata={"source": "drift_monitor", "monitor_id": str(public_id), "format": "csv"},
                 )
             if not artifact:
-                raise ValidationError({"reference_file": "A reference CSV or Parquet file is required."})
+                raise ValidationError({"reference_file": "A reference CSV file is required."})
             name = artifact.name
             key = f"{project_prefix(project.owner.tenant_id, project.public_id)}/drift/{public_id}/reference/{name}"
             stored = storage.copy(artifact.uri, key)
@@ -106,4 +107,3 @@ def create_monitor(*, data, backend, storage=None):
         for uri in reversed(written):
             storage.delete(uri)
         raise
-

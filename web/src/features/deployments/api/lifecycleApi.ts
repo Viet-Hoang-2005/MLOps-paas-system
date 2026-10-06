@@ -15,12 +15,12 @@ export async function buildPreview(
 }
 export async function buildTraining(
   jobId: string,
-  outputRevision?: number,
+  outputRevision: number,
 ): Promise<Build> {
   return (
     await apiClient.post<Build>(
       controlPlaneURL(`/training-jobs/${jobId}/build/`),
-      outputRevision !== undefined ? { output_revision: outputRevision } : {},
+      { output_revision: outputRevision },
     )
   ).data;
 }

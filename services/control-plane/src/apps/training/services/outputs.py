@@ -11,10 +11,12 @@ from apps.observability.services.lifecycle import record_training_event
 from apps.training.models import TrainingJob, TrainingOutput
 from common.api.exceptions import Conflict
 from common.validation.artifacts import (
+    MAX_REFERENCE_DATA_BYTES,
     parse_reference_preview,
     validate_reference_data_file,
     validate_source_code_file,
 )
+from common.validation.revisions import validate_output_revision
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import training_output_prefix
 
@@ -120,13 +122,9 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
             if job.outputs_purged_at:
                 raise Conflict("Outputs for this training job have been purged.")
 
-            expected_revision = data.get("output_revision")
-            if expected_revision is not None:
-                try:
-                    if int(expected_revision) != job.output_revision:
-                        raise Conflict("Revision conflict. Please reload latest outputs before saving.")
-                except (ValueError, TypeError):
-                    raise Conflict("Invalid output revision format.")
+            expected_revision = validate_output_revision(data.get("output_revision"))
+            if expected_revision != job.output_revision:
+                raise Conflict("Revision conflict. Please reload latest outputs before saving.")
 
             remove_assets = data.get("remove_assets") or []
             if isinstance(remove_assets, str):
@@ -185,12 +183,11 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
                         "updated_at": timezone.now().isoformat(),
                     },
                 )
-                job.entry_point = filename
 
             # Reference data mutation
             if reference_data_file:
-                filename, fmt = validate_reference_data_file(reference_data_file)
-                content_type = "text/csv" if fmt == "csv" else "application/vnd.apache.parquet"
+                filename, _ = validate_reference_data_file(reference_data_file)
+                content_type = "text/csv"
                 key = f"{out_prefix}supplemental/reference/{uuid.uuid4().hex[:8]}_{filename}"
                 stored = storage.put(key, reference_data_file, content_type)
                 new_uploaded_uris.append(stored.uri)
@@ -210,14 +207,14 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
                     size_bytes=stored.size_bytes,
                     content_type=content_type,
                     metadata={
-                        "format": fmt,
+                        "format": "csv",
                         "updated_by": getattr(user, "username", getattr(user, "email", "system")),
                         "updated_at": timezone.now().isoformat(),
                     },
                 )
 
             job.output_revision += 1
-            job.save(update_fields=["output_revision", "entry_point", "updated_at"])
+            job.save(update_fields=["output_revision", "updated_at"])
 
             record_training_event(
                 job=job,
@@ -251,9 +248,8 @@ def get_job_reference_preview(job: TrainingJob, storage=None) -> dict[str, Any]:
     if not ref_output or not ref_output.s3_uri:
         raise ValidationError({"reference_data": "This training job does not have a reference dataset."})
     try:
-        raw = storage.read(ref_output.s3_uri)
+        raw = storage.read(ref_output.s3_uri, max_bytes=MAX_REFERENCE_DATA_BYTES)
     except Exception as exc:
         raise ValidationError({"reference_data": "Could not read reference data from storage."}) from exc
 
     return parse_reference_preview(raw, ref_output.relative_path, max_rows=100)
-

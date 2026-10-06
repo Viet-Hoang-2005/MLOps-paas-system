@@ -43,9 +43,9 @@ export const driftEn = {
     "Are you sure you want to delete this configuration? This action cannot be undone.",
   deleteConfirm: "Delete",
   createPage: {
-    invalidReference: "Upload a nonempty CSV or Parquet file, at most 100 MB.",
+    invalidReference: "Upload a nonempty CSV file, at most 100 MB.",
     referenceUploadHint:
-      "CSV or Parquet tabular dataset with header, at most 100 MB.",
+      "CSV tabular dataset with header, at most 100 MB.",
     monitorReferenceLocked:
       "This monitor's reference snapshot cannot be replaced.",
     previewLoadFailed: "Unable to load the CSV preview.",
@@ -73,9 +73,6 @@ export const driftEn = {
     saving: "Saving…",
     update: "Update monitor",
     create: "Create monitor",
-    parquetStagedTitle: "Parquet Dataset Staged",
-    parquetStagedDesc:
-      "Binary Parquet file selected. Evidently AI will process and validate schema during drift run execution.",
   },
   reportPage: {
     missingRun: "No drift run was specified.",

@@ -228,7 +228,7 @@ export interface TrainingJobModelOutputSummary {
 
 export interface ReferenceDataPreview {
   filename: string;
-  format: "csv" | "parquet";
+  format: "csv";
   columns: string[];
   rows: Array<Array<string | number | boolean | null>>;
   total_rows: number;

@@ -84,7 +84,7 @@ export default function SourceTrainingJobPage() {
             defaultValue: "Training Data",
           })}
           icon={<Database className="h-4 w-4" />}
-          accept=".zip,.csv,.parquet"
+          accept=".zip,.csv"
           editorType="csv"
           onDirtyChange={(dirty) => flow.setEditorDirty("data", dirty)}
         />
