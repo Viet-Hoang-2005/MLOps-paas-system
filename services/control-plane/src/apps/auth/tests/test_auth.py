@@ -3,11 +3,19 @@ from urllib.parse import urlparse
 import jwt
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import OperationalError
 from django.core.files.base import ContentFile
 from django.test import override_settings
 from rest_framework.test import APIClient
 
 from apps.auth.services.oauth import _oauth_user, authenticate_github, authenticate_google
+
+
+def browser_auth_headers(origin="http://localhost:5173"):
+    return {
+        "HTTP_X_REQUESTED_WITH": "XMLHttpRequest",
+        "HTTP_ORIGIN": origin,
+    }
 
 
 class FakeResponse:
@@ -61,6 +69,7 @@ def test_token_contains_tenant_id_and_sets_cookie():
         "/api/auth/token/",
         {"email": user.email, "password": "password123"},
         format="json",
+        **browser_auth_headers(),
     )
 
     assert response.status_code == 200
@@ -83,6 +92,7 @@ def test_refreshed_access_token_via_cookie_keeps_gateway_claims():
         "/api/auth/token/",
         {"email": user.email, "password": "password123"},
         format="json",
+        **browser_auth_headers(),
     )
     assert issued.status_code == 200
     assert "refresh_token" in issued.cookies
@@ -101,12 +111,25 @@ def test_refreshed_access_token_via_cookie_keeps_gateway_claims():
     )
     assert rejected_bad_origin.status_code == 403
 
+    rejected_missing_origin = client.post(
+        "/api/auth/token/refresh/",
+        format="json",
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+    assert rejected_missing_origin.status_code == 403
+
+    rejected_missing_custom_header = client.post(
+        "/api/auth/token/refresh/",
+        format="json",
+        HTTP_ORIGIN="http://localhost:5173",
+    )
+    assert rejected_missing_custom_header.status_code == 403
+
     # 3. Valid refresh with cookie and header
     response = client.post(
         "/api/auth/token/refresh/",
         format="json",
-        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
-        HTTP_ORIGIN="http://localhost:5173",
+        **browser_auth_headers(),
     )
     assert response.status_code == 200
     assert "access" in response.data
@@ -126,6 +149,7 @@ def test_logout_blacklists_token_and_clears_cookie():
         "/api/auth/token/",
         {"email": user.email, "password": "password123"},
         format="json",
+        **browser_auth_headers(),
     )
     old_refresh = issued.cookies["refresh_token"].value
     client.cookies["refresh_token"] = old_refresh
@@ -138,7 +162,7 @@ def test_logout_blacklists_token_and_clears_cookie():
     logout_res = client.post(
         "/api/auth/logout/",
         format="json",
-        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        **browser_auth_headers(),
     )
     assert logout_res.status_code == 200
     assert logout_res.cookies["refresh_token"].value == ""
@@ -148,9 +172,20 @@ def test_logout_blacklists_token_and_clears_cookie():
     retry_refresh = client.post(
         "/api/auth/token/refresh/",
         format="json",
-        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        **browser_auth_headers(),
     )
     assert retry_refresh.status_code in (401, 403)
+
+
+@pytest.mark.django_db
+def test_logout_invalid_refresh_cookie_is_idempotent_and_cleared():
+    client = APIClient()
+    client.cookies["refresh_token"] = "not-a-valid-refresh-token"
+
+    response = client.post("/api/auth/logout/", format="json", **browser_auth_headers())
+
+    assert response.status_code == 200
+    assert response.cookies["refresh_token"].value == ""
 
 
 @pytest.mark.django_db
@@ -176,6 +211,7 @@ def test_complete_registration_ignores_field_of_work(monkeypatch):
             "field_of_work": "Must be ignored during registration",
         },
         format="json",
+        **browser_auth_headers(),
     )
 
     assert response.status_code == 201
@@ -186,6 +222,87 @@ def test_complete_registration_ignores_field_of_work(monkeypatch):
     user = get_user_model().objects.get(email="new-owner@example.com")
     assert user.full_name == "New Owner"
     assert user.field_of_work == ""
+
+
+@pytest.mark.django_db
+def test_cookie_issuing_endpoints_reject_missing_browser_security_headers(monkeypatch):
+    user = get_user_model().objects.create_user("csrf@example.com", "password123")
+    client = APIClient()
+
+    login = client.post(
+        "/api/auth/token/",
+        {"email": user.email, "password": "password123"},
+        format="json",
+        HTTP_ORIGIN="http://localhost:5173",
+    )
+    assert login.status_code == 403
+
+    oauth = client.post(
+        "/api/auth/oauth/google/",
+        {"token": "provider-token"},
+        format="json",
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+    assert oauth.status_code == 403
+
+    monkeypatch.setattr(
+        "apps.auth.api.registration_endpoints.read_token",
+        lambda token, purpose: {"email": "csrf-registration@example.com"},
+    )
+    registration = client.post(
+        "/api/auth/register/complete/",
+        {
+            "registration_token": "registration-token",
+            "full_name": "CSRF Test",
+            "password": "password123",
+        },
+        format="json",
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        HTTP_ORIGIN="http://malicious-site.example",
+    )
+    assert registration.status_code == 403
+    assert not get_user_model().objects.filter(email="csrf-registration@example.com").exists()
+
+
+@pytest.mark.django_db
+def test_google_oauth_endpoint_sets_refresh_cookie(monkeypatch):
+    user = get_user_model().objects.create_user("oauth-cookie@example.com", "password123")
+    monkeypatch.setattr(
+        "apps.auth.api.oauth_endpoints.authenticate_google",
+        lambda token: (user, False),
+    )
+
+    response = APIClient().post(
+        "/api/auth/oauth/google/",
+        {"token": "provider-token"},
+        format="json",
+        **browser_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert "access" in response.data
+    assert "refresh" not in response.data
+    assert response.cookies["refresh_token"]["httponly"] is True
+
+
+@pytest.mark.django_db
+def test_logout_blacklist_database_error_is_not_reported_as_success(monkeypatch):
+    user = get_user_model().objects.create_user("logout-error@example.com", "password123")
+    client = APIClient(raise_request_exception=False)
+    issued = client.post(
+        "/api/auth/token/",
+        {"email": user.email, "password": "password123"},
+        format="json",
+        **browser_auth_headers(),
+    )
+    client.cookies["refresh_token"] = issued.cookies["refresh_token"].value
+
+    def fail_blacklist(_self):
+        raise OperationalError("blacklist storage unavailable")
+
+    monkeypatch.setattr("apps.auth.api.endpoints._KeyIdRefreshToken.blacklist", fail_blacklist)
+    response = client.post("/api/auth/logout/", format="json", **browser_auth_headers())
+    assert response.status_code == 500
 
 
 @pytest.mark.django_db

@@ -121,7 +121,6 @@ export default function CompleteProfilePage() {
       toast.success(t("profile.success"));
       saveAuthTokens(
         response.access,
-        response.refresh,
         "/dashboard",
         response.tenant_id,
       );

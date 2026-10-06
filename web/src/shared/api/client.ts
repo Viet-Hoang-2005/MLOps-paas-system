@@ -1,16 +1,18 @@
 import {
-  clearAuthStore,
+  broadcastLogout,
+  runWithRefreshLock,
+} from "@/shared/api/authCoordination";
+import {
+  clearAuthSession,
   getAccessToken,
-  setAuthTokens,
-} from "@/features/auth/authStore";
-import { broadcastLogout, runWithRefreshLock } from "@/features/auth/authSync";
+  setAuthSession,
+} from "@/shared/api/authSession";
 import axios, { type InternalAxiosRequestConfig } from "axios";
 import { apiBaseURL } from "./config";
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 type TokenRefreshResponse = {
   access: string;
-  refresh?: string;
   tenant_id?: string;
 };
 
@@ -30,7 +32,7 @@ const isPublicAuthRequest = (url = "") =>
   publicAuthPaths.some((path) => url.includes(path));
 
 export const clearAuthAndRedirect = () => {
-  clearAuthStore();
+  clearAuthSession();
   broadcastLogout();
   if (typeof window !== "undefined" && window.location.pathname !== "/login") {
     window.location.href = "/login";
@@ -52,7 +54,7 @@ export const refreshAccessToken = (): Promise<string> => {
         },
       );
       const newAccess = response.data.access;
-      setAuthTokens({
+      setAuthSession({
         access: newAccess,
         tenantId: response.data.tenant_id,
       });

@@ -36,7 +36,6 @@ export interface PasswordResetCompleteRequest {
 export interface AuthResponse {
   message: string;
   access: string;
-  refresh?: string;
   tenant_id: string;
   is_new_user?: boolean;
 }

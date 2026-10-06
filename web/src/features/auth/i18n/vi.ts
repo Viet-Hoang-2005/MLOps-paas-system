@@ -24,6 +24,8 @@ export const authVi = {
     githubSuccess: "Đã đăng nhập bằng GitHub.",
     githubFailed: "Đăng nhập GitHub thất bại. Vui lòng thử lại.",
     logoutSuccess: "Đăng xuất thành công.",
+    logoutServerFailed:
+      "Đã đăng xuất trên thiết bị này nhưng máy chủ chưa thể thu hồi phiên. Tải lại trang có thể khôi phục phiên.",
   },
   signup: {
     title: "Tạo tài khoản",

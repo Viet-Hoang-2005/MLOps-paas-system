@@ -66,6 +66,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
     serializer_class = TenantTokenSerializer
 
     def post(self, request, *args, **kwargs):
+        verify_auth_security_headers(request)
         response = super().post(request, *args, **kwargs)
         if response.status_code == status.HTTP_200_OK:
             refresh_token = response.data.pop("refresh", None)
@@ -109,7 +110,8 @@ class LogoutEndpoint(APIView):
             try:
                 token = _KeyIdRefreshToken(refresh_token)
                 token.blacklist()
-            except Exception:
+            except TokenError:
+                # Expired or malformed tokens are already unusable; still clear the cookie.
                 pass
         response = Response({"message": "Successfully logged out."})
         clear_refresh_token_cookie(response)

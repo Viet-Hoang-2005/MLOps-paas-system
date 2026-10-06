@@ -27,7 +27,6 @@ export {
   setAuthTokens,
 };
 export const clearAuthTokens = clearAuthStore;
-export const getRefreshToken = () => null;
 
 const saveTokens = (access: string, tenantId?: string) => {
   setAuthTokens({ access, tenantId });
@@ -109,27 +108,7 @@ export function useAuth() {
   );
 
   const saveAuthTokens = useCallback(
-    (
-      access: string,
-      arg2?: string,
-      arg3?: string,
-      arg4?: string,
-    ) => {
-      let redirectTo = "/dashboard";
-      let tenantId: string | undefined;
-
-      if (arg2 && arg2.startsWith("/")) {
-        redirectTo = arg2;
-        tenantId = arg3;
-      } else {
-        if (arg3 && arg3.startsWith("/")) {
-          redirectTo = arg3;
-          tenantId = arg4;
-        } else {
-          tenantId = arg3 || arg4;
-        }
-      }
-
+    (access: string, redirectTo = "/dashboard", tenantId?: string) => {
       saveTokens(access, tenantId);
       navigate(redirectTo);
     },
@@ -137,14 +116,21 @@ export function useAuth() {
   );
 
   const logout = useCallback(async () => {
+    let serverRevoked = true;
     try {
       await logoutSession();
-    } finally {
-      clearAuthStore();
-      broadcastLogout();
-      toast.success(t("login.logoutSuccess"));
-      navigate("/login");
+    } catch {
+      serverRevoked = false;
     }
+
+    clearAuthStore();
+    broadcastLogout();
+    if (serverRevoked) {
+      toast.success(t("login.logoutSuccess"));
+    } else {
+      toast.warning(t("login.logoutServerFailed"));
+    }
+    navigate("/login");
   }, [navigate, t]);
 
   return {

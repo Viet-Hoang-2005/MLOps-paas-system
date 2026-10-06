@@ -45,21 +45,20 @@ def get_refresh_token_from_request(request) -> str | None:
 
 def verify_auth_security_headers(request):
     """
-    Guards sensitive cookie-based auth endpoints (refresh & logout)
-    against CSRF by validating custom header and origin allowlist.
+    Guards cookie-based authentication endpoints against CSRF.
     """
-    # 1. Custom header check (Browsers do not allow cross-origin requests to send custom headers without preflight)
-    custom_header = request.headers.get("X-Requested-With") or request.headers.get("X-Client-App")
-    if not custom_header:
-        raise PermissionDenied("Missing required security header (X-Requested-With).")
+    # A cross-origin browser request with this header requires a successful CORS preflight.
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        raise PermissionDenied("Missing or invalid security header (X-Requested-With).")
 
-    # 2. Origin check (if present, must match CORS allowed origins)
+    # Cookie-bearing browser requests must always identify an allowlisted origin.
     origin = request.headers.get("Origin")
-    if origin:
-        allowed = getattr(settings, "CORS_ALLOWED_ORIGINS", [])
-        # Strip trailing slashes for comparison
-        clean_origin = origin.rstrip("/")
-        clean_allowed = [str(o).rstrip("/") for o in allowed]
-        if clean_origin not in clean_allowed:
-            raise PermissionDenied("Origin not allowed.")
+    if not origin:
+        raise PermissionDenied("Origin header is required.")
+
+    allowed = getattr(settings, "CORS_ALLOWED_ORIGINS", [])
+    clean_origin = origin.rstrip("/")
+    clean_allowed = [str(value).rstrip("/") for value in allowed]
+    if clean_origin not in clean_allowed:
+        raise PermissionDenied("Origin not allowed.")
 

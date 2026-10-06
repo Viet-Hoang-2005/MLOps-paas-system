@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.auth.models import UserAvatar
+from apps.auth.services.cookies import verify_auth_security_headers
 from apps.auth.services.otp import read_token, send_otp, verify_otp
 from apps.auth.services.tokens import create_auth_response
 
@@ -50,6 +51,7 @@ class CompleteRegistrationEndpoint(APIView):
     permission_classes = (permissions.AllowAny,)
 
     def post(self, request):
+        verify_auth_security_headers(request)
         token = str(request.data.get("registration_token", ""))
         payload = read_token(token, "registration")
         password = str(request.data.get("password", ""))

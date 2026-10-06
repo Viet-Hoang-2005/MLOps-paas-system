@@ -15,6 +15,13 @@ The Django Control Plane is a domain-oriented modular monolith (`services/contro
 9. **`production`:** Production inference records (`ProductionPredictionRecord`), telemetry datasets, schema coordination with Consumer worker.
 10. **`observability`:** Health endpoints (`/health/live`, `/health/ready`), Prometheus metrics (`/health/metrics`), transactional event outbox, runtime log proxy.
 
+## Browser Authentication Contract
+
+- Browser sign-in endpoints return the short-lived RS256 access token in JSON and set the rotating refresh token only in a host-only `HttpOnly` cookie. Never return refresh tokens in JSON or persist either token in browser storage.
+- Refresh and logout read the refresh cookie and require the exact configured Web `Origin` plus `X-Requested-With: XMLHttpRequest`; cookie-setting password, OAuth, and registration-completion endpoints enforce the same request checks.
+- Logout blacklists a valid refresh token before clearing its cookie. Treat persistence failures as server errors so the Web can distinguish local logout from server-side revocation.
+- Model Server remains a stateless Bearer-token verifier and does not consume browser cookies.
+
 ## Strict Layering Pattern
 
 ```text
