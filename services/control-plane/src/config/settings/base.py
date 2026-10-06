@@ -118,8 +118,15 @@ SIMPLE_JWT = {
     "ISSUER": "django-control-plane",
 }
 
+CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
-CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key")
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key", "x-requested-with", "x-client-app")
+
+AUTH_COOKIE_NAME = "refresh_token"
+AUTH_COOKIE_SECURE = env_bool("AUTH_COOKIE_SECURE", False)
+AUTH_COOKIE_SAMESITE = env("AUTH_COOKIE_SAMESITE", "Lax")
+AUTH_COOKIE_PATH = env("AUTH_COOKIE_PATH", "/api/auth/")
 STATIC_URL = "/static/"
 STATIC_ROOT = SERVICE_ROOT / "staticfiles"
 

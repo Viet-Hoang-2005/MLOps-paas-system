@@ -2,12 +2,24 @@ import base64
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
-from rest_framework import generics, permissions
+from rest_framework import exceptions, generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .serializers import RegistrationSerializer, TenantTokenRefreshSerializer, TenantTokenSerializer
+from apps.auth.api.serializers import (
+    RegistrationSerializer,
+    TenantTokenRefreshSerializer,
+    TenantTokenSerializer,
+    _KeyIdRefreshToken,
+)
+from apps.auth.services.cookies import (
+    clear_refresh_token_cookie,
+    get_refresh_token_from_request,
+    set_refresh_token_cookie,
+    verify_auth_security_headers,
+)
 
 
 class RegisterEndpoint(generics.CreateAPIView):
@@ -50,5 +62,60 @@ class JWKSEndpoint(APIView):
         )
 
 
-token_endpoint = TokenObtainPairView.as_view(serializer_class=TenantTokenSerializer)
-refresh_endpoint = TokenRefreshView.as_view(serializer_class=TenantTokenRefreshSerializer)
+class CookieTokenObtainPairView(TokenObtainPairView):
+    serializer_class = TenantTokenSerializer
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            refresh_token = response.data.pop("refresh", None)
+            if refresh_token:
+                set_refresh_token_cookie(response, refresh_token)
+        return response
+
+
+class CookieTokenRefreshView(APIView):
+    authentication_classes = ()
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request, *args, **kwargs):
+        verify_auth_security_headers(request)
+        refresh_token = get_refresh_token_from_request(request)
+        if not refresh_token:
+            raise exceptions.AuthenticationFailed("Refresh token cookie is missing.")
+
+        serializer = TenantTokenRefreshSerializer(data={"refresh": refresh_token})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as exc:
+            raise InvalidToken(exc.args[0]) from exc
+
+        data = dict(serializer.validated_data)
+        new_refresh = data.pop("refresh", None)
+        response = Response(data, status=status.HTTP_200_OK)
+        if new_refresh:
+            set_refresh_token_cookie(response, new_refresh)
+        return response
+
+
+class LogoutEndpoint(APIView):
+    authentication_classes = ()
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request):
+        verify_auth_security_headers(request)
+        refresh_token = get_refresh_token_from_request(request)
+        if refresh_token:
+            try:
+                token = _KeyIdRefreshToken(refresh_token)
+                token.blacklist()
+            except Exception:
+                pass
+        response = Response({"message": "Successfully logged out."})
+        clear_refresh_token_cookie(response)
+        return response
+
+
+token_endpoint = CookieTokenObtainPairView.as_view()
+refresh_endpoint = CookieTokenRefreshView.as_view()
+logout_endpoint = LogoutEndpoint.as_view()

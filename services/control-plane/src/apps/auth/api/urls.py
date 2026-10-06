@@ -9,7 +9,7 @@ from .account_endpoints import (
     PasswordChangeVerifyEndpoint,
     ProfileEndpoint,
 )
-from .endpoints import JWKSEndpoint, RegisterEndpoint, refresh_endpoint, token_endpoint
+from .endpoints import JWKSEndpoint, RegisterEndpoint, logout_endpoint, refresh_endpoint, token_endpoint
 from .oauth_endpoints import GitHubOAuthEndpoint, GoogleOAuthEndpoint
 from .registration_endpoints import (
     CompleteRegistrationEndpoint,
@@ -23,6 +23,7 @@ from .registration_endpoints import (
 urlpatterns = [
     path("token/", token_endpoint, name="token"),
     path("token/refresh/", refresh_endpoint, name="token-refresh"),
+    path("logout/", logout_endpoint, name="logout"),
     path("register/", RegisterEndpoint.as_view(), name="register"),
     path("profile/", ProfileEndpoint.as_view(), name="profile"),
     path("register/request-otp/", RegistrationOTPRequestEndpoint.as_view()),

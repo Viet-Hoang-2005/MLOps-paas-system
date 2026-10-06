@@ -2,30 +2,35 @@ import {
   loginBaseAuth,
   loginGitHub,
   loginGoogle,
+  logoutSession,
 } from "@/features/auth/api/authApi";
+import {
+  clearAuthStore,
+  getAccessToken,
+  getTenantId,
+  isAuthenticated,
+  setAuthTokens,
+} from "@/features/auth/authStore";
+import { broadcastLogout, initAuthBroadcast } from "@/features/auth/authSync";
 import type { AuthResponse, LoginCredentials } from "@/features/auth/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { toast } from "@/shared/types/toastStore";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
-export const getAccessToken = () => localStorage.getItem("access_token");
-export const getRefreshToken = () => localStorage.getItem("refresh_token");
-export const isAuthenticated = () => !!getAccessToken();
-
-const saveTokens = (access: string, refresh: string, tenantId?: string) => {
-  localStorage.setItem("access_token", access);
-  localStorage.setItem("refresh_token", refresh);
-  if (tenantId) {
-    localStorage.setItem("tenant_id", tenantId);
-  }
+export {
+  clearAuthStore,
+  getAccessToken,
+  getTenantId,
+  isAuthenticated,
+  setAuthTokens,
 };
+export const clearAuthTokens = clearAuthStore;
+export const getRefreshToken = () => null;
 
-export const clearAuthTokens = () => {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-  localStorage.removeItem("tenant_id");
+const saveTokens = (access: string, tenantId?: string) => {
+  setAuthTokens({ access, tenantId });
 };
 
 export function useAuth() {
@@ -33,9 +38,17 @@ export function useAuth() {
   const { t } = useTranslation("auth");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const cleanup = initAuthBroadcast(() => {
+      clearAuthStore();
+      navigate("/login");
+    });
+    return cleanup;
+  }, [navigate]);
+
   const handleOAuthSuccess = useCallback(
     (response: AuthResponse, successMessage = t("login.oauthSuccess")) => {
-      saveTokens(response.access, response.refresh, response.tenant_id);
+      saveTokens(response.access, response.tenant_id);
       toast.success(successMessage);
       navigate("/dashboard");
     },
@@ -52,7 +65,7 @@ export function useAuth() {
       setLoading(true);
       try {
         const response = await loginBaseAuth(credentials);
-        saveTokens(response.access, response.refresh, response.tenant_id);
+        saveTokens(response.access, response.tenant_id);
         toast.success(t("login.success"));
         navigate("/dashboard");
       } catch (error) {
@@ -98,20 +111,40 @@ export function useAuth() {
   const saveAuthTokens = useCallback(
     (
       access: string,
-      refresh: string,
-      redirectTo = "/dashboard",
-      tenantId?: string,
+      arg2?: string,
+      arg3?: string,
+      arg4?: string,
     ) => {
-      saveTokens(access, refresh, tenantId);
+      let redirectTo = "/dashboard";
+      let tenantId: string | undefined;
+
+      if (arg2 && arg2.startsWith("/")) {
+        redirectTo = arg2;
+        tenantId = arg3;
+      } else {
+        if (arg3 && arg3.startsWith("/")) {
+          redirectTo = arg3;
+          tenantId = arg4;
+        } else {
+          tenantId = arg3 || arg4;
+        }
+      }
+
+      saveTokens(access, tenantId);
       navigate(redirectTo);
     },
     [navigate],
   );
 
-  const logout = useCallback(() => {
-    clearAuthTokens();
-    toast.success(t("login.logoutSuccess"));
-    navigate("/login");
+  const logout = useCallback(async () => {
+    try {
+      await logoutSession();
+    } finally {
+      clearAuthStore();
+      broadcastLogout();
+      toast.success(t("login.logoutSuccess"));
+      navigate("/login");
+    }
   }, [navigate, t]);
 
   return {

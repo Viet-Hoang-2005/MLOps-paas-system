@@ -21,6 +21,8 @@ services:
       DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0,control-plane,control_plane}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://mlops-nids-nt114.id.vn,http://localhost:5173,http://127.0.0.1:5173}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-https://mlops-nids-nt114.id.vn,http://localhost:5173,http://127.0.0.1:5173}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-False}
       DB_HOST_RW: postgres
       DB_HOST_RO: postgres
       DB_USER: ${DB_USER}

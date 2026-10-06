@@ -12,6 +12,14 @@ import type {
 
 export const refreshSession = refreshAccessToken;
 
+export const logoutSession = async (): Promise<{ message: string }> => {
+  try {
+    return (await apiClient.post<{ message: string }>("/auth/logout/", {})).data;
+  } catch {
+    return { message: "Successfully logged out." };
+  }
+};
+
 export const loginBaseAuth = async (
   credentials: LoginCredentials,
 ): Promise<AuthResponse> =>

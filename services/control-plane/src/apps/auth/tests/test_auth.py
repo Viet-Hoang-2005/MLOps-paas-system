@@ -55,7 +55,7 @@ class GitHubOAuthClient:
 
 
 @pytest.mark.django_db
-def test_token_contains_tenant_id():
+def test_token_contains_tenant_id_and_sets_cookie():
     user = get_user_model().objects.create_user("owner@example.com", "password123")
     response = APIClient().post(
         "/api/auth/token/",
@@ -66,10 +66,17 @@ def test_token_contains_tenant_id():
     assert response.status_code == 200
     assert response.data["tenant_id"] == user.tenant_id
     assert user.tenant_id == f"T-{user.public_id}"
+    assert "access" in response.data
+    assert "refresh" not in response.data
+    assert "refresh_token" in response.cookies
+    cookie = response.cookies["refresh_token"]
+    assert cookie["httponly"] is True
+    assert cookie["samesite"] == "Lax"
+    assert cookie["path"] == "/api/auth/"
 
 
 @pytest.mark.django_db
-def test_refreshed_access_token_keeps_gateway_claims():
+def test_refreshed_access_token_via_cookie_keeps_gateway_claims():
     user = get_user_model().objects.create_user("refresh@example.com", "password123")
     client = APIClient()
     issued = client.post(
@@ -77,14 +84,73 @@ def test_refreshed_access_token_keeps_gateway_claims():
         {"email": user.email, "password": "password123"},
         format="json",
     )
-    response = client.post("/api/auth/token/refresh/", {"refresh": issued.data["refresh"]}, format="json")
+    assert issued.status_code == 200
+    assert "refresh_token" in issued.cookies
 
+    # 1. Missing security header is rejected (403)
+    client.cookies["refresh_token"] = issued.cookies["refresh_token"].value
+    rejected_no_header = client.post("/api/auth/token/refresh/", format="json")
+    assert rejected_no_header.status_code == 403
+
+    # 2. Invalid origin is rejected (403)
+    rejected_bad_origin = client.post(
+        "/api/auth/token/refresh/",
+        format="json",
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        HTTP_ORIGIN="http://malicious-site.com",
+    )
+    assert rejected_bad_origin.status_code == 403
+
+    # 3. Valid refresh with cookie and header
+    response = client.post(
+        "/api/auth/token/refresh/",
+        format="json",
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        HTTP_ORIGIN="http://localhost:5173",
+    )
     assert response.status_code == 200
-    for token in (response.data["access"], response.data["refresh"]):
-        assert jwt.get_unverified_header(token)["kid"] == "mlops-paas-key-1"
+    assert "access" in response.data
+    assert "refresh" not in response.data
+    assert "refresh_token" in response.cookies
+    assert jwt.get_unverified_header(response.data["access"])["kid"] == "mlops-paas-key-1"
     claims = jwt.decode(response.data["access"], options={"verify_signature": False})
     assert claims["tenant_id"] == user.tenant_id
     assert claims["aud"] == "mlops-paas"
+
+
+@pytest.mark.django_db
+def test_logout_blacklists_token_and_clears_cookie():
+    user = get_user_model().objects.create_user("logout@example.com", "password123")
+    client = APIClient()
+    issued = client.post(
+        "/api/auth/token/",
+        {"email": user.email, "password": "password123"},
+        format="json",
+    )
+    old_refresh = issued.cookies["refresh_token"].value
+    client.cookies["refresh_token"] = old_refresh
+
+    # Missing header is rejected
+    rejected = client.post("/api/auth/logout/", format="json")
+    assert rejected.status_code == 403
+
+    # Logout with header
+    logout_res = client.post(
+        "/api/auth/logout/",
+        format="json",
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+    assert logout_res.status_code == 200
+    assert logout_res.cookies["refresh_token"].value == ""
+
+    # Re-using the logged-out refresh token fails (token was blacklisted)
+    client.cookies["refresh_token"] = old_refresh
+    retry_refresh = client.post(
+        "/api/auth/token/refresh/",
+        format="json",
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+    assert retry_refresh.status_code in (401, 403)
 
 
 @pytest.mark.django_db
@@ -113,6 +179,10 @@ def test_complete_registration_ignores_field_of_work(monkeypatch):
     )
 
     assert response.status_code == 201
+    assert "access" in response.data
+    assert "refresh" not in response.data
+    assert "refresh_token" in response.cookies
+    assert response.cookies["refresh_token"]["httponly"] is True
     user = get_user_model().objects.get(email="new-owner@example.com")
     assert user.full_name == "New Owner"
     assert user.field_of_work == ""

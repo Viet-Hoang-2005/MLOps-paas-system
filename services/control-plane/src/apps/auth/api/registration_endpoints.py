@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 
 from apps.auth.models import UserAvatar
 from apps.auth.services.otp import read_token, send_otp, verify_otp
-from apps.auth.services.tokens import token_payload
+from apps.auth.services.tokens import create_auth_response
 
 
 class EmailSerializer(serializers.Serializer):
@@ -65,8 +65,9 @@ class CompleteRegistrationEndpoint(APIView):
             user.avatar = avatar
             user.save(update_fields=["avatar"])
             UserAvatar.objects.create(user=user, image=user.avatar.name)
-        return Response(
-            token_payload(user, message="Account created.", is_new_user=True),
+        return create_auth_response(
+            user,
+            {"message": "Account created.", "is_new_user": True},
             status=status.HTTP_201_CREATED,
         )
 

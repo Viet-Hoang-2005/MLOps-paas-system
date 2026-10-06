@@ -1,23 +1,16 @@
-import { Navigate } from "react-router-dom";
+import { refreshSession } from "@/features/auth/api/authApi";
+import {
+  clearAuthStore,
+  isAuthenticated,
+} from "@/features/auth/authStore";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import {
-  clearAuthTokens,
-  getAccessToken,
-  getRefreshToken,
-} from "@/features/auth/hooks/useAuth";
-import { refreshSession } from "@/features/auth/api/authApi";
+import { Navigate } from "react-router-dom";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<
     "checking" | "authenticated" | "unauthenticated"
-  >(() =>
-    getAccessToken()
-      ? "authenticated"
-      : getRefreshToken()
-        ? "checking"
-        : "unauthenticated",
-  );
+  >(() => (isAuthenticated() ? "authenticated" : "checking"));
 
   useEffect(() => {
     if (status !== "checking") {
@@ -34,7 +27,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (isMounted) {
-          clearAuthTokens();
+          clearAuthStore();
           setStatus("unauthenticated");
         }
       });

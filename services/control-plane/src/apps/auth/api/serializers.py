@@ -54,6 +54,13 @@ class TenantTokenRefreshSerializer(TokenRefreshSerializer):
     # The model gateway resolves the verifying key by `kid`, so refreshed tokens need it too.
     token_class = _KeyIdRefreshToken
 
+    def validate(self, attrs):
+        refresh_token = self.token_class(attrs["refresh"])
+        tenant_id = refresh_token.payload.get("tenant_id", "")
+        data = super().validate(attrs)
+        data["tenant_id"] = tenant_id
+        return data
+
 
 class UserSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="public_id", read_only=True)

@@ -30,6 +30,7 @@ DEBUG = False
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+AUTH_COOKIE_SECURE = env_bool("AUTH_COOKIE_SECURE", True)
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", True)
 # In-cluster callers use plain HTTP; the model gateway fetches JWKS to verify user JWTs.
 SECURE_REDIRECT_EXEMPT = [r"^health/", r"^internal/", r"^api/auth/\.well-known/jwks\.json$"]
