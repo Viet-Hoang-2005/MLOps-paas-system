@@ -70,24 +70,27 @@ function extractFilesFromForm(form: ModelBuildFormValues): PendingUploadFile[] {
 export async function getPreviewUploadUrls(
   projectId: string,
   files: Array<{ kind: string; filename: string; size_bytes: number; content_type?: string }>,
+  flavor?: string,
+  artifact_format?: string,
 ): Promise<PresignedUploadResponse> {
   return (
     await apiClient.post<PresignedUploadResponse>(
       controlPlaneURL(`/models/${projectId}/preview/upload-urls/`),
-      { files },
+      { files, flavor: flavor || undefined, artifact_format: artifact_format || undefined },
     )
   ).data;
 }
 
 export async function getNewProjectUploadUrls(
   name: string,
-  flavor: string,
   files: Array<{ kind: string; filename: string; size_bytes: number; content_type?: string }>,
+  flavor?: string,
+  artifact_format?: string,
 ): Promise<PresignedUploadResponse> {
   return (
     await apiClient.post<PresignedUploadResponse>(
       controlPlaneURL("/models/preview/upload-urls/"),
-      { name, flavor, files },
+      { name, files, flavor: flavor || undefined, artifact_format: artifact_format || undefined },
     )
   ).data;
 }
@@ -153,8 +156,9 @@ export async function createPreviewProject(
   }));
   const presignedResponse = await getNewProjectUploadUrls(
     form.name,
-    form.flavor,
     urlPayload,
+    form.flavor,
+    form.artifact_format,
   );
 
   // Phase 2: Upload files directly to S3
@@ -197,7 +201,12 @@ export async function updatePreview(
       size_bytes: p.file.size,
       content_type: p.file.type || "application/octet-stream",
     }));
-    const presignedResponse = await getPreviewUploadUrls(id, urlPayload);
+    const presignedResponse = await getPreviewUploadUrls(
+      id,
+      urlPayload,
+      form.flavor,
+      form.artifact_format,
+    );
 
     // Phase 2: Upload directly to S3
     uploadedAssets = await uploadFilesDirectlyToS3(

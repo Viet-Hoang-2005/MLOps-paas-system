@@ -44,9 +44,11 @@ module "security" {
 }
 
 module "storage" {
-  count               = var.enable_artifact_storage ? 1 : 0
-  source              = "./modules/storage"
-  enable_runtime_logs = local.enable_k3s_compute_stack
+  count                             = var.enable_artifact_storage ? 1 : 0
+  source                            = "./modules/storage"
+  enable_runtime_logs               = local.enable_k3s_compute_stack
+  staging_expiration_days           = var.artifacts_staging_expiration_days
+  noncurrent_version_retention_days = var.artifacts_noncurrent_version_retention_days
 }
 
 module "secrets" {

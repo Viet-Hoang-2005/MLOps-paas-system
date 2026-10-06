@@ -132,12 +132,14 @@ class ProjectPreviewUploadUrlsEndpoint(APIView):
             raise Conflict("This project is being deleted.")
         serializer = ProjectPreviewUploadUrlsRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        flavor = serializer.validated_data.get("flavor") or project.preview.flavor
+        artifact_format = serializer.validated_data.get("artifact_format") or project.preview.artifact_format
         files = generate_preview_upload_urls(
             tenant_id=project.owner.tenant_id,
             project_id=str(project.public_id),
             files_data=serializer.validated_data["files"],
-            flavor=project.preview.flavor,
-            artifact_format=project.preview.artifact_format,
+            flavor=flavor,
+            artifact_format=artifact_format,
         )
         return Response({"project_id": str(project.public_id), "files": files})
 
@@ -153,6 +155,7 @@ class ProjectCreateUploadUrlsEndpoint(APIView):
             project_id=str(project_id),
             files_data=serializer.validated_data["files"],
             flavor=serializer.validated_data.get("flavor"),
+            artifact_format=serializer.validated_data.get("artifact_format", "raw"),
         )
         return Response({"project_id": str(project_id), "files": files})
 

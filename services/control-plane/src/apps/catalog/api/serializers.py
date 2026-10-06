@@ -206,12 +206,15 @@ class PresignedUploadItemSerializer(serializers.Serializer):
 
 
 class ProjectPreviewUploadUrlsRequestSerializer(serializers.Serializer):
+    flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"), required=False)
+    artifact_format = serializers.ChoiceField(choices=("raw", "mlflow_zip"), required=False)
     files = serializers.ListField(child=PresignedUploadItemSerializer(), min_length=1)
 
 
 class NewProjectUploadUrlsRequestSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=160)
     flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"), required=False)
+    artifact_format = serializers.ChoiceField(choices=("raw", "mlflow_zip"), required=False)
     files = serializers.ListField(child=PresignedUploadItemSerializer(), min_length=1)
 
     def validate_name(self, value):

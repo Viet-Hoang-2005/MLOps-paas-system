@@ -42,6 +42,53 @@ resource "aws_s3_bucket_cors_configuration" "artifacts_cors" {
   }
 }
 
+# Cấu hình vòng đời (Lifecycle) cho artifacts S3 bucket
+resource "aws_s3_bucket_lifecycle_configuration" "artifacts_lifecycle" {
+  bucket = aws_s3_bucket.artifacts_bucket.id
+
+  # 1. Tự động dọn dẹp các object tạm thời trong staging (upload bỏ dở hoặc lưu thất bại)
+  rule {
+    id     = "ephemeral-staging-cleanup"
+    status = "Enabled"
+
+    filter {
+      prefix = "staging/"
+    }
+
+    expiration {
+      days = var.staging_expiration_days
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 1
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+  }
+
+  # 2. Quản lý phiên bản cũ (noncurrent versions) và delete marker cho toàn bộ bucket
+  rule {
+    id     = "artifacts-versioning-cleanup"
+    status = "Enabled"
+
+    filter {}
+
+    noncurrent_version_expiration {
+      noncurrent_days = var.noncurrent_version_retention_days
+    }
+
+    expiration {
+      expired_object_delete_marker = true
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
+
 resource "aws_s3_bucket" "runtime_logs" {
   count         = var.enable_runtime_logs ? 1 : 0
   bucket        = var.runtime_logs_bucket_name

@@ -25,3 +25,15 @@ variable "cors_allowed_origins" {
     "http://127.0.0.1:5173"
   ]
 }
+
+variable "staging_expiration_days" {
+  description = "Number of days before ephemeral staging uploads in S3 are automatically expired."
+  type        = number
+  default     = 1
+}
+
+variable "noncurrent_version_retention_days" {
+  description = "Number of days to retain noncurrent object versions in the artifacts S3 bucket."
+  type        = number
+  default     = 30
+}

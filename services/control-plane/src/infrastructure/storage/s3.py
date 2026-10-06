@@ -47,12 +47,25 @@ class S3Storage:
             raise ValueError("Object exceeds the allowed read size.")
         return value
 
+    def compute_sha256(self, uri: str) -> str:
+        bucket, key = self.parse_uri(uri)
+        response = self.client.get_object(Bucket=bucket, Key=key)
+        hasher = hashlib.sha256()
+        body = response["Body"]
+        try:
+            while chunk := body.read(1024 * 1024):
+                hasher.update(chunk)
+        finally:
+            body.close()
+        return hasher.hexdigest()
+
     def head(self, uri: str) -> StoredObject:
         bucket, key = self.parse_uri(uri)
         response = self.client.head_object(Bucket=bucket, Key=key)
         metadata = response.get("Metadata", {})
-        etag = response.get("ETag", "").strip('"')
-        checksum = metadata.get("sha256", etag)
+        checksum = metadata.get("sha256")
+        if not checksum:
+            checksum = self.compute_sha256(uri)
         return StoredObject(
             key=key,
             uri=uri,
@@ -85,21 +98,28 @@ class S3Storage:
         bucket, key = self.parse_uri(uri)
         self.client.delete_object(Bucket=bucket, Key=key)
 
-    def copy(self, source_uri, destination_key):
+    def copy(self, source_uri, destination_key, checksum=None, content_type=None, size_bytes=None):
         source_bucket, source_key = self.parse_uri(source_uri)
+        if not checksum or not content_type or size_bytes is None:
+            source_head = self.head(source_uri)
+            checksum = checksum or source_head.checksum
+            content_type = content_type or source_head.content_type
+            size_bytes = size_bytes if size_bytes is not None else source_head.size_bytes
+
         self.client.copy_object(
             Bucket=self.bucket,
             Key=destination_key,
             CopySource={"Bucket": source_bucket, "Key": source_key},
+            Metadata={"sha256": checksum},
+            MetadataDirective="REPLACE",
+            ContentType=content_type,
         )
-        response = self.client.head_object(Bucket=self.bucket, Key=destination_key)
-        metadata = response.get("Metadata", {})
         return StoredObject(
             destination_key,
             f"s3://{self.bucket}/{destination_key}",
-            metadata.get("sha256", ""),
-            response.get("ContentLength", 0),
-            response.get("ContentType", "application/octet-stream"),
+            checksum,
+            size_bytes,
+            content_type,
         )
 
     @staticmethod

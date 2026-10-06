@@ -82,6 +82,18 @@ variable "enable_artifact_storage" {
   default     = true
 }
 
+variable "artifacts_staging_expiration_days" {
+  description = "Number of days before ephemeral staging uploads in S3 are automatically expired."
+  type        = number
+  default     = 1
+}
+
+variable "artifacts_noncurrent_version_retention_days" {
+  description = "Number of days to retain noncurrent object versions in the artifacts S3 bucket."
+  type        = number
+  default     = 30
+}
+
 variable "enable_secrets_manager" {
   description = "Create persistent Secrets Manager resources."
   type        = bool

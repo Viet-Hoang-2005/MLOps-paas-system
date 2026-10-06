@@ -1,3 +1,4 @@
+import hashlib
 from types import SimpleNamespace
 
 import pytest
@@ -29,15 +30,25 @@ class MemoryStorage:
         self.deleted = []
         self.fail_copy = False
 
-    def put(self, key, file, content_type):
+    def put(self, key, file, content_type="application/octet-stream"):
         uri = f"s3://test-bucket/{key}"
-        self.objects[uri] = file.read()
-        return StoredObject(key, uri, "checksum", len(self.objects[uri]), content_type)
+        payload = file.read() if hasattr(file, "read") else file
+        if isinstance(payload, str):
+            payload = payload.encode()
+        self.objects[uri] = payload
+        checksum = hashlib.sha256(payload).hexdigest()
+        return StoredObject(key, uri, checksum, len(self.objects[uri]), content_type)
 
-    def copy(self, uri, key):
+    def copy(self, uri, key, checksum=None, content_type=None, size_bytes=None):
         if self.fail_copy:
             raise RuntimeError("storage unavailable")
-        return self.put(key, SimpleUploadedFile(key, self.objects[uri]), "application/octet-stream")
+        payload = self.objects[uri]
+        dest_uri = f"s3://{self.bucket}/{key}"
+        self.objects[dest_uri] = payload
+        resolved_checksum = checksum or hashlib.sha256(payload).hexdigest()
+        resolved_content_type = content_type or "application/octet-stream"
+        resolved_size = size_bytes if size_bytes is not None else len(payload)
+        return StoredObject(key, dest_uri, resolved_checksum, resolved_size, resolved_content_type)
 
     def read(self, uri, max_bytes=4 * 1024 * 1024):
         value = self.objects[uri]
@@ -50,7 +61,8 @@ class MemoryStorage:
             raise KeyError(f"Object not found: {uri}")
         payload = self.objects[uri]
         key = uri.removeprefix(f"s3://{self.bucket}/")
-        return StoredObject(key, uri, "checksum", len(payload), "application/octet-stream")
+        checksum = hashlib.sha256(payload).hexdigest()
+        return StoredObject(key, uri, checksum, len(payload), "application/octet-stream")
 
     def presigned_put(self, uri, expires_in=900, content_type=None):
         return f"https://{self.bucket}.s3.test/{uri}?signature=mock"

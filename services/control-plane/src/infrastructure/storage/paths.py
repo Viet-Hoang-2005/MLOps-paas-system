@@ -9,6 +9,16 @@ def project_prefix(tenant_id, project_id):
     return f"users/{_clean(tenant_id)}/models/{_clean(project_id)}"
 
 
+def preview_staging_prefix(tenant_id, project_id, upload_batch_id=None):
+    base = f"staging/{project_prefix(tenant_id, project_id)}/preview"
+    return f"{base}/{_clean(upload_batch_id)}/" if upload_batch_id else f"{base}/"
+
+
+def preview_committed_prefix(tenant_id, project_id, commit_token=None):
+    base = f"{project_prefix(tenant_id, project_id)}/preview/committed"
+    return f"{base}/{_clean(commit_token)}/" if commit_token else f"{base}/"
+
+
 def workspace_prefix(tenant_id, project_id, kind):
     if kind not in {"code", "data"}:
         raise ValueError("Workspace kind must be code or data")
