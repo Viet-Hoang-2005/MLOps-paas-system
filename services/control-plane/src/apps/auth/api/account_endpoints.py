@@ -1,10 +1,14 @@
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.auth.api.serializers import AvatarSerializer, UserSerializer
+from apps.auth.api.serializers import AvatarSerializer, TenantTokenSerializer, UserSerializer
 from apps.auth.models import UserAvatar
+from apps.auth.services.cookies import set_refresh_token_cookie, verify_auth_security_headers
 from apps.auth.services.otp import read_token, send_otp, verify_otp
+from apps.auth.services.tokens import revoke_user_refresh_tokens
 from apps.observability.services.outbox import enqueue_event
 
 
@@ -84,12 +88,37 @@ class PasswordChangeVerifyEndpoint(APIView):
 
 class PasswordChangeCompleteEndpoint(APIView):
     def post(self, request):
-        payload = read_token(str(request.data.get("password_change_token", "")), "password_change")
+        if request.headers.get("Origin") or request.headers.get("X-Requested-With"):
+            verify_auth_security_headers(request)
+
+        token = str(request.data.get("password_change_token", ""))
+        try:
+            payload = read_token(token, "password_change", consume=False)
+        except TypeError:
+            payload = read_token(token, "password_change")
         if payload["email"].lower() != request.user.email.lower():
             raise serializers.ValidationError({"token": "Token belongs to another account."})
+
         password = str(request.data.get("new_password", ""))
-        if len(password) < 8:
-            raise serializers.ValidationError({"new_password": "Password must contain at least 8 characters."})
+        try:
+            validate_password(password, user=request.user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"new_password": list(exc.messages)})
+
+        try:
+            read_token(token, "password_change", consume=True)
+        except TypeError:
+            pass
+
         request.user.set_password(password)
         request.user.save(update_fields=["password"])
-        return Response({"message": "Password changed."})
+
+        revoke_user_refresh_tokens(request.user)
+
+        refresh = TenantTokenSerializer.get_token(request.user)
+        response = Response({
+            "message": "Password changed.",
+            "access": str(refresh.access_token),
+        })
+        set_refresh_token_cookie(response, str(refresh))
+        return response

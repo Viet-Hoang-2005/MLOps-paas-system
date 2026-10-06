@@ -1,10 +1,16 @@
 from typing import cast
 
 import jwt
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
+from rest_framework_simplejwt.settings import api_settings
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from rest_framework_simplejwt.utils import datetime_from_epoch
 
 from apps.auth.models import CustomUser, UserAvatar
 
@@ -59,6 +65,22 @@ class TenantTokenRefreshSerializer(TokenRefreshSerializer):
         tenant_id = refresh_token.payload.get("tenant_id", "")
         data = super().validate(attrs)
         data["tenant_id"] = tenant_id
+
+        if "refresh" in data and "rest_framework_simplejwt.token_blacklist" in settings.INSTALLED_APPS:
+            new_token = self.token_class(data["refresh"])
+            user_id = new_token.payload.get(api_settings.USER_ID_CLAIM)
+            user_model = get_user_model()
+            try:
+                user = user_model.objects.get(**{api_settings.USER_ID_FIELD: user_id})
+            except user_model.DoesNotExist:
+                user = None
+            OutstandingToken.objects.create(
+                user=user,
+                jti=new_token.payload[api_settings.JTI_CLAIM],
+                token=str(new_token),
+                created_at=datetime_from_epoch(new_token.payload["iat"]),
+                expires_at=datetime_from_epoch(new_token.payload["exp"]),
+            )
         return data
 
 
@@ -85,11 +107,22 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class RegistrationSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=8)
+    password = serializers.CharField(write_only=True)
 
     class Meta:
         model = get_user_model()
         fields = ("email", "password", "full_name")
+
+    def validate_password(self, value):
+        user = get_user_model()(
+            email=self.initial_data.get("email", ""),
+            full_name=self.initial_data.get("full_name", ""),
+        )
+        try:
+            validate_password(value, user=user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages))
+        return value
 
     def create(self, validated_data):
         return get_user_model().objects.create_user(**validated_data)

@@ -207,7 +207,7 @@ def test_complete_registration_ignores_field_of_work(monkeypatch):
         {
             "registration_token": "registration-token",
             "full_name": "New Owner",
-            "password": "password123",
+            "password": "ValidStrongPass#2026",
             "field_of_work": "Must be ignored during registration",
         },
         format="json",
