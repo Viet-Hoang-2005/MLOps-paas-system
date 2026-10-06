@@ -30,7 +30,7 @@ export interface TrainingBuild {
 
 export interface TrainingOutput {
   id: ResourceId;
-  kind: "model" | "metric" | "insight" | "file";
+  kind: "model" | "metric" | "insight" | "source_code" | "reference_data" | "file";
   relative_path: string;
   s3_uri: string;
   checksum: string;
@@ -41,10 +41,9 @@ export interface TrainingOutput {
 }
 
 export interface TrainingJob {
-  reference_path: string;
-  reference_snapshot_uri: string;
   id: ResourceId;
   project_id: ResourceId;
+  output_revision: number;
   name: string;
   model_flavor: ModelFlavor;
   model_version: string;
@@ -195,3 +194,43 @@ export interface TrainingUsageResponse {
   current_month_start: string;
   current_month_end: string;
 }
+
+export interface TrainingOutputSummaryAsset {
+  id: ResourceId;
+  name: string;
+  relative_path: string;
+  kind: "model" | "metric" | "insight" | "source_code" | "reference_data" | "file";
+  checksum: string;
+  size_bytes: number;
+  content_type: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  content?: string;
+}
+
+export interface TrainingJobModelOutputSummary {
+  job_id: ResourceId;
+  project_id: ResourceId;
+  output_revision: number;
+  model_flavor: ModelFlavor;
+  entry_point: string;
+  requirements_text: string;
+  model_artifact: TrainingOutputSummaryAsset | null;
+  source_code: TrainingOutputSummaryAsset | null;
+  reference_data: TrainingOutputSummaryAsset | null;
+  metrics: Record<string, unknown>;
+  params: Record<string, unknown>;
+  insights: Record<string, unknown>;
+  can_edit: boolean;
+  can_build: boolean;
+  outputs_purged_at: string | null;
+}
+
+export interface ReferenceDataPreview {
+  filename: string;
+  format: "csv" | "parquet";
+  columns: string[];
+  rows: Array<Array<string | number | boolean | null>>;
+  total_rows: number;
+}
+

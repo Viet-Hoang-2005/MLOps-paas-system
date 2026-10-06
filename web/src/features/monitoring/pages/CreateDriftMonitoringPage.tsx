@@ -35,9 +35,20 @@ function CsvPreview({
   onRetry: () => void;
 }) {
   const { t } = useTranslation("monitoring");
+  const isParquet = text === "PARQUET_PREVIEW";
   return (
     <div className="h-100 overflow-hidden rounded-surface border border-border bg-muted">
-      {text && !error ? (
+      {isParquet ? (
+        <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center text-color-muted-foreground">
+          <Database className="h-8 w-8 text-color-primary" />
+          <p className="text-style-body font-medium text-color-foreground">
+            {t("createPage.parquetStagedTitle")}
+          </p>
+          <p className="max-w-md text-style-caption">
+            {t("createPage.parquetStagedDesc")}
+          </p>
+        </div>
+      ) : text && !error ? (
         <DataViewer key={text} initialCsvText={text} readOnly />
       ) : (
         <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center text-color-muted-foreground">
@@ -155,7 +166,7 @@ function CreateDriftMonitorContent({
             </div>
           ) : (
             <FileDropzone
-              accept=".csv"
+              accept=".csv,.parquet"
               title={referenceName || t("createPage.referenceData")}
               subtitle={t("createPage.referenceUploadHint")}
               disabled={form.loading || !form.versionId || form.save.isPending}

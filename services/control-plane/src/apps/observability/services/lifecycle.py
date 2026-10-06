@@ -61,7 +61,9 @@ def record_training_event(*, job, event_type, message, metadata=None, idempotenc
     )
 
 
-def record_registry_event(*, version, event_type, actor=None, from_state="", to_state="", metadata=None):
+def record_registry_event(
+    *, version, event_type, actor=None, from_state="", to_state="", metadata=None, message=""
+):
     return record_event(
         project=version.project,
         aggregate_type="model_version",
@@ -71,4 +73,5 @@ def record_registry_event(*, version, event_type, actor=None, from_state="", to_
         from_state=from_state,
         to_state=to_state,
         metadata=metadata,
+        message=message,
     )

@@ -3,6 +3,7 @@ from django.urls import path
 from .endpoints import (
     DriftMonitorDetailEndpoint,
     DriftMonitorListCreateEndpoint,
+    DriftMonitorReferencePreviewEndpoint,
     DriftMonitorReferenceURLEndpoint,
     DriftRunEndpoint,
     DriftRunLogsEndpoint,
@@ -15,5 +16,7 @@ urlpatterns = [
     path("runs/<uuid:run_id>/report-url/", DriftRunReportURLEndpoint.as_view(), name="drift-run-report-url"),
     path("<uuid:monitor_id>/", DriftMonitorDetailEndpoint.as_view(), name="drift-monitor-detail"),
     path("<uuid:monitor_id>/reference-url/", DriftMonitorReferenceURLEndpoint.as_view(), name="drift-monitor-reference-url"),
+    path("<uuid:monitor_id>/reference-preview/", DriftMonitorReferencePreviewEndpoint.as_view(), name="drift-monitor-reference-preview"),
     path("<uuid:monitor_id>/runs/", DriftRunEndpoint.as_view(), name="drift-run"),
 ]
+

@@ -116,6 +116,14 @@ class ProjectPreviewEndpoint(APIView):
         return Response(ModelPreviewSerializer(preview).data)
 
 
+class ProjectPreviewReferencePreviewEndpoint(APIView):
+    def get(self, request, project_id):
+        from apps.catalog.services.preview import get_preview_reference_preview
+
+        project = project_for_user(request.user, project_id)
+        return Response(get_preview_reference_preview(project))
+
+
 class RunningSourceEndpoint(APIView):
     def get(self, request, project_id):
         from apps.catalog.services.snapshots import running_source
@@ -135,3 +143,4 @@ class ProjectBuildEndpoint(APIView):
         revision = serializers.IntegerField(min_value=1).run_validation(request.data.get("revision"))
         build = request_preview_build(project=project, revision=revision, backend=settings.BUILD_BACKEND)
         return Response(BuildSerializer(build).data, status=status.HTTP_201_CREATED)
+

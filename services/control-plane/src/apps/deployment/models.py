@@ -35,6 +35,7 @@ class Build(ExecutionWatch):
     artifact_format = models.CharField(max_length=20, default="raw")
     requirements_snapshot = models.TextField(blank=True)
     preview_revision = models.PositiveIntegerField(null=True, blank=True)
+    source_output_revision = models.PositiveIntegerField(null=True, blank=True)
     registration_status = models.CharField(
         max_length=20,
         default="unregistered",

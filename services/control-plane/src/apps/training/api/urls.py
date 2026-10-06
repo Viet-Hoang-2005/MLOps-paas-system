@@ -8,7 +8,9 @@ from .endpoints import (
     TrainingJobEventsEndpoint,
     TrainingJobListCreateEndpoint,
     TrainingJobLogsEndpoint,
+    TrainingJobModelOutputEndpoint,
     TrainingJobOutputsEndpoint,
+    TrainingJobReferencePreviewEndpoint,
     TrainingJobRetryEndpoint,
     TrainingJobSubmitEndpoint,
     TrainingRuntimeCapabilitiesEndpoint,
@@ -24,6 +26,8 @@ urlpatterns = [
     path("<uuid:job_id>/logs/", TrainingJobLogsEndpoint.as_view(), name="training-job-logs"),
     path("<uuid:job_id>/download/", TrainingJobDownloadEndpoint.as_view(), name="training-job-download"),
     path("<uuid:job_id>/build/", TrainingJobBuildEndpoint.as_view(), name="training-job-build"),
+    path("<uuid:job_id>/model-output/", TrainingJobModelOutputEndpoint.as_view(), name="training-job-model-output"),
+    path("<uuid:job_id>/reference-preview/", TrainingJobReferencePreviewEndpoint.as_view(), name="training-job-reference-preview"),
     path("<uuid:job_id>/outputs/", TrainingJobOutputsEndpoint.as_view(), name="training-job-outputs"),
     path(
         "runtime-capabilities/",

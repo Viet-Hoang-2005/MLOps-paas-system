@@ -167,12 +167,17 @@ function BuildDeploymentContent() {
       if (modelOut) map["source_artifact"] = modelOut.relative_path;
       else if (selectedJob.model_artifact_uri)
         map["source_artifact"] = selectedJob.model_artifact_uri;
-      if (selectedJob.entry_point || selectedJob.source_zip) {
-        map["source_code"] = selectedJob.entry_point || selectedJob.source_zip;
+      const sourceCodeOut = selectedJob.outputs.find(
+        (o) => o.kind === "source_code",
+      );
+      if (sourceCodeOut) {
+        map["source_code"] = sourceCodeOut.relative_path;
       }
-      if (selectedJob.reference_path || selectedJob.training_data) {
-        map["reference_data"] =
-          selectedJob.reference_path || selectedJob.training_data;
+      const refDataOut = selectedJob.outputs.find(
+        (o) => o.kind === "reference_data",
+      );
+      if (refDataOut) {
+        map["reference_data"] = refDataOut.relative_path;
       }
       selectedJob.outputs.forEach((o) => {
         if (o.kind === "metric") map["metrics"] = o.relative_path;
@@ -237,7 +242,7 @@ function BuildDeploymentContent() {
       buildId
         ? rebuildById(buildId)
         : source === "training"
-          ? buildTraining(jobId)
+          ? buildTraining(jobId, selectedJob?.output_revision)
           : buildPreview(activeProjectId, preview.data!.revision),
     onSuccess: (result) => {
       client.setQueryData(deploymentFlowKeys.build(result.id), result);

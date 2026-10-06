@@ -60,7 +60,6 @@ const emptyMetadata: TrainingMetadataForm = {
 const emptySource: TrainingSourceForm = {
   model_flavor: "sklearn",
   entry_point: "",
-  reference_path: "",
   requirements_text: "",
 };
 const emptyExecution: TrainingExecutionForm = {
@@ -81,7 +80,6 @@ const sourceFingerprint = (form: TrainingSourceForm) =>
   JSON.stringify({
     model_flavor: form.model_flavor,
     entry_point: form.entry_point.trim(),
-    reference_path: form.reference_path,
     requirements_text: form.requirements_text,
   });
 
@@ -379,7 +377,6 @@ export default function CreateTrainingJobPage() {
         project_id: project.id,
         model_flavor: sourceForm.model_flavor,
         entry_point: sourceForm.entry_point,
-        reference_path: sourceForm.reference_path,
         requirements_text: sourceForm.requirements_text,
         vcpu: executionForm.vcpu,
         memory: executionForm.memory_mb,

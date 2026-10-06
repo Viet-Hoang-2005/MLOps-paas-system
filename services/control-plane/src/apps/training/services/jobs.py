@@ -27,12 +27,6 @@ def create_job(*, project, validated_data):
     project = type(project).objects.select_for_update().get(pk=project.pk)
     if project.deletion_state != "active":
         raise Conflict("This project is being deleted.")
-    reference_path = validated_data.get("reference_path", "")
-    reference_asset = (
-        project.workspace_assets.filter(kind="data", relative_path=reference_path).first() if reference_path else None
-    )
-    if reference_path and (not reference_asset or not reference_path.lower().endswith(".csv")):
-        raise ValidationError({"reference_path": "Choose a CSV from this project's workspace."})
     source_zip = validated_data.pop("source_zip", None)
     training_data = validated_data.pop("training_data", None)
     validated_data["backend"] = settings.TRAINING_BACKEND
@@ -55,21 +49,18 @@ def create_job(*, project, validated_data):
             storage.put(storage.parse_uri(draft.code_snapshot_uri)[1], source_zip, "application/zip")
         else:
             _snapshot_code(project, draft, storage)
+
         if training_data:
-            storage.put(
-                storage.parse_uri(draft.data_snapshot_uri)[1], training_data, training_data.content_type or "text/csv"
-            )
+            if hasattr(training_data, "name") and training_data.name.lower().endswith(".zip"):
+                storage.put(storage.parse_uri(draft.data_snapshot_uri)[1], training_data, "application/zip")
+            else:
+                bundle = BytesIO()
+                filename = getattr(training_data, "name", "train.csv") or "train.csv"
+                with ZipFile(bundle, "w", ZIP_DEFLATED) as archive:
+                    archive.writestr(filename, training_data.read())
+                storage.put(storage.parse_uri(draft.data_snapshot_uri)[1], bundle.getvalue(), "application/zip")
         else:
             _snapshot_data(project, draft, storage)
-        if draft.reference_path:
-            key = (
-                storage.parse_uri(draft.data_snapshot_uri)[1].rsplit("/", 1)[0]
-                + "/reference/"
-                + reference_asset.relative_path.rsplit("/", 1)[-1]
-            )
-            copied = storage.copy(reference_asset.s3_uri, key)
-            draft.reference_snapshot_uri = copied.uri
-            draft.save(update_fields=["reference_snapshot_uri"])
     except Exception:
         storage.delete_prefix(training_job_prefix(project.owner.tenant_id, project.public_id, draft.public_id))
         raise
@@ -81,6 +72,11 @@ def _snapshot_code(project, job, storage):
     assets = list(project.workspace_assets.filter(kind="code"))
     if not assets:
         return
+    entry_point_found = any(asset.relative_path == job.entry_point for asset in assets)
+    if not entry_point_found:
+        raise ValidationError(
+            {"entry_point": f"The entry point file '{job.entry_point}' was not found in the workspace code."}
+        )
     bundle = BytesIO()
     with ZipFile(bundle, "w", ZIP_DEFLATED) as archive:
         for asset in assets:
@@ -91,12 +87,16 @@ def _snapshot_code(project, job, storage):
 
 
 def _snapshot_data(project, job, storage):
-    asset = project.workspace_assets.filter(kind="data").order_by("-updated_at").first()
-    if not asset:
+    assets = list(project.workspace_assets.filter(kind="data"))
+    if not assets:
         return
-    bucket, key = storage.parse_uri(asset.s3_uri)
-    body = storage.client.get_object(Bucket=bucket, Key=key)["Body"].read()
-    storage.put(storage.parse_uri(job.data_snapshot_uri)[1], body, asset.content_type or "text/csv")
+    bundle = BytesIO()
+    with ZipFile(bundle, "w", ZIP_DEFLATED) as archive:
+        for asset in assets:
+            bucket, key = storage.parse_uri(asset.s3_uri)
+            body = storage.client.get_object(Bucket=bucket, Key=key)["Body"].read()
+            archive.writestr(asset.relative_path, body)
+    storage.put(storage.parse_uri(job.data_snapshot_uri)[1], bundle.getvalue(), "application/zip")
 
 
 @transaction.atomic
@@ -113,7 +113,6 @@ def retry_job(job, *, storage=None):
         "model_flavor",
         "entry_point",
         "requirements_text",
-        "reference_path",
         "vcpu",
         "memory_mb",
         "max_runtime_seconds",
@@ -136,9 +135,6 @@ def retry_job(job, *, storage=None):
         for field, kind in (("code_snapshot_uri", "code"), ("data_snapshot_uri", "data")):
             copied = storage.copy(getattr(job, field), storage.parse_uri(uris[kind])[1])
             setattr(retry, field, copied.uri)
-        if job.reference_snapshot_uri:
-            key = storage.parse_uri(uris["data"])[1].rsplit("/", 1)[0] + "/reference/reference.csv"
-            retry.reference_snapshot_uri = storage.copy(job.reference_snapshot_uri, key).uri
         retry.save()
         record_training_event(job=retry, event_type="created", message="Training retry created from immutable inputs.")
         return submit_job(retry)
@@ -245,3 +241,4 @@ def request_output_purge(job):
         )
         transaction.on_commit(lambda: purge_training_job_outputs.delay(str(job.public_id)))
     return job
+

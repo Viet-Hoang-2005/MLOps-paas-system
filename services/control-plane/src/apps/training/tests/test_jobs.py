@@ -32,7 +32,7 @@ def test_training_job_paths_are_project_scoped(monkeypatch):
     job = TrainingJob.objects.get(public_id=response.data["id"])
     prefix = f"users/{user.tenant_id}/models/{project.public_id}/training/jobs/{job.public_id}"
     assert job.code_snapshot_uri.endswith(f"{prefix}/input/code/source.zip")
-    assert job.data_snapshot_uri.endswith(f"{prefix}/input/data/train.csv")
+    assert job.data_snapshot_uri.endswith(f"{prefix}/input/data/data.zip")
     assert job.output_uri.endswith(f"{prefix}/output/model.tar.gz")
     assert job.mlflow_artifact_uri.endswith(f"{prefix}/mlflow/")
     assert "other-tenant" not in job.code_snapshot_uri

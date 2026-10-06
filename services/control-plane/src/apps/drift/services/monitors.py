@@ -1,7 +1,4 @@
-import csv
-import io
 import uuid
-from pathlib import Path
 
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
@@ -10,10 +7,14 @@ from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor
 from apps.registry.models import ModelArtifact, ModelVersion
 from common.api.exceptions import Conflict
+from common.validation.artifacts import (
+    parse_reference_preview,
+    validate_reference_data_file,
+)
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import project_prefix, version_prefix
 
-MAX_REFERENCE_BYTES = 10 * 1024 * 1024
+MAX_REFERENCE_BYTES = 100 * 1024 * 1024
 
 
 def reference_download_url(monitor, storage=None):
@@ -23,34 +24,29 @@ def reference_download_url(monitor, storage=None):
 
 
 def validate_reference_upload(upload):
-    name = Path(upload.name.replace("\\", "/")).name
-    if not name.lower().endswith(".csv") or len(name) > 255:
-        raise ValidationError({"reference_file": "Upload a CSV file with a valid filename."})
     try:
-        content = upload.read(MAX_REFERENCE_BYTES + 1)
-        if len(content) > MAX_REFERENCE_BYTES:
-            raise ValueError
-        text = content.decode("utf-8-sig")
-        if "\x00" in text:
-            raise ValueError
-        rows = csv.reader(io.StringIO(text), strict=True)
-        header = next(rows)
-        if not header or any(not col.strip() for col in header) or len(set(header)) != len(header):
-            raise ValueError
-        count = 0
-        for row in rows:
-            if not row:
-                continue
-            if len(row) != len(header):
-                raise ValueError
-            count += 1
-        if not count:
-            raise ValueError
-    except (ValueError, UnicodeDecodeError, csv.Error, StopIteration) as exc:
-        raise ValidationError({"reference_file": "Upload a UTF-8 CSV with a header and data rows, at most 10 MiB."}) from exc
-    finally:
+        name, _ = validate_reference_data_file(upload)
         upload.seek(0)
-    return name
+        return name
+    except ValidationError as exc:
+        upload.seek(0)
+        if "reference_data_file" in exc.detail:
+            raise ValidationError({"reference_file": exc.detail["reference_data_file"]}) from exc
+        raise
+    except Exception:
+        upload.seek(0)
+        raise
+
+
+def get_monitor_reference_preview(monitor, storage=None) -> dict:
+    storage = storage or S3Storage()
+    if not monitor.reference_uri:
+        raise ValidationError({"reference_file": "This monitor does not have a reference snapshot."})
+    try:
+        raw = storage.read(monitor.reference_uri)
+    except Exception as exc:
+        raise ValidationError({"reference_file": "Could not read reference data from storage."}) from exc
+    return parse_reference_preview(raw, monitor.reference_name or "reference.csv", max_rows=100)
 
 
 def create_monitor(*, data, backend, storage=None):
@@ -79,20 +75,26 @@ def create_monitor(*, data, backend, storage=None):
             if upload and artifact:
                 raise Conflict("This version already has reference data. It cannot be replaced from monitoring.")
             if upload:
-                name = validate_reference_upload(upload)
+                name, fmt = validate_reference_data_file(upload)
+                content_type = "text/csv" if fmt == "csv" else "application/vnd.apache.parquet"
                 key = (
                     f"{version_prefix(project.owner.tenant_id, project.public_id, version.public_id)}"
                     f"/artifacts/reference_data/{public_id}/{name}"
                 )
-                stored = storage.put(key, upload, "text/csv")
+                stored = storage.put(key, upload, content_type)
                 written.append(stored.uri)
                 artifact = ModelArtifact.objects.create(
-                    version=version, kind="reference_data", name=name, uri=stored.uri,
-                    checksum=stored.checksum, size_bytes=stored.size_bytes, content_type="text/csv",
-                    metadata={"source": "drift_monitor", "monitor_id": str(public_id)},
+                    version=version,
+                    kind="reference_data",
+                    name=name,
+                    uri=stored.uri,
+                    checksum=stored.checksum,
+                    size_bytes=stored.size_bytes,
+                    content_type=content_type,
+                    metadata={"source": "drift_monitor", "monitor_id": str(public_id), "format": fmt},
                 )
             if not artifact:
-                raise ValidationError({"reference_file": "A reference CSV is required."})
+                raise ValidationError({"reference_file": "A reference CSV or Parquet file is required."})
             name = artifact.name
             key = f"{project_prefix(project.owner.tenant_id, project.public_id)}/drift/{public_id}/reference/{name}"
             stored = storage.copy(artifact.uri, key)
@@ -104,3 +106,4 @@ def create_monitor(*, data, backend, storage=None):
         for uri in reversed(written):
             storage.delete(uri)
         raise
+

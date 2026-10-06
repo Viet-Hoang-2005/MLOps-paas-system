@@ -45,8 +45,8 @@ export const monitoringVi = {
     "Bạn có chắc muốn xóa cấu hình? Không thể hoàn tác thao tác này.",
   deleteConfirm: "Xóa",
   createPage: {
-    invalidReference: "Tải lên CSV không rỗng, tối đa 10 MiB.",
-    referenceUploadHint: "CSV UTF-8 có tiêu đề và dòng dữ liệu, tối đa 10 MiB.",
+    invalidReference: "Tải lên tệp CSV hoặc Parquet hợp lệ, tối đa 100 MB.",
+    referenceUploadHint: "Tệp bảng CSV hoặc Parquet, tối đa 100 MB.",
     monitorReferenceLocked:
       "Không thể thay thế bản chụp dữ liệu tham chiếu của monitor này.",
     previewLoadFailed: "Không thể tải bản xem trước CSV.",
@@ -74,6 +74,9 @@ export const monitoringVi = {
     saving: "Đang lưu…",
     update: "Cập nhật giám sát",
     create: "Tạo giám sát",
+    parquetStagedTitle: "Đã chọn tệp Parquet",
+    parquetStagedDesc:
+      "Đã chọn tệp Parquet nhị phân. Evidently AI sẽ xử lý và kiểm tra schema khi chạy giám sát lệch dữ liệu.",
   },
   reportPage: {
     missingRun: "Chưa chỉ định lần kiểm tra lệch dữ liệu.",

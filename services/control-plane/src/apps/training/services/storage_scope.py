@@ -9,7 +9,7 @@ def expected_training_uris(job, bucket):
     )
     return {
         "code": f"s3://{bucket}/{prefix}/input/code/source.zip",
-        "data": f"s3://{bucket}/{prefix}/input/data/train.csv",
+        "data": f"s3://{bucket}/{prefix}/input/data/data.zip",
         "output": f"s3://{bucket}/{prefix}/output/model.tar.gz",
         "mlflow": f"s3://{bucket}/{prefix}/mlflow/",
     }
@@ -20,3 +20,4 @@ def validate_training_uri(job, bucket, kind, uri):
     if uri != expected:
         raise ValueError(f"Training {kind} URI is outside the job-scoped storage path.")
     return uri
+

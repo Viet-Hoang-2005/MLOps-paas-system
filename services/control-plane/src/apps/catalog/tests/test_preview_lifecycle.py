@@ -271,8 +271,9 @@ def test_training_build_provenance_survives_source_job_deletion(project):
 
     storage = MemoryStorage()
     code = storage.put("input/code.zip", SimpleUploadedFile("code.zip", b"code"), "application/zip")
-    reference = storage.put("input/reference.csv", SimpleUploadedFile("reference.csv", b"x\n1\n"), "text/csv")
     output = storage.put("output/model.tar.gz", SimpleUploadedFile("model.tar.gz", b"model"), "application/gzip")
+    source_file = storage.put("output/train.py", SimpleUploadedFile("train.py", b"print(1)"), "text/x-python")
+    ref_file = storage.put("output/reference.csv", SimpleUploadedFile("reference.csv", b"x\n1\n"), "text/csv")
     job = TrainingJob.objects.create(
         project=project,
         name="trained",
@@ -280,9 +281,10 @@ def test_training_build_provenance_survives_source_job_deletion(project):
         status="completed",
         entry_point="train.py",
         code_snapshot_uri=code.uri,
-        reference_snapshot_uri=reference.uri,
     )
     TrainingOutput.objects.create(job=job, kind="model", relative_path="model.tar.gz", s3_uri=output.uri)
+    TrainingOutput.objects.create(job=job, kind="source_code", relative_path="train.py", s3_uri=source_file.uri)
+    TrainingOutput.objects.create(job=job, kind="reference_data", relative_path="reference.csv", s3_uri=ref_file.uri)
     build, _ = request_training_build(job=job, backend="docker", storage=storage)
     job_id = job.public_id
     complete_build(build, image_uri="temporary")
@@ -396,8 +398,7 @@ def test_training_retry_preserves_frozen_inputs_not_updated_workspace(project, m
     inputs = {}
     for kind, name, content in (
         ("code", "code.zip", b"old code"),
-        ("data", "train.csv", b"old data"),
-        ("reference", "reference.csv", b"old reference"),
+        ("data", "data.zip", b"old data"),
     ):
         inputs[kind] = storage.put(f"original/{name}", SimpleUploadedFile(name, content), "application/octet-stream")
     job = TrainingJob.objects.create(
@@ -407,21 +408,17 @@ def test_training_retry_preserves_frozen_inputs_not_updated_workspace(project, m
         model_flavor="xgboost",
         code_snapshot_uri=inputs["code"].uri,
         data_snapshot_uri=inputs["data"].uri,
-        reference_snapshot_uri=inputs["reference"].uri,
-        reference_path="reference.csv",
     )
     WorkspaceAsset.objects.create(
-        project=project, kind="data", relative_path="reference.csv", s3_uri="s3://test-bucket/new-workspace.csv"
+        project=project, kind="data", relative_path="data.zip", s3_uri="s3://test-bucket/new-workspace.zip"
     )
     monkeypatch.setattr("apps.observability.services.outbox._publish_pending", lambda: None)
     retry = retry_job(job, storage=storage)
     assert retry.status == "queued"
     assert retry.retry_of_id == job.pk
-    assert retry.reference_path == "reference.csv"
     for field, kind in (
         ("code_snapshot_uri", "code"),
         ("data_snapshot_uri", "data"),
-        ("reference_snapshot_uri", "reference"),
     ):
         assert str(retry.public_id) in getattr(retry, field)
         assert storage.read(getattr(retry, field)) == storage.read(inputs[kind].uri)

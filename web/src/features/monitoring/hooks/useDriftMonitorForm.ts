@@ -19,7 +19,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export const THRESHOLD_VALUES = [500, 1000, 2000, 5000, 10000, 20000];
-const MAX_REFERENCE_BYTES = 10 * 1024 * 1024;
+const MAX_REFERENCE_BYTES = 100 * 1024 * 1024;
 
 export function useDriftMonitorForm(
   monitorId: string | undefined,
@@ -69,7 +69,13 @@ export function useDriftMonitorForm(
   });
   const localReference = useQuery({
     queryKey: driftQueryKeys.uploadPreview(upload?.id ?? ""),
-    queryFn: () => reference!.text(),
+    queryFn: async () => {
+      if (!reference) return "";
+      if (reference.name.toLowerCase().endsWith(".parquet")) {
+        return "PARQUET_PREVIEW";
+      }
+      return await reference.text();
+    },
     enabled: Boolean(reference),
   });
   const referenceQuery = monitorId
@@ -158,8 +164,9 @@ export function useDriftMonitorForm(
       setFileError("");
       setUpload(null);
       if (!file) return;
+      const lower = file.name.toLowerCase();
       if (
-        !file.name.toLowerCase().endsWith(".csv") ||
+        (!lower.endsWith(".csv") && !lower.endsWith(".parquet")) ||
         !file.size ||
         file.size > MAX_REFERENCE_BYTES
       ) {

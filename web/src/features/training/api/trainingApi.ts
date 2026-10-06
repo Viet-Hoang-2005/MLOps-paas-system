@@ -10,9 +10,11 @@ import type {
   TrainingJobListResponse,
   TrainingJobLogsResponse,
   TrainingJobMetricsResponse,
+  TrainingJobModelOutputSummary,
   TrainingJobStatus,
   TrainingRuntimeCapabilities,
   TrainingUsageResponse,
+  ReferenceDataPreview,
 } from "@/features/training/types";
 
 const trainingJobFormData = (payload: TrainingJobFormValues) => {
@@ -21,7 +23,6 @@ const trainingJobFormData = (payload: TrainingJobFormValues) => {
   formData.append("model_flavor", payload.model_flavor);
   formData.append("project", payload.project_id || "");
   formData.append("entry_point", payload.entry_point || "train.py");
-  formData.append("reference_path", payload.reference_path || "");
   formData.append("requirements_text", payload.requirements_text);
   formData.append("vcpu", String(payload.vcpu));
   formData.append("memory_mb", String(payload.memory));
@@ -190,5 +191,52 @@ export const deleteTrainingJob = async (
   (
     await apiClient.delete<TrainingJobDeletionRequest>(
       controlPlaneURL(`/training-jobs/${jobId}/`),
+    )
+  ).data;
+
+export const getModelOutputSummary = async (
+  jobId: string,
+): Promise<TrainingJobModelOutputSummary> =>
+  (
+    await apiClient.get<TrainingJobModelOutputSummary>(
+      controlPlaneURL(`/training-jobs/${jobId}/model-output/`),
+    )
+  ).data;
+
+export const patchModelOutput = async (
+  jobId: string,
+  payload: {
+    output_revision: number;
+    source_code_file?: File | null;
+    reference_data_file?: File | null;
+    remove_assets?: string[];
+  },
+): Promise<TrainingJobModelOutputSummary> => {
+  const formData = new FormData();
+  formData.append("output_revision", String(payload.output_revision));
+  if (payload.source_code_file) {
+    formData.append("source_code_file", payload.source_code_file);
+  }
+  if (payload.reference_data_file) {
+    formData.append("reference_data_file", payload.reference_data_file);
+  }
+  if (payload.remove_assets && payload.remove_assets.length > 0) {
+    formData.append("remove_assets", JSON.stringify(payload.remove_assets));
+  }
+  return (
+    await apiClient.patch<TrainingJobModelOutputSummary>(
+      controlPlaneURL(`/training-jobs/${jobId}/model-output/`),
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    )
+  ).data;
+};
+
+export const getJobReferencePreview = async (
+  jobId: string,
+): Promise<ReferenceDataPreview> =>
+  (
+    await apiClient.get<ReferenceDataPreview>(
+      controlPlaneURL(`/training-jobs/${jobId}/reference-preview/`),
     )
   ).data;

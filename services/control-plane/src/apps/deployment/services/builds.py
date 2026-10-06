@@ -12,8 +12,8 @@ from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import build_input_prefix, build_prefix
 
 
-def request_training_build(*, job, backend, storage=None):
-    """Create or reuse the image build backed by one immutable training output."""
+def request_training_build(*, job, backend, output_revision=None, storage=None):
+    """Create or reuse the image build backed by immutable training outputs."""
 
     storage = storage or S3Storage()
     with transaction.atomic():
@@ -25,11 +25,17 @@ def request_training_build(*, job, backend, storage=None):
             raise ValidationError({"job": "Training must complete successfully before it can be registered."})
         if job.outputs_purged_at is not None:
             raise ValidationError({"job": "Training outputs have been deleted."})
+        if output_revision is not None and int(output_revision) != job.output_revision:
+            raise Conflict("Training output changed in another session. Reload before building.")
+
         existing = job.builds.filter(status__in=("pending", "queued", "building")).first()
         if existing:
             if existing.deletion_state != "active":
                 raise Conflict("Wait for the previous training build cleanup to finish.")
-            return existing, False
+            if existing.source_output_revision == job.output_revision:
+                return existing, False
+            raise Conflict("A build for this training job with a different revision is already running.")
+
         output = job.outputs.filter(kind="model").order_by("-created_at").first()
         if not output or not output.s3_uri:
             raise ValidationError({"job": "This training job has no model output."})
@@ -41,7 +47,7 @@ def request_training_build(*, job, backend, storage=None):
             flavor=job.model_flavor,
             artifact_format="training_output",
             requirements_snapshot=job.requirements_text,
-            preview_revision=job.project.preview.revision,
+            source_output_revision=job.output_revision,
             backend=backend,
             status="pending",
         )
@@ -65,24 +71,43 @@ def request_training_build(*, job, backend, storage=None):
                 content_type=stored.content_type or output.content_type,
                 metadata={"source_job_id": str(job.public_id)},
             )
-            for kind, uri in (("source_code", job.code_snapshot_uri), ("reference_data", job.reference_snapshot_uri)):
-                if not uri:
+            for supp in job.outputs.filter(kind__in=("source_code", "reference_data")):
+                if not supp.s3_uri:
                     continue
-                name = Path(uri).name
+                name = Path(supp.relative_path).name
                 copied = storage.copy(
-                    uri,
-                    f"{build_input_prefix(job.project.owner.tenant_id, job.project.public_id, build.public_id, kind)}{name}",
+                    supp.s3_uri,
+                    f"{build_input_prefix(job.project.owner.tenant_id, job.project.public_id, build.public_id, supp.kind)}{name}",
                 )
                 BuildInputAsset.objects.create(
                     build=build,
-                    kind=kind,
+                    kind=supp.kind,
                     name=name,
                     s3_uri=copied.uri,
-                    checksum=copied.checksum,
-                    size_bytes=copied.size_bytes,
-                    content_type=copied.content_type,
-                    metadata={"entry_point": job.entry_point} if kind == "source_code" else {},
+                    checksum=copied.checksum or supp.checksum,
+                    size_bytes=copied.size_bytes or supp.size_bytes,
+                    content_type=copied.content_type or supp.content_type,
+                    metadata={"entry_point": job.entry_point} if supp.kind == "source_code" else supp.metadata,
                 )
+
+            for m_out in job.outputs.filter(kind__in=("metric", "insight")):
+                if not m_out.s3_uri:
+                    continue
+                try:
+                    content = storage.read(m_out.s3_uri).decode("utf-8")
+                    val = json.loads(content)
+                    if m_out.kind == "metric" and isinstance(val, dict):
+                        build.metrics_summary = {**build.metrics_summary, **val}
+                    elif m_out.kind == "insight" and "param" in m_out.relative_path.lower() and isinstance(val, dict):
+                        build.params_summary = {**build.params_summary, **val}
+                    elif m_out.kind == "insight":
+                        if isinstance(val, dict):
+                            build.insights_summary = {**build.insights_summary, **val}
+                        elif isinstance(val, list):
+                            build.insights_summary = {**build.insights_summary, Path(m_out.relative_path).stem: val}
+                except Exception:
+                    pass
+            build.save(update_fields=["metrics_summary", "params_summary", "insights_summary"])
         except Exception:
             storage.delete_prefix(build_prefix(job.project.owner.tenant_id, job.project.public_id, build.public_id))
             raise
@@ -90,6 +115,7 @@ def request_training_build(*, job, backend, storage=None):
         build.save(update_fields=["status", "updated_at"])
         transaction.on_commit(lambda: _enqueue(build))
         return build, True
+
 
 
 def _enqueue(build):

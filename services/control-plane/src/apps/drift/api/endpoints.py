@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 
 from apps.drift.selectors import monitor_for_user, monitors_for_user, run_for_user
 from apps.drift.services.logs import drift_run_logs
-from apps.drift.services.monitors import reference_download_url
+from apps.drift.services.monitors import get_monitor_reference_preview, reference_download_url
 from apps.drift.services.reports import report_uri_for_run
 from apps.drift.services.runs import request_run
 from common.api.exceptions import Conflict
@@ -24,7 +24,10 @@ class DriftMonitorListCreateEndpoint(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         from apps.drift.services.monitors import create_monitor
 
-        serializer.instance = create_monitor(data=serializer.validated_data, backend=settings.DRIFT_BACKEND)
+        serializer.instance = create_monitor(
+            data=serializer.validated_data,
+            backend=settings.DRIFT_BACKEND,
+        )
 
 
 class DriftMonitorDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
@@ -47,6 +50,12 @@ class DriftMonitorReferenceURLEndpoint(APIView):
     def get(self, request, monitor_id):
         monitor = monitor_for_user(request.user, monitor_id)
         return Response({"url": reference_download_url(monitor)})
+
+
+class DriftMonitorReferencePreviewEndpoint(APIView):
+    def get(self, request, monitor_id):
+        monitor = monitor_for_user(request.user, monitor_id)
+        return Response(get_monitor_reference_preview(monitor))
 
 
 class DriftRunLogsEndpoint(APIView):
@@ -72,3 +81,4 @@ class DriftRunReportURLEndpoint(APIView):
         if not report_uri:
             raise Conflict("The completed drift run does not have an HTML report.")
         return Response({"url": S3Storage().presigned_get(report_uri, 900)})
+

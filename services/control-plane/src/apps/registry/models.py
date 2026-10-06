@@ -67,7 +67,14 @@ class ModelArtifact(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["version", "kind", "name"], name="registry_artifact_unique")]
+        constraints = [
+            models.UniqueConstraint(fields=["version", "kind", "name"], name="registry_artifact_unique"),
+            models.UniqueConstraint(
+                fields=["version", "kind"],
+                condition=models.Q(kind__in=["source_code", "reference_data"]),
+                name="registry_artifact_unique_supplemental_kind",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.version}: {self.kind}/{self.name}"

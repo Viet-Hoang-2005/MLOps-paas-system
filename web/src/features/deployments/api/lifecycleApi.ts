@@ -13,10 +13,14 @@ export async function buildPreview(
     )
   ).data;
 }
-export async function buildTraining(jobId: string): Promise<Build> {
+export async function buildTraining(
+  jobId: string,
+  outputRevision?: number,
+): Promise<Build> {
   return (
     await apiClient.post<Build>(
       controlPlaneURL(`/training-jobs/${jobId}/build/`),
+      outputRevision !== undefined ? { output_revision: outputRevision } : {},
     )
   ).data;
 }

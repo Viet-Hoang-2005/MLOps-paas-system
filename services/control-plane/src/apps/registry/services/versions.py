@@ -209,3 +209,110 @@ def set_alias(*, project, actor, name, version):
         },
     )
     return alias
+
+
+def add_supplemental_artifacts(*, version, actor, source_code_file=None, reference_data_file=None, storage=None):
+    from django.utils import timezone
+    from common.api.exceptions import Conflict
+    from common.validation.artifacts import (
+        validate_reference_data_file,
+        validate_source_code_file,
+    )
+
+    if not source_code_file and not reference_data_file:
+        raise ValidationError({"artifacts": "No supplemental artifact provided."})
+
+    storage = storage or S3Storage()
+    uploaded_uris = []
+    try:
+        with transaction.atomic():
+            project = type(version.project).objects.select_for_update().get(pk=version.project_id)
+            if getattr(project, "deletion_state", "active") != "active":
+                raise Conflict("This project is being deleted.")
+            version = ModelVersion.objects.select_for_update().get(pk=version.pk)
+
+            prefix = version_prefix(project.owner.tenant_id, project.public_id, version.public_id)
+
+            if source_code_file:
+                if version.artifacts.filter(kind="source_code").exists():
+                    raise Conflict("This version already has a source code artifact and cannot be replaced.")
+                filename = validate_source_code_file(source_code_file)
+                key = f"{prefix}/artifacts/supplemental/source/{filename}"
+                stored = storage.put(key, source_code_file, "text/x-python")
+                uploaded_uris.append(stored.uri)
+                ModelArtifact.objects.create(
+                    version=version,
+                    kind="source_code",
+                    name=filename,
+                    uri=stored.uri,
+                    checksum=stored.checksum,
+                    size_bytes=stored.size_bytes,
+                    content_type="text/x-python",
+                    metadata={
+                        "provenance": "supplemental_upload",
+                        "uploaded_by": getattr(actor, "username", "system"),
+                        "uploaded_at": timezone.now().isoformat(),
+                    },
+                )
+                record_registry_event(
+                    version=version,
+                    actor=actor,
+                    event_type="artifact_added",
+                    message=f"Added supplemental source code {filename}",
+                    metadata={"kind": "source_code", "name": filename},
+                )
+
+            if reference_data_file:
+                if version.artifacts.filter(kind="reference_data").exists():
+                    raise Conflict("This version already has a reference data artifact and cannot be replaced.")
+                filename, fmt = validate_reference_data_file(reference_data_file)
+                content_type = "text/csv" if fmt == "csv" else "application/vnd.apache.parquet"
+                key = f"{prefix}/artifacts/supplemental/reference/{filename}"
+                stored = storage.put(key, reference_data_file, content_type)
+                uploaded_uris.append(stored.uri)
+                ModelArtifact.objects.create(
+                    version=version,
+                    kind="reference_data",
+                    name=filename,
+                    uri=stored.uri,
+                    checksum=stored.checksum,
+                    size_bytes=stored.size_bytes,
+                    content_type=content_type,
+                    metadata={
+                        "provenance": "supplemental_upload",
+                        "format": fmt,
+                        "uploaded_by": getattr(actor, "username", "system"),
+                        "uploaded_at": timezone.now().isoformat(),
+                    },
+                )
+                record_registry_event(
+                    version=version,
+                    actor=actor,
+                    event_type="artifact_added",
+                    message=f"Added supplemental reference data {filename}",
+                    metadata={"kind": "reference_data", "name": filename, "format": fmt},
+                )
+    except Exception:
+        for uri in uploaded_uris:
+            try:
+                storage.delete(uri)
+            except Exception:
+                pass
+        raise
+
+    return version
+
+
+def get_version_reference_preview(version, storage=None) -> dict:
+    from common.validation.artifacts import parse_reference_preview
+
+    storage = storage or S3Storage()
+    artifact = version.artifacts.filter(kind="reference_data").first()
+    if not artifact or not artifact.uri:
+        raise ValidationError({"reference_data": "This version does not have a reference dataset."})
+    try:
+        raw = storage.read(artifact.uri)
+    except Exception as exc:
+        raise ValidationError({"reference_data": "Could not read reference data from storage."}) from exc
+
+    return parse_reference_preview(raw, artifact.name, max_rows=100)

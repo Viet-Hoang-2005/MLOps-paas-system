@@ -749,17 +749,26 @@ def _run() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     source_zip_path = WORKSPACE / "source.zip"
-    train_csv_path = INPUT_TRAIN_DIR / "train.csv"
+    data_download_path = WORKSPACE / "data_download"
     requirements_path = SOURCE_DIR / "requirements.txt"
     model_archive_path = OUTPUT_DIR / "model.tar.gz"
 
     download_presigned_url(source_uri, source_zip_path)
-    download_presigned_url(training_data_uri, train_csv_path)
+    download_presigned_url(training_data_uri, data_download_path)
     if requirements_uri:
         download_presigned_url(requirements_uri, requirements_path)
 
     log("Extracting source zip")
     safe_extract_zip(source_zip_path, SOURCE_DIR)
+
+    log("Extracting training data")
+    import zipfile
+
+    if zipfile.is_zipfile(data_download_path):
+        safe_extract_zip(data_download_path, INPUT_TRAIN_DIR)
+    else:
+        train_csv_path = INPUT_TRAIN_DIR / "train.csv"
+        shutil.copy(data_download_path, train_csv_path)
 
     requirements_text = os.environ.get("REQUIREMENTS_TEXT", "").strip()
     if requirements_text:

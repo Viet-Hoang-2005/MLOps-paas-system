@@ -11,7 +11,7 @@ from apps.catalog.models import ModelProject
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
 from apps.deployment.models import Build, Deployment
 from apps.drift.models import DriftMonitor
-from apps.drift.services.monitors import create_monitor, validate_reference_upload
+from apps.drift.services.monitors import MAX_REFERENCE_BYTES, create_monitor, validate_reference_upload
 from common.api.exceptions import Conflict
 
 
@@ -89,7 +89,7 @@ def test_missing_reference_and_changed_running_rejected(running_version):
     ("reference.json", b"a\n1\n"), ("empty.csv", b""), ("header.csv", b"a\n"),
     ("broken.csv", b"a,b\n1\n"), ("duplicate.csv", b"a,a\n1,2\n"),
     ("blank.csv", b"a,\n1,2\n"), ("invalid.csv", b"\xff\xfe"), ("nul.csv", b"a\n\x00\n"),
-    ("large.csv", b"a" * (10 * 1024 * 1024 + 1)),
+    ("large.csv", b"a" * (MAX_REFERENCE_BYTES + 1)),
 ], ids=["extension", "empty", "header-only", "width", "duplicate-header", "blank-header", "encoding", "nul", "oversize"])
 def test_invalid_csv_rejected_and_stream_rewound(filename, content):
     upload = SimpleUploadedFile(filename, content)

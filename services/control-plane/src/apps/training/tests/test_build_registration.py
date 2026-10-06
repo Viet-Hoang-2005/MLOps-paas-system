@@ -56,6 +56,15 @@ def completed_job(email="training-build@example.com"):
         size_bytes=42,
         content_type="application/gzip",
     )
+    TrainingOutput.objects.create(
+        job=job,
+        kind="source_code",
+        relative_path="train.py",
+        s3_uri="s3://bucket/train.py",
+        checksum="source-checksum",
+        size_bytes=100,
+        content_type="text/x-python",
+    )
     return job
 
 
@@ -81,7 +90,7 @@ def test_training_build_reuses_active_attempt_and_snapshots_output(monkeypatch, 
     assert first.flavor == "xgboost"
     assert first.requirements_snapshot == "xgboost==2.0.3"
     assert first.input_assets.get(kind="training_output").s3_uri != job.output_uri
-    assert first.input_assets.get(kind="source_code").s3_uri != job.code_snapshot_uri
+    assert first.input_assets.get(kind="source_code").s3_uri != "s3://bucket/train.py"
     assert queued == [str(first.public_id)]
 
 

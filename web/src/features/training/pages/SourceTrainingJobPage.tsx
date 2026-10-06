@@ -80,18 +80,12 @@ export default function SourceTrainingJobPage() {
           ref={dataEditor}
           modelId={flow.project.id}
           fileType="data_file"
-          title={t("createFlow.source.referenceData")}
+          title={t("createFlow.source.trainingData", {
+            defaultValue: "Training Data",
+          })}
           icon={<Database className="h-4 w-4" />}
           accept=".zip,.csv,.parquet"
           editorType="csv"
-          currentEntryPoint={flow.sourceForm.reference_path}
-          onSetEntryPoint={(file) =>
-            flow.setSourceField("reference_path", file)
-          }
-          entryPointExtension=".csv"
-          setAsMainLabel={t("createFlow.source.setReference", {
-            defaultValue: "Set as Reference",
-          })}
           onDirtyChange={(dirty) => flow.setEditorDirty("data", dirty)}
         />
         <div className="space-y-4">

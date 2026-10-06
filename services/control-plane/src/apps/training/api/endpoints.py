@@ -18,6 +18,11 @@ from apps.training.services.jobs import (
     submit_job,
 )
 from apps.training.services.logs import training_logs
+from apps.training.services.outputs import (
+    get_job_reference_preview,
+    get_model_output_summary,
+    mutate_training_output,
+)
 from common.api.exceptions import ServiceUnavailable
 from infrastructure.runtime_logs import runtime_log_page
 
@@ -129,10 +134,34 @@ class TrainingJobBuildEndpoint(APIView):
     def post(self, request, job_id):
         build, created = request_training_build(
             job=job_for_user(request.user, job_id),
+            output_revision=request.data.get("output_revision"),
             backend=settings.BUILD_BACKEND,
         )
         response_status = status.HTTP_201_CREATED if created else status.HTTP_200_OK
         return Response(TrainingBuildSerializer(build).data, status=response_status)
+
+
+class TrainingJobModelOutputEndpoint(APIView):
+    def get(self, request, job_id):
+        job = job_for_user(request.user, job_id)
+        return Response(get_model_output_summary(job))
+
+    def patch(self, request, job_id):
+        job = job_for_user(request.user, job_id)
+        data = {
+            "output_revision": request.data.get("output_revision"),
+            "source_code_file": request.FILES.get("source_code_file"),
+            "reference_data_file": request.FILES.get("reference_data_file"),
+            "remove_assets": request.data.get("remove_assets"),
+        }
+        summary = mutate_training_output(job=job, user=request.user, data=data)
+        return Response(summary, status=status.HTTP_200_OK)
+
+
+class TrainingJobReferencePreviewEndpoint(APIView):
+    def get(self, request, job_id):
+        job = job_for_user(request.user, job_id)
+        return Response(get_job_reference_preview(job))
 
 
 class TrainingJobOutputsEndpoint(APIView):

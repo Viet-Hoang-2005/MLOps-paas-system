@@ -59,8 +59,7 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "training_data",
             "code_snapshot_uri",
             "data_snapshot_uri",
-            "reference_path",
-            "reference_snapshot_uri",
+            "output_revision",
             "output_uri",
             "mlflow_artifact_uri",
             "mlflow_run_id",
@@ -93,7 +92,7 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "backend",
             "code_snapshot_uri",
             "data_snapshot_uri",
-            "reference_snapshot_uri",
+            "output_revision",
             "output_uri",
             "mlflow_artifact_uri",
             "external_job_id",
@@ -120,7 +119,7 @@ class TrainingJobSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if self.instance and any(
-            field in attrs for field in ("project", "source_zip", "training_data", "reference_path")
+            field in attrs for field in ("project", "source_zip", "training_data")
         ):
             raise serializers.ValidationError(
                 "The project and uploaded input snapshots are immutable; create a new job."
@@ -181,3 +180,4 @@ class TrainingBuildSerializer(serializers.Serializer):
     @staticmethod
     def get_source_job_id(instance):
         return instance.source_job_reference or (instance.source_job.public_id if instance.source_job_id else None)
+

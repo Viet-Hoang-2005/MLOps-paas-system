@@ -10,6 +10,11 @@ from rest_framework.exceptions import ValidationError
 from apps.catalog.artifact_types import validate_source_artifact
 from apps.catalog.models import ModelPreview, PreviewAsset
 from common.api.exceptions import Conflict
+from common.validation.artifacts import (
+    parse_reference_preview,
+    validate_reference_data_file,
+    validate_source_code_file,
+)
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import project_prefix
 
@@ -37,13 +42,17 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
             )
         elif require_artifact:
             raise ValidationError({"source_artifact_file": "A model artifact is required."})
-        for kind, suffixes in {
-            "source_code": {".py"},
-            "reference_data": {".csv"},
-            "label_mapping": {".json", ".pkl"},
-        }.items():
-            if kind in uploaded and Path(uploaded[kind].name).suffix.lower() not in suffixes:
-                raise ValidationError({FILE_FIELDS[kind]: "Unsupported file format."})
+
+        if "source_code" in uploaded:
+            validate_source_code_file(uploaded["source_code"])
+
+        if "reference_data" in uploaded:
+            _, fmt = validate_reference_data_file(uploaded["reference_data"])
+            uploaded["reference_data"].content_type = "text/csv" if fmt == "csv" else "application/vnd.apache.parquet"
+
+        if "label_mapping" in uploaded and Path(uploaded["label_mapping"].name).suffix.lower() not in {".json", ".pkl"}:
+            raise ValidationError({"label_mapping_file": "Unsupported file format."})
+
         for kind in ("metrics", "params", "model_insights", "feature_importance", "input_schema"):
             if kind in uploaded and Path(uploaded[kind].name).suffix.lower() != ".json":
                 raise ValidationError({FILE_FIELDS[kind]: "Upload a JSON file."})
@@ -60,9 +69,7 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                 if kind in {"metrics", "params", "model_insights", "input_schema"} and not isinstance(value, dict):
                     raise ValueError
             except (ValueError, UnicodeDecodeError) as exc:
-                raise ValidationError(
-                    {FILE_FIELDS[kind]: "Upload a valid JSON object (or label/importance array), at most 4 MiB."}
-                ) from exc
+                raise ValidationError({FILE_FIELDS[kind]: "Upload a valid JSON file under 4 MiB."}) from exc
             finally:
                 file.seek(0)
         written = []
@@ -109,3 +116,18 @@ def create_project_preview(*, actor, data):
         save_preview(project=project, data={**data, "revision": project.preview.revision}, require_artifact=True)
         project.refresh_from_db()
     return project
+
+
+def get_preview_reference_preview(project, storage=None) -> dict:
+    storage = storage or S3Storage()
+    preview = project.preview
+    asset = preview.assets.filter(kind="reference_data").first()
+    if not asset or not asset.s3_uri:
+        raise ValidationError({"reference_data": "This project preview does not have a reference dataset."})
+    try:
+        raw = storage.read(asset.s3_uri)
+    except Exception as exc:
+        raise ValidationError({"reference_data": "Could not read reference data from storage."}) from exc
+
+    return parse_reference_preview(raw, asset.name, max_rows=100)
+
