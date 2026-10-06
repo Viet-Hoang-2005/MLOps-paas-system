@@ -17,7 +17,10 @@ def save_project_metadata(*, actor, validated_data, project=None, storage=None):
     try:
         with transaction.atomic():
             if project is None:
-                return ModelProject.objects.create(owner=actor, **data)
+                kwargs = {**data}
+                if "project_id" in validated_data and validated_data["project_id"]:
+                    kwargs["public_id"] = validated_data["project_id"]
+                return ModelProject.objects.create(owner=actor, **kwargs)
             project = ModelProject.objects.select_for_update().get(pk=project.pk)
             if project.deletion_state != "active":
                 raise Conflict("This project is being deleted.")

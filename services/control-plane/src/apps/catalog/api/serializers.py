@@ -190,12 +190,44 @@ class ModelPreviewSerializer(serializers.ModelSerializer):
         fields = ("revision", "flavor", "artifact_format", "requirements_text", "assets", "updated_at")
 
 
+class UploadedAssetInputSerializer(serializers.Serializer):
+    kind = serializers.ChoiceField(choices=PreviewAsset.KINDS)
+    name = serializers.CharField(max_length=255)
+    s3_uri = serializers.CharField(max_length=1024)
+
+
+class PresignedUploadItemSerializer(serializers.Serializer):
+    kind = serializers.ChoiceField(choices=PreviewAsset.KINDS)
+    filename = serializers.CharField(max_length=255)
+    size_bytes = serializers.IntegerField(min_value=1, required=False)
+    content_type = serializers.CharField(
+        max_length=160, required=False, allow_blank=True, default="application/octet-stream"
+    )
+
+
+class ProjectPreviewUploadUrlsRequestSerializer(serializers.Serializer):
+    files = serializers.ListField(child=PresignedUploadItemSerializer(), min_length=1)
+
+
+class NewProjectUploadUrlsRequestSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=160)
+    flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"), required=False)
+    files = serializers.ListField(child=PresignedUploadItemSerializer(), min_length=1)
+
+    def validate_name(self, value):
+        request = self.context.get("request")
+        if request and ModelProject.objects.filter(owner=request.user, name=value, is_active=True).exists():
+            raise Conflict(f"A model project named {value} already exists.")
+        return value
+
+
 class PreviewWriteSerializer(serializers.Serializer):
     revision = serializers.IntegerField(min_value=1)
     flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"), required=False)
     artifact_format = serializers.ChoiceField(choices=("raw", "mlflow_zip"), required=False)
     requirements_text = serializers.CharField(required=False, allow_blank=True)
     remove_assets = serializers.ListField(child=serializers.ChoiceField(choices=PreviewAsset.KINDS), required=False)
+    assets = serializers.ListField(child=UploadedAssetInputSerializer(), required=False)
     source_artifact_file = serializers.FileField(required=False)
     source_code_file = serializers.FileField(required=False)
     reference_data_file = serializers.FileField(required=False)
@@ -208,9 +240,23 @@ class PreviewWriteSerializer(serializers.Serializer):
 
 
 class ProjectCreateSerializer(PreviewWriteSerializer):
+    project_id = serializers.UUIDField(required=False)
     revision = serializers.IntegerField(required=False)
     name = serializers.CharField(max_length=160)
     description = serializers.CharField(required=False, allow_blank=True, default="")
     access_mode = serializers.ChoiceField(choices=ModelProject.ACCESS_MODES, default="private")
     flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"))
-    source_artifact_file = serializers.FileField()
+    source_artifact_file = serializers.FileField(required=False)
+
+    def validate_name(self, value):
+        request = self.context.get("request")
+        if request and ModelProject.objects.filter(owner=request.user, name=value, is_active=True).exists():
+            raise Conflict(f"A model project named {value} already exists.")
+        return value
+
+    def validate(self, attrs):
+        has_file = bool(attrs.get("source_artifact_file"))
+        has_asset = any(asset.get("kind") == "source_artifact" for asset in attrs.get("assets", []))
+        if not has_file and not has_asset:
+            raise serializers.ValidationError({"source_artifact": "A model artifact is required."})
+        return attrs

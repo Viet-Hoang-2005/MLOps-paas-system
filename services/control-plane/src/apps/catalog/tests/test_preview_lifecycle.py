@@ -45,6 +45,20 @@ class MemoryStorage:
             raise ValueError("Object exceeds the allowed read size.")
         return value
 
+    def head(self, uri):
+        if uri not in self.objects:
+            raise KeyError(f"Object not found: {uri}")
+        payload = self.objects[uri]
+        key = uri.removeprefix(f"s3://{self.bucket}/")
+        return StoredObject(key, uri, "checksum", len(payload), "application/octet-stream")
+
+    def presigned_put(self, uri, expires_in=900, content_type=None):
+        return f"https://{self.bucket}.s3.test/{uri}?signature=mock"
+
+    def presigned_get(self, uri, expires_in=900):
+        return f"https://{self.bucket}.s3.test/{uri}?signature=mock-get"
+
+
     @staticmethod
     def parse_uri(uri):
         return uri.removeprefix("s3://").split("/", 1)

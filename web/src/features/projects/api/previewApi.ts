@@ -1,5 +1,6 @@
 import { apiClient } from "@/shared/api/client";
 import { controlPlaneURL } from "@/shared/api/config";
+import { uploadFileToPresignedUrl } from "@/shared/api/s3Upload";
 import type {
   ModelBuildFormValues,
   ModelProject,
@@ -12,6 +13,7 @@ export interface PreviewAsset {
   name: string;
   download_url: string;
 }
+
 export interface ModelPreview {
   revision: number;
   flavor: ModelFlavor | "";
@@ -20,42 +22,159 @@ export interface ModelPreview {
   assets: PreviewAsset[];
 }
 
-export const getPreview = async (id: string) =>
+export interface PresignedUploadItem {
+  kind: string;
+  filename: string;
+  s3_uri: string;
+  upload_url: string;
+  content_type: string;
+}
+
+export interface PresignedUploadResponse {
+  project_id: string;
+  files: PresignedUploadItem[];
+}
+
+export interface UploadedAssetReference {
+  kind: string;
+  name: string;
+  s3_uri: string;
+}
+
+interface PendingUploadFile {
+  kind: string;
+  file: File;
+}
+
+export const getPreview = async (id: string): Promise<ModelPreview> =>
   (await apiClient.get<ModelPreview>(controlPlaneURL(`/models/${id}/preview/`)))
     .data;
 
-function previewData(form: ModelBuildFormValues) {
-  const data = new FormData();
-  data.append("flavor", form.flavor);
-  data.append("artifact_format", form.artifact_format);
-  data.append("requirements_text", form.requirements_text);
-  const files: Array<[string, File | null | undefined]> = [
-    ["source_artifact_file", form.source_artifact],
-    ["source_code_file", form.source_code_file],
-    ["reference_data_file", form.reference_data_file],
-    ["label_mapping_file", form.label_mapping_file],
-    ["metrics_file", form.metrics_file],
-    ["params_file", form.params_file],
-    ["model_insights_file", form.model_insights_file],
-    ["feature_importance_file", form.feature_importance_file],
-    ["input_schema_file", form.input_schema_file],
+function extractFilesFromForm(form: ModelBuildFormValues): PendingUploadFile[] {
+  const fileEntries: Array<[string, File | null | undefined]> = [
+    ["source_artifact", form.source_artifact],
+    ["source_code", form.source_code_file],
+    ["reference_data", form.reference_data_file],
+    ["label_mapping", form.label_mapping_file],
+    ["metrics", form.metrics_file],
+    ["params", form.params_file],
+    ["model_insights", form.model_insights_file],
+    ["feature_importance", form.feature_importance_file],
+    ["input_schema", form.input_schema_file],
   ];
-  files.forEach(([key, file]) => {
-    if (file) data.append(key, file);
-  });
-  return data;
+  return fileEntries
+    .filter((entry): entry is [string, File] => Boolean(entry[1]))
+    .map(([kind, file]) => ({ kind, file }));
+}
+
+export async function getPreviewUploadUrls(
+  projectId: string,
+  files: Array<{ kind: string; filename: string; size_bytes: number; content_type?: string }>,
+): Promise<PresignedUploadResponse> {
+  return (
+    await apiClient.post<PresignedUploadResponse>(
+      controlPlaneURL(`/models/${projectId}/preview/upload-urls/`),
+      { files },
+    )
+  ).data;
+}
+
+export async function getNewProjectUploadUrls(
+  name: string,
+  flavor: string,
+  files: Array<{ kind: string; filename: string; size_bytes: number; content_type?: string }>,
+): Promise<PresignedUploadResponse> {
+  return (
+    await apiClient.post<PresignedUploadResponse>(
+      controlPlaneURL("/models/preview/upload-urls/"),
+      { name, flavor, files },
+    )
+  ).data;
+}
+
+async function uploadFilesDirectlyToS3(
+  pendingFiles: PendingUploadFile[],
+  presignedItems: PresignedUploadItem[],
+  onProgress?: (kind: string, percent: number) => void,
+): Promise<UploadedAssetReference[]> {
+  const uploadedAssets: UploadedAssetReference[] = [];
+
+  for (const item of presignedItems) {
+    const pending = pendingFiles.find((p) => p.kind === item.kind);
+    if (!pending) continue;
+
+    await uploadFileToPresignedUrl(
+      item.upload_url,
+      pending.file,
+      item.content_type,
+      (percent) => {
+        if (onProgress) {
+          onProgress(item.kind, percent);
+        }
+      },
+    );
+
+    uploadedAssets.push({
+      kind: item.kind,
+      name: item.filename,
+      s3_uri: item.s3_uri,
+    });
+  }
+
+  return uploadedAssets;
 }
 
 export async function createPreviewProject(
   form: ModelBuildFormValues,
+  onProgress?: (kind: string, percent: number) => void,
 ): Promise<ModelProject> {
-  const data = previewData(form);
-  data.append("name", form.name);
-  data.append("description", form.description);
-  data.append("access_mode", form.access_mode);
+  const pendingFiles = extractFilesFromForm(form);
+
+  if (pendingFiles.length === 0) {
+    return (
+      await apiClient.post<ModelProject>(controlPlaneURL("/models/"), {
+        name: form.name,
+        description: form.description,
+        access_mode: form.access_mode,
+        flavor: form.flavor,
+        artifact_format: form.artifact_format,
+        requirements_text: form.requirements_text,
+        assets: [],
+      })
+    ).data;
+  }
+
+  // Phase 1: Request presigned URLs and pre-allocated project_id
+  const urlPayload = pendingFiles.map((p) => ({
+    kind: p.kind,
+    filename: p.file.name,
+    size_bytes: p.file.size,
+    content_type: p.file.type || "application/octet-stream",
+  }));
+  const presignedResponse = await getNewProjectUploadUrls(
+    form.name,
+    form.flavor,
+    urlPayload,
+  );
+
+  // Phase 2: Upload files directly to S3
+  const uploadedAssets = await uploadFilesDirectlyToS3(
+    pendingFiles,
+    presignedResponse.files,
+    onProgress,
+  );
+
+  // Phase 3: Register project and preview in Django with verified asset references
   return (
-    await apiClient.post<ModelProject>(controlPlaneURL("/models/"), data, {
-      headers: { "Content-Type": "multipart/form-data" },
+    await apiClient.post<ModelProject>(controlPlaneURL("/models/"), {
+      project_id: presignedResponse.project_id,
+      name: form.name,
+      description: form.description,
+      access_mode: form.access_mode,
+      flavor: form.flavor,
+      artifact_format: form.artifact_format,
+      requirements_text: form.requirements_text,
+      assets: uploadedAssets,
     })
   ).data;
 }
@@ -65,15 +184,41 @@ export async function updatePreview(
   revision: number,
   form: ModelBuildFormValues,
   removeAssets: string[] = [],
+  onProgress?: (kind: string, percent: number) => void,
 ): Promise<ModelPreview> {
-  const data = previewData(form);
-  data.append("revision", String(revision));
-  removeAssets.forEach((kind) => data.append("remove_assets", kind));
+  const pendingFiles = extractFilesFromForm(form);
+  let uploadedAssets: UploadedAssetReference[] = [];
+
+  if (pendingFiles.length > 0) {
+    // Phase 1: Request presigned URLs
+    const urlPayload = pendingFiles.map((p) => ({
+      kind: p.kind,
+      filename: p.file.name,
+      size_bytes: p.file.size,
+      content_type: p.file.type || "application/octet-stream",
+    }));
+    const presignedResponse = await getPreviewUploadUrls(id, urlPayload);
+
+    // Phase 2: Upload directly to S3
+    uploadedAssets = await uploadFilesDirectlyToS3(
+      pendingFiles,
+      presignedResponse.files,
+      onProgress,
+    );
+  }
+
+  // Phase 3: Patch preview metadata and asset references
   return (
     await apiClient.patch<ModelPreview>(
       controlPlaneURL(`/models/${id}/preview/`),
-      data,
-      { headers: { "Content-Type": "multipart/form-data" } },
+      {
+        revision,
+        flavor: form.flavor,
+        artifact_format: form.artifact_format,
+        requirements_text: form.requirements_text,
+        assets: uploadedAssets,
+        remove_assets: removeAssets,
+      },
     )
   ).data;
 }

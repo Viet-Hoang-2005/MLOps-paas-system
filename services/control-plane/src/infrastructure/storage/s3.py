@@ -47,6 +47,20 @@ class S3Storage:
             raise ValueError("Object exceeds the allowed read size.")
         return value
 
+    def head(self, uri: str) -> StoredObject:
+        bucket, key = self.parse_uri(uri)
+        response = self.client.head_object(Bucket=bucket, Key=key)
+        metadata = response.get("Metadata", {})
+        etag = response.get("ETag", "").strip('"')
+        checksum = metadata.get("sha256", etag)
+        return StoredObject(
+            key=key,
+            uri=uri,
+            checksum=checksum,
+            size_bytes=response.get("ContentLength", 0),
+            content_type=response.get("ContentType", "application/octet-stream"),
+        )
+
     def presigned_get(self, uri, expires_in=900):
         bucket, key = self.parse_uri(uri)
         return self.client.generate_presigned_url(

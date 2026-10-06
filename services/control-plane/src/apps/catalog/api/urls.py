@@ -4,8 +4,10 @@ from .endpoints import (
     ModelProjectDetailEndpoint,
     ModelProjectListCreateEndpoint,
     ProjectBuildEndpoint,
+    ProjectCreateUploadUrlsEndpoint,
     ProjectPreviewEndpoint,
     ProjectPreviewReferencePreviewEndpoint,
+    ProjectPreviewUploadUrlsEndpoint,
     RunningSourceEndpoint,
     TrainingProjectCreateEndpoint,
     WorkspaceFilesEndpoint,
@@ -14,8 +16,14 @@ from .endpoints import (
 urlpatterns = [
     path("", ModelProjectListCreateEndpoint.as_view(), name="model-list"),
     path("training-projects/", TrainingProjectCreateEndpoint.as_view(), name="training-project-create"),
+    path("preview/upload-urls/", ProjectCreateUploadUrlsEndpoint.as_view(), name="project-create-upload-urls"),
     path("<uuid:project_id>/", ModelProjectDetailEndpoint.as_view(), name="model-detail"),
     path("<uuid:project_id>/preview/", ProjectPreviewEndpoint.as_view(), name="project-preview"),
+    path(
+        "<uuid:project_id>/preview/upload-urls/",
+        ProjectPreviewUploadUrlsEndpoint.as_view(),
+        name="project-preview-upload-urls",
+    ),
     path(
         "<uuid:project_id>/preview/reference-preview/",
         ProjectPreviewReferencePreviewEndpoint.as_view(),
@@ -25,4 +33,3 @@ urlpatterns = [
     path("<uuid:project_id>/builds/", ProjectBuildEndpoint.as_view(), name="project-builds"),
     path("<uuid:project_id>/workspace/<str:kind>/files/", WorkspaceFilesEndpoint.as_view(), name="workspace-files"),
 ]
-

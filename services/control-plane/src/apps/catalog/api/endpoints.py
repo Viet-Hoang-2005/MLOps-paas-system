@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -6,20 +8,27 @@ from rest_framework.views import APIView
 from apps.catalog.models import ModelProject
 from apps.catalog.selectors import project_for_user
 from apps.catalog.services.deletion import request_project_deletion
-from apps.catalog.services.preview import create_project_preview, save_preview
+from apps.catalog.services.preview import (
+    create_project_preview,
+    generate_preview_upload_urls,
+    save_preview,
+)
 from apps.catalog.services.project_metadata import save_project_metadata
 from apps.catalog.services.workspace import delete_workspace_file, save_workspace_file
 from apps.deployment.api.serializers import (
     BuildSerializer,
 )
 from apps.deployment.services.builds import request_preview_build
+from common.api.exceptions import Conflict
 
 from .serializers import (
     ModelPreviewSerializer,
     ModelProjectSerializer,
+    NewProjectUploadUrlsRequestSerializer,
     PreviewWriteSerializer,
     ProjectCreateSerializer,
     ProjectMetadataWriteSerializer,
+    ProjectPreviewUploadUrlsRequestSerializer,
     WorkspaceAssetSerializer,
     WorkspaceUploadSerializer,
 )
@@ -37,7 +46,7 @@ class ModelProjectListCreateEndpoint(generics.ListCreateAPIView):
         )
 
     def create(self, request, *args, **kwargs):
-        serializer = ProjectCreateSerializer(data=request.data)
+        serializer = ProjectCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         project = create_project_preview(actor=request.user, data=serializer.validated_data)
         return Response(ModelProjectSerializer(project).data, status=status.HTTP_201_CREATED)
@@ -116,6 +125,38 @@ class ProjectPreviewEndpoint(APIView):
         return Response(ModelPreviewSerializer(preview).data)
 
 
+class ProjectPreviewUploadUrlsEndpoint(APIView):
+    def post(self, request, project_id):
+        project = project_for_user(request.user, project_id)
+        if not project.is_active or project.deletion_state != "active":
+            raise Conflict("This project is being deleted.")
+        serializer = ProjectPreviewUploadUrlsRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        files = generate_preview_upload_urls(
+            tenant_id=project.owner.tenant_id,
+            project_id=str(project.public_id),
+            files_data=serializer.validated_data["files"],
+            flavor=project.preview.flavor,
+            artifact_format=project.preview.artifact_format,
+        )
+        return Response({"project_id": str(project.public_id), "files": files})
+
+
+class ProjectCreateUploadUrlsEndpoint(APIView):
+    def post(self, request):
+        serializer = NewProjectUploadUrlsRequestSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        project_id = uuid.uuid4()
+        tenant_id = request.user.tenant_id
+        files = generate_preview_upload_urls(
+            tenant_id=tenant_id,
+            project_id=str(project_id),
+            files_data=serializer.validated_data["files"],
+            flavor=serializer.validated_data.get("flavor"),
+        )
+        return Response({"project_id": str(project_id), "files": files})
+
+
 class ProjectPreviewReferencePreviewEndpoint(APIView):
     def get(self, request, project_id):
         from apps.catalog.services.preview import get_preview_reference_preview
@@ -143,4 +184,3 @@ class ProjectBuildEndpoint(APIView):
         revision = serializers.IntegerField(min_value=1).run_validation(request.data.get("revision"))
         build = request_preview_build(project=project, revision=revision, backend=settings.BUILD_BACKEND)
         return Response(BuildSerializer(build).data, status=status.HTTP_201_CREATED)
-
