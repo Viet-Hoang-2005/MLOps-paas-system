@@ -15,8 +15,10 @@ class StoredObject:
 
 
 class S3Storage:
-    def __init__(self, client=None, bucket=None):
+    def __init__(self, client=None, bucket=None, client_config=None):
         kwargs = {"region_name": settings.AWS_S3_REGION_NAME}
+        if client_config is not None:
+            kwargs["config"] = client_config
         if settings.AWS_S3_ENDPOINT_URL:
             kwargs["endpoint_url"] = settings.AWS_S3_ENDPOINT_URL
         self.client = client or boto3.client("s3", **kwargs)

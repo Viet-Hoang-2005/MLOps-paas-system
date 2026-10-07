@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+import docker.errors
+from infrastructure.execution.job_containers import labels_for
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
@@ -41,8 +43,8 @@ class DockerDriftAsyncTests(TestCase):
         self.owner, self.project, self.version, self.monitor, self.drift_run = _create_drift_fixtures()
 
     def test_docker_drift_run_dispatches_without_blocking(self):
-        fake_container = SimpleNamespace(id="drift-container-123")
-        docker_client = SimpleNamespace(run=Mock(return_value=fake_container))
+        fake_container = SimpleNamespace(id="drift-container-123", attrs={})
+        docker_client = SimpleNamespace(run=Mock(return_value=fake_container), client=SimpleNamespace(containers=SimpleNamespace(get=Mock(side_effect=docker.errors.NotFound("missing")))))
         storage = SimpleNamespace(
             bucket="bucket",
             presigned_get=Mock(return_value="https://s3.test/presigned-get"),
@@ -69,9 +71,11 @@ class DockerDriftAsyncTests(TestCase):
         backend = DockerDriftBackend(docker_client=docker_client, storage=SimpleNamespace())
 
         self.drift_run.external_run_id = "running-drift-id"
+        container_mock.id = "running-drift-id"
+        container_mock.attrs["Config"] = {"Labels": labels_for(self.drift_run, "drift")}
         result = backend.poll(self.drift_run)
 
-        self.assertEqual(result, {"status": "running"})
+        self.assertEqual(result, {"status": "running", "runtime_id": "running-drift-id"})
         container_mock.reload.assert_called_once()
         container_mock.remove.assert_not_called()
 
@@ -85,11 +89,13 @@ class DockerDriftAsyncTests(TestCase):
         backend = DockerDriftBackend(docker_client=docker_client, storage=SimpleNamespace())
 
         self.drift_run.external_run_id = "completed-drift-id"
+        container_mock.id = "completed-drift-id"
+        container_mock.attrs["Config"] = {"Labels": labels_for(self.drift_run, "drift")}
         result = backend.poll(self.drift_run)
 
         self.assertEqual(result["status"], "completed")
         self.assertEqual(result["exit_code"], 0)
-        container_mock.remove.assert_called_once_with(force=True)
+        container_mock.remove.assert_not_called()
 
     def test_docker_drift_poll_failed(self):
         container_mock = Mock()
@@ -101,12 +107,14 @@ class DockerDriftAsyncTests(TestCase):
         backend = DockerDriftBackend(docker_client=docker_client, storage=SimpleNamespace())
 
         self.drift_run.external_run_id = "failed-drift-id"
+        container_mock.id = "failed-drift-id"
+        container_mock.attrs["Config"] = {"Labels": labels_for(self.drift_run, "drift")}
         result = backend.poll(self.drift_run)
 
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["exit_code"], 1)
         self.assertIn("Missing required feature columns", result["error"])
-        container_mock.remove.assert_called_once_with(force=True)
+        container_mock.remove.assert_not_called()
 
     def test_execute_drift_run_dispatches_and_schedules_poll(self):
         fake_backend = Mock()

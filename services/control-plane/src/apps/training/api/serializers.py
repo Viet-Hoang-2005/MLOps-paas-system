@@ -71,6 +71,10 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "external_job_id",
             "celery_task_id",
             "status",
+            "observation_status",
+            "observation_error",
+            "execution_deadline_at",
+            "runtime_started_at",
             "vcpu",
             "memory_mb",
             "max_runtime_seconds",
@@ -93,6 +97,7 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = (
+            "observation_status", "observation_error", "execution_deadline_at", "runtime_started_at",
             "backend",
             "code_snapshot_uri",
             "data_snapshot_uri",
@@ -122,6 +127,9 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             self.fields["project"].queryset = ModelProject.objects.filter(owner=request.user, is_active=True)
 
     def validate(self, attrs):
+        from apps.training.services.resources import validate_resources
+
+        validate_resources(attrs, self.instance)
         if self.instance and any(
             field in attrs for field in ("project", "source_zip", "training_data")
         ):

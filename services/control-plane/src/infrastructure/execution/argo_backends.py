@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from apps.deployment.models import Endpoint
 from apps.deployment.services.callbacks import issue_callback_token
@@ -29,6 +30,33 @@ class _ArgoBackend:
     def trigger(self, payload):
         response = self.client.trigger(getattr(settings, self.setting_name), payload)
         return {"dispatched": True, "response": response}
+
+    def poll(self, resource):
+        # Actual cluster observations arrive through the scoped reconcile workflow.
+        return {"status": "not_found"}
+
+    def persist_dispatch(self, resource, **fields):
+        from common.api.exceptions import Conflict
+        project = resource.project if hasattr(resource, "project") else resource.monitor.version.project
+        with transaction.atomic():
+            locked_project = type(project).objects.select_for_update().get(pk=project.pk)
+            rows = type(resource).objects.filter(pk=resource.pk).exclude(status__in=["cancelling", "cancelled", "failed", "completed"]).filter(execution_stop_requested=False)
+            if resource.execution_check_token:
+                rows = rows.filter(execution_check_token=resource.execution_check_token, execution_check_lease_until__gt=timezone.now())
+            if locked_project.deletion_state != "active" or not rows.update(**fields):
+                raise Conflict("Execution is inactive or dispatch lease expired.")
+
+    def reconcile(self, resource, kind, token, stop=False):
+        from apps.observability.services.executions import project_for, signed_observation_token
+
+        project = project_for(resource, kind)
+        return self.client.trigger(settings.ARGO_RECONCILE_WEBHOOK_URL, {
+            "kind": kind, "resource_id": str(resource.public_id),
+            "project_id": str(project.public_id), "tenant_id": str(project.owner.tenant_id),
+            "stop": stop,
+            "callback_url": f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/executions/{kind}/{resource.public_id}/observations/",
+            "callback_token": signed_observation_token(kind, resource, token),
+        })
 
 
 class ArgoBuildBackend(_ArgoBackend):
@@ -94,8 +122,8 @@ class ArgoTrainingBackend(_ArgoBackend):
         validate_training_uri(job, self.storage.bucket, "code", job.code_snapshot_uri)
         validate_training_uri(job, self.storage.bucket, "data", job.data_snapshot_uri)
         validate_training_uri(job, self.storage.bucket, "output", job.output_uri)
-        output_upload_capability = issue_capability(job, "output_upload")
-        reporter_capability = issue_capability(job, "trusted_reporter")
+        output_upload_capability = issue_capability(job, "output_upload", preserve_existing=True)
+        reporter_capability = issue_capability(job, "trusted_reporter", preserve_existing=True)
         job.external_job_id = runtime_name
         job.tracking = {
             **job.tracking,
@@ -107,7 +135,7 @@ class ArgoTrainingBackend(_ArgoBackend):
                 "pod_selector": f"mlops.io/training-job-id={job.public_id}",
             },
         }
-        job.save(update_fields=["external_job_id", "tracking", "updated_at"])
+        self.persist_dispatch(job, external_job_id=job.external_job_id, tracking=job.tracking)
         return self.trigger(
             {
                 "job_id": str(job.public_id),
@@ -116,6 +144,10 @@ class ArgoTrainingBackend(_ArgoBackend):
                 "job_name": runtime_name,
                 "vcpu": job.vcpu,
                 "memory": job.memory_mb,
+                "max_runtime_seconds": job.max_runtime_seconds,
+                "dispatch_timeout_seconds": settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS,
+                "input_download_url": f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/training-jobs/{job.public_id}/input-download-urls/",
+                "input_download_capability": issue_capability(job, "input_download", preserve_existing=True),
                 "accelerator_type": job.accelerator_type,
                 "accelerator_count": job.accelerator_count,
                 "s3_source_uri": self.storage.presigned_get(
@@ -268,10 +300,12 @@ class ArgoDriftBackend(_ArgoBackend):
         drift_run.report_html_uri = uris["report.html"]
         drift_run.report_json_uri = uris["report.json"]
         drift_run.summary_uri = uris["summary.json"]
-        drift_run.save(update_fields=["report_html_uri", "report_json_uri", "summary_uri"])
+        self.persist_dispatch(drift_run, report_html_uri=drift_run.report_html_uri, report_json_uri=drift_run.report_json_uri, summary_uri=drift_run.summary_uri)
         return self.trigger(
             {
                 "job_id": str(drift_run.public_id),
+                "max_runtime_seconds": settings.DRIFT_MAX_RUNTIME_SECONDS,
+                "dispatch_timeout_seconds": settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS,
                 "monitor_id": str(monitor.public_id),
                 "tenant_id": project.owner.tenant_id,
                 "project_id": str(project.public_id),

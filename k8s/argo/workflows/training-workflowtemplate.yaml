@@ -35,6 +35,9 @@ spec:
           - {name: control_plane_webhook_url}
           - {name: reporter_capability}
           - {name: requirements_text, value: ""}
+          - {name: max_runtime_seconds}
+          - {name: input_download_url}
+          - {name: input_download_capability}
       steps:
         - - name: run-cpu-pytorch-job
             template: cpu-pytorch-job
@@ -54,6 +57,9 @@ spec:
                 - {name: entry_point, value: "{{inputs.parameters.entry_point}}"}
                 - {name: model_version, value: "{{inputs.parameters.model_version}}"}
                 - {name: requirements_text, value: "{{inputs.parameters.requirements_text}}"}
+                - {name: max_runtime_seconds, value: "{{inputs.parameters.max_runtime_seconds}}"}
+                - {name: input_download_url, value: "{{inputs.parameters.input_download_url}}"}
+                - {name: input_download_capability, value: "{{inputs.parameters.input_download_capability}}"}
           - name: run-gpu-pytorch-job
             template: gpu-pytorch-job
             when: "'{{inputs.parameters.accelerator_type}}' == 'gpu' && {{inputs.parameters.accelerator_count}} > 0"
@@ -73,6 +79,9 @@ spec:
                 - {name: entry_point, value: "{{inputs.parameters.entry_point}}"}
                 - {name: model_version, value: "{{inputs.parameters.model_version}}"}
                 - {name: requirements_text, value: "{{inputs.parameters.requirements_text}}"}
+                - {name: max_runtime_seconds, value: "{{inputs.parameters.max_runtime_seconds}}"}
+                - {name: input_download_url, value: "{{inputs.parameters.input_download_url}}"}
+                - {name: input_download_capability, value: "{{inputs.parameters.input_download_capability}}"}
     - name: cpu-pytorch-job
       inputs:
         parameters:
@@ -89,6 +98,9 @@ spec:
           - {name: entry_point}
           - {name: model_version}
           - {name: requirements_text}
+          - {name: max_runtime_seconds}
+          - {name: input_download_url}
+          - {name: input_download_capability}
       resource:
         action: create
         successCondition: status.replicaStatuses.Master.succeeded == 1
@@ -147,6 +159,9 @@ spec:
                           - {name: REQUIREMENTS_TEXT, value: {{=toJson(inputs.parameters.requirements_text)}}}
                           - {name: TRAINING_JOB_ID, value: {{=toJson(inputs.parameters.job_id)}}}
                           - {name: TENANT_ID, value: {{=toJson(inputs.parameters.tenant_id)}}}
+                          - {name: MAX_RUNTIME_SECONDS, value: {{=toJson(inputs.parameters.max_runtime_seconds)}}}
+                          - {name: S3_INPUT_DOWNLOAD_URL, value: {{=toJson(inputs.parameters.input_download_url)}}}
+                          - {name: S3_INPUT_DOWNLOAD_CAPABILITY, value: {{=toJson(inputs.parameters.input_download_capability)}}}
                           - {name: ENTRY_POINT, value: {{=toJson(inputs.parameters.entry_point)}}}
                           - {name: MODEL_VERSION, value: {{=toJson(inputs.parameters.model_version)}}}
     - name: gpu-pytorch-job
@@ -166,6 +181,9 @@ spec:
           - {name: entry_point}
           - {name: model_version}
           - {name: requirements_text}
+          - {name: max_runtime_seconds}
+          - {name: input_download_url}
+          - {name: input_download_capability}
       resource:
         action: create
         successCondition: status.replicaStatuses.Master.succeeded == 1
@@ -232,6 +250,9 @@ spec:
                           - {name: REQUIREMENTS_TEXT, value: {{=toJson(inputs.parameters.requirements_text)}}}
                           - {name: TRAINING_JOB_ID, value: {{=toJson(inputs.parameters.job_id)}}}
                           - {name: TENANT_ID, value: {{=toJson(inputs.parameters.tenant_id)}}}
+                          - {name: MAX_RUNTIME_SECONDS, value: {{=toJson(inputs.parameters.max_runtime_seconds)}}}
+                          - {name: S3_INPUT_DOWNLOAD_URL, value: {{=toJson(inputs.parameters.input_download_url)}}}
+                          - {name: S3_INPUT_DOWNLOAD_CAPABILITY, value: {{=toJson(inputs.parameters.input_download_capability)}}}
                           - {name: ENTRY_POINT, value: {{=toJson(inputs.parameters.entry_point)}}}
                           - {name: MODEL_VERSION, value: {{=toJson(inputs.parameters.model_version)}}}
     - name: report-status

@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -148,15 +149,22 @@ def test_execute_failure_does_not_overwrite_cancelling(monkeypatch):
     assert job.status == "cancelling"
 
 
+@pytest.mark.django_db
 def test_docker_cancel_waits_for_exit_and_removes_container():
+    from infrastructure.execution.job_containers import labels_for
+    _, job = training_job(status="running")
+    job.external_job_id = "container-id"
     calls = []
 
     class Container:
-        def kill(self):
-            calls.append("kill")
+        id = "container-id"
+        attrs = {"Config": {"Labels": labels_for(job, "training")}, "State": {"Status": "running"}}
 
-        def wait(self, timeout):
-            calls.append(("wait", timeout))
+        def reload(self):
+            pass
+
+        def stop(self, timeout):
+            calls.append(("stop", timeout))
 
         def remove(self, force):
             calls.append(("remove", force))
@@ -166,24 +174,24 @@ def test_docker_cancel_waits_for_exit_and_removes_container():
     )
     backend = DockerTrainingBackend(docker_client=docker_client, storage=SimpleNamespace())
 
-    result = backend.cancel(SimpleNamespace(external_job_id="container-id"))
+    result = backend.cancel(job)
 
     assert result == {"dispatched": False, "confirmed": True}
-    assert calls == ["kill", ("wait", 30), ("remove", True)]
+    assert calls == [("stop", 30), ("remove", True)]
 
 
-def test_docker_cancel_retries_when_execution_started_before_container_registration():
+@pytest.mark.django_db
+def test_docker_cancel_adopts_runtime_before_container_registration():
+    from infrastructure.execution.job_containers import labels_for
+    _, job = training_job(status="running")
+    container = Mock(id="unregistered", attrs={"Config": {"Labels": labels_for(job, "training")}, "State": {"Status": "running"}})
     backend = DockerTrainingBackend(
-        docker_client=SimpleNamespace(client=SimpleNamespace()),
+        docker_client=SimpleNamespace(client=SimpleNamespace(containers=SimpleNamespace(get=Mock(return_value=container)))),
         storage=SimpleNamespace(),
     )
 
-    result = backend.cancel(
-        SimpleNamespace(
-            started_at=timezone.now(),
-            external_job_id="",
-        )
-    )
+    result = backend.cancel(job)
 
-    assert result["confirmed"] is False
-    assert result["retry"] is True
+    assert result["confirmed"] is True
+    container.stop.assert_called_once_with(timeout=30)
+    container.remove.assert_called_once_with(force=True)

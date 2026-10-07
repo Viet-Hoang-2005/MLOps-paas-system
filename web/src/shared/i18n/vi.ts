@@ -1,4 +1,8 @@
 export const commonVi = {
+  execution: {
+    retrying: "Tạm thời chưa cập nhật được trạng thái thực thi. Đang kiểm tra lại.",
+    cleanup_pending: "Đang dừng runtime và chờ hoàn tất dọn dẹp.",
+  },
   actions: {
     back: "Quay lại",
     close: "Đóng",

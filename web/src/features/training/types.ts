@@ -41,6 +41,10 @@ export interface TrainingOutput {
 }
 
 export interface TrainingJob {
+  observation_status?: "ok" | "retrying" | "cleanup_pending";
+  observation_error?: string;
+  execution_deadline_at?: string | null;
+  runtime_started_at?: string | null;
   id: ResourceId;
   project_id: ResourceId;
   output_revision: number;
@@ -120,6 +124,7 @@ export interface TrainingJobFormValues {
 }
 
 export interface TrainingRuntimeCapabilities {
+  runtime_options_seconds?: number[];
   enabled: boolean;
   backend: "docker" | "argo";
   cpu_profiles: Array<{ id: string; vcpu: number; memory_mb: number }>;

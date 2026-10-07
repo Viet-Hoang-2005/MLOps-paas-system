@@ -1,4 +1,8 @@
 export const commonEn = {
+  execution: {
+    retrying: "Execution status is temporarily unavailable. Checking again.",
+    cleanup_pending: "Stopping the runtime. Cleanup is pending.",
+  },
   language: {
     label: "Language",
     current: "Language: {{language}}",

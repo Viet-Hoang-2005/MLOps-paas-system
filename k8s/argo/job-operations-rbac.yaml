@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-job-operations-sa
+  namespace: mlops-execution
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-job-operations
+  namespace: mlops-execution
+rules:
+  - apiGroups: [argoproj.io]
+    resources: [workflows]
+    verbs: [get, create, patch]
+  - apiGroups: [argoproj.io]
+    resources: [workflowtaskresults]
+    verbs: [create, patch]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-job-operations
+  namespace: mlops-execution
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: argo-job-operations}
+subjects:
+  - {kind: ServiceAccount, name: argo-job-operations-sa, namespace: mlops-execution}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-job-observation
+  namespace: user-jobs
+rules:
+  - apiGroups: [kubeflow.org]
+    resources: [pytorchjobs]
+    verbs: [get, delete]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-job-observation
+  namespace: user-jobs
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: argo-job-observation}
+subjects:
+  - {kind: ServiceAccount, name: argo-job-operations-sa, namespace: mlops-execution}

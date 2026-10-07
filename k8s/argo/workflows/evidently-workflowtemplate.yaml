@@ -9,6 +9,8 @@ spec:
   podMetadata:
     labels:
       mlops.io/drift-run-id: "{{workflow.parameters.job_id}}"
+      mlops.io/project-id: "{{workflow.parameters.project_id}}"
+      mlops.io/tenant-id: "{{workflow.parameters.tenant_id}}"
   arguments:
     parameters:
       - name: job_id

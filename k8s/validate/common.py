@@ -64,7 +64,7 @@ WORKLOAD_APPLICATIONS = {
     "mlops-prod-workload-model-server": ("model-server", "mlops-paas-model-server"),
     "mlops-prod-workload-web": ("web", "mlops-paas-web"),
 }
-ARGO_WEBHOOK_EVENTS = {"build", "deploy", "delete", "drift", "train", "cancel-train"}
+ARGO_WEBHOOK_EVENTS = {"build", "deploy", "delete", "drift", "train", "cancel-train", "reconcile"}
 LEGACY_SHARED_SECRET_TARGETS = {
     "mlops-paas-secret",
     "postgres-secrets",

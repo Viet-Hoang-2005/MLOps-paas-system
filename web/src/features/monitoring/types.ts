@@ -1,6 +1,10 @@
 import type { ResourceId } from "@/shared/types";
 
 export interface DriftMonitoringResult {
+  observation_status?: "ok" | "retrying" | "cleanup_pending";
+  observation_error?: string;
+  execution_deadline_at?: string | null;
+  runtime_started_at?: string | null;
   id: ResourceId;
   status: string;
   report_html_uri: string;

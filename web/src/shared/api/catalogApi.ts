@@ -1,4 +1,5 @@
 import { apiClient } from "@/shared/api/client";
+import { inferenceClient } from "@/shared/api/inferenceClient";
 import { controlPlaneURL } from "@/shared/api/config";
 import { fetchAllPages } from "@/shared/api/pagination";
 import type { MessageResponse } from "@/shared/types";
@@ -145,7 +146,7 @@ export const predictWithModelProject = async (
   endpointUrl: string,
   features: Record<string, unknown>,
 ): Promise<ModelPredictionResponse> =>
-  (await apiClient.post<ModelPredictionResponse>(endpointUrl, { features }))
+  (await inferenceClient.post<ModelPredictionResponse>(endpointUrl, { features }))
     .data;
 
 export const listSourceCodeFiles = async (

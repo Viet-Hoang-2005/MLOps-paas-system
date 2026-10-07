@@ -48,7 +48,8 @@ class MetricsEndpoint(APIView):
     permission_classes = (AllowAny,)
 
     def get(self, request):
-        return HttpResponse(generate_latest() + shared_celery_metrics(), content_type=CONTENT_TYPE_LATEST)
+        from apps.observability.services.executions import execution_metrics
+        return HttpResponse(generate_latest() + shared_celery_metrics() + execution_metrics(), content_type=CONTENT_TYPE_LATEST)
 
 
 class ModelObservabilityEndpoint(APIView):

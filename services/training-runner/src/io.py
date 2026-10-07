@@ -24,7 +24,7 @@ def upload_presigned_url(source, uri, requests_module, log):
     validate_presigned_url(uri)
     log(f"Uploading {source} via presigned PUT URL")
     with open(source, "rb") as handle:
-        response = requests_module.put(uri, data=handle, timeout=300)
+        response = requests_module.put(uri, data=handle, headers={"Content-Type": "application/gzip"}, timeout=300)
     if response.status_code not in (200, 201, 204):
         raise RuntimeError(f"Presigned PUT upload failed with HTTP status {response.status_code}")
 

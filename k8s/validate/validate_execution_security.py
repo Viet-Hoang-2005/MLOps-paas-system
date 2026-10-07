@@ -34,7 +34,7 @@ def validate(context: ValidationContext) -> list[str]:
     webhooks = source_spec.get("webhook") or {}
     if set(webhooks) != ARGO_WEBHOOK_EVENTS:
         errors.append(
-            "webhook-eventsource must define exactly the six trusted execution endpoints"
+            "webhook-eventsource must define exactly the trusted execution endpoints"
         )
     for event in sorted(ARGO_WEBHOOK_EVENTS):
         webhook = webhooks.get(event) or {}
@@ -45,9 +45,10 @@ def validate(context: ValidationContext) -> list[str]:
             errors.append(
                 f"Argo webhook {event} must use the dedicated bearer-token Secret"
             )
-        if webhook.get("maxPayloadSize") != 262144:
+        expected_limit = 16384 if event == "reconcile" else 262144
+        if webhook.get("maxPayloadSize") != expected_limit:
             errors.append(
-                f"Argo webhook {event} must enforce the 256 KiB payload limit"
+                f"Argo webhook {event} must enforce the {expected_limit} byte payload limit"
             )
     event_bus = find_resource(execution, "EventBus", "default")
     if resource_namespace(event_bus) != "argo-events":

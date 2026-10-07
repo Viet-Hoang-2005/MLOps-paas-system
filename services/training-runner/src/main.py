@@ -2,11 +2,15 @@
 
 import sys
 
-from src import application
-
-
 def main() -> None:
-    application.main()
+    if "--worker" in sys.argv:
+        from src import application
+
+        application.main()
+    else:
+        from src.supervisor import run
+
+        sys.exit(run())
 
 
 if __name__ == "__main__":

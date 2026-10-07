@@ -4,7 +4,6 @@ import os
 import docker
 import docker.errors
 from django.conf import settings
-from django.db import transaction
 
 from apps.deployment.models import Endpoint
 from apps.training.services.capabilities import issue_capability
@@ -18,26 +17,6 @@ from infrastructure.storage.paths import build_prefix, drift_run_prefix
 from .build_inputs import label_mapping_input
 from .image_references import build_image_tag, image_repository, immutable_image_reference
 from .local_containers import remove_container, start_container
-
-
-def _start_container(docker_client, project, resource, identity_field, **kwargs):
-    """Serialize runtime creation with project deletion, not the whole long-running job."""
-    from apps.catalog.models import ModelProject
-    from common.api.exceptions import Conflict
-
-    with transaction.atomic():
-        locked = ModelProject.objects.select_for_update().get(pk=project.pk)
-        current = type(resource).objects.select_for_update().get(pk=resource.pk)
-        if (
-            locked.deletion_state != "active"
-            or getattr(current, "deletion_state", "active") != "active"
-            or current.status in {"cancelled", "cancelling", "stopped", "failed"}
-        ):
-            raise Conflict("The task or project has been cancelled.")
-        container = docker_client.run(**kwargs)
-        setattr(resource, identity_field, container.id)
-        resource.save(update_fields=[identity_field])
-        return container
 
 
 def _logging_environment():
@@ -112,7 +91,7 @@ class DockerBuildBackend:
 
 class DockerTrainingBackend:
     def __init__(self, docker_client=None, storage=None):
-        self.docker = docker_client or DockerClient()
+        self.docker = docker_client or DockerClient(timeout=3)
         self.storage = storage or S3Storage()
 
     def run(self, job):
@@ -120,7 +99,7 @@ class DockerTrainingBackend:
         validate_training_uri(job, self.storage.bucket, "code", job.code_snapshot_uri)
         validate_training_uri(job, self.storage.bucket, "data", job.data_snapshot_uri)
         validate_training_uri(job, self.storage.bucket, "output", job.output_uri)
-        output_upload_capability = issue_capability(job, "output_upload")
+        output_upload_capability = issue_capability(job, "output_upload", preserve_existing=True)
         environment = {
             **_logging_environment(),
             "S3_SOURCE_URI": self.storage.presigned_get(
@@ -133,6 +112,9 @@ class DockerTrainingBackend:
                 f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/training-jobs/{job.public_id}/output-upload-url/"
             ),
             "S3_OUTPUT_UPLOAD_CAPABILITY": output_upload_capability,
+            "S3_INPUT_DOWNLOAD_URL": f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/training-jobs/{job.public_id}/input-download-urls/",
+            "S3_INPUT_DOWNLOAD_CAPABILITY": issue_capability(job, "input_download", preserve_existing=True),
+            "MAX_RUNTIME_SECONDS": str(job.max_runtime_seconds),
             "ENTRY_POINT": job.entry_point,
             "MODEL_VERSION": "",
             "TRAINING_JOB_ID": str(job.public_id),
@@ -142,74 +124,35 @@ class DockerTrainingBackend:
             else "",
             "REDIS_URL": settings.REDIS_URL,
         }
-        container = _start_container(
+        from .job_containers import start
+
+        container = start(
             self.docker,
-            project,
             job,
-            "external_job_id",
+            "training",
             image="mlops-paas-training-runner:latest",
             name=f"training-{job.public_id}",
             environment=environment,
             network=settings.DOCKER_NETWORK_NAME,
+            nano_cpus=job.vcpu * 1_000_000_000,
+            mem_limit=f"{job.memory_mb}m",
+            memswap_limit=f"{job.memory_mb}m",
+            device_requests=[docker.types.DeviceRequest(count=job.accelerator_count, capabilities=[["gpu"]])] if job.accelerator_type == "gpu" else [],
         )
-        job.external_job_id = container.id
-        job.save(update_fields=["external_job_id", "updated_at"])
         return {"dispatched": True, "container_id": container.id}
 
     def poll(self, job):
-        if not job.external_job_id:
-            return {"status": "failed", "error": "No container ID registered."}
-        try:
-            container = self.docker.client.containers.get(job.external_job_id)
-            container.reload()
-            state = container.attrs.get("State", {})
-            status = state.get("Status", "").lower()
-            if status in {"running", "created", "restarting"}:
-                return {"status": "running"}
-            exit_code = state.get("ExitCode", 0)
-            logs = container.logs(stdout=True, stderr=True).decode("utf-8", errors="replace")
-            try:
-                container.remove(force=True)
-            except docker.errors.NotFound:
-                pass
-            if exit_code == 0:
-                return {"status": "completed", "logs": logs, "exit_code": 0}
-            return {
-                "status": "failed",
-                "error": logs[-12000:],
-                "logs": logs,
-                "exit_code": exit_code,
-            }
-        except docker.errors.NotFound:
-            return {"status": "not_found"}
-        except Exception as exc:
-            return {"status": "error", "error": str(exc)}
+        from .job_containers import observe
+
+        return observe(self.docker.client, job, "training")
+
+    def cleanup(self, job):
+        from .job_containers import remove
+
+        return remove(self.docker.client, job, "training")
 
     def cancel(self, job):
-        if getattr(job, "started_at", None) and not job.external_job_id:
-            return {
-                "dispatched": False,
-                "confirmed": False,
-                "retry": True,
-                "detail": "Training execution started but the runtime container is not registered yet.",
-            }
-        if job.external_job_id:
-            try:
-                container = self.docker.client.containers.get(job.external_job_id)
-                try:
-                    container.kill()
-                except docker.errors.APIError:
-                    container.reload()
-                    if container.status not in {"exited", "dead"}:
-                        raise
-                container.wait(timeout=30)
-                try:
-                    container.remove(force=True)
-                except docker.errors.NotFound:
-                    pass
-            except docker.errors.NotFound:
-                pass
-        return {"dispatched": False, "confirmed": True}
+        return {"dispatched": False, **self.cleanup(job)}
 
 
 class DockerDeploymentBackend:
@@ -298,7 +241,7 @@ class DockerDeploymentBackend:
 
 class DockerDriftBackend:
     def __init__(self, docker_client=None, storage=None):
-        self.docker = docker_client or DockerClient()
+        self.docker = docker_client or DockerClient(timeout=3)
         self.storage = storage or S3Storage()
 
     def run(self, drift_run):
@@ -338,61 +281,36 @@ class DockerDriftBackend:
             "DB_PORT": os.environ.get("DB_PORT", "5432"),
             "DB_SCHEMA": settings.DB_SCHEMA,
         }
-        container = _start_container(
+        from .job_containers import start
+
+        drift_run.report_html_uri = uris["report.html"]
+        drift_run.report_json_uri = uris["report.json"]
+        drift_run.summary_uri = uris["summary.json"]
+        rows = type(drift_run).objects.filter(pk=drift_run.pk)
+        if drift_run.execution_check_token:
+            from django.utils import timezone
+            rows = rows.filter(execution_check_token=drift_run.execution_check_token, execution_check_lease_until__gt=timezone.now())
+        rows.update(report_html_uri=drift_run.report_html_uri, report_json_uri=drift_run.report_json_uri, summary_uri=drift_run.summary_uri)
+        container = start(
             self.docker,
-            project,
             drift_run,
-            "external_run_id",
+            "drift",
             image="mlops-paas-evidently",
             name=f"drift-{drift_run.public_id}",
             environment=environment,
             network=settings.DOCKER_NETWORK_NAME,
         )
-        drift_run.external_run_id = container.id
-        drift_run.report_html_uri = uris["report.html"]
-        drift_run.report_json_uri = uris["report.json"]
-        drift_run.summary_uri = uris["summary.json"]
-        drift_run.save(update_fields=["external_run_id", "report_html_uri", "report_json_uri", "summary_uri"])
         return {"dispatched": True, "container_id": container.id}
 
     def poll(self, drift_run):
-        if not drift_run.external_run_id:
-            return {"status": "failed", "error": "No container ID registered."}
-        try:
-            container = self.docker.client.containers.get(drift_run.external_run_id)
-            container.reload()
-            state = container.attrs.get("State", {})
-            status = state.get("Status", "").lower()
-            if status in {"running", "created", "restarting"}:
-                return {"status": "running"}
-            exit_code = state.get("ExitCode", 0)
-            logs = container.logs(stdout=True, stderr=True).decode("utf-8", errors="replace")
-            try:
-                container.remove(force=True)
-            except docker.errors.NotFound:
-                pass
-            if exit_code == 0:
-                return {"status": "completed", "logs": logs, "exit_code": 0}
-            return {
-                "status": "failed",
-                "error": logs[-12000:],
-                "logs": logs,
-                "exit_code": exit_code,
-            }
-        except docker.errors.NotFound:
-            return {"status": "not_found"}
-        except Exception as exc:
-            return {"status": "error", "error": str(exc)}
+        from .job_containers import observe
+
+        return observe(self.docker.client, drift_run, "drift")
+
+    def cleanup(self, drift_run):
+        from .job_containers import remove
+
+        return remove(self.docker.client, drift_run, "drift")
 
     def cancel(self, drift_run):
-        if drift_run.external_run_id:
-            try:
-                container = self.docker.client.containers.get(drift_run.external_run_id)
-                try:
-                    container.kill()
-                except Exception:
-                    pass
-                container.remove(force=True)
-            except docker.errors.NotFound:
-                pass
-        return {"dispatched": False, "confirmed": True}
+        return {"dispatched": False, **self.cleanup(drift_run)}

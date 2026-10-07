@@ -42,6 +42,20 @@ succeeds, so production collection captures subprocess output. Preserve metric/E
 protocols and never infer lifecycle state from tenant output. See
 `docs/runtime-logs.md` for production collection and access boundaries.
 
+## Durable Training And Drift
+
+PostgreSQL owns dispatch, observation leases and cleanup intent for TrainingJob/DriftRun.
+With EXECUTION_WATCH_ENABLED, Beat scans every 15 seconds; batch size is 100 and
+leases last 60 seconds. Runtime I/O stays outside transactions. Temporary backend
+errors retain lifecycle state and set observation_status=retrying (or cleanup_pending).
+Deterministic UUID runtime names and tenant/project/resource labels fence adoption
+and cleanup. Terminal results commit before runtime removal and verify scoped S3 outputs.
+Training capabilities include runtime_options_seconds; CPU/memory profiles and GPU
+counts are validated on create/update/submit. Runner deadline covers startup through
+upload; input URLs are obtained at start, output PUT sends application/gzip.
+Argo observation capabilities bind kind, resource, tenant, project and lease; callback
+replay or expired leases are denied. See docs/dev/p1-execution-recovery.md for rollout.
+
 ## Configuration
 
 Secrets enter trusted services through environment/Secret resources. Tenant jobs receive explicit minimal values. Inspect `.env.example`, Compose, Kubernetes ConfigMaps/Secrets, workflow templates, and tests together before adding a variable.

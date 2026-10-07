@@ -8,6 +8,7 @@ import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
 import { Button } from "@/shared/components/Button";
 import { Slider } from "@/shared/components/Slider";
 import { StatePanel } from "@/shared/components/StatePanel";
+import { ExecutionObservation } from "@/shared/components/ExecutionObservation";
 import { StepTitle } from "@/shared/components/StepTitle";
 import {
   TerminalActionButton,
@@ -38,6 +39,21 @@ export default function ExecutionTrainingJobPage() {
     flow.job &&
     ["pending", "queued", "uploading", "running"].includes(flow.job.status);
   const profiles = flow.capabilities?.cpu_profiles ?? [];
+  const supportedRuntimeOptions = (
+    flow.capabilities?.runtime_options_seconds ?? []
+  ).map((value) => ({
+    value,
+    label:
+      runtimeOptions.find((option) => option.value === value)?.label ??
+      `${Math.round(value / 60)}m`,
+  }));
+  const observeExecution = Boolean(
+    flow.job &&
+    (["queued", "running", "uploading", "cancelling"].includes(
+      flow.job.status,
+    ) ||
+      flow.job.observation_status === "cleanup_pending"),
+  );
   const trainingEnabled = flow.capabilities?.enabled ?? false;
   const accelerators = flow.capabilities?.accelerators ?? [
     { type: "none" as const, counts: [0] },
@@ -47,6 +63,14 @@ export default function ExecutionTrainingJobPage() {
     enabled: Boolean(flow.job),
     terminalStatuses: TRAINING_TERMINAL_STATUSES,
   });
+
+  useEffect(() => {
+    if (!observeExecution) return;
+    const timer = window.setInterval(() => {
+      void flow.refreshJob().catch(() => undefined);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [flow, observeExecution]);
 
   useEffect(() => {
     const terminalKey = `${flow.job?.id ?? ""}:${stream.status ?? ""}`;
@@ -137,7 +161,7 @@ export default function ExecutionTrainingJobPage() {
             {t("createFlow.execution.maxRuntime")}
           </p>
           <Slider
-            options={runtimeOptions}
+            options={supportedRuntimeOptions}
             value={flow.executionForm.max_runtime_seconds}
             onChange={(value) =>
               flow.setExecutionField("max_runtime_seconds", value)
@@ -145,6 +169,7 @@ export default function ExecutionTrainingJobPage() {
           />
         </div>
 
+        <ExecutionObservation state={flow.job} />
         <TerminalViewer
           key={flow.job?.id ?? "new-training"}
           title={t("createFlow.execution.console")}

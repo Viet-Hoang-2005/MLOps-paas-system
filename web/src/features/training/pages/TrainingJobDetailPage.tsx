@@ -21,6 +21,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { ExecutionObservation } from "@/shared/components/ExecutionObservation";
 import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -105,7 +106,9 @@ export default function TrainingJobDetailPage() {
     enabled: Boolean(parsedJobId),
     refetchInterval: (query) => {
       const currentJob = query.state.data;
-      return currentJob && ACTIVE_STATUSES.includes(currentJob.status)
+      return currentJob &&
+        (ACTIVE_STATUSES.includes(currentJob.status) ||
+          currentJob.observation_status === "cleanup_pending")
         ? AUTO_SYNC_INTERVAL_MS
         : false;
     },
@@ -329,6 +332,7 @@ export default function TrainingJobDetailPage() {
 
   return (
     <section className="flex w-full flex-1 flex-col space-y-6">
+      <ExecutionObservation state={job} />
       <button
         type="button"
         onClick={() => navigate("/dashboard/training")}

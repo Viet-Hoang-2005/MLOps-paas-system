@@ -21,6 +21,17 @@ from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import training_output_prefix
 
 
+def verify_training_output(job, storage=None):
+    from botocore.config import Config
+    from .storage_scope import validate_training_uri
+
+    storage = storage or S3Storage(client_config=Config(connect_timeout=3, read_timeout=5, retries={"max_attempts": 0}))
+    validate_training_uri(job, storage.bucket, "output", job.output_uri)
+    bucket, key = storage.parse_uri(job.output_uri)
+    if not storage.client.head_object(Bucket=bucket, Key=key).get("ContentLength"):
+        raise ValueError("Training output is empty.")
+
+
 def serialize_output_asset(output: TrainingOutput, storage=None) -> dict[str, Any]:
     content = None
     if output.kind == "source_code" and output.s3_uri:

@@ -34,6 +34,7 @@ import {
   type DriftMonitoringResult,
 } from "@/features/monitoring/hooks/useDriftMonitoring";
 import { Badge } from "@/shared/components/Badge";
+import { ExecutionObservation } from "@/shared/components/ExecutionObservation";
 import { Button } from "@/shared/components/Button";
 import { CardSummary } from "@/shared/components/Card";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
@@ -220,6 +221,7 @@ export default function DriftMonitoringPage() {
   return (
     <div className="flex w-full flex-1 flex-col space-y-6">
       <PageHeader title={t("title")} />
+      <ExecutionObservation state={results?.find((run) => run.id === activeRunId) ?? results?.[0]} />
       <p className="text-color-muted-foreground">{t("runningDriftOnly")}</p>
       <section className="rounded-surface border border-border bg-surface p-4 space-y-2">
         <h2>{t("currentStatus")}</h2>

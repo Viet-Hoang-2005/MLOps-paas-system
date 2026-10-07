@@ -12,9 +12,14 @@ from infrastructure.storage.paths import (
 
 
 @shared_task(
-    bind=True, autoretry_for=(ConnectionError, TimeoutError), retry_backoff=True, retry_jitter=True, max_retries=5
+    bind=True, autoretry_for=(ConnectionError, TimeoutError), retry_backoff=True, retry_jitter=True, max_retries=5,
+    soft_time_limit=50, time_limit=55,
 )
 def execute_training_job(self, job_id):
+    from django.conf import settings
+    if settings.EXECUTION_WATCH_ENABLED:
+        from apps.observability.services.executions import reconcile
+        return reconcile("training", job_id)
     from apps.observability.services.lifecycle import record_training_event
 
     from .models import TrainingJob
@@ -92,8 +97,12 @@ def execute_training_job(self, job_id):
     return "completed"
 
 
-@shared_task(bind=True, max_retries=7200)
+@shared_task(bind=True, max_retries=7200, soft_time_limit=50, time_limit=55)
 def poll_training_job_status(self, job_id):
+    from django.conf import settings
+    if settings.EXECUTION_WATCH_ENABLED:
+        from apps.observability.services.executions import reconcile
+        return reconcile("training", job_id)
     from apps.observability.services.lifecycle import record_training_event
 
     from .models import TrainingJob
@@ -178,8 +187,14 @@ def poll_training_job_status(self, job_id):
     retry_backoff=True,
     retry_jitter=True,
     max_retries=5,
+    soft_time_limit=50,
+    time_limit=55,
 )
 def cancel_training_job(self, job_id):
+    from django.conf import settings
+    if settings.EXECUTION_WATCH_ENABLED:
+        from apps.observability.services.executions import reconcile
+        return reconcile("training", job_id)
     from .models import TrainingJob
     from .services.logs import append_training_log
 
@@ -272,6 +287,9 @@ def delete_training_job(self, job_id):
         return "retained"
     if job.status in {"pending", "queued", "uploading", "running", "cancelling"}:
         return "waiting-for-cancellation"
+    from django.conf import settings
+    if settings.EXECUTION_WATCH_ENABLED and job.observation_status == "cleanup_pending":
+        return "waiting-for-runtime-cleanup"
     if job.builds.filter(status__in=("pending", "queued", "building")).exists():
         TrainingJob.objects.filter(pk=job.pk).update(
             deletion_error="A model build is still using this training output."

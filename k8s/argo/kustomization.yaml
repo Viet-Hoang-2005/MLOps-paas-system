@@ -2,6 +2,8 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
+  - job-operations-rbac.yaml
+  - workflows/job-operations-workflowtemplate.yaml
   - configmap.yaml
   - external-secrets.yaml
   - rbac.yaml
@@ -17,3 +19,11 @@ resources:
   - workflows/training-workflowtemplate.yaml
   - workflows/training-cancel-workflowtemplate.yaml
   - sensor.yaml
+
+configMapGenerator:
+  - name: argo-job-operations
+    namespace: mlops-execution
+    files:
+      - scripts/job_ops.py
+generatorOptions:
+  disableNameSuffixHash: true

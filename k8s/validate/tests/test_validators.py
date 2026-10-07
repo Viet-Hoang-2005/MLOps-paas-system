@@ -206,7 +206,7 @@ class ValidatorNegativeTests(unittest.TestCase):
         )
         errors = validate_execution_security(context)
         self.assertTrue(
-            any("six trusted execution endpoints" in error for error in errors)
+            any("exactly the trusted execution endpoints" in error for error in errors)
         )
 
     def test_secrets_rejects_missing_colocated_targets(self):

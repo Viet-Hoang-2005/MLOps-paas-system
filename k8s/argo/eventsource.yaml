@@ -7,6 +7,14 @@ spec:
   template:
     serviceAccountName: argo-eventsource-sa
   webhook:
+    reconcile:
+      port: "12000"
+      endpoint: /reconcile
+      method: POST
+      maxPayloadSize: 16384
+      authSecret:
+        name: argo-events-webhook-server
+        key: token
     build:
       port: "12000"
       endpoint: /build

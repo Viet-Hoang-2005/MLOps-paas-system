@@ -6,13 +6,16 @@ from apps.deployment.api.urls import build_patterns, deployment_patterns, endpoi
 from apps.deployment.api.webhooks import BuildWebhookEndpoint, DeploymentWebhookEndpoint
 from apps.drift.api.webhooks import AutomaticDriftWebhookEndpoint, DriftRunWebhookEndpoint
 from apps.observability.api.endpoints import ProductionDataEndpoint
+from apps.observability.api.executions import ExecutionObservationEndpoint
 from apps.training.api.webhooks import (
     TrainingCancellationWebhookEndpoint,
     TrainingJobWebhookEndpoint,
     TrainingOutputUploadURLEndpoint,
+    TrainingInputDownloadURLEndpoint,
 )
 
 urlpatterns = [
+    path("internal/executions/<str:kind>/<uuid:public_id>/observations/", ExecutionObservationEndpoint.as_view()),
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.auth.api.urls")),
     path("api/api-keys/", include("apps.access.api.urls")),
@@ -39,6 +42,7 @@ urlpatterns = [
         TrainingCancellationWebhookEndpoint.as_view(),
     ),
     path("internal/training-jobs/<uuid:job_id>/output-upload-url/", TrainingOutputUploadURLEndpoint.as_view()),
+    path("internal/training-jobs/<uuid:job_id>/input-download-urls/", TrainingInputDownloadURLEndpoint.as_view()),
     path("internal/webhooks/drift-runs/<uuid:run_id>/", DriftRunWebhookEndpoint.as_view()),
     path("internal/webhooks/automatic-drift/", AutomaticDriftWebhookEndpoint.as_view()),
 ]

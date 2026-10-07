@@ -51,6 +51,10 @@ services:
       TRAINING_GPU_COUNTS: ${TRAINING_GPU_COUNTS:-1}
       DRIFT_BACKEND: ${DRIFT_BACKEND:-}
       LOCAL_TRAINING_TIMEOUT: ${LOCAL_TRAINING_TIMEOUT:-1800}
+      EXECUTION_WATCH_ENABLED: ${EXECUTION_WATCH_ENABLED:-true}
+      EXECUTION_DISPATCH_TIMEOUT_SECONDS: ${EXECUTION_DISPATCH_TIMEOUT_SECONDS:-1800}
+      DRIFT_MAX_RUNTIME_SECONDS: ${DRIFT_MAX_RUNTIME_SECONDS:-3600}
+      TRAINING_CAPABILITY_MAX_TTL_SECONDS: ${TRAINING_CAPABILITY_MAX_TTL_SECONDS:-46800}
       LOCAL_TRAINING_MAX_OUTPUT_MB: ${LOCAL_TRAINING_MAX_OUTPUT_MB:-500}
       LOCAL_TRAINING_ALLOW_PIP_INSTALL: ${LOCAL_TRAINING_ALLOW_PIP_INSTALL:-True}
       ENABLE_GPU_TRAINING: ${ENABLE_GPU_TRAINING:-False}
@@ -119,6 +123,10 @@ services:
       AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-}
       EXECUTION_BACKEND: ${EXECUTION_BACKEND:-docker}
       LOCAL_BUILD_TIMEOUT_SECONDS: ${LOCAL_BUILD_TIMEOUT_SECONDS:-43200}
+      EXECUTION_WATCH_ENABLED: ${EXECUTION_WATCH_ENABLED:-true}
+      EXECUTION_DISPATCH_TIMEOUT_SECONDS: ${EXECUTION_DISPATCH_TIMEOUT_SECONDS:-1800}
+      DRIFT_MAX_RUNTIME_SECONDS: ${DRIFT_MAX_RUNTIME_SECONDS:-3600}
+      TRAINING_CAPABILITY_MAX_TTL_SECONDS: ${TRAINING_CAPABILITY_MAX_TTL_SECONDS:-46800}
       LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS: ${LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS:-90}
       BUILD_BACKEND: ${BUILD_BACKEND:-}
       DEPLOYMENT_BACKEND: ${DEPLOYMENT_BACKEND:-}
@@ -175,6 +183,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/4
       REDIS_URL: redis://redis:6379/1
       LOCAL_EXECUTION_WATCH_ENABLED: "true"
+      EXECUTION_WATCH_ENABLED: ${EXECUTION_WATCH_ENABLED:-true}
     volumes:
       - ./services/control-plane:/app
     command: sh -c "until python manage.py migrate --check; do sleep 2; done; exec celery -A config beat --schedule=/tmp/celerybeat-schedule"
@@ -273,7 +282,14 @@ services:
   traefik:
     image: traefik:latest
     container_name: traefik
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     command:
+      - "--ping=true"
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
@@ -391,6 +407,13 @@ services:
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:latest
     container_name: redpanda
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "info", "-X", "brokers=localhost:9092"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     command:
       - redpanda
       - start

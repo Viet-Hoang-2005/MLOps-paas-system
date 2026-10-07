@@ -16,7 +16,8 @@
     "test:evolution": "node scripts/test-evolution.mjs",
     "test:monitoring": "node scripts/test-monitoring.mjs",
     "test:metrics": "node scripts/test-runtime-metrics.mjs",
-    "test:health": "node scripts/test-runtime-health.mjs"
+    "test:health": "node scripts/test-runtime-health.mjs",
+    "test:inference": "node scripts/test-inference.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",

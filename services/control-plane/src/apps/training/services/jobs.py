@@ -145,6 +145,8 @@ def retry_job(job, *, storage=None):
 
 @transaction.atomic
 def submit_job(job):
+    from apps.training.services.resources import validate_resources
+    validate_resources({}, job)
     project = type(job.project).objects.select_for_update().get(pk=job.project_id)
     job = TrainingJob.objects.select_for_update().get(pk=job.pk)
     if project.deletion_state != "active":
@@ -160,8 +162,8 @@ def submit_job(job):
 
 
 def _enqueue(job):
-    result = execute_training_job.delay(str(job.public_id))
-    TrainingJob.objects.filter(pk=job.pk).update(celery_task_id=result.id)
+    from apps.observability.services.executions import enqueue_safely
+    enqueue_safely(job, execute_training_job)
 
 
 def cancel_job(job):
@@ -177,7 +179,8 @@ def cancel_job(job):
             event_type="cancellation_requested",
             message="Training cancellation requested.",
         )
-        transaction.on_commit(lambda: cancel_training_job.delay(str(job.public_id)))
+        from apps.observability.services.executions import enqueue_safely
+        transaction.on_commit(lambda: enqueue_safely(job, cancel_training_job))
     return job
 
 
@@ -202,16 +205,25 @@ def request_job_deletion(job):
             task = delete_training_job
             event_type = "deletion_requested"
             message = "Training deletion requested."
+        if settings.EXECUTION_WATCH_ENABLED:
+            job.execution_stop_requested = True
+            job.observation_status = "cleanup_pending"
+            job.next_execution_check_at = timezone.now()
+            task = cancel_training_job
         job.save(
             update_fields=[
                 "deletion_requested_at",
                 "deletion_error",
                 "status",
+                "execution_stop_requested",
+                "observation_status",
+                "next_execution_check_at",
                 "updated_at",
             ]
         )
         record_training_event(job=job, event_type=event_type, message=message)
-        transaction.on_commit(lambda: task.delay(str(job.public_id)))
+        from apps.observability.services.executions import enqueue_safely
+        transaction.on_commit(lambda: enqueue_safely(job, task))
     return job
 
 

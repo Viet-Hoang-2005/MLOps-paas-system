@@ -40,6 +40,8 @@ def clean_runtime_env(monkeypatch):
         "S3_OUTPUT_UPLOAD_URL",
         "S3_OUTPUT_UPLOAD_CAPABILITY",
         "S3_REQUIREMENTS_URI",
+        "S3_INPUT_DOWNLOAD_URL",
+        "S3_INPUT_DOWNLOAD_CAPABILITY",
         "ENTRY_POINT",
         "MODEL_VERSION",
         "TRAINING_JOB_ID",

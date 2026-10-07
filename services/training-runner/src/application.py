@@ -733,6 +733,16 @@ def create_model_archive(archive_path: Path) -> None:
 def _run() -> None:
     source_uri = require_env("S3_SOURCE_URI")
     training_data_uri = require_env("S3_TRAINING_DATA_URI")
+    input_endpoint = os.environ.get("S3_INPUT_DOWNLOAD_URL", "")
+    if input_endpoint:
+        response = requests.post(
+            input_endpoint,
+            headers={"Authorization": f"Bearer {require_env('S3_INPUT_DOWNLOAD_CAPABILITY')}"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        urls = response.json()
+        source_uri, training_data_uri = urls["source_url"], urls["data_url"]
     output_upload_endpoint = require_env("S3_OUTPUT_UPLOAD_URL")
     output_upload_capability = require_env("S3_OUTPUT_UPLOAD_CAPABILITY")
     entry_point = os.environ.get("ENTRY_POINT", "train.py").strip() or "train.py"
@@ -741,8 +751,12 @@ def _run() -> None:
     requirements_uri = os.environ.get("S3_REQUIREMENTS_URI", "").strip()
 
     log("Preparing workspace")
-    if WORKSPACE.exists():
-        shutil.rmtree(WORKSPACE)
+    WORKSPACE.mkdir(parents=True, exist_ok=True)
+    for path in WORKSPACE.iterdir():
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
     SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     INPUT_TRAIN_DIR.mkdir(parents=True, exist_ok=True)
     MODEL_DIR.mkdir(parents=True, exist_ok=True)

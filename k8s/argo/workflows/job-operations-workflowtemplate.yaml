@@ -1,0 +1,64 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: mlops-paas-job-tombstone-template
+  namespace: mlops-execution
+spec:
+  serviceAccountName: argo-workflow-basic-sa
+  entrypoint: stopped
+  templates:
+    - name: stopped
+      container:
+        image: python:3.10-slim
+        command: ["true"]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: mlops-paas-job-submit-template
+  namespace: mlops-execution
+spec:
+  serviceAccountName: argo-job-operations-sa
+  entrypoint: submit
+  activeDeadlineSeconds: 55
+  templates:
+    - name: submit
+      container:
+        image: python:3.10-slim
+        command: [python, /ops/job_ops.py, submit]
+        env:
+          - {name: EXECUTION_KIND, value: "{{workflow.parameters.execution_kind}}"}
+          - {name: EXECUTION_PAYLOAD, value: "{{workflow.parameters.execution_payload}}"}
+        resources:
+          requests: {cpu: 50m, memory: 64Mi}
+          limits: {cpu: 250m, memory: 128Mi}
+        volumeMounts:
+          - {name: operations, mountPath: /ops, readOnly: true}
+  volumes:
+    - name: operations
+      configMap: {name: argo-job-operations}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: mlops-paas-job-reconcile-template
+  namespace: mlops-execution
+spec:
+  serviceAccountName: argo-job-operations-sa
+  entrypoint: reconcile
+  activeDeadlineSeconds: 55
+  templates:
+    - name: reconcile
+      container:
+        image: python:3.10-slim
+        command: [python, /ops/job_ops.py, reconcile]
+        env:
+          - {name: EXECUTION_PAYLOAD, value: "{{workflow.parameters.execution_payload}}"}
+        resources:
+          requests: {cpu: 50m, memory: 64Mi}
+          limits: {cpu: 250m, memory: 128Mi}
+        volumeMounts:
+          - {name: operations, mountPath: /ops, readOnly: true}
+  volumes:
+    - name: operations
+      configMap: {name: argo-job-operations}

@@ -97,6 +97,7 @@ def test_training_creation_and_submission_are_disabled_during_platform_validatio
         "enabled": False,
         "backend": settings.TRAINING_BACKEND,
         "cpu_profiles": [],
+        "runtime_options_seconds": [],
         "accelerators": [],
     }
     assert create.status_code == 503

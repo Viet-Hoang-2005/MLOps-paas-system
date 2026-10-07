@@ -51,6 +51,20 @@ def test_capability_is_hashed_and_bound_to_job_and_purpose():
 
 
 @pytest.mark.django_db
+def test_dispatch_retry_preserves_existing_capability_and_caps_ttl(settings):
+    job = _job()
+    job.max_runtime_seconds = 43200
+    settings.TRAINING_CAPABILITY_MAX_TTL_SECONDS = 999999
+    first = issue_capability(job, "input_download", preserve_existing=True)
+    second = issue_capability(job, "input_download", preserve_existing=True)
+    from apps.training.services.capabilities import capability_for_token
+    assert capability_for_token(job=job, purpose="input_download", token=first)
+    assert capability_for_token(job=job, purpose="input_download", token=second)
+    capability = capability_for_token(job=job, purpose="input_download", token=first)
+    assert 45890 <= (capability.expires_at - timezone.now()).total_seconds() <= 46800
+
+
+@pytest.mark.django_db
 def test_output_upload_capability_is_one_time_and_put_scoped(monkeypatch):
     job = _job()
     token = issue_capability(job, "output_upload")
@@ -98,7 +112,8 @@ def test_expired_capability_and_legacy_shared_secret_are_rejected():
 
 
 @pytest.mark.django_db
-def test_trusted_reporter_sets_terminal_status_once():
+def test_trusted_reporter_sets_terminal_status_once(monkeypatch):
+    monkeypatch.setattr("apps.training.api.webhooks.verify_training_output", lambda job: None)
     job = _job()
     token = issue_capability(job, "trusted_reporter")
     client = APIClient()
@@ -136,6 +151,19 @@ def test_trusted_reporter_cannot_overwrite_cancelled_job():
     job.refresh_from_db()
     assert job.status == "cancelled"
     assert response.data["ignored"] is True
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("error,code,expected_status", [(ValueError("empty"), 200, "failed"), (TimeoutError("temporary"), 503, "running")])
+def test_trusted_completion_requires_output(monkeypatch, error, code, expected_status):
+    monkeypatch.setattr("apps.training.api.webhooks.verify_training_output", Mock(side_effect=error))
+    job = _job()
+    token = issue_capability(job, "trusted_reporter")
+    response = APIClient().post(f"/internal/webhooks/training-jobs/{job.public_id}/", {"workflow_status": "Succeeded"}, format="json", HTTP_AUTHORIZATION=f"Bearer {token}")
+    assert response.status_code == code
+    job.refresh_from_db()
+    assert job.status == expected_status
+    assert not job.outputs.exists()
 
 
 @pytest.mark.django_db

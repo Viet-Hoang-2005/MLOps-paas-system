@@ -10,9 +10,14 @@ from infrastructure.storage import S3Storage
 
 
 @shared_task(
-    bind=True, autoretry_for=(ConnectionError, TimeoutError), retry_backoff=True, retry_jitter=True, max_retries=5
+    bind=True, autoretry_for=(ConnectionError, TimeoutError), retry_backoff=True, retry_jitter=True, max_retries=5,
+    soft_time_limit=50, time_limit=55,
 )
 def execute_drift_run(self, run_id):
+    from django.conf import settings
+    if settings.EXECUTION_WATCH_ENABLED:
+        from apps.observability.services.executions import reconcile
+        return reconcile("drift", run_id)
     from .models import DriftRun
 
     with transaction.atomic():
@@ -83,8 +88,12 @@ def execute_drift_run(self, run_id):
     return "completed"
 
 
-@shared_task(bind=True, max_retries=120)
+@shared_task(bind=True, max_retries=120, soft_time_limit=50, time_limit=55)
 def poll_drift_run_status(self, run_id):
+    from django.conf import settings
+    if settings.EXECUTION_WATCH_ENABLED:
+        from apps.observability.services.executions import reconcile
+        return reconcile("drift", run_id)
     from .models import DriftRun
 
     try:

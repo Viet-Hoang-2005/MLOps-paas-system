@@ -26,6 +26,10 @@ class DriftRunSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "status",
+            "observation_status",
+            "observation_error",
+            "execution_deadline_at",
+            "runtime_started_at",
             "celery_task_id",
             "external_run_id",
             "current_data_uri",

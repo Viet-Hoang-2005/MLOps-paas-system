@@ -68,7 +68,7 @@ LOCAL_RUNTIME_METRICS_ENABLED = os.environ.get("LOCAL_RUNTIME_METRICS_ENABLED", 
 
 def _redis_connection():
     if REDIS_CONNECTION_MODE == "direct":
-        return redis.from_url(REDIS_URL)
+        return redis.from_url(REDIS_URL, socket_connect_timeout=2, socket_timeout=2)
     if REDIS_CONNECTION_MODE != "sentinel":
         raise ValueError("REDIS_CONNECTION_MODE must be direct or sentinel")
     addresses = os.environ.get("REDIS_SENTINEL_HOSTS", "")
@@ -173,9 +173,9 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
 )
 app.add_middleware(RequestLoggingMiddleware, routes=app.router.routes)
 
@@ -262,6 +262,15 @@ async def health_check():
         "mode": "central-model-server",
         "model_registry_connected": model_registry_engine is not None,
     }
+
+
+@app.get("/health/ready")
+def readiness():
+    from src.readiness import dependency_checks
+
+    checks = dependency_checks(model_registry_engine, _redis_connection, kafka_producer)
+    ready = all(value == "ok" for value in checks.values())
+    return JSONResponse({"status": "ok" if ready else "unavailable", "checks": checks}, status_code=200 if ready else 503)
 
 
 @app.get("/models/{version_id}/health")

@@ -19,5 +19,5 @@ def request_run(monitor, idempotency_key=None):
 
 
 def _enqueue(run):
-    result = execute_drift_run.delay(str(run.public_id))
-    DriftRun.objects.filter(pk=run.pk).update(celery_task_id=result.id)
+    from apps.observability.services.executions import enqueue_safely
+    enqueue_safely(run, execute_drift_run)

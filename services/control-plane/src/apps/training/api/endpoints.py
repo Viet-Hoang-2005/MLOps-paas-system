@@ -19,6 +19,7 @@ from apps.training.services.jobs import (
     submit_job,
 )
 from apps.training.services.logs import training_logs
+from apps.training.services.resources import CPU_PROFILES, RUNTIME_OPTIONS
 from apps.training.services.outputs import (
     get_job_reference_preview,
     get_model_output_summary,
@@ -182,6 +183,7 @@ class TrainingRuntimeCapabilitiesEndpoint(APIView):
                     "enabled": False,
                     "backend": settings.TRAINING_BACKEND,
                     "cpu_profiles": [],
+                    "runtime_options_seconds": [],
                     "accelerators": [],
                 }
             )
@@ -191,11 +193,11 @@ class TrainingRuntimeCapabilitiesEndpoint(APIView):
         return Response(
             {
                 "enabled": True,
+                "runtime_options_seconds": RUNTIME_OPTIONS,
                 "backend": settings.TRAINING_BACKEND,
                 "cpu_profiles": [
-                    {"id": "small", "vcpu": 1, "memory_mb": 2048},
-                    {"id": "medium", "vcpu": 2, "memory_mb": 4096},
-                    {"id": "large", "vcpu": 4, "memory_mb": 8192},
+                    {"id": name, "vcpu": cpu, "memory_mb": memory}
+                    for name, (cpu, memory) in zip(("small", "medium", "large"), CPU_PROFILES)
                 ],
                 "accelerators": accelerators,
             }

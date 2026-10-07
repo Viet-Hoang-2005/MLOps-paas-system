@@ -107,7 +107,7 @@ def _main_env(monkeypatch):
 def test_main_orchestrates_success(monkeypatch, runner_workspace):
     _main_env(monkeypatch)
     monkeypatch.setenv("REQUIREMENTS_TEXT", "cHl0ZXN0PT04LjIuMg==")
-    downloads = Mock()
+    downloads = Mock(side_effect=lambda uri, destination: destination.write_bytes(b"feature,target\n1,0\n"))
     extract = Mock()
     install = Mock()
     bundle = Mock()
@@ -150,7 +150,7 @@ def test_main_orchestrates_success(monkeypatch, runner_workspace):
 def test_main_writes_plain_requirements_and_stops_after_failed_training(monkeypatch, runner_workspace):
     _main_env(monkeypatch)
     monkeypatch.setenv("REQUIREMENTS_TEXT", "numpy pandas")
-    monkeypatch.setattr(runner, "download_presigned_url", Mock())
+    monkeypatch.setattr(runner, "download_presigned_url", Mock(side_effect=lambda uri, destination: destination.write_bytes(b"feature,target\n1,0\n")))
     monkeypatch.setattr(runner, "safe_extract_zip", Mock())
     monkeypatch.setattr(runner, "install_requirements", Mock())
     monkeypatch.setattr(

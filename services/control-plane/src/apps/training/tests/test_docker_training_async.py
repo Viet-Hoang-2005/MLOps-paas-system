@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+import docker.errors
+from infrastructure.execution.job_containers import labels_for
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -29,8 +31,8 @@ class DockerTrainingAsyncTests(TestCase):
         self.job.save(update_fields=["code_snapshot_uri", "data_snapshot_uri", "output_uri"])
 
     def test_docker_training_run_dispatches_without_blocking(self):
-        fake_container = SimpleNamespace(id="container-abc-123")
-        docker_client = SimpleNamespace(run=Mock(return_value=fake_container))
+        fake_container = SimpleNamespace(id="container-abc-123", attrs={})
+        docker_client = SimpleNamespace(run=Mock(return_value=fake_container), client=SimpleNamespace(containers=SimpleNamespace(get=Mock(side_effect=docker.errors.NotFound("missing")))))
         storage = SimpleNamespace(
             bucket="bucket",
             presigned_get=Mock(return_value="https://s3.test/presigned"),
@@ -56,9 +58,11 @@ class DockerTrainingAsyncTests(TestCase):
         backend = DockerTrainingBackend(docker_client=docker_client, storage=SimpleNamespace())
 
         self.job.external_job_id = "running-container-id"
+        container_mock.id = "running-container-id"
+        container_mock.attrs["Config"] = {"Labels": labels_for(self.job, "training")}
         result = backend.poll(self.job)
 
-        self.assertEqual(result, {"status": "running"})
+        self.assertEqual(result, {"status": "running", "runtime_id": "running-container-id"})
         container_mock.reload.assert_called_once()
         container_mock.remove.assert_not_called()
 
@@ -72,12 +76,14 @@ class DockerTrainingAsyncTests(TestCase):
         backend = DockerTrainingBackend(docker_client=docker_client, storage=SimpleNamespace())
 
         self.job.external_job_id = "finished-container-id"
+        container_mock.id = "finished-container-id"
+        container_mock.attrs["Config"] = {"Labels": labels_for(self.job, "training")}
         result = backend.poll(self.job)
 
         self.assertEqual(result["status"], "completed")
         self.assertEqual(result["exit_code"], 0)
         self.assertIn("Training complete", result["logs"])
-        container_mock.remove.assert_called_once_with(force=True)
+        container_mock.remove.assert_not_called()
 
     def test_docker_training_poll_failed(self):
         container_mock = Mock()
@@ -89,12 +95,14 @@ class DockerTrainingAsyncTests(TestCase):
         backend = DockerTrainingBackend(docker_client=docker_client, storage=SimpleNamespace())
 
         self.job.external_job_id = "failed-container-id"
+        container_mock.id = "failed-container-id"
+        container_mock.attrs["Config"] = {"Labels": labels_for(self.job, "training")}
         result = backend.poll(self.job)
 
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["exit_code"], 1)
         self.assertIn("ValueError: bad data", result["error"])
-        container_mock.remove.assert_called_once_with(force=True)
+        container_mock.remove.assert_not_called()
 
     def test_execute_training_job_dispatches_and_enqueues_poll(self):
         fake_backend = Mock()

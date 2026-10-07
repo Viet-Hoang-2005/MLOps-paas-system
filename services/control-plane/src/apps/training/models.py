@@ -2,9 +2,10 @@ import uuid
 
 from django.db import models
 from django.utils import timezone
+from common.execution_watch import ExecutionWatch
 
 
-class TrainingJob(models.Model):
+class TrainingJob(ExecutionWatch):
     MODEL_FLAVORS = (
         ("sklearn", "Scikit-learn"),
         ("xgboost", "XGBoost"),
@@ -85,13 +86,14 @@ class TrainingJob(models.Model):
 
     def mark_finished(self, status):
         self.completed_at = timezone.now()
-        started = self.started_at or self.created_at or self.completed_at
+        started = self.runtime_started_at or self.started_at or self.created_at or self.completed_at
         self.runtime_seconds = max(0, int((self.completed_at - started).total_seconds()))
         self.status = status
 
 
 class TrainingJobCapability(models.Model):
     PURPOSES = (
+        ("input_download", "Input download"),
         ("output_upload", "Output upload"),
         ("trusted_reporter", "Trusted reporter"),
         ("cancel_reporter", "Cancellation reporter"),

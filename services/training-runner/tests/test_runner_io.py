@@ -58,6 +58,7 @@ def test_upload_presigned_url_success(monkeypatch, tmp_path, status):
     monkeypatch.setattr("requests.put", put)
     runner.upload_presigned_url(source, "https://example.test/upload")
     assert put.call_args.kwargs["timeout"] == 300
+    assert put.call_args.kwargs["headers"] == {"Content-Type": "application/gzip"}
 
 
 def test_upload_presigned_url_failure(monkeypatch, tmp_path):

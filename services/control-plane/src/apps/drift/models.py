@@ -1,6 +1,7 @@
 import uuid
 
 from django.db import models
+from common.execution_watch import ExecutionWatch
 
 
 class DriftMonitor(models.Model):
@@ -31,7 +32,7 @@ class DriftMonitor(models.Model):
         return f"{self.version}: {self.name}"
 
 
-class DriftRun(models.Model):
+class DriftRun(ExecutionWatch):
     STATUSES = tuple(
         (value, value.title()) for value in ("pending", "queued", "running", "completed", "failed", "cancelled")
     )

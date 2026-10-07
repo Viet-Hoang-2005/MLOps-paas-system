@@ -5,10 +5,12 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.catalog.models import ModelProject
 from apps.observability.services.lifecycle import has_event, record_training_event
 from apps.training.models import TrainingJob, TrainingOutput
 from apps.training.services.capabilities import capability_for_token
 from apps.training.services.logs import append_training_log
+from apps.training.services.outputs import verify_training_output
 from apps.training.services.storage_scope import validate_training_uri
 from common.logging import record_transition
 from infrastructure.storage import S3Storage
@@ -36,7 +38,22 @@ class TrainingJobWebhookEndpoint(APIView):
 
     def post(self, request, job_id):
         key = request.headers.get("Idempotency-Key") or str(request.data.get("idempotency_key", ""))
+        output_error = ""
+        candidate = TrainingJob.objects.select_related("project__owner").filter(public_id=job_id).first()
+        if candidate and candidate.status not in {"cancelling", "completed", "failed", "cancelled"} and not candidate.deletion_requested_at and candidate.project.deletion_state == "active":
+            capability = capability_for_token(job=candidate, purpose="trusted_reporter", token=_bearer_token(request))
+            if capability and not capability.consumed_at and _terminal_status(request.data.get("workflow_status")) == "completed":
+                try:
+                    verify_training_output(candidate)
+                except Exception as exc:
+                    from botocore.exceptions import ClientError
+                    missing = isinstance(exc, ValueError) or (isinstance(exc, ClientError) and exc.response["Error"]["Code"] in {"404", "NoSuchKey", "NotFound"})
+                    if not missing:
+                        return Response({"detail": "Training output verification is temporarily unavailable."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+                    output_error = "Training output is missing or empty."
         with transaction.atomic():
+            if candidate:
+                ModelProject.objects.select_for_update().filter(pk=candidate.project_id).first()
             try:
                 job = TrainingJob.objects.select_for_update().get(public_id=job_id)
             except TrainingJob.DoesNotExist:
@@ -56,6 +73,8 @@ class TrainingJobWebhookEndpoint(APIView):
                     status=status.HTTP_403_FORBIDDEN,
                 )
             status_value = _terminal_status(request.data.get("workflow_status"))
+            if output_error:
+                status_value = "failed"
             if not status_value:
                 return Response(
                     {"detail": "A terminal workflow_status is required."},
@@ -63,6 +82,7 @@ class TrainingJobWebhookEndpoint(APIView):
                 )
             if (
                 job.status in {"cancelling", "completed", "failed", "cancelled"}
+                or job.execution_stop_requested
                 or job.deletion_requested_at
                 or job.project.deletion_state != "active"
             ):
@@ -78,11 +98,15 @@ class TrainingJobWebhookEndpoint(APIView):
                 )
             elif status_value == "failed":
                 job.mark_finished("failed")
-                job.error_message = "Training workflow failed."
+                job.error_message = output_error or "Training workflow failed."
             else:
                 job.mark_finished("cancelled")
             capability.consumed_at = timezone.now()
             capability.save(update_fields=["consumed_at"])
+            job.observation_status = "cleanup_pending"
+            job.execution_stop_requested = True
+            job.next_execution_check_at = timezone.now()
+            job.save(update_fields=["observation_status", "execution_stop_requested", "next_execution_check_at"])
             job.save(update_fields=["status", "completed_at", "runtime_seconds", "error_message", "updated_at"])
             record_training_event(
                 job=job,
@@ -172,6 +196,16 @@ class TrainingCancellationWebhookEndpoint(APIView):
         )
 
 
+class TrainingInputDownloadURLEndpoint(APIView):
+    authentication_classes = ()
+    permission_classes = ()
+
+    def post(self, request, job_id):
+        from apps.training.services.inputs import input_download_urls
+
+        return Response(input_download_urls(job_id, _bearer_token(request)))
+
+
 class TrainingOutputUploadURLEndpoint(APIView):
     authentication_classes = ()
     permission_classes = ()
@@ -184,7 +218,7 @@ class TrainingOutputUploadURLEndpoint(APIView):
                 purpose="output_upload",
                 token=_bearer_token(request),
             )
-            if not capability or capability.consumed_at:
+            if not capability or capability.consumed_at or job.status not in {"queued", "running", "uploading"} or job.execution_stop_requested or job.deletion_requested_at or job.project.deletion_state != "active":
                 return Response({"detail": "Invalid training output capability."}, status=status.HTTP_403_FORBIDDEN)
             storage = S3Storage()
             validate_training_uri(job, storage.bucket, "output", job.output_uri)

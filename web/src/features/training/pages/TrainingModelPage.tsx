@@ -87,6 +87,7 @@ export default function TrainingModelPage() {
       return jobs.some(
         (job) =>
           (job.deletion_pending && !job.deletion_error) ||
+          job.observation_status === "cleanup_pending" ||
           ACTIVE_STATUSES.includes(job.status),
       )
         ? 4000
