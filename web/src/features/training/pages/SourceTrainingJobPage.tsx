@@ -3,9 +3,9 @@ import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
-  SourceEditor,
-  type SourceEditorHandle,
-} from "@/shared/components/SourceEditor";
+  Editor,
+  type EditorHandle,
+} from "@/shared/components/Editor";
 import { useCreateTrainingJob } from "@/features/training/trainingFlowContext";
 import type { ModelFlavor } from "@/features/projects/types";
 import { Button } from "@/shared/components/Button";
@@ -17,8 +17,8 @@ import { TextArea } from "@/shared/components/TextArea";
 export default function SourceTrainingJobPage() {
   const { t } = useTranslation("training");
   const flow = useCreateTrainingJob();
-  const codeEditor = useRef<SourceEditorHandle>(null);
-  const dataEditor = useRef<SourceEditorHandle>(null);
+  const codeEditor = useRef<EditorHandle>(null);
+  const dataEditor = useRef<EditorHandle>(null);
   const transitioning = flow.transitionState !== "idle";
 
   if (!flow.project) return null;
@@ -64,7 +64,7 @@ export default function SourceTrainingJobPage() {
           />
         </div>
 
-        <SourceEditor
+        <Editor
           ref={codeEditor}
           modelId={flow.project.id}
           fileType="code_file"
@@ -76,7 +76,7 @@ export default function SourceTrainingJobPage() {
           onSetEntryPoint={(file) => flow.setSourceField("entry_point", file)}
           onDirtyChange={(dirty) => flow.setEditorDirty("code", dirty)}
         />
-        <SourceEditor
+        <Editor
           ref={dataEditor}
           modelId={flow.project.id}
           fileType="data_file"

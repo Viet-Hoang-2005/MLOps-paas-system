@@ -17,7 +17,7 @@ import {
   Settings,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -69,6 +69,36 @@ export default function Sidebar({
   const { selectedModel } = useModelSelection();
   const [modelGroupOpen, setModelGroupOpen] = useState(true);
   const [systemGroupOpen, setSystemGroupOpen] = useState(true);
+  const [narrowExpanded, setNarrowExpanded] = useState(false);
+  const [prevPathname, setPrevPathname] = useState(location.pathname);
+
+  if (prevPathname !== location.pathname) {
+    setPrevPathname(location.pathname);
+    setNarrowExpanded(false);
+  }
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1280) {
+        setNarrowExpanded(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const handleToggle = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 1280) {
+      setNarrowExpanded((prev) => !prev);
+    } else {
+      onToggle();
+    }
+  };
+
+  const handleCloseAll = () => {
+    onCloseMobile();
+    setNarrowExpanded(false);
+  };
 
   const managementItem = {
     key: "management",
@@ -112,13 +142,14 @@ export default function Sidebar({
       active
         ? "bg-primary text-color-primary-foreground"
         : "text-color-muted-foreground hover:bg-muted hover:text-color-foreground",
-      "md:justify-center md:px-0 xl:justify-start xl:px-3",
-      collapsed && "xl:justify-center xl:px-0",
+      narrowExpanded ? "md:justify-start md:px-3" : "md:justify-center md:px-0",
+      collapsed ? "xl:justify-center xl:px-0" : "xl:justify-start xl:px-3",
     );
 
   const labelClass = cn(
-    "truncate md:hidden xl:block",
-    collapsed && "xl:hidden",
+    "truncate",
+    narrowExpanded ? "md:block" : "md:hidden",
+    collapsed ? "xl:hidden" : "xl:block",
   );
 
   const renderItem = (
@@ -138,9 +169,9 @@ export default function Sidebar({
       <NavLink
         key={item.key}
         to={item.to}
-        onClick={onCloseMobile}
+        onClick={handleCloseAll}
         className={itemClass(active)}
-        title={collapsed ? t(`navigation.${item.key}`) : undefined}
+        title={!narrowExpanded || collapsed ? t(`navigation.${item.key}`) : undefined}
       >
         <Icon className={cn("h-5 w-5 shrink-0", iconClassName)} />
         <span className={labelClass}>{t(`navigation.${item.key}`)}</span>
@@ -158,11 +189,36 @@ export default function Sidebar({
           aria-label={t("actions.closeNavigation")}
         />
       )}
+
+      {narrowExpanded && (
+        <button
+          type="button"
+          className="fixed inset-0 top-16 z-20 hidden bg-overlay md:block xl:hidden animate-fade-in"
+          onClick={() => setNarrowExpanded(false)}
+          aria-label={t("actions.closeNavigation")}
+        />
+      )}
+
+      {/* Permanent placeholder in flex layout for md (tablet/narrow) to eliminate layout shift */}
+      <div
+        className="hidden md:block md:w-17 md:shrink-0 xl:hidden"
+        aria-hidden="true"
+      />
+
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-56 flex-col border-r border-border bg-surface transition-[transform,width] duration-200 md:static md:z-20 md:w-17 md:translate-x-0 xl:w-56",
+          "flex flex-col border-r border-border bg-surface transition-[transform,width,box-shadow] duration-200",
+          // Mobile (< md)
+          "fixed inset-y-0 left-0 z-40 w-56",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
-          collapsed && "xl:w-17",
+          // Narrow desktop / tablet (md to xl): permanently fixed below header, width transitions over constant placeholder
+          "md:fixed md:top-16 md:bottom-0 md:left-0 md:translate-x-0",
+          narrowExpanded
+            ? "md:z-30 md:w-56 md:shadow-(--shadow-overlay)"
+            : "md:z-20 md:w-17 md:shadow-none",
+          // Wide desktop (xl)
+          "xl:static xl:top-auto xl:bottom-auto xl:left-auto xl:z-20 xl:translate-x-0 xl:shadow-none",
+          collapsed ? "xl:w-17" : "xl:w-56",
         )}
       >
         <div className="flex h-16 items-center justify-between border-b border-border px-3 md:hidden">
@@ -179,23 +235,30 @@ export default function Sidebar({
           </button>
         </div>
 
-        <div className="hidden h-12 items-center border-b border-border px-3 md:flex md:justify-center xl:justify-between">
+        <div
+          className={cn(
+            "hidden h-12 items-center border-b border-border px-3 md:flex",
+            narrowExpanded ? "md:justify-between" : "md:justify-center",
+            collapsed ? "xl:justify-center" : "xl:justify-between",
+          )}
+        >
           <span
             className={cn(
-              "text-style-body text-color-muted-foreground md:hidden xl:block",
-              collapsed && "xl:hidden",
+              "truncate text-style-body text-color-muted-foreground",
+              !narrowExpanded && "md:hidden",
+              collapsed ? "xl:hidden" : "xl:block",
             )}
           >
             {t("navigation.managementGroup")}
           </span>
           <button
             type="button"
-            onClick={onToggle}
+            onClick={handleToggle}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-surface text-color-muted-foreground hover:bg-muted hover:text-color-foreground"
             aria-label={
-              collapsed
-                ? t("actions.expandSidebar")
-                : t("actions.collapseSidebar")
+              narrowExpanded || (!collapsed && typeof window !== "undefined" && window.innerWidth >= 1280)
+                ? t("actions.collapseSidebar")
+                : t("actions.expandSidebar")
             }
           >
             <Menu className="h-5 w-5" />
@@ -211,16 +274,24 @@ export default function Sidebar({
           <div
             className={cn(
               "-mx-3 flex items-center justify-between border-b border-border transition-all",
+              narrowExpanded
+                ? "md:h-10 md:px-3 md:mt-3 md:mb-2 md:cursor-pointer md:select-none"
+                : "md:h-0 md:my-2 md:px-0",
               collapsed
-                ? "h-10 px-3 md:h-0 md:my-2 md:px-0 xl:h-0 xl:my-2 xl:px-0"
-                : "h-10 px-3 mt-3 mb-2 cursor-pointer select-none group/model md:h-0 md:my-2 md:px-0 xl:h-10 xl:px-3 xl:mt-3 xl:mb-2",
+                ? "xl:h-0 xl:my-2 xl:px-0"
+                : "xl:h-10 xl:px-3 xl:mt-3 xl:mb-2 xl:cursor-pointer xl:select-none",
             )}
-            onClick={() => !collapsed && setModelGroupOpen((open) => !open)}
+            onClick={() => {
+              if (narrowExpanded || !collapsed) {
+                setModelGroupOpen((open) => !open);
+              }
+            }}
           >
             <span
               className={cn(
-                "text-style-body text-color-muted-foreground group-hover/model:text-color-foreground transition-colors md:hidden xl:block",
-                collapsed && "xl:hidden",
+                "text-style-body text-color-muted-foreground group-hover/model:text-color-foreground transition-colors",
+                narrowExpanded ? "md:block" : "md:hidden",
+                collapsed ? "xl:hidden" : "xl:block",
               )}
             >
               {t("navigation.modelGroup")}
@@ -232,8 +303,9 @@ export default function Sidebar({
                 setModelGroupOpen((open) => !open);
               }}
               className={cn(
-                "flex h-7 w-7 items-center justify-center rounded-compact text-color-muted-foreground hover:bg-muted hover:text-color-foreground transition-colors md:hidden xl:flex",
-                collapsed && "xl:hidden",
+                "h-7 w-7 items-center justify-center rounded-compact text-color-muted-foreground hover:bg-muted hover:text-color-foreground transition-colors",
+                narrowExpanded ? "md:flex" : "md:hidden",
+                collapsed ? "xl:hidden" : "xl:flex",
               )}
               aria-label={
                 modelGroupOpen
@@ -250,23 +322,32 @@ export default function Sidebar({
             </button>
           </div>
 
-          {(modelGroupOpen || collapsed) && (
+          {((narrowExpanded ? modelGroupOpen : true) &&
+            (collapsed ? true : modelGroupOpen)) && (
             <div className="space-y-1">{modelItems.map(renderItem)}</div>
           )}
 
           <div
             className={cn(
               "-mx-3 flex items-center justify-between border-b border-border transition-all",
+              narrowExpanded
+                ? "md:h-10 md:px-3 md:mt-3 md:mb-2 md:cursor-pointer md:select-none"
+                : "md:h-0 md:my-2 md:px-0",
               collapsed
-                ? "h-10 px-3 md:h-0 md:my-2 md:px-0 xl:h-0 xl:my-2 xl:px-0"
-                : "h-10 px-3 mt-3 mb-2 cursor-pointer select-none group/system md:h-0 md:my-2 md:px-0 xl:h-10 xl:px-3 xl:mt-3 xl:mb-2",
+                ? "xl:h-0 xl:my-2 xl:px-0"
+                : "xl:h-10 xl:px-3 xl:mt-3 xl:mb-2 xl:cursor-pointer xl:select-none",
             )}
-            onClick={() => !collapsed && setSystemGroupOpen((open) => !open)}
+            onClick={() => {
+              if (narrowExpanded || !collapsed) {
+                setSystemGroupOpen((open) => !open);
+              }
+            }}
           >
             <span
               className={cn(
-                "text-style-body text-color-muted-foreground group-hover/system:text-color-foreground transition-colors md:hidden xl:block",
-                collapsed && "xl:hidden",
+                "text-style-body text-color-muted-foreground group-hover/system:text-color-foreground transition-colors",
+                narrowExpanded ? "md:block" : "md:hidden",
+                collapsed ? "xl:hidden" : "xl:block",
               )}
             >
               {t("navigation.systemGroup")}
@@ -278,8 +359,9 @@ export default function Sidebar({
                 setSystemGroupOpen((open) => !open);
               }}
               className={cn(
-                "flex h-7 w-7 items-center justify-center rounded-compact text-color-muted-foreground hover:bg-muted hover:text-color-foreground transition-colors md:hidden xl:flex",
-                collapsed && "xl:hidden",
+                "h-7 w-7 items-center justify-center rounded-compact text-color-muted-foreground hover:bg-muted hover:text-color-foreground transition-colors",
+                narrowExpanded ? "md:flex" : "md:hidden",
+                collapsed ? "xl:hidden" : "xl:flex",
               )}
               aria-label={
                 systemGroupOpen
@@ -296,7 +378,8 @@ export default function Sidebar({
             </button>
           </div>
 
-          {(systemGroupOpen || collapsed) && (
+          {((narrowExpanded ? systemGroupOpen : true) &&
+            (collapsed ? true : systemGroupOpen)) && (
             <div className="space-y-1">{systemItems.map(renderItem)}</div>
           )}
 
@@ -305,10 +388,15 @@ export default function Sidebar({
               type="button"
               onClick={logout}
               className={cn(
-                "flex h-10 w-full items-center gap-3 rounded-surface px-3 text-style-body-strong text-color-muted-foreground transition-colors hover:bg-danger-subtle hover:text-color-danger md:justify-center md:px-0 xl:justify-start xl:px-3",
-                collapsed && "xl:justify-center xl:px-0",
+                "flex h-10 w-full items-center gap-3 rounded-surface px-3 text-style-body-strong text-color-muted-foreground transition-colors hover:bg-danger-subtle hover:text-color-danger",
+                narrowExpanded
+                  ? "md:justify-start md:px-3"
+                  : "md:justify-center md:px-0",
+                collapsed
+                  ? "xl:justify-center xl:px-0"
+                  : "xl:justify-start xl:px-3",
               )}
-              title={collapsed ? t("actions.logout") : undefined}
+              title={!narrowExpanded || collapsed ? t("actions.logout") : undefined}
             >
               <LogOut className="h-5 w-5 shrink-0" />
               <span className={labelClass}>{t("actions.logout")}</span>

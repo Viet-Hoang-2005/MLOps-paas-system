@@ -12,7 +12,6 @@ export default function NotificationsPage() {
         title={t("comingSoon")}
         description={t("description")}
         icon={<Bell className="h-6 w-6" />}
-        showModelName={false}
       />
     </section>
   );

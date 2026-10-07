@@ -9,7 +9,7 @@ import {
 } from "@/shared/components/ProgressLine";
 import { StepTitle } from "@/shared/components/StepTitle";
 import { toast } from "@/shared/types/toastStore";
-import { Activity, Bot, Check, Copy, Package, Server } from "lucide-react";
+import { Activity, Bot, Check, Copy, Package, GitBranch } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -62,7 +62,7 @@ export function ModelStatusLine({
             : registrationStatus !== "registered"
               ? "active"
               : "completed",
-        icon: Server,
+        icon: GitBranch,
         helper:
           registrationStatus === "registered"
             ? t("workflow.stepRegisterModelHelper")

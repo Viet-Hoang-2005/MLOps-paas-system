@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import i18next from "i18next";
 import { I18nextProvider } from "react-i18next";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { parseResource, validateResourcePair } from "./i18n-resources.mjs";
 
 // Transpile real modules in memory using the existing TypeScript/Node tooling.
@@ -309,15 +310,20 @@ for (const language of ["en", "vi"]) {
     resources: { en: { evolution: en }, vi: { evolution: vi } },
     interpolation: { escapeValue: false },
   });
+  const queryClient = new QueryClient();
   const render = (component, props) =>
     renderToStaticMarkup(
       React.createElement(
-        I18nextProvider,
-        { i18n: instance },
+        QueryClientProvider,
+        { client: queryClient },
         React.createElement(
-          MemoryRouter,
-          null,
-          React.createElement(component, props),
+          I18nextProvider,
+          { i18n: instance },
+          React.createElement(
+            MemoryRouter,
+            null,
+            React.createElement(component, props),
+          ),
         ),
       ),
     );

@@ -3,6 +3,7 @@ import {
   getModelProject,
   getVersionSnapshot,
   getRunningSource,
+  getRunningAttributes,
 } from "@/shared/api/catalogApi";
 import { downloadText } from "@/shared/api/files";
 import { evolutionQueryKeys } from "@/features/evolution/queryKeys";
@@ -48,3 +49,11 @@ export const useRunningSource = (projectId?: string, versionId?: string) =>
     queryFn: () => getRunningSource(projectId!),
     enabled: Boolean(projectId && versionId),
   });
+
+export const useRunningAttributes = (projectId?: string, versionId?: string) =>
+  useQuery({
+    queryKey: overviewQueryKeys.attributes(projectId ?? "", versionId ?? ""),
+    queryFn: () => getRunningAttributes(projectId!),
+    enabled: Boolean(projectId && versionId),
+  });
+

@@ -11,8 +11,8 @@ import {
 import { Button } from "@/shared/components/Button";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { DataViewer } from "@/shared/components/DataViewer";
-import { LazyCodeEditor } from "@/shared/components/LazyCodeEditor";
-import { SourceTree } from "@/shared/components/SourceTree";
+import { CodeViewer } from "@/shared/components/CodeViewer";
+import { DirectoryTree } from "@/shared/components/DirectoryTree";
 import {
   buildSourceTree,
   type CreatingFileState,
@@ -37,7 +37,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-export interface SourceEditorProps {
+export interface EditorProps {
   modelId: string;
   fileType: "code_file" | "data_file";
   title: string;
@@ -51,12 +51,12 @@ export interface SourceEditorProps {
   entryPointExtension?: string;
 }
 
-export interface SourceEditorHandle {
+export interface EditorHandle {
   save: () => Promise<boolean>;
 }
 
-export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(
-  function SourceEditor(
+export const Editor = forwardRef<EditorHandle, EditorProps>(
+  function Editor(
     {
       modelId,
       fileType,
@@ -537,7 +537,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(
                 onChange={handleEditorChange}
               />
             ) : (
-              <LazyCodeEditor
+              <CodeViewer
                 height="100%"
                 language={getLanguage(selectedPath)}
                 theme={resolvedTheme === "dark" ? "vs-dark" : "vs"}
@@ -607,7 +607,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(
                   {t("sourceEditor.noFiles")}
                 </div>
               ) : (
-                <SourceTree
+                <DirectoryTree
                   nodes={treeNodes}
                   selectedPath={selectedPath}
                   onSelect={handleSelectPath}

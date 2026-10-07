@@ -1,17 +1,20 @@
 import { RouteFallback } from "@/app/router/RouteFallback";
 import { useTheme } from "@/app/theme/useTheme";
-import { buildDeploymentPath } from "@/features/deployments/navigation";
-import { ModelPredictionsTesting } from "@/features/overview/components/ModelPredictionsTesting";
-import { ModelStatusLine } from "@/features/overview/components/ModelStatusLine";
-import { ResourceUsageChart } from "@/features/overview/components/ResourceUsageChart";
 import {
   useProjectOverview,
+  useRunningAttributes,
   useRunningSource,
   useSnapshotText,
 } from "@/features/overview/hooks/useProjectOverview";
+import { AttributesOverviewPage } from "@/features/overview/pages/AttributesOverviewPage";
+import { CodeOverviewPage } from "@/features/overview/pages/CodeOverviewPage";
+import { DataOverviewPage } from "@/features/overview/pages/DataOverviewPage";
+import { DeploymentOverviewPage } from "@/features/overview/pages/DeploymentOverviewPage";
+import { InformationOverviewPage } from "@/features/overview/pages/InformationOverviewPage";
 import { EditMetadataDialog } from "@/features/projects/components/EditMetadataDialog";
 import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
 import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
+import { usePreview } from "@/features/projects/hooks/usePreview";
 import { catalogQueryKeys } from "@/features/projects/queryKeys";
 import {
   deleteModelProject,
@@ -21,22 +24,18 @@ import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
-import { DataViewer } from "@/shared/components/DataViewer";
-import { LazyCodeEditor } from "@/shared/components/LazyCodeEditor";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { PageTabs } from "@/shared/components/PageTabs";
-import { Placeholder } from "@/shared/components/Placeholder";
-import { Select } from "@/shared/components/Select";
-import { formatDateTime } from "@/shared/i18n/formatters";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Box,
   Code,
-  Database,
+  FileSpreadsheet,
   Home,
   Info,
   PenLine,
   Settings2,
+  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
@@ -50,7 +49,7 @@ import {
 
 export default function ProjectOverviewPage() {
   const { modelId } = useParams();
-  const { t, i18n } = useTranslation("overview");
+  const { t } = useTranslation("overview");
   const { t: tCommon } = useTranslation("common");
   const { selectedModel, loading: isModelLoading } = useModelSelection();
   const { resolvedTheme } = useTheme();
@@ -60,13 +59,41 @@ export default function ProjectOverviewPage() {
   const tab = params.get("tab") || "deployment";
   const project = useProjectOverview(modelId);
   const model = project.data;
+  const isPreview = model?.lifecycle_status === "preview";
+  const effectiveVersionId =
+    model?.active_endpoint?.version_id ?? model?.latest_version_id ?? undefined;
+
   const source = useRunningSource(
-    tab === "code" ? modelId : undefined,
-    model?.active_endpoint?.version_id,
+    !isPreview && tab === "code" ? modelId : undefined,
+    effectiveVersionId,
   );
   const reference = useSnapshotText(
-    tab === "data" ? model?.reference_data?.download_url : undefined,
-    model?.active_endpoint?.version_id,
+    !isPreview && tab === "data" ? model?.reference_data?.download_url : undefined,
+    effectiveVersionId,
+  );
+  const attributes = useRunningAttributes(
+    tab === "attributes" ? modelId : undefined,
+    effectiveVersionId,
+  );
+
+  const preview = usePreview(isPreview ? modelId : undefined);
+  const previewSourceAsset = preview.data?.assets.find(
+    (a) => a.kind === "source_code",
+  );
+  const previewRefAsset = preview.data?.assets.find(
+    (a) => a.kind === "reference_data",
+  );
+  const previewSource = useSnapshotText(
+    isPreview && tab === "code" ? previewSourceAsset?.download_url : undefined,
+    isPreview && previewSourceAsset
+      ? `preview-source-${modelId}-${preview.data?.revision}`
+      : undefined,
+  );
+  const previewReference = useSnapshotText(
+    isPreview && tab === "data" ? previewRefAsset?.download_url : undefined,
+    isPreview && previewRefAsset
+      ? `preview-ref-${modelId}-${preview.data?.revision}`
+      : undefined,
   );
   const [editMetadataOpen, setEditMetadataOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -194,6 +221,12 @@ export default function ProjectOverviewPage() {
               onClick: () => setParams({ tab: "deployment" }),
             },
             {
+              label: t("workflow.attributes"),
+              icon: SlidersHorizontal,
+              isActive: tab === "attributes",
+              onClick: () => setParams({ tab: "attributes" }),
+            },
+            {
               label: t("workflow.code"),
               icon: Code,
               isActive: tab === "code",
@@ -201,7 +234,7 @@ export default function ProjectOverviewPage() {
             },
             {
               label: t("workflow.data"),
-              icon: Database,
+              icon: FileSpreadsheet,
               isActive: tab === "data",
               onClick: () => setParams({ tab: "data" }),
             },
@@ -215,78 +248,95 @@ export default function ProjectOverviewPage() {
         />
       </div>
 
-      {tab !== "information" && !hasRunning ? (
-        <Placeholder
-          title={tCommon("navigation.deployment")}
-          description={`${t("workflow.noRunning")} ${t("workflow.healthNotChecked")}`}
-          icon={<Box className="h-6 w-6" />}
-          showModelName={false}
-          action={
-            <Button size="md" onClick={() => navigate(buildDeploymentPath())}>
-              {t("workflow.deploy")}
-            </Button>
+      {tab === "deployment" && (
+        <DeploymentOverviewPage
+          model={model}
+          modelId={modelId!}
+          hasRunning={hasRunning}
+          healthUnavailable={project.isError}
+        />
+      )}
+
+      {tab === "attributes" && (
+        <AttributesOverviewPage
+          modelId={modelId!}
+          attributes={attributes.data}
+          isLoading={attributes.isLoading}
+        />
+      )}
+
+      {tab === "code" && (
+        <CodeOverviewPage
+          modelId={modelId!}
+          effectiveVersionId={effectiveVersionId}
+          isPreview={isPreview}
+          source={{
+            data: source.data,
+            isLoading: source.isLoading,
+            isError: source.isError,
+          }}
+          previewSource={{
+            asset: previewSourceAsset,
+            data: previewSource.data,
+            isLoading:
+              preview.isLoading ||
+              (Boolean(previewSourceAsset) && previewSource.isLoading),
+            isError: previewSource.isError,
+          }}
+          theme={resolvedTheme}
+          onUploadSuccess={async () => {
+            if (isPreview) {
+              await preview.refetch();
+              await project.refetch();
+            } else {
+              await project.refetch();
+              await source.refetch();
+            }
+          }}
+        />
+      )}
+
+      {tab === "data" && (
+        <DataOverviewPage
+          modelId={modelId!}
+          effectiveVersionId={effectiveVersionId}
+          isPreview={isPreview}
+          referenceDataName={model.reference_data?.name}
+          reference={{
+            data: reference.data,
+            isLoading: reference.isLoading,
+            isError: reference.isError,
+          }}
+          previewReference={{
+            asset: previewRefAsset,
+            data: previewReference.data,
+            isLoading:
+              preview.isLoading ||
+              (Boolean(previewRefAsset) && previewReference.isLoading),
+            isError: previewReference.isError,
+          }}
+          onUploadSuccess={async () => {
+            if (isPreview) {
+              await preview.refetch();
+              await project.refetch();
+            } else {
+              await project.refetch();
+            }
+          }}
+        />
+      )}
+
+      {tab === "information" && (
+        <InformationOverviewPage
+          model={model}
+          onUpdateAccessMode={(accessMode) =>
+            update.mutate({
+              name: model.name,
+              description: model.description,
+              access_mode: accessMode,
+            })
           }
         />
-      ) : tab === "deployment" ? (
-        <div role="tabpanel" className="space-y-6">
-          <ModelStatusLine model={model} healthUnavailable={project.isError} />
-          <ResourceUsageChart
-            projectId={modelId!}
-            deploymentId={model.active_endpoint?.deployment_id ?? ""}
-          />
-          <ModelPredictionsTesting model={model} />
-        </div>
-      ) : (
-        <section
-          role="tabpanel"
-          className="space-y-5 rounded-surface border border-border bg-surface p-6"
-        >
-          {tab === "information" ? (
-            <>
-              <p>{model.name}</p>
-              <p>{model.description}</p>
-              <p>{model.flavor}</p>
-              <p>
-                {formatDateTime(model.created_at, i18n.language)} ·{" "}
-                {formatDateTime(model.updated_at, i18n.language)}
-              </p>
-              <Select
-                value={model.access_mode}
-                onChange={(value) =>
-                  update.mutate({
-                    name: model.name,
-                    description: model.description,
-                    access_mode: value as "private" | "public",
-                  })
-                }
-                options={[
-                  { value: "private", label: t("workflow.private") },
-                  { value: "public", label: t("workflow.public") },
-                ]}
-              />
-            </>
-          ) : tab === "code" ? (
-            source.isError ? (
-              <p role="alert">{t("workflow.failed")}</p>
-            ) : source.data ? (
-              <LazyCodeEditor
-                height="400px"
-                language="python"
-                theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
-                value={source.data}
-                options={{ readOnly: true, minimap: { enabled: false } }}
-              />
-            ) : (
-              <p>{t("workflow.noSource")}</p>
-            )
-          ) : reference.isError ? (
-            <p role="alert">{t("workflow.failed")}</p>
-          ) : reference.data ? (
-            <DataViewer initialCsvText={reference.data} readOnly />
-          ) : (
-            <p>{t("workflow.noReference")}</p>
-          )}
-        </section>
       )}
 
       <ConfirmDialog

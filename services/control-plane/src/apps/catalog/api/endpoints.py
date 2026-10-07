@@ -175,6 +175,25 @@ class RunningSourceEndpoint(APIView):
         return Response({"content": running_source(project_for_user(request.user, project_id))})
 
 
+class RunningAttributesEndpoint(APIView):
+    def get(self, request, project_id):
+        from apps.catalog.services.snapshots import running_attributes
+
+        project = project_for_user(request.user, project_id)
+        return Response(running_attributes(project))
+
+
+class RunningLabelMappingEndpoint(APIView):
+    def get(self, request, project_id):
+        from apps.catalog.services.snapshots import running_label_mapping
+
+        project = project_for_user(request.user, project_id)
+        result = running_label_mapping(project)
+        if result is None:
+            return Response({"filename": "", "mapping": {}}, status=status.HTTP_200_OK)
+        return Response(result)
+
+
 class ProjectBuildEndpoint(APIView):
     def get(self, request, project_id):
         project = project_for_user(request.user, project_id)

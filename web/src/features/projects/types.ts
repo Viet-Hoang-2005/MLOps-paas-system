@@ -56,6 +56,7 @@ export interface ModelProject {
   endpoint_last_checked_at?: string | null;
   flavor?: ModelFlavor | "";
   lifecycle_status?: ModelLifecycleStatus;
+  latest_version_id?: ResourceId | null;
   deployment_id?: ResourceId;
   source_code?: ProjectAssetSummary | null;
   reference_data?: ProjectAssetSummary | null;

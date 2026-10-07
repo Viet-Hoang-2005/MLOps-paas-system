@@ -220,3 +220,63 @@ export const deleteReferenceFile = async (
       },
     )
   ).data;
+
+export interface ModelInsightItem {
+  name: string;
+  value: number;
+  abs_value?: number;
+  class_name?: string;
+  rank?: number;
+}
+
+export interface ModelInsightsSummary {
+  schema_version?: string;
+  kind?: string;
+  source?: string;
+  feature_count?: number;
+  items?: ModelInsightItem[];
+}
+
+export interface ModelLabelMappingData {
+  filename: string;
+  mapping: Record<string, unknown> | unknown[];
+}
+
+export interface ModelInputSchemaData {
+  filename: string;
+  schema: unknown;
+}
+
+export interface ModelArtifactSummary {
+  kind: string;
+  name: string;
+  size_bytes: number;
+}
+
+export interface ModelAttributesResponse {
+  metrics: Record<string, unknown> | null;
+  params: Record<string, unknown> | null;
+  insights: ModelInsightsSummary | null;
+  label_mapping: ModelLabelMappingData | null;
+  input_schema: ModelInputSchemaData | null;
+  artifacts: ModelArtifactSummary[];
+}
+
+export const getRunningAttributes = async (
+  modelId: string,
+): Promise<ModelAttributesResponse> =>
+  (
+    await apiClient.get<ModelAttributesResponse>(
+      controlPlaneURL(`/models/${modelId}/running-attributes/`),
+    )
+  ).data;
+
+export const getRunningLabelMapping = async (
+  modelId: string,
+): Promise<ModelLabelMappingData> =>
+  (
+    await apiClient.get<ModelLabelMappingData>(
+      controlPlaneURL(`/models/${modelId}/label-mapping/`),
+    )
+  ).data;
+

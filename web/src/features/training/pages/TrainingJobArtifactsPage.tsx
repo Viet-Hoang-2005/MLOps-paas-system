@@ -12,7 +12,7 @@ import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { Callout } from "@/shared/components/Callout";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
-import { LazyCodeEditor } from "@/shared/components/LazyCodeEditor";
+import { CodeViewer } from "@/shared/components/CodeViewer";
 import { toast } from "@/shared/types/toastStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -699,7 +699,7 @@ export default function TrainingJobArtifactsPage() {
                 </span>
               </div>
               <div className="h-80 bg-surface">
-                <LazyCodeEditor
+                <CodeViewer
                   height="100%"
                   language="python"
                   theme={resolvedTheme === "dark" ? "vs-dark" : "vs"}

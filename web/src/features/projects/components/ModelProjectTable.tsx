@@ -110,13 +110,32 @@ export function ModelProjectTable({
       {
         accessorKey: "lifecycle_status",
         header: t("workflow.status"),
-        cell: ({ row }) => (
-          <Badge>
-            {t(
-              `workflow.${row.original.deletion_state !== "active" ? row.original.deletion_state : (row.original.lifecycle_status ?? "preview")}`,
-            )}
-          </Badge>
-        ),
+        cell: ({ row }) => {
+          const deletionState = row.original.deletion_state;
+          const lifecycleStatus = row.original.lifecycle_status ?? "preview";
+          const statusKey =
+            deletionState && deletionState !== "active"
+              ? deletionState
+              : lifecycleStatus;
+
+          const variant =
+            deletionState === "delete_failed"
+              ? "danger"
+              : deletionState === "deleting"
+                ? "warning"
+                : lifecycleStatus === "running"
+                  ? "success"
+                  : "neutral";
+
+          return (
+            <Badge variant={variant}>
+              {t(`workflow.${statusKey}`)}
+              {row.original.preview_changed
+                ? ` · ${t("workflow.previewChanged")}`
+                : ""}
+            </Badge>
+          );
+        },
       },
       {
         accessorKey: "updated_at",

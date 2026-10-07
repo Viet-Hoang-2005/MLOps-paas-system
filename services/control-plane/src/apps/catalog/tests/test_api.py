@@ -126,3 +126,67 @@ def test_project_list_returns_latest_active_endpoint_for_the_owner():
         "registration_status": "unregistered",
         "last_checked_at": None,
     }
+
+
+@pytest.mark.django_db
+def test_running_attributes_and_label_mapping_with_pickle_and_json(monkeypatch):
+    import pickle
+    from apps.registry.models import ModelArtifact
+
+    owner = get_user_model().objects.create_user("attr-owner@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="NIDS-Attr")
+    version = ModelVersion.objects.create(
+        project=project,
+        version="1",
+        metrics_summary={"accuracy": 0.985, "f1_score": 0.978},
+        params_summary={"n_estimators": 100, "max_depth": 5},
+        insights_summary={"kind": "feature_importance", "items": [{"name": "col1", "value": 0.42}]},
+    )
+    build = Build.objects.create(project=project, version=version, flavor="xgboost", status="ready")
+    deployment = Deployment.objects.create(version=version, build=build, status="succeeded")
+    project.active_deployment = deployment
+    project.save(update_fields=["active_deployment"])
+
+    # Create pkl label mapping artifact
+    pkl_bytes = pickle.dumps({0: "benign", 1: "attack"})
+    ModelArtifact.objects.create(
+        version=version,
+        kind="label_mapping",
+        name="labels.pkl",
+        uri="s3://test-bucket/labels.pkl",
+        size_bytes=len(pkl_bytes),
+    )
+
+    class FakeStorage:
+        def parse_uri(self, uri):
+            return "test-bucket", "labels.pkl"
+
+        @property
+        def client(self):
+            class FakeClient:
+                def get_object(self, **kwargs):
+                    from io import BytesIO
+                    return {"Body": BytesIO(pkl_bytes)}
+            return FakeClient()
+
+    from apps.catalog.services import snapshots
+    monkeypatch.setattr(snapshots, "S3Storage", lambda: FakeStorage())
+
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    # Test running-attributes
+    res = client.get(f"/api/models/{project.public_id}/running-attributes/")
+    assert res.status_code == 200
+    assert res.data["metrics"] == {"accuracy": 0.985, "f1_score": 0.978}
+    assert res.data["params"] == {"n_estimators": 100, "max_depth": 5}
+    assert res.data["insights"]["kind"] == "feature_importance"
+    assert res.data["label_mapping"]["filename"] == "labels.pkl"
+    assert res.data["label_mapping"]["mapping"] == {"0": "benign", "1": "attack"}
+
+    # Test label-mapping standalone endpoint
+    res_lm = client.get(f"/api/models/{project.public_id}/label-mapping/")
+    assert res_lm.status_code == 200
+    assert res_lm.data["filename"] == "labels.pkl"
+    assert res_lm.data["mapping"] == {"0": "benign", "1": "attack"}
+

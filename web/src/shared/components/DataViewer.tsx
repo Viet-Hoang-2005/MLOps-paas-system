@@ -1,15 +1,19 @@
+import type { ReactNode } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import Papa from "papaparse";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/shared/components/Button";
 
-interface DataViewerProps {
+export interface DataViewerProps {
+  title?: ReactNode;
   initialCsvText: string;
   onChange?: (csvText: string) => void;
   readOnly?: boolean;
 }
 
 export function DataViewer({
+  title,
   initialCsvText,
   onChange,
   readOnly = false,
@@ -17,7 +21,7 @@ export function DataViewer({
   const { t } = useTranslation("common");
   const [data, setData] = useState<string[][]>([]);
   const [page, setPage] = useState(0);
-  const pageSize = 100;
+  const pageSize = 50;
 
   useEffect(() => {
     // Parse initial CSV
@@ -62,8 +66,18 @@ export function DataViewer({
 
   return (
     <div className="flex flex-col h-full bg-surface relative">
-      <div className="flex items-center justify-end p-2 border-b border-border">
-        <div className="flex items-center gap-2 text-style-body text-color-muted-foreground">
+      <div className="flex items-center justify-between gap-4 p-2 border-b border-border">
+        <div className="flex items-center min-w-0">
+          {title &&
+            (typeof title === "string" ? (
+              <span className="truncate text-style-body text-color-muted-foreground">
+                {title}
+              </span>
+            ) : (
+              title
+            ))}
+        </div>
+        <div className="flex items-center gap-4 text-style-body text-color-muted-foreground shrink-0">
           <span>
             {t("csv.range", {
               start: page * pageSize + 1,
@@ -71,25 +85,23 @@ export function DataViewer({
               total: data.length,
             })}
           </span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
+          <div className="flex items-center">
+            <Button
+              size="icon"
+              border={false}
+              icon={<ArrowLeft className="h-5 w-5" />}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="rounded-surface p-1 hover:bg-muted disabled:opacity-50"
               aria-label={t("csv.previous")}
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
+            />
+            <Button
+              size="icon"
+              border={false}
+              icon={<ArrowRight className="h-5 w-5" />}
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="rounded-surface p-1 hover:bg-muted disabled:opacity-50"
               aria-label={t("csv.next")}
-            >
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            />
           </div>
         </div>
       </div>

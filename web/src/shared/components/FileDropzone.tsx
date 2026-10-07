@@ -8,6 +8,7 @@ export function FileDropzone({
   hint,
   onChange,
   disabled = false,
+  className,
 }: {
   accept: string;
   title: string;
@@ -15,12 +16,14 @@ export function FileDropzone({
   hint?: string;
   onChange: (file: File | null) => void;
   disabled?: boolean;
+  className?: string;
 }) {
   return (
     <label
       className={cn(
         "flex min-h-40 flex-col items-center justify-center rounded-surface border border-dashed border-border bg-muted px-4 text-center transition-colors",
         disabled ? "cursor-default" : "cursor-pointer hover:border-primary",
+        className,
       )}
     >
       <UploadCloud className="mb-3 h-6 w-6 text-color-muted-foreground" />

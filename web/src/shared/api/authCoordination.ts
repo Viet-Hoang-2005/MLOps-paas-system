@@ -13,9 +13,9 @@ const getBroadcastChannel = (): BroadcastChannel | null => {
   return broadcastChannelInstance;
 };
 
-export const runWithRefreshLock = async <T>(
+export async function runWithRefreshLock<T>(
   action: () => Promise<T>,
-): Promise<T> => {
+): Promise<T> {
   if (
     typeof navigator !== "undefined" &&
     "locks" in navigator &&
@@ -24,7 +24,7 @@ export const runWithRefreshLock = async <T>(
     return navigator.locks.request(REFRESH_LOCK_NAME, () => action());
   }
   return action();
-};
+}
 
 export const initAuthBroadcast = (onLogout: () => void): (() => void) => {
   const channel = getBroadcastChannel();

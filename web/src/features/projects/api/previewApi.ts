@@ -231,3 +231,57 @@ export async function updatePreview(
     )
   ).data;
 }
+
+export async function uploadPreviewSingleAsset(
+  projectId: string,
+  kind: "source_code" | "reference_data",
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<ModelPreview> {
+  const currentPreview = await getPreview(projectId);
+
+  const urlPayload = [
+    {
+      kind,
+      filename: file.name,
+      size_bytes: file.size,
+      content_type: file.type || (kind === "source_code" ? "text/x-python" : "text/csv"),
+    },
+  ];
+
+  const presignedResponse = await getPreviewUploadUrls(
+    projectId,
+    urlPayload,
+    currentPreview.flavor || undefined,
+    currentPreview.artifact_format || undefined,
+  );
+
+  const item = presignedResponse.files[0];
+  if (!item) {
+    throw new Error("No presigned upload URL generated");
+  }
+
+  await uploadFileToPresignedUrl(
+    item.upload_url,
+    file,
+    item.content_type,
+    onProgress,
+  );
+
+  return (
+    await apiClient.patch<ModelPreview>(
+      controlPlaneURL(`/models/${projectId}/preview/`),
+      {
+        revision: currentPreview.revision,
+        assets: [
+          {
+            kind: item.kind,
+            name: item.filename,
+            s3_uri: item.s3_uri,
+          },
+        ],
+      },
+    )
+  ).data;
+}
+

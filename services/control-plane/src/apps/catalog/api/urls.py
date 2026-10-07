@@ -8,6 +8,8 @@ from .endpoints import (
     ProjectPreviewEndpoint,
     ProjectPreviewReferencePreviewEndpoint,
     ProjectPreviewUploadUrlsEndpoint,
+    RunningAttributesEndpoint,
+    RunningLabelMappingEndpoint,
     RunningSourceEndpoint,
     TrainingProjectCreateEndpoint,
     WorkspaceFilesEndpoint,
@@ -30,6 +32,8 @@ urlpatterns = [
         name="project-preview-reference-preview",
     ),
     path("<uuid:project_id>/running-source/", RunningSourceEndpoint.as_view(), name="project-running-source"),
+    path("<uuid:project_id>/running-attributes/", RunningAttributesEndpoint.as_view(), name="project-running-attributes"),
+    path("<uuid:project_id>/label-mapping/", RunningLabelMappingEndpoint.as_view(), name="project-label-mapping"),
     path("<uuid:project_id>/builds/", ProjectBuildEndpoint.as_view(), name="project-builds"),
     path("<uuid:project_id>/workspace/<str:kind>/files/", WorkspaceFilesEndpoint.as_view(), name="workspace-files"),
 ]

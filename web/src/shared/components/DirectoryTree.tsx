@@ -41,7 +41,7 @@ function InlineTreeInput({ onCommit }: { onCommit: (value: string) => void }) {
   );
 }
 
-interface SourceTreeProps {
+interface DirectoryTreeProps {
   nodes: SourceTreeNode[];
   level?: number;
   selectedPath: string | null;
@@ -55,7 +55,7 @@ interface SourceTreeProps {
   currentParentPath?: string;
 }
 
-export function SourceTree({
+export function DirectoryTree({
   nodes,
   level = 0,
   selectedPath,
@@ -67,7 +67,7 @@ export function SourceTree({
   creatingFile,
   onFinishCreating,
   currentParentPath = "",
-}: SourceTreeProps) {
+}: DirectoryTreeProps) {
   return (
     <ul className="space-y-0.5">
       {nodes.map((node) => {
@@ -106,7 +106,7 @@ export function SourceTree({
                 <span className="min-w-0 flex-1 truncate">{node.name}</span>
               </button>
               {isExpanded ? (
-                <SourceTree
+                <DirectoryTree
                   nodes={node.children}
                   level={level + 1}
                   selectedPath={selectedPath}

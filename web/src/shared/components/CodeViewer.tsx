@@ -6,7 +6,7 @@ const MonacoEditor = lazy(() =>
   import("@monaco-editor/react").then((module) => ({ default: module.Editor })),
 );
 
-export function LazyCodeEditor(props: EditorProps) {
+export function CodeViewer(props: EditorProps) {
   return (
     <Suspense
       fallback={

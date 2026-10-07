@@ -13,6 +13,7 @@ class ModelProjectSerializer(serializers.ModelSerializer):
     active_endpoint = serializers.SerializerMethodField()
     source_code = serializers.SerializerMethodField()
     reference_data = serializers.SerializerMethodField()
+    latest_version_id = serializers.SerializerMethodField()
     preview_revision = serializers.IntegerField(source="preview.revision", read_only=True)
     preview_changed = serializers.SerializerMethodField()
 
@@ -29,6 +30,7 @@ class ModelProjectSerializer(serializers.ModelSerializer):
             "source_code",
             "reference_data",
             "lifecycle_status",
+            "latest_version_id",
             "active_endpoint",
             "is_active",
             "deletion_state",
@@ -99,10 +101,21 @@ class ModelProjectSerializer(serializers.ModelSerializer):
             }
         return None
 
+    def get_latest_version_id(self, instance):
+        if instance.active_deployment_id:
+            return str(instance.active_deployment.version.public_id)
+        latest = instance.versions.order_by("-registered_at", "-id").first()
+        return str(latest.public_id) if latest else None
+
     def _asset_summary(self, instance, kind):
-        if not instance.active_deployment_id:
+        version = None
+        if instance.active_deployment_id:
+            version = instance.active_deployment.version
+        elif instance.versions.exists():
+            version = instance.versions.order_by("-registered_at", "-id").first()
+        if not version:
             return None
-        artifact = instance.active_deployment.version.artifacts.filter(
+        artifact = version.artifacts.filter(
             kind={"code": "source_code", "data": "reference_data"}[kind]
         ).first()
         return (
