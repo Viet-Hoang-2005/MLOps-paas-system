@@ -72,7 +72,7 @@ export default function ProjectOverviewPage() {
     effectiveVersionId,
   );
   const attributes = useRunningAttributes(
-    tab === "attributes" ? modelId : undefined,
+    modelId,
     effectiveVersionId,
   );
 
@@ -260,8 +260,12 @@ export default function ProjectOverviewPage() {
       {tab === "attributes" && (
         <AttributesOverviewPage
           modelId={modelId!}
+          effectiveVersionId={effectiveVersionId}
+          isPreview={isPreview}
           attributes={attributes.data}
           isLoading={attributes.isLoading}
+          isError={attributes.isError}
+          onRetry={() => attributes.refetch()}
         />
       )}
 
@@ -321,6 +325,7 @@ export default function ProjectOverviewPage() {
               await project.refetch();
             } else {
               await project.refetch();
+              await reference.refetch();
             }
           }}
         />

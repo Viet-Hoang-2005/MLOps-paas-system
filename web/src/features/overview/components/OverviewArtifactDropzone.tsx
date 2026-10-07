@@ -198,6 +198,8 @@ export function OverviewArtifactDropzone({
             ? t("workflow.uploadPreviewHint")
             : t("workflow.uploadImmutableHint")
         }
+        hasFile={Boolean(stagedFile)}
+        onRemove={() => setStagedFile(null)}
         onChange={handleFileChange}
       />
 

@@ -232,9 +232,41 @@ export async function updatePreview(
   ).data;
 }
 
+export type PreviewSingleAssetKind =
+  | "source_code"
+  | "reference_data"
+  | "label_mapping"
+  | "input_schema"
+  | "metrics"
+  | "params"
+  | "model_insights"
+  | "feature_importance";
+
+function getAssetContentType(kind: string, file: File): string {
+  if (file.type) return file.type;
+  switch (kind) {
+    case "source_code":
+      return "text/x-python";
+    case "reference_data":
+      return "text/csv";
+    case "label_mapping":
+      return file.name.endsWith(".pkl")
+        ? "application/octet-stream"
+        : "application/json";
+    case "input_schema":
+    case "metrics":
+    case "params":
+    case "model_insights":
+    case "feature_importance":
+      return "application/json";
+    default:
+      return "application/octet-stream";
+  }
+}
+
 export async function uploadPreviewSingleAsset(
   projectId: string,
-  kind: "source_code" | "reference_data",
+  kind: PreviewSingleAssetKind,
   file: File,
   onProgress?: (percent: number) => void,
 ): Promise<ModelPreview> {
@@ -245,7 +277,7 @@ export async function uploadPreviewSingleAsset(
       kind,
       filename: file.name,
       size_bytes: file.size,
-      content_type: file.type || (kind === "source_code" ? "text/x-python" : "text/csv"),
+      content_type: getAssetContentType(kind, file),
     },
   ];
 
@@ -280,6 +312,22 @@ export async function uploadPreviewSingleAsset(
             s3_uri: item.s3_uri,
           },
         ],
+      },
+    )
+  ).data;
+}
+
+export async function removePreviewAsset(
+  projectId: string,
+  kind: PreviewSingleAssetKind,
+): Promise<ModelPreview> {
+  const currentPreview = await getPreview(projectId);
+  return (
+    await apiClient.patch<ModelPreview>(
+      controlPlaneURL(`/models/${projectId}/preview/`),
+      {
+        revision: currentPreview.revision,
+        remove_assets: [kind],
       },
     )
   ).data;

@@ -96,6 +96,12 @@ class ModelVersionSupplementalArtifactsEndpoint(APIView):
             actor=request.user,
             source_code_file=request.FILES.get("source_code_file"),
             reference_data_file=request.FILES.get("reference_data_file"),
+            label_mapping_file=request.FILES.get("label_mapping_file"),
+            input_schema_file=request.FILES.get("input_schema_file"),
+            metrics_file=request.FILES.get("metrics_file"),
+            params_file=request.FILES.get("params_file"),
+            model_insights_file=request.FILES.get("model_insights_file"),
+            feature_importance_file=request.FILES.get("feature_importance_file"),
         )
         return Response(ModelVersionSerializer(updated).data)
 

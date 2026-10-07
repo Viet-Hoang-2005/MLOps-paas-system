@@ -79,12 +79,17 @@ export const getVersionSnapshot = async (
     )
   ).data;
 
-export const getRunningSource = async (id: string): Promise<string> =>
-  (
+export const getRunningSource = async (
+  id: string,
+  versionId?: string,
+): Promise<string> => {
+  const query = versionId ? `?version_id=${encodeURIComponent(versionId)}` : "";
+  return (
     await apiClient.get<{ content: string }>(
-      controlPlaneURL(`/models/${id}/running-source/`),
+      controlPlaneURL(`/models/${id}/running-source/${query}`),
     )
   ).data.content;
+};
 
 export const createTrainingProject = async (
   payload: ModelProjectFormValues,
@@ -257,6 +262,8 @@ export interface ModelAttributesResponse {
   metrics: Record<string, unknown> | null;
   params: Record<string, unknown> | null;
   insights: ModelInsightsSummary | null;
+  model_insights?: ModelInsightsSummary | null;
+  feature_importance?: ModelInsightsSummary | null;
   label_mapping: ModelLabelMappingData | null;
   input_schema: ModelInputSchemaData | null;
   artifacts: ModelArtifactSummary[];
@@ -264,19 +271,25 @@ export interface ModelAttributesResponse {
 
 export const getRunningAttributes = async (
   modelId: string,
-): Promise<ModelAttributesResponse> =>
-  (
+  versionId?: string,
+): Promise<ModelAttributesResponse> => {
+  const query = versionId ? `?version_id=${encodeURIComponent(versionId)}` : "";
+  return (
     await apiClient.get<ModelAttributesResponse>(
-      controlPlaneURL(`/models/${modelId}/running-attributes/`),
+      controlPlaneURL(`/models/${modelId}/running-attributes/${query}`),
     )
   ).data;
+};
 
 export const getRunningLabelMapping = async (
   modelId: string,
-): Promise<ModelLabelMappingData> =>
-  (
+  versionId?: string,
+): Promise<ModelLabelMappingData> => {
+  const query = versionId ? `?version_id=${encodeURIComponent(versionId)}` : "";
+  return (
     await apiClient.get<ModelLabelMappingData>(
-      controlPlaneURL(`/models/${modelId}/label-mapping/`),
+      controlPlaneURL(`/models/${modelId}/label-mapping/${query}`),
     )
   ).data;
+};
 

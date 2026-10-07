@@ -212,7 +212,21 @@ def set_alias(*, project, actor, name, version):
     return alias
 
 
-def add_supplemental_artifacts(*, version, actor, source_code_file=None, reference_data_file=None, storage=None):
+def add_supplemental_artifacts(
+    *,
+    version,
+    actor,
+    source_code_file=None,
+    reference_data_file=None,
+    label_mapping_file=None,
+    input_schema_file=None,
+    metrics_file=None,
+    params_file=None,
+    model_insights_file=None,
+    feature_importance_file=None,
+    storage=None,
+):
+    import json
     from django.utils import timezone
     from common.api.exceptions import Conflict
     from common.validation.artifacts import (
@@ -220,7 +234,16 @@ def add_supplemental_artifacts(*, version, actor, source_code_file=None, referen
         validate_source_code_file,
     )
 
-    if not source_code_file and not reference_data_file:
+    if (
+        not source_code_file
+        and not reference_data_file
+        and not label_mapping_file
+        and not input_schema_file
+        and not metrics_file
+        and not params_file
+        and not model_insights_file
+        and not feature_importance_file
+    ):
         raise ValidationError({"artifacts": "No supplemental artifact provided."})
 
     storage = storage or S3Storage()
@@ -293,6 +316,71 @@ def add_supplemental_artifacts(*, version, actor, source_code_file=None, referen
                     message=f"Added supplemental reference data {filename}",
                     metadata={"kind": "reference_data", "name": filename, "format": "csv"},
                 )
+
+            attribute_uploads = [
+                ("label_mapping", label_mapping_file, "application/json" if getattr(label_mapping_file, "name", "").endswith(".json") else "application/octet-stream"),
+                ("input_schema", input_schema_file, "application/json"),
+                ("metrics", metrics_file, "application/json"),
+                ("params", params_file, "application/json"),
+                ("model_insights", model_insights_file, "application/json"),
+                ("feature_importance", feature_importance_file, "application/json"),
+            ]
+
+            for kind, f_obj, default_ct in attribute_uploads:
+                if not f_obj:
+                    continue
+                if version.artifacts.filter(kind=kind).exists():
+                    raise Conflict(f"This version already has a {kind} artifact and cannot be replaced.")
+                filename = getattr(f_obj, "name", f"{kind}.json")
+                if kind == "label_mapping":
+                    if not (filename.lower().endswith(".json") or filename.lower().endswith(".pkl")):
+                        raise ValidationError({"label_mapping": "Label mapping must be a .json or .pkl file."})
+                else:
+                    if not filename.lower().endswith(".json"):
+                        raise ValidationError({kind: f"{kind} must be a .json file."})
+
+                key = f"{prefix}/artifacts/supplemental/{kind}/{filename}"
+                stored = storage.put(key, f_obj, default_ct)
+                uploaded_uris.append(stored.uri)
+                ModelArtifact.objects.create(
+                    version=version,
+                    kind=kind,
+                    name=filename,
+                    uri=stored.uri,
+                    checksum=stored.checksum,
+                    size_bytes=stored.size_bytes,
+                    content_type=default_ct,
+                    metadata={
+                        "provenance": "supplemental_upload",
+                        "uploaded_by": getattr(actor, "username", "system"),
+                        "uploaded_at": timezone.now().isoformat(),
+                    },
+                )
+                record_registry_event(
+                    version=version,
+                    actor=actor,
+                    event_type="artifact_added",
+                    message=f"Added supplemental {kind} {filename}",
+                    metadata={"kind": kind, "name": filename},
+                )
+
+                try:
+                    f_obj.seek(0)
+                    raw_content = json.loads(f_obj.read().decode("utf-8", errors="replace"))
+                    if kind == "metrics" and isinstance(raw_content, dict):
+                        version.metrics_summary = raw_content
+                        version.save(update_fields=["metrics_summary"])
+                    elif kind == "params" and isinstance(raw_content, dict):
+                        version.params_summary = raw_content
+                        version.save(update_fields=["params_summary"])
+                    elif kind in {"model_insights", "feature_importance"}:
+                        if isinstance(raw_content, list):
+                            version.insights_summary = {"kind": "feature_importance", "items": raw_content}
+                        elif isinstance(raw_content, dict):
+                            version.insights_summary = raw_content
+                        version.save(update_fields=["insights_summary"])
+                except Exception:
+                    pass
     except Exception:
         for uri in uploaded_uris:
             try:

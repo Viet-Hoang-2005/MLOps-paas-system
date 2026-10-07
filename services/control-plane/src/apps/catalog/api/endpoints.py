@@ -172,7 +172,9 @@ class RunningSourceEndpoint(APIView):
     def get(self, request, project_id):
         from apps.catalog.services.snapshots import running_source
 
-        return Response({"content": running_source(project_for_user(request.user, project_id))})
+        project = project_for_user(request.user, project_id)
+        version_id = request.query_params.get("version_id")
+        return Response({"content": running_source(project, version_id=version_id)})
 
 
 class RunningAttributesEndpoint(APIView):
@@ -180,7 +182,8 @@ class RunningAttributesEndpoint(APIView):
         from apps.catalog.services.snapshots import running_attributes
 
         project = project_for_user(request.user, project_id)
-        return Response(running_attributes(project))
+        version_id = request.query_params.get("version_id")
+        return Response(running_attributes(project, version_id=version_id))
 
 
 class RunningLabelMappingEndpoint(APIView):
@@ -188,7 +191,8 @@ class RunningLabelMappingEndpoint(APIView):
         from apps.catalog.services.snapshots import running_label_mapping
 
         project = project_for_user(request.user, project_id)
-        result = running_label_mapping(project)
+        version_id = request.query_params.get("version_id")
+        result = running_label_mapping(project, version_id=version_id)
         if result is None:
             return Response({"filename": "", "mapping": {}}, status=status.HTTP_200_OK)
         return Response(result)

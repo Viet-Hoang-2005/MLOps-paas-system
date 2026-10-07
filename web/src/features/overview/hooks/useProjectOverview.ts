@@ -46,14 +46,16 @@ export const useRunningVersion = (id?: string) =>
 export const useRunningSource = (projectId?: string, versionId?: string) =>
   useQuery({
     queryKey: overviewQueryKeys.source(projectId ?? "", versionId ?? ""),
-    queryFn: () => getRunningSource(projectId!),
+    queryFn: () => getRunningSource(projectId!, versionId),
     enabled: Boolean(projectId && versionId),
   });
 
 export const useRunningAttributes = (projectId?: string, versionId?: string) =>
   useQuery({
     queryKey: overviewQueryKeys.attributes(projectId ?? "", versionId ?? ""),
-    queryFn: () => getRunningAttributes(projectId!),
-    enabled: Boolean(projectId && versionId),
+    queryFn: () => getRunningAttributes(projectId!, versionId),
+    enabled: Boolean(projectId),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 

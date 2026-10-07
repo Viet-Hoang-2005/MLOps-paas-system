@@ -18,6 +18,8 @@ interface ModelArtifactFieldsProps {
   ) => void;
   existingArtifactName?: string;
   existingAssets?: Record<string, string>;
+  onRemoveArtifact?: () => void;
+  onRemoveAsset?: (kind: string) => void;
   readOnly?: boolean;
 }
 
@@ -66,6 +68,8 @@ export function ModelArtifactFields({
   setField,
   existingArtifactName,
   existingAssets,
+  onRemoveArtifact,
+  onRemoveAsset,
   readOnly = false,
 }: ModelArtifactFieldsProps) {
   const { t } = useTranslation("deployments");
@@ -175,6 +179,14 @@ export function ModelArtifactFields({
                   extensions: extensions.join(", "),
                 })
           }
+          hasFile={Boolean(form.source_artifact || existingArtifactName)}
+          onRemove={() => {
+            if (onRemoveArtifact) {
+              onRemoveArtifact();
+            } else {
+              setField("source_artifact", null);
+            }
+          }}
           onChange={(file) => setField("source_artifact", file)}
         />
         {form.artifact_format === "mlflow_zip" ? (
@@ -210,6 +222,13 @@ export function ModelArtifactFields({
                   "uploadFlow.build.attachments.labelMappingSubtitle",
                 )}
                 hint={t("uploadFlow.build.attachments.labelMappingIndicators")}
+                hasFile={Boolean(
+                  form.label_mapping_file || existingAssets?.label_mapping,
+                )}
+                onRemove={() => {
+                  onRemoveAsset?.("label_mapping");
+                  setField("label_mapping_file", null);
+                }}
                 onChange={(file) => setField("label_mapping_file", file)}
               />
               <FileDropzone
@@ -222,6 +241,13 @@ export function ModelArtifactFields({
                 }
                 subtitle={t("uploadFlow.build.attachments.inputSchemaSubtitle")}
                 hint={t("uploadFlow.build.attachments.inputSchemaIndicators")}
+                hasFile={Boolean(
+                  form.input_schema_file || existingAssets?.input_schema,
+                )}
+                onRemove={() => {
+                  onRemoveAsset?.("input_schema");
+                  setField("input_schema_file", null);
+                }}
                 onChange={(file) => setField("input_schema_file", file)}
               />
             </div>
@@ -236,6 +262,13 @@ export function ModelArtifactFields({
                 }
                 subtitle={t("uploadFlow.build.attachments.metricsSubtitle")}
                 hint={t("uploadFlow.build.attachments.metricsIndicators")}
+                hasFile={Boolean(
+                  form.metrics_file || existingAssets?.metrics,
+                )}
+                onRemove={() => {
+                  onRemoveAsset?.("metrics");
+                  setField("metrics_file", null);
+                }}
                 onChange={(file) => setField("metrics_file", file)}
               />
               <FileDropzone
@@ -248,6 +281,13 @@ export function ModelArtifactFields({
                 }
                 subtitle={t("uploadFlow.build.attachments.paramsSubtitle")}
                 hint={t("uploadFlow.build.attachments.paramsIndicators")}
+                hasFile={Boolean(
+                  form.params_file || existingAssets?.params,
+                )}
+                onRemove={() => {
+                  onRemoveAsset?.("params");
+                  setField("params_file", null);
+                }}
                 onChange={(file) => setField("params_file", file)}
               />
               <FileDropzone
@@ -260,6 +300,13 @@ export function ModelArtifactFields({
                 }
                 subtitle={t("uploadFlow.build.attachments.insightsSubtitle")}
                 hint={t("uploadFlow.build.attachments.insightsIndicators")}
+                hasFile={Boolean(
+                  form.model_insights_file || existingAssets?.model_insights,
+                )}
+                onRemove={() => {
+                  onRemoveAsset?.("model_insights");
+                  setField("model_insights_file", null);
+                }}
                 onChange={(file) => setField("model_insights_file", file)}
               />
               <FileDropzone
@@ -276,6 +323,13 @@ export function ModelArtifactFields({
                 hint={t(
                   "uploadFlow.build.attachments.featureImportanceIndicators",
                 )}
+                hasFile={Boolean(
+                  form.feature_importance_file || existingAssets?.feature_importance,
+                )}
+                onRemove={() => {
+                  onRemoveAsset?.("feature_importance");
+                  setField("feature_importance_file", null);
+                }}
                 onChange={(file) => setField("feature_importance_file", file)}
               />
             </div>
@@ -298,6 +352,11 @@ export function ModelArtifactFields({
             t("uploadFlow.build.requirementsFile")
           }
           subtitle={t("uploadFlow.build.optional")}
+          hasFile={Boolean(form.requirements_file)}
+          onRemove={() => {
+            setField("requirements_file", null);
+            setField("requirements_text", "");
+          }}
           onChange={(file) => {
             setField("requirements_file", file);
             if (file)

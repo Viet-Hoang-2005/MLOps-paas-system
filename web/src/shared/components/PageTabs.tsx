@@ -31,6 +31,10 @@ export function PageTabs({ tabs }: PageTabsProps) {
               <NavLink
                 key={key}
                 to={tab.to}
+                onClick={(e) => {
+                  (e.currentTarget as HTMLElement).blur();
+                  tab.onClick?.();
+                }}
                 className={({ isActive }) =>
                   [
                     "inline-flex h-10 items-center gap-2 border-b-2 px-3 text-style-body-strong transition-colors focus-visible:ring-2 focus-visible:ring-ring",
@@ -50,7 +54,10 @@ export function PageTabs({ tabs }: PageTabsProps) {
             <button
               key={key}
               type="button"
-              onClick={tab.onClick}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                tab.onClick?.();
+              }}
               className={[
                 "inline-flex h-10 items-center gap-2 border-b-2 px-3 text-style-body-strong transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                 tab.isActive

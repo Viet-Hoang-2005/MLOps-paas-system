@@ -5,7 +5,7 @@ import {
 import { CodeDataFields } from "@/features/projects/components/CodeDataFields";
 import { ModelArtifactFields } from "@/features/projects/components/ModelArtifactFields";
 import { ModelMetadataFields } from "@/features/projects/components/ModelMetadataFields";
-import { usePreview } from "@/features/projects/hooks/usePreview";
+import { previewKeys, usePreview } from "@/features/projects/hooks/usePreview";
 import { catalogQueryKeys } from "@/features/projects/queryKeys";
 import type { ModelBuildFormValues } from "@/features/projects/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
@@ -14,7 +14,7 @@ import { Callout } from "@/shared/components/Callout";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useBlocker, useNavigate, useParams } from "react-router-dom";
 
@@ -38,12 +38,39 @@ export default function NewModelProjectPage() {
   const preview = usePreview(modelId);
   const [form, setForm] = useState(emptyForm);
   const [dirty, setDirty] = useState(false);
+  const [removedAssetKinds, setRemovedAssetKinds] = useState<Set<string>>(
+    new Set(),
+  );
   const allowExit = useRef(false);
   const initialized = useRef(false);
 
   const existingArtifact = preview.data?.assets.find(
-    (asset) => asset.kind === "source_artifact",
+    (asset) =>
+      asset.kind === "source_artifact" &&
+      !removedAssetKinds.has("source_artifact"),
   );
+  const existingSourceCode = preview.data?.assets.find(
+    (asset) =>
+      asset.kind === "source_code" && !removedAssetKinds.has("source_code"),
+  );
+  const existingReferenceData = preview.data?.assets.find(
+    (asset) =>
+      asset.kind === "reference_data" &&
+      !removedAssetKinds.has("reference_data"),
+  );
+
+  const filteredExistingAssets = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (preview.data?.assets) {
+      for (const asset of preview.data.assets) {
+        if (!removedAssetKinds.has(asset.kind)) {
+          map[asset.kind] = asset.name;
+        }
+      }
+    }
+    return map;
+  }, [preview.data, removedAssetKinds]);
+
   const hasArtifact = Boolean(form.source_artifact || existingArtifact);
 
   useEffect(() => {
@@ -68,11 +95,76 @@ export default function NewModelProjectPage() {
   const setField = (key: string, value: unknown) => {
     setForm((current) => ({ ...current, [key]: value }));
     setDirty(true);
+    if (value) {
+      const assetKind =
+        key === "source_artifact"
+          ? "source_artifact"
+          : key === "source_code_file"
+            ? "source_code"
+            : key === "reference_data_file"
+              ? "reference_data"
+              : key.endsWith("_file")
+                ? key.replace(/_file$/, "")
+                : null;
+      if (assetKind) {
+        setRemovedAssetKinds((prev) => {
+          if (!prev.has(assetKind)) return prev;
+          const next = new Set(prev);
+          next.delete(assetKind);
+          return next;
+        });
+      }
+    }
   };
+
+  const handleRemoveSourceCode = () => {
+    setField("source_code_file", null);
+    setRemovedAssetKinds((prev) => {
+      const next = new Set(prev);
+      next.add("source_code");
+      return next;
+    });
+  };
+
+  const handleRemoveReferenceData = () => {
+    setField("reference_data_file", null);
+    setRemovedAssetKinds((prev) => {
+      const next = new Set(prev);
+      next.add("reference_data");
+      return next;
+    });
+  };
+
+  const handleRemoveArtifact = () => {
+    setField("source_artifact", null);
+    setRemovedAssetKinds((prev) => {
+      const next = new Set(prev);
+      next.add("source_artifact");
+      return next;
+    });
+  };
+
+  const handleRemoveAsset = (kind: string) => {
+    const formKey = `${kind}_file` as keyof ModelBuildFormValues;
+    if (formKey in form) {
+      setField(formKey, null);
+    }
+    setRemovedAssetKinds((prev) => {
+      const next = new Set(prev);
+      next.add(kind);
+      return next;
+    });
+  };
+
   const save = useMutation({
     mutationFn: async () => {
       if (modelId) {
-        await updatePreview(modelId, preview.data!.revision, form);
+        await updatePreview(
+          modelId,
+          preview.data!.revision,
+          form,
+          Array.from(removedAssetKinds),
+        );
         return modelId;
       }
       return (await createPreviewProject(form)).id;
@@ -83,6 +175,11 @@ export default function NewModelProjectPage() {
       await queryClient.invalidateQueries({
         queryKey: catalogQueryKeys.projects(),
       });
+      if (modelId) {
+        await queryClient.invalidateQueries({
+          queryKey: previewKeys.detail(modelId),
+        });
+      }
       navigate(`/dashboard/projects/${id}/overview`);
     },
   });
@@ -115,11 +212,18 @@ export default function NewModelProjectPage() {
             form={form}
             setField={(field, value) => setField(field, value)}
             existingArtifactName={existingArtifact?.name}
+            existingAssets={filteredExistingAssets}
+            onRemoveArtifact={handleRemoveArtifact}
+            onRemoveAsset={handleRemoveAsset}
           />
           <hr className="border-border" />
           <CodeDataFields
             form={form}
             project={null}
+            existingSourceCodeName={existingSourceCode?.name}
+            existingReferenceDataName={existingReferenceData?.name}
+            onRemoveSourceCode={handleRemoveSourceCode}
+            onRemoveReferenceData={handleRemoveReferenceData}
             setField={(field, value) => setField(field, value)}
           />
           {(save.isError || preview.isError) && (
