@@ -147,3 +147,28 @@ class DriftWebhookRaceConditionTests(TestCase):
         self.assertIn("Insufficient production samples", run.error_message)
         self.assertTrue(run.execution_stop_requested)
         self.assertEqual(run.observation_status, "cleanup_pending")
+
+    def test_late_skipped_webhook_does_not_overwrite_completed_result(self):
+        run = _drift_fixture()
+        run.status = "completed"
+        run.drift_score = 0.61
+        run.has_drift = True
+        run.summary = {"drift_score": 0.61, "has_drift": True}
+        run.save(update_fields=["status", "drift_score", "has_drift", "summary"])
+
+        payload = {"drift_summary": {"status": "skipped", "reason": "Insufficient production samples (10 < 100)"}}
+        response = APIClient().post(
+            f"/internal/webhooks/drift-runs/{run.public_id}/",
+            payload,
+            format="json",
+            HTTP_X_CONTROL_PLANE_SECRET="test-secret",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {"status": "completed", "duplicate": True})
+        run.refresh_from_db()
+        self.assertEqual(run.status, "completed")
+        self.assertEqual(run.drift_score, 0.61)
+        self.assertIs(run.has_drift, True)
+        self.assertEqual(run.summary["drift_score"], 0.61)
+        self.assertFalse(run.execution_stop_requested)

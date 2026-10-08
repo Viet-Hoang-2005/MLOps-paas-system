@@ -51,6 +51,9 @@ class DriftRunWebhookEndpoint(APIView):
                 return Response({"status": run.status, "duplicate": True})
 
             if is_skipped:
+                if run.status == "completed":
+                    # A retried job's late skip must not erase a real result.
+                    return Response({"status": run.status, "duplicate": True})
                 run.summary = summary
                 run.drift_score = None
                 run.has_drift = False

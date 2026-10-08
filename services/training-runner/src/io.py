@@ -85,15 +85,44 @@ def request_output_upload_url(endpoint, capability, requests_module):
     return upload_url
 
 
-def safe_extract_zip(zip_path, destination):
+MAX_EXTRACT_FILES = 20_000
+MAX_EXTRACT_BYTES = 4 * 1024**3
+# A single huge member that shrinks this much is a decompression bomb, not data.
+MAX_COMPRESSION_RATIO = 500
+RATIO_CHECK_MIN_BYTES = 100 * 1024**2
+
+
+def safe_extract_zip(
+    zip_path,
+    destination,
+    *,
+    max_files=MAX_EXTRACT_FILES,
+    max_uncompressed_bytes=MAX_EXTRACT_BYTES,
+):
+    """Extract a zip after checking paths, symlinks, entry count and expanded size.
+
+    The limits use the sizes declared in the central directory; ``zipfile`` stops
+    reading each member at its declared size, so a forged header cannot expand
+    past what was checked here.
+    """
     destination.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_path) as archive:
+        members = archive.infolist()
+        if len(members) > max_files:
+            raise RuntimeError(f"Zip contains too many entries ({len(members)} > {max_files}).")
+        if sum(member.file_size for member in members) > max_uncompressed_bytes:
+            raise RuntimeError(f"Zip expands beyond the {max_uncompressed_bytes} byte limit.")
         destination_root = destination.resolve()
-        for member in archive.infolist():
+        for member in members:
             member_path = (destination / member.filename).resolve()
             is_symlink = (member.external_attr >> 16) & 0o170000 == 0o120000
             if not member_path.is_relative_to(destination_root) or is_symlink:
                 raise RuntimeError("Source zip contains an unsafe path.")
+            if (
+                member.file_size >= RATIO_CHECK_MIN_BYTES
+                and member.file_size > max(member.compress_size, 1) * MAX_COMPRESSION_RATIO
+            ):
+                raise RuntimeError(f"Zip member {member.filename} looks like a decompression bomb.")
         archive.extractall(destination)
 
 

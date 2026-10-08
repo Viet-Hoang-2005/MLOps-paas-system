@@ -165,7 +165,6 @@ def test_schema_rejects_mixed_lifecycle_and_health(runtime):
 def test_scheduler_uses_only_health_queue_and_bounded_tasks(settings):
     from apps.deployment.health_tasks import probe_runtime_health
 
-    assert len(settings.CELERY_BEAT_SCHEDULE) == 1
     schedule = settings.CELERY_BEAT_SCHEDULE["runtime-health-scan"]
     assert schedule["schedule"] == 15
     assert schedule["options"] == {"queue": "runtime-health", "expires": 15}

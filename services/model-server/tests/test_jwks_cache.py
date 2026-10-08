@@ -145,3 +145,83 @@ async def test_fetch_public_key_caches_all_returned_keys():
     assert res2 is not None
     assert client.get.call_count == 1  # Still 1!
 
+
+
+def _jwks_client(delay=0.0):
+    response = Mock()
+    response.json.return_value = {"keys": [{"kid": "real-key", "n": "abc"}]}
+
+    async def slow_get(*args, **kwargs):
+        await asyncio.sleep(delay)
+        return response
+
+    client = AsyncMock()
+    client.__aenter__.return_value = client
+    client.get.side_effect = slow_get
+    return client
+
+
+def _fetch(kid, cache, client):
+    rsa_algo = Mock()
+    rsa_algo.from_jwk.return_value = "parsed-real-key"
+    return auth_service.fetch_public_key(
+        kid,
+        cache=cache,
+        jwks_url="http://jwks",
+        summary=Mock(),
+        http_client_factory=lambda: client,
+        rsa_algorithm=rsa_algo,
+    )
+
+
+@pytest.mark.asyncio
+async def test_concurrent_requests_for_one_unknown_kid_share_a_single_fetch():
+    cache = JwksKeyCache()
+    client = _jwks_client(delay=0.05)
+
+    results = await asyncio.gather(*(_fetch("bogus-key", cache, client) for _ in range(25)))
+
+    assert results == [None] * 25
+    assert client.get.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_concurrent_requests_for_a_valid_kid_share_a_single_fetch():
+    cache = JwksKeyCache()
+    client = _jwks_client(delay=0.05)
+
+    results = await asyncio.gather(*(_fetch("real-key", cache, client) for _ in range(25)))
+
+    assert results == ["parsed-real-key"] * 25
+    assert client.get.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_many_distinct_unknown_kids_cost_one_fetch_per_interval(monkeypatch):
+    now = 1000.0
+    monkeypatch.setattr(time, "monotonic", lambda: now)
+    cache = JwksKeyCache(min_refetch_interval=10.0)
+    client = _jwks_client(delay=0.01)
+
+    await asyncio.gather(*(_fetch(f"random-{i}", cache, client) for i in range(25)))
+    assert client.get.call_count == 1
+    # Throttled misses are not cached, so a rotated key is picked up after the interval.
+    assert not cache.is_negative("random-5")
+
+    now += 11.0
+    await _fetch("random-5", cache, client)
+    assert client.get.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_failed_fetch_is_not_retried_until_the_interval_passes(monkeypatch):
+    now = 1000.0
+    monkeypatch.setattr(time, "monotonic", lambda: now)
+    cache = JwksKeyCache(min_refetch_interval=10.0)
+    client = AsyncMock()
+    client.__aenter__.return_value = client
+    client.get.side_effect = ConnectionError("control plane down")
+
+    assert await _fetch("k1", cache, client) is None
+    assert await _fetch("k2", cache, client) is None
+    assert client.get.call_count == 1

@@ -449,8 +449,16 @@ services:
           echo "Waiting for Redpanda Kafka API to become ready..."
           sleep 2
         done
+        if [ -n "$$KAFKA_DLQ_TOPIC" ]; then
+          rpk topic create "$$KAFKA_DLQ_TOPIC" \
+            --if-not-exists \
+            --partitions 1 \
+            --replicas 1 \
+            -X brokers=redpanda:9092
+        fi
     environment:
       KAFKA_TOPIC: ${KAFKA_TOPIC:-mlops_paas_production_data}
+      KAFKA_DLQ_TOPIC: ${KAFKA_DLQ_TOPIC-mlops_paas_production_data.dlq}
       KAFKA_TOPIC_PARTITIONS: ${KAFKA_TOPIC_PARTITIONS:-3}
     depends_on:
       redpanda:
@@ -481,6 +489,7 @@ services:
       DB_SCHEMA: ${DB_SCHEMA:-control_plane}
       REDPANDA_BROKERS: redpanda:9092
       KAFKA_TOPIC: ${KAFKA_TOPIC:-mlops_paas_production_data}
+      KAFKA_DLQ_TOPIC: ${KAFKA_DLQ_TOPIC-mlops_paas_production_data.dlq}
       KAFKA_TOPIC_RETRY_SECONDS: ${KAFKA_TOPIC_RETRY_SECONDS:-5}
       KAFKA_BATCH_SIZE: ${KAFKA_BATCH_SIZE:-500}
       KAFKA_DB_RETRY_INITIAL_SECONDS: ${KAFKA_DB_RETRY_INITIAL_SECONDS:-5}

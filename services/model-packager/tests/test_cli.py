@@ -1,6 +1,7 @@
 import io
 import json
 import logging
+import pickle
 import subprocess
 import tarfile
 import zipfile
@@ -200,10 +201,14 @@ def configure_build(monkeypatch, tmp_path, flavor="sklearn", source_type="manual
         monkeypatch.setenv("SOURCE_ARTIFACT_NAME", "model.pkl")
 
 
+# Artifacts are scanned with an allowlist and unparseable bytes are rejected, so fakes must be real pickles.
+ARTIFACT_BYTES = pickle.dumps({"weights": [1.0, 2.0]})
+
+
 def stub_package_helpers(monkeypatch):
     def download(url, path):
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(b"artifact")
+        path.write_bytes(ARTIFACT_BYTES)
 
     def save(model, flavor, package_dir, requirements):
         package_dir.mkdir(parents=True, exist_ok=True)
@@ -258,7 +263,7 @@ def test_run_build_task_includes_uploaded_label_mapping(monkeypatch, tmp_path):
 
     cli.run_build_task("version", "http://callback")
 
-    assert (tmp_path / "model" / "label_classes_v1.json").read_bytes() == b"artifact"
+    assert (tmp_path / "model" / "label_classes_v1.json").read_bytes() == ARTIFACT_BYTES
     with zipfile.ZipFile(tmp_path / "model-package.zip") as archive:
         assert "model/label_classes_v1.json" in archive.namelist()
 
@@ -285,7 +290,7 @@ def test_run_build_task_training_job_pytorch(monkeypatch, tmp_path):
         dest.parent.mkdir(parents=True, exist_ok=True)
         with tarfile.open(dest, "w:gz") as tar:
             model_file = tmp_path / "scratch_baf.pt"
-            model_file.write_bytes(b"baf_torch_weights")
+            model_file.write_bytes(ARTIFACT_BYTES)
             tar.add(model_file, arcname="baf_model.pt")
             req_file = tmp_path / "scratch_req.txt"
             req_file.write_text("torch>=2.0.0\n")

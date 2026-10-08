@@ -46,7 +46,12 @@ import { Table } from "@/shared/components/Table";
 import { TerminalViewer } from "@/shared/components/TerminalViewer";
 import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
 
-const DRIFT_TERMINAL_STATUSES = ["completed", "failed", "cancelled"] as const;
+const DRIFT_TERMINAL_STATUSES = [
+  "completed",
+  "failed",
+  "cancelled",
+  "skipped",
+] as const;
 
 export default function DriftMonitoringPage() {
   const { t, i18n } = useTranslation("monitoring");

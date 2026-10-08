@@ -37,7 +37,7 @@ spec:
         - name: init-kafka-topic
           image: docker.redpanda.com/redpandadata/redpanda:v23.3.21
           command: ["/bin/sh", "-c"]
-          args: ["rpk topic create mlops_paas_production_data --brokers redpanda-service.mlops-redpanda.svc.cluster.local:9092 || true"]
+          args: ["rpk topic create mlops_paas_production_data mlops_paas_production_data.dlq --brokers redpanda-service.mlops-redpanda.svc.cluster.local:9092 || true"]
       containers:
         - name: consumer
           image: mlops-paas-consumer

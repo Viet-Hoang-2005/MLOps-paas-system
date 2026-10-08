@@ -71,6 +71,8 @@ def test_stop_before_dispatch_creates_tombstone(payload):
     assert ops.reconcile(api, payload)["status"] == "stopped"
     assert stored["spec"]["shutdown"] == "Terminate"
     assert stored["spec"]["workflowTemplateRef"]["name"] == "mlops-paas-job-tombstone-template"
+    # Must outlive the replay of the original submit event (days, not minutes).
+    assert stored["spec"]["ttlStrategy"]["secondsAfterCompletion"] >= 7 * 24 * 3600
     assert ops.submit(api, payload, "training") is stored
 
 

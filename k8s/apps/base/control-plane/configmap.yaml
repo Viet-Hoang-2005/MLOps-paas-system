@@ -27,6 +27,8 @@ data:
   GITHUB_OAUTH_REDIRECT_URI: "https://mlops-nids-nt114.id.vn/oauth/github/callback"
   CORS_ALLOWED_ORIGINS: "https://mlops-nids-nt114.id.vn,http://localhost:5173,http://127.0.0.1:5173"
   CSRF_TRUSTED_ORIGINS: "https://mlops-nids-nt114.id.vn"
+  # Traefik is the only proxy that appends to X-Forwarded-For; raise this if another proxy/LB is added in front.
+  TRUSTED_PROXY_COUNT: "1"
   AUTH_COOKIE_SECURE: "true"
   ARGO_BUILD_WEBHOOK_URL: "http://webhook-eventsource-eventsource-svc.argo-events.svc.cluster.local:12000/build"
   ARGO_TRAINING_WEBHOOK_URL: "http://webhook-eventsource-eventsource-svc.argo-events.svc.cluster.local:12000/train"

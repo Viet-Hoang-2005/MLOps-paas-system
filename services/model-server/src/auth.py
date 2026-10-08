@@ -1,9 +1,19 @@
 """Authentication decisions independent from the FastAPI route module."""
 
+import contextlib
 import json
+import time
 import uuid
 
 from fastapi import HTTPException
+
+
+def _cached_key(cache, kid):
+    """Return (found, key): found is True for a cached key or a cached miss."""
+    if hasattr(cache, "is_negative") and cache.is_negative(kid):
+        return True, None
+    cached = cache.get(kid) if hasattr(cache, "get") else None
+    return cached is not None, cached
 
 
 async def fetch_public_key(
@@ -15,12 +25,43 @@ async def fetch_public_key(
     http_client_factory,
     rsa_algorithm,
 ):
-    if hasattr(cache, "is_negative") and cache.is_negative(kid):
-        return None
-    cached = cache.get(kid) if hasattr(cache, "get") else None
-    if cached is not None:
-        return cached
+    found, key = _cached_key(cache, kid)
+    if found:
+        return key
 
+    # One download at a time: concurrent requests for an unknown kid wait for the
+    # in-flight fetch and then read its result from the cache.
+    async with getattr(cache, "fetch_lock", None) or contextlib.nullcontext():
+        found, key = _cached_key(cache, kid)
+        if found:
+            return key
+        last_fetch_at = getattr(cache, "last_fetch_at", None)
+        interval = getattr(cache, "min_refetch_interval", 0)
+        if last_fetch_at is not None and time.monotonic() - last_fetch_at < interval:
+            # The key set was loaded moments ago. Do not hit the Control Plane again
+            # for another kid, and do not cache a miss: a rotated key may appear soon.
+            return None
+        if hasattr(cache, "last_fetch_at"):
+            cache.last_fetch_at = time.monotonic()
+        return await _download_public_key(
+            kid,
+            cache=cache,
+            jwks_url=jwks_url,
+            summary=summary,
+            http_client_factory=http_client_factory,
+            rsa_algorithm=rsa_algorithm,
+        )
+
+
+async def _download_public_key(
+    kid,
+    *,
+    cache,
+    jwks_url,
+    summary,
+    http_client_factory,
+    rsa_algorithm,
+):
     try:
         async with http_client_factory() as client:
             response = await client.get(jwks_url, timeout=5.0)

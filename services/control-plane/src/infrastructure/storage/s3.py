@@ -2,6 +2,7 @@ import hashlib
 from dataclasses import dataclass
 
 import boto3
+from botocore.config import Config
 from django.conf import settings
 
 
@@ -17,9 +18,11 @@ class StoredObject:
 
 class S3Storage:
     def __init__(self, client=None, bucket=None, client_config=None):
-        kwargs = {"region_name": settings.AWS_S3_REGION_NAME}
+        # SigV4 signs Content-Length, which bounds what a presigned PUT can upload.
+        config = Config(signature_version="s3v4")
         if client_config is not None:
-            kwargs["config"] = client_config
+            config = config.merge(client_config)
+        kwargs = {"region_name": settings.AWS_S3_REGION_NAME, "config": config}
         if settings.AWS_S3_ENDPOINT_URL:
             kwargs["endpoint_url"] = settings.AWS_S3_ENDPOINT_URL
         self.client = client or boto3.client("s3", **kwargs)

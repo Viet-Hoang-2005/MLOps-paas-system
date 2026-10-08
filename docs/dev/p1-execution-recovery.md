@@ -128,7 +128,8 @@ the entire validated event body, including runtime and input capability. The
 training template retains CPU/RAM/GPU requests/limits. Reconcile reads Workflow,
 PyTorchJob and main-container timestamps, then reports via a 60-second signed
 resource/tenant/project/lease capability. Replay and expired leases are denied.
-Stop-before-submit creates a Git-managed terminated Workflow tombstone.
+Stop-before-submit creates a Git-managed terminated Workflow tombstone that is kept for
+7 days (`TOMBSTONE_TTL_SECONDS`), far beyond the replay window of the submit event.
 
 On a staging cluster, verify duplicate train/drift events reuse the same Workflow
 UID and PyTorchJob/Pod UID; deliberately send wrong ownership and confirm denial.

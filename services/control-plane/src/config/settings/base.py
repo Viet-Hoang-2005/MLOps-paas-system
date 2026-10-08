@@ -100,13 +100,21 @@ JWT_PRIVATE_KEY = env("JWT_PRIVATE_KEY", "").replace("\\n", "\n")
 JWT_PUBLIC_KEY = env("JWT_PUBLIC_KEY", "").replace("\\n", "\n")
 JWT_ALGORITHM = "RS256" if JWT_PRIVATE_KEY and JWT_PUBLIC_KEY else "HS256"
 PASSWORD_RESET_THROTTLE_RATE = env("PASSWORD_RESET_THROTTLE_RATE", "10/minute")
+REGISTRATION_THROTTLE_RATE = env("REGISTRATION_THROTTLE_RATE", "10/minute")
+PASSWORD_CHANGE_THROTTLE_RATE = env("PASSWORD_CHANGE_THROTTLE_RATE", "10/minute")
+# Reverse proxies in front of the app that append to X-Forwarded-For. 0 trusts
+# only the socket address, so the header can never choose the throttle key.
+TRUSTED_PROXY_COUNT = env_int("TRUSTED_PROXY_COUNT", 0)
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_PAGINATION_CLASS": "common.api.pagination.DefaultPagination",
     "EXCEPTION_HANDLER": "common.api.exceptions.exception_handler",
+    "NUM_PROXIES": TRUSTED_PROXY_COUNT,
     "DEFAULT_THROTTLE_RATES": {
         "password_reset": PASSWORD_RESET_THROTTLE_RATE,
+        "registration": REGISTRATION_THROTTLE_RATE,
+        "password_change": PASSWORD_CHANGE_THROTTLE_RATE,
     },
 }
 SIMPLE_JWT = {
@@ -218,11 +226,19 @@ CELERY_TASK_ROUTES = {
     "apps.deployment.health_tasks.scan_runtime_health": {"queue": "runtime-health"},
     "apps.deployment.health_tasks.probe_runtime_health": {"queue": "runtime-health"},
 }
+STOP_RECONCILE_INTERVAL_SECONDS = env_int("STOP_RECONCILE_INTERVAL_SECONDS", 120)
+STOP_RECONCILE_GRACE_SECONDS = env_int("STOP_RECONCILE_GRACE_SECONDS", 600)
+STOP_RECONCILE_BATCH_SIZE = env_int("STOP_RECONCILE_BATCH_SIZE", 50)
 CELERY_BEAT_SCHEDULE = {
     "runtime-health-scan": {
         "task": "apps.deployment.health_tasks.scan_runtime_health",
         "schedule": RUNTIME_HEALTH_INTERVAL_SECONDS,
         "options": {"queue": "runtime-health", "expires": 15},
+    },
+    "stopped-deployment-reconcile": {
+        "task": "apps.deployment.tasks.reconcile_stopped_deployments",
+        "schedule": STOP_RECONCILE_INTERVAL_SECONDS,
+        "options": {"queue": "celery", "expires": 60},
     },
 }
 if LOCAL_EXECUTION_WATCH_ENABLED:

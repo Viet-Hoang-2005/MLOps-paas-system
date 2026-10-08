@@ -9,6 +9,7 @@ from src.batching import (
     build_automatic_drift_signals,
     build_prediction_records_dataframe,
 )
+from src.dead_letter import DeadLetter, DeadLetterQueue
 from src.logging_utils import Summary, configure, get_logger, log_event
 from src.models import KafkaRecord, KafkaRecordProcessingError, RetryState
 
@@ -43,6 +44,10 @@ KAFKA_DB_RETRY_MAX_SECONDS = max(
     int(os.environ.get("KAFKA_DB_RETRY_MAX_SECONDS", "60")),
 )
 KAFKA_DB_RETRY_MAX_ATTEMPTS = max(1, int(os.environ.get("KAFKA_DB_RETRY_MAX_ATTEMPTS", "5")))
+# Records that cannot be stored are parked here instead of being dropped. An empty
+# value disables the dead-letter topic and restores drop-and-log behaviour.
+KAFKA_DLQ_TOPIC = os.environ.get("KAFKA_DLQ_TOPIC", f"{KAFKA_TOPIC}.dlq")
+dead_letter = DeadLetterQueue(REDPANDA_BROKERS, KAFKA_DLQ_TOPIC)
 
 RUNNING = True
 DISPATCHER_JOIN_TIMEOUT_SECONDS = REQUEST_TIMEOUT_SECONDS + OUTBOX_POLL_SECONDS + 1
@@ -163,6 +168,64 @@ def _schedule_retry(consumer, key: tuple[str, int], retries: dict[tuple[str, int
     )
 
 
+def _release_unsaveable_batch(consumer, key: tuple[str, int], batch: list[KafkaRecord], attempts: int) -> bool:
+    """Free a partition whose batch the database keeps rejecting.
+
+    The batch is parked in the dead-letter topic first. If that fails the batch is
+    kept (and retried later) rather than lost; only with the dead-letter topic
+    disabled is it dropped, loudly.
+    """
+    if dead_letter.enabled:
+        letters = [
+            DeadLetter(
+                value=json.dumps(record.payload, default=str).encode("utf-8"),
+                topic=record.topic,
+                partition=record.partition,
+                offset=record.offset,
+                reason="db_write_failed",
+            )
+            for record in batch
+        ]
+        if not dead_letter.publish(letters):
+            log_event(
+                logger,
+                "ERROR",
+                "partition_batch_dead_letter_failed",
+                "Batch kept for retry because it could not be parked in the dead-letter topic",
+                topic=key[0],
+                partition=key[1],
+                attempts=attempts,
+                batch_size=len(batch),
+            )
+            return False
+        log_event(
+            logger,
+            "ERROR",
+            "partition_batch_dead_lettered",
+            "Batch moved to the dead-letter topic after max DB retry attempts to unblock partition",
+            topic=key[0],
+            partition=key[1],
+            attempts=attempts,
+            batch_size=len(batch),
+            dead_letter_topic=dead_letter.topic,
+        )
+    else:
+        log_event(
+            logger,
+            "ERROR",
+            "partition_batch_discarded_max_retries",
+            "Discarding batch after reaching max DB retry attempts to unblock partition",
+            topic=key[0],
+            partition=key[1],
+            attempts=attempts,
+            batch_size=len(batch),
+            data_loss=True,
+        )
+    if batch:
+        _commit_batch_offset(consumer, batch[-1])
+    return True
+
+
 def flush_pending_batch(
     consumer,
     pending_batches: dict[tuple[str, int], list[KafkaRecord]],
@@ -174,24 +237,14 @@ def flush_pending_batch(
     saved = flush_batch(consumer, batch)
     if not saved:
         retry = retries.get(key)
-        if retry and retry.attempts >= KAFKA_DB_RETRY_MAX_ATTEMPTS:
-            log_event(
-                logger,
-                "ERROR",
-                "partition_batch_discarded_max_retries",
-                "Discarding batch after reaching max DB retry attempts to unblock partition",
-                topic=key[0],
-                partition=key[1],
-                attempts=retry.attempts,
-                batch_size=len(batch),
-            )
-            if batch:
-                _commit_batch_offset(consumer, batch[-1])
-            pending_batches.pop(key, None)
-            was_paused = retries.pop(key, None)
-            if was_paused:
-                consumer.resume([_partition_handle(key)])
-            return False
+        failed_attempts = (retry.attempts if retry else 0) + 1
+        if failed_attempts >= KAFKA_DB_RETRY_MAX_ATTEMPTS:
+            if _release_unsaveable_batch(consumer, key, batch, failed_attempts):
+                pending_batches.pop(key, None)
+                was_paused = retries.pop(key, None)
+                if was_paused:
+                    consumer.resume([_partition_handle(key)])
+                return False
 
         _schedule_retry(consumer, key, retries)
         return False
@@ -201,6 +254,90 @@ def flush_pending_batch(
     if was_paused:
         consumer.resume([_partition_handle(key)])
         retry_summary.recovery(f"{key[0]}:{key[1]}", partition=key[1])
+    return True
+
+
+def skip_corrupt_record(
+    consumer,
+    pending_batches: dict[tuple[str, int], list[KafkaRecord]],
+    retries: dict[tuple[str, int], RetryState],
+    msg,
+    error: Exception,
+) -> bool:
+    """Skip a malformed record without committing past unsaved records before it.
+
+    A Kafka offset commit covers every earlier offset in the partition, so the
+    corrupt record may only be committed once the partition has no retained
+    batch. Otherwise a restart would resume after records that were never
+    persisted. When the batch cannot be flushed the record stays uncommitted:
+    the next committed batch (or a replay after restart) moves past it.
+    """
+    key = (msg.topic(), msg.partition())
+    log_event(
+        logger,
+        "ERROR",
+        "consumer_corrupt_message_skipped",
+        "Malformed Kafka record skipped to prevent poison pill crash loop",
+        topic=key[0],
+        partition=key[1],
+        offset=msg.offset(),
+        error_type=type(error).__name__,
+    )
+    if pending_batches.get(key) and key not in retries:
+        try:
+            flush_pending_batch(consumer, pending_batches, retries, key)
+        except Exception as flush_err:
+            log_event(
+                logger,
+                "ERROR",
+                "consumer_pending_flush_failed",
+                "Failed to flush pending batch before skipping corrupt record",
+                error_type=type(flush_err).__name__,
+            )
+    # A batch dropped after max retries is already released, so only a batch
+    # that is still retained blocks the skip.
+    if pending_batches.get(key):
+        log_event(
+            logger,
+            "WARNING",
+            "consumer_corrupt_message_commit_deferred",
+            "Corrupt record left uncommitted until the retained batch is saved",
+            topic=key[0],
+            partition=key[1],
+            offset=msg.offset(),
+        )
+        return False
+    if dead_letter.enabled:
+        letter = DeadLetter(
+            value=msg.value() or b"",
+            topic=key[0],
+            partition=key[1],
+            offset=msg.offset(),
+            reason=f"malformed_record:{type(error).__name__}",
+        )
+        if not dead_letter.publish([letter]):
+            log_event(
+                logger,
+                "ERROR",
+                "consumer_corrupt_message_dead_letter_failed",
+                "Corrupt record left uncommitted because it could not be parked in the dead-letter topic",
+                topic=key[0],
+                partition=key[1],
+                offset=msg.offset(),
+            )
+            return False
+    try:
+        next_offset = TopicPartition(key[0], key[1], msg.offset() + 1)
+        consumer.commit(offsets=[next_offset], asynchronous=False)
+    except Exception as commit_err:
+        log_event(
+            logger,
+            "ERROR",
+            "consumer_corrupt_message_commit_failed",
+            "Failed to commit offset after malformed record",
+            error_type=type(commit_err).__name__,
+        )
+        return False
     return True
 
 
@@ -277,39 +414,7 @@ def main():
                     flush_pending_batch(consumer, pending_batches, retries, key)
 
             except Exception as parse_e:
-                log_event(
-                    logger,
-                    "ERROR",
-                    "consumer_corrupt_message_skipped",
-                    "Malformed Kafka record skipped to prevent poison pill crash loop",
-                    topic=msg.topic(),
-                    partition=msg.partition(),
-                    offset=msg.offset(),
-                    error_type=type(parse_e).__name__,
-                )
-                key = (msg.topic(), msg.partition())
-                if key in pending_batches and pending_batches[key]:
-                    try:
-                        flush_pending_batch(consumer, pending_batches, retries, key)
-                    except Exception as flush_err:
-                        log_event(
-                            logger,
-                            "ERROR",
-                            "consumer_pending_flush_failed",
-                            "Failed to flush pending batch before skipping corrupt record",
-                            error_type=type(flush_err).__name__,
-                        )
-                try:
-                    next_offset = TopicPartition(msg.topic(), msg.partition(), msg.offset() + 1)
-                    consumer.commit(offsets=[next_offset], asynchronous=False)
-                except Exception as commit_err:
-                    log_event(
-                        logger,
-                        "ERROR",
-                        "consumer_corrupt_message_commit_failed",
-                        "Failed to commit offset after malformed record",
-                        error_type=type(commit_err).__name__,
-                    )
+                skip_corrupt_record(consumer, pending_batches, retries, msg, parse_e)
 
     except KeyboardInterrupt:
         log_event(logger, "INFO", "shutdown_requested", "Consumer shutdown requested")

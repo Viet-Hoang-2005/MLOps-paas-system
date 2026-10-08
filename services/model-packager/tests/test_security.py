@@ -1,6 +1,8 @@
 import io
 import os
 import pickle
+import subprocess
+import sys
 import tarfile
 import zipfile
 from pathlib import Path
@@ -217,3 +219,192 @@ def test_safe_extract_zip_rejects_symlink(tmp_path):
     with pytest.raises(ValueError, match="links"):
         packager_io.safe_extract_zip(sym_zip, extract_dest)
 
+
+
+class _Exploit:
+    def __reduce__(self):
+        return (os.system, ("echo pwned",))
+
+
+def _torch_container(pickle_bytes: bytes) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as z:
+        z.writestr("archive/data.pkl", pickle_bytes)
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize("member_name", ["model.pt", "nested/model.pth"])
+def test_validate_model_package_security_scans_pytorch_files_in_tar(tmp_path, member_name):
+    archive_path = tmp_path / "training-model.tar.gz"
+    payload = pickle.dumps(_Exploit())
+    with tarfile.open(archive_path, "w:gz") as tar:
+        info = tarfile.TarInfo(member_name)
+        info.size = len(payload)
+        tar.addfile(info, io.BytesIO(payload))
+    with pytest.raises(PackageSecurityError, match="disallowed module"):
+        validate_model_package_security(archive_path)
+
+
+def test_validate_model_package_security_scans_pytorch_container_in_tar(tmp_path):
+    archive_path = tmp_path / "training-model.tar.gz"
+    payload = _torch_container(pickle.dumps(_Exploit()))
+    with tarfile.open(archive_path, "w:gz") as tar:
+        info = tarfile.TarInfo("model.pt")
+        info.size = len(payload)
+        tar.addfile(info, io.BytesIO(payload))
+    with pytest.raises(PackageSecurityError, match="disallowed module"):
+        validate_model_package_security(archive_path)
+
+
+def test_validate_model_package_security_scans_pytorch_files_in_zip(tmp_path):
+    archive_path = tmp_path / "model.zip"
+    with zipfile.ZipFile(archive_path, "w") as z:
+        z.writestr("data/model.pth", pickle.dumps(_Exploit()))
+    with pytest.raises(PackageSecurityError, match="disallowed module"):
+        validate_model_package_security(archive_path)
+
+
+def test_validate_model_package_security_accepts_benign_pytorch_files_in_tar(tmp_path):
+    archive_path = tmp_path / "training-model.tar.gz"
+    payload = _torch_container(pickle.dumps({"weights": [1.0, 2.0]}))
+    with tarfile.open(archive_path, "w:gz") as tar:
+        info = tarfile.TarInfo("model.pt")
+        info.size = len(payload)
+        tar.addfile(info, io.BytesIO(payload))
+    validate_model_package_security(archive_path)
+
+
+def _unicode(value: str) -> bytes:
+    return b"\x8c" + bytes([len(value)]) + value.encode()
+
+
+def _stack_global_pickle(*steps: bytes) -> bytes:
+    """Protocol 4 pickle that calls the resolved STACK_GLOBAL with one string argument."""
+    return b"\x80\x04" + b"".join(steps) + _unicode("echo hi") + b"\x85R."
+
+
+@pytest.mark.parametrize(
+    "module,name",
+    [("runpy", "_run_code"), ("pydoc", "pipepager"), ("code", "interact"), ("distutils.spawn", "spawn")],
+)
+def test_scan_pickle_data_rejects_modules_missing_from_old_denylist(module, name):
+    payload = _stack_global_pickle(_unicode(module), _unicode(name), b"\x93")
+    with pytest.raises(PackageSecurityError, match="disallowed module"):
+        scan_pickle_data(payload, "unlisted.pkl")
+
+
+def test_scan_pickle_data_rejects_symbols_outside_the_allowlist():
+    with pytest.raises(PackageSecurityError, match="disallowed builtin"):
+        scan_pickle_data(_stack_global_pickle(_unicode("builtins"), _unicode("getattr"), b"\x93"), "getattr.pkl")
+    with pytest.raises(PackageSecurityError, match="disallowed symbol"):
+        scan_pickle_data(_stack_global_pickle(_unicode("numpy"), _unicode("load"), b"\x93"), "numpy-load.pkl")
+    # A dotted attribute path could walk from an allowed module to os.system.
+    with pytest.raises(PackageSecurityError, match="disallowed"):
+        scan_pickle_data(
+            _stack_global_pickle(_unicode("sklearn.ensemble"), _unicode("os.system"), b"\x93"), "dotted.pkl"
+        )
+    # Functions of an allowed package are not classes.
+    with pytest.raises(PackageSecurityError, match="disallowed symbol"):
+        scan_pickle_data(
+            _stack_global_pickle(_unicode("sklearn.ensemble"), _unicode("fetch_openml"), b"\x93"), "function.pkl"
+        )
+
+
+def test_scan_pickle_data_is_not_fooled_by_decoy_strings():
+    # os.system is on the stack; two decoy strings are pushed and popped so a
+    # naive "last two strings" scan would only ever see numpy.dtype.
+    payload = _stack_global_pickle(
+        _unicode("os"), _unicode("system"), _unicode("numpy"), _unicode("dtype"), b"00", b"\x93"
+    )
+    with pytest.raises(PackageSecurityError, match="disallowed module"):
+        scan_pickle_data(payload, "decoy.pkl")
+
+
+def test_scan_pickle_data_rejects_non_literal_and_extension_globals():
+    with pytest.raises(PackageSecurityError, match="non-literal"):
+        scan_pickle_data(b"\x80\x04N" + _unicode("dtype") + b"\x93.", "non-literal.pkl")
+    with pytest.raises(PackageSecurityError, match="extension registry"):
+        scan_pickle_data(b"\x80\x02\x82\x01.", "ext.pkl")
+
+
+@pytest.mark.parametrize("payload", [b"not a pickle at all", b"\x80\x04\x8c\x05ab", b""])
+def test_scan_pickle_data_rejects_unparseable_data(payload):
+    with pytest.raises(PackageSecurityError, match="Could not verify"):
+        scan_pickle_data(payload, "garbage.pkl")
+
+
+_BUILD_REAL_ARTIFACTS = """
+import pickle, sys
+from pathlib import Path
+import joblib
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+
+out = Path(sys.argv[1])
+rng = np.random.default_rng(0)
+features = rng.normal(size=(60, 4))
+labels = (features[:, 0] > 0).astype(int)
+models = {
+    "pipeline": Pipeline([("scale", StandardScaler()), ("clf", LogisticRegression())]).fit(features, labels),
+    "forest": RandomForestClassifier(n_estimators=3, random_state=0).fit(features, labels),
+}
+for protocol in (0, 2, 4):
+    (out / f"pipeline-p{protocol}.pkl").write_bytes(pickle.dumps(models["pipeline"], protocol=protocol))
+(out / "models.pkl").write_bytes(pickle.dumps(models))
+joblib.dump(models, out / "models-c0.joblib", compress=0)
+joblib.dump(models, out / "models-c3.joblib", compress=3)
+try:
+    import xgboost
+    booster = xgboost.XGBClassifier(n_estimators=2).fit(features[:, :3], labels)
+    (out / "xgboost.pkl").write_bytes(pickle.dumps(booster))
+except ImportError:
+    pass
+try:
+    import torch
+    net = torch.nn.Sequential(torch.nn.Linear(3, 2), torch.nn.ReLU())
+    torch.save(net, out / "full.pt")
+    torch.save(net.state_dict(), out / "state.pth")
+except ImportError:
+    pass
+"""
+
+
+@pytest.fixture(scope="module")
+def real_artifacts(tmp_path_factory):
+    """Real model files, built in a clean interpreter (conftest stubs torch/xgboost)."""
+    out = tmp_path_factory.mktemp("real-artifacts")
+    result = subprocess.run(
+        [sys.executable, "-c", _BUILD_REAL_ARTIFACTS, str(out)], capture_output=True, text=True, timeout=300
+    )
+    if result.returncode != 0:
+        pytest.skip(f"could not build real artifacts: {result.stderr[-300:]}")
+    return out
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["models.pkl", "pipeline-p0.pkl", "pipeline-p2.pkl", "pipeline-p4.pkl", "xgboost.pkl", "full.pt", "state.pth"],
+)
+def test_validate_pickle_file_accepts_real_pickled_models(real_artifacts, name):
+    path = real_artifacts / name
+    if not path.exists():
+        pytest.skip(f"{name} unavailable in this environment")
+    validate_pickle_file(path)
+
+
+@pytest.mark.parametrize("name", ["models-c0.joblib", "models-c3.joblib"])
+def test_validate_pickle_file_accepts_joblib_models_with_arrays(real_artifacts, name):
+    validate_pickle_file(real_artifacts / name)
+
+
+def test_validate_pickle_file_rejects_malicious_global_after_joblib_arrays(tmp_path):
+    import joblib
+    import numpy as np
+
+    path = tmp_path / "evil.joblib"
+    joblib.dump({"weights": np.arange(1000, dtype="float64"), "payload": _Exploit()}, path)
+    with pytest.raises(PackageSecurityError, match="disallowed module"):
+        validate_pickle_file(path)

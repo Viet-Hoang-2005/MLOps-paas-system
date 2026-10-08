@@ -8,6 +8,7 @@ data:
   LOG_FORMAT: "console"
   LOG_SUMMARY_INTERVAL_SECONDS: "60"
   KAFKA_TOPIC: "mlops_paas_production_data"
+  KAFKA_DLQ_TOPIC: "mlops_paas_production_data.dlq"
   KAFKA_TOPIC_RETRY_SECONDS: "5"
   KAFKA_BATCH_SIZE: "500"
   KAFKA_DB_RETRY_INITIAL_SECONDS: "5"

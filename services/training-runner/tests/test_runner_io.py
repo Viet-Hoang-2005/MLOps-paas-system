@@ -8,6 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 from src import application as runner
+from src import io as io_module
 
 
 def test_require_env(monkeypatch):
@@ -93,6 +94,38 @@ def test_safe_extract_zip_rejects_symlink(tmp_path):
         handle.writestr(info, "target")
     with pytest.raises(RuntimeError, match="unsafe path"):
         runner.safe_extract_zip(archive, tmp_path / "source")
+
+
+def test_safe_extract_zip_rejects_too_many_entries(tmp_path):
+    archive = tmp_path / "many.zip"
+    with zipfile.ZipFile(archive, "w") as handle:
+        for index in range(5):
+            handle.writestr(f"file-{index}.txt", "x")
+    with pytest.raises(RuntimeError, match="too many entries"):
+        io_module.safe_extract_zip(archive, tmp_path / "out", max_files=4)
+    assert not list((tmp_path / "out").iterdir())
+
+
+def test_safe_extract_zip_rejects_oversized_expansion(tmp_path):
+    archive = tmp_path / "big.zip"
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as handle:
+        handle.writestr("a.csv", "0" * 4096)
+        handle.writestr("b.csv", "0" * 4096)
+    with pytest.raises(RuntimeError, match="expands beyond"):
+        io_module.safe_extract_zip(archive, tmp_path / "out", max_uncompressed_bytes=8000)
+    assert not list((tmp_path / "out").iterdir())
+    io_module.safe_extract_zip(archive, tmp_path / "ok", max_uncompressed_bytes=8192)
+    assert (tmp_path / "ok" / "a.csv").stat().st_size == 4096
+
+
+def test_safe_extract_zip_rejects_decompression_bomb(tmp_path, monkeypatch):
+    archive = tmp_path / "bomb.zip"
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as handle:
+        handle.writestr("zeros.bin", bytes(1) * (2 * 1024 * 1024))
+    monkeypatch.setattr(io_module, "RATIO_CHECK_MIN_BYTES", 1024 * 1024)
+    with pytest.raises(RuntimeError, match="decompression bomb"):
+        io_module.safe_extract_zip(archive, tmp_path / "out")
+    assert not list((tmp_path / "out").iterdir())
 
 
 def test_install_requirements_noop_success_and_failure(monkeypatch, tmp_path, runner_workspace):

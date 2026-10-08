@@ -8,6 +8,9 @@ from common.logging import record_transition
 from infrastructure.execution import drift_backend, polls_runtime_status
 from infrastructure.storage import S3Storage
 
+# "skipped" is final: the run ended without a result because of too few samples.
+TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled", "skipped"})
+
 
 @shared_task(
     bind=True, autoretry_for=(ConnectionError, TimeoutError), retry_backoff=True, retry_jitter=True, max_retries=5,
@@ -101,7 +104,7 @@ def poll_drift_run_status(self, run_id):
     except DriftRun.DoesNotExist:
         return "not_found"
 
-    if run.status in {"completed", "failed", "cancelled"}:
+    if run.status in TERMINAL_RUN_STATUSES:
         return run.status
 
     backend = drift_backend(run.monitor.backend)
@@ -117,7 +120,7 @@ def poll_drift_run_status(self, run_id):
     if current_status == "completed":
         with transaction.atomic():
             run = DriftRun.objects.select_for_update().get(pk=run.pk)
-            if run.status in {"completed", "failed", "cancelled"}:
+            if run.status in TERMINAL_RUN_STATUSES:
                 return run.status
             if not run.summary and run.summary_uri:
                 try:
@@ -143,7 +146,7 @@ def poll_drift_run_status(self, run_id):
         error_msg = result.get("error") or f"Drift analysis failed with exit code {result.get('exit_code')}"
         with transaction.atomic():
             run = DriftRun.objects.select_for_update().get(pk=run.pk)
-            if run.status in {"completed", "cancelled"}:
+            if run.status in {"completed", "cancelled", "skipped"}:
                 return run.status
             run.status = "failed"
             run.error_message = error_msg[:12000]
@@ -155,7 +158,7 @@ def poll_drift_run_status(self, run_id):
     if current_status in {"not_found", "error"}:
         with transaction.atomic():
             run = DriftRun.objects.select_for_update().get(pk=run.pk)
-            if run.status in {"completed", "cancelled"}:
+            if run.status in {"completed", "cancelled", "skipped"}:
                 return run.status
             run.status = "failed"
             run.error_message = f"Drift container error: {result.get('error') or 'Container not found'}"

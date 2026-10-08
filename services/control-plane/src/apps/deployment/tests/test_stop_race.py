@@ -123,3 +123,52 @@ def test_late_argo_success_for_stopped_deployment_removes_runtime_again(
     assert stops == [str(candidate.public_id), str(candidate.public_id)]
     project.refresh_from_db()
     assert project.active_deployment_id == running.pk
+
+
+def _age(deployment, seconds):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    Deployment.objects.filter(pk=deployment.pk).update(updated_at=timezone.now() - timedelta(seconds=seconds))
+
+
+def test_reconcile_redispatches_stop_whose_runtime_removal_was_lost(runtimes, settings):
+    from django.core.cache import cache
+
+    from apps.deployment.tasks import reconcile_stopped_deployments
+
+    cache.clear()
+    _project, running, candidate, stops = runtimes
+    Deployment.objects.filter(pk=running.pk).update(status="stopped")
+    Deployment.objects.filter(pk=candidate.pk).update(status="stopped")
+    _age(running, settings.STOP_RECONCILE_GRACE_SECONDS + 5)
+
+    assert reconcile_stopped_deployments() == 1
+    # Within the same grace period a still-failing stop is not hammered again.
+    assert reconcile_stopped_deployments() == 0
+    # The recently stopped candidate is left to its own in-flight task.
+    assert stops == [str(running.public_id)]
+
+
+def test_reconcile_ignores_completed_and_live_deployments(runtimes, settings):
+    from django.core.cache import cache
+    from django.utils import timezone
+
+    from apps.deployment.tasks import reconcile_stopped_deployments
+
+    cache.clear()
+    _project, running, candidate, stops = runtimes
+    Deployment.objects.filter(pk=running.pk).update(status="stopped", stopped_at=timezone.now())
+    _age(running, settings.STOP_RECONCILE_GRACE_SECONDS + 5)
+    _age(candidate, settings.STOP_RECONCILE_GRACE_SECONDS + 5)  # still deploying
+
+    assert reconcile_stopped_deployments() == 0
+    assert stops == []
+
+
+def test_reconcile_is_scheduled():
+    from django.conf import settings
+
+    entry = settings.CELERY_BEAT_SCHEDULE["stopped-deployment-reconcile"]
+    assert entry["task"] == "apps.deployment.tasks.reconcile_stopped_deployments"

@@ -302,7 +302,22 @@ def test_logout_blacklist_database_error_is_not_reported_as_success(monkeypatch)
 
     monkeypatch.setattr("apps.auth.api.endpoints._KeyIdRefreshToken.blacklist", fail_blacklist)
     response = client.post("/api/auth/logout/", format="json", **browser_auth_headers())
-    assert response.status_code == 500
+    # Revocation failed: report it, but still drop the cookie from this browser.
+    assert response.status_code == 503
+    assert response.cookies["refresh_token"].value == ""
+    assert "could not be revoked" in response.data["detail"]
+
+
+@pytest.mark.django_db
+def test_logout_rejected_by_security_header_keeps_the_cookie():
+    client = APIClient()
+    client.cookies["refresh_token"] = "any-token"
+
+    response = client.post("/api/auth/logout/", format="json")
+
+    # A forged cross-site request must not be able to sign the user out.
+    assert response.status_code == 403
+    assert "refresh_token" not in response.cookies or response.cookies["refresh_token"].value != ""
 
 
 @pytest.mark.django_db

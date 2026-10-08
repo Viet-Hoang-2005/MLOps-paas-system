@@ -8,62 +8,101 @@ Provides static inspection to protect model packaging environments against:
 - Untrusted dependency specifications
 """
 
+import _compat_pickle
 import io
-import os
 import pickletools
 import re
 import tarfile
 import zipfile
 from pathlib import Path
 
-# Modules that must never be referenced by deserialized ML model pickles
-DANGEROUS_MODULES = frozenset(
+# Pickle allowlist. A model pickle may only reference the globals below; every
+# other global (os, subprocess, runpy, builtins.eval, ...) is rejected, so new
+# dangerous modules never need to be listed by hand.
+_CLASS_NAME = re.compile(r"^_?[A-Z][A-Za-z0-9]*$")
+_PLAIN_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+# Module trees where any CapWords class may be referenced (no functions, no
+# imported modules, no dotted attribute paths).
+ALLOWED_CLASS_MODULES = (
+    "sklearn.base", "sklearn.calibration", "sklearn.cluster", "sklearn.compose",
+    "sklearn.covariance", "sklearn.cross_decomposition", "sklearn.decomposition",
+    "sklearn.discriminant_analysis", "sklearn.dummy", "sklearn.ensemble",
+    "sklearn.feature_extraction", "sklearn.feature_selection", "sklearn.gaussian_process",
+    "sklearn.impute", "sklearn.isotonic", "sklearn.kernel_approximation",
+    "sklearn.kernel_ridge", "sklearn.linear_model", "sklearn.manifold", "sklearn.mixture",
+    "sklearn.model_selection", "sklearn.multiclass", "sklearn.multioutput",
+    "sklearn.naive_bayes", "sklearn.neighbors", "sklearn.neural_network", "sklearn.pipeline",
+    "sklearn.preprocessing", "sklearn.semi_supervised", "sklearn.svm", "sklearn.tree",
+    "sklearn.metrics._scorer", "sklearn.utils._bunch", "sklearn._loss",
+    "xgboost",
+    "pandas.core",
+    "torch.nn",
+)
+
+_NUMPY_NAMES = frozenset(
     {
-        "os",
-        "posix",
-        "nt",
-        "subprocess",
-        "sys",
-        "shutil",
-        "socket",
-        "pty",
-        "ctypes",
-        "urllib",
-        "requests",
-        "http",
-        "webbrowser",
-        "commands",
-        "platform",
-        "importlib",
-        "multiprocessing",
-        "concurrent",
-        "asyncio",
-        "threading",
-        "pickle",
-        "_pickle",
+        "dtype", "ndarray", "matrix", "float16", "float32", "float64", "int8", "int16",
+        "int32", "int64", "uint8", "uint16", "uint32", "uint64", "bool_", "complex64",
+        "complex128", "object_", "str_",
+    }
+)
+_NUMPY_INTERNALS = frozenset({"_reconstruct", "scalar", "_frombuffer", "_mareconstruct"})
+_TORCH_DTYPES = frozenset(
+    {
+        "float16", "float32", "float64", "bfloat16", "int8", "int16", "int32", "int64",
+        "uint8", "bool", "complex64", "complex128",
+    }
+)
+_TORCH_STORAGES = frozenset(
+    {
+        "FloatStorage", "DoubleStorage", "HalfStorage", "BFloat16Storage", "LongStorage",
+        "IntStorage", "ShortStorage", "CharStorage", "ByteStorage", "BoolStorage",
     }
 )
 
-# Built-in functions that allow code execution or filesystem access
-DANGEROUS_BUILTINS = frozenset(
-    {
-        "eval",
-        "exec",
-        "compile",
-        "open",
-        "__import__",
-        "getattr",
-        "setattr",
-        "delattr",
-        "breakpoint",
-        "input",
-        "exit",
-        "quit",
-        "globals",
-        "locals",
-        "system",
-    }
-)
+# Exact (module -> symbols) pairs for helpers and containers that carry no code.
+ALLOWED_GLOBALS: dict[str, frozenset[str]] = {
+    "builtins": frozenset(
+        {
+            "set", "frozenset", "list", "dict", "tuple", "int", "float", "complex", "str",
+            "bytes", "bytearray", "bool", "slice", "range", "object",
+        }
+    ),
+    "collections": frozenset({"OrderedDict", "defaultdict", "deque", "Counter"}),
+    "copyreg": frozenset({"_reconstructor", "__newobj__"}),
+    "_codecs": frozenset({"encode"}),
+    "datetime": frozenset({"datetime", "date", "time", "timedelta", "timezone"}),
+    "decimal": frozenset({"Decimal"}),
+    "fractions": frozenset({"Fraction"}),
+    "joblib.numpy_pickle": frozenset({"NumpyArrayWrapper", "NDArrayWrapper"}),
+    "joblib.numpy_pickle_compat": frozenset({"NDArrayWrapper", "ZNDArrayWrapper"}),
+    "numpy": _NUMPY_NAMES,
+    "numpy.core.multiarray": _NUMPY_INTERNALS,
+    "numpy._core.multiarray": _NUMPY_INTERNALS,
+    "numpy.core.numeric": _NUMPY_INTERNALS,
+    "numpy._core.numeric": _NUMPY_INTERNALS,
+    "numpy.ma.core": frozenset({"_mareconstruct", "MaskedArray"}),
+    "numpy.random._pickle": frozenset(
+        {"__randomstate_ctor", "__bit_generator_ctor", "__generator_ctor"}
+    ),
+    "numpy.random.mtrand": frozenset({"RandomState"}),
+    "numpy.random._mt19937": frozenset({"MT19937"}),
+    "numpy.random._pcg64": frozenset({"PCG64", "PCG64DXSM"}),
+    "pandas._libs.internals": frozenset({"_unpickle_block"}),
+    "pandas.core.indexes.base": frozenset({"_new_Index"}),
+    "scipy.sparse._csr": frozenset({"csr_matrix", "csr_array"}),
+    "scipy.sparse._csc": frozenset({"csc_matrix", "csc_array"}),
+    "scipy.sparse._coo": frozenset({"coo_matrix", "coo_array"}),
+    "scipy.sparse.csr": frozenset({"csr_matrix"}),
+    "scipy.sparse.csc": frozenset({"csc_matrix"}),
+    "torch": frozenset({"Size", "device", "Tensor"} | _TORCH_DTYPES | _TORCH_STORAGES),
+    "torch._tensor": frozenset({"Tensor", "_rebuild_from_type_v2"}),
+    "torch._utils": frozenset(
+        {"_rebuild_tensor", "_rebuild_tensor_v2", "_rebuild_parameter", "_rebuild_parameter_with_state"}
+    ),
+    "torch.storage": frozenset({"TypedStorage", "UntypedStorage"}),
+}
 
 # File extensions prohibited in model artifacts
 DANGEROUS_FILE_EXTENSIONS = frozenset(
@@ -168,81 +207,208 @@ def validate_safe_requirements(requirements_text: str) -> None:
             )
 
 
-def scan_pickle_data(data: bytes, source_name: str = "pickle") -> None:
-    """Scan raw pickle bytes for malicious opcodes without executing unpickle."""
-    stack: list[str] = []
-    memo: dict[int, str] = {}
-    try:
-        for op, arg, _ in pickletools.genops(data):
-            if op.name in ("SHORT_BINUNICODE", "BINUNICODE", "UNICODE", "STRING"):
-                stack.append(str(arg))
-            elif op.name == "MEMOIZE":
-                if stack:
-                    memo[len(memo)] = stack[-1]
-            elif op.name in ("PUT", "BINPUT", "LONG_BINPUT"):
-                if stack and arg is not None:
-                    try:
-                        memo[int(arg)] = stack[-1]
-                    except (ValueError, TypeError):
-                        pass
-            elif op.name in ("GET", "BINGET", "LONG_BINGET"):
-                if arg is not None:
-                    try:
-                        idx = int(arg)
-                        if idx in memo:
-                            stack.append(memo[idx])
-                    except (ValueError, TypeError):
-                        pass
-            elif op.name == "STACK_GLOBAL":
-                if len(stack) >= 2:
-                    name = stack.pop()
-                    module = stack.pop()
-                    _check_global_symbol(module, name, source_name)
-            elif op.name == "GLOBAL":
-                parts = str(arg).split(" ", 1)
-                module = parts[0]
-                name = parts[1] if len(parts) > 1 else ""
-                _check_global_symbol(module, name, source_name)
-    except PackageSecurityError:
-        raise
-    except Exception:
-        # Non-pickle byte sequence or mock artifact. If any dangerous opcodes were present,
-        # _check_global_symbol would have already raised PackageSecurityError.
+_STRING_OPS = frozenset(
+    {"STRING", "BINSTRING", "SHORT_BINSTRING", "UNICODE", "BINUNICODE", "SHORT_BINUNICODE", "BINUNICODE8"}
+)
+_JOBLIB_ARRAY_MODULES = frozenset({"joblib.numpy_pickle", "joblib.numpy_pickle_compat"})
+_COMPRESSION_MAGIC = (b"\x78", b"\x1f\x8b", b"BZh", b"\xfd7zXZ", b"\x5d\x00", b"\x04\x22\x4d\x18")
+_UNKNOWN = object()
+_MARK = object()
+
+
+# Only these are really resolved while verifying a joblib stream (joblib needs
+# real numpy arrays); every other allowlisted class is replaced by _InertClass.
+_REAL_MODULE_ROOTS = frozenset(
+    {"numpy", "joblib", "builtins", "collections", "copyreg", "_codecs", "datetime", "decimal", "fractions"}
+)
+
+
+class _InertClass:
+    def __new__(cls, *args, **kwargs):
+        return object.__new__(cls)
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __setstate__(self, state):
         pass
 
 
+class _MalformedPickle(Exception):
+    pass
+
+
+def _in_module_tree(module: str, root: str) -> bool:
+    return module == root or module.startswith(root + ".")
+
+
+def is_allowed_global(module: str, name: str) -> bool:
+    """Return True when a pickle may reference ``module.name``."""
+    if not _PLAIN_NAME.match(module.replace(".", "_")) or not _PLAIN_NAME.match(name):
+        return False
+    if name in ALLOWED_GLOBALS.get(module, ()):
+        return True
+    if _CLASS_NAME.match(name) and any(_in_module_tree(module, root) for root in ALLOWED_CLASS_MODULES):
+        return True
+    return module.startswith("numpy.dtypes") and name.endswith("DType") and _CLASS_NAME.match(name) is not None
+
+
+def _normalize_global(module: str, name: str) -> tuple[str, str]:
+    """Apply the Python 2 name mapping the unpickler uses for protocol < 3 pickles."""
+    if (module, name) in _compat_pickle.NAME_MAPPING:
+        return _compat_pickle.NAME_MAPPING[(module, name)]
+    return _compat_pickle.IMPORT_MAPPING.get(module, module), name
+
+
 def _check_global_symbol(module: str, name: str, source_name: str) -> None:
-    """Verify resolved global symbol against dangerous lists."""
-    module_parts = module.split(".")
-    root_module = module_parts[0].lower()
-
-    if root_module in DANGEROUS_MODULES:
-        raise PackageSecurityError(
-            f"Dangerous pickle opcode detected in {source_name}: reference to disallowed module '{module}' (symbol: '{name}')"
-        )
-
-    if root_module in ("builtins", "__builtin__") and name in DANGEROUS_BUILTINS:
-        raise PackageSecurityError(
-            f"Dangerous pickle opcode detected in {source_name}: reference to disallowed builtin '{module}.{name}'"
-        )
-
-
-def validate_pickle_file(file_path: Path) -> None:
-    """Scan a pickle or PyTorch model file for malicious instructions."""
-    if not file_path.is_file():
+    """Reject any global that is not on the allowlist."""
+    module, name = _normalize_global(module, name)
+    if is_allowed_global(module, name):
         return
+    known = module in ALLOWED_GLOBALS or any(_in_module_tree(module, root) for root in ALLOWED_CLASS_MODULES)
+    if module in ("builtins", "__builtin__"):
+        kind = "builtin"
+        target = f"{module}.{name}"
+    elif known:
+        kind = "symbol"
+        target = f"{module}.{name}"
+    else:
+        kind = "module"
+        target = f"{module}' (symbol: '{name}"
+    raise PackageSecurityError(
+        f"Dangerous pickle opcode detected in {source_name}: reference to disallowed {kind} '{target}'"
+    )
 
-    data = file_path.read_bytes()
+
+def _split_global(arg) -> tuple[str, str]:
+    parts = str(arg).split(" ", 1)
+    return parts[0], parts[1] if len(parts) > 1 else ""
+
+
+def _walk_pickle(data: bytes, source_name: str) -> bool:
+    """Check every global with a simulated stack. Returns True if joblib arrays were met.
+
+    Joblib writes raw array bytes inside the stream, so the walk stops there and
+    the stream is verified by a restricted joblib unpickler instead.
+    """
+    stack: list = []
+    marks: list[int] = []
+    memo: dict[int, object] = {}
+    try:
+        for op, arg, _ in pickletools.genops(data):
+            name = op.name
+            if name in _STRING_OPS:
+                stack.append(arg if isinstance(arg, str) else _UNKNOWN)
+                continue
+            if name == "MARK":
+                marks.append(len(stack))
+                stack.append(_MARK)
+                continue
+            if name in ("GLOBAL", "INST"):
+                module, symbol = _split_global(arg)
+                _check_global_symbol(module, symbol, source_name)
+                if module in _JOBLIB_ARRAY_MODULES:
+                    return True
+            elif name == "STACK_GLOBAL":
+                if len(stack) < 2 or not all(isinstance(item, str) for item in stack[-2:]):
+                    raise PackageSecurityError(
+                        f"Dangerous pickle opcode detected in {source_name}: non-literal global reference"
+                    )
+                module, symbol = stack[-2], stack[-1]
+                _check_global_symbol(module, symbol, source_name)
+                if module in _JOBLIB_ARRAY_MODULES:
+                    return True
+            elif name in ("EXT1", "EXT2", "EXT4"):
+                raise PackageSecurityError(
+                    f"Dangerous pickle opcode detected in {source_name}: extension registry references are not allowed"
+                )
+            elif name in ("GET", "BINGET", "LONG_BINGET"):
+                stack.append(memo.get(int(arg), _UNKNOWN))
+                continue
+            elif name == "DUP":
+                stack.append(stack[-1])
+                continue
+            elif name == "MEMOIZE":
+                memo[len(memo)] = stack[-1]
+                continue
+            elif name in ("PUT", "BINPUT", "LONG_BINPUT"):
+                memo[int(arg)] = stack[-1]
+                continue
+            elif name == "STOP":
+                return False
+
+            before = op.stack_before
+            if pickletools.markobject in before:
+                if not marks:
+                    raise _MalformedPickle
+                del stack[marks.pop():]
+                below = before.index(pickletools.markobject)
+                if below:
+                    del stack[-below:]
+            elif before:
+                del stack[-len(before):]
+            stack.extend(_UNKNOWN for _ in op.stack_after)
+    except PackageSecurityError:
+        raise
+    except Exception as exc:
+        raise _MalformedPickle from exc
+    return False
+
+
+def _verify_joblib_stream(data: bytes, source_name: str) -> None:
+    """Load a joblib stream with an allowlist-only unpickler (arrays are read, code is not run)."""
+    try:
+        from joblib import numpy_pickle
+    except ImportError as exc:
+        raise PackageSecurityError(f"Cannot verify joblib artifact {source_name}: joblib is unavailable") from exc
+
+    class RestrictedUnpickler(numpy_pickle.NumpyUnpickler):
+        def find_class(self, module, name):
+            _check_global_symbol(module, name, source_name)
+            if _normalize_global(module, name)[0].split(".")[0] in _REAL_MODULE_ROOTS:
+                return super().find_class(module, name)
+            # Third-party classes are never imported or run, only walked past.
+            return _InertClass
+
+    try:
+        with numpy_pickle._read_fileobject(io.BytesIO(data), source_name, None) as handle:
+            RestrictedUnpickler(source_name, handle, mmap_mode=None).load()
+    except PackageSecurityError:
+        raise
+    except Exception as exc:
+        raise PackageSecurityError(f"Cannot verify joblib artifact {source_name}: {type(exc).__name__}") from exc
+
+
+def scan_pickle_data(data: bytes, source_name: str = "pickle") -> None:
+    """Check a pickle against the global allowlist without running its code.
+
+    Anything that cannot be parsed is rejected rather than assumed to be safe.
+    """
+    try:
+        if _walk_pickle(data, source_name):
+            _verify_joblib_stream(data, source_name)
+    except _MalformedPickle:
+        if data.startswith(_COMPRESSION_MAGIC):
+            _verify_joblib_stream(data, source_name)
+            return
+        raise PackageSecurityError(f"Could not verify pickle structure of {source_name}") from None
+
+
+# Serialized model suffixes that are loaded through pickle (PyTorch .pt/.pth
+# checkpoints are pickles, usually inside a zip container).
+PICKLE_MODEL_SUFFIXES = (".pkl", ".pickle", ".joblib", ".pt", ".pth")
+
+
+def scan_model_bytes(data: bytes, label: str) -> None:
+    """Scan raw pickle or PyTorch container bytes for malicious instructions."""
     # Check if this is a PyTorch ZIP container
-    if data.startswith(b"PK\x03\x04"):
+    if data.startswith(b"PK"):
         try:
             with zipfile.ZipFile(io.BytesIO(data), "r") as archive:
                 for member in archive.infolist():
                     if member.filename.endswith((".pkl", ".pickle")):
                         member_bytes = archive.read(member.filename)
-                        scan_pickle_data(
-                            member_bytes, f"{file_path.name}:{member.filename}"
-                        )
+                        scan_pickle_data(member_bytes, f"{label}:{member.filename}")
             return
         except PackageSecurityError:
             raise
@@ -250,7 +416,14 @@ def validate_pickle_file(file_path: Path) -> None:
             # Fall back to raw scanning if zip parsing fails
             pass
 
-    scan_pickle_data(data, file_path.name)
+    scan_pickle_data(data, label)
+
+
+def validate_pickle_file(file_path: Path) -> None:
+    """Scan a pickle or PyTorch model file for malicious instructions."""
+    if not file_path.is_file():
+        return
+    scan_model_bytes(file_path.read_bytes(), file_path.name)
 
 
 def validate_archive_structure(
@@ -365,9 +538,9 @@ def validate_model_package_security(
                         raise PackageSecurityError(
                             f"Prohibited executable or script detected in archive: {name}"
                         )
-                    if suffix in (".pkl", ".pickle", ".joblib"):
+                    if suffix in PICKLE_MODEL_SUFFIXES:
                         data = archive.read(name)
-                        scan_pickle_data(data, f"{archive_or_file_path.name}:{name}")
+                        scan_model_bytes(data, f"{archive_or_file_path.name}:{name}")
                     if Path(name).name == "requirements.txt":
                         try:
                             req_content = archive.read(name).decode("utf-8")
@@ -384,10 +557,10 @@ def validate_model_package_security(
                         raise PackageSecurityError(
                             f"Prohibited executable or script detected in archive: {name}"
                         )
-                    if suffix in (".pkl", ".pickle", ".joblib") and member.isreg():
+                    if suffix in PICKLE_MODEL_SUFFIXES and member.isreg():
                         extracted = archive.extractfile(member)
                         if extracted:
-                            scan_pickle_data(
+                            scan_model_bytes(
                                 extracted.read(),
                                 f"{archive_or_file_path.name}:{name}",
                             )
@@ -399,13 +572,7 @@ def validate_model_package_security(
                                 validate_safe_requirements(req_content)
                             except UnicodeDecodeError:
                                 pass
-        elif archive_or_file_path.suffix.lower() in (
-            ".pkl",
-            ".pickle",
-            ".joblib",
-            ".pt",
-            ".pth",
-        ):
+        elif archive_or_file_path.suffix.lower() in PICKLE_MODEL_SUFFIXES:
             validate_pickle_file(archive_or_file_path)
 
     if extract_dir and extract_dir.exists():

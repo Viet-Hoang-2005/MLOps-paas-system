@@ -15,7 +15,6 @@ import requests
 import yaml
 from src import config, image_build, io
 from src.security import (
-    PackageSecurityError,
     validate_model_package_security,
     validate_no_dangerous_binaries,
     validate_safe_requirements,

@@ -1,5 +1,7 @@
+import json
 from unittest.mock import Mock
 
+import pytest
 from src import kafka_runtime as main
 from src.batching import PREDICTION_RECORD_COLUMNS, is_production_sample
 from src.models import KafkaRecord
@@ -20,6 +22,27 @@ class FakeConsumer:
 
     def resume(self, partitions):
         self.resumed.extend(partitions)
+
+
+class FakeDeadLetter:
+    def __init__(self, enabled=True, succeeds=True):
+        self.enabled = enabled
+        self.succeeds = succeeds
+        self.topic = "events.dlq"
+        self.published = []
+
+    def publish(self, letters):
+        if not self.succeeds:
+            return False
+        self.published.extend(letters)
+        return True
+
+
+@pytest.fixture(autouse=True)
+def dead_letter(monkeypatch):
+    fake = FakeDeadLetter()
+    monkeypatch.setattr(main, "dead_letter", fake)
+    return fake
 
 
 def record(payload=None, offset=0, partition=0):
@@ -122,7 +145,7 @@ def test_is_production_sample_rejects_non_uuid():
     assert not is_production_sample(valid | {"features": "not-a-dict"})
 
 
-def test_flush_pending_batch_discards_after_max_retries(monkeypatch):
+def test_flush_pending_batch_dead_letters_after_max_retries(monkeypatch, dead_letter):
     from src.models import RetryState
 
     consumer = FakeConsumer()
@@ -145,3 +168,147 @@ def test_flush_pending_batch_discards_after_max_retries(monkeypatch):
     # Should resume the partition
     assert len(consumer.resumed) == 1
     assert consumer.resumed[0].partition == 0
+    # The batch is parked, not lost
+    assert [(letter.offset, letter.reason) for letter in dead_letter.published] == [(10, "db_write_failed")]
+    assert json.loads(dead_letter.published[0].value)["prediction"] == "safe"
+
+
+def corrupt_message(offset, partition=0):
+    msg = Mock()
+    msg.topic.return_value = "events"
+    msg.partition.return_value = partition
+    msg.offset.return_value = offset
+    return msg
+
+
+def test_corrupt_record_commits_after_pending_batch_is_saved(monkeypatch):
+    consumer = FakeConsumer()
+    monkeypatch.setattr(
+        main,
+        "save_prediction_records_and_automatic_drift_signals",
+        Mock(return_value=True),
+    )
+    key = ("events", 0)
+    pending = {key: [record(offset=4)]}
+
+    assert main.skip_corrupt_record(consumer, pending, {}, corrupt_message(5), ValueError("bad"))
+    assert key not in pending
+    # Batch commit (offset 5) followed by the skip commit (offset 6).
+    assert [c[0][0].offset for c in consumer.commits] == [5, 6]
+
+
+def test_corrupt_record_does_not_commit_past_unsaved_batch(monkeypatch):
+    consumer = FakeConsumer()
+    monkeypatch.setattr(
+        main,
+        "save_prediction_records_and_automatic_drift_signals",
+        Mock(return_value=False),
+    )
+    key = ("events", 0)
+    pending = {key: [record(offset=4)]}
+    retries = {}
+
+    assert not main.skip_corrupt_record(consumer, pending, retries, corrupt_message(5), ValueError("bad"))
+    assert consumer.commits == []
+    assert len(pending[key]) == 1
+    assert retries[key].attempts == 1
+
+
+def test_corrupt_record_does_not_force_flush_during_retry_backoff(monkeypatch):
+    from src.models import RetryState
+
+    consumer = FakeConsumer()
+    save = Mock(return_value=False)
+    monkeypatch.setattr(main, "save_prediction_records_and_automatic_drift_signals", save)
+    key = ("events", 0)
+    pending = {key: [record(offset=4)]}
+    retries = {key: RetryState(attempts=2)}
+
+    assert not main.skip_corrupt_record(consumer, pending, retries, corrupt_message(5), ValueError("bad"))
+    save.assert_not_called()
+    assert retries[key].attempts == 2
+    assert consumer.commits == []
+
+
+def test_corrupt_record_commits_when_partition_has_no_batch():
+    consumer = FakeConsumer()
+
+    assert main.skip_corrupt_record(consumer, {}, {}, corrupt_message(7), ValueError("bad"))
+    assert [c[0][0].offset for c in consumer.commits] == [8]
+
+
+def _failing_save(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "save_prediction_records_and_automatic_drift_signals",
+        Mock(return_value=False),
+    )
+
+
+def test_batch_stays_retained_when_dead_letter_publish_fails(monkeypatch, dead_letter):
+    from src.models import RetryState
+
+    dead_letter.succeeds = False
+    consumer = FakeConsumer()
+    _failing_save(monkeypatch)
+    key = ("events", 0)
+    pending = {key: [record(offset=10)]}
+    retries = {key: RetryState(attempts=main.KAFKA_DB_RETRY_MAX_ATTEMPTS)}
+
+    assert not main.flush_pending_batch(consumer, pending, retries, key)
+    assert len(pending[key]) == 1
+    assert retries[key].attempts == main.KAFKA_DB_RETRY_MAX_ATTEMPTS + 1
+    assert consumer.commits == []
+    assert consumer.resumed == []
+
+
+def test_batch_is_dropped_loudly_only_when_dead_letter_is_disabled(monkeypatch, dead_letter):
+    from src.models import RetryState
+
+    dead_letter.enabled = False
+    consumer = FakeConsumer()
+    _failing_save(monkeypatch)
+    key = ("events", 0)
+    pending = {key: [record(offset=10)]}
+    retries = {key: RetryState(attempts=main.KAFKA_DB_RETRY_MAX_ATTEMPTS)}
+
+    assert not main.flush_pending_batch(consumer, pending, retries, key)
+    assert key not in pending
+    assert dead_letter.published == []
+    assert consumer.commits[0][0][0].offset == 11
+
+
+def test_batch_is_dropped_after_exactly_max_attempts(monkeypatch, dead_letter):
+    consumer = FakeConsumer()
+    _failing_save(monkeypatch)
+    key = ("events", 0)
+    pending = {key: [record(offset=3)]}
+    retries = {}
+
+    for _ in range(main.KAFKA_DB_RETRY_MAX_ATTEMPTS - 1):
+        main.flush_pending_batch(consumer, pending, retries, key)
+        assert key in pending
+    main.flush_pending_batch(consumer, pending, retries, key)
+    assert key not in pending
+    assert len(dead_letter.published) == 1
+
+
+def test_corrupt_record_is_parked_before_its_offset_is_committed(dead_letter):
+    consumer = FakeConsumer()
+    msg = corrupt_message(7)
+    msg.value.return_value = b"{not json"
+
+    assert main.skip_corrupt_record(consumer, {}, {}, msg, ValueError("bad"))
+    assert [c[0][0].offset for c in consumer.commits] == [8]
+    letter = dead_letter.published[0]
+    assert (letter.value, letter.offset, letter.reason) == (b"{not json", 7, "malformed_record:ValueError")
+
+
+def test_corrupt_record_is_not_committed_when_dead_letter_publish_fails(dead_letter):
+    dead_letter.succeeds = False
+    consumer = FakeConsumer()
+    msg = corrupt_message(7)
+    msg.value.return_value = b"{not json"
+
+    assert not main.skip_corrupt_record(consumer, {}, {}, msg, ValueError("bad"))
+    assert consumer.commits == []

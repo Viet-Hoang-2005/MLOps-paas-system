@@ -9,6 +9,7 @@ from apps.auth.models import UserAvatar
 from apps.auth.services.cookies import set_refresh_token_cookie, verify_auth_security_headers
 from apps.auth.services.otp import read_token, send_otp, verify_otp
 from apps.auth.services.tokens import revoke_user_refresh_tokens
+from apps.auth.throttles import PasswordChangeRateThrottle
 from apps.observability.services.outbox import enqueue_event
 
 
@@ -71,12 +72,16 @@ class AccountDeleteEndpoint(APIView):
 
 
 class PasswordChangeRequestEndpoint(APIView):
+    throttle_classes = (PasswordChangeRateThrottle,)
+
     def post(self, request):
         send_otp(email=request.user.email, purpose="password_change")
         return Response({"message": "Verification code sent."})
 
 
 class PasswordChangeVerifyEndpoint(APIView):
+    throttle_classes = (PasswordChangeRateThrottle,)
+
     def post(self, request):
         token = verify_otp(
             email=request.user.email,

@@ -13,6 +13,9 @@ from pathlib import Path
 UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 EXECUTION_NS = "mlops-execution"
 TRAINING_NS = "user-jobs"
+# A tombstone is only a terminated Workflow without Pods. It must outlive any
+# replay of the original submit event, otherwise the event recreates the job.
+TOMBSTONE_TTL_SECONDS = 7 * 24 * 3600
 
 
 class Kubernetes:
@@ -124,7 +127,7 @@ def reconcile(api, payload):
             tombstone = {"apiVersion": "argoproj.io/v1alpha1", "kind": "Workflow",
                 "metadata": {"name": name, "namespace": EXECUTION_NS, "labels": labels},
                 "spec": {"shutdown": "Terminate", "workflowTemplateRef": {"name": "mlops-paas-job-tombstone-template"},
-                         "ttlStrategy": {"secondsAfterCompletion": 300}, "podGC": {"strategy": "OnPodCompletion"}}}
+                         "ttlStrategy": {"secondsAfterCompletion": TOMBSTONE_TTL_SECONDS}, "podGC": {"strategy": "OnPodCompletion"}}}
             api.request("POST", workflow_path(), tombstone)
             workflow = api.request("GET", workflow_path(name))
             verify(workflow, labels)

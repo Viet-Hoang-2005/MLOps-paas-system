@@ -440,3 +440,41 @@ def test_password_reset_endpoints_rate_throttled():
     assert res_throttled.status_code == 429
     assert "throttled" in str(res_throttled.data).lower()
 
+
+
+def _reset_complete(client, **headers):
+    return client.post(
+        "/api/auth/password-reset/complete/",
+        {"reset_token": "dummy-token", "new_password": "NewPass#2026!"},
+        format="json",
+        **headers,
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("proxies", [0, 1])
+def test_throttle_ignores_client_controlled_forwarded_for(settings, proxies):
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK, "NUM_PROXIES": proxies}
+    client = APIClient()
+    for i in range(10):
+        # Only the entry appended by the trusted proxy (the last one) may count.
+        assert _reset_complete(client, HTTP_X_FORWARDED_FOR=f"198.51.100.{i}, 203.0.113.7").status_code == 400
+    assert _reset_complete(client, HTTP_X_FORWARDED_FOR="198.51.100.200, 203.0.113.7").status_code == 429
+
+
+@pytest.mark.django_db
+def test_throttle_separates_clients_behind_a_trusted_proxy(settings):
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK, "NUM_PROXIES": 1}
+    client = APIClient()
+    for _ in range(10):
+        assert _reset_complete(client, HTTP_X_FORWARDED_FOR="203.0.113.7").status_code == 400
+    assert _reset_complete(client, HTTP_X_FORWARDED_FOR="203.0.113.7").status_code == 429
+    assert _reset_complete(client, HTTP_X_FORWARDED_FOR="203.0.113.8").status_code == 400
+
+
+@pytest.mark.django_db
+def test_registration_otp_endpoints_rate_throttled():
+    client = APIClient()
+    for _ in range(10):
+        assert client.post("/api/auth/register/verify-otp/", {"email": "a@example.com", "otp_code": "123456"}, format="json").status_code == 400
+    assert client.post("/api/auth/register/verify-otp/", {"email": "a@example.com", "otp_code": "123456"}, format="json").status_code == 429

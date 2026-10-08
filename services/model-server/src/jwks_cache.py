@@ -1,5 +1,6 @@
 """Bounded LRU cache with positive & negative TTL for JWKS public keys."""
 
+import asyncio
 import collections
 import time
 from typing import Any
@@ -8,9 +9,13 @@ _SENTINEL = object()
 
 
 class JwksKeyCache:
-    """Thread-safe and async-safe bounded LRU cache with positive & negative TTL.
+    """Bounded LRU cache with positive & negative TTL, for use from one event loop.
 
     Protects Control Plane from DoS floods when requests query unknown or invalid key IDs.
+    The cache itself is not locked: its methods never await, so coroutines on a single
+    loop cannot interleave inside them. ``fetch_lock`` serialises JWKS downloads and
+    ``last_fetch_at`` rate-limits them, so concurrent or ever-changing unknown key IDs
+    cost the Control Plane at most one fetch per ``min_refetch_interval``.
     """
 
     def __init__(
@@ -18,10 +23,14 @@ class JwksKeyCache:
         max_size: int = 500,
         positive_ttl: float = 3600.0,
         negative_ttl: float = 60.0,
+        min_refetch_interval: float = 10.0,
     ):
         self.max_size = max_size
         self.positive_ttl = positive_ttl
         self.negative_ttl = negative_ttl
+        self.min_refetch_interval = min_refetch_interval
+        self.fetch_lock = asyncio.Lock()
+        self.last_fetch_at: float | None = None
         # Map: kid -> (value, expires_at_monotonic)
         self._entries: collections.OrderedDict[str, tuple[Any, float]] = collections.OrderedDict()
 

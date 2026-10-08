@@ -9,7 +9,6 @@ from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
 from apps.catalog.artifact_types import (
-    get_max_source_artifact_bytes,
     validate_source_artifact,
 )
 from apps.catalog.models import ModelPreview, PreviewAsset

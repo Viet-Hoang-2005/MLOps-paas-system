@@ -1,4 +1,5 @@
 import base64
+import logging
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
@@ -20,6 +21,8 @@ from apps.auth.services.cookies import (
     set_refresh_token_cookie,
     verify_auth_security_headers,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RegisterEndpoint(generics.CreateAPIView):
@@ -106,14 +109,26 @@ class LogoutEndpoint(APIView):
     def post(self, request):
         verify_auth_security_headers(request)
         refresh_token = get_refresh_token_from_request(request)
+
+        revoked = True
         if refresh_token:
             try:
-                token = _KeyIdRefreshToken(refresh_token)
-                token.blacklist()
+                _KeyIdRefreshToken(refresh_token).blacklist()
             except TokenError:
-                # Expired or malformed tokens are already unusable; still clear the cookie.
+                # Expired or malformed tokens are already unusable.
                 pass
-        response = Response({"message": "Successfully logged out."})
+            except Exception:
+                logger.exception("Refresh token revocation failed during logout")
+                revoked = False
+        if not revoked:
+            # Never report success for a session the server could not revoke, but still
+            # drop the browser cookie so this client stops presenting the token.
+            response = Response(
+                {"detail": "Signed out locally, but the session could not be revoked on the server; it expires on its own."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        else:
+            response = Response({"message": "Successfully logged out."})
         clear_refresh_token_cookie(response)
         return response
 

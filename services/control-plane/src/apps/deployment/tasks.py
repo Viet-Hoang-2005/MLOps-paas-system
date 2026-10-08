@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from celery import shared_task
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 
@@ -377,3 +378,26 @@ def stop_deployment(self, deployment_id):
         payload={"deployment_id": str(deployment.public_id), "status": "stopped"},
     )
     return "stopped"
+
+
+@shared_task(ignore_result=True, expires=60, soft_time_limit=50, time_limit=55)
+def reconcile_stopped_deployments():
+    """Re-dispatch stops whose runtime removal never completed.
+
+    A stop is claimed in the database first and the runtime is removed by a queued
+    task. If that task is lost (worker or broker down between commit and enqueue) or
+    exhausts its retries, nothing else would ever remove the runtime. ``stopped_at``
+    is written only after ``backend.stop`` succeeds, so a stopped deployment without
+    it past the grace period still owns a runtime. ``stop_deployment`` is idempotent.
+    """
+    cutoff = timezone.now() - timedelta(seconds=settings.STOP_RECONCILE_GRACE_SECONDS)
+    stale = Deployment.objects.filter(status="stopped", stopped_at__isnull=True, updated_at__lt=cutoff)
+    dispatched = 0
+    for public_id in stale.order_by("updated_at").values_list("public_id", flat=True)[: settings.STOP_RECONCILE_BATCH_SIZE]:
+        # A failing stop is retried at most once per grace period, not on every scan.
+        if cache.add(f"deployment-stop-reconcile:{public_id}", 1, timeout=settings.STOP_RECONCILE_GRACE_SECONDS):
+            stop_deployment.delay(str(public_id))
+            dispatched += 1
+    if dispatched:
+        logger.warning("Re-dispatched %s stale deployment stop(s).", dispatched)
+    return dispatched

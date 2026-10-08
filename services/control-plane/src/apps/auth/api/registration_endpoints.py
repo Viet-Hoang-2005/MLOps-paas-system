@@ -14,6 +14,7 @@ from apps.auth.services.otp import (
     verify_otp,
 )
 from apps.auth.services.tokens import create_auth_response, revoke_user_refresh_tokens
+from apps.auth.throttles import PasswordResetRateThrottle, RegistrationRateThrottle
 
 
 class EmailSerializer(serializers.Serializer):
@@ -27,6 +28,7 @@ class OTPSerializer(EmailSerializer):
 class RegistrationOTPRequestEndpoint(APIView):
     authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = (RegistrationRateThrottle,)
 
     def post(self, request):
         serializer = EmailSerializer(data=request.data)
@@ -41,6 +43,7 @@ class RegistrationOTPRequestEndpoint(APIView):
 class RegistrationOTPVerifyEndpoint(APIView):
     authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = (RegistrationRateThrottle,)
 
     def post(self, request):
         serializer = OTPSerializer(data=request.data)
@@ -56,6 +59,7 @@ class RegistrationOTPVerifyEndpoint(APIView):
 class CompleteRegistrationEndpoint(APIView):
     authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = (RegistrationRateThrottle,)
 
     def post(self, request):
         verify_auth_security_headers(request)
@@ -96,27 +100,6 @@ class CompleteRegistrationEndpoint(APIView):
             {"message": "Account created.", "is_new_user": True},
             status=status.HTTP_201_CREATED,
         )
-
-
-from rest_framework.throttling import SimpleRateThrottle
-
-
-class PasswordResetRateThrottle(SimpleRateThrottle):
-    scope = "password_reset"
-    default_rate = "10/minute"
-
-    def get_rate(self):
-        try:
-            return self.THROTTLE_RATES.get(self.scope) or self.default_rate
-        except Exception:
-            return self.default_rate
-
-    def get_cache_key(self, request, view):
-        ident = self.get_ident(request) or "unknown"
-        return self.cache_format % {
-            "scope": self.scope,
-            "ident": ident,
-        }
 
 
 class PasswordResetRequestEndpoint(APIView):
