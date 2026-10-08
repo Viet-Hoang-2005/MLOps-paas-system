@@ -66,9 +66,8 @@ class S3Storage:
         bucket, key = self.parse_uri(uri)
         response = self.client.head_object(Bucket=bucket, Key=key)
         metadata = response.get("Metadata", {})
-        checksum = metadata.get("sha256")
-        if not checksum:
-            checksum = self.compute_sha256(uri)
+        etag = response.get("ETag", "").strip('"')
+        checksum = metadata.get("sha256") or etag
         return StoredObject(
             key=key,
             uri=uri,

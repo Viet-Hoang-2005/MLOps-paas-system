@@ -98,9 +98,31 @@ class CompleteRegistrationEndpoint(APIView):
         )
 
 
+from rest_framework.throttling import SimpleRateThrottle
+
+
+class PasswordResetRateThrottle(SimpleRateThrottle):
+    scope = "password_reset"
+    default_rate = "10/minute"
+
+    def get_rate(self):
+        try:
+            return self.THROTTLE_RATES.get(self.scope) or self.default_rate
+        except Exception:
+            return self.default_rate
+
+    def get_cache_key(self, request, view):
+        ident = self.get_ident(request) or "unknown"
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": ident,
+        }
+
+
 class PasswordResetRequestEndpoint(APIView):
     authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = (PasswordResetRateThrottle,)
 
     def post(self, request):
         serializer = EmailSerializer(data=request.data)
@@ -116,6 +138,7 @@ class PasswordResetRequestEndpoint(APIView):
 class PasswordResetVerifyEndpoint(APIView):
     authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = (PasswordResetRateThrottle,)
 
     def post(self, request):
         serializer = OTPSerializer(data=request.data)
@@ -131,6 +154,7 @@ class PasswordResetVerifyEndpoint(APIView):
 class PasswordResetCompleteEndpoint(APIView):
     authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = (PasswordResetRateThrottle,)
 
     def post(self, request):
         token = str(request.data.get("reset_token", ""))

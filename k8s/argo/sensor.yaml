@@ -429,6 +429,10 @@ spec:
               spec:
                 workflowTemplateRef:
                   name: mlops-paas-job-submit-template
+                ttlStrategy:
+                  secondsAfterCompletion: 300
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - {name: execution_kind, value: "drift"}
@@ -454,6 +458,10 @@ spec:
               spec:
                 workflowTemplateRef:
                   name: mlops-paas-model-server-delete-template
+                ttlStrategy:
+                  secondsAfterCompletion: 300
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - name: project_id
@@ -491,6 +499,10 @@ spec:
               spec:
                 workflowTemplateRef:
                   name: mlops-paas-job-submit-template
+                ttlStrategy:
+                  secondsAfterCompletion: 300
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - {name: execution_kind, value: "training"}
@@ -516,6 +528,10 @@ spec:
               spec:
                 workflowTemplateRef:
                   name: mlops-paas-training-cancel-template
+                ttlStrategy:
+                  secondsAfterCompletion: 300
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - name: job_id
@@ -559,6 +575,10 @@ spec:
               spec:
                 workflowTemplateRef:
                   name: mlops-paas-job-reconcile-template
+                ttlStrategy:
+                  secondsAfterCompletion: 300
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - {name: execution_payload, value: ""}

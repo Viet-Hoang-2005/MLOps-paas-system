@@ -362,3 +362,81 @@ def test_password_change_enforces_validators_and_revokes_old_refresh_tokens():
     assert new_refresh_attempt.status_code == 200
     assert "access" in new_refresh_attempt.data
 
+
+@pytest.mark.django_db
+def test_parallel_failed_otp_verifications_cannot_exceed_max_attempts():
+    from concurrent.futures import ThreadPoolExecutor
+
+    email = "parallel-brute@example.com"
+    send_otp(email=email, purpose="registration")
+    correct_code = cache.get(_cache_key(email, "registration"))
+    assert correct_code is not None
+
+    def try_verify(i):
+        try:
+            verify_otp(email=email, code=f"{i:06d}", purpose="registration")
+            return "success"
+        except ValidationError as exc:
+            msg = str(exc)
+            if "Too many failed attempts" in msg:
+                return "too_many"
+            if "Invalid verification code" in msg:
+                return "invalid"
+            if "Invalid or expired" in msg:
+                return "expired"
+            return f"other: {msg}"
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(try_verify, range(1, 16)))
+
+    assert "success" not in results
+    invalid_counts = [r for r in results if r == "invalid"]
+    assert len(invalid_counts) <= MAX_OTP_ATTEMPTS - 1
+    assert all(r in ("invalid", "too_many", "expired") for r in results)
+    assert cache.get(_cache_key(email, "registration")) is None
+
+
+@pytest.mark.django_db
+def test_concurrent_correct_otp_verification_only_succeeds_once():
+    from concurrent.futures import ThreadPoolExecutor
+
+    email = "parallel-correct@example.com"
+    send_otp(email=email, purpose="registration")
+    correct_code = cache.get(_cache_key(email, "registration"))
+    assert correct_code is not None
+
+    def try_verify(_):
+        try:
+            return verify_otp(email=email, code=correct_code, purpose="registration")
+        except ValidationError:
+            return None
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        results = list(executor.map(try_verify, range(5)))
+
+    successful = [r for r in results if r is not None]
+    assert len(successful) == 1
+    assert cache.get(_cache_key(email, "registration")) is None
+
+
+@pytest.mark.django_db
+def test_password_reset_endpoints_rate_throttled():
+    client = APIClient()
+
+    # 1. Password reset complete endpoint throttles after 10 requests
+    for _ in range(10):
+        res = client.post(
+            "/api/auth/password-reset/complete/",
+            {"reset_token": "dummy-token", "new_password": "NewPass#2026!"},
+            format="json",
+        )
+        assert res.status_code == 400
+
+    res_throttled = client.post(
+        "/api/auth/password-reset/complete/",
+        {"reset_token": "dummy-token", "new_password": "NewPass#2026!"},
+        format="json",
+    )
+    assert res_throttled.status_code == 429
+    assert "throttled" in str(res_throttled.data).lower()
+

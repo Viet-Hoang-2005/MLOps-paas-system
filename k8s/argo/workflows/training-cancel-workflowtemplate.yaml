@@ -7,6 +7,10 @@ spec:
   serviceAccountName: argo-workflow-training-sa
   entrypoint: cancel-training
   onExit: report-cancellation
+  ttlStrategy:
+    secondsAfterCompletion: 300
+  podGC:
+    strategy: OnPodCompletion
   arguments:
     parameters:
       - name: job_id

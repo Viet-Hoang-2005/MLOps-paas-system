@@ -153,8 +153,8 @@ def submit_job(job):
         raise Conflict("This project is being deleted.")
     if job.deletion_requested_at:
         raise Conflict("This training job is being deleted.")
-    if job.status not in {"pending", "failed"}:
-        return job
+    if job.status != "pending":
+        raise Conflict("Only pending jobs can be submitted.")
     job.status = "queued"
     job.save(update_fields=["status", "updated_at"])
     transaction.on_commit(lambda: _enqueue(job))

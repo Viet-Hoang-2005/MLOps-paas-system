@@ -106,3 +106,122 @@ def test_sensor_forwards_entire_training_payload():
             manifest = template["resource"]["manifest"]
             assert "MAX_RUNTIME_SECONDS" in manifest and "inputs.parameters.max_runtime_seconds" in manifest
             assert "S3_INPUT_DOWNLOAD_CAPABILITY" in manifest
+
+
+def test_kubernetes_request_error_handling(monkeypatch):
+    k8s = ops.Kubernetes.__new__(ops.Kubernetes)
+    k8s.token = "fake-token"
+    k8s.context = None
+    k8s.url = "https://k8s.test"
+
+    import urllib.error
+
+    def mock_urlopen_409(req, *args, **kwargs):
+        raise urllib.error.HTTPError(req.full_url, 409, "Conflict", {}, None)
+
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen_409)
+
+    # POST on 409 returns None (already exists)
+    assert k8s.request("POST", "/test", {}) is None
+
+    # PATCH on 409 must NOT return None; it must raise RuntimeError
+    with pytest.raises(RuntimeError, match=r"Kubernetes operation failed \(409\)"):
+        k8s.request("PATCH", "/test", {})
+
+    # 404 returns None
+    def mock_urlopen_404(req, *args, **kwargs):
+        raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {}, None)
+
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen_404)
+    assert k8s.request("PATCH", "/test", {}) is None
+    assert k8s.request("GET", "/test") is None
+
+
+def test_reconcile_stop_retries_patch_409(payload):
+    payload["stop"] = True
+    wf = workflow(payload)
+    api = Mock()
+    patch_calls = 0
+
+    def request(method, path, data=None):
+        nonlocal patch_calls
+        if "/pods" in path:
+            return {"items": []}
+        if "/pytorchjobs/" in path:
+            return None
+        if method == "PATCH":
+            patch_calls += 1
+            if patch_calls == 1:
+                raise RuntimeError("Kubernetes operation failed (409).")
+            return wf
+        return wf
+
+    api.request.side_effect = request
+    res = ops.reconcile(api, payload)
+    assert res["status"] == "error"  # phase is Running
+    assert patch_calls == 2
+
+
+def test_reconcile_stop_raises_on_persistent_patch_409(payload):
+    payload["stop"] = True
+    wf = workflow(payload)
+    api = Mock()
+
+    def request(method, path, data=None):
+        if "/pods" in path:
+            return {"items": []}
+        if "/pytorchjobs/" in path:
+            return None
+        if method == "PATCH":
+            raise RuntimeError("Kubernetes operation failed (409).")
+        return wf
+
+    api.request.side_effect = request
+    with pytest.raises(RuntimeError, match=r"Kubernetes operation failed \(409\)"):
+        ops.reconcile(api, payload)
+
+
+def test_pytorch_jobs_have_owner_reference_and_active_deadline():
+    root = Path(__file__).parents[2]
+    training = yaml.safe_load((root / "argo/workflows/training-workflowtemplate.yaml").read_text())
+    pytorch_templates = [t for t in training["spec"]["templates"] if t.get("name") in {"cpu-pytorch-job", "gpu-pytorch-job"}]
+    assert len(pytorch_templates) == 2
+    for t in pytorch_templates:
+        assert t["resource"]["setOwnerReference"] is True
+        manifest = t["resource"]["manifest"]
+        assert "kind: PyTorchJob" in manifest
+        assert "cleanPodPolicy: Running" in manifest
+        assert "activeDeadlineSeconds: {{=asInt(inputs.parameters.max_runtime_seconds)}}" in manifest
+
+
+def test_operational_workflows_have_ttl_and_pod_gc():
+    root = Path(__file__).parents[2]
+    job_ops_docs = list(yaml.safe_load_all((root / "argo/workflows/job-operations-workflowtemplate.yaml").read_text()))
+    expected_image = "python:3.10-slim@sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2"
+    for doc in job_ops_docs:
+        assert doc["spec"]["ttlStrategy"]["secondsAfterCompletion"] == 300
+        assert doc["spec"]["podGC"]["strategy"] == "OnPodCompletion"
+        for t in doc["spec"]["templates"]:
+            if "container" in t:
+                assert t["container"]["image"] == expected_image
+        if doc["metadata"]["name"] == "mlops-paas-job-submit-template":
+            assert doc["spec"]["activeDeadlineSeconds"] >= 240
+            submit_tpl = next(t for t in doc["spec"]["templates"] if t["name"] == "submit")
+            assert submit_tpl["retryStrategy"]["limit"] == "3"
+
+    cancel_doc = yaml.safe_load((root / "argo/workflows/training-cancel-workflowtemplate.yaml").read_text())
+    assert cancel_doc["spec"]["ttlStrategy"]["secondsAfterCompletion"] == 300
+    assert cancel_doc["spec"]["podGC"]["strategy"] == "OnPodCompletion"
+
+    delete_doc = yaml.safe_load((root / "argo/workflows/delete-workflowtemplate.yaml").read_text())
+    assert delete_doc["spec"]["ttlStrategy"]["secondsAfterCompletion"] == 300
+    assert delete_doc["spec"]["podGC"]["strategy"] == "OnPodCompletion"
+
+    sensor = yaml.safe_load((root / "argo/sensor.yaml").read_text())
+    op_triggers = ["drift-workflow-trigger", "delete-workflow-trigger", "train-workflow-trigger", "cancel-train-workflow-trigger", "reconcile-job-trigger"]
+    for t in sensor["spec"]["triggers"]:
+        if t["template"]["name"] in op_triggers:
+            wf_spec = t["template"]["k8s"]["source"]["resource"]["spec"]
+            assert wf_spec["ttlStrategy"]["secondsAfterCompletion"] == 300
+            assert wf_spec["podGC"]["strategy"] == "OnPodCompletion"
+

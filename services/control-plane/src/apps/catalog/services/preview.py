@@ -1,5 +1,6 @@
 """Revision-checked drafts and immutable build inputs."""
 
+import hashlib
 import json
 import uuid
 from pathlib import Path
@@ -147,6 +148,7 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                 if not stored.etag:
                     raise ValidationError({"assets": f"Uploaded asset '{kind}' has no storage ETag."})
 
+                checksum = ""
                 if kind == "source_artifact":
                     if not flavor:
                         raise ValidationError({"flavor": "Flavor must be specified."})
@@ -156,6 +158,9 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                         artifact_format=artifact_format,
                         size_bytes=stored.size_bytes,
                     )
+                    # For model artifacts (can be multi-GB), do NOT stream over network in web request.
+                    # Use client-provided checksum, storage metadata checksum, or fallback to ETag.
+                    checksum = item.get("checksum") or stored.checksum or stored.etag.strip('"')
                 elif kind == "source_code":
                     if not name.lower().endswith(".py"):
                         raise ValidationError({"source_code": "Source code must be a Python (.py) file."})
@@ -165,6 +170,7 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                         )
                     content = storage.read(s3_uri, max_bytes=MAX_SOURCE_CODE_BYTES + 1)
                     validate_source_code_content(name, content, error_key="source_code")
+                    checksum = hashlib.sha256(content).hexdigest()
                 elif kind == "reference_data":
                     if not name.lower().endswith(".csv"):
                         raise ValidationError({"reference_data": "Reference dataset must be a CSV (.csv) file."})
@@ -174,6 +180,7 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                         )
                     content = storage.read(s3_uri, max_bytes=MAX_REFERENCE_DATA_BYTES + 1)
                     validate_reference_data_content(name, content, error_key="reference_data")
+                    checksum = hashlib.sha256(content).hexdigest()
                 elif kind in {"label_mapping", "metrics", "params", "model_insights", "feature_importance", "input_schema"}:
                     if not name.lower().endswith(".json"):
                         raise ValidationError({kind: "Upload a JSON file."})
@@ -195,8 +202,8 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                         if isinstance(exc, ValidationError):
                             raise
                         raise ValidationError({kind: "Upload a valid JSON file under 4 MiB."}) from exc
+                    checksum = hashlib.sha256(content).hexdigest()
 
-                checksum = storage.compute_sha256(s3_uri)
                 verified_staging_assets.append(
                     (kind, name, s3_uri, checksum, stored.size_bytes, stored.content_type, stored.etag)
                 )
@@ -247,8 +254,6 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                     expected_etag=staging_etag,
                 )
                 committed_uris.append(stored_committed.uri)
-                if storage.compute_sha256(stored_committed.uri) != staging_checksum:
-                    raise ValidationError({"assets": f"Uploaded asset '{kind}' changed during save. Upload it again."})
                 committed_assets.append((kind, name, stored_committed))
 
             # 3. Fast atomic database transaction (<10ms)

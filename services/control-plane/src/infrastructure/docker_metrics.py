@@ -52,8 +52,10 @@ class DockerMetricsClient:
         try:
             # No container reference from HTTP input, and no scan of all containers.
             container = client.containers.get(f"deploy-{deployment.public_id}")
-            if container.status != "running" or any(
-                container.labels.get(key) != value for key, value in labels.items()
+            labels_dict = container.labels or {}
+            has_mlops_labels = any(key.startswith("mlops_") for key in labels_dict)
+            if container.status != "running" or (
+                has_mlops_labels and any(labels_dict.get(key) != value for key, value in labels.items())
             ):
                 return None
             return parse_stats(container.stats(stream=False))

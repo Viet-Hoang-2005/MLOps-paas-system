@@ -29,6 +29,19 @@ def _hourly_key(email: str, purpose: str) -> str:
     return f"identity:otp:hourly:{purpose}:{email.strip().lower()}"
 
 
+def _atomic_incr(key: str, timeout: int) -> int:
+    try:
+        return cache.incr(key)
+    except ValueError:
+        if cache.add(key, 1, timeout):
+            return 1
+        try:
+            return cache.incr(key)
+        except ValueError:
+            cache.set(key, 1, timeout)
+            return 1
+
+
 def check_and_record_otp_cooldown(*, email: str, purpose: str) -> None:
     """
     Guards against email spam and resource exhaustion by enforcing:
@@ -54,8 +67,17 @@ def check_and_record_otp_cooldown(*, email: str, purpose: str) -> None:
             detail="Too many verification codes requested for this email. Please try again later.",
         )
 
-    cache.set(cooldown_key, time.time(), OTP_COOLDOWN_SECONDS)
-    cache.set(hourly_key, hourly_count + 1, 3600)
+    now = time.time()
+    if not cache.add(cooldown_key, now, OTP_COOLDOWN_SECONDS):
+        last_sent_at = cache.get(cooldown_key)
+        elapsed = int(time.time() - float(last_sent_at)) if last_sent_at is not None else 0
+        remaining = max(1, OTP_COOLDOWN_SECONDS - elapsed)
+        raise Throttled(
+            wait=remaining,
+            detail=f"Please wait {remaining} seconds before requesting another verification code.",
+        )
+
+    _atomic_incr(hourly_key, 3600)
 
 
 def send_otp(*, email: str, purpose: str) -> None:
@@ -81,6 +103,10 @@ def verify_otp(*, email: str, code: str, purpose: str) -> str:
     key = _cache_key(clean_email, purpose)
     attempts_key = _attempts_key(clean_email, purpose)
 
+    expected = cache.get(key)
+    if not expected:
+        raise ValidationError({"otp_code": "Invalid or expired verification code."})
+
     attempts = cache.get(attempts_key) or 0
     if attempts >= MAX_OTP_ATTEMPTS:
         cache.delete(key)
@@ -88,26 +114,21 @@ def verify_otp(*, email: str, code: str, purpose: str) -> str:
             "otp_code": "Too many failed attempts. This verification code is no longer valid. Please request a new code."
         })
 
-    expected = cache.get(key)
-    if not expected:
-        raise ValidationError({"otp_code": "Invalid or expired verification code."})
-
     if not secrets.compare_digest(str(expected), str(code).strip()):
-        attempts += 1
-        cache.set(attempts_key, attempts, OTP_TTL_SECONDS)
-        if attempts >= MAX_OTP_ATTEMPTS:
+        failed_attempts = _atomic_incr(attempts_key, OTP_TTL_SECONDS)
+        if failed_attempts >= MAX_OTP_ATTEMPTS:
             cache.delete(key)
-            cache.delete(attempts_key)
             raise ValidationError({
                 "otp_code": "Too many failed attempts. This verification code is no longer valid. Please request a new code."
             })
-        remaining = MAX_OTP_ATTEMPTS - attempts
+        remaining = max(0, MAX_OTP_ATTEMPTS - failed_attempts)
         raise ValidationError({
             "otp_code": f"Invalid verification code. You have {remaining} attempt{'s' if remaining > 1 else ''} remaining."
         })
 
     # Successful verification: delete code and attempt counter immediately
-    cache.delete(key)
+    if not cache.delete(key):
+        raise ValidationError({"otp_code": "Invalid or expired verification code."})
     cache.delete(attempts_key)
     jti = secrets.token_hex(16)
     return signing.dumps(

@@ -172,3 +172,101 @@ def test_training_job_list_reports_model_lifecycle_status():
     assert status_by_job[str(built.public_id)] == "built"
     assert status_by_job[str(deployed.public_id)] == "deployed"
     assert built_build.status == "ready"
+
+
+@pytest.mark.django_db
+def test_submit_job_requires_pending_status(monkeypatch):
+    user = get_user_model().objects.create_user("submit-status@example.com", "password123")
+    project = ModelProject.objects.create(owner=user, name="NIDS")
+    client = APIClient()
+    client.force_authenticate(user)
+    monkeypatch.setattr("apps.observability.services.outbox._publish_pending", lambda: None)
+
+    pending_job = TrainingJob.objects.create(
+        project=project,
+        name="pending-job",
+        model_flavor="sklearn",
+        code_snapshot_uri="s3://bucket/source.zip",
+        data_snapshot_uri="s3://bucket/train.csv",
+        output_uri="s3://bucket/model.tar.gz",
+        status="pending",
+    )
+    submit_res = client.post(f"/api/training-jobs/{pending_job.public_id}/submit/")
+    assert submit_res.status_code == 202
+    pending_job.refresh_from_db()
+    assert pending_job.status == "queued"
+
+    # Submitting already queued job fails with 409 Conflict
+    re_submit = client.post(f"/api/training-jobs/{pending_job.public_id}/submit/")
+    assert re_submit.status_code == 409
+    assert "Only pending jobs can be submitted" in re_submit.data["error"]["detail"]
+
+    # Submitting a failed job fails with 409 Conflict
+    failed_job = TrainingJob.objects.create(
+        project=project,
+        name="failed-job",
+        model_flavor="sklearn",
+        code_snapshot_uri="s3://bucket/source.zip",
+        data_snapshot_uri="s3://bucket/train.csv",
+        output_uri="s3://bucket/model.tar.gz",
+        status="failed",
+    )
+    failed_submit = client.post(f"/api/training-jobs/{failed_job.public_id}/submit/")
+    assert failed_submit.status_code == 409
+    assert "Only pending jobs can be submitted" in failed_submit.data["error"]["detail"]
+
+    # Submitting a cancelled job fails with 409 Conflict
+    cancelled_job = TrainingJob.objects.create(
+        project=project,
+        name="cancelled-job",
+        model_flavor="sklearn",
+        code_snapshot_uri="s3://bucket/source.zip",
+        data_snapshot_uri="s3://bucket/train.csv",
+        output_uri="s3://bucket/model.tar.gz",
+        status="cancelled",
+    )
+    cancelled_submit = client.post(f"/api/training-jobs/{cancelled_job.public_id}/submit/")
+    assert cancelled_submit.status_code == 409
+    assert "Only pending jobs can be submitted" in cancelled_submit.data["error"]["detail"]
+
+
+@pytest.mark.django_db
+def test_failed_job_retry_endpoint_creates_new_attempt(monkeypatch):
+    from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    user = get_user_model().objects.create_user("retry-endpoint@example.com", "password123")
+    project = ModelProject.objects.create(owner=user, name="NIDS")
+    client = APIClient()
+    client.force_authenticate(user)
+    monkeypatch.setattr("apps.observability.services.outbox._publish_pending", lambda: None)
+
+    storage = MemoryStorage()
+    code_file = storage.put("orig/code.zip", SimpleUploadedFile("code.zip", b"code"), "application/zip")
+    data_file = storage.put("orig/data.zip", SimpleUploadedFile("data.zip", b"data"), "application/zip")
+
+    failed_job = TrainingJob.objects.create(
+        project=project,
+        name="failed-job",
+        model_flavor="sklearn",
+        code_snapshot_uri=code_file.uri,
+        data_snapshot_uri=data_file.uri,
+        output_uri="s3://bucket/model.tar.gz",
+        status="failed",
+    )
+
+    monkeypatch.setattr("apps.training.services.jobs.S3Storage", lambda: storage)
+    retry_res = client.post(f"/api/training-jobs/{failed_job.public_id}/retry/")
+    assert retry_res.status_code == 201
+
+    failed_job.refresh_from_db()
+    assert failed_job.status == "failed"
+
+    new_job = TrainingJob.objects.get(public_id=retry_res.data["id"])
+    assert new_job.pk != failed_job.pk
+    assert new_job.public_id != failed_job.public_id
+    assert new_job.retry_of == failed_job
+    assert new_job.status == "queued"
+    assert new_job.trigger_kind == "retry"
+
+

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core import signing
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -20,8 +21,9 @@ class ExecutionObservationEndpoint(APIView):
 
     def post(self, request, kind, public_id):
         token = request.headers.get("Authorization", "").removeprefix("Bearer ")
+        token_ttl = getattr(settings, "EXECUTION_OBSERVATION_TOKEN_TTL_SECONDS", 300)
         try:
-            claims = signing.loads(token, salt="execution-observation", max_age=60)
+            claims = signing.loads(token, salt="execution-observation", max_age=token_ttl)
         except signing.BadSignature:
             raise PermissionDenied("Invalid observation capability.")
         if claims.get("kind") != kind or claims.get("id") != str(public_id):

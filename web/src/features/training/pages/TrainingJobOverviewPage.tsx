@@ -5,6 +5,7 @@ import {
   Clock,
   Info,
   Loader2,
+  RotateCcw,
   UploadCloud,
   XCircle,
 } from "lucide-react";
@@ -13,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { MetadataRow } from "@/features/training/components/TrainingOverviewSections";
 import { useTrainingJobDetailContext } from "@/features/training/trainingJobDetailContext";
 import { computeElapsed, formatDuration } from "@/shared/lib/formatDuration";
+import { Button } from "@/shared/components/Button";
 import { PageBody } from "@/shared/components/PageBody";
 import {
   ProgressLine,
@@ -21,7 +23,8 @@ import {
 
 export default function TrainingJobOverviewPage() {
   const { t, i18n } = useTranslation("training");
-  const { job, statusLabels } = useTrainingJobDetailContext();
+  const { job, statusLabels, requestRetryJob, retryingJob } =
+    useTrainingJobDetailContext();
 
   const isCompleted = job.status === "completed";
   const isFailed = job.status === "failed";
@@ -131,13 +134,28 @@ export default function TrainingJobOverviewPage() {
 
       {job.status === "failed" && (
         <div className="rounded-surface border border-danger/20 bg-danger-subtle p-5">
-          <h4 className="mb-2 flex items-center gap-2 text-style-heading text-color-danger">
-            <AlertTriangle className="h-5 w-5" />
-            {t("detail.overview.failedTitle")}
-          </h4>
-          <p className="mb-3 text-style-body-strong text-color-danger">
-            {job.stop_reason || t("detail.overview.failedFallback")}
-          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h4 className="mb-2 flex items-center gap-2 text-style-heading text-color-danger">
+                <AlertTriangle className="h-5 w-5" />
+                {t("detail.overview.failedTitle")}
+              </h4>
+              <p className="mb-3 text-style-body-strong text-color-danger">
+                {job.stop_reason || t("detail.overview.failedFallback")}
+              </p>
+            </div>
+            {requestRetryJob && (
+              <Button
+                variant="secondary"
+                icon={<RotateCcw className="h-4 w-4" />}
+                onClick={requestRetryJob}
+                disabled={job.deletion_pending || retryingJob}
+                className="shrink-0"
+              >
+                {t("retryJob")}
+              </Button>
+            )}
+          </div>
           {job.error_message && (
             <div className="overflow-x-auto rounded-surface border border-danger/20 bg-surface p-4">
               <code className="wrap-break-words whitespace-pre-wrap font-mono text-style-code-sm text-color-danger">
@@ -150,13 +168,28 @@ export default function TrainingJobOverviewPage() {
 
       {job.status === "cancelled" && (
         <div className="rounded-surface border border-warning/20 bg-warning-subtle p-5">
-          <h4 className="mb-2 flex items-center gap-2 text-style-heading text-color-warning">
-            <AlertTriangle className="h-5 w-5" />
-            {t("detail.overview.cancelledTitle")}
-          </h4>
-          <p className="text-style-body-strong text-color-warning">
-            {job.stop_reason || t("detail.overview.cancelledFallback")}
-          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h4 className="mb-2 flex items-center gap-2 text-style-heading text-color-warning">
+                <AlertTriangle className="h-5 w-5" />
+                {t("detail.overview.cancelledTitle")}
+              </h4>
+              <p className="text-style-body-strong text-color-warning">
+                {job.stop_reason || t("detail.overview.cancelledFallback")}
+              </p>
+            </div>
+            {requestRetryJob && (
+              <Button
+                variant="secondary"
+                icon={<RotateCcw className="h-4 w-4" />}
+                onClick={requestRetryJob}
+                disabled={job.deletion_pending || retryingJob}
+                className="shrink-0"
+              >
+                {t("retryJob")}
+              </Button>
+            )}
+          </div>
         </div>
       )}
 

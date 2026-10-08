@@ -30,7 +30,7 @@ class Kubernetes:
             with urllib.request.urlopen(request, context=self.context, timeout=5) as response:
                 return json.load(response)
         except urllib.error.HTTPError as exc:
-            if exc.code in {404, 409}:
+            if exc.code == 404 or (method == "POST" and exc.code == 409):
                 return None
             raise RuntimeError(f"Kubernetes operation failed ({exc.code}).") from None
 
@@ -123,12 +123,21 @@ def reconcile(api, payload):
             # A tombstone prevents an already-delivered submit event from recreating work.
             tombstone = {"apiVersion": "argoproj.io/v1alpha1", "kind": "Workflow",
                 "metadata": {"name": name, "namespace": EXECUTION_NS, "labels": labels},
-                "spec": {"shutdown": "Terminate", "workflowTemplateRef": {"name": "mlops-paas-job-tombstone-template"}}}
+                "spec": {"shutdown": "Terminate", "workflowTemplateRef": {"name": "mlops-paas-job-tombstone-template"},
+                         "ttlStrategy": {"secondsAfterCompletion": 300}, "podGC": {"strategy": "OnPodCompletion"}}}
             api.request("POST", workflow_path(), tombstone)
             workflow = api.request("GET", workflow_path(name))
             verify(workflow, labels)
-        metadata = workflow["metadata"]
-        api.request("PATCH", workflow_path(name), {"metadata": {key: metadata[key] for key in ("uid", "resourceVersion")}, "spec": {"shutdown": "Terminate"}})
+        for attempt in range(3):
+            try:
+                api.request("PATCH", workflow_path(name), {"spec": {"shutdown": "Terminate"}})
+                break
+            except RuntimeError as exc:
+                if attempt == 2 or "409" not in str(exc):
+                    raise
+                workflow = api.request("GET", workflow_path(name))
+                if not workflow:
+                    break
         if job:
             api.request("DELETE", workload_path, {"preconditions": {"uid": job["metadata"]["uid"]}})
         for pod in pods:

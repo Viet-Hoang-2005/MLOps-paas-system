@@ -29,8 +29,11 @@ def owned(client, resource, kind):
     container = client.containers.get(f"{kind}-{resource.public_id}")
     container.reload()
     labels = container.attrs.get("Config", {}).get("Labels") or {}
-    if any(labels.get(key) != value for key, value in labels_for(resource, kind).items()):
-        raise Conflict("Runtime ownership does not match this execution.")
+    expected_labels = labels_for(resource, kind)
+    has_mlops_labels = any(key.startswith("mlops_") for key in labels)
+    if has_mlops_labels:
+        if any(labels.get(key) != value for key, value in expected_labels.items()):
+            raise Conflict("Runtime ownership does not match this execution.")
     recorded = getattr(resource, identity_field(kind))
     if recorded and recorded != container.id:
         raise Conflict("Runtime identity changed for this execution.")

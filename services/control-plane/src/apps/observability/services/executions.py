@@ -84,9 +84,10 @@ def claim(kind, public_id=None):
         else:
             rows = rows.filter(Q(next_execution_check_at__isnull=True) | Q(next_execution_check_at__lte=now))
         claimed = []
+        lease_seconds = getattr(settings, "EXECUTION_CHECK_LEASE_SECONDS", 300)
         for row in rows.order_by("pk")[:100]:
             row.execution_check_token = uuid.uuid4()
-            row.execution_check_lease_until = now + timedelta(seconds=60)
+            row.execution_check_lease_until = now + timedelta(seconds=lease_seconds)
             row.dispatch_deadline_at = row.dispatch_deadline_at or now + timedelta(seconds=settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS)
             row.save(update_fields=WATCH_FIELDS)
             claimed.append((str(row.public_id), str(row.execution_check_token)))
@@ -99,10 +100,11 @@ def scan():
     if not settings.EXECUTION_WATCH_ENABLED:
         return 0
     count = 0
+    lease_seconds = getattr(settings, "EXECUTION_CHECK_LEASE_SECONDS", 300)
     for kind in ("training", "drift"):
         for public_id, token in claim(kind):
             try:
-                reconcile_job_execution.apply_async(args=[kind, public_id, token], expires=30)
+                reconcile_job_execution.apply_async(args=[kind, public_id, token], expires=min(60, lease_seconds))
                 count += 1
             except Exception:
                 model_for(kind).objects.filter(public_id=public_id, execution_check_token=token).update(

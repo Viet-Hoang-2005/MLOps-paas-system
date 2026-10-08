@@ -6,10 +6,14 @@ metadata:
 spec:
   serviceAccountName: argo-workflow-basic-sa
   entrypoint: stopped
+  ttlStrategy:
+    secondsAfterCompletion: 300
+  podGC:
+    strategy: OnPodCompletion
   templates:
     - name: stopped
       container:
-        image: python:3.10-slim
+        image: python:3.10-slim@sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2
         command: ["true"]
 ---
 apiVersion: argoproj.io/v1alpha1
@@ -20,11 +24,19 @@ metadata:
 spec:
   serviceAccountName: argo-job-operations-sa
   entrypoint: submit
-  activeDeadlineSeconds: 55
+  activeDeadlineSeconds: 240
+  ttlStrategy:
+    secondsAfterCompletion: 300
+  podGC:
+    strategy: OnPodCompletion
   templates:
     - name: submit
+      retryStrategy:
+        limit: "3"
+        retryPolicy: Always
+        backoff: {duration: "2s", factor: "2", maxDuration: "30s"}
       container:
-        image: python:3.10-slim
+        image: python:3.10-slim@sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2
         command: [python, /ops/job_ops.py, submit]
         env:
           - {name: EXECUTION_KIND, value: "{{workflow.parameters.execution_kind}}"}
@@ -46,11 +58,19 @@ metadata:
 spec:
   serviceAccountName: argo-job-operations-sa
   entrypoint: reconcile
-  activeDeadlineSeconds: 55
+  activeDeadlineSeconds: 240
+  ttlStrategy:
+    secondsAfterCompletion: 300
+  podGC:
+    strategy: OnPodCompletion
   templates:
     - name: reconcile
+      retryStrategy:
+        limit: "3"
+        retryPolicy: Always
+        backoff: {duration: "2s", factor: "2", maxDuration: "30s"}
       container:
-        image: python:3.10-slim
+        image: python:3.10-slim@sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2
         command: [python, /ops/job_ops.py, reconcile]
         env:
           - {name: EXECUTION_PAYLOAD, value: "{{workflow.parameters.execution_payload}}"}

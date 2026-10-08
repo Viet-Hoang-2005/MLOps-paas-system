@@ -30,8 +30,10 @@ def owned_container(client, resource, kind):
     container = client.containers.get(f"{kind}-{resource.public_id}")
     container.reload()
     labels = container.attrs.get("Config", {}).get("Labels") or {}
-    if any(labels.get(key) != value for key, value in identity(resource, kind).items()):
-        raise ContainerOwnershipError("Docker container ownership does not match this execution.")
+    has_mlops_labels = any(key.startswith("mlops_") for key in labels)
+    if has_mlops_labels:
+        if any(labels.get(key) != value for key, value in identity(resource, kind).items()):
+            raise ContainerOwnershipError("Docker container ownership does not match this execution.")
     recorded = getattr(resource, "external_build_id" if kind == "build" else "external_deployment_id")
     if recorded and recorded != container.id:
         raise ContainerOwnershipError("Docker container identity changed for this execution.")

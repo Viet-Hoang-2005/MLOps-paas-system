@@ -103,6 +103,7 @@ spec:
           - {name: input_download_capability}
       resource:
         action: create
+        setOwnerReference: true
         successCondition: status.replicaStatuses.Master.succeeded == 1
         failureCondition: status.replicaStatuses.Master.failed > 0
         manifest: |
@@ -119,6 +120,9 @@ spec:
               mlops.io/project-id: {{=toJson(inputs.parameters.project_id)}}
               mlops.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
           spec:
+            runPolicy:
+              cleanPodPolicy: Running
+              activeDeadlineSeconds: {{=asInt(inputs.parameters.max_runtime_seconds)}}
             pytorchReplicaSpecs:
               Master:
                 replicas: 1
@@ -186,6 +190,7 @@ spec:
           - {name: input_download_capability}
       resource:
         action: create
+        setOwnerReference: true
         successCondition: status.replicaStatuses.Master.succeeded == 1
         failureCondition: status.replicaStatuses.Master.failed > 0
         manifest: |
@@ -202,6 +207,9 @@ spec:
               mlops.io/project-id: {{=toJson(inputs.parameters.project_id)}}
               mlops.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
           spec:
+            runPolicy:
+              cleanPodPolicy: Running
+              activeDeadlineSeconds: {{=asInt(inputs.parameters.max_runtime_seconds)}}
             pytorchReplicaSpecs:
               Master:
                 replicas: 1

@@ -219,6 +219,15 @@ def test_foreign_container_is_never_removed_or_reused(attempt):
     existing.remove.assert_not_called()
 
 
+def test_pre_migration_container_without_mlops_labels_is_adopted_and_cleanable(attempt):
+    existing = container()
+    existing.id = "container"
+    existing.attrs["Config"] = {"Labels": {}}
+    client = Mock()
+    client.containers.get.return_value = existing
+    assert owned_container(client, attempt, "build") is existing
+
+
 def test_lease_expiry_discards_inflight_result(candidate):
     def probe(**kwargs):
         Deployment.objects.filter(pk=candidate.pk).update(execution_check_lease_until=timezone.now() - timedelta(seconds=1))

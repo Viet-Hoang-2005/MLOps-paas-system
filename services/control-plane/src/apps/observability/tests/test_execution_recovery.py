@@ -213,6 +213,63 @@ def test_observation_capability_resource_binding_and_replay(job):
     assert client.post(url, {"status": "failed"}).status_code == 403
 
 
+def test_observation_token_valid_beyond_60s_within_lease(job, monkeypatch):
+    import time
+    from django.utils import timezone
+    from datetime import timedelta
+
+    base_time = time.time()
+    base_now = timezone.now()
+
+    token = executions.claim("training", job.public_id)[0][1]
+    auth = executions.signed_observation_token("training", job, token)
+
+    job.refresh_from_db()
+    # Check that lease is set to 300 seconds
+    assert job.execution_check_lease_until >= base_now + timedelta(seconds=290)
+
+    # 75 seconds later (past old 60s limit, but within 300s TTL and lease)
+    monkeypatch.setattr(time, "time", lambda: base_time + 75)
+    monkeypatch.setattr(timezone, "now", lambda: base_now + timedelta(seconds=75))
+
+    # Scanner will NOT claim again during active lease
+    assert executions.claim("training", job.public_id) == []
+
+    # Observation callback succeeds at 75s
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {auth}")
+    url = f"/internal/executions/training/{job.public_id}/observations/"
+    res = client.post(url, {"status": "running"})
+    assert res.status_code == 200
+
+    # After observation applied, lease is released
+    job.refresh_from_db()
+    assert job.execution_check_token is None
+    assert job.execution_check_lease_until is None
+
+
+def test_observation_token_expires_after_ttl(job, monkeypatch):
+    import time
+    from django.utils import timezone
+    from datetime import timedelta
+
+    base_time = time.time()
+    base_now = timezone.now()
+
+    token = executions.claim("training", job.public_id)[0][1]
+    auth = executions.signed_observation_token("training", job, token)
+
+    # 305 seconds later (past 300s TTL)
+    monkeypatch.setattr(time, "time", lambda: base_time + 305)
+    monkeypatch.setattr(timezone, "now", lambda: base_now + timedelta(seconds=305))
+
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {auth}")
+    url = f"/internal/executions/training/{job.public_id}/observations/"
+    res = client.post(url, {"status": "running"})
+    assert res.status_code == 403
+
+
 def test_recover_container_created_before_id_was_saved(job):
     container = Mock(id="existing", attrs={"Config": {"Labels": labels_for(job, "training")}, "State": {"Status": "running"}})
     docker_client = SimpleNamespace(run=Mock(), client=SimpleNamespace(containers=SimpleNamespace(get=Mock(return_value=container))))
@@ -224,10 +281,50 @@ def test_recover_container_created_before_id_was_saved(job):
 
 
 def test_wrong_ownership_never_adopted(job):
-    container = Mock(attrs={"Config": {"Labels": {}}})
+    container = Mock(attrs={"Config": {"Labels": {"mlops_tenant_id": "other-tenant"}}})
     client = SimpleNamespace(containers=SimpleNamespace(get=Mock(return_value=container)))
     assert observe(client, job, "training")["status"] == "error"
     container.remove.assert_not_called()
+
+
+def test_pre_migration_container_without_mlops_labels_is_observed_and_cleaned_up(job):
+    container = Mock(
+        id="pre-mig-container-123",
+        attrs={"Config": {"Labels": {}}, "State": {"Status": "exited", "ExitCode": 0}},
+    )
+    client = SimpleNamespace(containers=SimpleNamespace(get=Mock(return_value=container)))
+    res = observe(client, job, "training")
+    assert res["status"] == "completed"
+
+    from infrastructure.execution.job_containers import remove
+    remove(client, job, "training")
+    container.remove.assert_called_once_with(force=True)
+
+
+def test_pre_migration_container_reconcile_cleans_up_and_stops_claiming(job):
+    job.status = "failed"
+    job.observation_status = "cleanup_pending"
+    job.execution_stop_requested = True
+    job.save()
+
+    container = Mock(
+        id="pre-mig-container-456",
+        attrs={"Config": {"Labels": {}}, "State": {"Status": "exited", "ExitCode": 1}},
+    )
+    client = SimpleNamespace(containers=SimpleNamespace(get=Mock(return_value=container)))
+
+    from infrastructure.execution.docker_backends import DockerTrainingBackend
+    backend = DockerTrainingBackend(docker_client=SimpleNamespace(client=client))
+
+    from unittest.mock import patch
+    with patch("apps.observability.services.executions.backend_for", return_value=backend):
+        executions.reconcile("training", job.public_id)
+
+    job.refresh_from_db()
+    assert job.observation_status == "ok"
+    assert job.next_execution_check_at is None
+    container.remove.assert_called_once_with(force=True)
+    assert executions.claim("training", job.public_id) == []
 
 
 def test_terminal_deletion_request_remains_scannable(job):

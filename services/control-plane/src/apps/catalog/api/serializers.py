@@ -207,6 +207,7 @@ class UploadedAssetInputSerializer(serializers.Serializer):
     kind = serializers.ChoiceField(choices=PreviewAsset.KINDS)
     name = serializers.CharField(max_length=255)
     s3_uri = serializers.CharField(max_length=1024)
+    checksum = serializers.CharField(max_length=128, required=False, allow_blank=True, default="")
 
 
 class PresignedUploadItemSerializer(serializers.Serializer):

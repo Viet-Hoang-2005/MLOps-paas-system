@@ -3,7 +3,7 @@ import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPl
 import { formatDateTime, formatNumber } from "@/shared/i18n/formatters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { BrainCircuit, Eye, Rocket, Trash2 } from "lucide-react";
+import { BrainCircuit, Eye, Rocket, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
@@ -13,6 +13,7 @@ import {
   deleteTrainingJob,
   getTrainingUsage,
   listTrainingJobs,
+  retryTrainingJob,
 } from "@/features/training/api/trainingApi";
 import {
   TrainingJobStatusFilter,
@@ -72,6 +73,7 @@ export default function TrainingModelPage() {
   const { selectedModel, loading: isModelLoading } = useModelSelection();
   const [statusFilter, setStatusFilter] = useState<TrainingStatusFilter>("all");
   const [jobToDelete, setJobToDelete] = useState<TrainingJob | null>(null);
+  const [jobToRetry, setJobToRetry] = useState<TrainingJob | null>(null);
   const pendingDeletionIds = useRef<Set<string>>(new Set());
 
   const {
@@ -192,6 +194,23 @@ export default function TrainingModelPage() {
     },
   });
 
+  const retryMutation = useMutation({
+    mutationFn: (job: TrainingJob) => retryTrainingJob(job.id),
+    onSuccess: (newJob) => {
+      setJobToRetry(null);
+      toast.success(t("createFlow.messages.trainingStarted"));
+      void queryClient.invalidateQueries({
+        queryKey: trainingQueryKeys.jobs(),
+      });
+      navigate(`/dashboard/training/jobs/${newJob.id}/overview`);
+    },
+    onError: (error) => {
+      toast.error(
+        getApiErrorMessage(error, t("createFlow.messages.trainingStartFailed")),
+      );
+    },
+  });
+
   const columns = useMemo<ColumnDef<TrainingJob>[]>(
     () => [
       {
@@ -305,6 +324,17 @@ export default function TrainingModelPage() {
                   navigate(`/dashboard/training/jobs/${job.id}/overview`)
                 }
               />
+              {(job.status === "failed" || job.status === "cancelled") && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label={t("training:retryJob")}
+                  title={t("training:retryJob")}
+                  icon={<RotateCcw className="h-4 w-4" />}
+                  disabled={deleting || retryMutation.isPending}
+                  onClick={() => setJobToRetry(job)}
+                />
+              )}
               <Button
                 size="icon"
                 variant="ghost"
@@ -320,7 +350,7 @@ export default function TrainingModelPage() {
         },
       },
     ],
-    [navigate, t, i18n.language],
+    [navigate, retryMutation.isPending, t, i18n.language],
   );
 
   if (!selectedModel) {
@@ -489,6 +519,18 @@ export default function TrainingModelPage() {
         onCancel={() => setJobToDelete(null)}
         onConfirm={() => {
           if (jobToDelete) deleteMutation.mutate(jobToDelete);
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(jobToRetry)}
+        title={t("retryTitle")}
+        description={t("retryDescription", { job: jobToRetry?.name ?? "" })}
+        confirmText={t("retryJob")}
+        tone="default"
+        loading={retryMutation.isPending}
+        onCancel={() => setJobToRetry(null)}
+        onConfirm={() => {
+          if (jobToRetry) retryMutation.mutate(jobToRetry);
         }}
       />
     </section>
