@@ -5,9 +5,13 @@ import { formatNumber } from "@/shared/i18n/formatters";
 export function SnapshotMetadata({ version }: { version: ModelVersion }) {
   const { t, i18n } = useTranslation("evolution");
   const sections = [
-    { title: t("snapshot.metrics"), value: version.metrics_summary },
-    { title: t("snapshot.params"), value: version.params_summary },
-    { title: t("snapshot.insights"), value: version.insights_summary },
+    { title: `${t("snapshot.metrics")} · ${t("snapshot.registeredSource")}`, value: version.metrics_summary },
+    { title: `${t("snapshot.params")} · ${t("snapshot.registeredSource")}`, value: version.params_summary },
+    { title: `${t("snapshot.insights")} · ${t("snapshot.registeredSource")}`, value: version.insights_summary },
+    ...Object.entries(version.supplemental_summaries ?? {}).map(([kind, item]) => ({
+      title: `${kind} · ${t("snapshot.supplementalSource")}`,
+      value: item.value as Record<string, unknown>,
+    })),
   ].filter((section) => Object.keys(section.value ?? {}).length > 0);
   return (
     <div className="space-y-5">

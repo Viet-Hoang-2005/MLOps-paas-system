@@ -60,19 +60,43 @@ function RunDeploymentContent({
         ? "info"
         : "neutral";
   if (run.loading && !run.build.data) return <RouteFallback />;
+  if (run.build.data?.registration_status === "registering") {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={t("workflow.runDeployment")} back />
+        <Callout
+          variant="info"
+          title={t("workflow.registering")}
+          description={t("workflow.registrationInProgress")}
+        />
+        <Button
+          variant="secondary"
+          onClick={() => navigate(buildDeploymentPath({ projectId, buildId }))}
+        >
+          {t("workflow.openBuild")}
+        </Button>
+      </div>
+    );
+  }
   if (run.mismatch || run.error || (!run.loading && !run.eligible)) {
     return (
       <div className="space-y-6">
         <PageHeader title={t("workflow.runDeployment")} back />
         <Callout
           variant="danger"
-          title={t("workflow.runNotEligible")}
+          title={
+            run.build.data?.registration_error
+              ? t("workflow.registrationFailed")
+              : t("workflow.runNotEligible")
+          }
           description={
             run.error
               ? getApiErrorMessage(run.error, t("workflow.notFound"))
               : run.mismatch
                 ? t("workflow.invalidBuildProject")
-                : t("workflow.registeredBuildRequired")
+                : run.build.data?.registration_error
+                  ? run.build.data.registration_error
+                  : t("workflow.registeredBuildRequired")
           }
         />
         <Button

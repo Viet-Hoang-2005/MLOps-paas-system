@@ -1,6 +1,7 @@
 import {
   addSupplementalArtifacts,
   getVersionReferencePreview,
+  type SupplementalArtifactsPayload,
 } from "@/features/evolution/api/evolutionApi";
 import { evolutionQueryKeys } from "@/features/evolution/queryKeys";
 import type { Build, ModelVersion } from "@/features/projects/types";
@@ -29,6 +30,15 @@ import { VersionRecords } from "./VersionRecords";
 
 const MAX_SOURCE_CODE_BYTES = 5 * 1024 * 1024; // < 5 MB
 const MAX_REFERENCE_DATA_BYTES = 100 * 1024 * 1024; // < 100 MB
+const ATTRIBUTE_KINDS = [
+  "label_mapping",
+  "input_schema",
+  "metrics",
+  "params",
+  "model_insights",
+  "feature_importance",
+] as const;
+type AttributeKind = (typeof ATTRIBUTE_KINDS)[number];
 
 function formatBytes(bytes?: number): string {
   if (bytes === undefined || bytes === null) return "—";
@@ -52,6 +62,7 @@ export function VersionDetails({
 
   const [stagedSourceFile, setStagedSourceFile] = useState<File | null>(null);
   const [stagedRefFile, setStagedRefFile] = useState<File | null>(null);
+  const [stagedAttributes, setStagedAttributes] = useState<Partial<Record<AttributeKind, File>>>({});
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const hasSourceCode = version.artifacts.some(
@@ -60,6 +71,9 @@ export function VersionDetails({
   const hasRefData = version.artifacts.some((a) => a.kind === "reference_data");
   const refArtifact = version.artifacts.find(
     (a) => a.kind === "reference_data",
+  );
+  const missingAttributeKinds = ATTRIBUTE_KINDS.filter(
+    (kind) => !version.artifacts.some((artifact) => artifact.kind === kind),
   );
 
   // Reference preview query
@@ -79,11 +93,15 @@ export function VersionDetails({
       return await addSupplementalArtifacts(version.id, {
         source_code_file: stagedSourceFile || undefined,
         reference_data_file: stagedRefFile || undefined,
+        ...Object.fromEntries(
+          Object.entries(stagedAttributes).map(([kind, file]) => [`${kind}_file`, file]),
+        ) as SupplementalArtifactsPayload,
       });
     },
     onSuccess: (updated) => {
       setStagedSourceFile(null);
       setStagedRefFile(null);
+      setStagedAttributes({});
       queryClient.setQueryData(
         evolutionQueryKeys.snapshot(version.id),
         updated,
@@ -93,6 +111,15 @@ export function VersionDetails({
       });
       void queryClient.invalidateQueries({
         queryKey: evolutionQueryKeys.snapshot(version.id),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: evolutionQueryKeys.referencePreview(version.id),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["overview"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["catalog", "projects"],
       });
       toast.success(t("workspace.supplementalSuccess"));
     },
@@ -349,6 +376,51 @@ export function VersionDetails({
         </section>
       )}
 
+      {missingAttributeKinds.length > 0 && (
+        <section className="space-y-4">
+          <h3 className="text-style-heading">{t("workspace.supplementalAttributes")}</h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {missingAttributeKinds.map((kind) => (
+              <label key={kind} className="flex min-w-0 flex-col gap-2 border-b border-border pb-3">
+                <span className="text-style-body-sm text-color-foreground">
+                  {t(`workspace.attributeKinds.${kind}`)}
+                </span>
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  className="w-full min-w-0 text-style-caption text-color-muted-foreground"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (!file) return;
+                    if (!file.name.toLowerCase().endsWith(".json") || file.size === 0 || file.size > 4 * 1024 * 1024) {
+                      toast.error(t("workspace.invalidSupplementalJson"));
+                      return;
+                    }
+                    setStagedAttributes((current) => ({ ...current, [kind]: file }));
+                  }}
+                />
+                {stagedAttributes[kind] && (
+                  <span className="truncate text-style-caption text-color-muted-foreground">
+                    {stagedAttributes[kind].name} ({formatBytes(stagedAttributes[kind].size)})
+                  </span>
+                )}
+              </label>
+            ))}
+          </div>
+          {Object.keys(stagedAttributes).length > 0 && (
+            <Button
+              variant="primary"
+              icon={<Upload className="h-4 w-4" />}
+              loading={uploadMutation.isPending}
+              onClick={() => uploadMutation.mutate()}
+            >
+              {t("workspace.upload")}
+            </Button>
+          )}
+        </section>
+      )}
+
       {/* Registered Artifacts List */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -428,15 +500,17 @@ export function VersionDetails({
       <section className="space-y-3">
         <h3 className="text-style-heading">{t("workspace.parameters")}</h3>
         <VersionRecords
-          rows={Object.entries(version.params_summary).map(
-            ([name, value]) => ({
-              name,
-              value,
-            }),
-          )}
+          rows={[
+            ...Object.entries(version.params_summary).map(([name, value]) => ({
+              name, value, source: t("snapshot.registeredSource"),
+            })),
+            ...Object.entries((version.supplemental_summaries?.params?.value ?? {}) as Record<string, unknown>)
+              .map(([name, value]) => ({ name, value, source: t("snapshot.supplementalSource") })),
+          ]}
           columns={[
             { key: "name", title: t("workspace.name") },
             { key: "value", title: t("workspace.value") },
+            { key: "source", title: t("workspace.source") },
           ]}
           empty={t("workspace.noParameters")}
         />

@@ -19,6 +19,7 @@ def test_s3storage_head_uses_metadata_sha256_when_present():
 
     assert stored.checksum == "precalculated-sha256-hex-digest"
     assert stored.checksum != "md5-etag-value"
+    assert stored.etag == '"md5-etag-value"'
     client.head_object.assert_called_once_with(Bucket="test-bucket", Key="models/model.pkl")
     client.get_object.assert_not_called()
 
@@ -114,4 +115,19 @@ def test_s3storage_copy_with_explicit_checksum_bypasses_extra_head():
         MetadataDirective="REPLACE",
         ContentType="application/octet-stream",
     )
+
+
+def test_s3storage_copy_requires_verified_source_etag():
+    client = MagicMock()
+    storage = S3Storage(client=client, bucket="test-bucket")
+    storage.copy(
+        "s3://test-bucket/staging/model.pkl",
+        "committed/model.pkl",
+        checksum="verified-sha256",
+        content_type="application/octet-stream",
+        size_bytes=5,
+        expected_etag="verified-etag",
+    )
+
+    assert client.copy_object.call_args.kwargs["CopySourceIfMatch"] == "verified-etag"
 

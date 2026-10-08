@@ -97,6 +97,8 @@ export const projectsVi = {
       "Quá trình đóng gói image thất bại. Vui lòng kiểm tra log bên trên để biết chi tiết.",
     buildCancelled: "Đã hủy quá trình build image",
     registrationFailed: "Đăng ký mô hình thất bại",
+    registrationInProgress:
+      "Đang tiến hành đăng ký mô hình. Vui lòng chờ phiên bản được đăng ký trước khi triển khai.",
     register: "Đăng ký mô hình",
     registerSuccess: "Đăng ký mô hình thành công",
     registerFailed: "Đăng ký mô hình thất bại",

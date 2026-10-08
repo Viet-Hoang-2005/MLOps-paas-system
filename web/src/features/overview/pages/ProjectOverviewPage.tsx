@@ -59,21 +59,22 @@ export default function ProjectOverviewPage() {
   const tab = params.get("tab") || "deployment";
   const project = useProjectOverview(modelId);
   const model = project.data;
-  const isPreview = model?.lifecycle_status === "preview";
-  const effectiveVersionId =
-    model?.active_endpoint?.version_id ?? model?.latest_version_id ?? undefined;
+  const hasRunning = model?.active_endpoint?.deployment_status === "succeeded";
+  const isPreview = Boolean(model) && !hasRunning;
+  const effectiveVersionId = hasRunning ? model?.active_endpoint?.version_id : undefined;
 
   const source = useRunningSource(
-    !isPreview && tab === "code" ? modelId : undefined,
+    hasRunning && tab === "code" ? modelId : undefined,
     effectiveVersionId,
   );
   const reference = useSnapshotText(
-    !isPreview && tab === "data" ? model?.reference_data?.download_url : undefined,
+    hasRunning && tab === "data" ? model?.reference_data?.download_url : undefined,
     effectiveVersionId,
   );
   const attributes = useRunningAttributes(
     modelId,
     effectiveVersionId,
+    isPreview,
   );
 
   const preview = usePreview(isPreview ? modelId : undefined);
@@ -150,8 +151,6 @@ export default function ProjectOverviewPage() {
 
   if (!model) return <p>{t("workflow.loading")}</p>;
 
-  const hasRunning = model.active_endpoint?.deployment_status === "succeeded";
-
   return (
     <div className="flex w-full flex-1 flex-col space-y-6">
       <PageHeader title={tCommon("navigation.home")} />
@@ -172,6 +171,9 @@ export default function ProjectOverviewPage() {
                   ? ` · ${t("workflow.previewChanged")}`
                   : ""}
               </Badge>
+              {!hasRunning && model.lifecycle_status === "registered" && (
+                <Badge variant="neutral">{t("workflow.preview")}</Badge>
+              )}
             </div>
             <p className="text-color-muted-foreground">
               {model.description || t("noDescription")}

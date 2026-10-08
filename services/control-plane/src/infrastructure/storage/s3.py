@@ -12,6 +12,7 @@ class StoredObject:
     checksum: str
     size_bytes: int
     content_type: str
+    etag: str = ""
 
 
 class S3Storage:
@@ -74,6 +75,7 @@ class S3Storage:
             checksum=checksum,
             size_bytes=response.get("ContentLength", 0),
             content_type=response.get("ContentType", "application/octet-stream"),
+            etag=response.get("ETag", ""),
         )
 
     def presigned_get(self, uri, expires_in=900):
@@ -100,7 +102,7 @@ class S3Storage:
         bucket, key = self.parse_uri(uri)
         self.client.delete_object(Bucket=bucket, Key=key)
 
-    def copy(self, source_uri, destination_key, checksum=None, content_type=None, size_bytes=None):
+    def copy(self, source_uri, destination_key, checksum=None, content_type=None, size_bytes=None, expected_etag=None):
         source_bucket, source_key = self.parse_uri(source_uri)
         if not checksum or not content_type or size_bytes is None:
             source_head = self.head(source_uri)
@@ -108,6 +110,7 @@ class S3Storage:
             content_type = content_type or source_head.content_type
             size_bytes = size_bytes if size_bytes is not None else source_head.size_bytes
 
+        options = {"CopySourceIfMatch": expected_etag} if expected_etag else {}
         self.client.copy_object(
             Bucket=self.bucket,
             Key=destination_key,
@@ -115,6 +118,7 @@ class S3Storage:
             Metadata={"sha256": checksum},
             MetadataDirective="REPLACE",
             ContentType=content_type,
+            **options,
         )
         return StoredObject(
             destination_key,

@@ -233,6 +233,7 @@ def add_supplemental_artifacts(
         validate_reference_data_file,
         validate_source_code_file,
     )
+    from apps.catalog.services.snapshots import parse_label_mapping_payload
 
     if (
         not source_code_file
@@ -274,7 +275,7 @@ def add_supplemental_artifacts(
                     content_type="text/x-python",
                     metadata={
                         "provenance": "supplemental_upload",
-                        "uploaded_by": getattr(actor, "username", "system"),
+                        "uploaded_by": getattr(actor, "email", "system"),
                         "uploaded_at": timezone.now().isoformat(),
                     },
                 )
@@ -305,7 +306,7 @@ def add_supplemental_artifacts(
                     metadata={
                         "provenance": "supplemental_upload",
                         "format": "csv",
-                        "uploaded_by": getattr(actor, "username", "system"),
+                        "uploaded_by": getattr(actor, "email", "system"),
                         "uploaded_at": timezone.now().isoformat(),
                     },
                 )
@@ -318,7 +319,7 @@ def add_supplemental_artifacts(
                 )
 
             attribute_uploads = [
-                ("label_mapping", label_mapping_file, "application/json" if getattr(label_mapping_file, "name", "").endswith(".json") else "application/octet-stream"),
+                ("label_mapping", label_mapping_file, "application/json"),
                 ("input_schema", input_schema_file, "application/json"),
                 ("metrics", metrics_file, "application/json"),
                 ("params", params_file, "application/json"),
@@ -332,12 +333,36 @@ def add_supplemental_artifacts(
                 if version.artifacts.filter(kind=kind).exists():
                     raise Conflict(f"This version already has a {kind} artifact and cannot be replaced.")
                 filename = getattr(f_obj, "name", f"{kind}.json")
-                if kind == "label_mapping":
-                    if not (filename.lower().endswith(".json") or filename.lower().endswith(".pkl")):
-                        raise ValidationError({"label_mapping": "Label mapping must be a .json or .pkl file."})
-                else:
-                    if not filename.lower().endswith(".json"):
-                        raise ValidationError({kind: f"{kind} must be a .json file."})
+                if not filename.lower().endswith(".json"):
+                    raise ValidationError({kind: f"{kind} must be a .json file."})
+
+                try:
+                    raw_bytes = f_obj.read(4 * 1024 * 1024 + 1)
+                    if len(raw_bytes) > 4 * 1024 * 1024:
+                        raise ValueError("JSON file exceeds 4 MiB.")
+                    if kind == "label_mapping":
+                        raw_content = parse_label_mapping_payload(filename, raw_bytes)
+                    else:
+                        raw_content = json.loads(raw_bytes.decode("utf-8"))
+                    if kind in {"metrics", "params", "model_insights", "input_schema"} and not isinstance(raw_content, dict):
+                        raise ValueError("Expected a JSON object.")
+                    if kind == "feature_importance" and not isinstance(raw_content, (dict, list)):
+                        raise ValueError("Expected a JSON object or array.")
+                except (UnicodeDecodeError, ValueError) as exc:
+                    raise ValidationError({kind: "Upload a valid JSON file under 4 MiB."}) from exc
+                finally:
+                    f_obj.seek(0)
+
+                original = {
+                    "metrics": version.metrics_summary,
+                    "params": version.params_summary,
+                    "model_insights": version.insights_summary,
+                    "feature_importance": version.insights_summary,
+                }.get(kind) or {}
+                if kind in {"metrics", "params", "model_insights", "feature_importance"} and isinstance(raw_content, dict):
+                    overlap = set(raw_content) & set(original)
+                    if overlap:
+                        raise ValidationError({kind: f"Keys already exist in the registered snapshot: {', '.join(sorted(overlap))}."})
 
                 key = f"{prefix}/artifacts/supplemental/{kind}/{filename}"
                 stored = storage.put(key, f_obj, default_ct)
@@ -352,8 +377,9 @@ def add_supplemental_artifacts(
                     content_type=default_ct,
                     metadata={
                         "provenance": "supplemental_upload",
-                        "uploaded_by": getattr(actor, "username", "system"),
+                        "uploaded_by": getattr(actor, "email", "system"),
                         "uploaded_at": timezone.now().isoformat(),
+                        "summary": raw_content,
                     },
                 )
                 record_registry_event(
@@ -364,23 +390,6 @@ def add_supplemental_artifacts(
                     metadata={"kind": kind, "name": filename},
                 )
 
-                try:
-                    f_obj.seek(0)
-                    raw_content = json.loads(f_obj.read().decode("utf-8", errors="replace"))
-                    if kind == "metrics" and isinstance(raw_content, dict):
-                        version.metrics_summary = raw_content
-                        version.save(update_fields=["metrics_summary"])
-                    elif kind == "params" and isinstance(raw_content, dict):
-                        version.params_summary = raw_content
-                        version.save(update_fields=["params_summary"])
-                    elif kind in {"model_insights", "feature_importance"}:
-                        if isinstance(raw_content, list):
-                            version.insights_summary = {"kind": "feature_importance", "items": raw_content}
-                        elif isinstance(raw_content, dict):
-                            version.insights_summary = raw_content
-                        version.save(update_fields=["insights_summary"])
-                except Exception:
-                    pass
     except Exception:
         for uri in uploaded_uris:
             try:

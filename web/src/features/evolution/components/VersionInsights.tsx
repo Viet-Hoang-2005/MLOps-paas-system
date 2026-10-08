@@ -6,10 +6,13 @@ import { useTranslation } from "react-i18next";
 export function VersionInsights({ version }: { version: ModelVersion }) {
   const { t, i18n } = useTranslation("evolution");
   const insights = version.insights_summary;
+  const supplemental = ["model_insights", "feature_importance"]
+    .map((kind) => ({ kind, value: version.supplemental_summaries?.[kind]?.value }))
+    .filter(({ value }) => value !== undefined);
   const items = [...(insights.items ?? [])]
     .filter((item) => Number.isFinite(item.value))
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
-  if (!Object.keys(insights).length)
+  if (!Object.keys(insights).length && !supplemental.length)
     return (
       <p className="text-color-muted-foreground">{t("workspace.noInsights")}</p>
     );
@@ -17,6 +20,14 @@ export function VersionInsights({ version }: { version: ModelVersion }) {
   const max = Math.max(...top.map((item) => Math.abs(item.value)), 1e-10);
   return (
     <div className="space-y-6">
+      {supplemental.map(({ kind, value }) => (
+        <section key={kind} className="space-y-2">
+          <h3 className="text-style-heading">{kind} · {t("snapshot.supplementalSource")}</h3>
+          <pre className="max-h-80 overflow-auto rounded-surface border border-border bg-muted p-4 text-style-code-sm">
+            {JSON.stringify(value, null, 2)}
+          </pre>
+        </section>
+      ))}
       <div className="grid gap-4 sm:grid-cols-3">
         {[
           [t("workspace.insightKind"), insights.kind],

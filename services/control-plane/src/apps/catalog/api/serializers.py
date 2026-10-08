@@ -60,23 +60,27 @@ class ModelProjectSerializer(serializers.ModelSerializer):
         return value
 
     def get_flavor(self, instance):
-        return instance.active_deployment.version.flavor if instance.active_deployment_id else instance.preview.flavor
+        return instance.active_deployment.version.flavor if self._has_running(instance) else instance.preview.flavor
+
+    @staticmethod
+    def _has_running(instance):
+        return bool(instance.active_deployment_id and instance.active_deployment.status == "succeeded")
 
     def get_preview_changed(self, instance):
         return bool(
-            instance.active_deployment_id
+            self._has_running(instance)
             and instance.active_deployment.build.preview_revision != instance.preview.revision
         )
 
     def get_lifecycle_status(self, instance):
         """Return the current user-facing lifecycle state for the management list."""
-        if instance.active_deployment_id:
+        if self._has_running(instance):
             return "running"
         return "registered" if instance.versions.exists() else "preview"
 
     def get_active_endpoint(self, instance):
         """Return only the explicitly selected Running deployment endpoint."""
-        for deployment in [instance.active_deployment] if instance.active_deployment_id else []:
+        for deployment in [instance.active_deployment] if self._has_running(instance) else []:
             endpoint = getattr(deployment, "endpoint", None)
             if endpoint is None:
                 continue
@@ -102,19 +106,15 @@ class ModelProjectSerializer(serializers.ModelSerializer):
         return None
 
     def get_latest_version_id(self, instance):
-        if instance.active_deployment_id:
+        if self._has_running(instance):
             return str(instance.active_deployment.version.public_id)
         latest = instance.versions.order_by("-registered_at", "-id").first()
         return str(latest.public_id) if latest else None
 
     def _asset_summary(self, instance, kind):
-        version = None
-        if instance.active_deployment_id:
-            version = instance.active_deployment.version
-        elif instance.versions.exists():
-            version = instance.versions.order_by("-registered_at", "-id").first()
-        if not version:
+        if not self._has_running(instance):
             return None
+        version = instance.active_deployment.version
         artifact = version.artifacts.filter(
             kind={"code": "source_code", "data": "reference_data"}[kind]
         ).first()
@@ -244,15 +244,11 @@ class PreviewWriteSerializer(serializers.Serializer):
     requirements_text = serializers.CharField(required=False, allow_blank=True)
     remove_assets = serializers.ListField(child=serializers.ChoiceField(choices=PreviewAsset.KINDS), required=False)
     assets = serializers.ListField(child=UploadedAssetInputSerializer(), required=False)
-    source_artifact_file = serializers.FileField(required=False)
-    source_code_file = serializers.FileField(required=False)
-    reference_data_file = serializers.FileField(required=False)
-    label_mapping_file = serializers.FileField(required=False)
-    metrics_file = serializers.FileField(required=False)
-    params_file = serializers.FileField(required=False)
-    model_insights_file = serializers.FileField(required=False)
-    feature_importance_file = serializers.FileField(required=False)
-    input_schema_file = serializers.FileField(required=False)
+
+    def validate(self, attrs):
+        if any(key.endswith("_file") for key in self.initial_data):
+            raise serializers.ValidationError({"assets": "Upload files with a presigned staging URL."})
+        return attrs
 
 
 class ProjectCreateSerializer(PreviewWriteSerializer):
@@ -262,7 +258,6 @@ class ProjectCreateSerializer(PreviewWriteSerializer):
     description = serializers.CharField(required=False, allow_blank=True, default="")
     access_mode = serializers.ChoiceField(choices=ModelProject.ACCESS_MODES, default="private")
     flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"))
-    source_artifact_file = serializers.FileField(required=False)
 
     def validate_name(self, value):
         request = self.context.get("request")
@@ -271,8 +266,8 @@ class ProjectCreateSerializer(PreviewWriteSerializer):
         return value
 
     def validate(self, attrs):
-        has_file = bool(attrs.get("source_artifact_file"))
+        attrs = super().validate(attrs)
         has_asset = any(asset.get("kind") == "source_artifact" for asset in attrs.get("assets", []))
-        if not has_file and not has_asset:
+        if not has_asset:
             raise serializers.ValidationError({"source_artifact": "A model artifact is required."})
         return attrs

@@ -129,8 +129,7 @@ def test_project_list_returns_latest_active_endpoint_for_the_owner():
 
 
 @pytest.mark.django_db
-def test_running_attributes_and_label_mapping_with_pickle_and_json(monkeypatch):
-    import pickle
+def test_running_attributes_and_label_mapping_with_json(monkeypatch):
     from apps.registry.models import ModelArtifact
 
     owner = get_user_model().objects.create_user("attr-owner@example.com", "password123")
@@ -147,26 +146,25 @@ def test_running_attributes_and_label_mapping_with_pickle_and_json(monkeypatch):
     project.active_deployment = deployment
     project.save(update_fields=["active_deployment"])
 
-    # Create pkl label mapping artifact
-    pkl_bytes = pickle.dumps({0: "benign", 1: "attack"})
+    mapping_bytes = b'{"0": "benign", "1": "attack"}'
     ModelArtifact.objects.create(
         version=version,
         kind="label_mapping",
-        name="labels.pkl",
-        uri="s3://test-bucket/labels.pkl",
-        size_bytes=len(pkl_bytes),
+        name="labels.json",
+        uri="s3://test-bucket/labels.json",
+        size_bytes=len(mapping_bytes),
     )
 
     class FakeStorage:
         def parse_uri(self, uri):
-            return "test-bucket", "labels.pkl"
+            return "test-bucket", "labels.json"
 
         @property
         def client(self):
             class FakeClient:
                 def get_object(self, **kwargs):
                     from io import BytesIO
-                    return {"Body": BytesIO(pkl_bytes)}
+                    return {"Body": BytesIO(mapping_bytes)}
             return FakeClient()
 
     from apps.catalog.services import snapshots
@@ -181,12 +179,92 @@ def test_running_attributes_and_label_mapping_with_pickle_and_json(monkeypatch):
     assert res.data["metrics"] == {"accuracy": 0.985, "f1_score": 0.978}
     assert res.data["params"] == {"n_estimators": 100, "max_depth": 5}
     assert res.data["insights"]["kind"] == "feature_importance"
-    assert res.data["label_mapping"]["filename"] == "labels.pkl"
+    assert res.data["label_mapping"]["filename"] == "labels.json"
     assert res.data["label_mapping"]["mapping"] == {"0": "benign", "1": "attack"}
 
     # Test label-mapping standalone endpoint
     res_lm = client.get(f"/api/models/{project.public_id}/label-mapping/")
     assert res_lm.status_code == 200
-    assert res_lm.data["filename"] == "labels.pkl"
+    assert res_lm.data["filename"] == "labels.json"
     assert res_lm.data["mapping"] == {"0": "benign", "1": "attack"}
+
+
+@pytest.mark.django_db
+def test_running_snapshot_never_falls_back_to_registered_or_preview():
+    owner = get_user_model().objects.create_user("no-running@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Not deployed")
+    ModelVersion.objects.create(project=project, version="1")
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    assert client.get(f"/api/models/{project.public_id}/running-source/").status_code == 409
+    assert client.get(f"/api/models/{project.public_id}/running-attributes/").status_code == 409
+    assert client.get(f"/api/models/{project.public_id}/label-mapping/").status_code == 409
+    assert client.get(f"/api/models/{project.public_id}/preview/attributes/").status_code == 200
+    detail = client.get(f"/api/models/{project.public_id}/").data
+    assert detail["source_code"] is None
+    assert detail["reference_data"] is None
+
+
+@pytest.mark.django_db
+def test_unsuccessful_active_deployment_is_not_reported_as_running():
+    owner = get_user_model().objects.create_user("inactive-running@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Inactive deployment")
+    version = ModelVersion.objects.create(project=project, version="1")
+    build = Build.objects.create(project=project, version=version, status="ready")
+    project.active_deployment = Deployment.objects.create(version=version, build=build, status="failed")
+    project.save(update_fields=["active_deployment"])
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    detail = client.get(f"/api/models/{project.public_id}/").data
+    assert detail["lifecycle_status"] == "registered"
+    assert detail["active_endpoint"] is None
+    assert client.get(f"/api/models/{project.public_id}/running-attributes/").status_code == 409
+
+
+@pytest.mark.django_db
+def test_running_snapshot_rejects_other_versions():
+    owner = get_user_model().objects.create_user("running-owner@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Running")
+    active = ModelVersion.objects.create(project=project, version="1")
+    other = ModelVersion.objects.create(project=project, version="2")
+    build = Build.objects.create(project=project, version=active, status="ready")
+    project.active_deployment = Deployment.objects.create(version=active, build=build, status="succeeded")
+    project.save(update_fields=["active_deployment"])
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    base = f"/api/models/{project.public_id}/running-attributes/"
+    assert client.get(base, {"version_id": str(other.public_id)}).status_code == 409
+    assert client.get(base, {"version_id": str(uuid.uuid4())}).status_code == 404
+    assert client.get(base, {"version_id": "invalid"}).status_code == 404
+
+
+@pytest.mark.django_db
+def test_running_insights_keep_registered_and_supplemental_content():
+    from apps.registry.models import ModelArtifact
+
+    owner = get_user_model().objects.create_user("insights-owner@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Insights")
+    version = ModelVersion.objects.create(
+        project=project, version="1", insights_summary={"kind": "model_insights", "registered": True}
+    )
+    build = Build.objects.create(project=project, version=version, status="ready")
+    project.active_deployment = Deployment.objects.create(version=version, build=build, status="succeeded")
+    project.save(update_fields=["active_deployment"])
+    ModelArtifact.objects.create(
+        version=version,
+        kind="model_insights",
+        name="extra.json",
+        uri="",
+        metadata={"provenance": "supplemental_upload", "summary": {"supplemental": True}},
+    )
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    response = client.get(f"/api/models/{project.public_id}/running-attributes/")
+    assert response.status_code == 200
+    assert response.data["model_insights"] == {"kind": "model_insights", "registered": True}
+    assert response.data["supplemental_summaries"]["model_insights"] == {"supplemental": True}
 

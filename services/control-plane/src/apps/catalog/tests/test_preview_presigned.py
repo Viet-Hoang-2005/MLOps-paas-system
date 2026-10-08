@@ -305,8 +305,8 @@ def test_presigned_security_confinement_and_validation(project, owner, monkeypat
     )
     assert res4.status_code == 400
     assert "is empty" in str(res4.data)
-    # Staging cleanup: the invalid empty file is automatically deleted from S3 on failure
-    assert stored_empty.uri not in storage.objects
+    # Failed saves keep staging until its lifecycle expiry or a successful retry.
+    assert stored_empty.uri in storage.objects
 
 
 @pytest.mark.django_db
@@ -423,8 +423,7 @@ def test_save_preview_validates_existing_retained_artifact_on_flavor_or_format_c
     )
     assert res_bad_flavor.status_code == 400
     assert "Pytorch raw models require one of: .pt, .pth" in str(res_bad_flavor.data)
-    # Staging object is deleted upon validation failure
-    assert stored_metrics_1.uri not in storage.objects
+    assert stored_metrics_1.uri in storage.objects
 
     # 2. User changes artifact_format to "mlflow_zip" without re-uploading artifact (model.pkl is not a .zip)
     staging_metrics_key_2 = f"staging/{prefix}/preview/b3/metrics/metrics.json"
@@ -441,7 +440,7 @@ def test_save_preview_validates_existing_retained_artifact_on_flavor_or_format_c
     )
     assert res_bad_format.status_code == 400
     assert "A model package upload requires a .zip file." in str(res_bad_format.data)
-    assert stored_metrics_2.uri not in storage.objects
+    assert stored_metrics_2.uri in storage.objects
 
     # 3. User changes flavor to "xgboost" (which accepts .pkl) -> SUCCESS
     staging_metrics_key_3 = f"staging/{prefix}/preview/b4/metrics/metrics.json"
@@ -462,7 +461,7 @@ def test_save_preview_validates_existing_retained_artifact_on_flavor_or_format_c
 
 
 @pytest.mark.django_db
-def test_save_preview_cleans_up_staging_objects_on_failure(project, owner, monkeypatch):
+def test_save_preview_keeps_staging_objects_on_failure(project, owner, monkeypatch):
     storage = MemoryStorage()
     monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
     monkeypatch.setattr("apps.catalog.api.serializers.S3Storage", lambda: storage)
@@ -487,6 +486,5 @@ def test_save_preview_cleans_up_staging_objects_on_failure(project, owner, monke
         format="json",
     )
     assert response.status_code == 409
-    # The staged object was immediately cleaned up on failure!
-    assert stored_staging.uri not in storage.objects
+    assert stored_staging.uri in storage.objects
 

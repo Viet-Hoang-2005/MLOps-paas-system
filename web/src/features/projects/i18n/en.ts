@@ -97,6 +97,8 @@ export const catalogEn = {
       "The build process failed. Check the logs above for details.",
     buildCancelled: "Build was cancelled",
     registrationFailed: "Registration failed",
+    registrationInProgress:
+      "Model registration is in progress. Please wait for the version to be registered before deploying.",
     register: "Register model",
     registerSuccess: "Model registered successfully",
     registerFailed: "Failed to register model",

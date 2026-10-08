@@ -186,6 +186,13 @@ class RunningAttributesEndpoint(APIView):
         return Response(running_attributes(project, version_id=version_id))
 
 
+class PreviewAttributesEndpoint(APIView):
+    def get(self, request, project_id):
+        from apps.catalog.services.snapshots import preview_attributes
+
+        return Response(preview_attributes(project_for_user(request.user, project_id)))
+
+
 class RunningLabelMappingEndpoint(APIView):
     def get(self, request, project_id):
         from apps.catalog.services.snapshots import running_label_mapping

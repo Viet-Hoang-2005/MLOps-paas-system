@@ -46,6 +46,16 @@ export const evolutionVi = {
     missing: "Không có dữ liệu",
     noArtifacts: "Chưa có artifact.",
     supplementalArtifacts: "Artifact bổ sung",
+    supplementalAttributes: "Thuộc tính bổ sung",
+    invalidSupplementalJson: "Chọn tệp JSON không rỗng, nhỏ hơn 4 MiB.",
+    attributeKinds: {
+      label_mapping: "Ánh xạ nhãn",
+      input_schema: "Lược đồ đầu vào",
+      metrics: "Metric",
+      params: "Tham số",
+      model_insights: "Thông tin mô hình",
+      feature_importance: "Tầm quan trọng đặc trưng",
+    },
     supplementalDesc:
       "Có thể bổ sung một lần nếu thiếu mã nguồn hoặc dữ liệu tham chiếu. Artifact đã có là bất biến.",
     addSourceCode: "Bổ sung mã nguồn",
@@ -113,6 +123,8 @@ export const evolutionVi = {
     comparisonLoadFailed: "Không tải được phiên bản để so sánh.",
   },
   snapshot: {
+    registeredSource: "Bản đăng ký",
+    supplementalSource: "Tệp bổ sung",
     metrics: "Metric",
     params: "Tham số",
     insights: "Phân tích / độ quan trọng đặc trưng",

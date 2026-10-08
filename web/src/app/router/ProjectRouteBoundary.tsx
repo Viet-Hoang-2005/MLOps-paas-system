@@ -9,7 +9,8 @@ export default function ProjectRouteBoundary() {
   const { t } = useTranslation("projects");
   const projects = useModelProjects();
   if (projects.isPending) return <RouteFallback />;
-  if (projects.isError) return <p role="alert">{t("workflow.failed")}</p>;
+  if (projects.isError && !projects.data)
+    return <p role="alert">{t("workflow.failed")}</p>;
   if (!projects.data?.models.some((project) => project.id === modelId))
     return <NotFoundPage />;
   return <Outlet key={modelId} />;

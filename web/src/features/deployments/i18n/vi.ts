@@ -218,7 +218,7 @@ export const deploymentsVi = {
         tensorflow: "Artifact Keras, SavedModel hoặc MLflow.",
       },
       attachments: {
-        labelMapping: "Chọn ánh xạ nhãn (.json, .pkl)",
+        labelMapping: "Chọn ánh xạ nhãn (.json)",
         labelMappingSubtitle: "Ánh xạ nhãn phân loại từ số sang tên",
         labelMappingIndicators: "(0: bình thường, 1: tấn công,…)",
         labelMappingHint: "Ánh xạ nhãn phân loại từ số sang tên",

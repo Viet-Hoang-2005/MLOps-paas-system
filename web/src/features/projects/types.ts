@@ -81,6 +81,11 @@ export interface ModelVersion {
   metrics_summary: Record<string, unknown>;
   params_summary: Record<string, unknown>;
   insights_summary: RegistryModelInsightsSummary;
+  supplemental_summaries?: Record<string, {
+    value: unknown;
+    uploaded_by: string | null;
+    uploaded_at: string | null;
+  }>;
   artifacts: VersionArtifact[];
   metrics: VersionMetric[];
   events: VersionEvent[];

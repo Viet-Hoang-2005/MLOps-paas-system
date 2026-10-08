@@ -8,6 +8,7 @@ from .endpoints import (
     ProjectPreviewEndpoint,
     ProjectPreviewReferencePreviewEndpoint,
     ProjectPreviewUploadUrlsEndpoint,
+    PreviewAttributesEndpoint,
     RunningAttributesEndpoint,
     RunningLabelMappingEndpoint,
     RunningSourceEndpoint,
@@ -21,6 +22,7 @@ urlpatterns = [
     path("preview/upload-urls/", ProjectCreateUploadUrlsEndpoint.as_view(), name="project-create-upload-urls"),
     path("<uuid:project_id>/", ModelProjectDetailEndpoint.as_view(), name="model-detail"),
     path("<uuid:project_id>/preview/", ProjectPreviewEndpoint.as_view(), name="project-preview"),
+    path("<uuid:project_id>/preview/attributes/", PreviewAttributesEndpoint.as_view(), name="project-preview-attributes"),
     path(
         "<uuid:project_id>/preview/upload-urls/",
         ProjectPreviewUploadUrlsEndpoint.as_view(),

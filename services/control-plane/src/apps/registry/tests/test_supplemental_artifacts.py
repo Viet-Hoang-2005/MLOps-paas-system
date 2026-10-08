@@ -3,13 +3,14 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 import pytest
-from rest_framework.test import APIClient
+from rest_framework.exceptions import ValidationError
 
 from apps.catalog.models import ModelProject
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
 from apps.deployment.models import Build
 from apps.registry.models import ModelArtifact, ModelVersion
 from apps.registry.services.versions import add_supplemental_artifacts
+from apps.registry.api.serializers import ModelVersionSerializer
 from common.api.exceptions import Conflict
 
 
@@ -18,7 +19,7 @@ def version_with_model_source(db):
     user = get_user_model().objects.create_user("supp-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="Supplemental Test")
     version = ModelVersion.objects.create(project=project, version="1")
-    build = Build.objects.create(project=project, version=version, status="ready")
+    Build.objects.create(project=project, version=version, status="ready")
     # Model artifact from preview has kind="source"
     ModelArtifact.objects.create(
         version=version,
@@ -115,3 +116,54 @@ def test_cannot_add_duplicate_supplemental_source_code(version_with_model_source
             source_code_file=py_file_second,
             storage=storage,
         )
+
+
+@pytest.mark.django_db
+def test_supplemental_summary_preserves_registered_snapshot(version_with_model_source):
+    _, version, user = version_with_model_source
+    version.metrics_summary = {"accuracy": 0.9}
+    version.save(update_fields=["metrics_summary"])
+    storage = MemoryStorage()
+    add_supplemental_artifacts(
+        version=version,
+        actor=user,
+        metrics_file=SimpleUploadedFile("metrics.json", b'{"precision": 0.8}'),
+        storage=storage,
+    )
+
+    version.refresh_from_db()
+    assert version.metrics_summary == {"accuracy": 0.9}
+    summary = ModelVersionSerializer(version).data["supplemental_summaries"]["metrics"]
+    assert summary["value"] == {"precision": 0.8}
+    assert summary["uploaded_by"] == user.email
+
+    with pytest.raises(Conflict):
+        add_supplemental_artifacts(
+            version=version,
+            actor=user,
+            metrics_file=SimpleUploadedFile("metrics2.json", b'{"recall": 0.7}'),
+            storage=storage,
+        )
+
+
+@pytest.mark.django_db
+def test_supplemental_summary_rejects_existing_keys_and_pickle(version_with_model_source):
+    _, version, user = version_with_model_source
+    version.params_summary = {"max_depth": 5}
+    version.save(update_fields=["params_summary"])
+    storage = MemoryStorage()
+    with pytest.raises(ValidationError):
+        add_supplemental_artifacts(
+            version=version,
+            actor=user,
+            params_file=SimpleUploadedFile("params.json", b'{"max_depth": 9}'),
+            storage=storage,
+        )
+    with pytest.raises(ValidationError):
+        add_supplemental_artifacts(
+            version=version,
+            actor=user,
+            label_mapping_file=SimpleUploadedFile("labels.pkl", b"pickle"),
+            storage=storage,
+        )
+    assert not version.artifacts.filter(kind__in=["params", "label_mapping"]).exists()

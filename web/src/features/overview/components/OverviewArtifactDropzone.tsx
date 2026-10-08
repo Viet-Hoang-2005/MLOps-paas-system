@@ -1,5 +1,3 @@
-import { addSupplementalArtifacts } from "@/features/evolution/api/evolutionApi";
-import { evolutionQueryKeys } from "@/features/evolution/queryKeys";
 import { overviewQueryKeys } from "@/features/overview/queryKeys";
 import { uploadPreviewSingleAsset } from "@/features/projects/api/previewApi";
 import { previewKeys } from "@/features/projects/hooks/usePreview";
@@ -11,7 +9,7 @@ import { FileDropzone } from "@/shared/components/FileDropzone";
 import { cn } from "@/shared/lib/cn";
 import { toast } from "@/shared/types/toastStore";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Code2, FileSpreadsheet, Lock, Upload } from "lucide-react";
+import { Code2, FileSpreadsheet, Upload } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -27,18 +25,14 @@ function formatBytes(bytes?: number): string {
 
 interface OverviewArtifactDropzoneProps {
   projectId: string;
-  versionId?: string;
   kind: "source_code" | "reference_data";
-  isModelPreview?: boolean;
   className?: string;
   onUploadSuccess?: () => void | Promise<void>;
 }
 
 export function OverviewArtifactDropzone({
   projectId,
-  versionId,
   kind,
-  isModelPreview,
   className,
   onUploadSuccess,
 }: OverviewArtifactDropzoneProps) {
@@ -84,55 +78,20 @@ export function OverviewArtifactDropzone({
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      if (isModelPreview) {
-        if (!stagedFile) return;
-        return await uploadPreviewSingleAsset(projectId, kind, stagedFile);
-      }
-      if (!versionId) {
-        throw new Error(t("workflow.noVersionForUpload"));
-      }
-      return await addSupplementalArtifacts(versionId, {
-        source_code_file: isSource ? stagedFile : undefined,
-        reference_data_file: !isSource ? stagedFile : undefined,
-      });
+      if (!stagedFile) return;
+      return await uploadPreviewSingleAsset(projectId, kind, stagedFile);
     },
     onSuccess: async () => {
       setStagedFile(null);
       toast.success(t("workflow.uploadSuccess"));
-      if (isModelPreview) {
-        await Promise.all([
-          client.invalidateQueries({
-            queryKey: previewKeys.detail(projectId),
-          }),
-          client.invalidateQueries({
-            queryKey: overviewQueryKeys.detail(projectId),
-          }),
-        ]);
-      } else {
-        await Promise.all([
-          client.invalidateQueries({
-            queryKey: overviewQueryKeys.detail(projectId),
-          }),
-          versionId
-            ? client.invalidateQueries({
-                queryKey: overviewQueryKeys.source(projectId, versionId),
-              })
-            : Promise.resolve(),
-          versionId
-            ? client.invalidateQueries({
-                queryKey: evolutionQueryKeys.snapshot(versionId),
-              })
-            : Promise.resolve(),
-          client.invalidateQueries({
-            queryKey: evolutionQueryKeys.versions(projectId),
-          }),
-          versionId
-            ? client.invalidateQueries({
-                queryKey: evolutionQueryKeys.referencePreview(versionId),
-              })
-            : Promise.resolve(),
-        ]);
-      }
+      await Promise.all([
+        client.invalidateQueries({
+          queryKey: previewKeys.detail(projectId),
+        }),
+        client.invalidateQueries({
+          queryKey: overviewQueryKeys.detail(projectId),
+        }),
+      ]);
       if (onUploadSuccess) {
         await onUploadSuccess();
       }
@@ -161,24 +120,17 @@ export function OverviewArtifactDropzone({
                 : t("workflow.uploadRefTitle")}
             </span>
             <Badge variant="neutral">
-              {!isModelPreview && <Lock className="h-3 w-3 inline" />}
-              {isModelPreview
-                ? t("workflow.uploadPreviewNoticeTitle")
-                : t("workflow.uploadImmutableNoticeTitle")}
+              {t("workflow.uploadPreviewNoticeTitle")}
             </Badge>
           </div>
         }
-        description={
-          isModelPreview
-            ? t("workflow.uploadPreviewNotice")
-            : t("workflow.uploadImmutableNotice")
-        }
+        description={t("workflow.uploadPreviewNotice")}
       />
 
       <FileDropzone
         className="flex-1"
         accept={isSource ? ".py" : ".csv"}
-        disabled={uploadMutation.isPending || (!isModelPreview && !versionId)}
+        disabled={uploadMutation.isPending}
         title={
           stagedFile
             ? stagedFile.name
@@ -193,11 +145,7 @@ export function OverviewArtifactDropzone({
               ? t("workflow.uploadSourceSubtitle")
               : t("workflow.uploadRefSubtitle")
         }
-        hint={
-          isModelPreview
-            ? t("workflow.uploadPreviewHint")
-            : t("workflow.uploadImmutableHint")
-        }
+        hint={t("workflow.uploadPreviewHint")}
         hasFile={Boolean(stagedFile)}
         onRemove={() => setStagedFile(null)}
         onChange={handleFileChange}
@@ -232,7 +180,6 @@ export function OverviewArtifactDropzone({
               variant="primary"
               icon={<Upload className="h-4 w-4" />}
               loading={uploadMutation.isPending}
-              disabled={!isModelPreview && !versionId}
               onClick={() => uploadMutation.mutate()}
             >
               {t("workflow.upload")}
@@ -243,4 +190,3 @@ export function OverviewArtifactDropzone({
     </div>
   );
 }
-

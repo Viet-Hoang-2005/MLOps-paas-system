@@ -268,7 +268,17 @@ export interface ModelAttributesResponse {
   label_mapping: ModelLabelMappingData | null;
   input_schema: ModelInputSchemaData | null;
   artifacts: ModelArtifactSummary[];
+  summary_sources?: {
+    metrics: Record<string, "registered" | "supplemental">;
+    params: Record<string, "registered" | "supplemental">;
+    model_insights?: "registered" | "supplemental" | null;
+    feature_importance?: "registered" | "supplemental" | null;
+  };
+  supplemental_summaries?: Record<string, unknown>;
 }
+
+export const getPreviewAttributes = async (modelId: string): Promise<ModelAttributesResponse> =>
+  (await apiClient.get<ModelAttributesResponse>(controlPlaneURL(`/models/${modelId}/preview/attributes/`))).data;
 
 export const getRunningAttributes = async (
   modelId: string,

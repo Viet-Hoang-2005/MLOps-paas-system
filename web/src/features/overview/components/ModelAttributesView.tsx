@@ -15,10 +15,6 @@ import {
   removePreviewAsset,
   type PreviewSingleAssetKind,
 } from "@/features/projects/api/previewApi";
-import {
-  addSupplementalArtifacts,
-  type SupplementalArtifactsPayload,
-} from "@/features/evolution/api/evolutionApi";
 import { overviewQueryKeys } from "@/features/overview/queryKeys";
 import { previewKeys } from "@/features/projects/hooks/usePreview";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -29,6 +25,7 @@ import {
   Copy,
   FileCode,
   Gauge,
+  GitBranch,
   Layers,
   ListTree,
   Lock,
@@ -39,6 +36,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 export interface ModelAttributesViewProps {
   attributes?: ModelAttributesResponse | null;
@@ -148,8 +146,6 @@ interface AttributeDropzoneCardProps {
   kind: PreviewSingleAssetKind;
   accept: string;
   projectId: string;
-  versionId?: string;
-  isPreview?: boolean;
   onSuccess: () => void;
 }
 
@@ -160,8 +156,6 @@ function AttributeDropzoneCard({
   kind,
   accept,
   projectId,
-  versionId,
-  isPreview,
   onSuccess,
 }: AttributeDropzoneCardProps) {
   const { t } = useTranslation("overview");
@@ -178,7 +172,7 @@ function AttributeDropzoneCard({
     }
     const lower = file.name.toLowerCase();
     if (kind === "label_mapping") {
-      if (!lower.endsWith(".json") && !lower.endsWith(".pkl")) {
+      if (!lower.endsWith(".json")) {
         toast.error(t("workflow.invalidLabelMappingFile"));
         return;
       }
@@ -194,16 +188,7 @@ function AttributeDropzoneCard({
   const uploadMutation = useMutation({
     mutationFn: async () => {
       if (!stagedFile) return;
-      if (isPreview) {
-        return await uploadPreviewSingleAsset(projectId, kind, stagedFile);
-      }
-      if (!versionId) {
-        throw new Error(t("workflow.noVersionForUpload"));
-      }
-      const payloadKey = `${kind}_file` as keyof SupplementalArtifactsPayload;
-      return await addSupplementalArtifacts(versionId, {
-        [payloadKey]: stagedFile,
-      });
+      return await uploadPreviewSingleAsset(projectId, kind, stagedFile);
     },
     onSuccess: () => {
       setStagedFile(null);
@@ -223,10 +208,7 @@ function AttributeDropzoneCard({
         description={hint}
         badge={
           <Badge variant="neutral">
-            {!isPreview && <Lock className="mr-1 inline h-3 w-3" />}
-            {isPreview
-              ? t("workflow.uploadPreviewNoticeTitle")
-              : t("workflow.uploadImmutableNoticeTitle")}
+            {t("workflow.uploadPreviewNoticeTitle")}
           </Badge>
         }
         className="mb-6"
@@ -235,7 +217,7 @@ function AttributeDropzoneCard({
       <div className="space-y-4">
         <FileDropzone
           accept={accept}
-          disabled={uploadMutation.isPending || (!isPreview && !versionId)}
+          disabled={uploadMutation.isPending}
           title={
             stagedFile
               ? stagedFile.name
@@ -272,13 +254,71 @@ function AttributeDropzoneCard({
                 variant="primary"
                 icon={<Upload className="h-4 w-4" />}
                 loading={uploadMutation.isPending}
-                disabled={!isPreview && !versionId}
                 onClick={() => uploadMutation.mutate()}
               >
                 {t("workflow.upload")}
               </Button>
             </div>
           </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+interface AttributeMissingVersionCardProps {
+  title: string;
+  hint?: string;
+  icon: ReactNode;
+  projectId: string;
+  versionId?: string;
+}
+
+function AttributeMissingVersionCard({
+  title,
+  hint,
+  icon,
+  projectId,
+  versionId,
+}: AttributeMissingVersionCardProps) {
+  const { t } = useTranslation("overview");
+  const navigate = useNavigate();
+
+  return (
+    <section className="rounded-surface border border-border bg-surface p-6">
+      <StepTitle
+        icon={icon}
+        title={title}
+        badge={
+          <Badge variant="neutral">
+            <Lock className="mr-1 inline h-3 w-3" />
+            {t("workflow.immutableBadge")}
+          </Badge>
+        }
+        className="mb-6"
+      />
+
+      <div className="flex flex-col items-center justify-center rounded-surface border border-dashed border-border bg-muted/30 px-6 py-8 text-center">
+        <p className="text-style-body font-medium text-color-foreground">
+          {t("workflow.missingAttributeInVersion", { name: title })}
+        </p>
+        <p className="mt-1 max-w-md text-style-caption text-color-muted-foreground">
+          {hint || t("workflow.missingAttributeInVersionHint")}
+        </p>
+        {versionId && (
+          <Button
+            className="mt-4"
+            variant="secondary"
+            size="sm"
+            icon={<GitBranch className="h-4 w-4" />}
+            onClick={() =>
+              navigate(
+                `/dashboard/projects/${projectId}/evolution?versionId=${versionId}&tab=details`,
+              )
+            }
+          >
+            {t("workflow.openInEvolution")}
+          </Button>
         )}
       </div>
     </section>
@@ -310,7 +350,7 @@ export function ModelAttributesView({
 
   const handleRefresh = async () => {
     await client.invalidateQueries({
-      queryKey: overviewQueryKeys.attributes(projectId, versionId ?? ""),
+      queryKey: overviewQueryKeys.attributes(projectId, isPreview ? "preview" : (versionId ?? "")),
     });
     await client.invalidateQueries({
       queryKey: previewKeys.detail(projectId),
@@ -453,6 +493,11 @@ export function ModelAttributesView({
                   >
                     {key}
                   </span>
+                  {attributes?.summary_sources?.metrics[key] && (
+                    <span className="text-style-caption text-color-muted-foreground">
+                      {t(`workflow.${attributes.summary_sources.metrics[key]}Source`)}
+                    </span>
+                  )}
                   <span
                     className="mt-2 truncate font-mono text-style-heading text-color-foreground"
                     title={String(val)}
@@ -464,7 +509,7 @@ export function ModelAttributesView({
             })}
           </div>
         </section>
-      ) : (
+      ) : isPreview ? (
         <AttributeDropzoneCard
           kind="metrics"
           accept=".json"
@@ -472,9 +517,15 @@ export function ModelAttributesView({
           hint={t("workflow.metricsHint")}
           icon={<Gauge className="h-5 w-5 text-color-primary" />}
           projectId={projectId}
-          versionId={versionId}
-          isPreview={isPreview}
           onSuccess={handleRefresh}
+        />
+      ) : (
+        <AttributeMissingVersionCard
+          title={t("workflow.metricsTitle")}
+          hint={t("workflow.missingAttributeInVersionHint")}
+          icon={<Gauge className="h-5 w-5 text-color-primary" />}
+          projectId={projectId}
+          versionId={versionId}
         />
       )}
 
@@ -515,6 +566,11 @@ export function ModelAttributesView({
                 >
                   {key}
                 </div>
+                {attributes?.summary_sources?.params[key] && (
+                  <div className="text-style-caption text-color-muted-foreground">
+                    {t(`workflow.${attributes.summary_sources.params[key]}Source`)}
+                  </div>
+                )}
                 <div
                   className="mt-1 truncate font-mono text-style-body text-color-foreground"
                   title={String(val)}
@@ -525,7 +581,7 @@ export function ModelAttributesView({
             ))}
           </div>
         </section>
-      ) : (
+      ) : isPreview ? (
         <AttributeDropzoneCard
           kind="params"
           accept=".json"
@@ -533,9 +589,15 @@ export function ModelAttributesView({
           hint={t("workflow.paramsHint")}
           icon={<SlidersHorizontal className="h-5 w-5 text-color-primary" />}
           projectId={projectId}
-          versionId={versionId}
-          isPreview={isPreview}
           onSuccess={handleRefresh}
+        />
+      ) : (
+        <AttributeMissingVersionCard
+          title={t("workflow.paramsTitle")}
+          hint={t("workflow.missingAttributeInVersionHint")}
+          icon={<SlidersHorizontal className="h-5 w-5 text-color-primary" />}
+          projectId={projectId}
+          versionId={versionId}
         />
       )}
 
@@ -592,17 +654,23 @@ export function ModelAttributesView({
             ))}
           </div>
         </section>
-      ) : (
+      ) : isPreview ? (
         <AttributeDropzoneCard
           kind="label_mapping"
-          accept=".json,.pkl"
+          accept=".json"
           title={t("workflow.labelMappingTitle")}
           hint={t("workflow.labelMappingHint")}
           icon={<ListTree className="h-5 w-5 text-color-primary" />}
           projectId={projectId}
-          versionId={versionId}
-          isPreview={isPreview}
           onSuccess={handleRefresh}
+        />
+      ) : (
+        <AttributeMissingVersionCard
+          title={t("workflow.labelMappingTitle")}
+          hint={t("workflow.missingAttributeInVersionHint")}
+          icon={<ListTree className="h-5 w-5 text-color-primary" />}
+          projectId={projectId}
+          versionId={versionId}
         />
       )}
 
@@ -721,7 +789,7 @@ export function ModelAttributesView({
             </pre>
           )}
         </section>
-      ) : (
+      ) : isPreview ? (
         <AttributeDropzoneCard
           kind="input_schema"
           accept=".json"
@@ -729,9 +797,15 @@ export function ModelAttributesView({
           hint={t("workflow.inputSchemaHint")}
           icon={<Table className="h-5 w-5 text-color-primary" />}
           projectId={projectId}
-          versionId={versionId}
-          isPreview={isPreview}
           onSuccess={handleRefresh}
+        />
+      ) : (
+        <AttributeMissingVersionCard
+          title={t("workflow.inputSchemaTitle")}
+          hint={t("workflow.missingAttributeInVersionHint")}
+          icon={<Table className="h-5 w-5 text-color-primary" />}
+          projectId={projectId}
+          versionId={versionId}
         />
       )}
 
@@ -743,6 +817,11 @@ export function ModelAttributesView({
             title={
               <span className="flex items-center gap-2">
                 <span>{t("workflow.featureImportanceTitle")}</span>
+                {attributes?.summary_sources?.feature_importance && (
+                  <span className="text-style-caption text-color-muted-foreground">
+                    {t(`workflow.${attributes.summary_sources.feature_importance}Source`)}
+                  </span>
+                )}
                 <span className="text-style-caption text-color-muted-foreground">
                   ({t("workflow.totalFeatures")}: {insightItems.length})
                 </span>
@@ -821,7 +900,7 @@ export function ModelAttributesView({
             })}
           </div>
         </section>
-      ) : (
+      ) : isPreview ? (
         <AttributeDropzoneCard
           kind="feature_importance"
           accept=".json"
@@ -829,9 +908,15 @@ export function ModelAttributesView({
           hint={t("workflow.featureImportanceHint")}
           icon={<BarChart3 className="h-5 w-5 text-color-primary" />}
           projectId={projectId}
-          versionId={versionId}
-          isPreview={isPreview}
           onSuccess={handleRefresh}
+        />
+      ) : (
+        <AttributeMissingVersionCard
+          title={t("workflow.featureImportanceTitle")}
+          hint={t("workflow.missingAttributeInVersionHint")}
+          icon={<BarChart3 className="h-5 w-5 text-color-primary" />}
+          projectId={projectId}
+          versionId={versionId}
         />
       )}
 
@@ -840,7 +925,16 @@ export function ModelAttributesView({
         <section className="rounded-surface border border-border bg-surface p-6">
           <StepTitle
             icon={<Layers className="h-5 w-5 text-color-primary" />}
-            title={t("workflow.insightsTitle")}
+            title={
+              <span className="flex items-center gap-2">
+                {t("workflow.insightsTitle")}
+                {attributes?.summary_sources?.model_insights && (
+                  <span className="text-style-caption text-color-muted-foreground">
+                    {t(`workflow.${attributes.summary_sources.model_insights}Source`)}
+                  </span>
+                )}
+              </span>
+            }
             className="mb-6"
             action={
               isPreview ? (
@@ -864,7 +958,7 @@ export function ModelAttributesView({
             {JSON.stringify(insights, null, 2)}
           </pre>
         </section>
-      ) : (
+      ) : isPreview ? (
         <AttributeDropzoneCard
           kind="model_insights"
           accept=".json"
@@ -872,10 +966,31 @@ export function ModelAttributesView({
           hint={t("workflow.insightsHint")}
           icon={<Layers className="h-5 w-5 text-color-primary" />}
           projectId={projectId}
-          versionId={versionId}
-          isPreview={isPreview}
           onSuccess={handleRefresh}
         />
+      ) : (
+        <AttributeMissingVersionCard
+          title={t("workflow.insightsTitle")}
+          hint={t("workflow.missingAttributeInVersionHint")}
+          icon={<Layers className="h-5 w-5 text-color-primary" />}
+          projectId={projectId}
+          versionId={versionId}
+        />
+      )}
+
+      {(["model_insights", "feature_importance"] as const).map((kind) =>
+        attributes?.summary_sources?.[kind] === "registered" &&
+        attributes.supplemental_summaries?.[kind] !== undefined ? (
+          <section key={kind} className="space-y-3">
+            <h3 className="text-style-heading text-color-foreground">
+              {t(kind === "model_insights" ? "workflow.insightsTitle" : "workflow.featureImportanceTitle")}
+              {" · "}{t("workflow.supplementalSource")}
+            </h3>
+            <pre className="max-h-80 overflow-auto rounded-surface border border-border bg-muted p-4 text-style-caption text-color-foreground">
+              {JSON.stringify(attributes.supplemental_summaries[kind], null, 2)}
+            </pre>
+          </section>
+        ) : null,
       )}
 
       <ConfirmDialog

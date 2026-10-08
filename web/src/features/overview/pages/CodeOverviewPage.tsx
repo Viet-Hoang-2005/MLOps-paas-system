@@ -12,9 +12,10 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { Loading } from "@/shared/components/Loading";
 import { Placeholder } from "@/shared/components/Placeholder";
 import { toast } from "@/shared/types/toastStore";
-import { FileCode, Lock, RotateCcw, Save, Trash2 } from "lucide-react";
+import { FileCode, GitBranch, Lock, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 export interface CodeOverviewPageProps {
   modelId: string;
@@ -45,6 +46,7 @@ export function CodeOverviewPage({
   onUploadSuccess,
 }: CodeOverviewPageProps) {
   const { t } = useTranslation("overview");
+  const navigate = useNavigate();
   const [editorContainerEl, setEditorContainerEl] = useState<HTMLDivElement | null>(null);
   const [editorHeight, setEditorHeight] = useState<number>(450);
 
@@ -149,6 +151,43 @@ export function CodeOverviewPage({
     ? Boolean(previewSource.asset && previewSource.data)
     : Boolean(source.data);
 
+  if ((isPreview ? previewSource.isError : source.isError) && !hasCode) {
+    return (
+      <Placeholder role="tabpanel" className="flex-1 min-h-105">
+        <p role="alert" className="text-style-body text-color-danger">
+          {t("workflow.failed")}
+        </p>
+      </Placeholder>
+    );
+  }
+
+  if (!isPreview && !hasCode) {
+    return (
+      <Placeholder
+        role="tabpanel"
+        className="flex-1 min-h-105"
+        icon={<FileCode className="h-6 w-6 text-color-primary" />}
+        title={t("workflow.noRunningCodeTitle")}
+        description={t("workflow.noRunningCodeDesc")}
+        action={
+          effectiveVersionId ? (
+            <Button
+              variant="secondary"
+              icon={<GitBranch className="h-4 w-4" />}
+              onClick={() =>
+                navigate(
+                  `/dashboard/projects/${modelId}/evolution?versionId=${effectiveVersionId}&tab=details`,
+                )
+              }
+            >
+              {t("workflow.openInEvolution")}
+            </Button>
+          ) : undefined
+        }
+      />
+    );
+  }
+
   const fileName = isPreview
     ? (previewSource.asset?.name || "source_code.py")
     : "source_code.py";
@@ -231,19 +270,14 @@ export function CodeOverviewPage({
               }}
             />
           </div>
-        ) : previewSource.isError ? (
-          <p role="alert">{t("workflow.failed")}</p>
         ) : (
           <OverviewArtifactDropzone
             projectId={modelId}
-            isModelPreview
             kind="source_code"
             onUploadSuccess={onUploadSuccess}
           />
         )
-      ) : source.isError ? (
-        <p role="alert">{t("workflow.failed")}</p>
-      ) : hasCode ? (
+      ) : (
         <div
           ref={setEditorContainerEl}
           style={{ height: `${editorHeight}px` }}
@@ -274,13 +308,6 @@ export function CodeOverviewPage({
             }}
           />
         </div>
-      ) : (
-        <OverviewArtifactDropzone
-          projectId={modelId}
-          versionId={effectiveVersionId}
-          kind="source_code"
-          onUploadSuccess={onUploadSuccess}
-        />
       )}
 
       <ConfirmDialog

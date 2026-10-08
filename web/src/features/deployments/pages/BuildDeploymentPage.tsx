@@ -34,9 +34,9 @@ import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
 import { toast } from "@/shared/types/toastStore";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pause, Play, RotateCcw } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 export default function BuildDeploymentPage() {
   const [params] = useSearchParams();
@@ -261,9 +261,42 @@ function BuildDeploymentContent() {
       }),
   });
 
+  const awaitingRegistrationRef = useRef(false);
+
   const register = useBuildRegistration(buildId, activeProjectId);
   const isRegistering =
     register.isPending || build.data?.registration_status === "registering";
+
+  useEffect(() => {
+    if (!awaitingRegistrationRef.current || !build.data) return;
+
+    if (
+      isRegisteredBuild(build.data) &&
+      build.data.deletion_state === "active"
+    ) {
+      awaitingRegistrationRef.current = false;
+      toast.success(t("workflow.registerSuccess"));
+      navigate(runDeploymentPath(build.data.project_id, build.data.id));
+    } else if (
+      build.data.registration_status === "failed" ||
+      Boolean(build.data.registration_error)
+    ) {
+      awaitingRegistrationRef.current = false;
+      toast.error(
+        build.data.registration_error || t("workflow.registerFailed"),
+      );
+    }
+  }, [build.data, navigate, t]);
+
+  const handleRegister = () => {
+    awaitingRegistrationRef.current = true;
+    register.mutate(undefined, {
+      onError: (err) => {
+        awaitingRegistrationRef.current = false;
+        toast.error(getApiErrorMessage(err, t("workflow.registerFailed")));
+      },
+    });
+  };
   const error =
     start.error ||
     cancel.error ||
@@ -350,18 +383,6 @@ function BuildDeploymentContent() {
       />
     );
   }
-  if (
-    register.isSuccess &&
-    isRegisteredBuild(build.data) &&
-    build.data?.deletion_state === "active"
-  ) {
-    return (
-      <Navigate
-        to={runDeploymentPath(build.data.project_id, build.data.id)}
-        replace
-      />
-    );
-  }
   return (
     <div className="flex min-h-full w-full flex-1 flex-col space-y-6">
       <PageHeader title={t("workflow.buildDeployment")} back />
@@ -434,6 +455,14 @@ function BuildDeploymentContent() {
           />
         )}
 
+        {build.data?.registration_status === "registering" && (
+          <Callout
+            variant="info"
+            title={t("workflow.registering")}
+            description={t("workflow.registrationInProgress")}
+          />
+        )}
+
         {Boolean(build.data?.registration_error) && (
           <Callout
             variant="danger"
@@ -486,28 +515,14 @@ function BuildDeploymentContent() {
             type="button"
             variant="primary"
             fullWidth
-            loading={
-              isRegistering || build.data?.registration_status === "registering"
-            }
+            loading={isRegistering}
             disabled={
               build.data?.status !== "ready" ||
               Boolean(build.data?.version_id) ||
               isRegistering ||
               build.data?.deletion_state !== "active"
             }
-            onClick={() =>
-              register.mutate(undefined, {
-                onSuccess: () => {
-                  toast.success(t("workflow.registerSuccess"));
-                  navigate(runDeploymentPath(activeProjectId, buildId!));
-                },
-                onError: (err) => {
-                  toast.error(
-                    getApiErrorMessage(err, t("workflow.registerFailed")),
-                  );
-                },
-              })
-            }
+            onClick={handleRegister}
           >
             {t("workflow.register")}
           </Button>

@@ -1,29 +1,32 @@
 import json
 import logging
-import pickle
+import uuid
 from io import BytesIO
 from zipfile import BadZipFile, ZipFile
 
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 
+from common.api.exceptions import Conflict
 from infrastructure.storage import S3Storage
 
 logger = logging.getLogger(__name__)
 
 
 def _effective_version(project, version_id=None):
-    if version_id and hasattr(project, "versions"):
+    if not project.active_deployment_id or project.active_deployment.status != "succeeded":
+        raise Conflict("This project has no Running deployment.")
+    version = project.active_deployment.version
+    if version_id:
         try:
-            matched = project.versions.filter(public_id=version_id).first()
-            if matched:
-                return matched
-        except Exception:
-            pass
-    if project.active_deployment_id:
-        return project.active_deployment.version
-    if hasattr(project, "versions") and project.versions.exists():
-        return project.versions.order_by("-registered_at", "-id").first()
-    return None
+            requested_id = uuid.UUID(str(version_id))
+        except ValueError as exc:
+            raise NotFound("Version not found in this project.") from exc
+        if requested_id == version.public_id:
+            return version
+        if project.versions.filter(public_id=requested_id).exists():
+            raise Conflict("The requested version is not Running.")
+        raise NotFound("Version not found in this project.")
+    return version
 
 
 def running_source(project, version_id=None, storage=None):
@@ -60,33 +63,17 @@ def running_source(project, version_id=None, storage=None):
 
 
 def parse_label_mapping_payload(filename: str, payload_bytes: bytes) -> dict:
-    """Safely parse label mapping bytes (.json or .pkl) into a standard JSON-serializable dictionary."""
-    if not payload_bytes:
-        return {}
-    lower = filename.lower()
-    if lower.endswith(".pkl"):
-        try:
-            raw = pickle.loads(payload_bytes)
-            if hasattr(raw, "tolist"):
-                raw = raw.tolist()
-            if isinstance(raw, (list, tuple)):
-                return {str(idx): (str(val) if not isinstance(val, (str, int, float, bool)) else str(val)) for idx, val in enumerate(raw)}
-            elif isinstance(raw, dict):
-                return {str(k): (str(v) if not isinstance(v, (str, int, float, bool)) else str(v)) for k, v in raw.items()}
-            return {"0": str(raw)}
-        except Exception as exc:
-            raise ValidationError(f"Could not parse pickle label mapping: {exc}")
-    elif lower.endswith(".json"):
-        try:
-            raw = json.loads(payload_bytes.decode("utf-8-sig", errors="replace"))
-            if isinstance(raw, list):
-                return {str(idx): (str(val) if not isinstance(val, (str, int, float, bool)) else str(val)) for idx, val in enumerate(raw)}
-            elif isinstance(raw, dict):
-                return {str(k): (str(v) if not isinstance(v, (str, int, float, bool)) else str(v)) for k, v in raw.items()}
-            return {"0": str(raw)}
-        except Exception as exc:
-            raise ValidationError(f"Could not parse JSON label mapping: {exc}")
-    return {}
+    """Parse untrusted JSON label mappings without executing uploaded content."""
+    if not filename.lower().endswith(".json"):
+        raise ValidationError({"label_mapping": "Label mapping must be a JSON file."})
+    try:
+        raw = json.loads(payload_bytes.decode("utf-8-sig"))
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise ValidationError({"label_mapping": "Upload a valid JSON label mapping."}) from exc
+    if not isinstance(raw, (dict, list)):
+        raise ValidationError({"label_mapping": "Label mapping must be a JSON object or array."})
+    values = enumerate(raw) if isinstance(raw, list) else raw.items()
+    return {str(key): str(value) for key, value in values}
 
 
 def _parse_artifact_data(uri, storage):
@@ -100,7 +87,7 @@ def _parse_artifact_data(uri, storage):
 
 
 def running_label_mapping(project, version_id=None, storage=None):
-    """Retrieve and deserialize the label mapping for the project's active deployment or latest version or preview."""
+    """Retrieve the label mapping from the active Running version."""
     version = _effective_version(project, version_id=version_id)
     storage = storage or S3Storage()
     if version:
@@ -117,19 +104,6 @@ def running_label_mapping(project, version_id=None, storage=None):
             logger.warning("Failed to parse label mapping %s for version %s: %s", artifact.name, getattr(version, "public_id", None), exc)
             return None
 
-    preview = getattr(project, "preview", None)
-    if preview:
-        asset = preview.assets.filter(kind="label_mapping").first()
-        if asset and asset.s3_uri:
-            try:
-                payload = _parse_artifact_data(asset.s3_uri, storage)
-                return {
-                    "filename": asset.name,
-                    "mapping": parse_label_mapping_payload(asset.name, payload),
-                }
-            except Exception as exc:
-                logger.warning("Failed to parse preview label mapping %s: %s", asset.name, exc)
-                return None
     return None
 
 
@@ -140,10 +114,11 @@ def running_attributes(project, version_id=None, storage=None):
 
     metrics = {}
     params = {}
-    insights = {}
     label_mapping = None
     input_schema = None
     artifacts_list = []
+    summary_sources = {"metrics": {}, "params": {}, "model_insights": None, "feature_importance": None}
+    supplemental_summaries = {}
 
     feature_importance = None
     model_insights = None
@@ -151,13 +126,37 @@ def running_attributes(project, version_id=None, storage=None):
     if version:
         metrics = dict(version.metrics_summary or {})
         params = dict(version.params_summary or {})
+        summary_sources["metrics"] = {key: "registered" for key in metrics}
+        summary_sources["params"] = {key: "registered" for key in params}
         raw_insights = dict(version.insights_summary or {})
         if raw_insights.get("kind") == "feature_importance":
             feature_importance = raw_insights
+            summary_sources["feature_importance"] = "registered"
         elif raw_insights:
             model_insights = raw_insights
+            summary_sources["model_insights"] = "registered"
 
         for art in version.artifacts.all():
+            supplemental = art.metadata.get("summary") if art.metadata.get("provenance") == "supplemental_upload" else None
+            if supplemental is not None:
+                supplemental_summaries[art.kind] = supplemental
+                if art.kind == "metrics" and isinstance(supplemental, dict):
+                    metrics.update(supplemental)
+                    summary_sources["metrics"].update({key: "supplemental" for key in supplemental})
+                elif art.kind == "params" and isinstance(supplemental, dict):
+                    params.update(supplemental)
+                    summary_sources["params"].update({key: "supplemental" for key in supplemental})
+                elif art.kind == "feature_importance":
+                    if not feature_importance:
+                        feature_importance = (
+                            {"kind": "feature_importance", "items": supplemental}
+                            if isinstance(supplemental, list) else supplemental
+                        )
+                        summary_sources["feature_importance"] = "supplemental"
+                elif art.kind == "model_insights":
+                    if not model_insights:
+                        model_insights = supplemental
+                        summary_sources["model_insights"] = "supplemental"
             artifacts_list.append({
                 "kind": art.kind,
                 "name": art.name,
@@ -223,8 +222,21 @@ def running_attributes(project, version_id=None, storage=None):
             "label_mapping": label_mapping,
             "input_schema": input_schema,
             "artifacts": artifacts_list,
+            "summary_sources": summary_sources,
+            "supplemental_summaries": supplemental_summaries,
         }
 
+
+def preview_attributes(project, storage=None):
+    """Read draft attributes independently of the Running snapshot API."""
+    storage = storage or S3Storage()
+    metrics = {}
+    params = {}
+    label_mapping = None
+    input_schema = None
+    feature_importance = None
+    model_insights = None
+    artifacts_list = []
     preview = getattr(project, "preview", None)
     if preview:
         for art in preview.assets.all():
@@ -287,6 +299,12 @@ def running_attributes(project, version_id=None, storage=None):
                 except Exception:
                     pass
 
+    return _preview_attributes_result(
+        metrics, params, model_insights, feature_importance, label_mapping, input_schema, artifacts_list
+    )
+
+
+def _preview_attributes_result(metrics, params, model_insights, feature_importance, label_mapping, input_schema, artifacts_list):
     return {
         "metrics": metrics,
         "params": params,

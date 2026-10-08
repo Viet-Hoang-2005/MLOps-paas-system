@@ -211,7 +211,7 @@ export function ModelArtifactFields({
             </summary>
             <div className="grid gap-4 md:grid-cols-2">
               <FileDropzone
-                accept=".pkl,.json"
+                accept=".json"
                 disabled={readOnly}
                 title={
                   form.label_mapping_file?.name ||

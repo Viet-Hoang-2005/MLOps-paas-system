@@ -12,9 +12,10 @@ import { DataViewer } from "@/shared/components/DataViewer";
 import { Loading } from "@/shared/components/Loading";
 import { Placeholder } from "@/shared/components/Placeholder";
 import { toast } from "@/shared/types/toastStore";
-import { Lock, RotateCcw, Save, Table as TableIcon, Trash2 } from "lucide-react";
+import { GitBranch, Lock, RotateCcw, Save, Table as TableIcon, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 export interface DataOverviewPageProps {
   modelId: string;
@@ -45,6 +46,7 @@ export function DataOverviewPage({
   onUploadSuccess,
 }: DataOverviewPageProps) {
   const { t } = useTranslation("overview");
+  const navigate = useNavigate();
   const [viewerContainerEl, setViewerContainerEl] = useState<HTMLDivElement | null>(null);
   const [viewerHeight, setViewerHeight] = useState<number>(450);
 
@@ -148,6 +150,43 @@ export function DataOverviewPage({
     ? Boolean(previewReference.asset && previewReference.data)
     : Boolean(reference.data);
 
+  if ((isPreview ? previewReference.isError : reference.isError) && !hasData) {
+    return (
+      <Placeholder role="tabpanel" className="flex-1 min-h-105">
+        <p role="alert" className="text-style-body text-color-danger">
+          {t("workflow.failed")}
+        </p>
+      </Placeholder>
+    );
+  }
+
+  if (!isPreview && !hasData) {
+    return (
+      <Placeholder
+        role="tabpanel"
+        className="flex-1 min-h-105"
+        icon={<TableIcon className="h-6 w-6 text-color-primary" />}
+        title={t("workflow.noRunningDataTitle")}
+        description={t("workflow.noRunningDataDesc")}
+        action={
+          effectiveVersionId ? (
+            <Button
+              variant="secondary"
+              icon={<GitBranch className="h-4 w-4" />}
+              onClick={() =>
+                navigate(
+                  `/dashboard/projects/${modelId}/evolution?versionId=${effectiveVersionId}&tab=details`,
+                )
+              }
+            >
+              {t("workflow.openInEvolution")}
+            </Button>
+          ) : undefined
+        }
+      />
+    );
+  }
+
   const fileName = isPreview
     ? (previewReference.asset?.name || "reference_data.csv")
     : (referenceDataName || "reference_data.csv");
@@ -219,19 +258,14 @@ export function DataOverviewPage({
               readOnly={false}
             />
           </div>
-        ) : previewReference.isError ? (
-          <p role="alert">{t("workflow.failed")}</p>
         ) : (
           <OverviewArtifactDropzone
             projectId={modelId}
-            isModelPreview
             kind="reference_data"
             onUploadSuccess={onUploadSuccess}
           />
         )
-      ) : reference.isError ? (
-        <p role="alert">{t("workflow.failed")}</p>
-      ) : hasData ? (
+      ) : (
         <div
           ref={setViewerContainerEl}
           style={{ height: `${viewerHeight}px` }}
@@ -255,13 +289,6 @@ export function DataOverviewPage({
             readOnly={true}
           />
         </div>
-      ) : (
-        <OverviewArtifactDropzone
-          projectId={modelId}
-          versionId={effectiveVersionId}
-          kind="reference_data"
-          onUploadSuccess={onUploadSuccess}
-        />
       )}
 
       <ConfirmDialog

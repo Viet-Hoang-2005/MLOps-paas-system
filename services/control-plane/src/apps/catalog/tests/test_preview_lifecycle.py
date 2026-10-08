@@ -1,4 +1,5 @@
 import hashlib
+import uuid
 from types import SimpleNamespace
 
 import pytest
@@ -20,6 +21,7 @@ from apps.registry.models import ModelVersion
 from apps.registry.services.versions import register_successful_build
 from common.api.exceptions import Conflict
 from infrastructure.storage.s3 import StoredObject
+from infrastructure.storage.paths import project_prefix
 
 
 class MemoryStorage:
@@ -39,10 +41,12 @@ class MemoryStorage:
         checksum = hashlib.sha256(payload).hexdigest()
         return StoredObject(key, uri, checksum, len(self.objects[uri]), content_type)
 
-    def copy(self, uri, key, checksum=None, content_type=None, size_bytes=None):
+    def copy(self, uri, key, checksum=None, content_type=None, size_bytes=None, expected_etag=None):
         if self.fail_copy:
             raise RuntimeError("storage unavailable")
         payload = self.objects[uri]
+        if expected_etag and expected_etag.strip('"') != hashlib.sha256(payload).hexdigest():
+            raise RuntimeError("staging object changed")
         dest_uri = f"s3://{self.bucket}/{key}"
         self.objects[dest_uri] = payload
         resolved_checksum = checksum or hashlib.sha256(payload).hexdigest()
@@ -62,7 +66,10 @@ class MemoryStorage:
         payload = self.objects[uri]
         key = uri.removeprefix(f"s3://{self.bucket}/")
         checksum = hashlib.sha256(payload).hexdigest()
-        return StoredObject(key, uri, checksum, len(payload), "application/octet-stream")
+        return StoredObject(key, uri, checksum, len(payload), "application/octet-stream", f'"{checksum}"')
+
+    def compute_sha256(self, uri):
+        return hashlib.sha256(self.objects[uri]).hexdigest()
 
     def presigned_put(self, uri, expires_in=900, content_type=None):
         return f"https://{self.bucket}.s3.test/{uri}?signature=mock"
@@ -92,6 +99,13 @@ def project(db):
 
 
 def draft(project, storage, content=b"model-v1"):
+    assets = staged_assets(project, storage, [
+        ("source_artifact", "model.pkl", content),
+        ("source_code", "train.py", b"print('v1')"),
+        ("reference_data", "reference.csv", b"x,label\n1,A\n"),
+        ("label_mapping", "labels.json", b'["A", "B"]'),
+        ("metrics", "metrics.json", b'{"accuracy": 0.9}'),
+    ])
     return save_preview(
         project=project,
         storage=storage,
@@ -100,13 +114,19 @@ def draft(project, storage, content=b"model-v1"):
             "revision": project.preview.revision,
             "flavor": "xgboost",
             "requirements_text": "xgboost==2.0.3",
-            "source_artifact_file": SimpleUploadedFile("model.pkl", content),
-            "source_code_file": SimpleUploadedFile("train.py", b"print('v1')"),
-            "reference_data_file": SimpleUploadedFile("reference.csv", b"x,label\n1,A\n"),
-            "label_mapping_file": SimpleUploadedFile("labels.json", b'["A", "B"]'),
-            "metrics_file": SimpleUploadedFile("metrics.json", b'{"accuracy": 0.9}'),
+            "assets": assets,
         },
     )
+
+
+def staged_assets(project, storage, entries):
+    batch = uuid.uuid4()
+    result = []
+    for kind, name, payload in entries:
+        key = f"staging/{project_prefix(project.owner.tenant_id, project.public_id)}/preview/{batch}/{kind}/{name}"
+        stored = storage.put(key, payload)
+        result.append({"kind": kind, "name": name, "s3_uri": stored.uri})
+    return result
 
 
 def test_preview_revision_and_snapshot_isolation(project, monkeypatch):
@@ -117,13 +137,27 @@ def test_preview_revision_and_snapshot_isolation(project, monkeypatch):
     save_preview(
         project=project,
         storage=storage,
-        data={"revision": preview.revision, "source_artifact_file": SimpleUploadedFile("model.pkl", b"model-v2")},
+        data={"revision": preview.revision, "assets": staged_assets(project, storage, [("source_artifact", "model.pkl", b"model-v2")])},
     )
     assert storage.read(original.s3_uri) == b"model-v1"
     assert build.metrics_summary == {"accuracy": 0.9}
     assert build.input_assets.filter(kind__in=("source_code", "reference_data", "label_mapping")).count() == 3
     with pytest.raises(Conflict):
         save_preview(project=project, storage=storage, data={"revision": preview.revision})
+
+
+def test_replacement_wins_when_kind_is_also_marked_for_removal(project):
+    storage = MemoryStorage()
+    preview = draft(project, storage)
+    staged = staged_assets(project, storage, [("metrics", "updated.json", b'{"accuracy": 0.95}')])
+
+    save_preview(
+        project=project,
+        storage=storage,
+        data={"revision": preview.revision, "assets": staged, "remove_assets": ["metrics"]},
+    )
+
+    assert project.preview.assets.get(kind="metrics").name == "updated.json"
 
 
 def test_failed_snapshot_rolls_back_build(project):
@@ -137,15 +171,39 @@ def test_failed_snapshot_rolls_back_build(project):
 
 
 def test_invalid_preview_does_not_save_revision_or_assets(project):
+    storage = MemoryStorage()
     with pytest.raises(ValidationError):
         save_preview(
             project=project,
-            storage=MemoryStorage(),
-            data={"revision": 1, "metrics_file": SimpleUploadedFile("metrics.json", b"not json")},
+            storage=storage,
+            data={"revision": 1, "assets": staged_assets(project, storage, [("metrics", "metrics.json", b"not json")])},
         )
     project.preview.refresh_from_db()
     assert project.preview.revision == 1
     assert not project.preview.assets.exists()
+
+
+def test_staging_change_during_copy_preserves_previous_preview(project):
+    class ReplacedStagingStorage(MemoryStorage):
+        replace_on_copy = False
+
+        def copy(self, uri, key, **kwargs):
+            if self.replace_on_copy and "staging/" in uri:
+                self.objects[uri] = b"replaced"
+            return super().copy(uri, key, **kwargs)
+
+    storage = ReplacedStagingStorage()
+    preview = draft(project, storage)
+    storage.replace_on_copy = True
+    previous = preview.assets.get(kind="source_artifact")
+    staged = staged_assets(project, storage, [("source_artifact", "model.pkl", b"new model")])
+
+    with pytest.raises(RuntimeError, match="staging object changed"):
+        save_preview(project=project, storage=storage, data={"revision": preview.revision, "assets": staged})
+
+    preview.refresh_from_db()
+    assert preview.assets.get(kind="source_artifact").s3_uri == previous.s3_uri
+    assert storage.read(previous.s3_uri) == b"model-v1"
 
 
 def test_build_completion_requires_explicit_idempotent_registration(project):
@@ -268,7 +326,22 @@ def test_late_completion_does_not_resurrect_cancelled_build(project):
 def test_preview_upload_fields_exist():
     from apps.catalog.api.serializers import PreviewWriteSerializer
 
-    assert {"source_code_file", "reference_data_file", "label_mapping_file"} <= set(PreviewWriteSerializer().fields)
+    assert "assets" in PreviewWriteSerializer().fields
+    assert "source_artifact_file" not in PreviewWriteSerializer().fields
+
+
+def test_preview_api_rejects_legacy_multipart_files(project):
+    client = APIClient()
+    client.force_authenticate(project.owner)
+    response = client.patch(
+        f"/api/models/{project.public_id}/preview/",
+        {"revision": project.preview.revision, "metrics_file": SimpleUploadedFile("metrics.json", b"{}")},
+        format="multipart",
+    )
+    assert response.status_code == 400
+    assert "presigned staging URL" in str(response.data)
+    project.preview.refresh_from_db()
+    assert project.preview.revision == 1
 
 
 def test_registration_failure_removes_partial_snapshot_and_can_retry(project):
@@ -367,15 +440,29 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
     monkeypatch.setattr("apps.deployment.tasks.execute_deployment.delay", lambda id: SimpleNamespace(id="deploy-task"))
     client = APIClient()
     client.force_authenticate(project.owner)
+    upload = client.post(
+        "/api/models/preview/upload-urls/",
+        {"name": "API lifecycle", "flavor": "xgboost", "files": [
+            {"kind": "source_artifact", "filename": "model.pkl"},
+            {"kind": "reference_data", "filename": "reference.csv"},
+        ]},
+        format="json",
+    )
+    assert upload.status_code == 200, upload.data
+    payloads = {"source_artifact": b"model", "reference_data": b"x\n1\n"}
+    assets = []
+    for item in upload.data["files"]:
+        storage.objects[item["s3_uri"]] = payloads[item["kind"]]
+        assets.append({"kind": item["kind"], "name": item["filename"], "s3_uri": item["s3_uri"]})
     created = client.post(
         "/api/models/",
         {
             "name": "API lifecycle",
             "flavor": "xgboost",
-            "source_artifact_file": SimpleUploadedFile("model.pkl", b"model"),
-            "reference_data_file": SimpleUploadedFile("reference.csv", b"x\n1\n"),
+            "project_id": upload.data["project_id"],
+            "assets": assets,
         },
-        format="multipart",
+        format="json",
     )
     assert created.status_code == 201, created.data
     id = created.data["id"]

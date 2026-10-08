@@ -7,7 +7,11 @@ import { useTranslation } from "react-i18next";
 
 export function VersionMetrics({ version }: { version: ModelVersion }) {
   const { t, i18n } = useTranslation("evolution");
-  const summary = Object.entries(version.metrics_summary);
+  const supplemental = (version.supplemental_summaries?.metrics?.value ?? {}) as Record<string, unknown>;
+  const summary = [
+    ...Object.entries(version.metrics_summary).map(([name, value]) => ({ name, value, source: t("snapshot.registeredSource") })),
+    ...Object.entries(supplemental).map(([name, value]) => ({ name, value, source: t("snapshot.supplementalSource") })),
+  ];
   const series = metricSeries(version.metrics);
   const number = (value: number) =>
     formatNumber(value, i18n.language, { maximumFractionDigits: 6 });
@@ -16,25 +20,26 @@ export function VersionMetrics({ version }: { version: ModelVersion }) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {summary
           .filter(
-            ([, value]) => typeof value === "number" && Number.isFinite(value),
+            ({ value }) => typeof value === "number" && Number.isFinite(value),
           )
-          .map(([name, value]) => (
+          .map(({ name, value, source }) => (
             <div
               key={name}
               className="rounded-surface border border-border bg-muted p-4"
             >
               <p className="text-style-caption text-color-muted-foreground">
-                {name}
+                {name} · {source}
               </p>
               <p className="mt-2 text-style-metric">{number(Number(value))}</p>
             </div>
           ))}
       </div>
       <VersionRecords
-        rows={summary.map(([name, value]) => ({ name, value }))}
+        rows={summary}
         columns={[
           { key: "name", title: t("workspace.name") },
           { key: "value", title: t("workspace.value") },
+          { key: "source", title: t("workspace.source") },
         ]}
         empty={t("workspace.noMetrics")}
       />

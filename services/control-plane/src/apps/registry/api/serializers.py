@@ -25,6 +25,7 @@ class ModelVersionSerializer(serializers.ModelSerializer):
     artifacts = ModelArtifactSerializer(many=True, read_only=True)
     metrics = serializers.SerializerMethodField()
     events = serializers.SerializerMethodField()
+    supplemental_summaries = serializers.SerializerMethodField()
 
     class Meta:
         model = ModelVersion
@@ -43,6 +44,7 @@ class ModelVersionSerializer(serializers.ModelSerializer):
             "metrics_summary",
             "params_summary",
             "insights_summary",
+            "supplemental_summaries",
             "artifacts",
             "metrics",
             "events",
@@ -67,6 +69,19 @@ class ModelVersionSerializer(serializers.ModelSerializer):
 
     def get_metrics(self, instance):
         return ModelMetricSerializer(instance.metrics.all(), many=True).data
+
+    @staticmethod
+    def get_supplemental_summaries(instance):
+        return {
+            artifact.kind: {
+                "value": artifact.metadata["summary"],
+                "uploaded_by": artifact.metadata.get("uploaded_by"),
+                "uploaded_at": artifact.metadata.get("uploaded_at"),
+            }
+            for artifact in instance.artifacts.all()
+            if artifact.metadata.get("provenance") == "supplemental_upload"
+            and "summary" in artifact.metadata
+        }
 
     @staticmethod
     def get_source_job_id(instance):

@@ -13,14 +13,9 @@ from common.api.exceptions import Conflict
 from common.validation.artifacts import (
     MAX_REFERENCE_DATA_BYTES,
     parse_reference_preview,
-    validate_reference_data_file,
-    validate_source_code_file,
 )
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import project_prefix
-
-FILE_FIELDS = {kind: f"{kind}_file" for kind, _ in PreviewAsset.KINDS}
-
 
 def generate_preview_upload_urls(
     *, tenant_id, project_id, files_data, storage=None, flavor=None, artifact_format="raw"
@@ -40,8 +35,8 @@ def generate_preview_upload_urls(
             raise ValidationError({"source_code": "Source code must be a Python (.py) file."})
         elif kind == "reference_data" and not filename.lower().endswith(".csv"):
             raise ValidationError({"reference_data": "Reference dataset must be a CSV (.csv) file."})
-        elif kind == "label_mapping" and Path(filename).suffix.lower() not in {".json", ".pkl"}:
-            raise ValidationError({"label_mapping": "Label mapping must be a .json or .pkl file."})
+        elif kind == "label_mapping" and Path(filename).suffix.lower() != ".json":
+            raise ValidationError({"label_mapping": "Label mapping must be a .json file."})
         elif (
             kind in {"metrics", "params", "model_insights", "feature_importance", "input_schema"}
             and not filename.lower().endswith(".json")
@@ -71,7 +66,8 @@ def generate_preview_upload_urls(
 
 def save_preview(*, project, data, storage=None, require_artifact=False):
     storage = storage or S3Storage()
-    uploaded = {kind: data[field] for kind, field in FILE_FIELDS.items() if data.get(field)}
+    if any(data.get(f"{kind}_file") for kind, _ in PreviewAsset.KINDS):
+        raise ValidationError({"assets": "Upload files with a presigned staging URL."})
     presigned_assets = data.get("assets") or []
 
     # Path 1: Presigned S3 Assets flow (when presigned_assets list is provided and non-empty)
@@ -117,7 +113,7 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                     raise ValidationError({"source_code": "Source code must be a Python (.py) file."})
                 elif kind == "reference_data" and not name.lower().endswith(".csv"):
                     raise ValidationError({"reference_data": "Reference dataset must be a CSV (.csv) file."})
-                elif kind == "label_mapping" and Path(name).suffix.lower() not in {".json", ".pkl"}:
+                elif kind == "label_mapping" and Path(name).suffix.lower() != ".json":
                     raise ValidationError({"label_mapping": "Unsupported file format."})
                 elif (
                     kind in {"metrics", "params", "model_insights", "feature_importance", "input_schema"}
@@ -132,8 +128,10 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
 
                 if stored.size_bytes == 0:
                     raise ValidationError({"assets": f"Uploaded asset '{kind}' is empty."})
+                if not stored.etag:
+                    raise ValidationError({"assets": f"Uploaded asset '{kind}' has no storage ETag."})
 
-                if kind in {"metrics", "params", "model_insights", "feature_importance", "input_schema"}:
+                if kind in {"label_mapping", "metrics", "params", "model_insights", "feature_importance", "input_schema"}:
                     try:
                         content = storage.read(s3_uri, max_bytes=4 * 1024 * 1024 + 1)
                         if len(content) > 4 * 1024 * 1024:
@@ -146,8 +144,9 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                     except Exception as exc:
                         raise ValidationError({kind: "Upload a valid JSON file under 4 MiB."}) from exc
 
+                checksum = storage.compute_sha256(s3_uri)
                 verified_staging_assets.append(
-                    (kind, name, s3_uri, stored.checksum, stored.size_bytes, stored.content_type)
+                    (kind, name, s3_uri, checksum, stored.size_bytes, stored.content_type, stored.etag)
                 )
 
             # Validate effective artifact (newly uploaded or retained existing) against final flavor & format
@@ -167,7 +166,7 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
             # Crucial for data integrity (P1): Once saved, the preview asset points to a committed key
             # that has NEVER had a presigned PUT URL issued for it. Any post-save reuse of the presigned
             # URL only affects the abandoned staging key and CANNOT overwrite the saved preview object.
-            for kind, name, staging_uri, staging_checksum, staging_size, staging_content_type in verified_staging_assets:
+            for kind, name, staging_uri, staging_checksum, staging_size, staging_content_type, staging_etag in verified_staging_assets:
                 commit_token = uuid.uuid4()
                 committed_key = (
                     f"{project_prefix(tenant_id, project_id)}/preview/committed/{commit_token}/{kind}/{name}"
@@ -178,10 +177,11 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                     checksum=staging_checksum,
                     content_type=staging_content_type,
                     size_bytes=staging_size,
+                    expected_etag=staging_etag,
                 )
                 committed_uris.append(stored_committed.uri)
-                # Remove staging object immediately so it cannot be reused
-                storage.delete(staging_uri)
+                if storage.compute_sha256(stored_committed.uri) != staging_checksum:
+                    raise ValidationError({"assets": f"Uploaded asset '{kind}' changed during save. Upload it again."})
                 committed_assets.append((kind, name, stored_committed))
 
             # 3. Fast atomic database transaction (<10ms)
@@ -211,18 +211,18 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                         },
                     )
                 if remove:
-                    preview.assets.filter(kind__in=remove).delete()
+                    preview.assets.filter(kind__in=remove - replaced_kinds).delete()
                 preview.flavor = flavor or preview.flavor
                 preview.artifact_format = artifact_format or preview.artifact_format
                 preview.requirements_text = data.get("requirements_text", preview.requirements_text)
                 preview.revision += 1
                 preview.save()
 
-                for uri in old_uris:
-                    try:
-                        storage.delete(uri)
-                    except Exception:
-                        pass
+            for uri in old_uris + staged_uris_to_clean:
+                try:
+                    storage.delete(uri)
+                except Exception:
+                    pass
             return preview
         except Exception:
             for uri in committed_uris:
@@ -230,14 +230,9 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                     storage.delete(uri)
                 except Exception:
                     pass
-            for uri in staged_uris_to_clean:
-                try:
-                    storage.delete(uri)
-                except Exception:
-                    pass
             raise
 
-    # Path 2: Fallback legacy multipart upload OR pure metadata update
+    # Metadata-only update.
     with transaction.atomic():
         project = type(project).objects.select_for_update().get(pk=project.pk)
         if not project.is_active or project.deletion_state != "active":
@@ -248,74 +243,19 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
         flavor = data.get("flavor", preview.flavor)
         artifact_format = data.get("artifact_format", preview.artifact_format)
         remove = set(data.get("remove_assets", []))
-        artifact = uploaded.get("source_artifact")
         existing = preview.assets.filter(kind="source_artifact").first()
-        if artifact or (existing and "source_artifact" not in remove):
+        if existing and "source_artifact" not in remove:
             validate_source_artifact(
-                filename=artifact.name if artifact else existing.name, flavor=flavor, artifact_format=artifact_format
+                filename=existing.name, flavor=flavor, artifact_format=artifact_format
             )
         elif require_artifact:
-            raise ValidationError({"source_artifact_file": "A model artifact is required."})
-
-        if "source_code" in uploaded:
-            validate_source_code_file(uploaded["source_code"])
-
-        if "reference_data" in uploaded:
-            validate_reference_data_file(uploaded["reference_data"])
-            uploaded["reference_data"].content_type = "text/csv"
-
-        if "label_mapping" in uploaded and Path(uploaded["label_mapping"].name).suffix.lower() not in {".json", ".pkl"}:
-            raise ValidationError({"label_mapping_file": "Unsupported file format."})
-
-        for kind in ("metrics", "params", "model_insights", "feature_importance", "input_schema"):
-            if kind in uploaded and Path(uploaded[kind].name).suffix.lower() != ".json":
-                raise ValidationError({FILE_FIELDS[kind]: "Upload a JSON file."})
-        for kind, file in uploaded.items():
-            if Path(file.name).suffix.lower() != ".json":
-                continue
-            try:
-                content = file.read(4 * 1024 * 1024 + 1)
-                if len(content) > 4 * 1024 * 1024:
-                    raise ValueError
-                value = json.loads(content)
-                if not isinstance(value, (dict, list)):
-                    raise ValueError
-                if kind in {"metrics", "params", "model_insights", "input_schema"} and not isinstance(value, dict):
-                    raise ValueError
-            except (ValueError, UnicodeDecodeError) as exc:
-                raise ValidationError({FILE_FIELDS[kind]: "Upload a valid JSON file under 4 MiB."}) from exc
-            finally:
-                file.seek(0)
-        written = []
-        try:
-            for kind, file in uploaded.items():
-                name = Path(file.name).name
-                key = (
-                    f"{project_prefix(project.owner.tenant_id, project.public_id)}/preview/committed/{uuid.uuid4()}/{kind}/{name}"
-                )
-                stored = storage.put(key, file, file.content_type or "application/octet-stream")
-                written.append(stored.uri)
-                PreviewAsset.objects.update_or_create(
-                    preview=preview,
-                    kind=kind,
-                    defaults={
-                        "name": name,
-                        "s3_uri": stored.uri,
-                        "checksum": stored.checksum,
-                        "size_bytes": stored.size_bytes,
-                        "content_type": stored.content_type,
-                    },
-                )
-            preview.assets.filter(kind__in=remove - set(uploaded)).delete()
-            preview.flavor = flavor
-            preview.artifact_format = artifact_format
-            preview.requirements_text = data.get("requirements_text", preview.requirements_text)
-            preview.revision += 1
-            preview.save()
-        except Exception:
-            for uri in written:
-                storage.delete(uri)
-            raise
+            raise ValidationError({"source_artifact": "A model artifact is required."})
+        preview.assets.filter(kind__in=remove).delete()
+        preview.flavor = flavor
+        preview.artifact_format = artifact_format
+        preview.requirements_text = data.get("requirements_text", preview.requirements_text)
+        preview.revision += 1
+        preview.save()
     return preview
 
 

@@ -47,6 +47,16 @@ export const registryEn = {
     missing: "Not available",
     noArtifacts: "No artifacts recorded.",
     supplementalArtifacts: "Supplemental Artifacts",
+    supplementalAttributes: "Supplemental attributes",
+    invalidSupplementalJson: "Select a non-empty JSON file under 4 MiB.",
+    attributeKinds: {
+      label_mapping: "Label mapping",
+      input_schema: "Input schema",
+      metrics: "Metrics",
+      params: "Parameters",
+      model_insights: "Model insights",
+      feature_importance: "Feature importance",
+    },
     supplementalDesc:
       "Missing source code or reference dataset can be added once. Existing artifacts are immutable.",
     addSourceCode: "Add Supplemental Source Code",
@@ -115,6 +125,8 @@ export const registryEn = {
     comparisonLoadFailed: "Unable to load versions for comparison.",
   },
   snapshot: {
+    registeredSource: "Registered snapshot",
+    supplementalSource: "Supplemental upload",
     metrics: "Metrics",
     params: "Parameters",
     insights: "Insights / feature importance",

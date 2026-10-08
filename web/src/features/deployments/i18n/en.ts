@@ -215,7 +215,7 @@ export const deployEn = {
         tensorflow: "Keras, SavedModel, or MLflow artifacts.",
       },
       attachments: {
-        labelMapping: "Choose label mapping (.json, .pkl)",
+        labelMapping: "Choose label mapping (.json)",
         labelMappingSubtitle:
           "Mapping classification labels from numbers to letters",
         labelMappingIndicators: "(0: benign, 1: attack,...)",

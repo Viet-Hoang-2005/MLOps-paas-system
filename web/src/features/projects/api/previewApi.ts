@@ -133,20 +133,6 @@ export async function createPreviewProject(
 ): Promise<ModelProject> {
   const pendingFiles = extractFilesFromForm(form);
 
-  if (pendingFiles.length === 0) {
-    return (
-      await apiClient.post<ModelProject>(controlPlaneURL("/models/"), {
-        name: form.name,
-        description: form.description,
-        access_mode: form.access_mode,
-        flavor: form.flavor,
-        artifact_format: form.artifact_format,
-        requirements_text: form.requirements_text,
-        assets: [],
-      })
-    ).data;
-  }
-
   // Phase 1: Request presigned URLs and pre-allocated project_id
   const urlPayload = pendingFiles.map((p) => ({
     kind: p.kind,
@@ -250,9 +236,7 @@ function getAssetContentType(kind: string, file: File): string {
     case "reference_data":
       return "text/csv";
     case "label_mapping":
-      return file.name.endsWith(".pkl")
-        ? "application/octet-stream"
-        : "application/json";
+      return "application/json";
     case "input_schema":
     case "metrics":
     case "params":
