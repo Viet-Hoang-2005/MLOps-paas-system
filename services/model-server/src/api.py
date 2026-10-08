@@ -27,6 +27,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from redis.sentinel import Sentinel
 
 from src import auth as auth_service
+from src.jwks_cache import JwksKeyCache
 from src.events import publish_inference_event
 from src.inference import parse_worker_prediction
 from src.logging_utils import (
@@ -194,7 +195,7 @@ paas_latency_histogram = Histogram(
 Instrumentator().instrument(app)
 app.add_api_route("/metrics", metrics_response, include_in_schema=False)
 
-JWKS_CACHE: dict[str, Any] = {}
+JWKS_CACHE: JwksKeyCache = JwksKeyCache()
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 

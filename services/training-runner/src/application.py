@@ -100,10 +100,15 @@ def parse_metric_events(stdout_text: str, warnings: list[dict]) -> tuple[list[di
 
     for line_number, line in enumerate(stdout_text.splitlines(), start=1):
         stripped = line.strip()
-        if not stripped.startswith("METRIC_JSON:"):
+        matched_prefix = None
+        for prefix in ("METRIC_JSON:", "METRIC_JSON "):
+            if stripped.startswith(prefix):
+                matched_prefix = prefix
+                break
+        if not matched_prefix:
             continue
 
-        raw_payload = stripped.split("METRIC_JSON:", 1)[1].strip()
+        raw_payload = stripped[len(matched_prefix):].strip()
         try:
             payload = json.loads(raw_payload)
         except json.JSONDecodeError as exc:

@@ -120,3 +120,20 @@ def test_writes_mlops_bundle_and_manifest(runner_workspace):
     summary = json.loads((mlops_dir / "training_summary.json").read_text(encoding="utf-8"))
     assert summary["status"] == "succeeded"
     assert summary["warnings_count"] >= 2
+
+
+def test_metric_parsing_supports_both_space_and_colon_prefixes():
+    warnings = []
+    events, metrics = runner.parse_metric_events(
+        "\n".join(
+            (
+                'METRIC_JSON {"loss": 0.05, "step": 1}',
+                'METRIC_JSON:{"accuracy": 0.95, "epoch": 2}',
+                'METRIC_JSON: {"f1_score": 0.88}',
+            )
+        ),
+        warnings,
+    )
+    assert metrics == {"loss": 0.05, "step": 1, "accuracy": 0.95, "epoch": 2, "f1_score": 0.88}
+    assert len(events) == 3
+    assert len(warnings) == 0

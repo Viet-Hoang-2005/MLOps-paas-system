@@ -104,12 +104,30 @@ def test_install_requirements_noop_success_and_failure(monkeypatch, tmp_path, ru
     monkeypatch.setattr(runner, "runtime_log", runtime_log)
     requirements = tmp_path / "requirements.txt"
     requirements.write_text("pytest", encoding="utf-8")
+    monkeypatch.setenv("CAPABILITY_TOKEN", "super-secret-token")
     runner.install_requirements(requirements)
     runtime_log.detail.assert_any_call("installed")
     runtime_log.detail.assert_any_call("warning")
+    assert "CAPABILITY_TOKEN" not in run.call_args.kwargs["env"]
+    assert "PATH" in run.call_args.kwargs["env"]
     run.return_value = subprocess.CompletedProcess([], 2, "", "bad")
     with pytest.raises(RuntimeError, match="exit code 2"):
         runner.install_requirements(requirements)
+
+
+def test_install_requirements_rejects_unsafe_dependencies(tmp_path):
+    req_file = tmp_path / "req.txt"
+    req_file.write_text("-e .\n")
+    with pytest.raises(RuntimeError, match="Disallowed pip option"):
+        runner.install_requirements(req_file)
+
+    req_file.write_text("git+https://github.com/evil/repo.git\n")
+    with pytest.raises(RuntimeError, match="Remote URL"):
+        runner.install_requirements(req_file)
+
+    req_file.write_text("../secret_pkg\n")
+    with pytest.raises(RuntimeError, match="Local path references"):
+        runner.install_requirements(req_file)
 
 
 @pytest.mark.parametrize(

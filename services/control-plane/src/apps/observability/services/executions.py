@@ -19,7 +19,7 @@ from infrastructure.execution import drift_backend, training_backend
 from infrastructure.storage import S3Storage
 
 logger = logging.getLogger(__name__)
-TERMINAL = {"completed", "failed", "cancelled"}
+TERMINAL = {"completed", "failed", "cancelled", "skipped"}
 ACTIVE = {"queued", "running", "uploading", "cancelling"}
 WATCH_FIELDS = [field.name for field in TrainingJob._meta.fields if field.name in {
     "next_execution_check_at", "execution_check_token", "execution_check_lease_until",
@@ -284,7 +284,10 @@ def apply_observation(kind, public_id, token, observation):
         except Exception as exc:
             from botocore.exceptions import ClientError
             missing = isinstance(exc, ValueError) or (isinstance(exc, ClientError) and exc.response["Error"]["Code"] in {"404", "NoSuchKey", "NotFound"})
-            observed = "failed" if missing else "error"
+            if getattr(row, "status", None) == "skipped" or (isinstance(getattr(row, "summary", None), dict) and row.summary.get("status") == "skipped"):
+                observed = "skipped"
+            else:
+                observed = "failed" if missing else "error"
             observation = {**observation, "status": observed, "error": "Runtime output verification failed."}
     project = project_for(row, kind)
     with transaction.atomic():
@@ -330,13 +333,18 @@ def apply_observation(kind, public_id, token, observation):
         elif observed == "not_found" and not current.runtime_started_at and (row.backend if kind == "training" else row.monitor.backend) == "argo":
             current.status = "queued"
             current.save(update_fields=["status"])
-        elif observed in {"completed", "failed", "not_found"}:
+        elif observed in {"completed", "failed", "not_found", "skipped"}:
             if data is not None:
                 current.summary = data
                 current.drift_score = data.get("drift_score", data.get("share_of_drifted_columns"))
                 current.has_drift = data.get("has_drift", data.get("dataset_drift"))
                 current.save(update_fields=["summary", "drift_score", "has_drift"])
-            status = "completed" if observed == "completed" else "failed"
+            if observed == "completed":
+                status = "completed"
+            elif observed == "skipped":
+                status = "skipped"
+            else:
+                status = "failed"
             _finish(current, kind, status, observation.get("error", "Runtime is missing." if observed == "not_found" else ""), finished_at=finished)
             current.observation_status = "cleanup_pending"
             current.execution_stop_requested = True

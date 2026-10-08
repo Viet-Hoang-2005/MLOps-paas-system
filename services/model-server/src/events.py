@@ -3,8 +3,23 @@
 import json
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
+
+
+def to_serializable(obj: Any) -> Any:
+    """Convert NumPy scalars/arrays, tensors, dates, and UUIDs for JSON serialization."""
+    if hasattr(obj, "tolist"):
+        return obj.tolist()
+    if hasattr(obj, "item"):
+        return obj.item()
+    if isinstance(obj, uuid.UUID):
+        return str(obj)
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    if hasattr(obj, "__dict__"):
+        return obj.__dict__
+    return str(obj)
 
 
 def publish_inference_event(
@@ -30,6 +45,15 @@ def publish_inference_event(
     started = time.perf_counter()
     try:
         record_id = prediction_id or str(uuid.uuid4())
+        conf_val = confidence
+        if hasattr(conf_val, "item"):
+            conf_val = conf_val.item()
+        if conf_val is not None:
+            try:
+                conf_val = float(conf_val)
+            except (ValueError, TypeError):
+                conf_val = None
+
         payload = {
             "id": record_id,
             "prediction_id": record_id,
@@ -39,7 +63,7 @@ def publish_inference_event(
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "features": features,
             "prediction": prediction,
-            "confidence": confidence,
+            "confidence": conf_val,
             "latency_ms": latency_ms,
             "status_code": status_code,
             "request_id": request_id,
@@ -47,7 +71,7 @@ def publish_inference_event(
         producer.produce(
             topic=topic,
             key=record_id.encode("utf-8"),
-            value=json.dumps(payload).encode("utf-8"),
+            value=json.dumps(payload, default=to_serializable).encode("utf-8"),
         )
         producer.poll(0)
         summary.record(

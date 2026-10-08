@@ -15,25 +15,50 @@ async def fetch_public_key(
     http_client_factory,
     rsa_algorithm,
 ):
-    if kid not in cache:
-        try:
-            async with http_client_factory() as client:
-                response = await client.get(jwks_url, timeout=5.0)
-                response.raise_for_status()
-                for key_data in response.json().get("keys", []):
-                    if key_data.get("kid") == kid:
-                        public_key = rsa_algorithm.from_jwk(json.dumps(key_data))
-                        cache[kid] = public_key
-                        summary.recovery("fetch")
-                        return public_key
-        except Exception as exc:
-            summary.failure(
-                "fetch",
-                "JWKS fetch or parse failed",
-                error_type=type(exc).__name__,
-            )
+    if hasattr(cache, "is_negative") and cache.is_negative(kid):
+        return None
+    cached = cache.get(kid) if hasattr(cache, "get") else None
+    if cached is not None:
+        return cached
+
+    try:
+        async with http_client_factory() as client:
+            response = await client.get(jwks_url, timeout=5.0)
+            response.raise_for_status()
+            keys_data = response.json().get("keys", [])
+            kid_found_in_payload = False
+            found_key = None
+            for key_data in keys_data:
+                k_id = key_data.get("kid")
+                if not k_id:
+                    continue
+                if k_id == kid:
+                    kid_found_in_payload = True
+                    pub_key = rsa_algorithm.from_jwk(json.dumps(key_data))
+                    cache[k_id] = pub_key
+                    found_key = pub_key
+                else:
+                    try:
+                        pub_key = rsa_algorithm.from_jwk(json.dumps(key_data))
+                        cache[k_id] = pub_key
+                    except Exception:
+                        pass
+
+            if found_key is not None:
+                summary.recovery("fetch")
+                return found_key
+
+            if not kid_found_in_payload:
+                if hasattr(cache, "set_negative"):
+                    cache.set_negative(kid)
             return None
-    return cache.get(kid)
+    except Exception as exc:
+        summary.failure(
+            "fetch",
+            "JWKS fetch or parse failed",
+            error_type=type(exc).__name__,
+        )
+        return None
 
 
 async def authorize_model_access(

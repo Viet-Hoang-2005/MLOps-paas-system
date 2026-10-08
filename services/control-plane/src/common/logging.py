@@ -49,6 +49,7 @@ def _lifecycle_message(event):
         "completion_enqueued": "completion queued",
         "deleted": "was deleted",
         "outputs_purged": "outputs were purged",
+        "skipped": "was skipped",
     }
     fallback = f"changed to {transition or 'a new state'}"
     return f"{resource_name} {phrases.get(transition, fallback)}"

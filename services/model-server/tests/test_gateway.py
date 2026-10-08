@@ -391,3 +391,54 @@ def test_runtime_health_is_not_a_routing_or_version_selection_gate(monkeypatch):
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
     record = {"deployment_status": "succeeded", "health_status": "unhealthy", "flavor": "xgboost", "endpoint_container_name": "runtime"}
     assert index.resolve_worker_url(record, "/predict") == "http://runtime:5001/predict"
+
+
+def test_publish_inference_event_handles_numpy_scalars_and_arrays():
+    import numpy as np
+    from src.events import publish_inference_event
+
+    producer = Mock()
+    summary = Mock()
+
+    features = {"x": np.float64(1.23), "arr": np.array([1, 2, 3])}
+    prediction = np.int64(42)
+    confidence = np.float32(0.95)
+
+    publish_inference_event(
+        producer,
+        summary,
+        topic="test-topic",
+        tenant_id="t-1",
+        project_id="p-1",
+        model_version_id="v-1",
+        features=features,
+        prediction=prediction,
+        confidence=confidence,
+    )
+
+    summary.failure.assert_not_called()
+    summary.recovery.assert_called_once_with("publish")
+    producer.produce.assert_called_once()
+
+    call_kwargs = producer.produce.call_args.kwargs
+    assert call_kwargs["topic"] == "test-topic"
+    deserialized = json.loads(call_kwargs["value"].decode("utf-8"))
+    assert deserialized["prediction"] == 42
+    assert deserialized["confidence"] == pytest.approx(0.95)
+    assert deserialized["features"]["x"] == pytest.approx(1.23)
+    assert deserialized["features"]["arr"] == [1, 2, 3]
+
+
+def test_parse_worker_prediction_normalizes_numpy_and_tensors():
+    import numpy as np
+    from src.inference import parse_worker_prediction
+
+    data = {
+        "prediction": np.array([np.int64(1), np.int64(2)]),
+        "confidence": np.float32(0.88),
+    }
+    pred, conf, engine = parse_worker_prediction(data, "sklearn")
+    assert pred == [1, 2]
+    assert isinstance(pred[0], int)
+    assert conf == pytest.approx(0.88)
+    assert isinstance(conf, float)

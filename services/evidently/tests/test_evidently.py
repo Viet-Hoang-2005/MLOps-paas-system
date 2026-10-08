@@ -412,3 +412,95 @@ def test_main_invalid_config_and_insufficient_samples(monkeypatch):
     monkeypatch.setattr(main, "MIN_SAMPLES", 2)
     monkeypatch.setattr(main, "load_production_data", lambda: pd.DataFrame({"a": [1]}))
     assert main.main() == 0
+
+
+def test_safe_extract_zip_rejects_symlinks(tmp_path):
+    archive = tmp_path / "symlink.zip"
+    zipinfo = zipfile.ZipInfo("symlink_entry.txt")
+    zipinfo.create_system = 3  # Unix system
+    zipinfo.external_attr = 0o120777 << 16  # S_IFLNK (symlink)
+    with zipfile.ZipFile(archive, "w") as handle:
+        handle.writestr(zipinfo, "target.txt")
+
+    with pytest.raises(ValueError, match="symbolic links"):
+        main.safe_extract_zip(archive, tmp_path / "out")
+
+
+def test_load_production_data_multi_tenant_scoping():
+    from src import data
+    executed_queries = []
+    executed_params = []
+
+    class DummyEngine:
+        def connect(self):
+            return Context(self)
+
+    def dummy_read_sql(sql, connection, params=None):
+        executed_queries.append(str(sql))
+        executed_params.append(params)
+        return pd.DataFrame({"features": ['{"f1": 1}'], "prediction": [0]})
+
+    data.load_production_data(
+        connection_url="postgresql://mock",
+        model_version_id="00000000-0000-0000-0000-000000000001",
+        max_samples=100,
+        min_samples=1,
+        create_engine=lambda *_: DummyEngine(),
+        sql_text=lambda q: q,
+        pandas_module=SimpleNamespace(read_sql=dummy_read_sql, json_normalize=pd.json_normalize, DataFrame=pd.DataFrame),
+        detail=lambda *_: None,
+        db_schema="control_plane",
+        tenant_id="T-tenant-123",
+        project_id="00000000-0000-0000-0000-000000000002",
+    )
+
+    assert len(executed_queries) == 1
+    query = executed_queries[0]
+    assert 'INNER JOIN "control_plane"."catalog_modelproject" AS project' in query
+    assert 'INNER JOIN "control_plane"."identity_customuser" AS owner_user' in query
+    assert 'project.public_id = CAST(:project_id AS uuid)' in query
+    assert 'owner_user.tenant_id = :tenant_id' in query
+    params = executed_params[0]
+    assert params["tenant_id"] == "T-tenant-123"
+    assert params["project_id"] == "00000000-0000-0000-0000-000000000002"
+    assert params["model_version_id"] == "00000000-0000-0000-0000-000000000001"
+
+
+def test_run_fails_fast_when_s3_upload_fails(monkeypatch):
+    monkeypatch.setattr(main, "validate_runtime_config", lambda: None)
+    monkeypatch.setattr(main, "MIN_SAMPLES", 1)
+    frame = pd.DataFrame({"a": [1]})
+    monkeypatch.setattr(main, "load_production_data", lambda: frame)
+    monkeypatch.setattr(main, "load_reference_data", lambda: frame)
+    monkeypatch.setattr(main, "get_column_mapping", lambda *a: main.ColumnMapping())
+    # Drift analysis succeeded locally, but S3 upload failed so html_s3_uri is missing
+    monkeypatch.setattr(main, "HTML_UPLOAD_URL", "http://upload-target")
+    monkeypatch.setattr(main, "run_drift_analysis", lambda *a: {
+        "dataset_drift": False,
+        "report_artifacts": {"local_html_path": "/tmp/report.html"}
+    })
+    webhook = Mock()
+    monkeypatch.setattr(main, "trigger_django_webhook", webhook)
+
+    exit_code = main._run()
+    assert exit_code == 1
+    webhook.assert_not_called()
+
+
+def test_insufficient_samples_triggers_skipped_webhook(monkeypatch):
+    monkeypatch.setattr(main, "validate_runtime_config", lambda: None)
+    monkeypatch.setattr(main, "MIN_SAMPLES", 100)
+    monkeypatch.setattr(main, "load_production_data", lambda: pd.DataFrame({"a": [1, 2]}))
+    monkeypatch.setattr(main, "CONTROL_PLANE_WEBHOOK_URL", "http://control-plane/webhook")
+
+    captured_summary = []
+    monkeypatch.setattr(main, "trigger_django_webhook", lambda s: captured_summary.append(s))
+
+    exit_code = main._run()
+    assert exit_code == 0
+    assert len(captured_summary) == 1
+    summary = captured_summary[0]
+    assert summary["status"] == "skipped"
+    assert summary["samples"] == 2
+    assert summary["minimum_samples"] == 100
+    assert "Insufficient production samples" in summary["reason"]

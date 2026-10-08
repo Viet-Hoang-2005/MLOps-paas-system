@@ -1,7 +1,47 @@
 """Presigned object transfer, archive extraction, and dependency installation."""
 
+import os
 import zipfile
+from pathlib import Path
 from urllib.parse import urlparse
+
+ALLOWED_PIP_ENV_VARS = frozenset(
+    {"PATH", "HOME", "LANG", "LC_ALL", "TZ", "TMPDIR", "TEMP", "TMP", "PYTHONPATH"}
+)
+
+
+def get_isolated_pip_env(base_env: dict | None = None) -> dict[str, str]:
+    source = os.environ if base_env is None else base_env
+    return {k: v for k, v in source.items() if k in ALLOWED_PIP_ENV_VARS}
+
+
+def validate_safe_requirements(requirements_path: Path) -> None:
+    if not requirements_path.exists():
+        return
+    text = requirements_path.read_text(encoding="utf-8")
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        lower_line = line.lower()
+        if any(
+            lower_line.startswith(opt)
+            for opt in (
+                "-e",
+                "--editable",
+                "--extra-index-url",
+                "--index-url",
+                "--find-links",
+                "--trusted-host",
+            )
+        ):
+            raise RuntimeError(f"Disallowed pip option in requirements.txt: '{line}'")
+        if any(scheme in lower_line for scheme in ("git+", "http://", "https://", "ftp://", "file://")):
+            raise RuntimeError(f"Remote URL and VCS dependencies are disallowed in requirements.txt: '{line}'")
+        if line.startswith((".", "/", "\\")) or ".." in line:
+            raise RuntimeError(f"Local path references are disallowed in requirements.txt: '{line}'")
+        if any(char in line for char in (";", "&", "|", "`", "$")):
+            raise RuntimeError(f"Disallowed shell characters in requirements.txt: '{line}'")
 
 
 def validate_presigned_url(uri: str) -> None:
@@ -57,13 +97,25 @@ def safe_extract_zip(zip_path, destination):
         archive.extractall(destination)
 
 
-def install_requirements(requirements_path, *, subprocess_module, python_executable, source_dir, detail, log):
+def install_requirements(
+    requirements_path,
+    *,
+    subprocess_module,
+    python_executable,
+    source_dir,
+    detail,
+    log,
+    env=None,
+):
     if not requirements_path.exists():
         return
+    validate_safe_requirements(requirements_path)
     log("Installing requirements.txt")
+    clean_env = get_isolated_pip_env(env)
     result = subprocess_module.run(
         [python_executable, "-m", "pip", "install", "-r", str(requirements_path)],
         cwd=str(source_dir),
+        env=clean_env,
         capture_output=True,
         text=True,
         check=False,

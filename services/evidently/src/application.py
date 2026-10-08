@@ -141,6 +141,8 @@ def load_production_data():
         pandas_module=pd,
         detail=runtime_log.detail,
         db_schema=DB_SCHEMA,
+        tenant_id=TENANT_ID,
+        project_id=PROJECT_ID,
     )
 
 
@@ -446,31 +448,45 @@ def save_drift_report(report, result_dict, summary):
         (summary_json_path, SUMMARY_JSON_UPLOAD_URL, "application/json"),
     ]
 
+    configured_uploads = [item for item in uploads if item[1]]
     uploaded_count = 0
+    max_retries = 3
+    is_testing = bool(os.environ.get("PYTEST_CURRENT_TEST"))
+
     for local_path, upload_url, content_type in uploads:
         if upload_url:
-            try:
-                with open(local_path, "rb") as f:
-                    resp = requests.put(upload_url, data=f, headers={"Content-Type": content_type})
-                    resp.raise_for_status()
-                uploaded_count += 1
-            except Exception as e:
+            last_err = None
+            for attempt in range(max_retries):
+                try:
+                    with open(local_path, "rb") as f:
+                        resp = requests.put(upload_url, data=f, headers={"Content-Type": content_type}, timeout=(5, 60))
+                        resp.raise_for_status()
+                    uploaded_count += 1
+                    last_err = None
+                    break
+                except Exception as e:
+                    last_err = e
+                    if attempt < max_retries - 1 and not is_testing:
+                        time.sleep(0.5 * (attempt + 1))
+            if last_err is not None:
                 runtime_log.event(
                     logging.ERROR,
                     "drift_report_upload_failed",
                     "Failed to upload drift report",
-                    reason=sanitize(str(e)),
+                    reason=sanitize(str(last_err)),
                 )
 
-    artifacts.update(
-        {
-            "s3_report_prefix": "",
-            "html_s3_uri": HTML_S3_URI,
-            "report_json_s3_uri": REPORT_JSON_S3_URI,
-            "summary_json_s3_uri": SUMMARY_JSON_S3_URI,
-            "html_url": HTML_PUBLIC_URL,
-        }
-    )
+    all_uploads_succeeded = (uploaded_count == len(configured_uploads))
+    if all_uploads_succeeded:
+        artifacts.update(
+            {
+                "s3_report_prefix": "",
+                "html_s3_uri": HTML_S3_URI,
+                "report_json_s3_uri": REPORT_JSON_S3_URI,
+                "summary_json_s3_uri": SUMMARY_JSON_S3_URI,
+                "html_url": HTML_PUBLIC_URL,
+            }
+        )
     runtime_log.detail(f"Drift report upload attempts finished: {uploaded_count}/{len(uploads)} files uploaded.")
 
     summary_with_artifacts = {**summary, "report_artifacts": artifacts}
@@ -478,22 +494,38 @@ def save_drift_report(report, result_dict, summary):
         json.dump(summary_with_artifacts, fp, ensure_ascii=False, indent=2, default=str)
 
     # Refresh summary.json on S3
-    if SUMMARY_JSON_UPLOAD_URL:
-        try:
-            with open(summary_json_path, "rb") as f:
-                resp = requests.put(
-                    SUMMARY_JSON_UPLOAD_URL,
-                    data=f,
-                    headers={"Content-Type": "application/json"},
-                )
-                resp.raise_for_status()
-        except Exception as e:
+    if SUMMARY_JSON_UPLOAD_URL and all_uploads_succeeded:
+        refresh_err = None
+        for attempt in range(max_retries):
+            try:
+                with open(summary_json_path, "rb") as f:
+                    resp = requests.put(
+                        SUMMARY_JSON_UPLOAD_URL,
+                        data=f,
+                        headers={"Content-Type": "application/json"},
+                        timeout=(5, 60),
+                    )
+                    resp.raise_for_status()
+                refresh_err = None
+                break
+            except Exception as e:
+                refresh_err = e
+                if attempt < max_retries - 1 and not is_testing:
+                    time.sleep(0.5 * (attempt + 1))
+        if refresh_err is not None:
             runtime_log.event(
                 logging.ERROR,
                 "drift_summary_upload_failed",
                 "Failed to refresh summary report",
-                reason=sanitize(str(e)),
+                reason=sanitize(str(refresh_err)),
             )
+    elif SUMMARY_JSON_UPLOAD_URL and not all_uploads_succeeded:
+        runtime_log.event(
+            logging.ERROR,
+            "drift_summary_upload_failed",
+            "Skipping refresh of summary report due to previous upload failures",
+            reason="previous_uploads_failed",
+        )
 
     return artifacts
 
@@ -553,6 +585,17 @@ def _run():
             samples=len(production_df),
             reason=f"minimum_samples={MIN_SAMPLES}",
         )
+        if CONTROL_PLANE_WEBHOOK_URL:
+            skipped_summary = {
+                "status": "skipped",
+                "reason": f"Insufficient production samples ({len(production_df)} < {MIN_SAMPLES})",
+                "samples": len(production_df),
+                "minimum_samples": MIN_SAMPLES,
+                "dataset_drift": False,
+                "has_drift": False,
+                "drift_score": None,
+            }
+            trigger_django_webhook(skipped_summary)
         return 0
 
     try:
@@ -579,6 +622,15 @@ def _run():
             "Drift analysis failed",
             reason=sanitize(str(e)),
             exc_info=True,
+        )
+        return 1
+
+    artifacts = drift_summary.get("report_artifacts", {})
+    if HTML_UPLOAD_URL and not artifacts.get("html_s3_uri"):
+        runtime_log.event(
+            logging.ERROR,
+            "drift_upload_incomplete",
+            "Required S3 drift report artifacts failed to upload",
         )
         return 1
 

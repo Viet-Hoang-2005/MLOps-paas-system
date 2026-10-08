@@ -34,7 +34,7 @@ class DriftMonitor(models.Model):
 
 class DriftRun(ExecutionWatch):
     STATUSES = tuple(
-        (value, value.title()) for value in ("pending", "queued", "running", "completed", "failed", "cancelled")
+        (value, value.title()) for value in ("pending", "queued", "running", "completed", "failed", "cancelled", "skipped")
     )
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     monitor = models.ForeignKey(DriftMonitor, on_delete=models.CASCADE, related_name="runs")
