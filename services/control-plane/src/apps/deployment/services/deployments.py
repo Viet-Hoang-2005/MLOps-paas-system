@@ -2,8 +2,7 @@ from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
 from apps.deployment.models import Deployment
-from apps.deployment.services.cache import invalidate_model_server_cache
-from apps.deployment.tasks import execute_deployment, stop_deployment
+from apps.deployment.tasks import claim_deployment_stop, execute_deployment
 from common.logging import runtime_line
 from infrastructure.execution import deployment_backend
 
@@ -35,8 +34,14 @@ def _enqueue(deployment):
 
 
 def request_stop(deployment):
-    invalidate_model_server_cache(str(deployment.version.public_id))
-    transaction.on_commit(lambda: stop_deployment.delay(str(deployment.public_id)))
+    from apps.catalog.models import ModelProject
+
+    with transaction.atomic():
+        project = ModelProject.objects.select_for_update().get(pk=deployment.version.project_id)
+        deployment = (
+            Deployment.objects.select_for_update(of=("self",)).select_related("version").get(pk=deployment.pk)
+        )
+        claim_deployment_stop(project, deployment)
     return deployment
 
 

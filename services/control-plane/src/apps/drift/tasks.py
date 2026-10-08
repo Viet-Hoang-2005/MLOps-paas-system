@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from common.logging import record_transition
-from infrastructure.execution import drift_backend
+from infrastructure.execution import drift_backend, polls_runtime_status
 from infrastructure.storage import S3Storage
 
 
@@ -55,7 +55,7 @@ def execute_drift_run(self, run_id):
         raise
     if isinstance(result, dict) and result.get("dispatched"):
         record_transition(run, "running", phase="dispatched")
-        if hasattr(drift_backend(run.monitor.backend), "poll"):
+        if polls_runtime_status(drift_backend(run.monitor.backend)):
             poll_drift_run_status.apply_async(args=[str(run.public_id)], countdown=5)
         return "running"
 
@@ -105,7 +105,7 @@ def poll_drift_run_status(self, run_id):
         return run.status
 
     backend = drift_backend(run.monitor.backend)
-    if not hasattr(backend, "poll"):
+    if not polls_runtime_status(backend):
         return run.status
 
     result = backend.poll(run)

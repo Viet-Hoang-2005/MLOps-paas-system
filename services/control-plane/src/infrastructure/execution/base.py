@@ -19,3 +19,8 @@ class DeploymentBackend(Protocol):
 
 class DriftBackend(Protocol):
     def run(self, drift_run): ...
+
+
+def polls_runtime_status(backend):
+    """Callback-driven (Argo) backends expose poll() only for the execution watcher."""
+    return hasattr(backend, "poll") and not getattr(type(backend), "reports_by_callback", False)

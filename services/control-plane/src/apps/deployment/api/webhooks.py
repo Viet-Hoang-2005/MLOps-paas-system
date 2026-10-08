@@ -14,7 +14,12 @@ from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.services.callbacks import valid_callback_token
 from apps.deployment.services.completion import complete_build
 from apps.deployment.services.logs import append_deployment_log
-from apps.deployment.tasks import _mark_deployment_succeeded, cleanup_failed_build_artifacts, delete_build
+from apps.deployment.tasks import (
+    _mark_deployment_succeeded,
+    cleanup_failed_build_artifacts,
+    delete_build,
+    stop_deployment,
+)
 from apps.observability.services.outbox import enqueue_event
 from common.api.permissions import HasInternalWebhookSecret
 from common.logging import record_transition
@@ -56,6 +61,9 @@ class DeploymentWebhookEndpoint(APIView):
             if deployment.backend != "argo":
                 return Response({"detail": "This deployment does not use Argo."}, status=409)
             if deployment.status in {"succeeded", "failed", "stopped"}:
+                if deployment.status == "stopped" and incoming == "succeeded":
+                    # The workflow created its runtime after the stop ran; remove it again.
+                    transaction.on_commit(lambda: stop_deployment.delay(str(deployment.public_id)))
                 return Response({"status": deployment.status, "duplicate": True})
             if deployment.version.project.deletion_state != "active":
                 return Response({"status": deployment.status, "ignored": True})

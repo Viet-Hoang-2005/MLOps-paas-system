@@ -22,6 +22,8 @@ from .image_references import (
 
 class _ArgoBackend:
     setting_name = ""
+    # Without the execution watcher, terminal status arrives only via callbacks.
+    reports_by_callback = True
 
     def __init__(self, client=None, storage=None):
         self.client = client or ArgoWebhookClient()

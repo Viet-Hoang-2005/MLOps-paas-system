@@ -109,7 +109,7 @@ and cancellation/completion serialization. Argo acceptance remains offline;
 cluster smoke below is required before production enablement.
 
 Backend regression uses `config.settings.test`. Lease concurrency requires
-`config.settings.test_postgres` with `PGTEST_HOST/PORT/DB/USER/PASSWORD` pointing to
+`config.settings.integration_postgres` with `PGTEST_HOST/PORT/DB/USER/PASSWORD` pointing to
 a separate disposable PostgreSQL server. Never point these at application data.
 Run `web/scripts/test-inference.mjs` for isolated client regression. Browser smoke
 is `web/scripts/smoke-inference-browser.mjs`; set `P1_PLAYWRIGHT_MODULE` to the
@@ -145,8 +145,9 @@ them manually also deletes create-if-absent history.
 Roll out: additive migrations, runner/adapters and Argo templates, backend/Beat,
 then FE. Inventory all active jobs before enabling the watchdog. Existing unlabeled
 Docker runtimes require an ownership audit rather than automatic label adoption.
-Production `EXECUTION_WATCH_ENABLED` stays false and training remains disabled until
-the staging handlers/images are compatible and cluster smoke has passed.
+Production `EXECUTION_WATCH_ENABLED` stays false until the staging handlers/images
+are compatible and cluster smoke has passed. While it is false, Argo training and
+drift are not status-polled; their terminal status arrives only through callbacks.
 Use the normal image promotion workflow; do not change pinned production digests
 to a local image. No production deployment is performed by this P1 change.
 

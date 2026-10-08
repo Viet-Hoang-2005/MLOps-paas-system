@@ -94,3 +94,25 @@ def test_argo_cancel_uses_job_bound_callback_capability(settings):
         f"/internal/webhooks/training-jobs/{job.public_id}/cancellation/"
     )
     assert payload["cancel_reporter_capability"]
+
+
+@pytest.mark.django_db
+def test_argo_training_is_not_status_polled_without_the_watcher(settings, monkeypatch):
+    from apps.training.tasks import poll_training_job_status
+    from infrastructure.execution import polls_runtime_status
+    from infrastructure.execution.argo_backends import ArgoDriftBackend
+    from infrastructure.execution.docker_backends import DockerTrainingBackend
+
+    settings.EXECUTION_WATCH_ENABLED = False
+    backend = ArgoTrainingBackend(client=FakeArgoClient(), storage=FakeStorage())
+    assert not polls_runtime_status(backend)
+    assert not polls_runtime_status(ArgoDriftBackend(client=FakeArgoClient(), storage=FakeStorage()))
+    assert polls_runtime_status(object.__new__(DockerTrainingBackend))
+
+    owner = get_user_model().objects.create_user("argo-poll@example.com", "test-password")
+    project = ModelProject.objects.create(owner=owner, name="argo-poll")
+    job = TrainingJob.objects.create(project=project, name="job", model_flavor="sklearn", backend="argo", status="running")
+    monkeypatch.setattr("apps.training.tasks.training_backend", lambda _: backend)
+    assert poll_training_job_status.run(str(job.public_id)) == "running"
+    job.refresh_from_db()
+    assert job.status == "running"

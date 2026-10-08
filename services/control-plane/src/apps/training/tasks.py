@@ -2,7 +2,7 @@ from celery import shared_task
 from django.db import transaction
 
 from common.logging import record_transition
-from infrastructure.execution import training_backend
+from infrastructure.execution import polls_runtime_status, training_backend
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import (
     training_job_prefix,
@@ -72,7 +72,7 @@ def execute_training_job(self, job_id):
     if isinstance(result, dict) and result.get("dispatched"):
         record_transition(job, "running", phase="dispatched")
         append_training_log(job.public_id, f"[SYSTEM] Training workload dispatched ({job.backend}).")
-        if hasattr(training_backend(job.backend), "poll"):
+        if polls_runtime_status(training_backend(job.backend)):
             poll_training_job_status.apply_async(args=[str(job.public_id)], countdown=3)
         else:
             append_training_log(job.public_id, "[SYSTEM] Waiting for trusted callback.")
@@ -117,7 +117,7 @@ def poll_training_job_status(self, job_id):
         return job.status
 
     backend = training_backend(job.backend)
-    if not hasattr(backend, "poll"):
+    if not polls_runtime_status(backend):
         return job.status
 
     result = backend.poll(job)

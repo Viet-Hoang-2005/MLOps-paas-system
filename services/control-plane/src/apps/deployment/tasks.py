@@ -24,6 +24,30 @@ from infrastructure.storage.paths import build_prefix
 logger = logging.getLogger(__name__)
 
 
+STOP_CLAIMABLE = {"pending", "deploying", "succeeded", "unconfirmed"}
+
+
+def claim_deployment_stop(project, deployment):
+    """Claim the stop under the caller's project and deployment locks.
+
+    The stopped status is written before the runtime is touched, so a late
+    readiness result can no longer promote this deployment.
+    """
+    if deployment.status in STOP_CLAIMABLE:
+        deployment.status = "stopped"
+        deployment.save(update_fields=["status", "updated_at"])
+    Endpoint.objects.filter(deployment=deployment).update(
+        health_status="unknown", last_checked_at=None, health_check_token=None, health_check_lease_until=None
+    )
+    if project.active_deployment_id == deployment.pk:
+        project.active_deployment = None
+        project.save(update_fields=["active_deployment", "updated_at"])
+    version_id = str(deployment.version.public_id)
+    public_id = str(deployment.public_id)
+    transaction.on_commit(lambda: invalidate_model_server_cache(version_id))
+    transaction.on_commit(lambda: stop_deployment.delay(public_id))
+
+
 def _mark_deployment_succeeded(deployment):
     from apps.catalog.models import ModelProject
     from apps.drift.models import DriftMonitor
@@ -44,9 +68,8 @@ def _mark_deployment_succeeded(deployment):
             is_active=False
         )
         if old_id and old_id != deployment.pk:
-            old = Deployment.objects.select_related("version").get(pk=old_id)
-            transaction.on_commit(lambda: invalidate_model_server_cache(str(old.version.public_id)))
-            transaction.on_commit(lambda: stop_deployment.delay(str(old.public_id)))
+            old = Deployment.objects.select_for_update(of=("self",)).select_related("version").get(pk=old_id)
+            claim_deployment_stop(project, old)
     invalidate_model_server_cache(str(deployment.version.public_id))
     append_deployment_log(deployment, "Runtime passed readiness checks; deployment succeeded.")
     record_transition(deployment, "succeeded")
@@ -325,15 +348,24 @@ def mark_deployment_unconfirmed(deployment_id):
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def stop_deployment(self, deployment_id):
+    from apps.catalog.models import ModelProject
+
     deployment = Deployment.objects.select_related("version", "build").get(public_id=deployment_id)
+    with transaction.atomic():
+        # Stops queued before the claim existed still win over a late promotion.
+        project = ModelProject.objects.select_for_update().get(pk=deployment.version.project_id)
+        locked = Deployment.objects.select_for_update(of=("self",)).select_related("version").get(pk=deployment.pk)
+        if locked.status in STOP_CLAIMABLE:
+            locked.status = "stopped"
+            locked.save(update_fields=["status", "updated_at"])
+        if project.active_deployment_id == locked.pk:
+            project.active_deployment = None
+            project.save(update_fields=["active_deployment", "updated_at"])
     deployment_backend(deployment.backend).stop(deployment)
-    Deployment.objects.filter(pk=deployment.pk).update(status="stopped", stopped_at=timezone.now())
+    Deployment.objects.filter(pk=deployment.pk, stopped_at__isnull=True).update(stopped_at=timezone.now())
     Endpoint.objects.filter(deployment=deployment).update(
         health_status="unknown", last_checked_at=None, health_check_token=None, health_check_lease_until=None
     )
-    from apps.catalog.models import ModelProject
-
-    ModelProject.objects.filter(active_deployment=deployment).update(active_deployment=None)
     invalidate_model_server_cache(str(deployment.version.public_id))
     append_deployment_log(deployment, "Deployment stopped.")
     record_transition(deployment, "stopped")

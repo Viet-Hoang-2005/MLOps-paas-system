@@ -11,6 +11,10 @@ from apps.catalog.models import ModelProject
 from apps.deployment.models import Build
 from apps.registry.models import ModelVersion
 
+pytestmark = pytest.mark.skipif(
+    connection.vendor != "postgresql", reason="Run with --ds=config.settings.integration_postgres."
+)
+
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.parametrize(
@@ -27,7 +31,6 @@ from apps.registry.models import ModelVersion
 def test_build_callback_locks_only_build_with_nullable_version(
     monkeypatch, initial_status, deletion_state, incoming, registered, expected_status, duplicate
 ):
-    assert connection.vendor == "postgresql", "Run with --ds=config.settings.test_postgres, not SQLite."
     owner = get_user_model().objects.create_user("callback@example.com", "test-password")
     project = ModelProject.objects.create(owner=owner, name="callback regression")
     version = ModelVersion.objects.create(project=project, version="1") if registered else None
