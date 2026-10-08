@@ -155,13 +155,14 @@ def register_build(build_id):
     if build.version_id:
         return "registered"
     try:
-        register_successful_build(build=build, image_uri=build.image_uri, image_digest=build.image_digest)
+        registered = register_successful_build(build=build, image_uri=build.image_uri, image_digest=build.image_digest)
     except Exception as exc:
         Build.objects.filter(pk=build.pk, version__isnull=True).update(
             registration_status="failed", registration_error=str(exc)[:12000]
         )
         raise
-    return "registered"
+    # Another worker may still hold this build; it finishes (or fails) the registration.
+    return "registered" if registered.version_id else "in_progress"
 
 
 @shared_task(bind=True)

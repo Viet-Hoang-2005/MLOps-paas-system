@@ -167,3 +167,113 @@ def test_supplemental_summary_rejects_existing_keys_and_pickle(version_with_mode
             storage=storage,
         )
     assert not version.artifacts.filter(kind__in=["params", "label_mapping"]).exists()
+
+
+class _HookedStorage(MemoryStorage):
+    """MemoryStorage that runs a callback when an object is uploaded."""
+
+    def __init__(self, on_put=None):
+        super().__init__()
+        self.on_put = on_put
+
+    def put(self, key, file, content_type="application/octet-stream"):
+        if self.on_put:
+            self.on_put(key)
+        return super().put(key, file, content_type)
+
+
+@pytest.mark.django_db
+def test_supplemental_upload_holds_no_transaction_while_talking_to_s3(version_with_model_source, monkeypatch):
+    import apps.registry.services.versions as versions_module
+
+    _, version, user = version_with_model_source
+    depth = {"value": 0}
+    real_atomic = versions_module.transaction.atomic
+
+    class CountingAtomic:
+        def __init__(self, *args, **kwargs):
+            self.inner = real_atomic(*args, **kwargs)
+
+        def __enter__(self):
+            depth["value"] += 1
+            return self.inner.__enter__()
+
+        def __exit__(self, *exc):
+            depth["value"] -= 1
+            return self.inner.__exit__(*exc)
+
+    monkeypatch.setattr(versions_module.transaction, "atomic", CountingAtomic)
+    storage = _HookedStorage(on_put=lambda key: pytest.fail("S3 upload inside a transaction") if depth["value"] else None)
+
+    add_supplemental_artifacts(
+        version=version,
+        actor=user,
+        source_code_file=SimpleUploadedFile("inference.py", b"def predict(): pass\n"),
+        reference_data_file=SimpleUploadedFile("ref.csv", b"a,b\n1,2\n3,4\n"),
+        storage=storage,
+    )
+
+    assert len(storage.objects) == 2
+
+
+@pytest.mark.django_db
+def test_losing_a_concurrent_upload_does_not_delete_the_winners_object(version_with_model_source):
+    _, version, user = version_with_model_source
+    winner_uri = "s3://test-bucket/winner/inference.py"
+
+    def competitor_commits_first(key):
+        ModelArtifact.objects.create(
+            version=version, kind="source_code", name="inference.py", uri=winner_uri, checksum="w", size_bytes=1
+        )
+
+    storage = _HookedStorage(on_put=competitor_commits_first)
+    storage.objects[winner_uri] = b"winner"
+
+    with pytest.raises(Conflict, match="already has a source code artifact"):
+        add_supplemental_artifacts(
+            version=version,
+            actor=user,
+            source_code_file=SimpleUploadedFile("inference.py", b"def predict(): pass\n"),
+            storage=storage,
+        )
+
+    assert storage.objects == {winner_uri: b"winner"}
+    assert len(storage.deleted) == 1 and storage.deleted[0] != winner_uri
+
+
+@pytest.mark.django_db
+def test_project_deleted_during_upload_rolls_back_and_cleans_up(version_with_model_source):
+    project, version, user = version_with_model_source
+
+    def project_gets_deleted(key):
+        ModelProject.objects.filter(pk=project.pk).update(deletion_state="deleting")
+
+    storage = _HookedStorage(on_put=project_gets_deleted)
+
+    with pytest.raises(Conflict, match="being deleted"):
+        add_supplemental_artifacts(
+            version=version,
+            actor=user,
+            source_code_file=SimpleUploadedFile("inference.py", b"def predict(): pass\n"),
+            storage=storage,
+        )
+
+    assert storage.objects == {}
+    assert not version.artifacts.filter(kind="source_code").exists()
+
+
+@pytest.mark.django_db
+def test_invalid_upload_never_reaches_storage(version_with_model_source):
+    _, version, user = version_with_model_source
+    storage = _HookedStorage()
+
+    with pytest.raises(ValidationError):
+        add_supplemental_artifacts(
+            version=version,
+            actor=user,
+            source_code_file=SimpleUploadedFile("inference.py", b"def predict(): pass\n"),
+            metrics_file=SimpleUploadedFile("metrics.json", b"not json"),
+            storage=storage,
+        )
+
+    assert storage.objects == {}
