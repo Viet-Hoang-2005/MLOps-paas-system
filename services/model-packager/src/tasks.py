@@ -14,6 +14,12 @@ import redis
 import requests
 import yaml
 from src import config, image_build, io
+from src.security import (
+    PackageSecurityError,
+    validate_model_package_security,
+    validate_no_dangerous_binaries,
+    validate_safe_requirements,
+)
 from src.core import (
     build_preview_tree,
     load_model,
@@ -282,8 +288,11 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
             training_archive_path = workspace / "training-model.tar.gz"
             extracted_dir = workspace / "training-artifact"
             download_presigned_file(source_download_url, training_archive_path)
+            runtime_log.detail("Scanning training artifact security...")
+            validate_model_package_security(training_archive_path)
             runtime_log.detail("Extracting training artifact safely...")
             safe_extract_tar(training_archive_path, extracted_dir)
+            validate_no_dangerous_binaries(extracted_dir)
             artifact_path = find_supported_model_file(extracted_dir, flavor=flavor)
             artifact_name = artifact_path.name
             training_summaries, extracted_mlops_dir = read_training_summaries(extracted_dir)
@@ -301,6 +310,11 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
             artifact_name = Path(source_artifact_name).name
             artifact_path = workspace / artifact_name
             download_presigned_file(source_download_url, artifact_path)
+            runtime_log.detail("Scanning uploaded artifact security...")
+            validate_model_package_security(artifact_path)
+
+        if requirements_text.strip():
+            validate_safe_requirements(requirements_text)
 
         runtime_log.detail(f"Loading {flavor} model...")
         model = load_model(artifact_path, flavor)
@@ -438,10 +452,13 @@ def run_test_zip_task(build_id: str, webhook_url: str) -> None:
         zip_path = workspace / artifact_name
 
         download_presigned_file(source_download_url, zip_path)
+        runtime_log.detail("Scanning model package security...")
+        validate_model_package_security(zip_path)
 
         extract_dir = workspace / "extracted"
         runtime_log.detail("Extracting ZIP archive safely...")
         safe_extract_zip(zip_path, extract_dir)
+        validate_no_dangerous_binaries(extract_dir)
 
         mlmodel_paths = list(extract_dir.rglob("MLmodel"))
         if not mlmodel_paths:
@@ -466,6 +483,7 @@ def run_test_zip_task(build_id: str, webhook_url: str) -> None:
             runtime_log.detail("No requirements.txt or conda.yaml found. Proceeding with default environment.")
 
         if requirements_text.strip():
+            validate_safe_requirements(requirements_text)
             runtime_log.detail("Installing package requirements for validation...")
             temp_req = workspace / "validation-requirements.txt"
             temp_req.write_text(requirements_text + "\n", encoding="utf-8")

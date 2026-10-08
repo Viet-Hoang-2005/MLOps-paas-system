@@ -211,8 +211,8 @@ class ArgoDeploymentBackend(_ArgoBackend):
         version = deployment.version
         project = version.project
         container_name = f"deploy-{str(deployment.public_id).lower()}"
-        model_type = "dl" if version.flavor in {"pytorch", "tensorflow"} else "ml"
-        target_port = 3000 if model_type == "dl" else 5001
+        model_type = "dl" if version.flavor in {"pytorch", "tensorflow", "keras"} else "ml"
+        target_port = 5002 if model_type == "dl" else 5001
         public_url = (
             f"{settings.MODEL_SERVER_PUBLIC_URL}/{project.owner.tenant_id}/models/"
             f"{project.public_id}/{version.public_id}"

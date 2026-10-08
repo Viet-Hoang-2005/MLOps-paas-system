@@ -98,16 +98,19 @@ def _records(frame: pd.DataFrame) -> list[dict]:
     for row in frame.to_dict("records"):
         if not row.get("public_id") or not row.get("project_id") or not row.get("model_version_id"):
             continue
+        obs_at = row.get("observed_at")
+        if pd.isna(obs_at):
+            obs_at = None
         records.append(
             {
                 "public_id": str(row["public_id"]),
                 "project_id": str(row["project_id"]),
                 "model_version_id": str(row["model_version_id"]),
-                "observed_at": row.get("observed_at"),
+                "observed_at": obs_at,
                 "features": json.dumps(row.get("features") or {}),
                 "prediction": "" if row.get("prediction") is None else str(row["prediction"]),
-                "confidence": row.get("confidence"),
-                "latency_ms": row.get("latency_ms"),
+                "confidence": None if pd.isna(row.get("confidence")) else row.get("confidence"),
+                "latency_ms": None if pd.isna(row.get("latency_ms")) else row.get("latency_ms"),
                 "request_id": str(row.get("request_id") or ""),
             }
         )

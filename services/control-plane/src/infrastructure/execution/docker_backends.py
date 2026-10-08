@@ -169,7 +169,7 @@ class DockerDeploymentBackend:
         project = deployment.version.project
         image = immutable_image_reference(deployment.build)
         container_name = f"deploy-{deployment.public_id}"
-        target_port = 5002 if deployment.version.flavor in {"pytorch", "tensorflow"} else 5001
+        target_port = 5002 if deployment.version.flavor in {"pytorch", "tensorflow", "keras"} else 5001
         internal_url = f"http://{container_name}:{target_port}"
         public_path = f"/{project.owner.tenant_id}/models/{project.public_id}/{deployment.version.public_id}"
         public_url = f"{settings.MODEL_SERVER_PUBLIC_URL}{public_path}"

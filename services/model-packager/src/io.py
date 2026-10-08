@@ -1,10 +1,10 @@
 """Artifact transfer, safe extraction, and webhook I/O."""
 
-import tarfile
-import zipfile
 import hashlib
 import json
+import tarfile
 import time
+import zipfile
 
 
 def download_presigned_file(download_url, destination, requests_module, detail):
@@ -52,6 +52,9 @@ def safe_extract_zip(archive_path, destination):
             resolved = (destination / member.filename).resolve()
             if not resolved.is_relative_to(destination_root):
                 raise ValueError("Model package contains an unsafe path.")
+            is_symlink = (member.external_attr >> 16) & 0o170000 == 0o120000
+            if is_symlink:
+                raise ValueError("Model package contains links, which are not supported.")
         archive.extractall(destination)
 
 

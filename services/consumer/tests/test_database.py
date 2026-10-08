@@ -131,3 +131,22 @@ def test_webhook_claim_uses_kind_destination_and_skip_locked(monkeypatch):
     assert "delivery_kind = 'webhook'" in statement
     assert "destination = 'automatic_drift'" in statement
     assert "FOR UPDATE SKIP LOCKED" in statement
+
+def test_records_converts_nat_and_nan_to_none():
+    frame = pd.DataFrame(
+        [
+            {
+                "public_id": "00000000-0000-0000-0000-000000000001",
+                "project_id": "00000000-0000-0000-0000-000000000002",
+                "model_version_id": "00000000-0000-0000-0000-000000000003",
+                "observed_at": pd.NaT,
+                "confidence": float("nan"),
+                "latency_ms": float("nan"),
+            }
+        ]
+    )
+    records = database._records(frame)
+    assert len(records) == 1
+    assert records[0]["observed_at"] is None
+    assert records[0]["confidence"] is None
+    assert records[0]["latency_ms"] is None

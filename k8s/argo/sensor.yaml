@@ -78,7 +78,7 @@ spec:
             value: ['^(ml|dl)$']
           - path: body.target_port
             type: string
-            value: ['^(3000|5001)$']
+            value: ['^(3000|5001|5002)$']
         exprs:
           - expr: image_name =~ project_id && callback =~ deployment_id && container_name == 'deploy-' + deployment_id
             fields:

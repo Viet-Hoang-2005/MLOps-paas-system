@@ -1,17 +1,25 @@
 from unittest.mock import Mock
 
 from src import kafka_runtime as main
-from src.batching import PREDICTION_RECORD_COLUMNS
+from src.batching import PREDICTION_RECORD_COLUMNS, is_production_sample
 from src.models import KafkaRecord
 
 
 class FakeConsumer:
     def __init__(self):
         self.commits = []
+        self.paused = []
+        self.resumed = []
 
     def commit(self, offsets, asynchronous):
         self.commits.append((offsets, asynchronous))
         return []
+
+    def pause(self, partitions):
+        self.paused.extend(partitions)
+
+    def resume(self, partitions):
+        self.resumed.extend(partitions)
 
 
 def record(payload=None, offset=0, partition=0):
@@ -91,3 +99,49 @@ def test_flush_rejects_mixed_partitions():
         assert "exactly one partition" in str(exc)
     else:
         raise AssertionError("Expected partition validation failure")
+
+def test_is_production_sample_rejects_non_uuid():
+    valid = {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "project_id": "00000000-0000-0000-0000-000000000002",
+        "model_version_id": "00000000-0000-0000-0000-000000000003",
+        "features": {"x": 1},
+        "status_code": 200,
+    }
+    assert is_production_sample(valid)
+
+    # Invalid event_id
+    assert not is_production_sample(valid | {"id": "not-a-uuid"})
+    # Invalid project_id
+    assert not is_production_sample(valid | {"project_id": "not-a-uuid"})
+    # Invalid model_version_id
+    assert not is_production_sample(valid | {"model_version_id": "not-a-uuid"})
+    # Non-dict payload
+    assert not is_production_sample("string_payload")
+    # Non-dict features
+    assert not is_production_sample(valid | {"features": "not-a-dict"})
+
+
+def test_flush_pending_batch_discards_after_max_retries(monkeypatch):
+    from src.models import RetryState
+
+    consumer = FakeConsumer()
+    monkeypatch.setattr(
+        main,
+        "save_prediction_records_and_automatic_drift_signals",
+        Mock(return_value=False),
+    )
+    key = ("events", 0)
+    pending = {key: [record(offset=10)]}
+    retries = {key: RetryState(attempts=main.KAFKA_DB_RETRY_MAX_ATTEMPTS)}
+
+    result = main.flush_pending_batch(consumer, pending, retries, key)
+    assert not result
+    assert key not in pending
+    assert key not in retries
+    # Should commit offset 11 (offset 10 + 1) to unblock partition
+    assert len(consumer.commits) == 1
+    assert consumer.commits[0][0][0].offset == 11
+    # Should resume the partition
+    assert len(consumer.resumed) == 1
+    assert consumer.resumed[0].partition == 0

@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-DEEP_LEARNING_FLAVORS = frozenset({"pytorch", "tensorflow"})
+DEEP_LEARNING_FLAVORS = frozenset({"pytorch", "tensorflow", "keras"})
 
 
 def serving_engine_for_flavor(flavor: Any) -> str:

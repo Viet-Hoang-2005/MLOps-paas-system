@@ -42,6 +42,7 @@ KAFKA_DB_RETRY_MAX_SECONDS = max(
     KAFKA_DB_RETRY_INITIAL_SECONDS,
     int(os.environ.get("KAFKA_DB_RETRY_MAX_SECONDS", "60")),
 )
+KAFKA_DB_RETRY_MAX_ATTEMPTS = max(1, int(os.environ.get("KAFKA_DB_RETRY_MAX_ATTEMPTS", "5")))
 
 RUNNING = True
 DISPATCHER_JOIN_TIMEOUT_SECONDS = REQUEST_TIMEOUT_SECONDS + OUTBOX_POLL_SECONDS + 1
@@ -172,6 +173,26 @@ def flush_pending_batch(
     batch = pending_batches[key]
     saved = flush_batch(consumer, batch)
     if not saved:
+        retry = retries.get(key)
+        if retry and retry.attempts >= KAFKA_DB_RETRY_MAX_ATTEMPTS:
+            log_event(
+                logger,
+                "ERROR",
+                "partition_batch_discarded_max_retries",
+                "Discarding batch after reaching max DB retry attempts to unblock partition",
+                topic=key[0],
+                partition=key[1],
+                attempts=retry.attempts,
+                batch_size=len(batch),
+            )
+            if batch:
+                _commit_batch_offset(consumer, batch[-1])
+            pending_batches.pop(key, None)
+            was_paused = retries.pop(key, None)
+            if was_paused:
+                consumer.resume([_partition_handle(key)])
+            return False
+
         _schedule_retry(consumer, key, retries)
         return False
 
@@ -240,6 +261,8 @@ def main():
             try:
                 val_json = msg.value().decode("utf-8")
                 row_data = json.loads(val_json)
+                if not isinstance(row_data, dict):
+                    raise ValueError(f"Payload must be a JSON object, got {type(row_data).__name__}")
                 record = KafkaRecord(
                     payload=row_data,
                     topic=msg.topic(),
@@ -254,7 +277,39 @@ def main():
                     flush_pending_batch(consumer, pending_batches, retries, key)
 
             except Exception as parse_e:
-                raise KafkaRecordProcessingError(type(parse_e).__name__) from None
+                log_event(
+                    logger,
+                    "ERROR",
+                    "consumer_corrupt_message_skipped",
+                    "Malformed Kafka record skipped to prevent poison pill crash loop",
+                    topic=msg.topic(),
+                    partition=msg.partition(),
+                    offset=msg.offset(),
+                    error_type=type(parse_e).__name__,
+                )
+                key = (msg.topic(), msg.partition())
+                if key in pending_batches and pending_batches[key]:
+                    try:
+                        flush_pending_batch(consumer, pending_batches, retries, key)
+                    except Exception as flush_err:
+                        log_event(
+                            logger,
+                            "ERROR",
+                            "consumer_pending_flush_failed",
+                            "Failed to flush pending batch before skipping corrupt record",
+                            error_type=type(flush_err).__name__,
+                        )
+                try:
+                    next_offset = TopicPartition(msg.topic(), msg.partition(), msg.offset() + 1)
+                    consumer.commit(offsets=[next_offset], asynchronous=False)
+                except Exception as commit_err:
+                    log_event(
+                        logger,
+                        "ERROR",
+                        "consumer_corrupt_message_commit_failed",
+                        "Failed to commit offset after malformed record",
+                        error_type=type(commit_err).__name__,
+                    )
 
     except KeyboardInterrupt:
         log_event(logger, "INFO", "shutdown_requested", "Consumer shutdown requested")
