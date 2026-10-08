@@ -1,7 +1,11 @@
 import { StepTitle } from "@/shared/components/StepTitle";
 import { FileDropzone } from "@/shared/components/FileDropzone";
+import { toast } from "@/shared/types/toastStore";
 import { useTranslation } from "react-i18next";
 import type { CodeDataForm, ModelProject } from "@/features/projects/types";
+
+const MAX_SOURCE_CODE_BYTES = 5 * 1024 * 1024;
+const MAX_REFERENCE_DATA_BYTES = 100 * 1024 * 1024;
 
 interface CodeDataFieldsProps {
   form: CodeDataForm;
@@ -47,7 +51,7 @@ export function CodeDataFields({
         description={t("uploadFlow.metadata.sourcesDescription")}
       />
       <FileDropzone
-        accept=".zip,.py"
+        accept=".py"
         disabled={readOnly}
         title={
           form.source_code_file?.name ||
@@ -64,7 +68,19 @@ export function CodeDataFields({
             setField("source_code_file", null);
           }
         }}
-        onChange={(file) => setField("source_code_file", file)}
+        onChange={(file) => {
+          if (file) {
+            if (!file.name.toLowerCase().endsWith(".py")) {
+              toast.error(t("uploadFlow.metadata.sourceCodeFormatError"));
+              return;
+            }
+            if (file.size > MAX_SOURCE_CODE_BYTES) {
+              toast.error(t("uploadFlow.metadata.sourceCodeTooLarge"));
+              return;
+            }
+          }
+          setField("source_code_file", file);
+        }}
       />
       <FileDropzone
         accept=".csv"
@@ -84,7 +100,19 @@ export function CodeDataFields({
             setField("reference_data_file", null);
           }
         }}
-        onChange={(file) => setField("reference_data_file", file)}
+        onChange={(file) => {
+          if (file) {
+            if (!file.name.toLowerCase().endsWith(".csv")) {
+              toast.error(t("uploadFlow.metadata.referenceDataFormatError"));
+              return;
+            }
+            if (file.size > MAX_REFERENCE_DATA_BYTES) {
+              toast.error(t("uploadFlow.metadata.referenceDataTooLarge"));
+              return;
+            }
+          }
+          setField("reference_data_file", file);
+        }}
       />
     </section>
   );

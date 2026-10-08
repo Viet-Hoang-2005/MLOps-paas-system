@@ -7,12 +7,19 @@ from pathlib import Path
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
-from apps.catalog.artifact_types import validate_source_artifact
+from apps.catalog.artifact_types import (
+    get_max_source_artifact_bytes,
+    validate_source_artifact,
+)
 from apps.catalog.models import ModelPreview, PreviewAsset
+from apps.catalog.services.snapshots import parse_label_mapping_payload
 from common.api.exceptions import Conflict
 from common.validation.artifacts import (
     MAX_REFERENCE_DATA_BYTES,
+    MAX_SOURCE_CODE_BYTES,
     parse_reference_preview,
+    validate_reference_data_content,
+    validate_source_code_content,
 )
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import project_prefix
@@ -28,20 +35,43 @@ def generate_preview_upload_urls(
         filename = Path(item["filename"].replace("\\", "/")).name
         if not filename or filename in {".", ".."}:
             raise ValidationError({kind: "Invalid filename."})
+        size_bytes = item.get("size_bytes")
+        if size_bytes is None or size_bytes <= 0:
+            raise ValidationError({kind: "File size (size_bytes) must be greater than 0."})
 
-        if kind == "source_artifact" and flavor:
-            validate_source_artifact(filename=filename, flavor=flavor, artifact_format=artifact_format)
-        elif kind == "source_code" and not filename.lower().endswith(".py"):
-            raise ValidationError({"source_code": "Source code must be a Python (.py) file."})
-        elif kind == "reference_data" and not filename.lower().endswith(".csv"):
-            raise ValidationError({"reference_data": "Reference dataset must be a CSV (.csv) file."})
-        elif kind == "label_mapping" and Path(filename).suffix.lower() != ".json":
-            raise ValidationError({"label_mapping": "Label mapping must be a .json file."})
-        elif (
-            kind in {"metrics", "params", "model_insights", "feature_importance", "input_schema"}
-            and not filename.lower().endswith(".json")
-        ):
-            raise ValidationError({kind: "Upload a JSON file."})
+        if kind == "source_artifact":
+            if not flavor:
+                raise ValidationError({"flavor": "Flavor must be specified."})
+            validate_source_artifact(
+                filename=filename,
+                flavor=flavor,
+                artifact_format=artifact_format,
+                size_bytes=size_bytes,
+            )
+        elif kind == "source_code":
+            if not filename.lower().endswith(".py"):
+                raise ValidationError({"source_code": "Source code must be a Python (.py) file."})
+            if size_bytes > MAX_SOURCE_CODE_BYTES:
+                raise ValidationError(
+                    {"source_code": f"Source code file must be at most {MAX_SOURCE_CODE_BYTES // (1024 * 1024)} MiB."}
+                )
+        elif kind == "reference_data":
+            if not filename.lower().endswith(".csv"):
+                raise ValidationError({"reference_data": "Reference dataset must be a CSV (.csv) file."})
+            if size_bytes > MAX_REFERENCE_DATA_BYTES:
+                raise ValidationError(
+                    {"reference_data": f"Reference data file must be at most {MAX_REFERENCE_DATA_BYTES // (1024 * 1024)} MiB."}
+                )
+        elif kind == "label_mapping":
+            if Path(filename).suffix.lower() != ".json":
+                raise ValidationError({"label_mapping": "Label mapping must be a .json file."})
+            if size_bytes > 4 * 1024 * 1024:
+                raise ValidationError({"label_mapping": "Upload a valid JSON file under 4 MiB."})
+        elif kind in {"metrics", "params", "model_insights", "feature_importance", "input_schema"}:
+            if not filename.lower().endswith(".json"):
+                raise ValidationError({kind: "Upload a JSON file."})
+            if size_bytes > 4 * 1024 * 1024:
+                raise ValidationError({kind: "Upload a valid JSON file under 4 MiB."})
 
         # Presigned upload URLs target strictly an ephemeral staging area.
         # Upon preview save, valid staged files are promoted (copied) to an immutable committed key,
@@ -51,7 +81,9 @@ def generate_preview_upload_urls(
         key = f"staging/{project_prefix(tenant_id, project_id)}/preview/{upload_batch_id}/{kind}/{filename}"
         s3_uri = f"s3://{storage.bucket}/{key}"
         content_type = item.get("content_type") or "application/octet-stream"
-        upload_url = storage.presigned_put(s3_uri, expires_in=900, content_type=content_type)
+        upload_url = storage.presigned_put(
+            s3_uri, expires_in=900, content_type=content_type, size_bytes=size_bytes
+        )
         result.append(
             {
                 "kind": kind,
@@ -105,22 +137,6 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                 if not s3_uri.startswith(expected_staging_prefix):
                     raise ValidationError({"assets": f"Storage URI for '{kind}' does not belong to this project's preview staging area."})
 
-                if kind == "source_artifact":
-                    if not flavor:
-                        raise ValidationError({"flavor": "Flavor must be specified."})
-                    validate_source_artifact(filename=name, flavor=flavor, artifact_format=artifact_format)
-                elif kind == "source_code" and not name.lower().endswith(".py"):
-                    raise ValidationError({"source_code": "Source code must be a Python (.py) file."})
-                elif kind == "reference_data" and not name.lower().endswith(".csv"):
-                    raise ValidationError({"reference_data": "Reference dataset must be a CSV (.csv) file."})
-                elif kind == "label_mapping" and Path(name).suffix.lower() != ".json":
-                    raise ValidationError({"label_mapping": "Unsupported file format."})
-                elif (
-                    kind in {"metrics", "params", "model_insights", "feature_importance", "input_schema"}
-                    and not name.lower().endswith(".json")
-                ):
-                    raise ValidationError({kind: "Upload a JSON file."})
-
                 try:
                     stored = storage.head(s3_uri)
                 except Exception as exc:
@@ -131,17 +147,53 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                 if not stored.etag:
                     raise ValidationError({"assets": f"Uploaded asset '{kind}' has no storage ETag."})
 
-                if kind in {"label_mapping", "metrics", "params", "model_insights", "feature_importance", "input_schema"}:
+                if kind == "source_artifact":
+                    if not flavor:
+                        raise ValidationError({"flavor": "Flavor must be specified."})
+                    validate_source_artifact(
+                        filename=name,
+                        flavor=flavor,
+                        artifact_format=artifact_format,
+                        size_bytes=stored.size_bytes,
+                    )
+                elif kind == "source_code":
+                    if not name.lower().endswith(".py"):
+                        raise ValidationError({"source_code": "Source code must be a Python (.py) file."})
+                    if stored.size_bytes > MAX_SOURCE_CODE_BYTES:
+                        raise ValidationError(
+                            {"source_code": f"Source code file must be at most {MAX_SOURCE_CODE_BYTES // (1024 * 1024)} MiB."}
+                        )
+                    content = storage.read(s3_uri, max_bytes=MAX_SOURCE_CODE_BYTES + 1)
+                    validate_source_code_content(name, content, error_key="source_code")
+                elif kind == "reference_data":
+                    if not name.lower().endswith(".csv"):
+                        raise ValidationError({"reference_data": "Reference dataset must be a CSV (.csv) file."})
+                    if stored.size_bytes > MAX_REFERENCE_DATA_BYTES:
+                        raise ValidationError(
+                            {"reference_data": f"Reference data file must be at most {MAX_REFERENCE_DATA_BYTES // (1024 * 1024)} MiB."}
+                        )
+                    content = storage.read(s3_uri, max_bytes=MAX_REFERENCE_DATA_BYTES + 1)
+                    validate_reference_data_content(name, content, error_key="reference_data")
+                elif kind in {"label_mapping", "metrics", "params", "model_insights", "feature_importance", "input_schema"}:
+                    if not name.lower().endswith(".json"):
+                        raise ValidationError({kind: "Upload a JSON file."})
+                    if stored.size_bytes > 4 * 1024 * 1024:
+                        raise ValidationError({kind: "Upload a valid JSON file under 4 MiB."})
                     try:
                         content = storage.read(s3_uri, max_bytes=4 * 1024 * 1024 + 1)
                         if len(content) > 4 * 1024 * 1024:
                             raise ValueError
-                        value = json.loads(content)
-                        if not isinstance(value, (dict, list)):
-                            raise ValueError
-                        if kind in {"metrics", "params", "model_insights", "input_schema"} and not isinstance(value, dict):
-                            raise ValueError
+                        if kind == "label_mapping":
+                            value = parse_label_mapping_payload(name, content)
+                        else:
+                            value = json.loads(content)
+                            if not isinstance(value, (dict, list)):
+                                raise ValueError
+                            if kind in {"metrics", "params", "model_insights", "input_schema"} and not isinstance(value, dict):
+                                raise ValueError
                     except Exception as exc:
+                        if isinstance(exc, ValidationError):
+                            raise
                         raise ValidationError({kind: "Upload a valid JSON file under 4 MiB."}) from exc
 
                 checksum = storage.compute_sha256(s3_uri)
@@ -150,15 +202,30 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                 )
 
             # Validate effective artifact (newly uploaded or retained existing) against final flavor & format
-            new_artifact_name = next((name for k, name, *_ in verified_staging_assets if k == "source_artifact"), None)
+            new_artifact_item = next(
+                ((name, size) for k, name, _, _, size, *_ in verified_staging_assets if k == "source_artifact"),
+                None,
+            )
             existing_artifact = current_preview.assets.filter(kind="source_artifact").first() if current_preview else None
-            effective_artifact_name = new_artifact_name or (
-                existing_artifact.name if existing_artifact and "source_artifact" not in remove else None
+            effective_artifact_name = (
+                new_artifact_item[0]
+                if new_artifact_item
+                else (existing_artifact.name if existing_artifact and "source_artifact" not in remove else None)
+            )
+            effective_artifact_size = (
+                new_artifact_item[1]
+                if new_artifact_item
+                else (existing_artifact.size_bytes if existing_artifact and "source_artifact" not in remove else None)
             )
             if effective_artifact_name:
                 if not flavor:
                     raise ValidationError({"flavor": "Flavor must be specified."})
-                validate_source_artifact(filename=effective_artifact_name, flavor=flavor, artifact_format=artifact_format)
+                validate_source_artifact(
+                    filename=effective_artifact_name,
+                    flavor=flavor,
+                    artifact_format=artifact_format,
+                    size_bytes=effective_artifact_size,
+                )
             elif require_artifact:
                 raise ValidationError({"source_artifact": "A model artifact is required."})
 
@@ -246,7 +313,10 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
         existing = preview.assets.filter(kind="source_artifact").first()
         if existing and "source_artifact" not in remove:
             validate_source_artifact(
-                filename=existing.name, flavor=flavor, artifact_format=artifact_format
+                filename=existing.name,
+                flavor=flavor,
+                artifact_format=artifact_format,
+                size_bytes=existing.size_bytes,
             )
         elif require_artifact:
             raise ValidationError({"source_artifact": "A model artifact is required."})

@@ -191,9 +191,13 @@ export const deploymentsVi = {
       sourcesDescription:
         "Giữ mã nguồn và dữ liệu tham chiếu cùng dự án để huấn luyện lại và giám sát.",
       sourceCode: "Chọn mã nguồn",
-      sourceHint: "Không bắt buộc: .py hoặc .zip",
+      sourceHint: "Không bắt buộc: .py (tối đa 5 MB)",
+      sourceCodeTooLarge: "Tệp mã nguồn tối đa 5 MB.",
+      sourceCodeFormatError: "Mã nguồn phải là tệp .py.",
       referenceData: "Chọn dữ liệu tham chiếu",
-      referenceHint: "Không bắt buộc: .csv",
+      referenceHint: "Không bắt buộc: .csv (tối đa 100 MB)",
+      referenceDataTooLarge: "Tệp dữ liệu tham chiếu tối đa 100 MB.",
+      referenceDataFormatError: "Dữ liệu tham chiếu phải là tệp .csv.",
     },
     build: {
       flavorTitle: "Framework mô hình",
@@ -206,8 +210,16 @@ export const deploymentsVi = {
       package: "Gói mô hình",
       chooseRaw: "Chọn artifact mô hình thô",
       choosePackage: "Chọn gói ZIP mô hình",
-      packageHint: "Tải lên một gói .zip chứa đầy đủ artifact mô hình",
-      allowedFiles: "Tệp {{flavor}} được phép: {{extensions}}",
+      packageHint:
+        "Tải lên một gói .zip chứa đầy đủ artifact mô hình (tối đa {{maxSize}})",
+      allowedFiles: "Tệp {{flavor}} được phép: {{extensions}} (tối đa {{maxSize}})",
+      artifactTooLarge:
+        "Tệp artifact mô hình vượt quá kích thước cho phép tối đa {{max}}.",
+      artifactRemovedExceedsLimit:
+        "Đã gỡ artifact mô hình đã chọn do vượt quá giới hạn {{max}} của framework mới.",
+      jsonTooLarge:
+        "Tệp đính kèm vượt quá kích thước cho phép tối đa {{max}}.",
+      jsonFormatError: "Tệp đính kèm phải là tệp .json.",
       packageLayout: "Cấu trúc gói {{flavor}} yêu cầu",
       packageLayoutHint:
         "ZIP có thể chứa tệp bổ sung nhưng bắt buộc có MLmodel.",

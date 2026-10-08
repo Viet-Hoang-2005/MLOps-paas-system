@@ -71,7 +71,7 @@ class MemoryStorage:
     def compute_sha256(self, uri):
         return hashlib.sha256(self.objects[uri]).hexdigest()
 
-    def presigned_put(self, uri, expires_in=900, content_type=None):
+    def presigned_put(self, uri, expires_in=900, content_type=None, size_bytes=None):
         return f"https://{self.bucket}.s3.test/{uri}?signature=mock"
 
     def presigned_get(self, uri, expires_in=900):
@@ -443,8 +443,8 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
     upload = client.post(
         "/api/models/preview/upload-urls/",
         {"name": "API lifecycle", "flavor": "xgboost", "files": [
-            {"kind": "source_artifact", "filename": "model.pkl"},
-            {"kind": "reference_data", "filename": "reference.csv"},
+            {"kind": "source_artifact", "filename": "model.pkl", "size_bytes": 1024},
+            {"kind": "reference_data", "filename": "reference.csv", "size_bytes": 2048},
         ]},
         format="json",
     )

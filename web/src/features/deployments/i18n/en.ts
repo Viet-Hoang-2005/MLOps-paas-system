@@ -186,9 +186,13 @@ export const deployEn = {
       sourcesDescription:
         "Keep optional source code and reference data with this project for retraining and monitoring.",
       sourceCode: "Choose source code",
-      sourceHint: "Optional .py or .zip",
+      sourceHint: "Optional .py (max 5 MB)",
+      sourceCodeTooLarge: "Source code file must be at most 5 MB.",
+      sourceCodeFormatError: "Source code must be a .py file.",
       referenceData: "Choose reference data",
-      referenceHint: "Optional .csv",
+      referenceHint: "Optional .csv (max 100 MB)",
+      referenceDataTooLarge: "Reference data file must be at most 100 MB.",
+      referenceDataFormatError: "Reference data must be a .csv file.",
     },
     build: {
       flavorTitle: "Framework flavor",
@@ -203,8 +207,15 @@ export const deployEn = {
       chooseRaw: "Choose raw model artifact",
       choosePackage: "Choose model package ZIP",
       packageHint:
-        "Upload one .zip package containing the complete model artifact",
-      allowedFiles: "Allowed {{flavor}} files: {{extensions}}",
+        "Upload one .zip package containing the complete model artifact (max {{maxSize}})",
+      allowedFiles: "Allowed {{flavor}} files: {{extensions}} (max {{maxSize}})",
+      artifactTooLarge:
+        "Model artifact file exceeds the maximum allowed size of {{max}}.",
+      artifactRemovedExceedsLimit:
+        "Removed previously selected model artifact because it exceeds the limit of {{max}} for the selected flavor.",
+      jsonTooLarge:
+        "Attachment file exceeds the maximum allowed size of {{max}}.",
+      jsonFormatError: "Attachment file must be a .json file.",
       packageLayout: "Expected {{flavor}} package layout",
       packageLayoutHint:
         "The ZIP may contain additional files, but it must include MLmodel.",

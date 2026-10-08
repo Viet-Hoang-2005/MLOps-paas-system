@@ -28,6 +28,9 @@ def project(db, owner):
 
 @pytest.mark.django_db
 def test_generate_preview_upload_urls_for_existing_project(project, owner, stranger, monkeypatch):
+    project.preview.flavor = "sklearn"
+    project.preview.save(update_fields=["flavor"])
+
     storage = MemoryStorage()
     monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
     monkeypatch.setattr(
@@ -75,7 +78,7 @@ def test_generate_preview_upload_urls_for_existing_project(project, owner, stran
     client.force_authenticate(stranger)
     res_stranger = client.post(
         f"/api/models/{project.public_id}/preview/upload-urls/",
-        {"files": [{"kind": "source_artifact", "filename": "model.joblib"}]},
+        {"files": [{"kind": "source_artifact", "filename": "model.joblib", "size_bytes": 1024}]},
         format="json",
     )
     assert res_stranger.status_code == 404
@@ -125,7 +128,7 @@ def test_generate_preview_upload_urls_for_new_project(owner, monkeypatch):
         {
             "name": "Existing Name",
             "flavor": "sklearn",
-            "files": [{"kind": "source_artifact", "filename": "model.pkl"}],
+            "files": [{"kind": "source_artifact", "filename": "model.pkl", "size_bytes": 5000}],
         },
         format="json",
     )
@@ -330,7 +333,7 @@ def test_generate_upload_urls_with_mlflow_zip_format(owner, monkeypatch):
             "name": "MLflow Model",
             "flavor": "sklearn",
             "artifact_format": "mlflow_zip",
-            "files": [{"kind": "source_artifact", "filename": "model.zip"}],
+            "files": [{"kind": "source_artifact", "filename": "model.zip", "size_bytes": 1024}],
         },
         format="json",
     )
@@ -343,7 +346,7 @@ def test_generate_upload_urls_with_mlflow_zip_format(owner, monkeypatch):
             "name": "MLflow Bad Model",
             "flavor": "sklearn",
             "artifact_format": "mlflow_zip",
-            "files": [{"kind": "source_artifact", "filename": "model.pkl"}],
+            "files": [{"kind": "source_artifact", "filename": "model.pkl", "size_bytes": 1024}],
         },
         format="json",
     )
@@ -375,7 +378,7 @@ def test_generate_upload_urls_for_existing_project_with_new_flavor(project, owne
         {
             "flavor": "pytorch",
             "artifact_format": "raw",
-            "files": [{"kind": "source_artifact", "filename": "model.pt"}],
+            "files": [{"kind": "source_artifact", "filename": "model.pt", "size_bytes": 1024}],
         },
         format="json",
     )
@@ -487,4 +490,137 @@ def test_save_preview_keeps_staging_objects_on_failure(project, owner, monkeypat
     )
     assert response.status_code == 409
     assert stored_staging.uri in storage.objects
+
+
+@pytest.mark.django_db
+def test_generate_upload_urls_flavor_and_content_size_limits(owner, monkeypatch):
+    storage = MemoryStorage()
+    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
+    monkeypatch.setattr(
+        "apps.catalog.api.endpoints.generate_preview_upload_urls",
+        lambda **kwargs: __import__(
+            "apps.catalog.services.preview", fromlist=["generate_preview_upload_urls"]
+        ).generate_preview_upload_urls(**kwargs, storage=storage),
+    )
+
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    # 1. XGBoost raw artifact <= 200 MiB succeeds
+    limit_200 = 200 * 1024 * 1024
+    res_ok = client.post(
+        "/api/models/preview/upload-urls/",
+        {
+            "name": "XGB Valid",
+            "flavor": "xgboost",
+            "artifact_format": "raw",
+            "files": [{"kind": "source_artifact", "filename": "model.pkl", "size_bytes": limit_200}],
+        },
+        format="json",
+    )
+    assert res_ok.status_code == 200
+
+    # 2. XGBoost raw artifact > 200 MiB fails
+    res_xgb_oversize = client.post(
+        "/api/models/preview/upload-urls/",
+        {
+            "name": "XGB Oversize",
+            "flavor": "xgboost",
+            "artifact_format": "raw",
+            "files": [{"kind": "source_artifact", "filename": "model.pkl", "size_bytes": limit_200 + 1}],
+        },
+        format="json",
+    )
+    assert res_xgb_oversize.status_code == 400
+    assert "must be at most 200 MiB" in str(res_xgb_oversize.data)
+
+    # 3. Source code > 5 MB fails
+    res_code_oversize = client.post(
+        "/api/models/preview/upload-urls/",
+        {
+            "name": "Code Oversize",
+            "flavor": "sklearn",
+            "files": [{"kind": "source_code", "filename": "serve.py", "size_bytes": 5 * 1024 * 1024 + 1}],
+        },
+        format="json",
+    )
+    assert res_code_oversize.status_code == 400
+    assert "must be at most 5 MiB" in str(res_code_oversize.data)
+
+    # 4. Reference data > 100 MB fails
+    res_data_oversize = client.post(
+        "/api/models/preview/upload-urls/",
+        {
+            "name": "Data Oversize",
+            "flavor": "sklearn",
+            "files": [{"kind": "reference_data", "filename": "ref.csv", "size_bytes": 100 * 1024 * 1024 + 1}],
+        },
+        format="json",
+    )
+    assert res_data_oversize.status_code == 400
+    assert "must be at most 100 MiB" in str(res_data_oversize.data)
+
+
+@pytest.mark.django_db
+def test_save_preview_validates_source_code_and_reference_data_content(project, owner, monkeypatch):
+    storage = MemoryStorage()
+    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.api.serializers.S3Storage", lambda: storage)
+
+    project.preview.flavor = "sklearn"
+    project.preview.save(update_fields=["flavor"])
+
+    prefix = project_prefix(owner.tenant_id, project.public_id)
+
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    # 1. Invalid source code: null bytes
+    bad_code_key = f"staging/{prefix}/preview/b-code/source_code/serve.py"
+    stored_bad_code = storage.put(bad_code_key, SimpleUploadedFile("serve.py", b"import math\x00"), "text/x-python")
+    res1 = client.patch(
+        f"/api/models/{project.public_id}/preview/",
+        {
+            "revision": project.preview.revision,
+            "assets": [{"kind": "source_code", "name": "serve.py", "s3_uri": stored_bad_code.uri}],
+        },
+        format="json",
+    )
+    assert res1.status_code == 400
+    assert "cannot contain binary null bytes" in str(res1.data)
+
+    # 2. Invalid reference data: empty rows / header only
+    bad_csv_key = f"staging/{prefix}/preview/b-csv/reference_data/ref.csv"
+    stored_bad_csv = storage.put(bad_csv_key, SimpleUploadedFile("ref.csv", b"col_a,col_b\n"), "text/csv")
+    res2 = client.patch(
+        f"/api/models/{project.public_id}/preview/",
+        {
+            "revision": project.preview.revision,
+            "assets": [{"kind": "reference_data", "name": "ref.csv", "s3_uri": stored_bad_csv.uri}],
+        },
+        format="json",
+    )
+    assert res2.status_code == 400
+    assert "at least one row of data" in str(res2.data)
+
+    # 3. Valid source code and reference data succeed
+    good_code_key = f"staging/{prefix}/preview/b-good/source_code/serve.py"
+    stored_good_code = storage.put(good_code_key, SimpleUploadedFile("serve.py", b"def predict(data): return 1\n"), "text/x-python")
+    good_csv_key = f"staging/{prefix}/preview/b-good/reference_data/ref.csv"
+    stored_good_csv = storage.put(good_csv_key, SimpleUploadedFile("ref.csv", b"f1,f2\n1.0,2.0\n3.0,4.0\n"), "text/csv")
+
+    res3 = client.patch(
+        f"/api/models/{project.public_id}/preview/",
+        {
+            "revision": project.preview.revision,
+            "assets": [
+                {"kind": "source_code", "name": "serve.py", "s3_uri": stored_good_code.uri},
+                {"kind": "reference_data", "name": "ref.csv", "s3_uri": stored_good_csv.uri},
+            ],
+        },
+        format="json",
+    )
+    assert res3.status_code == 200, res3.data
+    project.refresh_from_db()
+    assert project.preview.assets.count() == 2
 

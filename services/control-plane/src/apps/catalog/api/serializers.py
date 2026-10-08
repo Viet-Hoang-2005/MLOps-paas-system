@@ -212,7 +212,7 @@ class UploadedAssetInputSerializer(serializers.Serializer):
 class PresignedUploadItemSerializer(serializers.Serializer):
     kind = serializers.ChoiceField(choices=PreviewAsset.KINDS)
     filename = serializers.CharField(max_length=255)
-    size_bytes = serializers.IntegerField(min_value=1, required=False)
+    size_bytes = serializers.IntegerField(min_value=1, required=True)
     content_type = serializers.CharField(
         max_length=160, required=False, allow_blank=True, default="application/octet-stream"
     )

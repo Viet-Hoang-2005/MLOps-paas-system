@@ -9,27 +9,78 @@ MAX_SOURCE_CODE_BYTES = 5 * 1024 * 1024  # 5 MB
 MAX_REFERENCE_DATA_BYTES = 100 * 1024 * 1024  # 100 MB
 
 
-def validate_source_code_file(upload) -> str:
-    """Validate that upload is a UTF-8 Python file under 5 MB."""
-    name = Path(upload.name.replace("\\", "/")).name
-    if not name.lower().endswith(".py") or len(name) > 255:
-        raise ValidationError({"source_code_file": "Upload a Python (.py) file with a valid filename."})
+def validate_source_code_content(name: str, content: bytes, error_key: str = "source_code") -> str:
+    """Validate that content is valid UTF-8 Python text under 5 MB."""
+    filename = Path(name.replace("\\", "/")).name
+    if not filename.lower().endswith(".py") or len(filename) > 255:
+        raise ValidationError({error_key: "Upload a Python (.py) file with a valid filename."})
+    if len(content) > MAX_SOURCE_CODE_BYTES:
+        raise ValidationError(
+            {error_key: f"Source code file must be at most {MAX_SOURCE_CODE_BYTES // (1024 * 1024)} MiB."}
+        )
+    if len(content) == 0:
+        raise ValidationError({error_key: "Source code file cannot be empty."})
     try:
-        content = upload.read(MAX_SOURCE_CODE_BYTES + 1)
-        if len(content) > MAX_SOURCE_CODE_BYTES:
-            raise ValidationError(
-                {"source_code_file": f"Source code file must be at most {MAX_SOURCE_CODE_BYTES // (1024 * 1024)} MiB."}
-            )
         text = content.decode("utf-8")
         if "\x00" in text:
-            raise ValidationError({"source_code_file": "Source code file cannot contain binary null bytes."})
+            raise ValidationError({error_key: "Source code file cannot contain binary null bytes."})
         if not text.strip():
-            raise ValidationError({"source_code_file": "Source code file cannot be empty."})
+            raise ValidationError({error_key: "Source code file cannot be empty."})
     except UnicodeDecodeError as exc:
-        raise ValidationError({"source_code_file": "Source code file must be valid UTF-8 text."}) from exc
+        raise ValidationError({error_key: "Source code file must be valid UTF-8 text."}) from exc
+    return filename
+
+
+def validate_source_code_file(upload) -> str:
+    """Validate that upload is a UTF-8 Python file under 5 MB."""
+    name = Path(getattr(upload, "name", "source_code.py").replace("\\", "/")).name
+    try:
+        content = upload.read(MAX_SOURCE_CODE_BYTES + 1)
+        return validate_source_code_content(name, content, error_key="source_code_file")
     finally:
         upload.seek(0)
-    return name
+
+
+def validate_reference_data_content(name: str, content: bytes, error_key: str = "reference_data") -> tuple[str, str]:
+    """Validate that content is a valid UTF-8 CSV tabular dataset under 100 MB.
+
+    Returns (filename, 'csv').
+    """
+    filename = Path(name.replace("\\", "/")).name
+    suffix = Path(filename).suffix.lower()
+    if suffix != ".csv" or len(filename) > 255:
+        raise ValidationError({error_key: "Upload a CSV (.csv) file with a valid filename."})
+
+    if len(content) > MAX_REFERENCE_DATA_BYTES:
+        raise ValidationError(
+            {error_key: f"Reference data file must be at most {MAX_REFERENCE_DATA_BYTES // (1024 * 1024)} MiB."}
+        )
+    if len(content) == 0:
+        raise ValidationError({error_key: "Reference data file cannot be empty."})
+
+    try:
+        text = content.decode("utf-8-sig")
+        if "\x00" in text:
+            raise ValidationError({error_key: "CSV file cannot contain binary null bytes."})
+        rows = csv.reader(io.StringIO(text), strict=True)
+        header = next(rows, None)
+        if not header or any(not col.strip() for col in header) or len(set(header)) != len(header):
+            raise ValidationError({error_key: "CSV must contain a header row with unique, non-empty column names."})
+        count = 0
+        for row in rows:
+            if not row:
+                continue
+            if len(row) != len(header):
+                raise ValidationError({error_key: "All CSV data rows must have the same number of columns as the header."})
+            count += 1
+        if count == 0:
+            raise ValidationError({error_key: "CSV must contain at least one row of data."})
+    except ValidationError:
+        raise
+    except (UnicodeDecodeError, csv.Error) as exc:
+        raise ValidationError({error_key: f"Invalid CSV file format: {exc}"})
+
+    return filename, "csv"
 
 
 def validate_reference_data_file(upload) -> tuple[str, str]:
@@ -37,51 +88,12 @@ def validate_reference_data_file(upload) -> tuple[str, str]:
 
     Returns (filename, 'csv').
     """
-    name = Path(upload.name.replace("\\", "/")).name
-    suffix = Path(name).suffix.lower()
-    if suffix != ".csv" or len(name) > 255:
-        raise ValidationError({"reference_data_file": "Upload a CSV (.csv) file with a valid filename."})
-
+    name = Path(getattr(upload, "name", "reference_data.csv").replace("\\", "/")).name
     try:
         content = upload.read(MAX_REFERENCE_DATA_BYTES + 1)
-        if len(content) > MAX_REFERENCE_DATA_BYTES:
-            raise ValidationError(
-                {
-                    "reference_data_file": (
-                        f"Reference data file must be at most {MAX_REFERENCE_DATA_BYTES // (1024 * 1024)} MiB."
-                    )
-                }
-            )
-        if len(content) == 0:
-            raise ValidationError({"reference_data_file": "Reference data file cannot be empty."})
-
-        try:
-            text = content.decode("utf-8-sig")
-            if "\x00" in text:
-                raise ValidationError({"reference_data_file": "CSV file cannot contain binary null bytes."})
-            rows = csv.reader(io.StringIO(text), strict=True)
-            header = next(rows, None)
-            if not header or any(not col.strip() for col in header) or len(set(header)) != len(header):
-                raise ValidationError({"reference_data_file": "CSV must contain a header row with unique, non-empty column names."})
-            count = 0
-            for row in rows:
-                if not row:
-                    continue
-                if len(row) != len(header):
-                    raise ValidationError({"reference_data_file": "All CSV data rows must have the same number of columns as the header."})
-                count += 1
-            if count == 0:
-                raise ValidationError({"reference_data_file": "CSV must contain at least one row of data."})
-        except ValidationError:
-            raise
-        except (UnicodeDecodeError, csv.Error) as exc:
-            raise ValidationError({"reference_data_file": f"Invalid CSV file format: {exc}"})
-    except UnicodeDecodeError as exc:
-        raise ValidationError({"reference_data_file": "CSV file must be valid UTF-8 text."}) from exc
+        return validate_reference_data_content(name, content, error_key="reference_data_file")
     finally:
         upload.seek(0)
-
-    return name, "csv"
 
 
 def parse_reference_preview(data_bytes: bytes, filename: str, max_rows: int = 100) -> dict[str, Any]:

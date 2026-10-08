@@ -84,11 +84,13 @@ class S3Storage:
             "get_object", Params={"Bucket": bucket, "Key": key}, ExpiresIn=expires_in
         )
 
-    def presigned_put(self, uri, expires_in=900, content_type=None):
+    def presigned_put(self, uri, expires_in=900, content_type=None, size_bytes=None):
         bucket, key = self.parse_uri(uri)
         params = {"Bucket": bucket, "Key": key}
         if content_type:
             params["ContentType"] = content_type
+        if size_bytes is not None:
+            params["ContentLength"] = size_bytes
         return self.client.generate_presigned_url("put_object", Params=params, ExpiresIn=expires_in)
 
     def delete_prefix(self, prefix):
