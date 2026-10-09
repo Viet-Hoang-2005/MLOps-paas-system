@@ -1,6 +1,7 @@
 """Consumer persistence for Django-owned production and outbox tables."""
 
 import json
+import math
 import os
 import re
 import time
@@ -10,6 +11,7 @@ from urllib.parse import quote_plus
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import DataError, IntegrityError, InterfaceError, OperationalError
 from sqlalchemy.pool import QueuePool
 from src.logging_utils import Summary, get_logger, log_event
 
@@ -93,6 +95,44 @@ def init_db():
     )
 
 
+class PermanentWriteError(Exception):
+    """The data itself cannot be stored; retrying the same rows will never work."""
+
+
+class TransientWriteError(Exception):
+    """The database is unavailable; the rows may be fine and must be retried."""
+
+
+def _clean_json(value):
+    """Make a JSON value storable in PostgreSQL jsonb.
+
+    jsonb rejects NaN/Infinity and the NUL character, and one such value in a
+    batch of events would otherwise fail every other event written with it.
+    """
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, str):
+        return value.replace("\x00", "")
+    if isinstance(value, dict):
+        return {_clean_json(str(key)): _clean_json(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_clean_json(item) for item in value]
+    return value
+
+
+def _clean_text(value) -> str:
+    return str(value).replace("\x00", "")
+
+
+def _finite_or_none(value):
+    if value is None or pd.isna(value):
+        return None
+    try:
+        return value if math.isfinite(float(value)) else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _records(frame: pd.DataFrame) -> list[dict]:
     records = []
     for row in frame.to_dict("records"):
@@ -107,11 +147,11 @@ def _records(frame: pd.DataFrame) -> list[dict]:
                 "project_id": str(row["project_id"]),
                 "model_version_id": str(row["model_version_id"]),
                 "observed_at": obs_at,
-                "features": json.dumps(row.get("features") or {}),
-                "prediction": "" if row.get("prediction") is None else str(row["prediction"]),
-                "confidence": None if pd.isna(row.get("confidence")) else row.get("confidence"),
-                "latency_ms": None if pd.isna(row.get("latency_ms")) else row.get("latency_ms"),
-                "request_id": str(row.get("request_id") or ""),
+                "features": json.dumps(_clean_json(row.get("features") or {}), allow_nan=False),
+                "prediction": "" if row.get("prediction") is None else _clean_text(row["prediction"]),
+                "confidence": _finite_or_none(row.get("confidence")),
+                "latency_ms": _finite_or_none(row.get("latency_ms")),
+                "request_id": _clean_text(row.get("request_id") or ""),
             }
         )
     return records
@@ -193,6 +233,10 @@ def save_prediction_records_and_automatic_drift_signals(
             "Prediction and automatic-drift transaction failed",
             error_type=type(exc).__name__,
         )
+        if isinstance(exc, (DataError, IntegrityError, ValueError, TypeError)):
+            raise PermanentWriteError(type(exc).__name__) from None
+        if isinstance(exc, (OperationalError, InterfaceError)):
+            raise TransientWriteError(type(exc).__name__) from None
         return False
 
 

@@ -504,3 +504,83 @@ def test_insufficient_samples_triggers_skipped_webhook(monkeypatch):
     assert summary["samples"] == 2
     assert summary["minimum_samples"] == 100
     assert "Insufficient production samples" in summary["reason"]
+
+
+def _real_drift_run(monkeypatch, reference, production):
+    monkeypatch.setattr(main, "save_drift_report", lambda *a: {})
+    monkeypatch.setattr(main, "TENANT_ID", "t")
+    monkeypatch.setattr(main, "PROJECT_ID", "p")
+    monkeypatch.setattr(main, "MODEL_VERSION_ID", "v")
+    monkeypatch.setattr(main, "DRIFT_THRESHOLD", 0.5)
+    mapping = main.ColumnMapping()
+    mapping.prediction = "prediction"
+    return main.run_drift_analysis(reference, production, mapping)
+
+
+def test_string_predictions_do_not_register_as_drift_against_numeric_reference(monkeypatch):
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+    features = {f"f{i}": rng.normal(size=300) for i in range(4)}
+    labels = rng.integers(0, 2, size=300)
+    reference = pd.DataFrame({**features, "prediction": labels})
+    # Same distribution, but production stores predictions as text.
+    production = pd.DataFrame({**{k: rng.normal(size=300) for k in features}, "prediction": rng.permutation(labels).astype(str)})
+
+    summary = _real_drift_run(monkeypatch, reference, production)
+
+    assert summary["prediction_drift"] is False
+    assert "prediction" not in summary["drifted_feature_names"]
+    assert summary["number_of_drifted_features"] == 0
+    assert summary["has_drift"] is False
+
+
+def test_prediction_column_is_not_part_of_the_feature_drift_share(monkeypatch):
+    import numpy as np
+
+    rng = np.random.default_rng(1)
+    reference = pd.DataFrame(
+        {"a": rng.normal(size=400), "b": rng.normal(size=400), "c": rng.normal(size=400), "prediction": rng.integers(0, 2, 400)}
+    )
+    # Only `a` really moves; the prediction distribution shifts heavily as well.
+    production = pd.DataFrame(
+        {
+            "a": rng.normal(loc=6, size=400),
+            "b": rng.normal(size=400),
+            "c": rng.normal(size=400),
+            "prediction": np.ones(400, dtype=int),
+        }
+    )
+
+    summary = _real_drift_run(monkeypatch, reference, production)
+
+    assert summary["drifted_feature_names"] == ["a"]
+    assert summary["number_of_features"] == 3
+    assert summary["share_drifted_features"] == round(1 / 3, 4)
+    assert summary["prediction_drift"] is True
+    assert summary["share_drifted_features"] <= 1.0
+    assert summary["has_drift"] is False  # 1/3 is below the 0.5 threshold
+
+
+def test_mlflow_signature_enum_types_are_classified_correctly(monkeypatch):
+    from mlflow.types import DataType
+
+    signature = SimpleNamespace(
+        inputs=[
+            SimpleNamespace(name="age", type=DataType.long),
+            SimpleNamespace(name="score", type=DataType.double),
+            SimpleNamespace(name="city", type=DataType.string),
+        ]
+    )
+    monkeypatch.setattr(main, "resolve_model_dir", lambda _: "/model")
+    monkeypatch.setattr(main.mlflow.models, "get_model_info", lambda _: SimpleNamespace(signature=signature))
+
+    mapping = main.get_column_mapping(
+        pd.DataFrame({"age": [1], "score": [0.5], "city": ["a"]}),
+        pd.DataFrame({"age": [2], "score": [0.7], "city": ["b"]}),
+    )
+
+    # With the enum compared against plain strings every column became categorical,
+    # which made Evidently report drift for all numeric features.
+    assert mapping.numerical_features == ["age", "score"]
+    assert mapping.categorical_features == ["city"]

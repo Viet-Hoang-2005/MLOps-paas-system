@@ -12,11 +12,31 @@ def avatar_path(instance, filename):
 
 
 class CustomUserManager(BaseUserManager):
+    @classmethod
+    def normalize_email(cls, email):
+        email = super().normalize_email(email)
+        return email.strip().lower() if email else ""
+
+    def get_by_natural_key(self, username):
+        clean_email = str(username).strip().lower()
+        try:
+            return self.get(**{f"{self.model.USERNAME_FIELD}__iexact": clean_email})
+        except self.model.MultipleObjectsReturned:
+            user = (
+                self.filter(**{f"{self.model.USERNAME_FIELD}__iexact": clean_email})
+                .order_by("-is_active", "-date_joined")
+                .first()
+            )
+            if user:
+                return user
+            raise self.model.DoesNotExist
+
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError("Email is required")
         extra_fields.pop("tenant_id", None)
-        user: Any = self.model(email=self.normalize_email(email), **extra_fields)
+        clean_email = self.normalize_email(email)
+        user: Any = self.model(email=clean_email, **extra_fields)
         user.set_password(password) if password else user.set_unusable_password()
         user.save(using=self._db)
         return user
@@ -48,7 +68,14 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
+    def clean(self):
+        super().clean()
+        if self.email:
+            self.email = self.email.strip().lower()
+
     def save(self, *args, **kwargs):
+        if self.email:
+            self.email = self.email.strip().lower()
         if not self.public_id:
             self.public_id = uuid.uuid4()
         self.tenant_id = f"T-{self.public_id}"

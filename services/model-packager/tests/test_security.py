@@ -333,6 +333,11 @@ def test_scan_pickle_data_rejects_unparseable_data(payload):
         scan_pickle_data(payload, "garbage.pkl")
 
 
+COMMON_MODELS = (
+    "gradient-boosting", "hist-gradient-boosting", "hist-regressor", "knn", "knn-ball",
+    "knn-regressor", "column-selector", "select-k-best", "voting", "stacking",
+)
+
 _BUILD_REAL_ARTIFACTS = """
 import pickle, sys
 from pathlib import Path
@@ -367,8 +372,43 @@ try:
     net = torch.nn.Sequential(torch.nn.Linear(3, 2), torch.nn.ReLU())
     torch.save(net, out / "full.pt")
     torch.save(net.state_dict(), out / "state.pth")
+    layer = torch.nn.TransformerEncoderLayer(d_model=4, nhead=2, dim_feedforward=8)
+    torch.save(torch.nn.TransformerEncoder(layer, num_layers=1), out / "transformer.pt")
+    torch.save(net, out / "legacy.pt", _use_new_zipfile_serialization=False)
 except ImportError:
     pass
+
+from sklearn.compose import ColumnTransformer, make_column_selector
+from sklearn.ensemble import (
+    GradientBoostingClassifier,
+    HistGradientBoostingClassifier,
+    HistGradientBoostingRegressor,
+    StackingClassifier,
+    VotingClassifier,
+)
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+import pandas as pd
+
+frame = pd.DataFrame(features, columns=list("abcd"))
+common = {
+    "gradient-boosting": GradientBoostingClassifier(n_estimators=3).fit(features, labels),
+    "hist-gradient-boosting": HistGradientBoostingClassifier(max_iter=3).fit(features, labels),
+    "hist-regressor": HistGradientBoostingRegressor(max_iter=3).fit(features, features[:, 0]),
+    "knn": KNeighborsClassifier(algorithm="kd_tree").fit(features, labels),
+    "knn-ball": KNeighborsClassifier(algorithm="ball_tree").fit(features, labels),
+    "knn-regressor": KNeighborsRegressor().fit(features, features[:, 0]),
+    "column-selector": Pipeline([
+        ("columns", ColumnTransformer([("num", StandardScaler(), make_column_selector(dtype_include="number"))])),
+        ("clf", LogisticRegression()),
+    ]).fit(frame, labels),
+    "select-k-best": Pipeline([("select", SelectKBest(f_classif, k=2)), ("clf", LogisticRegression())]).fit(features, labels),
+    "voting": VotingClassifier([("lr", LogisticRegression()), ("rf", RandomForestClassifier(n_estimators=2))]).fit(features, labels),
+    "stacking": StackingClassifier([("lr", LogisticRegression()), ("rf", RandomForestClassifier(n_estimators=2))]).fit(features, labels),
+}
+for name, model in common.items():
+    (out / f"{name}.pkl").write_bytes(pickle.dumps(model))
+    joblib.dump(model, out / f"{name}.joblib")
 """
 
 
@@ -386,7 +426,11 @@ def real_artifacts(tmp_path_factory):
 
 @pytest.mark.parametrize(
     "name",
-    ["models.pkl", "pipeline-p0.pkl", "pipeline-p2.pkl", "pipeline-p4.pkl", "xgboost.pkl", "full.pt", "state.pth"],
+    [
+        "models.pkl", "pipeline-p0.pkl", "pipeline-p2.pkl", "pipeline-p4.pkl", "xgboost.pkl", "full.pt",
+        "state.pth", "transformer.pt",
+        *[f"{name}.pkl" for name in COMMON_MODELS],
+    ],
 )
 def test_validate_pickle_file_accepts_real_pickled_models(real_artifacts, name):
     path = real_artifacts / name
@@ -395,7 +439,9 @@ def test_validate_pickle_file_accepts_real_pickled_models(real_artifacts, name):
     validate_pickle_file(path)
 
 
-@pytest.mark.parametrize("name", ["models-c0.joblib", "models-c3.joblib"])
+@pytest.mark.parametrize(
+    "name", ["models-c0.joblib", "models-c3.joblib", *[f"{name}.joblib" for name in COMMON_MODELS]]
+)
 def test_validate_pickle_file_accepts_joblib_models_with_arrays(real_artifacts, name):
     validate_pickle_file(real_artifacts / name)
 
@@ -408,3 +454,89 @@ def test_validate_pickle_file_rejects_malicious_global_after_joblib_arrays(tmp_p
     joblib.dump({"weights": np.arange(1000, dtype="float64"), "payload": _Exploit()}, path)
     with pytest.raises(PackageSecurityError, match="disallowed module"):
         validate_pickle_file(path)
+
+
+def test_validate_pickle_file_rejects_legacy_multi_pickle_torch_files(real_artifacts, tmp_path):
+    legacy = real_artifacts / "legacy.pt"
+    if not legacy.exists():
+        pytest.skip("torch unavailable")
+    with pytest.raises(PackageSecurityError, match="multi-pickle"):
+        validate_pickle_file(legacy)
+
+    # A payload hidden after the first pickle is never executed unscanned.
+    crafted = tmp_path / "crafted.pt"
+    crafted.write_bytes(pickle.dumps({"weights": [1.0]}) + pickle.dumps(_Exploit()))
+    with pytest.raises(PackageSecurityError, match="multi-pickle"):
+        validate_pickle_file(crafted)
+
+
+def test_pickle_renamed_inside_an_archive_is_still_scanned(tmp_path):
+    payload = pickle.dumps(_Exploit())
+    for member in ("weights.dat", "model", "nested/blob.bin"):
+        archive = tmp_path / "renamed.zip"
+        with zipfile.ZipFile(archive, "w") as z:
+            z.writestr(member, payload)
+        with pytest.raises(PackageSecurityError, match="disallowed module"):
+            validate_model_package_security(archive)
+
+    tar_path = tmp_path / "renamed.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tar:
+        info = tarfile.TarInfo("weights.dat")
+        info.size = len(payload)
+        tar.addfile(info, io.BytesIO(payload))
+    with pytest.raises(PackageSecurityError, match="disallowed module"):
+        validate_model_package_security(tar_path)
+
+    # Protocol 0 has no magic bytes but is still a pickle.
+    legacy = tmp_path / "protocol0.zip"
+    with zipfile.ZipFile(legacy, "w") as z:
+        z.writestr("model.dat", pickle.dumps(_Exploit(), protocol=0))
+    with pytest.raises(PackageSecurityError, match="disallowed module"):
+        validate_model_package_security(legacy)
+
+
+def test_non_pickle_members_with_any_name_are_left_alone(tmp_path):
+    archive = tmp_path / "ok.zip"
+    with zipfile.ZipFile(archive, "w") as z:
+        z.writestr("MLmodel", "flavors:\n  python_function:\n    loader_module: mlflow.sklearn\n")
+        z.writestr("model/weights.dat", bytes(range(256)) * 8)
+        z.writestr("model/variables.data-00000-of-00001", b"\x00" * 64)
+        z.writestr("model/model.pkl", pickle.dumps({"weights": [1.0]}))
+    validate_model_package_security(archive)
+
+
+@pytest.mark.parametrize(
+    "mlmodel,message",
+    [
+        ("flavors:\n  python_function:\n    loader_module: evil\n    code: code\n", "disallowed loader_module"),
+        ("flavors:\n  python_function:\n    loader_module: mlflow.sklearn\n    code: code\n", "custom code"),
+        ("not: [valid", "Cannot verify MLmodel"),
+        ("just text", "Cannot verify MLmodel"),
+    ],
+)
+def test_mlmodel_cannot_load_custom_code(tmp_path, mlmodel, message):
+    archive = tmp_path / "mlflow.zip"
+    with zipfile.ZipFile(archive, "w") as z:
+        z.writestr("MLmodel", mlmodel)
+        z.writestr("code/evil.py", "import os\n")
+    with pytest.raises(PackageSecurityError, match=message):
+        validate_model_package_security(archive)
+
+
+def test_object_arrays_inside_joblib_files_are_checked_too(tmp_path):
+    import joblib
+    import numpy as np
+
+    # joblib stores object arrays as a nested plain pickle; it must obey the allowlist.
+    evil = np.empty(1, dtype=object)
+    evil[0] = _Exploit()
+    path = tmp_path / "nested.joblib"
+    joblib.dump({"weights": np.arange(10.0), "objects": evil}, path)
+    with pytest.raises(PackageSecurityError, match="disallowed module"):
+        validate_pickle_file(path)
+
+    benign = np.empty(2, dtype=object)
+    benign[0], benign[1] = {"a": 1}, [1, 2]
+    ok = tmp_path / "benign.joblib"
+    joblib.dump({"objects": benign}, ok)
+    validate_pickle_file(ok)

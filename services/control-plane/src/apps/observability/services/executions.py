@@ -348,9 +348,6 @@ def apply_observation(kind, public_id, token, observation):
             _finish(current, kind, status, observation.get("error", "Runtime is missing." if observed == "not_found" else ""), finished_at=finished)
             current.observation_status = "cleanup_pending"
             current.execution_stop_requested = True
-            if kind == "drift" and current.has_drift and status == "completed":
-                from apps.drift.tasks import handle_drift_detected
-                transaction.on_commit(lambda: handle_drift_detected.delay(str(current.public_id)), robust=True)
         _release(current)
         return current.status
 

@@ -42,7 +42,7 @@ from src.logging_utils import (
 )
 from src.logging_utils import request_id as validated_request_id
 from src.prometheus_metrics import metrics_response
-from src.routing import resolve_worker_url
+from src.routing import build_worker_payload, resolve_worker_url, serving_engine_for_flavor
 from src.runtime_metrics import record_request
 from src.schemas import InferenceRequest
 
@@ -282,7 +282,11 @@ async def model_health(version_id: str, token_payload: dict = Depends(verify_mod
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(worker_url)
+            if serving_engine_for_flavor(model_record.get("flavor")) == "dl":
+                # BentoML exposes custom APIs as POST only.
+                response = await client.post(worker_url, json={})
+            else:
+                response = await client.get(worker_url)
             if response.status_code == 200:
                 return response.json()
             return JSONResponse(
@@ -357,10 +361,7 @@ async def _predict(
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
-            worker_payload = {
-                "features": features_dict,
-                "model_version_id": resolved_model_version_id,
-            }
+            worker_payload = build_worker_payload(model_record, features_dict, resolved_model_version_id)
             response = await client.post(worker_url, json=worker_payload, headers={"X-Request-ID": request_id})
             latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
 

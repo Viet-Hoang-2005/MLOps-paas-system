@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject, WorkspaceAsset
 from apps.drift.models import DriftMonitor, DriftRun
-from apps.drift.tasks import execute_drift_run, handle_drift_detected, poll_drift_run_status
+from apps.drift.tasks import execute_drift_run, poll_drift_run_status
 from apps.registry.models import ModelVersion
 from infrastructure.execution.docker_backends import DockerDriftBackend
 
@@ -132,7 +132,7 @@ class DockerDriftAsyncTests(TestCase):
         self.drift_run.refresh_from_db()
         self.assertEqual(self.drift_run.status, "running")
 
-    def test_poll_drift_run_status_completes_and_triggers_ct_hook(self):
+    def test_poll_drift_run_status_records_drift_without_triggering_anything(self):
         self.drift_run.status = "running"
         self.drift_run.summary = {"drift_score": 0.35, "has_drift": True}
         self.drift_run.drift_score = 0.35
@@ -144,7 +144,7 @@ class DockerDriftAsyncTests(TestCase):
 
         with (
             patch("apps.drift.tasks.drift_backend", return_value=fake_backend),
-            patch("apps.drift.tasks.handle_drift_detected.delay") as mock_ct_delay,
+            patch("celery.app.task.Task.apply_async") as queued,
             self.captureOnCommitCallbacks(execute=True),
         ):
             result = poll_drift_run_status(str(self.drift_run.public_id))
@@ -152,35 +152,19 @@ class DockerDriftAsyncTests(TestCase):
         self.assertEqual(result, "completed")
         self.drift_run.refresh_from_db()
         self.assertEqual(self.drift_run.status, "completed")
-        mock_ct_delay.assert_called_once_with(str(self.drift_run.public_id))
-
-    def test_handle_drift_detected_prepares_evidence_payload(self):
-        self.drift_run.status = "completed"
-        self.drift_run.drift_score = 0.45
-        self.drift_run.has_drift = True
-        self.drift_run.summary = {
-            "drift_score": 0.45,
-            "has_drift": True,
-            "drifted_features": ["age", "income"],
-        }
-        self.drift_run.save(update_fields=["status", "drift_score", "has_drift", "summary"])
-
-        result = handle_drift_detected(str(self.drift_run.public_id))
-
-        self.assertEqual(result["status"], "drift_handled")
-        self.assertEqual(result["model_version_id"], str(self.version.public_id))
-        self.assertEqual(result["drift_score"], 0.45)
-        self.assertIn("drifted_features", result["evidence"]["summary"])
+        self.assertTrue(self.drift_run.has_drift)
+        # Continuous Training is not wired yet: detecting drift must not enqueue any follow-up work.
+        queued.assert_not_called()
 
 
 @override_settings(CONTROL_PLANE_WEBHOOK_SECRET="test-secret")
-class DriftWebhookContinuousTrainingHookTests(TestCase):
+class DriftWebhookDriftDetectionTests(TestCase):
     def setUp(self):
         self.owner, self.project, self.version, self.monitor, self.drift_run = _create_drift_fixtures()
         self.client = APIClient()
         self.headers = {"HTTP_X_CONTROL_PLANE_SECRET": "test-secret"}
 
-    def test_webhook_triggers_ct_hook_when_drift_detected(self):
+    def test_webhook_records_detected_drift_without_triggering_retraining(self):
         payload = {
             "drift_summary": {
                 "drift_score": 0.55,
@@ -189,10 +173,7 @@ class DriftWebhookContinuousTrainingHookTests(TestCase):
                 "share_of_drifted_columns": 0.55,
             }
         }
-        with (
-            patch("apps.drift.tasks.handle_drift_detected.delay") as mock_ct_delay,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
+        with patch("celery.app.task.Task.apply_async") as queued, self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(
                 f"/internal/webhooks/drift-runs/{self.drift_run.public_id}/",
                 payload,
@@ -203,9 +184,11 @@ class DriftWebhookContinuousTrainingHookTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.drift_run.refresh_from_db()
         self.assertTrue(self.drift_run.has_drift)
-        mock_ct_delay.assert_called_once_with(str(self.drift_run.public_id))
+        self.assertEqual(self.drift_run.drift_score, 0.55)
+        # Continuous Training is not wired yet: detecting drift must not enqueue any follow-up work.
+        queued.assert_not_called()
 
-    def test_webhook_does_not_trigger_ct_hook_when_no_drift(self):
+    def test_webhook_records_no_drift(self):
         payload = {
             "drift_summary": {
                 "drift_score": 0.05,
@@ -214,15 +197,13 @@ class DriftWebhookContinuousTrainingHookTests(TestCase):
                 "share_of_drifted_columns": 0.05,
             }
         }
-        with patch("apps.drift.tasks.handle_drift_detected.delay") as mock_ct_delay:
-            response = self.client.post(
-                f"/internal/webhooks/drift-runs/{self.drift_run.public_id}/",
-                payload,
-                format="json",
-                **self.headers,
-            )
+        response = self.client.post(
+            f"/internal/webhooks/drift-runs/{self.drift_run.public_id}/",
+            payload,
+            format="json",
+            **self.headers,
+        )
 
         self.assertEqual(response.status_code, 200)
         self.drift_run.refresh_from_db()
         self.assertFalse(self.drift_run.has_drift)
-        mock_ct_delay.assert_not_called()

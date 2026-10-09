@@ -86,8 +86,6 @@ def execute_drift_run(self, run_id):
         run.save(update_fields=["status", "completed_at", "error_message", "summary", "drift_score", "has_drift"])
         if not already_completed:
             record_transition(run, "completed")
-        if run.has_drift:
-            transaction.on_commit(lambda: handle_drift_detected.delay(str(run.public_id)))
     return "completed"
 
 
@@ -138,8 +136,6 @@ def poll_drift_run_status(self, run_id):
             run.error_message = ""
             run.save(update_fields=["status", "completed_at", "error_message", "summary", "drift_score", "has_drift"])
             record_transition(run, "completed")
-            if run.has_drift:
-                transaction.on_commit(lambda: handle_drift_detected.delay(str(run.public_id)))
         return "completed"
 
     if current_status == "failed":
@@ -168,55 +164,3 @@ def poll_drift_run_status(self, run_id):
         return "failed"
 
     return run.status
-
-
-@shared_task(bind=True)
-def handle_drift_detected(self, run_id):
-    """Entry point hook for Continuous Training (CT) and Degradation-Aware Diagnosis.
-
-    Triggered when a DriftRun records has_drift = True.
-    Coordinates evidence aggregation and prepares the workload for the
-    Multi-Evidence Diagnosis Engine and Retraining Decision Policy.
-    """
-    import logging
-
-    from .models import DriftRun
-
-    logger = logging.getLogger("apps.drift.tasks")
-    try:
-        run = DriftRun.objects.select_related(
-            "monitor",
-            "monitor__version",
-            "monitor__version__project",
-        ).get(public_id=run_id)
-    except DriftRun.DoesNotExist:
-        logger.warning(f"handle_drift_detected: DriftRun {run_id} not found.")
-        return "not_found"
-
-    version = run.monitor.version
-    project = version.project
-    drift_score = run.drift_score
-    summary = run.summary or {}
-
-    logger.info(
-        f"[CONTINUOUS_TRAINING_HOOK] Drift detected for project '{project.name}' "
-        f"(version '{version.version}', public_id={version.public_id}). "
-        f"Drift Score: {drift_score}. Ready for Degradation-Aware CT Engine."
-    )
-
-    evidence_payload = {
-        "drift_run_id": str(run.public_id),
-        "model_version_id": str(version.public_id),
-        "project_id": str(project.public_id),
-        "drift_score": drift_score,
-        "has_drift": True,
-        "summary": summary,
-        "triggered_at": timezone.now().isoformat(),
-    }
-
-    return {
-        "status": "drift_handled",
-        "model_version_id": str(version.public_id),
-        "drift_score": drift_score,
-        "evidence": evidence_payload,
-    }

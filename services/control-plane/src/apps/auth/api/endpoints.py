@@ -3,14 +3,13 @@ import logging
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
-from rest_framework import exceptions, generics, permissions, status
+from rest_framework import exceptions, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.auth.api.serializers import (
-    RegistrationSerializer,
     TenantTokenRefreshSerializer,
     TenantTokenSerializer,
     _KeyIdRefreshToken,
@@ -23,12 +22,6 @@ from apps.auth.services.cookies import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class RegisterEndpoint(generics.CreateAPIView):
-    authentication_classes = ()
-    permission_classes = (permissions.AllowAny,)
-    serializer_class = RegistrationSerializer
 
 
 def _b64(value):

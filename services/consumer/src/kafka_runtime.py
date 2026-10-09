@@ -19,6 +19,8 @@ if __name__ == "__main__":
     configure("consumer")
 
 from src.database import (
+    PermanentWriteError,
+    TransientWriteError,
     init_db,
     persistence_summary,
     save_prediction_records_and_automatic_drift_signals,
@@ -131,12 +133,72 @@ def flush_batch(consumer, records: list[KafkaRecord]) -> bool:
     if len(partitions) != 1:
         raise ValueError("A Kafka batch must contain records from exactly one partition.")
 
-    predictions = build_prediction_records_dataframe(records)
-    signals = build_automatic_drift_signals(records)
-    if not save_prediction_records_and_automatic_drift_signals(predictions, signals):
+    if not _save_records(records):
         return False
     if not _commit_batch_offset(consumer, records[-1]):
         return False
+    return True
+
+
+def _save_records(records: list[KafkaRecord]) -> bool:
+    """Store records; a record the database can never accept is parked, not allowed to fail the rest.
+
+    Returns False when the write should be retried. Raises TransientWriteError when the
+    database is unavailable. Rows are idempotent (ON CONFLICT DO NOTHING), so saving the
+    good half again on a later retry is harmless.
+    """
+    predictions = build_prediction_records_dataframe(records)
+    signals = build_automatic_drift_signals(records)
+    try:
+        return bool(save_prediction_records_and_automatic_drift_signals(predictions, signals))
+    except PermanentWriteError:
+        if len(records) == 1:
+            return _park_unstorable_record(records[0])
+        middle = len(records) // 2
+        return _save_records(records[:middle]) and _save_records(records[middle:])
+
+
+def _park_unstorable_record(record: KafkaRecord) -> bool:
+    if dead_letter.enabled:
+        letter = DeadLetter(
+            value=json.dumps(record.payload, default=str).encode("utf-8"),
+            topic=record.topic,
+            partition=record.partition,
+            offset=record.offset,
+            reason="unstorable_record",
+        )
+        if not dead_letter.publish([letter]):
+            log_event(
+                logger,
+                "ERROR",
+                "unstorable_record_dead_letter_failed",
+                "Batch kept for retry because a record could not be parked in the dead-letter topic",
+                topic=record.topic,
+                partition=record.partition,
+                offset=record.offset,
+            )
+            return False
+        log_event(
+            logger,
+            "ERROR",
+            "unstorable_record_dead_lettered",
+            "Record rejected by the database was moved to the dead-letter topic",
+            topic=record.topic,
+            partition=record.partition,
+            offset=record.offset,
+            dead_letter_topic=dead_letter.topic,
+        )
+        return True
+    log_event(
+        logger,
+        "ERROR",
+        "unstorable_record_dropped",
+        "Record rejected by the database was dropped because the dead-letter topic is disabled",
+        topic=record.topic,
+        partition=record.partition,
+        offset=record.offset,
+        data_loss=True,
+    )
     return True
 
 
@@ -151,9 +213,13 @@ def _retry_delay(attempts: int) -> int:
     )
 
 
-def _schedule_retry(consumer, key: tuple[str, int], retries: dict[tuple[str, int], RetryState]) -> None:
+def _schedule_retry(
+    consumer, key: tuple[str, int], retries: dict[tuple[str, int], RetryState], counted: bool = True
+) -> None:
     retry = retries.setdefault(key, RetryState())
     retry.attempts += 1
+    if counted:
+        retry.failures += 1
     delay = _retry_delay(retry.attempts)
     retry.next_retry_at = time.monotonic() + delay
     if retry.attempts == 1:
@@ -234,10 +300,15 @@ def flush_pending_batch(
 ) -> bool:
     """Flush a retained partition batch and release it only after offset commit."""
     batch = pending_batches[key]
-    saved = flush_batch(consumer, batch)
+    try:
+        saved = flush_batch(consumer, batch)
+    except TransientWriteError:
+        # The database is down: keep the batch and wait, however long it takes.
+        _schedule_retry(consumer, key, retries, counted=False)
+        return False
     if not saved:
         retry = retries.get(key)
-        failed_attempts = (retry.attempts if retry else 0) + 1
+        failed_attempts = (retry.failures if retry else 0) + 1
         if failed_attempts >= KAFKA_DB_RETRY_MAX_ATTEMPTS:
             if _release_unsaveable_batch(consumer, key, batch, failed_attempts):
                 pending_batches.pop(key, None)

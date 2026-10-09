@@ -29,20 +29,65 @@ CONTENT_TYPE_EXTENSIONS = {
 def authenticate_google(access_token, http=None):
     if not settings.GOOGLE_OAUTH2_CLIENT_ID:
         raise ValidationError({"google": "Google OAuth is not configured."})
-    response = (http or HttpClient()).request(
-        "GET",
-        "https://www.googleapis.com/oauth2/v3/userinfo",
-        headers={"Authorization": f"Bearer {access_token}"},
+
+    client = http or HttpClient()
+    token_param = (
+        {"id_token": access_token}
+        if access_token.count(".") == 2
+        else {"access_token": access_token}
     )
-    profile = response.json()
-    email = profile.get("email")
-    if not email or not profile.get("email_verified"):
+    try:
+        tokeninfo_res = client.request(
+            "GET",
+            "https://oauth2.googleapis.com/tokeninfo",
+            params=token_param,
+        )
+        tokeninfo = tokeninfo_res.json()
+    except Exception as exc:
+        logger.warning("Google tokeninfo validation failed", exc_info=True)
+        raise AuthenticationFailed("Invalid or expired Google token.") from exc
+
+    aud = tokeninfo.get("aud")
+    azp = tokeninfo.get("azp")
+    expected_client_id = settings.GOOGLE_OAUTH2_CLIENT_ID
+    if expected_client_id not in (aud, azp):
+        logger.warning(
+            "Google token audience mismatch: expected '%s', got aud='%s', azp='%s'",
+            expected_client_id,
+            aud,
+            azp,
+        )
+        raise AuthenticationFailed("Google token audience mismatch.")
+
+    email = tokeninfo.get("email")
+    email_verified = tokeninfo.get("email_verified")
+    is_verified = email_verified is True or str(email_verified).lower() == "true"
+    if not email or not is_verified:
         raise AuthenticationFailed("Google account email is not verified.")
+
+    profile = {}
+    try:
+        userinfo_res = client.request(
+            "GET",
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        profile = userinfo_res.json()
+    except Exception:
+        pass
+
+    userinfo_email = profile.get("email")
+    if userinfo_email and userinfo_email.lower() != email.lower():
+        raise AuthenticationFailed("Google userinfo email mismatch.")
+
+    name = profile.get("name") or tokeninfo.get("name", "")
+    picture = profile.get("picture") or tokeninfo.get("picture", "")
+
     return _oauth_user(
         email,
-        profile.get("name", ""),
+        name,
         "google",
-        avatar_url=_google_avatar_url(profile.get("picture", "")),
+        avatar_url=_google_avatar_url(picture) if picture else "",
         http=http,
     )
 
@@ -85,10 +130,23 @@ def authenticate_github(code, redirect_uri, http=None):
 
 
 def _oauth_user(email, full_name, provider, avatar_url="", http=None):
-    user, created = get_user_model().objects.get_or_create(
-        email__iexact=email,
-        defaults={"email": email, "full_name": full_name, "auth_provider": provider},
-    )
+    clean_email = str(email).strip().lower()
+    user_model = get_user_model()
+    try:
+        user, created = user_model.objects.get_or_create(
+            email__iexact=clean_email,
+            defaults={"email": clean_email, "full_name": full_name, "auth_provider": provider},
+        )
+    except user_model.MultipleObjectsReturned:
+        user = (
+            user_model.objects.filter(email__iexact=clean_email)
+            .order_by("-is_active", "-date_joined")
+            .first()
+        )
+        created = False
+        if not user:
+            raise AuthenticationFailed("Account lookup error.")
+
     if not user.is_active:
         raise AuthenticationFailed("Account is disabled.")
     if created and avatar_url:

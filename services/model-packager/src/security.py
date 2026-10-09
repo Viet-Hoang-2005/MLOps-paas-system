@@ -10,6 +10,7 @@ Provides static inspection to protect model packaging environments against:
 
 import _compat_pickle
 import io
+import pickle
 import pickletools
 import re
 import tarfile
@@ -34,7 +35,7 @@ ALLOWED_CLASS_MODULES = (
     "sklearn.model_selection", "sklearn.multiclass", "sklearn.multioutput",
     "sklearn.naive_bayes", "sklearn.neighbors", "sklearn.neural_network", "sklearn.pipeline",
     "sklearn.preprocessing", "sklearn.semi_supervised", "sklearn.svm", "sklearn.tree",
-    "sklearn.metrics._scorer", "sklearn.utils._bunch", "sklearn._loss",
+    "sklearn.metrics._scorer", "sklearn.metrics._dist_metrics", "sklearn.utils._bunch", "sklearn._loss", "_loss",
     "xgboost",
     "pandas.core",
     "torch.nn",
@@ -58,6 +59,13 @@ _TORCH_STORAGES = frozenset(
     {
         "FloatStorage", "DoubleStorage", "HalfStorage", "BFloat16Storage", "LongStorage",
         "IntStorage", "ShortStorage", "CharStorage", "ByteStorage", "BoolStorage",
+    }
+)
+
+_TORCH_ACTIVATIONS = frozenset(
+    {
+        "relu", "relu6", "gelu", "silu", "elu", "selu", "leaky_relu", "sigmoid", "tanh",
+        "softmax", "log_softmax", "softplus", "hardtanh", "mish",
     }
 )
 
@@ -102,6 +110,16 @@ ALLOWED_GLOBALS: dict[str, frozenset[str]] = {
         {"_rebuild_tensor", "_rebuild_tensor_v2", "_rebuild_parameter", "_rebuild_parameter_with_state"}
     ),
     "torch.storage": frozenset({"TypedStorage", "UntypedStorage"}),
+    "torch.nn.functional": _TORCH_ACTIVATIONS,
+    # Cython helpers that rebuild KD/ball trees and distance metrics, and plain selectors.
+    "sklearn.neighbors._kd_tree": frozenset({"newObj"}),
+    "sklearn.neighbors._ball_tree": frozenset({"newObj"}),
+    "sklearn.metrics._dist_metrics": frozenset({"newObj"}),
+    "sklearn.compose._column_transformer": frozenset({"make_column_selector"}),
+    "sklearn.feature_selection._univariate_selection": frozenset(
+        {"f_classif", "f_regression", "chi2", "f_oneway"}
+    ),
+    "sklearn.feature_selection._mutual_info": frozenset({"mutual_info_classif", "mutual_info_regression"}),
 }
 
 # File extensions prohibited in model artifacts
@@ -233,6 +251,23 @@ class _InertClass:
     def __setstate__(self, state):
         pass
 
+    # Placeholders for dict/list/set subclasses (e.g. sklearn Bunch) must accept
+    # the items the pickle fills in.
+    def __setitem__(self, key, value):
+        pass
+
+    def append(self, value):
+        pass
+
+    def extend(self, values):
+        pass
+
+    def update(self, *args, **kwargs):
+        pass
+
+    def add(self, value):
+        pass
+
 
 class _MalformedPickle(Exception):
     pass
@@ -285,7 +320,7 @@ def _split_global(arg) -> tuple[str, str]:
     return parts[0], parts[1] if len(parts) > 1 else ""
 
 
-def _walk_pickle(data: bytes, source_name: str) -> bool:
+def _walk_pickle(data: bytes, source_name: str, single_pickle: bool = False) -> bool:
     """Check every global with a simulated stack. Returns True if joblib arrays were met.
 
     Joblib writes raw array bytes inside the stream, so the walk stops there and
@@ -295,7 +330,7 @@ def _walk_pickle(data: bytes, source_name: str) -> bool:
     marks: list[int] = []
     memo: dict[int, object] = {}
     try:
-        for op, arg, _ in pickletools.genops(data):
+        for op, arg, pos in pickletools.genops(data):
             name = op.name
             if name in _STRING_OPS:
                 stack.append(arg if isinstance(arg, str) else _UNKNOWN)
@@ -335,6 +370,12 @@ def _walk_pickle(data: bytes, source_name: str) -> bool:
                 memo[int(arg)] = stack[-1]
                 continue
             elif name == "STOP":
+                if single_pickle and pos + 1 < len(data):
+                    # torch.load keeps reading pickles after the first STOP (legacy format),
+                    # so anything after it would run without having been scanned.
+                    raise PackageSecurityError(
+                        f"Unsupported multi-pickle file {source_name}: re-save it with the default torch.save"
+                    )
                 return False
 
             before = op.stack_before
@@ -355,6 +396,34 @@ def _walk_pickle(data: bytes, source_name: str) -> bool:
     return False
 
 
+def _restricted_find_class(base_find_class, module: str, name: str, source_name: str):
+    _check_global_symbol(module, name, source_name)
+    if _normalize_global(module, name)[0].split(".")[0] in _REAL_MODULE_ROOTS:
+        return base_find_class(module, name)
+    # Third-party classes are never imported or run, only walked past.
+    return _InertClass
+
+
+class _RestrictedPickleModule:
+    """Stand-in for ``pickle`` inside joblib: object arrays embed a nested pickle that
+    joblib reads with ``pickle.load``, which must obey the same allowlist."""
+
+    def __init__(self, source_name: str):
+        self._source_name = source_name
+
+    def __getattr__(self, name):
+        return getattr(pickle, name)
+
+    def load(self, file, **_kwargs):
+        source_name = self._source_name
+
+        class Restricted(pickle.Unpickler):
+            def find_class(self, module, name):
+                return _restricted_find_class(super().find_class, module, name, source_name)
+
+        return Restricted(file).load()
+
+
 def _verify_joblib_stream(data: bytes, source_name: str) -> None:
     """Load a joblib stream with an allowlist-only unpickler (arrays are read, code is not run)."""
     try:
@@ -364,12 +433,10 @@ def _verify_joblib_stream(data: bytes, source_name: str) -> None:
 
     class RestrictedUnpickler(numpy_pickle.NumpyUnpickler):
         def find_class(self, module, name):
-            _check_global_symbol(module, name, source_name)
-            if _normalize_global(module, name)[0].split(".")[0] in _REAL_MODULE_ROOTS:
-                return super().find_class(module, name)
-            # Third-party classes are never imported or run, only walked past.
-            return _InertClass
+            return _restricted_find_class(super().find_class, module, name, source_name)
 
+    original_pickle = numpy_pickle.pickle
+    numpy_pickle.pickle = _RestrictedPickleModule(source_name)
     try:
         with numpy_pickle._read_fileobject(io.BytesIO(data), source_name, None) as handle:
             RestrictedUnpickler(source_name, handle, mmap_mode=None).load()
@@ -377,15 +444,17 @@ def _verify_joblib_stream(data: bytes, source_name: str) -> None:
         raise
     except Exception as exc:
         raise PackageSecurityError(f"Cannot verify joblib artifact {source_name}: {type(exc).__name__}") from exc
+    finally:
+        numpy_pickle.pickle = original_pickle
 
 
-def scan_pickle_data(data: bytes, source_name: str = "pickle") -> None:
+def scan_pickle_data(data: bytes, source_name: str = "pickle", single_pickle: bool = False) -> None:
     """Check a pickle against the global allowlist without running its code.
 
     Anything that cannot be parsed is rejected rather than assumed to be safe.
     """
     try:
-        if _walk_pickle(data, source_name):
+        if _walk_pickle(data, source_name, single_pickle):
             _verify_joblib_stream(data, source_name)
     except _MalformedPickle:
         if data.startswith(_COMPRESSION_MAGIC):
@@ -399,7 +468,7 @@ def scan_pickle_data(data: bytes, source_name: str = "pickle") -> None:
 PICKLE_MODEL_SUFFIXES = (".pkl", ".pickle", ".joblib", ".pt", ".pth")
 
 
-def scan_model_bytes(data: bytes, label: str) -> None:
+def scan_model_bytes(data: bytes, label: str, single_pickle: bool = False) -> None:
     """Scan raw pickle or PyTorch container bytes for malicious instructions."""
     # Check if this is a PyTorch ZIP container
     if data.startswith(b"PK"):
@@ -416,14 +485,75 @@ def scan_model_bytes(data: bytes, label: str) -> None:
             # Fall back to raw scanning if zip parsing fails
             pass
 
-    scan_pickle_data(data, label)
+    scan_pickle_data(data, label, single_pickle)
 
 
 def validate_pickle_file(file_path: Path) -> None:
     """Scan a pickle or PyTorch model file for malicious instructions."""
     if not file_path.is_file():
         return
-    scan_model_bytes(file_path.read_bytes(), file_path.name)
+    scan_model_bytes(file_path.read_bytes(), file_path.name, _is_torch_suffix(file_path.name))
+
+
+def _is_torch_suffix(name: str) -> bool:
+    return Path(name).suffix.lower() in (".pt", ".pth")
+
+
+# Members of these kinds are not pickles; everything else is sniffed, so renaming
+# model.pkl to weights.dat does not skip the scan.
+SAFE_MEMBER_SUFFIXES = frozenset(
+    {
+        ".json", ".yaml", ".yml", ".txt", ".md", ".csv", ".npy", ".npz", ".safetensors", ".onnx",
+        ".pb", ".pbtxt", ".h5", ".keras", ".xgb", ".ubj", ".index", ".lock", ".cfg", ".ini",
+        ".toml", ".tflite", ".proto",
+    }
+)
+MAX_SNIFFED_MEMBER_BYTES = 256 * 1024 * 1024
+ALLOWED_MLFLOW_LOADERS = frozenset(
+    {"mlflow.sklearn", "mlflow.xgboost", "mlflow.pytorch", "mlflow.tensorflow", "mlflow.keras"}
+)
+
+
+def _looks_like_pickle(data: bytes) -> bool:
+    if len(data) > 1 and data[0] == 0x80 and 2 <= data[1] <= 5:
+        return True
+    try:
+        return any(op.name == "STOP" for op, _arg, _pos in pickletools.genops(data))
+    except Exception:
+        return False
+
+
+def _scan_archive_member(name: str, size: int, read_bytes, label: str) -> None:
+    """Scan one archive member as a pickle if it is one, whatever its file name says."""
+    suffix = Path(name).suffix.lower()
+    if suffix in PICKLE_MODEL_SUFFIXES:
+        scan_model_bytes(read_bytes(), label, _is_torch_suffix(name))
+        return
+    if suffix in SAFE_MEMBER_SUFFIXES or suffix.startswith(".data-"):
+        return
+    if size > MAX_SNIFFED_MEMBER_BYTES:
+        raise PackageSecurityError(f"Cannot verify large file with unknown type in archive: {name}")
+    data = read_bytes()
+    if _looks_like_pickle(data):
+        scan_model_bytes(data, label)
+
+
+def _validate_mlmodel(text: str, label: str) -> None:
+    """MLflow imports `loader_module` and adds `code/` to sys.path when loading a model."""
+    try:
+        import yaml
+
+        config = yaml.safe_load(text)
+    except Exception as exc:
+        raise PackageSecurityError(f"Cannot verify MLmodel file {label}") from exc
+    if not isinstance(config, dict):
+        raise PackageSecurityError(f"Cannot verify MLmodel file {label}")
+    pyfunc = (config.get("flavors") or {}).get("python_function") or {}
+    loader = pyfunc.get("loader_module")
+    if loader is not None and loader not in ALLOWED_MLFLOW_LOADERS:
+        raise PackageSecurityError(f"MLmodel in {label} uses a disallowed loader_module: {loader}")
+    if pyfunc.get("code"):
+        raise PackageSecurityError(f"MLmodel in {label} bundles custom code, which is not allowed")
 
 
 def validate_archive_structure(
@@ -538,9 +668,18 @@ def validate_model_package_security(
                         raise PackageSecurityError(
                             f"Prohibited executable or script detected in archive: {name}"
                         )
-                    if suffix in PICKLE_MODEL_SUFFIXES:
-                        data = archive.read(name)
-                        scan_model_bytes(data, f"{archive_or_file_path.name}:{name}")
+                    if not member.is_dir():
+                        _scan_archive_member(
+                            name,
+                            member.file_size,
+                            lambda n=name: archive.read(n),
+                            f"{archive_or_file_path.name}:{name}",
+                        )
+                    if Path(name).name == "MLmodel":
+                        _validate_mlmodel(
+                            archive.read(name).decode("utf-8", "replace"),
+                            f"{archive_or_file_path.name}:{name}",
+                        )
                     if Path(name).name == "requirements.txt":
                         try:
                             req_content = archive.read(name).decode("utf-8")
@@ -557,13 +696,19 @@ def validate_model_package_security(
                         raise PackageSecurityError(
                             f"Prohibited executable or script detected in archive: {name}"
                         )
-                    if suffix in PICKLE_MODEL_SUFFIXES and member.isreg():
+                    if member.isreg():
                         extracted = archive.extractfile(member)
                         if extracted:
-                            scan_model_bytes(
-                                extracted.read(),
-                                f"{archive_or_file_path.name}:{name}",
+                            _scan_archive_member(
+                                name, member.size, extracted.read, f"{archive_or_file_path.name}:{name}"
                             )
+                        if Path(name).name == "MLmodel":
+                            mlmodel = archive.extractfile(member)
+                            if mlmodel:
+                                _validate_mlmodel(
+                                    mlmodel.read().decode("utf-8", "replace"),
+                                    f"{archive_or_file_path.name}:{name}",
+                                )
                     if Path(name).name == "requirements.txt" and member.isreg():
                         extracted = archive.extractfile(member)
                         if extracted:

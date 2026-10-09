@@ -177,7 +177,8 @@ def get_column_mapping(reference_df, production_df):
                     num_cols = []
                     cat_cols = []
                     for inp in signature.inputs:
-                        if inp.type in ["integer", "long", "float", "double"]:
+                        type_name = getattr(inp.type, "name", str(inp.type))
+                        if type_name in ["integer", "long", "float", "double"]:
                             num_cols.append(inp.name)
                         else:
                             cat_cols.append(inp.name)
@@ -242,8 +243,25 @@ def filter_column_mapping(column_mapping, common_cols):
 
 
 # 5. Phân tích Data drift & Data Quality (Evidently 0.4.15)
+def align_prediction_types(reference_df, production_df):
+    """Give `prediction` the same kind of values on both sides.
+
+    Production stores predictions as text while a reference label is usually numeric;
+    comparing the two would report drift between identical distributions.
+    """
+    if "prediction" not in reference_df.columns or "prediction" not in production_df.columns:
+        return
+    reference = reference_df["prediction"]
+    if pd.api.types.is_numeric_dtype(reference) and not pd.api.types.is_bool_dtype(reference):
+        production_df["prediction"] = pd.to_numeric(production_df["prediction"], errors="coerce")
+    else:
+        reference_df["prediction"] = reference.astype(str)
+        production_df["prediction"] = production_df["prediction"].astype(str)
+
+
 def run_drift_analysis(reference_df, production_df, column_mapping):
     runtime_log.detail("[4/4] Running Evidently AI Data Drift & Data Quality analysis...")
+    align_prediction_types(reference_df, production_df)
 
     ignore_cols = {
         "prediction",
@@ -342,10 +360,15 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
             data_drift_table = result_data
 
     drift_by_columns = data_drift_table.get("drift_by_columns", {})
-    stat_drifted_feature_names = []
-    for col_name, col_data in drift_by_columns.items():
-        if col_data.get("drift_detected", False):
-            stat_drifted_feature_names.append(col_name)
+    # Only input features count towards the drifted share: Evidently also reports the
+    # prediction/target columns, which are not part of the denominator below.
+    feature_universe = expected_features or (set(common_cols) - ignore_cols)
+    stat_drifted_feature_names = [
+        col_name
+        for col_name, col_data in drift_by_columns.items()
+        if col_data.get("drift_detected", False) and col_name in feature_universe
+    ]
+    prediction_drift = (drift_by_columns.get("prediction") or {}).get("drift_detected")
 
     # 5. Tổng hợp độ trôi dạt tổng thể (Statistical Drift + Missing Features)
     all_drifted_features = sorted(list(set(stat_drifted_feature_names) | set(missing_features)))
@@ -381,6 +404,7 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
         "number_of_features": total_expected_count,
         "drifted_feature_names": all_drifted_features,
         "statistical_drifted_features": stat_drifted_feature_names,
+        "prediction_drift": prediction_drift,
         "missing_features": missing_features,
         "extra_features": extra_features,
         "data_quality": data_quality,

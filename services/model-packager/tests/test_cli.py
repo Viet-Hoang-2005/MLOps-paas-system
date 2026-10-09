@@ -203,6 +203,11 @@ def configure_build(monkeypatch, tmp_path, flavor="sklearn", source_type="manual
 
 # Artifacts are scanned with an allowlist and unparseable bytes are rejected, so fakes must be real pickles.
 ARTIFACT_BYTES = pickle.dumps({"weights": [1.0, 2.0]})
+VALID_MLMODEL = """\
+flavors:
+  python_function:
+    loader_module: mlflow.sklearn
+"""
 
 
 def stub_package_helpers(monkeypatch):
@@ -212,7 +217,7 @@ def stub_package_helpers(monkeypatch):
 
     def save(model, flavor, package_dir, requirements):
         package_dir.mkdir(parents=True, exist_ok=True)
-        (package_dir / "MLmodel").write_text("metadata")
+        (package_dir / "MLmodel").write_text(VALID_MLMODEL)
 
     monkeypatch.setattr(cli, "download_presigned_file", download)
     monkeypatch.setattr(cli, "upload_presigned_file", Mock())
@@ -346,7 +351,7 @@ def configure_zip_task(monkeypatch, tmp_path, kaniko=False):
 
     def download(url, destination):
         with zipfile.ZipFile(destination, "w") as archive:
-            archive.writestr("model/MLmodel", "metadata")
+            archive.writestr("model/MLmodel", VALID_MLMODEL)
             archive.writestr("model/requirements.txt", "numpy==1.26.4\n")
 
     monkeypatch.setattr(cli, "download_presigned_file", download)

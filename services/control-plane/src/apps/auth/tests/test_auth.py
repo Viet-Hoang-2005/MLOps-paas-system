@@ -33,13 +33,32 @@ class FakeResponse:
 
 
 class GoogleOAuthClient:
-    def __init__(self, profile, avatar=b"avatar"):
+    def __init__(self, profile, avatar=b"avatar", tokeninfo=None, tokeninfo_error=None):
         self.profile = profile
         self.avatar = avatar
+        self.tokeninfo = tokeninfo
+        self.tokeninfo_error = tokeninfo_error
         self.urls = []
 
     def request(self, method, url, **kwargs):
         self.urls.append((method, url, kwargs))
+        if "tokeninfo" in url:
+            if self.tokeninfo_error:
+                raise self.tokeninfo_error
+            if self.tokeninfo is not None:
+                return FakeResponse(payload=self.tokeninfo)
+            from django.conf import settings
+
+            return FakeResponse(
+                payload={
+                    "aud": getattr(settings, "GOOGLE_OAUTH2_CLIENT_ID", "") or "test-google-client",
+                    "azp": getattr(settings, "GOOGLE_OAUTH2_CLIENT_ID", "") or "test-google-client",
+                    "email": self.profile.get("email", ""),
+                    "email_verified": self.profile.get("email_verified", True),
+                    "name": self.profile.get("name", ""),
+                    "picture": self.profile.get("picture", ""),
+                }
+            )
         if "userinfo" in url:
             return FakeResponse(payload=self.profile)
         return FakeResponse(content=self.avatar)
@@ -394,7 +413,10 @@ def test_google_oauth_does_not_restore_a_removed_avatar():
 
     assert created is False
     assert not returned.avatar
-    assert [url for _, url, _ in client.urls] == ["https://www.googleapis.com/oauth2/v3/userinfo"]
+    assert [url for _, url, _ in client.urls] == [
+        "https://oauth2.googleapis.com/tokeninfo",
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+    ]
 
 
 @pytest.mark.django_db
@@ -443,3 +465,162 @@ def test_oauth_avatar_rejects_untrusted_url_without_failing_login():
     assert created is True
     assert not user.avatar
     assert len(client.urls) == 0
+
+
+@pytest.mark.django_db
+@override_settings(GOOGLE_OAUTH2_CLIENT_ID="test-google-client")
+def test_google_oauth_rejects_token_with_mismatched_audience():
+    from rest_framework.exceptions import AuthenticationFailed
+
+    # Token issued to an attacker's rogue Google OAuth client
+    client = GoogleOAuthClient(
+        {"email": "victim@example.com", "email_verified": True},
+        tokeninfo={
+            "aud": "attacker-rogue-client-id",
+            "azp": "attacker-rogue-client-id",
+            "email": "victim@example.com",
+            "email_verified": True,
+        },
+    )
+
+    with pytest.raises(AuthenticationFailed, match="Google token audience mismatch."):
+        authenticate_google("attacker-stolen-token", http=client)
+
+
+@pytest.mark.django_db
+@override_settings(GOOGLE_OAUTH2_CLIENT_ID="test-google-client")
+def test_google_oauth_rejects_unverified_email():
+    from rest_framework.exceptions import AuthenticationFailed
+
+    client = GoogleOAuthClient(
+        {"email": "unverified@example.com", "email_verified": False},
+        tokeninfo={
+            "aud": "test-google-client",
+            "azp": "test-google-client",
+            "email": "unverified@example.com",
+            "email_verified": False,
+        },
+    )
+
+    with pytest.raises(AuthenticationFailed, match="Google account email is not verified."):
+        authenticate_google("google-token", http=client)
+
+
+@pytest.mark.django_db
+@override_settings(GOOGLE_OAUTH2_CLIENT_ID="test-google-client")
+def test_google_oauth_accepts_token_matching_azp():
+    client = GoogleOAuthClient(
+        {"email": "azp-user@example.com", "email_verified": True, "name": "AZP User"},
+        tokeninfo={
+            "aud": "frontend-web-client-id",
+            "azp": "test-google-client",
+            "email": "azp-user@example.com",
+            "email_verified": "true",
+        },
+    )
+
+    user, created = authenticate_google("google-token", http=client)
+    assert created is True
+    assert user.email == "azp-user@example.com"
+
+
+@pytest.mark.django_db
+@override_settings(GOOGLE_OAUTH2_CLIENT_ID="test-google-client")
+def test_google_oauth_rejects_invalid_tokeninfo_response():
+    import requests
+    from rest_framework.exceptions import AuthenticationFailed
+
+    client = GoogleOAuthClient(
+        {},
+        tokeninfo_error=requests.exceptions.HTTPError("400 Bad Request"),
+    )
+
+    with pytest.raises(AuthenticationFailed, match="Invalid or expired Google token."):
+        authenticate_google("invalid-token", http=client)
+
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("method", ["post", "get", "put"])
+def test_legacy_register_endpoint_is_gone(method):
+    # It created accounts without verifying the email address.
+    client = APIClient()
+    response = getattr(client, method)(
+        "/api/auth/register/",
+        {"email": "victim@example.com", "password": "Sup3r-secret-pw", "full_name": "x"},
+        format="json",
+    )
+
+    assert response.status_code in (404, 405)
+    assert not get_user_model().objects.filter(email__iexact="victim@example.com").exists()
+
+
+@pytest.mark.django_db
+def test_user_email_is_always_normalized_to_lowercase():
+    user_model = get_user_model()
+    user = user_model.objects.create_user(email="Victim.User@Example.COM", password="Password123!")
+    assert user.email == "victim.user@example.com"
+
+    # Direct model save also enforces lowercasing
+    user.email = "ANOTHER.EMAIL@Domain.Com"
+    user.save()
+    user.refresh_from_db()
+    assert user.email == "another.email@domain.com"
+
+
+@pytest.mark.django_db
+def test_natural_key_and_login_are_case_insensitive():
+    user_model = get_user_model()
+    user = user_model.objects.create_user(email="case.test@example.com", password="Password123!")
+
+    # Natural key lookup ignores casing
+    found = user_model.objects.get_by_natural_key("CASE.TEST@EXAMPLE.COM")
+    assert found.id == user.id
+
+    # Token endpoint login works with uppercase / mixed case
+    client = APIClient()
+    response = client.post(
+        "/api/auth/token/",
+        {"email": "Case.Test@Example.Com", "password": "Password123!"},
+        format="json",
+        **browser_auth_headers(),
+    )
+    assert response.status_code == 200
+    assert "access" in response.data
+
+
+@pytest.mark.django_db
+def test_oauth_user_normalizes_email_and_survives_duplicate_casing():
+    user_model = get_user_model()
+    # Create an initial user
+    u1 = user_model.objects.create_user(email="oauth.victim@example.com", password="Password123!")
+
+    # OAuth login with uppercase email matches the existing lowercase user
+    matched_user, created = _oauth_user("OAuth.Victim@Example.Com", "Victim", "google")
+    assert created is False
+    assert matched_user.id == u1.id
+    assert matched_user.email == "oauth.victim@example.com"
+
+
+@pytest.mark.django_db
+def test_password_reset_complete_survives_duplicate_casing_without_500():
+    from django.core import signing
+
+    user_model = get_user_model()
+    user = user_model.objects.create_user(email="reset.victim@example.com", password="OldPassword123!")
+
+    token = signing.dumps(
+        {"email": "reset.victim@example.com", "purpose": "password_reset", "jti": "mock-jti"},
+        salt="identity-otp",
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/auth/password-reset/complete/",
+        {"reset_token": token, "new_password": "NewStrongPassword123!"},
+        format="json",
+    )
+    assert response.status_code == 200
+    user.refresh_from_db()
+    assert user.check_password("NewStrongPassword123!")
+

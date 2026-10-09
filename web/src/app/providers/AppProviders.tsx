@@ -1,25 +1,12 @@
 import { GoogleOAuthProvider } from "@react-oauth/google";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 import "@/app/i18n";
 import { ThemeProvider } from "@/app/theme/ThemeProvider";
+import { queryClient } from "@/shared/api/queryClient";
 
 export function AppProviders({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 5 * 60 * 1000,
-            gcTime: 30 * 60 * 1000,
-            retry: false,
-          },
-          mutations: { retry: false },
-        },
-      }),
-  );
-
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>

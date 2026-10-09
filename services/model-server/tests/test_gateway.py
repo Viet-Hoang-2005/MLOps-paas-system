@@ -442,3 +442,69 @@ def test_parse_worker_prediction_normalizes_numpy_and_tensors():
     assert isinstance(pred[0], int)
     assert conf == pytest.approx(0.88)
     assert isinstance(conf, float)
+
+
+class RecordingAsyncClient(FakeAsyncClient):
+    """Remembers how the worker was called, to assert the wire contract."""
+
+    calls: list = []
+
+    async def get(self, url, **kwargs):
+        self.calls.append(("GET", url, kwargs))
+        return await super().get(url, **kwargs)
+
+    async def post(self, url, **kwargs):
+        self.calls.append(("POST", url, kwargs))
+        return await super().post(url, **kwargs)
+
+
+def _record(flavor):
+    return {
+        "id": "version",
+        "project_id": "project",
+        "tenant_id": "t",
+        "flavor": flavor,
+        "endpoint_container_name": "worker",
+        "deployment_status": "succeeded",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "flavor,port,expected_body",
+    [
+        ("xgboost", 5001, {"features": {"x": 1}, "model_version_id": "version"}),
+        # BentoML wraps arguments by parameter name; a flat body is rejected with 400.
+        ("pytorch", 5002, {"payload": {"features": {"x": 1}, "model_version_id": "version"}}),
+        ("keras", 5002, {"payload": {"features": {"x": 1}, "model_version_id": "version"}}),
+    ],
+)
+async def test_predict_sends_the_body_shape_each_runtime_expects(monkeypatch, flavor, port, expected_body):
+    RecordingAsyncClient.calls = []
+    monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
+    monkeypatch.setattr(
+        index.httpx,
+        "AsyncClient",
+        lambda **kw: RecordingAsyncClient(post=FakeResponse(payload={"prediction": "ok", "confidence": None})),
+    )
+    await index.predict("v", Mock(), index.InferenceRequest(features={"x": 1}), BackgroundTasks(), {"model_record": _record(flavor)})
+
+    method, url, kwargs = RecordingAsyncClient.calls[0]
+    assert (method, url) == ("POST", f"http://worker:{port}/predict")
+    assert kwargs["json"] == expected_body
+
+
+@pytest.mark.asyncio
+async def test_health_uses_post_for_deep_learning_runtimes_and_get_for_ml(monkeypatch):
+    monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
+    healthy = FakeResponse(payload={"status": "healthy"})
+
+    RecordingAsyncClient.calls = []
+    monkeypatch.setattr(index.httpx, "AsyncClient", lambda **kw: RecordingAsyncClient(get=healthy, post=healthy))
+    assert (await index.model_health("v", {"model_record": _record("pytorch")}))["status"] == "healthy"
+    assert RecordingAsyncClient.calls[0][:2] == ("POST", "http://worker:5002/health")
+    assert RecordingAsyncClient.calls[0][2]["json"] == {}
+
+    RecordingAsyncClient.calls = []
+    assert (await index.model_health("v", {"model_record": _record("sklearn")}))["status"] == "healthy"
+    assert RecordingAsyncClient.calls[0][:2] == ("GET", "http://worker:5001/health")

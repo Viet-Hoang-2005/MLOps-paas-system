@@ -108,10 +108,6 @@ class DriftRunWebhookEndpoint(APIView):
                 phase="summary_updated" if already_completed else None,
                 source="webhook",
             )
-            if run.has_drift:
-                from apps.drift.tasks import handle_drift_detected
-
-                transaction.on_commit(lambda: handle_drift_detected.delay(str(run.public_id)))
         return Response({"status": run.status})
 
 

@@ -58,9 +58,9 @@ cp .env.example .env
 ```ini
 EXECUTION_BACKEND=docker
 REDIS_CONNECTION_MODE=direct
-REDIS_URL=redis://redis:6379/1
-CELERY_BROKER_URL=redis://redis:6379/3
-CELERY_RESULT_BACKEND=redis://redis:6379/4
+REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
+CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/3
+CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/4
 REDPANDA_BROKERS=redpanda:9092
 DB_HOST_RW=postgres
 DB_HOST_RO=postgres

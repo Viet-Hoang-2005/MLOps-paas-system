@@ -47,7 +47,6 @@ def _resource_context(name, args, kwargs):
             for task in (
                 "execute_drift_run",
                 "poll_drift_run_status",
-                "handle_drift_detected",
             )
         },
         **{

@@ -15,6 +15,7 @@ class KafkaRecord:
 @dataclass
 class RetryState:
     attempts: int = 0
+    failures: int = 0
     next_retry_at: float = 0.0
 
 

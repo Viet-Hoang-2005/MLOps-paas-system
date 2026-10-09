@@ -33,3 +33,11 @@ def resolve_worker_url(model_record: dict[str, Any], endpoint_path: str) -> str:
     else:
         host = container_name
     return f"http://{host}:{target_port}{endpoint_path}"
+
+
+def build_worker_payload(model_record: dict[str, Any], features: dict[str, Any], model_version_id: str) -> dict[str, Any]:
+    """Body for the worker's /predict: BentoML (deep learning) wraps arguments by name."""
+    body = {"features": features, "model_version_id": model_version_id}
+    if serving_engine_for_flavor(model_record.get("flavor")) == "dl":
+        return {"payload": body}
+    return body
