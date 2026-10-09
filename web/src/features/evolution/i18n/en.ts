@@ -13,6 +13,7 @@ export const registryEn = {
     loading: "Loading version…",
     loadFailed: "Unable to load evolution data.",
     retry: "Retry",
+    staleData: "Could not refresh. Showing the last loaded data.",
     empty:
       "No registered versions yet. Build an image and register it to start tracking versions.",
     notFound:

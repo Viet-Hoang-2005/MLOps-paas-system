@@ -8,6 +8,8 @@ export const projectsVi = {
     building: "Đang tạo image",
     ready: "Chỉ tạo image thành công",
     failed: "Thất bại",
+    retryLoad: "Thử lại",
+    staleData: "Không thể làm mới danh sách. Đang hiển thị dữ liệu đã tải trước đó.",
     cancelled: "Đã hủy",
     registering: "Đang đăng ký",
     unregistered: "Chưa đăng ký",

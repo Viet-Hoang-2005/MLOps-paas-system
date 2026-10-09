@@ -251,6 +251,17 @@ function BuildDeploymentContent() {
       });
       setParams({ projectId: result.project_id, buildId: result.id });
     },
+    onError: (err: unknown) => {
+      const status =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { status?: number } }).response?.status
+          : undefined;
+      // The training output changed since this list was loaded: reload it so the next
+      // attempt carries the current output_revision.
+      if (status === 409) {
+        void client.invalidateQueries({ queryKey: deploymentFlowKeys.jobs() });
+      }
+    },
   });
 
   const cancel = useMutation({

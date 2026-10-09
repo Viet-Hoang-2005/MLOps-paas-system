@@ -21,6 +21,8 @@ export const trainingEn = {
   },
   loadFailed: "Unable to load training jobs",
   checkApi: "Please check the control plane API.",
+  retryLoad: "Try again",
+  staleData: "Could not refresh the job list. Showing the last loaded data.",
   noJobs: "No training jobs yet",
   noJobsDescription:
     "Submit a source zip and CSV dataset to start your first training job.",

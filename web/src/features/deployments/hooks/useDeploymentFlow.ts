@@ -7,13 +7,9 @@ import {
 import { getDeployment } from "@/features/deployments/api/lifecycleApi";
 import { listTrainingJobs } from "@/features/training/api/trainingApi";
 
-export const deploymentFlowKeys = {
-  build: (id: string) => ["deployments", "build", id] as const,
-  deployment: (id: string) => ["deployments", "deployment", id] as const,
-  history: (id: string) => ["deployments", "history", id] as const,
-  jobs: () => ["deployments", "training-sources"] as const,
-  deployments: () => ["deployments", "all"] as const,
-};
+import { deploymentFlowKeys } from "@/features/deployments/queryKeys";
+
+export { deploymentFlowKeys };
 export const useBuild = (id: string | null) =>
   useQuery({
     queryKey: deploymentFlowKeys.build(id ?? ""),
@@ -36,7 +32,13 @@ export const useBuildHistory = (id?: string) =>
     refetchInterval: 5000,
   });
 export const useBuildTrainingSources = () =>
-  useQuery({ queryKey: deploymentFlowKeys.jobs(), queryFn: listTrainingJobs });
+  useQuery({
+    queryKey: deploymentFlowKeys.jobs(),
+    queryFn: listTrainingJobs,
+    // The output_revision in this list must match the server's when a build starts, and it
+    // changes whenever outputs are edited elsewhere; never trust a cached copy on entry.
+    refetchOnMount: "always",
+  });
 export const useDeployments = () =>
   useQuery({
     queryKey: deploymentFlowKeys.deployments(),

@@ -13,7 +13,6 @@
     "format:all": "prettier --write \"src/**/*.{ts,tsx,css,json}\" && eslint --fix .",
     "preview": "vite preview",
     "test:workflow": "node scripts/test-workflow-navigation.mjs && node scripts/test-monitoring.mjs && node scripts/test-evolution.mjs && node scripts/test-auth-cache.mjs",
-    "test:auth": "node scripts/test-auth-cache.mjs",
     "test:evolution": "node scripts/test-evolution.mjs",
     "test:monitoring": "node scripts/test-monitoring.mjs",
     "test:metrics": "node scripts/test-runtime-metrics.mjs",

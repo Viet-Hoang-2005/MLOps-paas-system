@@ -21,6 +21,8 @@ export const trainingVi = {
   },
   loadFailed: "Không thể tải tác vụ huấn luyện",
   checkApi: "Vui lòng kiểm tra API Control Plane.",
+  retryLoad: "Thử lại",
+  staleData: "Không thể làm mới danh sách tác vụ. Đang hiển thị dữ liệu đã tải trước đó.",
   noJobs: "Chưa có tác vụ huấn luyện",
   noJobsDescription:
     "Gửi ZIP mã nguồn và bộ dữ liệu CSV để bắt đầu tác vụ huấn luyện đầu tiên.",

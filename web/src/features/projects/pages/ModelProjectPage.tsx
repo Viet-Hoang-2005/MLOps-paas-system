@@ -2,6 +2,7 @@ import { ModelProjectTable } from "@/features/projects/components/ModelProjectTa
 import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Button } from "@/shared/components/Button";
+import { Callout } from "@/shared/components/Callout";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Search } from "@/shared/components/Search";
 import { Plus } from "lucide-react";
@@ -51,11 +52,26 @@ export default function ModelProjectPage() {
           {t("workflow.newProject")}
         </Button>
       </div>
-      {projects.isError ? (
-        <p role="alert">
-          {getApiErrorMessage(projects.error, t("workflow.failed"))}
-        </p>
-      ) : (
+      {projects.isError && (
+        // A failed background refresh keeps the last loaded list on screen; only a failed
+        // first load, with nothing to show, replaces the table.
+        <Callout
+          variant="danger"
+          role="alert"
+          description={`${projects.data ? `${t("workflow.staleData")} ` : ""}${getApiErrorMessage(projects.error, t("workflow.failed"))}`}
+          action={
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={projects.isFetching}
+              onClick={() => void projects.refetch()}
+            >
+              {t("workflow.retryLoad")}
+            </Button>
+          }
+        />
+      )}
+      {!(projects.isError && !projects.data) && (
         <ModelProjectTable
           data={filteredProjects}
           loading={projects.isLoading}

@@ -13,6 +13,7 @@ export const evolutionVi = {
     loading: "Đang tải phiên bản…",
     loadFailed: "Không tải được dữ liệu phiên bản mô hình.",
     retry: "Thử lại",
+    staleData: "Không thể làm mới. Đang hiển thị dữ liệu đã tải trước đó.",
     empty:
       "Chưa có phiên bản đăng ký. Hãy tạo image và đăng ký mô hình để bắt đầu quản lý phiên bản.",
     notFound: "Phiên bản này không thuộc dự án đã chọn hoặc không còn tồn tại.",

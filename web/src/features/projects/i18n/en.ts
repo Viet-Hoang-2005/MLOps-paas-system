@@ -8,6 +8,8 @@ export const catalogEn = {
     building: "Building",
     ready: "Build successful",
     failed: "Failed",
+    retryLoad: "Try again",
+    staleData: "Could not refresh the list. Showing the last loaded data.",
     cancelled: "Cancelled",
     registering: "Registering",
     unregistered: "Not registered",

@@ -5,6 +5,7 @@ import {
   getModelOutputSummary,
   patchModelOutput,
 } from "@/features/training/api/trainingApi";
+import { deploymentFlowKeys } from "@/features/deployments/queryKeys";
 import { trainingQueryKeys } from "@/features/training/queryKeys";
 import { useTrainingJobDetailContext } from "@/features/training/trainingJobDetailContext";
 import { getApiErrorMessage } from "@/shared/api/errors";
@@ -168,6 +169,10 @@ export default function TrainingJobArtifactsPage() {
       });
       void queryClient.invalidateQueries({
         queryKey: trainingQueryKeys.job(job.id),
+      });
+      // The Build page offers this job with its output_revision, which just changed.
+      void queryClient.invalidateQueries({
+        queryKey: deploymentFlowKeys.jobs(),
       });
       toast.success(
         t("detail.artifactPage.saveSuccess", {

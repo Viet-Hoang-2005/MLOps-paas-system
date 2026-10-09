@@ -24,6 +24,7 @@ import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
+import { Callout } from "@/shared/components/Callout";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Table } from "@/shared/components/Table";
@@ -80,7 +81,9 @@ export default function TrainingModelPage() {
     data,
     error: jobsError,
     isError,
+    isFetching,
     isLoading,
+    refetch,
   } = useQuery({
     queryKey: trainingQueryKeys.jobs(),
     queryFn: () => listTrainingJobs(),
@@ -493,13 +496,26 @@ export default function TrainingModelPage() {
         </Button>
       </div>
 
-      {isError ? (
-        <div className="rounded-surface border border-danger/20 bg-danger-subtle p-5">
-          <p className="text-style-body text-color-danger">
-            {getApiErrorMessage(jobsError, t("checkApi"))}
-          </p>
-        </div>
-      ) : (
+      {isError && (
+        // A failed background refresh (the list polls while jobs run) keeps the last loaded
+        // jobs on screen; only a failed first load, with nothing to show, replaces the table.
+        <Callout
+          variant="danger"
+          role="alert"
+          description={`${data ? `${t("staleData")} ` : ""}${getApiErrorMessage(jobsError, t("checkApi"))}`}
+          action={
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={isFetching}
+              onClick={() => void refetch()}
+            >
+              {t("retryLoad")}
+            </Button>
+          }
+        />
+      )}
+      {!(isError && !data) && (
         <Table
           data={trainingJobs}
           columns={columns}

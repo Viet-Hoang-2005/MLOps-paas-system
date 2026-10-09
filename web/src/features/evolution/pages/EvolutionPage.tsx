@@ -17,6 +17,7 @@ import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
+import { Callout } from "@/shared/components/Callout";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { GitBranch, GitCompare, RefreshCw } from "lucide-react";
 import { useState, useRef } from "react";
@@ -63,6 +64,11 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
   const state = useEvolution(projectId, params.get("versionId"));
   const tab = params.get("tab") ?? "details";
   const version = state.version;
+  // A failed background refresh keeps the last loaded data on screen. Only a failure with
+  // nothing to show replaces the page; otherwise it is a banner with a retry.
+  const loadFailed = Boolean(state.error);
+  const blocked = loadFailed && (!state.versions.data || !state.project.data);
+  const staleRefresh = loadFailed && !blocked;
   const select = (id: string) => {
     setCompare(false);
     setParams((previous) => evolutionParams(previous, { versionId: id }));
@@ -86,7 +92,7 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
       </div>
       {state.loading ? (
         <p role="status">{t("workspace.loading")}</p>
-      ) : state.error ? (
+      ) : blocked ? (
         <div role="alert" className="space-y-3">
           <p>{getApiErrorMessage(state.error, t("workspace.loadFailed"))}</p>
           <Button variant="secondary" onClick={() => void state.refresh()}>
@@ -95,6 +101,22 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
         </div>
       ) : (
         <>
+          {staleRefresh && (
+            <Callout
+              variant="danger"
+              role="alert"
+              description={`${t("workspace.staleData")} ${getApiErrorMessage(state.error, t("workspace.loadFailed"))}`}
+              action={
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void state.refresh()}
+                >
+                  {t("workspace.retry")}
+                </Button>
+              }
+            />
+          )}
           {(state.versions.data?.length ?? 0) > 0 && (
             <VersionLineage
               versions={state.versions.data!}
@@ -109,7 +131,7 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
             <p className="rounded-surface border border-dashed border-border p-10 text-center text-color-muted-foreground">
               {t("workspace.empty")}
             </p>
-          ) : state.detail.error ? (
+          ) : state.detail.error && !version ? (
             <div role="alert" className="space-y-3">
               <p>
                 {getApiErrorMessage(
