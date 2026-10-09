@@ -108,6 +108,39 @@ resource "aws_iam_role_policy" "worker_runtime_logs" {
   })
 }
 
+# Harbor uses static worker credentials to read and write container image layers.
+# This policy is not attached to Karpenter tenant training nodes or GitHub Actions.
+resource "aws_iam_role_policy" "worker_harbor_images" {
+  count = var.enable_harbor_images ? 1 : 0
+  name  = "mlops-worker-harbor-images"
+  role  = aws_iam_role.worker_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation",
+          "s3:ListBucketMultipartUploads"
+        ]
+        Resource = var.harbor_images_bucket_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListMultipartUploadParts",
+          "s3:AbortMultipartUpload"
+        ]
+        Resource = "${var.harbor_images_bucket_arn}/*"
+      }
+    ]
+  })
+}
+
 # Karpenter IAM Role and Policies
 data "aws_caller_identity" "current" {}
 

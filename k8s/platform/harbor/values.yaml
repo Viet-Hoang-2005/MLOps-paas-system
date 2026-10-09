@@ -29,10 +29,10 @@ persistence:
       disable: true
     s3:
       region: ap-southeast-1
-      bucket: mlops-paas-artifacts
+      bucket: mlops-paas-images
       v4auth: true
       secure: true
-      rootdirectory: /harbor-registry
+      rootdirectory: /
 
 registry:
   relativeurls: true

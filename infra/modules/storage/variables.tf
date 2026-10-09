@@ -10,6 +10,18 @@ variable "runtime_logs_bucket_name" {
   default     = "mlops-paas-runtime-logs"
 }
 
+variable "enable_harbor_images" {
+  description = "Create the dedicated Harbor container images bucket with the K3s stack."
+  type        = bool
+  default     = false
+}
+
+variable "harbor_images_bucket_name" {
+  description = "Dedicated private Harbor container image object-storage bucket."
+  type        = string
+  default     = "mlops-paas-images"
+}
+
 variable "bucket_name" {
   description = "Name of the S3 bucket"
   type        = string

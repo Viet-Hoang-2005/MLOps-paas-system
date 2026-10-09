@@ -5,7 +5,17 @@ variable "enable_runtime_logs" {
 
 variable "runtime_logs_bucket_arn" {
   type    = string
-  default = ""
+  default = "ARN of the S3 bucket for Loki runtime logs"
+}
+
+variable "enable_harbor_images" {
+  type    = bool
+  default = false
+}
+
+variable "harbor_images_bucket_arn" {
+  type    = string
+  default = "ARN of the S3 bucket for Harbor container images"
 }
 
 variable "artifacts_bucket_arn" {

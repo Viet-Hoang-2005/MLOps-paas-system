@@ -47,6 +47,7 @@ module "storage" {
   count                             = var.enable_artifact_storage ? 1 : 0
   source                            = "./modules/storage"
   enable_runtime_logs               = local.enable_k3s_compute_stack
+  enable_harbor_images              = local.enable_k3s_compute_stack
   staging_expiration_days           = var.artifacts_staging_expiration_days
   noncurrent_version_retention_days = var.artifacts_noncurrent_version_retention_days
 }
@@ -63,6 +64,8 @@ module "iam" {
   artifacts_bucket_arn       = module.storage[0].bucket_arn
   enable_runtime_logs        = local.enable_k3s_compute_stack
   runtime_logs_bucket_arn    = module.storage[0].runtime_logs_bucket_arn
+  enable_harbor_images       = local.enable_k3s_compute_stack
+  harbor_images_bucket_arn   = module.storage[0].harbor_images_bucket_arn
   github_secrets_arn         = module.secrets[0].aws_secrets_arn
   github_actions_secrets_arn = module.secrets[0].github_actions_secrets_arn
   mlflow_basic_auth_arn      = module.secrets[0].production_secrets_arn

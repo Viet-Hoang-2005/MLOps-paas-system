@@ -126,3 +126,48 @@ resource "aws_s3_bucket_lifecycle_configuration" "runtime_logs" {
   }
 }
 
+# Dedicated Harbor container image storage (production only)
+resource "aws_s3_bucket" "harbor_images" {
+  count         = var.enable_harbor_images ? 1 : 0
+  bucket        = var.harbor_images_bucket_name
+  force_destroy = true
+  tags          = { Component = "harbor-images" }
+}
+
+resource "aws_s3_bucket_ownership_controls" "harbor_images_acl_ownership" {
+  count  = var.enable_harbor_images ? 1 : 0
+  bucket = aws_s3_bucket.harbor_images[0].id
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "harbor_images" {
+  count                   = var.enable_harbor_images ? 1 : 0
+  bucket                  = aws_s3_bucket.harbor_images[0].id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "harbor_images" {
+  count  = var.enable_harbor_images ? 1 : 0
+  bucket = aws_s3_bucket.harbor_images[0].id
+  rule {
+    apply_server_side_encryption_by_default { sse_algorithm = "AES256" }
+  }
+}
+
+# Cleanup incomplete multipart uploads for harbor container images (e.g., interrupted pushes)
+resource "aws_s3_bucket_lifecycle_configuration" "harbor_images" {
+  count  = var.enable_harbor_images ? 1 : 0
+  bucket = aws_s3_bucket.harbor_images[0].id
+  rule {
+    id     = "harbor-multipart-cleanup"
+    status = "Enabled"
+    filter {}
+    abort_incomplete_multipart_upload { days_after_initiation = 1 }
+  }
+}
+
