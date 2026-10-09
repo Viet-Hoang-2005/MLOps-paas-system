@@ -130,7 +130,7 @@ async def test_prediction_uses_one_validated_id_and_trusted_context(monkeypatch,
         return response
 
     client.post.side_effect = post
-    monkeypatch.setattr(index.httpx, "AsyncClient", lambda **_: client)
+    monkeypatch.setattr(index, "worker_client", client)
     record = {
         "id": "trusted-version",
         "project_id": "trusted-project",

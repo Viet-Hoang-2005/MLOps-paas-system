@@ -1,11 +1,15 @@
 """Authentication decisions independent from the FastAPI route module."""
 
+import asyncio
 import contextlib
 import json
+import logging
 import time
 import uuid
 
 from fastapi import HTTPException
+
+logger = logging.getLogger(__name__)
 
 
 def _cached_key(cache, kid):
@@ -115,12 +119,18 @@ async def authorize_model_access(
 ):
     try:
         uuid.UUID(version_id)
-        model_record = get_model_version_record(
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Model version not found.") from None
+    try:
+        # Redis and PostgreSQL clients block; run them in a worker thread, not on the event loop.
+        model_record = await asyncio.to_thread(
+            get_model_version_record,
             version_id,
             redis_client=redis_client,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.error("Model registry lookup failed (%s).", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="Model registry is temporarily unavailable.") from None
     if not model_record:
         raise HTTPException(status_code=404, detail="Model version not found.")
     model_tenant_id = model_record["tenant_id"]
@@ -131,7 +141,7 @@ async def authorize_model_access(
             "model_record": model_record,
         }
     if api_key:
-        key_record = verify_project_api_key(api_key, model_record["project_pk"])
+        key_record = await asyncio.to_thread(verify_project_api_key, api_key, model_record["project_pk"])
         if not key_record:
             raise HTTPException(
                 status_code=401,
@@ -183,8 +193,5 @@ async def authorize_model_access(
         return payload
     except jwt_module.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Unauthorized: Token has expired")
-    except jwt_module.InvalidTokenError as exc:
-        raise HTTPException(
-            status_code=401,
-            detail=f"Unauthorized: Invalid token ({exc})",
-        )
+    except jwt_module.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid token")

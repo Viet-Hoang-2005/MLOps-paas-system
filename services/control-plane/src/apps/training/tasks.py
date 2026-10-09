@@ -267,6 +267,7 @@ def confirm_training_cancellation(job_id):
     retry_backoff=True,
     retry_jitter=True,
     max_retries=5,
+    reject_on_worker_lost=True,
 )
 def delete_training_job(self, job_id):
     from apps.deployment.models import Build
@@ -323,6 +324,7 @@ def delete_training_job(self, job_id):
     retry_backoff=True,
     retry_jitter=True,
     max_retries=5,
+    reject_on_worker_lost=True,
 )
 def purge_training_job_outputs(self, job_id):
     from apps.observability.services.lifecycle import record_training_event

@@ -5,7 +5,6 @@ import subprocess
 import sys
 import tarfile
 import zipfile
-from pathlib import Path
 
 import pytest
 from src import io as packager_io

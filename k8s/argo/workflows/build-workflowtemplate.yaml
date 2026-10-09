@@ -41,6 +41,13 @@ spec:
         items:
           - key: config.json
             path: config.json
+    - name: harbor-base-pull
+      secret:
+        secretName: harbor-base-pull-dockerconfig
+        optional: true
+        items:
+          - key: config.json
+            path: config.json
   templates:
     - name: build-model
       inputs:
@@ -82,6 +89,13 @@ spec:
                 - {name: label_mapping_filename, value: "{{inputs.parameters.label_mapping_filename}}"}
         - - name: build-image
             template: build-image
+            arguments:
+              parameters:
+                - {name: build_id, value: "{{inputs.parameters.build_id}}"}
+                - {name: image_repository, value: "{{inputs.parameters.image_repository}}"}
+                - {name: image_tag, value: "{{inputs.parameters.image_tag}}"}
+        - - name: push-image
+            template: push-image
             arguments:
               parameters:
                 - {name: build_id, value: "{{inputs.parameters.build_id}}"}
@@ -150,9 +164,6 @@ spec:
           - {name: LABEL_MAPPING_FILENAME, value: "{{inputs.parameters.label_mapping_filename}}"}
           - {name: OUTPUT_UPLOAD_URL, value: "{{inputs.parameters.output_upload_url}}"}
           - {name: CONTROL_PLANE_WEBHOOK_URL, value: "{{inputs.parameters.control_plane_webhook_url}}"}
-          # No CONTROL_PLANE_WEBHOOK_SECRET here: this step runs pip install and loads the
-          # user's model. Only notify-success and the exit handler hold the callback secret;
-          # a failed step is reported by the exit handler.
     - name: build-image
       nodeSelector: {workload-type: worker}
       inputs:
@@ -166,10 +177,30 @@ spec:
           - --context=dir:///workspace
           - --dockerfile=/workspace/Dockerfile
           - --destination={{inputs.parameters.image_repository}}:{{inputs.parameters.image_tag}}
-          - --digest-file=/workspace/image-digest
+          - --no-push
+          - --tar-path=/workspace/image.tar
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
-          - {name: harbor-config, mountPath: /kaniko/.docker/}
+          - {name: harbor-base-pull, mountPath: /kaniko/.docker/, readOnly: true}
+    - name: push-image
+      nodeSelector: {workload-type: worker}
+      inputs:
+        parameters:
+          - {name: build_id}
+          - {name: image_repository}
+          - {name: image_tag}
+      container:
+        image: quay.io/skopeo/stable:v1.22.3
+        command: [skopeo]
+        args:
+          - copy
+          - --dest-authfile=/auth/config.json
+          - --digestfile=/workspace/image-digest
+          - docker-archive:/workspace/image.tar
+          - docker://{{inputs.parameters.image_repository}}:{{inputs.parameters.image_tag}}
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+          - {name: harbor-config, mountPath: /auth, readOnly: true}
     - name: notify-success
       nodeSelector: {workload-type: worker}
       inputs:

@@ -211,23 +211,11 @@ def test_send_to_redpanda_payload_and_failure(monkeypatch):
 async def test_health_proxy_success_and_failure(monkeypatch):
     token = {"model_record": {"flavor": "sklearn", "deployment_status": "succeeded", "endpoint_container_name": "worker"}}
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
-    monkeypatch.setattr(
-        index.httpx,
-        "AsyncClient",
-        lambda **kw: FakeAsyncClient(get=FakeResponse(payload={"status": "healthy"})),
-    )
+    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(get=FakeResponse(payload={"status": "healthy"})))
     assert (await index.model_health("v", token))["status"] == "healthy"
-    monkeypatch.setattr(
-        index.httpx,
-        "AsyncClient",
-        lambda **kw: FakeAsyncClient(get=FakeResponse(500, text="bad")),
-    )
+    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(get=FakeResponse(500, text="bad")))
     assert (await index.model_health("v", token)).status_code == 500
-    monkeypatch.setattr(
-        index.httpx,
-        "AsyncClient",
-        lambda **kw: FakeAsyncClient(get=RuntimeError("down")),
-    )
+    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(get=RuntimeError("down")))
     assert (await index.model_health("v", token)).status_code == 503
 
 
@@ -242,10 +230,7 @@ async def test_predict_proxy_success_and_background_event(monkeypatch):
         "deployment_status": "succeeded",
     }
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
-    monkeypatch.setattr(
-        index.httpx,
-        "AsyncClient",
-        lambda **kw: FakeAsyncClient(
+    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(
             post=FakeResponse(
                 payload={
                     "prediction": "attack",
@@ -253,8 +238,7 @@ async def test_predict_proxy_success_and_background_event(monkeypatch):
                     "engine": "machine-learning-serving",
                 }
             )
-        ),
-    )
+        ))
     tasks = BackgroundTasks()
     response = await index.predict(
         "v",
@@ -281,11 +265,7 @@ async def test_predict_upstream_and_network_errors(monkeypatch):
         "deployment_status": "succeeded",
     }
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
-    monkeypatch.setattr(
-        index.httpx,
-        "AsyncClient",
-        lambda **kw: FakeAsyncClient(post=FakeResponse(422, {"detail": "bad"})),
-    )
+    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(post=FakeResponse(422, {"detail": "bad"})))
     response = await index.predict(
         "v",
         Mock(),
@@ -295,7 +275,7 @@ async def test_predict_upstream_and_network_errors(monkeypatch):
     )
     assert response.status_code == 422
     request_error = httpx.RequestError("down", request=Mock())
-    monkeypatch.setattr(index.httpx, "AsyncClient", lambda **kw: FakeAsyncClient(post=request_error))
+    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(post=request_error))
     with pytest.raises(HTTPException) as exc:
         await index.predict(
             "v",
@@ -340,7 +320,7 @@ async def test_predict_network_error_evicts_cache_and_returns_409_if_stopped(
     monkeypatch.setattr(index, "redis_client", fake_redis)
 
     request_error = httpx.RequestError("Connection refused", request=Mock())
-    monkeypatch.setattr(index.httpx, "AsyncClient", lambda **kw: FakeAsyncClient(post=request_error))
+    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(post=request_error))
 
     stopped_db_record = {
         "id": "v-stopped",
@@ -482,11 +462,7 @@ def _record(flavor):
 async def test_predict_sends_the_body_shape_each_runtime_expects(monkeypatch, flavor, port, expected_body):
     RecordingAsyncClient.calls = []
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
-    monkeypatch.setattr(
-        index.httpx,
-        "AsyncClient",
-        lambda **kw: RecordingAsyncClient(post=FakeResponse(payload={"prediction": "ok", "confidence": None})),
-    )
+    monkeypatch.setattr(index, "worker_client", RecordingAsyncClient(post=FakeResponse(payload={"prediction": "ok", "confidence": None})))
     await index.predict("v", Mock(), index.InferenceRequest(features={"x": 1}), BackgroundTasks(), {"model_record": _record(flavor)})
 
     method, url, kwargs = RecordingAsyncClient.calls[0]
@@ -500,7 +476,7 @@ async def test_health_uses_post_for_deep_learning_runtimes_and_get_for_ml(monkey
     healthy = FakeResponse(payload={"status": "healthy"})
 
     RecordingAsyncClient.calls = []
-    monkeypatch.setattr(index.httpx, "AsyncClient", lambda **kw: RecordingAsyncClient(get=healthy, post=healthy))
+    monkeypatch.setattr(index, "worker_client", RecordingAsyncClient(get=healthy, post=healthy))
     assert (await index.model_health("v", {"model_record": _record("pytorch")}))["status"] == "healthy"
     assert RecordingAsyncClient.calls[0][:2] == ("POST", "http://worker:5002/health")
     assert RecordingAsyncClient.calls[0][2]["json"] == {}

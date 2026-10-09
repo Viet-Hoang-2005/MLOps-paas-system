@@ -2,9 +2,21 @@
 
 import hashlib
 import json
+import math
 import tarfile
 import time
 import zipfile
+
+
+def finite_json(value):
+    """Replace NaN/Infinity with None: they are not JSON, and strict receivers reject them."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {key: finite_json(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [finite_json(item) for item in value]
+    return value
 
 
 def download_presigned_file(download_url, destination, requests_module, detail):
@@ -61,7 +73,8 @@ def safe_extract_zip(archive_path, destination):
 def post_webhook(webhook_url, payload, requests_module, headers):
     if not webhook_url:
         raise RuntimeError("Build callback URL is required.")
-    key = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+    payload = finite_json(payload)
+    key = hashlib.sha256(json.dumps(payload, sort_keys=True, allow_nan=False).encode()).hexdigest()
     delivery_headers = {**headers, "Idempotency-Key": f"build-{payload.get('build_id', '')}-{key}"}
     for attempt in range(3):
         try:

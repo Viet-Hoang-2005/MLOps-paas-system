@@ -165,7 +165,9 @@ def register_build(build_id):
     return "registered" if registered.version_id else "in_progress"
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, max_retries=5)
+@shared_task(
+    bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, max_retries=5, reject_on_worker_lost=True
+)
 def cancel_build(self, build_id):
     build = Build.objects.select_related("project").filter(public_id=build_id).first()
     if not build or build.deletion_state != "active":
@@ -177,7 +179,9 @@ def cancel_build(self, build_id):
     return "cancelled"
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, max_retries=5)
+@shared_task(
+    bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, max_retries=5, reject_on_worker_lost=True
+)
 def cleanup_failed_build_artifacts(self, build_id, delete_image=False):
     build = (
         Build.objects.select_related("project", "project__owner")
@@ -200,9 +204,22 @@ def cleanup_failed_build_artifacts(self, build_id, delete_image=False):
     return "purged"
 
 
-@shared_task(bind=True, max_retries=5)
+def _check_build_deletable(build):
+    if build.version_id or build.registration_status in {"registering", "registered"} or build.deployments.exists():
+        raise RuntimeError("Registered builds must be retained.")
+
+
+# reject_on_worker_lost: with acks_late, a worker killed mid-task would otherwise acknowledge the
+# message and the build would stay "deleting" with nothing left to finish it. Every step is
+# idempotent, so a redelivery is safe.
+@shared_task(bind=True, max_retries=5, reject_on_worker_lost=True)
 def delete_build(self, build_id):
-    """Keep the tombstone until external cleanup succeeds; repeated DELETE retries it."""
+    """Keep the tombstone until external cleanup succeeds; repeated DELETE retries it.
+
+    The runtime, image and object-storage cleanup is slow external I/O, so no lock is held
+    while it runs: the build is validated under the lock, cleaned with no lock, and its row is
+    removed in a second short transaction that validates again.
+    """
     from apps.catalog.models import ModelProject
 
     candidate = Build.objects.filter(public_id=build_id).first()
@@ -212,31 +229,41 @@ def delete_build(self, build_id):
         with transaction.atomic():
             ModelProject.objects.select_for_update().get(pk=candidate.project_id)
             build = (
-                Build.objects.select_for_update().select_related("project__owner").filter(public_id=build_id).first()
+                Build.objects.select_for_update(of=("self",))
+                .select_related("project__owner")
+                .filter(public_id=build_id)
+                .first()
             )
             if not build:
                 return "deleted"
             if build.deletion_state == "active":
                 return "retained"
-            if (
-                build.version_id
-                or build.registration_status in {"registering", "registered"}
-                or build.deployments.exists()
-            ):
-                raise RuntimeError("Registered builds must be retained.")
-            stop_build_for_deletion(build)
-            # Use the server-generated build tag even if the runner failed before
-            # reporting image_uri. Never delete a caller-supplied repository/digest.
-            build.image_uri = temporary_image_reference(
-                build.project.public_id,
-                build.public_id,
-                registry=settings.HARBOR_REGISTRY_URL if build.backend == "argo" else "",
-                registry_project=settings.HARBOR_USER_PROJECT,
-            )
-            BuildImageCleaner().delete(build)
-            S3Storage().delete_prefix(
-                f"{build_prefix(build.project.owner.tenant_id, build.project.public_id, build.public_id).rstrip('/')}/"
-            )
+            _check_build_deletable(build)
+            prefix = build_prefix(build.project.owner.tenant_id, build.project.public_id, build.public_id)
+            prefix = f"{prefix.rstrip('/')}/"
+
+        # A fresh object: the runner may have reported its end while the lock was released.
+        build = Build.objects.select_related("project").get(pk=build.pk)
+        stop_build_for_deletion(build)
+        # Use the server-generated build tag even if the runner failed before
+        # reporting image_uri. Never delete a caller-supplied repository/digest.
+        build.image_uri = temporary_image_reference(
+            build.project.public_id,
+            build.public_id,
+            registry=settings.HARBOR_REGISTRY_URL if build.backend == "argo" else "",
+            registry_project=settings.HARBOR_USER_PROJECT,
+        )
+        BuildImageCleaner().delete(build)
+        S3Storage().delete_prefix(prefix)
+
+        with transaction.atomic():
+            ModelProject.objects.select_for_update().get(pk=candidate.project_id)
+            build = Build.objects.select_for_update(of=("self",)).filter(pk=build.pk).first()
+            if not build:
+                return "deleted"
+            if build.deletion_state == "active":
+                return "retained"
+            _check_build_deletable(build)
             build.delete()
         return "deleted"
     except Exception as exc:
@@ -348,7 +375,7 @@ def mark_deployment_unconfirmed(deployment_id):
     return "unconfirmed"
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5, reject_on_worker_lost=True)
 def stop_deployment(self, deployment_id):
     from apps.catalog.models import ModelProject
 
@@ -406,4 +433,50 @@ def reconcile_stopped_deployments():
             dispatched += 1
     if dispatched:
         logger.warning("Re-dispatched %s stale deployment stop(s).", dispatched)
+    return dispatched
+
+
+def _dispatch_once(kind, public_id, task, grace):
+    # A task that keeps failing is retried at most once per grace period, not on every scan.
+    if cache.add(f"deletion-reconcile:{kind}:{public_id}", 1, timeout=grace):
+        task.delay(str(public_id))
+        return 1
+    return 0
+
+
+@shared_task(ignore_result=True, expires=120, soft_time_limit=100, time_limit=110)
+def reconcile_stalled_deletions():
+    """Re-dispatch deletions whose task was lost.
+
+    Deleting a build, project or training job is first recorded in the database and then
+    carried out by a queued task. If that task is lost (broker or worker down between the
+    commit and the enqueue, or the retries ran out) nothing else would ever finish it, and
+    the resource would stay in ``deleting`` forever. A deletion that is still recorded as in
+    progress after the grace period gets its task enqueued again; the tasks are idempotent.
+    ``delete_failed`` stays user-driven: repeating Delete is the explicit retry.
+    """
+    from apps.catalog.models import ModelProject
+    from apps.catalog.tasks import execute_project_deletion
+    from apps.training.models import TrainingJob
+    from apps.training.tasks import delete_training_job
+
+    grace = settings.DELETION_RECONCILE_GRACE_SECONDS
+    limit = settings.DELETION_RECONCILE_BATCH_SIZE
+    cutoff = timezone.now() - timedelta(seconds=grace)
+    dispatched = 0
+    stale_builds = Build.objects.filter(deletion_state="deleting", updated_at__lt=cutoff).order_by("updated_at")
+    for public_id in stale_builds.values_list("public_id", flat=True)[:limit]:
+        dispatched += _dispatch_once("build", public_id, delete_build, grace)
+    stale_projects = ModelProject.objects.filter(deletion_state="deleting", updated_at__lt=cutoff).order_by(
+        "updated_at"
+    )
+    for public_id in stale_projects.values_list("public_id", flat=True)[:limit]:
+        dispatched += _dispatch_once("project", public_id, execute_project_deletion, grace)
+    stale_jobs = TrainingJob.objects.filter(deletion_requested_at__lt=cutoff, deletion_error="").order_by(
+        "deletion_requested_at"
+    )
+    for public_id in stale_jobs.values_list("public_id", flat=True)[:limit]:
+        dispatched += _dispatch_once("training-job", public_id, delete_training_job, grace)
+    if dispatched:
+        logger.warning("Re-dispatched %s stalled deletion(s).", dispatched)
     return dispatched

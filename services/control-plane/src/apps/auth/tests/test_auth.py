@@ -624,3 +624,43 @@ def test_password_reset_complete_survives_duplicate_casing_without_500():
     user.refresh_from_db()
     assert user.check_password("NewStrongPassword123!")
 
+
+
+def _login(client, email, password="wrong-password", **extra):
+    return client.post(
+        "/api/auth/token/",
+        {"email": email, "password": password},
+        format="json",
+        **browser_auth_headers(),
+        **extra,
+    )
+
+
+@pytest.mark.django_db
+def test_login_is_throttled_per_account_across_addresses(settings):
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK, "NUM_PROXIES": 1}
+    user = get_user_model().objects.create_user("victim@example.com", "password123")
+    client = APIClient()
+    for i in range(10):
+        assert _login(client, user.email, HTTP_X_FORWARDED_FOR=f"203.0.113.{i}").status_code == 401
+    assert _login(client, user.email, "password123", HTTP_X_FORWARDED_FOR="203.0.113.99").status_code == 429
+    assert _login(client, "  VICTIM@Example.com ", HTTP_X_FORWARDED_FOR="203.0.113.98").status_code == 429
+    assert _login(client, "someone-else@example.com", HTTP_X_FORWARDED_FOR="203.0.113.97").status_code == 401
+
+
+@pytest.mark.django_db
+def test_login_is_throttled_per_address_across_accounts(settings):
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK, "NUM_PROXIES": 1}
+    client = APIClient()
+    for i in range(30):
+        assert _login(client, f"user{i}@example.com", HTTP_X_FORWARDED_FOR="198.51.100.7").status_code == 401
+    assert _login(client, "user99@example.com", HTTP_X_FORWARDED_FOR="198.51.100.7").status_code == 429
+    assert _login(client, "user99@example.com", HTTP_X_FORWARDED_FOR="198.51.100.8").status_code == 401
+
+
+@pytest.mark.django_db
+def test_login_throttle_does_not_cache_the_raw_email(settings):
+    from django.core.cache import cache
+
+    _login(APIClient(), "private.person@example.com")
+    assert not any("private.person" in str(key) for key in getattr(cache, "_cache", {}))

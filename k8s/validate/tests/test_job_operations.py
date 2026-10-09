@@ -283,3 +283,37 @@ def test_build_template_labels_workflow_and_keeps_callback_secret_away_from_user
     assert "cancel-build-dep" in {dep["name"] for dep in sensor["spec"]["dependencies"]}
     source = yaml.safe_load((root / "eventsource.yaml").read_text(encoding="utf-8"))
     assert "cancel-build" in source["spec"]["webhook"]
+
+
+def test_push_credential_is_only_mounted_where_no_user_code_runs():
+    """build-image runs the user's pip install as root; whatever it mounts, that code can read."""
+    root = Path(__file__).parents[3] / "k8s/argo"
+    template = yaml.safe_load((root / "workflows/build-workflowtemplate.yaml").read_text(encoding="utf-8"))
+    spec = template["spec"]
+    templates = {item["name"]: item for item in spec["templates"]}
+    secret_of = {volume["name"]: volume["secret"]["secretName"] for volume in spec["volumes"]}
+
+    def secrets_mounted(name):
+        container = templates[name]["container"]
+        return {secret_of[mount["name"]] for mount in container.get("volumeMounts", []) if mount["name"] in secret_of}
+
+    # Pushing credential: push-image only. The base-image pull secret is optional and pull-only.
+    assert secrets_mounted("push-image") == {"harbor-registry-dockerconfig"}
+    assert secrets_mounted("build-image") <= {"harbor-base-pull-dockerconfig"}
+    assert "harbor-registry-dockerconfig" not in secrets_mounted("build-image")
+    assert next(v for v in spec["volumes"] if v["name"] == "harbor-base-pull")["secret"]["optional"] is True
+    for name in ("build-image", "prepare-package"):
+        env = {item["name"] for item in templates[name]["container"].get("env", [])}
+        assert not {"CONTROL_PLANE_WEBHOOK_SECRET", "HARBOR_PASSWORD"} & env
+
+    # build-image must not push; push-image publishes the tarball and records the digest.
+    build_args = templates["build-image"]["container"]["args"]
+    assert "--no-push" in build_args and "--tar-path=/workspace/image.tar" in build_args
+    assert not any(arg.startswith("--digest-file") for arg in build_args)
+    push = templates["push-image"]["container"]
+    assert "--digestfile=/workspace/image-digest" in push["args"]
+    assert "docker-archive:/workspace/image.tar" in push["args"]
+    assert any(arg.startswith("docker://{{inputs.parameters.image_repository}}:") for arg in push["args"])
+
+    steps = [group[0]["template"] for group in templates["build-model"]["steps"]]
+    assert steps == ["prepare-package", "build-image", "push-image", "notify-success"]

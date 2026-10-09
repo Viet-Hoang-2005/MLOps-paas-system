@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import cast
 from urllib.parse import urlsplit, urlunsplit
 
-_context: contextvars.ContextVar[dict[str, object]] = contextvars.ContextVar("mlops_log_context", default={})
+_context: contextvars.ContextVar[dict[str, object]] = contextvars.ContextVar("mlops_log_context", default=None)
 _service = "backend"
 _output_lock = threading.RLock()
 _SECRET_KEY = (

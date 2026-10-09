@@ -22,11 +22,33 @@ from infrastructure.storage.paths import training_job_prefix
 ACTIVE_STATUSES = {"pending", "queued", "uploading", "running", "cancelling"}
 
 
-@transaction.atomic
-def create_job(*, project, validated_data):
-    project = type(project).objects.select_for_update().get(pk=project.pk)
+def _discard_unused_inputs(storage, project, job):
+    """Remove staged inputs of a job that was never saved.
+
+    A failure can also surface after the commit (an on_commit callback that cannot reach the
+    broker); the inputs then belong to a real job and must stay.
+    """
+    if not TrainingJob.objects.filter(public_id=job.public_id).exists():
+        storage.delete_prefix(training_job_prefix(project.owner.tenant_id, project.public_id, job.public_id))
+
+
+def _require_active_project(project):
+    """Lock the project row and refuse work for one that is being deleted."""
+    project = type(project).objects.select_for_update(of=("self",)).select_related("owner").get(pk=project.pk)
     if project.deletion_state != "active":
         raise Conflict("This project is being deleted.")
+    return project
+
+
+def create_job(*, project, validated_data):
+    """Stage a job's inputs, then create it.
+
+    Writing the code and data snapshots is object-storage I/O, so it runs with no lock held.
+    The job row is created afterwards in a short transaction that checks the project again;
+    until then only unreferenced objects exist, and they are removed if anything fails.
+    """
+    with transaction.atomic():
+        project = _require_active_project(project)
     source_zip = validated_data.pop("source_zip", None)
     training_data = validated_data.pop("training_data", None)
     validated_data["backend"] = settings.TRAINING_BACKEND
@@ -42,7 +64,6 @@ def create_job(*, project, validated_data):
     draft.data_snapshot_uri = scoped_uris["data"]
     draft.output_uri = scoped_uris["output"]
     draft.mlflow_artifact_uri = scoped_uris["mlflow"]
-    draft.save()
     storage = S3Storage()
     try:
         if source_zip:
@@ -61,10 +82,13 @@ def create_job(*, project, validated_data):
                 storage.put(storage.parse_uri(draft.data_snapshot_uri)[1], bundle.getvalue(), "application/zip")
         else:
             _snapshot_data(project, draft, storage)
+        with transaction.atomic():
+            _require_active_project(project)
+            draft.save()
+            record_training_event(job=draft, event_type="created", message="Training job created.")
     except Exception:
-        storage.delete_prefix(training_job_prefix(project.owner.tenant_id, project.public_id, draft.public_id))
+        _discard_unused_inputs(storage, project, draft)
         raise
-    record_training_event(job=draft, event_type="created", message="Training job created.")
     return draft
 
 
@@ -99,47 +123,63 @@ def _snapshot_data(project, job, storage):
     storage.put(storage.parse_uri(job.data_snapshot_uri)[1], bundle.getvalue(), "application/zip")
 
 
-@transaction.atomic
-def retry_job(job, *, storage=None):
-    """Retry the original immutable inputs, never the current workspace."""
-    project = type(job.project).objects.select_for_update().get(pk=job.project_id)
-    job = TrainingJob.objects.select_for_update().get(pk=job.pk)
+RETRY_FIELDS = (
+    "name",
+    "model_flavor",
+    "entry_point",
+    "requirements_text",
+    "vcpu",
+    "memory_mb",
+    "max_runtime_seconds",
+    "accelerator_type",
+    "accelerator_count",
+    "baseline_version_id",
+    "dataset_snapshot_id",
+)
+
+
+def _check_retryable(project, job):
     if project.deletion_state != "active" or job.deletion_requested_at:
         raise Conflict("This project or job is being deleted.")
     if job.status not in {"failed", "cancelled"}:
         raise Conflict("Only failed or cancelled jobs can be retried.")
-    fields = (
-        "name",
-        "model_flavor",
-        "entry_point",
-        "requirements_text",
-        "vcpu",
-        "memory_mb",
-        "max_runtime_seconds",
-        "accelerator_type",
-        "accelerator_count",
-        "baseline_version_id",
-        "dataset_snapshot_id",
-    )
-    retry = TrainingJob(
-        project=project,
-        retry_of=job,
-        trigger_kind="retry",
-        backend=settings.TRAINING_BACKEND,
-        **{field: getattr(job, field) for field in fields},
-    )
+
+
+def retry_job(job, *, storage=None):
+    """Retry the original immutable inputs, never the current workspace.
+
+    The inputs are copied with no lock held; the retry is created in a second short
+    transaction that checks the original job and project again.
+    """
+    with transaction.atomic():
+        project = type(job.project).objects.select_for_update(of=("self",)).select_related("owner").get(pk=job.project_id)
+        job = TrainingJob.objects.select_for_update().get(pk=job.pk)
+        _check_retryable(project, job)
+        retry = TrainingJob(
+            project=project,
+            retry_of=job,
+            trigger_kind="retry",
+            backend=settings.TRAINING_BACKEND,
+            **{field: getattr(job, field) for field in RETRY_FIELDS},
+        )
+        sources = {"code_snapshot_uri": job.code_snapshot_uri, "data_snapshot_uri": job.data_snapshot_uri}
     storage = storage or S3Storage()
     uris = expected_training_uris(retry, storage.bucket)
     retry.output_uri, retry.mlflow_artifact_uri = uris["output"], uris["mlflow"]
     try:
         for field, kind in (("code_snapshot_uri", "code"), ("data_snapshot_uri", "data")):
-            copied = storage.copy(getattr(job, field), storage.parse_uri(uris[kind])[1])
+            copied = storage.copy(sources[field], storage.parse_uri(uris[kind])[1])
             setattr(retry, field, copied.uri)
-        retry.save()
-        record_training_event(job=retry, event_type="created", message="Training retry created from immutable inputs.")
-        return submit_job(retry)
+        with transaction.atomic():
+            project = type(project).objects.select_for_update(of=("self",)).select_related("owner").get(pk=project.pk)
+            _check_retryable(project, TrainingJob.objects.select_for_update().get(pk=job.pk))
+            retry.save()
+            record_training_event(
+                job=retry, event_type="created", message="Training retry created from immutable inputs."
+            )
+            return submit_job(retry)
     except Exception:
-        storage.delete_prefix(training_job_prefix(project.owner.tenant_id, project.public_id, retry.public_id))
+        _discard_unused_inputs(storage, project, retry)
         raise
 
 

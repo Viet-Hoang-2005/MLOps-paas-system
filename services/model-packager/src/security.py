@@ -182,6 +182,11 @@ def validate_safe_requirements(requirements_text: str) -> None:
             "-f",
             "--trusted-host",
             "--process-dependency-links",
+            # Nested requirement/constraint files would be read from the builder's filesystem.
+            "-r",
+            "--requirement",
+            "-c",
+            "--constraint",
         )
         for prefix in disallowed_prefixes:
             if lower_line.startswith(prefix):

@@ -4,7 +4,7 @@ from apps.catalog.models import ModelProject
 from common.logging import record_transition
 
 
-@shared_task(bind=True)
+@shared_task(bind=True, reject_on_worker_lost=True)
 def execute_project_deletion(self, project_id):
     from apps.catalog.services.deletion import (
         finalize_project_deletion,
@@ -30,7 +30,7 @@ def execute_project_deletion(self, project_id):
     return "deleted"
 
 
-@shared_task(bind=True)
+@shared_task(bind=True, reject_on_worker_lost=True)
 def complete_project_deletion(self, project_id):
     """Complete an Argo deletion only after its runtime stop callback is trusted."""
     from apps.catalog.services.deletion import (

@@ -72,7 +72,7 @@ def log(message: str) -> None:
 
 
 def metric_log(payload: dict) -> None:
-    runtime_log.protocol(f"METRIC_JSON {json.dumps(payload, separators=(',', ':'))}")
+    runtime_log.protocol(f"METRIC_JSON {json.dumps(safe_json_value(payload), separators=(',', ':'), allow_nan=False)}")
 
 
 def warn(warnings: list[dict], code: str, message: str, **extra) -> None:
@@ -83,7 +83,11 @@ def warn(warnings: list[dict], code: str, message: str, **extra) -> None:
 
 def write_json(path: Path, payload) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    # allow_nan=False after normalizing: a stray NaN must fail here, never reach a strict JSON consumer.
+    path.write_text(
+        json.dumps(safe_json_value(payload), indent=2, sort_keys=True, default=str, allow_nan=False),
+        encoding="utf-8",
+    )
 
 
 def safe_json_value(value):
@@ -92,6 +96,19 @@ def safe_json_value(value):
 
 def is_number(value) -> bool:
     return metadata.is_number(value)
+
+
+def _warn_non_finite(warnings: list[dict], payload, source: str, **extra) -> None:
+    count = metadata.count_non_finite(payload)
+    if count:
+        warn(
+            warnings,
+            "non_finite_value_ignored",
+            "NaN or Infinity values are not valid JSON and were dropped.",
+            source=source,
+            count=count,
+            **extra,
+        )
 
 
 def parse_metric_events(stdout_text: str, warnings: list[dict]) -> tuple[list[dict], dict]:
@@ -130,6 +147,7 @@ def parse_metric_events(stdout_text: str, warnings: list[dict]) -> tuple[list[di
             )
             continue
 
+        _warn_non_finite(warnings, payload, "METRIC_JSON", line_number=line_number)
         normalized_payload = safe_json_value(payload)
         events.append({"line_number": line_number, "payload": normalized_payload})
         for key, value in normalized_payload.items():
@@ -159,6 +177,7 @@ def read_json_object(path: Path, label: str, warnings: list[dict]) -> dict:
             f"{label}.json must contain a JSON object.",
         )
         return {}
+    _warn_non_finite(warnings, payload, f"{label}.json")
     return safe_json_value(payload)
 
 

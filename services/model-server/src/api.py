@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 import uuid
@@ -20,6 +21,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.datastructures import Headers
 from fastapi.security import APIKeyHeader
 from jwt.algorithms import RSAAlgorithm
 from prometheus_client import Counter, Histogram
@@ -65,6 +67,12 @@ KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "mlops_paas_production_data")
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/1")
 REDIS_CONNECTION_MODE = os.environ.get("REDIS_CONNECTION_MODE", "direct")
 LOCAL_RUNTIME_METRICS_ENABLED = os.environ.get("LOCAL_RUNTIME_METRICS_ENABLED", "false").lower() == "true"
+# A prediction request carries one record of features; anything larger is refused before it is parsed.
+MAX_REQUEST_BODY_BYTES = int(os.environ.get("MAX_REQUEST_BODY_BYTES", str(1024 * 1024)))
+WORKER_MAX_CONNECTIONS = int(os.environ.get("WORKER_MAX_CONNECTIONS", "200"))
+WORKER_MAX_KEEPALIVE_CONNECTIONS = int(os.environ.get("WORKER_MAX_KEEPALIVE_CONNECTIONS", "50"))
+PREDICT_TIMEOUT_SECONDS = 60.0
+HEALTH_TIMEOUT_SECONDS = 10.0
 
 
 def _redis_connection():
@@ -138,6 +146,58 @@ def create_kafka_producer():
 redis_client = None
 metrics_redis_client = None
 kafka_producer = None
+worker_client: httpx.AsyncClient | None = None
+
+
+def get_worker_client() -> httpx.AsyncClient:
+    """One pooled client for every worker call, so connections are reused across requests."""
+    global worker_client
+    if worker_client is None:
+        worker_client = httpx.AsyncClient(
+            limits=httpx.Limits(
+                max_connections=WORKER_MAX_CONNECTIONS,
+                max_keepalive_connections=WORKER_MAX_KEEPALIVE_CONNECTIONS,
+            ),
+            timeout=PREDICT_TIMEOUT_SECONDS,
+        )
+    return worker_client
+
+
+class BodySizeLimitMiddleware:
+    """Refuse oversized bodies, by Content-Length up front and by bytes counted while streaming."""
+
+    def __init__(self, app, max_bytes: int):
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        declared = Headers(scope=scope).get("content-length")
+        if declared is not None:
+            try:
+                too_large = int(declared) > self.max_bytes
+            except ValueError:
+                return await JSONResponse({"detail": "Invalid Content-Length header."}, status_code=400)(
+                    scope, receive, send
+                )
+            if too_large:
+                return await JSONResponse(
+                    {"detail": f"Request body is larger than {self.max_bytes} bytes."}, status_code=413
+                )(scope, receive, send)
+        received = 0
+
+        async def limited_receive():
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    # An HTTPException survives FastAPI's body parsing and becomes a 413.
+                    raise HTTPException(status_code=413, detail=f"Request body is larger than {self.max_bytes} bytes.")
+            return message
+
+        await self.app(scope, limited_receive, send)
 
 
 @asynccontextmanager
@@ -149,9 +209,14 @@ async def lifespan(app: FastAPI):
         # A separate, bounded async connection; no blocking Redis IO in predict.
         metrics_redis_client = async_redis.from_url(REDIS_URL, socket_timeout=0.2, socket_connect_timeout=0.2)
     kafka_producer = create_kafka_producer()
+    get_worker_client()
     try:
         yield
     finally:
+        global worker_client
+        if worker_client is not None:
+            await worker_client.aclose()
+            worker_client = None
         if metrics_redis_client is not None:
             await metrics_redis_client.aclose()
             metrics_redis_client = None
@@ -171,6 +236,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Innermost, so the CORS and logging middlewares still wrap its 413.
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -281,30 +348,37 @@ async def model_health(version_id: str, token_payload: dict = Depends(verify_mod
     resolved_model_version_id = str(model_record.get("id", version_id))
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            if serving_engine_for_flavor(model_record.get("flavor")) == "dl":
-                # BentoML exposes custom APIs as POST only.
-                response = await client.post(worker_url, json={})
-            else:
-                response = await client.get(worker_url)
-            if response.status_code == 200:
-                return response.json()
-            return JSONResponse(
-                status_code=response.status_code,
-                content={
-                    "status": "unhealthy",
-                    "message": f"Worker health returned HTTP {response.status_code}",
-                    "detail": response.text,
-                },
-            )
+        client = get_worker_client()
+        if serving_engine_for_flavor(model_record.get("flavor")) == "dl":
+            # BentoML exposes custom APIs as POST only.
+            response = await client.post(worker_url, json={}, timeout=HEALTH_TIMEOUT_SECONDS)
+        else:
+            response = await client.get(worker_url, timeout=HEALTH_TIMEOUT_SECONDS)
+        if response.status_code == 200:
+            return response.json()
+        # The worker's own response body stays inside the cluster.
+        return JSONResponse(
+            status_code=response.status_code,
+            content={
+                "status": "unhealthy",
+                "message": f"Worker health returned HTTP {response.status_code}",
+            },
+        )
     except Exception as exc:
-        invalidate_model_version_cache(resolved_model_version_id, redis_client=redis_client)
+        log_event(
+            logger,
+            "WARNING",
+            "worker_health_unreachable",
+            "Worker health probe failed",
+            error_type=type(exc).__name__,
+        )
+        await asyncio.to_thread(invalidate_model_version_cache, resolved_model_version_id, redis_client=redis_client)
         return JSONResponse(
             status_code=503,
             content={
                 "status": "unhealthy",
                 "model_loaded": False,
-                "error": f"Cannot reach worker pod: {exc}",
+                "error": "Cannot reach worker pod.",
             },
         )
 
@@ -360,63 +434,81 @@ async def _predict(
     start_time = time.perf_counter()
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            worker_payload = build_worker_payload(model_record, features_dict, resolved_model_version_id)
-            response = await client.post(worker_url, json=worker_payload, headers={"X-Request-ID": request_id})
-            latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        client = get_worker_client()
+        worker_payload = build_worker_payload(model_record, features_dict, resolved_model_version_id)
+        response = await client.post(
+            worker_url,
+            json=worker_payload,
+            headers={"X-Request-ID": request_id},
+            timeout=PREDICT_TIMEOUT_SECONDS,
+        )
+        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
-            if response.status_code != 200:
-                paas_predictions_counter.labels(
-                    tenant_id=tenant_id,
-                    project_id=project_id,
-                    model_version_id=resolved_model_version_id,
-                    status=f"error_{response.status_code}",
-                ).inc()
-                try:
-                    error_detail = response.json()
-                except Exception:
-                    error_detail = response.text
-                return JSONResponse(status_code=response.status_code, content=error_detail)
-
-            prediction_result, confidence, engine = parse_worker_prediction(
-                response.json(),
-                model_record.get("flavor"),
-            )
-
+        if response.status_code != 200:
             paas_predictions_counter.labels(
                 tenant_id=tenant_id,
                 project_id=project_id,
                 model_version_id=resolved_model_version_id,
-                status="success",
+                status=f"error_{response.status_code}",
             ).inc()
-            background_tasks.add_task(
-                send_to_redpanda,
-                tenant_id,
-                project_id,
-                resolved_model_version_id,
-                features_dict,
-                prediction_result,
-                prediction_id=prediction_id,
-                confidence=confidence,
-                latency_ms=latency_ms,
-                status_code=200,
-                request_id=request_id,
-            )
+            if response.status_code >= 500:
+                # A worker crash can carry a traceback; callers get a fixed message.
+                log_event(
+                    logger,
+                    "WARNING",
+                    "worker_error_response",
+                    "Model worker returned a server error",
+                    status_code=response.status_code,
+                )
+                return JSONResponse(
+                    status_code=response.status_code,
+                    content={"detail": "The model worker failed to process the request."},
+                )
+            try:
+                error_detail = response.json()
+            except Exception:
+                error_detail = response.text
+            return JSONResponse(status_code=response.status_code, content=error_detail)
 
-            return JSONResponse(
-                content={
-                    "success": True,
-                    "prediction_id": prediction_id,
-                    "id": prediction_id,
-                    "prediction": prediction_result,
-                    "confidence": confidence,
-                    "tenant_id": tenant_id,
-                    "project_id": project_id,
-                    "model_version_id": resolved_model_version_id,
-                    "engine": engine,
-                },
-                status_code=200,
-            )
+        prediction_result, confidence, engine = parse_worker_prediction(
+            response.json(),
+            model_record.get("flavor"),
+        )
+
+        paas_predictions_counter.labels(
+            tenant_id=tenant_id,
+            project_id=project_id,
+            model_version_id=resolved_model_version_id,
+            status="success",
+        ).inc()
+        background_tasks.add_task(
+            send_to_redpanda,
+            tenant_id,
+            project_id,
+            resolved_model_version_id,
+            features_dict,
+            prediction_result,
+            prediction_id=prediction_id,
+            confidence=confidence,
+            latency_ms=latency_ms,
+            status_code=200,
+            request_id=request_id,
+        )
+
+        return JSONResponse(
+            content={
+                "success": True,
+                "prediction_id": prediction_id,
+                "id": prediction_id,
+                "prediction": prediction_result,
+                "confidence": confidence,
+                "tenant_id": tenant_id,
+                "project_id": project_id,
+                "model_version_id": resolved_model_version_id,
+                "engine": engine,
+            },
+            status_code=200,
+        )
     except httpx.RequestError as exc:
         paas_predictions_counter.labels(
             tenant_id=tenant_id,
@@ -425,11 +517,12 @@ async def _predict(
             status="error_503",
         ).inc()
         # Reactive invalidation: evict stale routing cache immediately
-        invalidate_model_version_cache(resolved_model_version_id, redis_client=redis_client)
+        # Redis and PostgreSQL clients block; keep them off the event loop.
+        await asyncio.to_thread(invalidate_model_version_cache, resolved_model_version_id, redis_client=redis_client)
 
         fresh_record = None
         try:
-            fresh_record = _fetch_model_version_from_db(resolved_model_version_id)
+            fresh_record = await asyncio.to_thread(_fetch_model_version_from_db, resolved_model_version_id)
         except Exception:
             fresh_record = None
 
@@ -445,7 +538,7 @@ async def _predict(
 
         raise HTTPException(
             status_code=503,
-            detail=f"Service Unavailable: Cannot reach model serving pod ({exc}). Routing cache invalidated.",
+            detail="Service Unavailable: Cannot reach model serving pod. Routing cache invalidated.",
         ) from exc
     except Exception as exc:
         paas_predictions_counter.labels(
@@ -454,7 +547,19 @@ async def _predict(
             model_version_id=resolved_model_version_id,
             status="error_500",
         ).inc()
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        # The exception text can hold internal addresses, paths or model output; log the type only.
+        log_event(
+            logger,
+            "ERROR",
+            "predict_failed",
+            "Prediction failed unexpectedly",
+            error_type=type(exc).__name__,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal error while processing the prediction (request_id: {request_id}).",
+        ) from exc
     finally:
         paas_latency_histogram.labels(
             tenant_id=tenant_id,

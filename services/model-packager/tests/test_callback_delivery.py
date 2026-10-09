@@ -13,7 +13,8 @@ def test_retry_uses_identical_payload_and_idempotency_key(monkeypatch):
     post_webhook("http://callback", payload, SimpleNamespace(post=post), {"X-Control-Plane-Secret": "fixture-secret"})
     assert post.call_count == 3
     assert sleep.call_count == 2
-    assert all(call.kwargs["json"] is payload for call in post.call_args_list)
+    sent = [call.kwargs["json"] for call in post.call_args_list]
+    assert all(item == payload and item is sent[0] for item in sent)
     keys = [call.kwargs["headers"]["Idempotency-Key"] for call in post.call_args_list]
     assert len(set(keys)) == 1
     assert all(call.kwargs["allow_redirects"] is False for call in post.call_args_list)

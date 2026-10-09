@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from apps.auth.throttles import LoginAccountRateThrottle, LoginIpRateThrottle
 from apps.auth.api.serializers import (
     TenantTokenRefreshSerializer,
     TenantTokenSerializer,
@@ -60,6 +61,7 @@ class JWKSEndpoint(APIView):
 
 class CookieTokenObtainPairView(TokenObtainPairView):
     serializer_class = TenantTokenSerializer
+    throttle_classes = (LoginIpRateThrottle, LoginAccountRateThrottle)
 
     def post(self, request, *args, **kwargs):
         verify_auth_security_headers(request)

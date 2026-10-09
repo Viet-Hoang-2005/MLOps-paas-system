@@ -1,10 +1,25 @@
 """Stateless normalization and artifact metadata helpers."""
 
 import hashlib
+import math
 from urllib.parse import urlparse
 
 
+def count_non_finite(value) -> int:
+    """How many NaN/Infinity numbers a JSON-like value holds."""
+    if isinstance(value, float):
+        return 0 if math.isfinite(value) else 1
+    if isinstance(value, (list, tuple)):
+        return sum(count_non_finite(item) for item in value)
+    if isinstance(value, dict):
+        return sum(count_non_finite(item) for item in value.values())
+    return 0
+
+
 def safe_json_value(value):
+    # NaN and Infinity are not JSON: strict parsers (the Control Plane's included) reject them.
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, list):
@@ -15,7 +30,8 @@ def safe_json_value(value):
 
 
 def is_number(value) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    """A finite number: NaN and Infinity cannot be reported as a metric."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def artifact_kind(relative_path, model_extensions, checkpoint_extensions, metadata_extensions) -> str:

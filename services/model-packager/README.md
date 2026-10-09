@@ -83,22 +83,31 @@ Trong nền tảng MLOps PaaS, Model Packager là thành phần thực thi của
 6. Mỗi dòng log trong quá trình build được đẩy trực tiếp vào Redis key `build_logs:{build_id}`.
 7. Khi build thành công, gọi HTTP POST tới `WEBHOOK_URL` của Control Plane kèm thông tin image và mã xác thực `CONTROL_PLANE_WEBHOOK_SECRET`.
 
-#### Kịch bản 2: Môi trường Production K3s (`BUILD_ENGINE=kaniko` qua Argo Workflow 3 bước)
+#### Kịch bản 2: Môi trường Production K3s (`BUILD_ENGINE=kaniko` qua Argo Workflow 4 bước)
 ```
-Step 1: model-packager (TASK_TYPE=BUILD, BUILD_ENGINE=kaniko)
+Step 1: prepare-package (model-packager, TASK_TYPE=BUILD, BUILD_ENGINE=kaniko)
   ├── Tải artifact từ S3 và chuẩn hóa định dạng MLflow
   ├── Sinh Dockerfile và requirements.txt vào thư mục chia sẻ /workspace/
   └── Ghi file trạng thái chuẩn bị webhook_payload.json vào /workspace/
 
-Step 2: kaniko-executor (Container của Google Kaniko)
-  ├── Đọc /workspace/Dockerfile và ngữ cảnh build
-  ├── Thực thi build image hoàn toàn không cần Docker daemon (Rootless)
-  └── Đẩy container image trực tiếp lên Harbor Registry nội bộ
+Step 2: build-image (Google Kaniko, KHÔNG có credential để push)
+  ├── Đọc /workspace/Dockerfile và ngữ cảnh build; `pip install` của người dùng chạy ở bước này
+  ├── Build không cần Docker daemon (Rootless) và ghi image ra /workspace/image.tar (--no-push)
+  └── Chỉ có thể kéo base image: ẩn danh, hoặc bằng secret tùy chọn `harbor-base-pull-dockerconfig`
 
-Step 3: model-packager (TASK_TYPE=NOTIFY_BUILD)
-  ├── Đọc kết quả từ /workspace/webhook_payload.json
+Step 3: push-image (skopeo, giữ credential push Harbor)
+  ├── Không chạy mã người dùng: chỉ đẩy /workspace/image.tar lên Harbor
+  └── Ghi digest của image đã đẩy vào /workspace/image-digest
+
+Step 4: notify-success (model-packager, TASK_TYPE=NOTIFY_BUILD)
+  ├── Đọc kết quả từ /workspace/webhook_payload.json và digest từ /workspace/image-digest
   └── Bắn Webhook Callback về Control Plane thông báo Build thành công
 ```
+
+Credential push Harbor tách khỏi bước build vì `pip install` của người dùng chạy với quyền root trong cùng
+container với Kaniko, nên mọi thứ được mount vào đó đều đọc được. Project Harbor chứa base image
+(`mlops-paas`) phải cho phép kéo ẩn danh, hoặc tạo secret `harbor-base-pull-dockerconfig` (khóa `config.json`)
+từ một tài khoản robot **chỉ có quyền pull**. Không dùng tài khoản có quyền push cho secret này.
 
 ---
 

@@ -102,6 +102,8 @@ JWT_ALGORITHM = "RS256" if JWT_PRIVATE_KEY and JWT_PUBLIC_KEY else "HS256"
 PASSWORD_RESET_THROTTLE_RATE = env("PASSWORD_RESET_THROTTLE_RATE", "10/minute")
 REGISTRATION_THROTTLE_RATE = env("REGISTRATION_THROTTLE_RATE", "10/minute")
 PASSWORD_CHANGE_THROTTLE_RATE = env("PASSWORD_CHANGE_THROTTLE_RATE", "10/minute")
+LOGIN_IP_THROTTLE_RATE = env("LOGIN_IP_THROTTLE_RATE", "30/minute")
+LOGIN_ACCOUNT_THROTTLE_RATE = env("LOGIN_ACCOUNT_THROTTLE_RATE", "10/minute")
 # Reverse proxies in front of the app that append to X-Forwarded-For. 0 trusts
 # only the socket address, so the header can never choose the throttle key.
 TRUSTED_PROXY_COUNT = env_int("TRUSTED_PROXY_COUNT", 0)
@@ -115,6 +117,8 @@ REST_FRAMEWORK = {
         "password_reset": PASSWORD_RESET_THROTTLE_RATE,
         "registration": REGISTRATION_THROTTLE_RATE,
         "password_change": PASSWORD_CHANGE_THROTTLE_RATE,
+        "login_ip": LOGIN_IP_THROTTLE_RATE,
+        "login_account": LOGIN_ACCOUNT_THROTTLE_RATE,
     },
 }
 SIMPLE_JWT = {
@@ -229,6 +233,9 @@ CELERY_TASK_ROUTES = {
 STOP_RECONCILE_INTERVAL_SECONDS = env_int("STOP_RECONCILE_INTERVAL_SECONDS", 120)
 STOP_RECONCILE_GRACE_SECONDS = env_int("STOP_RECONCILE_GRACE_SECONDS", 600)
 STOP_RECONCILE_BATCH_SIZE = env_int("STOP_RECONCILE_BATCH_SIZE", 50)
+DELETION_RECONCILE_INTERVAL_SECONDS = env_int("DELETION_RECONCILE_INTERVAL_SECONDS", 120)
+DELETION_RECONCILE_GRACE_SECONDS = env_int("DELETION_RECONCILE_GRACE_SECONDS", 600)
+DELETION_RECONCILE_BATCH_SIZE = env_int("DELETION_RECONCILE_BATCH_SIZE", 20)
 CELERY_BEAT_SCHEDULE = {
     "runtime-health-scan": {
         "task": "apps.deployment.health_tasks.scan_runtime_health",
@@ -239,6 +246,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.deployment.tasks.reconcile_stopped_deployments",
         "schedule": STOP_RECONCILE_INTERVAL_SECONDS,
         "options": {"queue": "celery", "expires": 60},
+    },
+    "stalled-deletion-reconcile": {
+        "task": "apps.deployment.tasks.reconcile_stalled_deletions",
+        "schedule": DELETION_RECONCILE_INTERVAL_SECONDS,
+        "options": {"queue": "celery", "expires": 120},
     },
 }
 if LOCAL_EXECUTION_WATCH_ENABLED:

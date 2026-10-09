@@ -14,6 +14,7 @@ import redis
 import requests
 import yaml
 from src import config, image_build, io
+from src.image_build import serving_base_image, write_build_context
 from src.security import (
     validate_model_package_security,
     validate_no_dangerous_binaries,
@@ -245,7 +246,8 @@ def read_training_summaries(extracted_dir: Path) -> tuple[dict[str, dict], Path 
             )
             continue
         if isinstance(value, dict):
-            summaries[key] = value
+            # json.loads accepts NaN/Infinity, but the callback must be strict JSON.
+            summaries[key] = io.finite_json(value)
     return summaries, mlops_dir
 
 
@@ -358,36 +360,12 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
             harbor_url = os.environ.get("HARBOR_REGISTRY_URL", "").strip().rstrip("/")
             if flavor in ["pytorch", "tensorflow", "keras"]:
                 runtime_log.detail("Detected Deep Learning flavor. Generating BentoML Dockerfile...")
-                base_image = (
-                    f"{harbor_url}/mlops-paas/deep-learning-serving:latest"
-                    if harbor_url
-                    else "mlops-paas-deep-learning-serving:latest"
-                )
-                dockerfile_content = f"""FROM {base_image}
-USER root
-COPY requirements.txt /tmp/custom_requirements.txt
-RUN grep -i -v -E '^(fastapi|uvicorn|starlette|pydantic|bentoml|httpx)([[:space:]=<>~!]*)?$' /tmp/custom_requirements.txt > /tmp/safe_requirements.txt || touch /tmp/safe_requirements.txt
-RUN pip install --no-cache-dir -r /tmp/safe_requirements.txt || echo 'Some requirements failed to install, continuing...'
-COPY model /app/model_artifact
-"""
+                serving_image = "deep-learning-serving"
             else:
                 runtime_log.detail("Generating custom lightweight Dockerfile...")
-                base_image = (
-                    f"{harbor_url}/mlops-paas/machine-learning-serving:latest"
-                    if harbor_url
-                    else "mlops-paas-machine-learning-serving:latest"
-                )
-                dockerfile_content = f"""FROM {base_image}
-USER root
-COPY requirements.txt /tmp/custom_requirements.txt
-RUN grep -i -v -E '^(fastapi|uvicorn|starlette|pydantic|bentoml|httpx)([[:space:]=<>~!]*)?$' /tmp/custom_requirements.txt > /tmp/safe_requirements.txt || touch /tmp/safe_requirements.txt
-RUN pip install --no-cache-dir -r /tmp/safe_requirements.txt || echo 'Some requirements failed to install, continuing...'
-COPY model /app/model_artifact
-"""
-            (workspace / "Dockerfile").write_text(dockerfile_content, encoding="utf-8")
-            (workspace / "requirements.txt").write_text(
-                (requirements_text.strip() + "\n") if requirements_text.strip() else "\n",
-                encoding="utf-8",
+                serving_image = "machine-learning-serving"
+            write_build_context(
+                workspace, serving_base_image(serving_image, harbor_url), requirements_text, runtime_log.detail
             )
 
             payload = {
@@ -399,7 +377,9 @@ COPY model /app/model_artifact
                 "requirements_snapshot": requirements_text,
                 **training_summaries,
             }
-            (workspace / "webhook_payload.json").write_text(json.dumps(payload), encoding="utf-8")
+            (workspace / "webhook_payload.json").write_text(
+                json.dumps(io.finite_json(payload), allow_nan=False), encoding="utf-8"
+            )
             runtime_log.protocol("Build context prepared successfully for Kaniko! BUILD_PREPARE_SUCCESS")
             return
         elif flavor in ["pytorch", "tensorflow", "keras"]:
@@ -525,26 +505,11 @@ def run_test_zip_task(build_id: str, webhook_url: str) -> None:
             runtime_log.detail("Kaniko build engine detected. Preparing build context for TEST_ZIP...")
             harbor_url = os.environ.get("HARBOR_REGISTRY_URL", "").strip().rstrip("/")
             is_deep_learning = flavor in ["pytorch", "tensorflow", "keras"]
-            base_image = (
-                f"{harbor_url}/mlops-paas/deep-learning-serving:latest"
-                if harbor_url and is_deep_learning
-                else "mlops-paas-deep-learning-serving:latest"
-                if is_deep_learning
-                else f"{harbor_url}/mlops-paas/machine-learning-serving:latest"
-                if harbor_url
-                else "mlops-paas-machine-learning-serving:latest"
-            )
-            dockerfile_content = f"""FROM {base_image}
-USER root
-COPY requirements.txt /tmp/custom_requirements.txt
-RUN grep -i -v -E '^(fastapi|uvicorn|starlette|pydantic|bentoml|httpx)([[:space:]=<>~!]*)?$' /tmp/custom_requirements.txt > /tmp/safe_requirements.txt || touch /tmp/safe_requirements.txt
-RUN pip install --no-cache-dir -r /tmp/safe_requirements.txt || echo 'Some requirements failed to install, continuing...'
-COPY model /app/model_artifact
-"""
-            (workspace / "Dockerfile").write_text(dockerfile_content, encoding="utf-8")
-            (workspace / "requirements.txt").write_text(
-                (requirements_text.strip() + "\n") if requirements_text.strip() else "\n",
-                encoding="utf-8",
+            write_build_context(
+                workspace,
+                serving_base_image("deep-learning-serving" if is_deep_learning else "machine-learning-serving", harbor_url),
+                requirements_text,
+                runtime_log.detail,
             )
             payload = {
                 "build_id": build_id,
@@ -554,7 +519,9 @@ COPY model /app/model_artifact
                 "task_type": "TEST_ZIP",
                 "requirements_snapshot": requirements_text,
             }
-            (workspace / "webhook_payload.json").write_text(json.dumps(payload), encoding="utf-8")
+            (workspace / "webhook_payload.json").write_text(
+                json.dumps(io.finite_json(payload), allow_nan=False), encoding="utf-8"
+            )
             runtime_log.protocol("TEST_ZIP context prepared successfully for Kaniko! BUILD_PREPARE_SUCCESS")
             return
         else:
@@ -586,7 +553,8 @@ def run_notify_task(workspace_dir: str, webhook_url: str) -> None:
     payload_file = workspace / "webhook_payload.json"
     if not payload_file.exists():
         raise FileNotFoundError(f"Webhook payload not found at {payload_file}")
-    payload = json.loads(payload_file.read_text(encoding="utf-8"))
+    # Contexts prepared by an older packager may still hold NaN/Infinity tokens.
+    payload = io.finite_json(json.loads(payload_file.read_text(encoding="utf-8")))
     image_uri = os.environ.get("IMAGE_URI", "").strip()
     digest_file = workspace / "image-digest"
     if image_uri:
