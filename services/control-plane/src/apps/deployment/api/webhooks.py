@@ -30,6 +30,15 @@ def _dict_payload(value):
     return value if isinstance(value, dict) else {}
 
 
+def _expected_image_reference(build):
+    return temporary_image_reference(
+        build.project.public_id,
+        build.public_id,
+        registry=settings.HARBOR_REGISTRY_URL if build.backend == "argo" else "",
+        registry_project=settings.HARBOR_USER_PROJECT,
+    )
+
+
 class HasDeploymentCallbackToken(BasePermission):
     message = "Invalid deployment reporter token."
 
@@ -61,8 +70,9 @@ class DeploymentWebhookEndpoint(APIView):
             if deployment.backend != "argo":
                 return Response({"detail": "This deployment does not use Argo."}, status=409)
             if deployment.status in {"succeeded", "failed", "stopped"}:
-                if deployment.status == "stopped" and incoming == "succeeded":
-                    # The workflow created its runtime after the stop ran; remove it again.
+                if deployment.status in {"stopped", "failed"} and incoming == "succeeded":
+                    # The workflow created its runtime after the stop or failure was recorded;
+                    # nothing owns that runtime any more, so remove it. The status stays final.
                     transaction.on_commit(lambda: stop_deployment.delay(str(deployment.public_id)))
                 return Response({"status": deployment.status, "duplicate": True})
             if deployment.version.project.deletion_state != "active":
@@ -124,6 +134,13 @@ class BuildWebhookEndpoint(APIView):
                 build.save(update_fields=["execution_completed_at"])
             if build.deletion_state != "active":
                 transaction.on_commit(lambda: delete_build.delay(str(build.public_id)))
+            elif build.backend == "argo" and build.status == "cancelled" and not build.version_id:
+                # The workflow outlived the cancel and may have published an image and package
+                # after the cancel-time cleanup ran. The image reference is server-generated.
+                if not build.image_uri:
+                    build.image_uri = _expected_image_reference(build)
+                    build.save(update_fields=["image_uri"])
+                transaction.on_commit(lambda: cleanup_failed_build_artifacts.delay(str(build.public_id), True))
             return Response(
                 {
                     "status": build.status,
@@ -131,8 +148,15 @@ class BuildWebhookEndpoint(APIView):
                     "duplicate": True,
                 }
             )
-        if build.backend == "docker" and incoming in {"success", "succeeded", "ready", "completed"}:
-            expected_image = temporary_image_reference(build.project.public_id, build.public_id)
+        # The only image a build may publish is the one named after its own identity; a
+        # reporter-supplied reference is never trusted, whichever backend ran the build.
+        expected_image = _expected_image_reference(build)
+        will_register = (
+            incoming in {"success", "succeeded", "ready", "completed"}
+            and build.deletion_state == "active"
+            and build.project.deletion_state == "active"
+        )
+        if will_register:  # a result that is discarded anyway must still be able to finish the build
             if (
                 request.data.get("image_uri") != expected_image
                 or not re.fullmatch(r"sha256:[a-f0-9]{64}", str(request.data.get("image_digest", "")))
@@ -148,15 +172,7 @@ class BuildWebhookEndpoint(APIView):
         build.save(update_fields=["execution_completed_at"])
         if incoming in {"success", "succeeded", "ready", "completed"}:
             project = build.project
-            image_uri = str(
-                request.data.get("image_uri")
-                or temporary_image_reference(
-                    project.public_id,
-                    build.public_id,
-                    registry=settings.HARBOR_REGISTRY_URL if build.backend == "argo" else "",
-                    registry_project=settings.HARBOR_USER_PROJECT,
-                )
-            )
+            image_uri = expected_image
             image_digest = str(request.data.get("image_digest", ""))[:255]
             if project.deletion_state != "active" or build.deletion_state != "active":
                 build.status = "cancelled"
@@ -189,8 +205,11 @@ class BuildWebhookEndpoint(APIView):
                 build.save(update_fields=["completed_at", "updated_at"])
         else:
             build.status = "failed"
-            build.image_uri = str(request.data.get("image_uri", build.image_uri))
-            build.image_digest = str(request.data.get("image_digest", build.image_digest))[:255]
+            # Cleanup deletes build.image_uri from the registry, so it must stay build-scoped.
+            if request.data.get("image_uri") == expected_image:
+                build.image_uri = expected_image
+            if re.fullmatch(r"sha256:[a-f0-9]{64}", str(request.data.get("image_digest", ""))):
+                build.image_digest = str(request.data["image_digest"])
             build.error_message = str(request.data.get("error_message", "Build failed."))[:12000]
             build.completed_at = timezone.now()
             build.save(

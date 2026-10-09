@@ -452,6 +452,12 @@ def test_main_dispatch_and_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "run_notify_task", Mock(side_effect=RuntimeError("bad")))
     webhook = Mock()
     monkeypatch.setattr(cli, "post_webhook", webhook)
+    monkeypatch.delenv("CONTROL_PLANE_WEBHOOK_SECRET", raising=False)
+    with pytest.raises(SystemExit):
+        cli.main()
+    # A step without the callback secret leaves failure reporting to the workflow exit handler.
+    webhook.assert_not_called()
+    monkeypatch.setenv("CONTROL_PLANE_WEBHOOK_SECRET", "fixture-secret")
     with pytest.raises(SystemExit):
         cli.main()
     assert webhook.call_args.args[1]["status"] == "error"

@@ -9,10 +9,19 @@ spec:
   podMetadata:
     labels:
       mlops.io/build-id: "{{workflow.parameters.build_id}}"
+  workflowMetadata:
+    labelsFrom:
+      mlops.io/build-id: {expression: workflow.parameters.build_id}
+      mlops.io/project-id: {expression: workflow.parameters.project_id}
+      mlops.io/tenant-id: {expression: workflow.parameters.tenant_id}
   onExit: notify-build-exit
   arguments:
     parameters:
       - name: build_id
+        value: ""
+      - name: project_id
+        value: ""
+      - name: tenant_id
         value: ""
       - name: control_plane_webhook_url
       - name: label_mapping_download_url
@@ -141,9 +150,9 @@ spec:
           - {name: LABEL_MAPPING_FILENAME, value: "{{inputs.parameters.label_mapping_filename}}"}
           - {name: OUTPUT_UPLOAD_URL, value: "{{inputs.parameters.output_upload_url}}"}
           - {name: CONTROL_PLANE_WEBHOOK_URL, value: "{{inputs.parameters.control_plane_webhook_url}}"}
-          - name: CONTROL_PLANE_WEBHOOK_SECRET
-            valueFrom:
-              secretKeyRef: {name: argo-build-callback-secret, key: CONTROL_PLANE_WEBHOOK_SECRET}
+          # No CONTROL_PLANE_WEBHOOK_SECRET here: this step runs pip install and loads the
+          # user's model. Only notify-success and the exit handler hold the callback secret;
+          # a failed step is reported by the exit handler.
     - name: build-image
       nodeSelector: {workload-type: worker}
       inputs:

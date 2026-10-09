@@ -687,14 +687,19 @@ def main():
             duration_ms=round((time.monotonic() - started) * 1000, 3),
         )
         try:
-            post_webhook(
-                webhook_url,
-                {
-                    "build_id": build_id,
-                    "status": "error",
-                    "error_message": sanitize(str(exc)),
-                },
-            )
+            if webhook_headers():
+                post_webhook(
+                    webhook_url,
+                    {
+                        "build_id": build_id,
+                        "status": "error",
+                        "error_message": sanitize(str(exc)),
+                    },
+                )
+            else:
+                # Steps that run user code hold no callback secret; the workflow's exit
+                # handler reports the failure instead.
+                runtime_log.detail("No callback credential in this step; the workflow exit handler reports the failure.")
         except Exception as webhook_exc:
             runtime_log.event(
                 logging.ERROR,

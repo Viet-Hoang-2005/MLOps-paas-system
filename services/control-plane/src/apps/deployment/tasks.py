@@ -165,7 +165,7 @@ def register_build(build_id):
     return "registered" if registered.version_id else "in_progress"
 
 
-@shared_task(bind=True)
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, max_retries=5)
 def cancel_build(self, build_id):
     build = Build.objects.select_related("project").filter(public_id=build_id).first()
     if not build or build.deletion_state != "active":
@@ -369,6 +369,11 @@ def stop_deployment(self, deployment_id):
         health_status="unknown", last_checked_at=None, health_check_token=None, health_check_lease_until=None
     )
     invalidate_model_server_cache(str(deployment.version.public_id))
+    if locked.status != "stopped":
+        # A failed deployment whose workflow still created a runtime: the runtime is removed
+        # but the recorded outcome stays what it was.
+        append_deployment_log(deployment, f"Removed the runtime of a {locked.status} deployment.")
+        return locked.status
     append_deployment_log(deployment, "Deployment stopped.")
     record_transition(deployment, "stopped")
     enqueue_event(

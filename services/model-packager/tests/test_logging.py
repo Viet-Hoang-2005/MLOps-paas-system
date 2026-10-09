@@ -77,6 +77,7 @@ def test_execution_events_and_failure_marker(monkeypatch, failed, capsys):
     )
     callback = Mock()
     monkeypatch.setattr(cli, "post_webhook", callback)
+    monkeypatch.setenv("CONTROL_PLANE_WEBHOOK_SECRET", "fixture-secret")
     token = object()
     monkeypatch.setattr(cli, "bind_context", Mock(return_value=token))
     reset = Mock()

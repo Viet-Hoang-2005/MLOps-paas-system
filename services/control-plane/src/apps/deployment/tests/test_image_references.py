@@ -1,6 +1,8 @@
 from http.client import HTTPMessage
 from types import SimpleNamespace
 
+import docker.errors
+import pytest
 import requests
 from requests.cookies import MockRequest, MockResponse
 
@@ -72,6 +74,68 @@ def test_docker_promotion_adds_version_tag_and_removes_temporary_tag():
         ("tag", "image-project-id", "v3"),
         ("remove", "image-project-id:build-build-id", False, False),
     ]
+
+
+def _docker_registry(get, remove):
+    images = SimpleNamespace(get=get, remove=remove)
+    return DockerImageRegistry(docker_client=SimpleNamespace(client=SimpleNamespace(images=images)))
+
+
+def test_docker_promotion_retry_after_temporary_tag_was_removed():
+    """A retry after a failed registration phase must still find the image by its final tag."""
+    tagged = []
+    image = SimpleNamespace(
+        attrs={"Id": "sha256:local-image-id"},
+        id="sha256:local-image-id",
+        tag=lambda repository, tag: tagged.append((repository, tag)),
+    )
+
+    def get(reference):
+        if reference == "image-project-id:v3":
+            return image
+        raise docker.errors.NotFound("temporary tag already removed")
+
+    def remove(reference, force, noprune):
+        raise docker.errors.ImageNotFound("already absent")
+
+    registry = _docker_registry(get, remove)
+    uri, identity = registry.promote(
+        build=SimpleNamespace(project=SimpleNamespace(public_id="project-id")),
+        version=SimpleNamespace(version="3"),
+        image_uri="image-project-id:build-build-id",
+    )
+
+    assert (uri, identity) == ("image-project-id:v3", "sha256:local-image-id")
+    assert tagged == [("image-project-id", "v3")]
+
+
+def test_docker_promotion_tolerates_failure_removing_temporary_tag():
+    image = SimpleNamespace(attrs={"Id": "sha256:id"}, id="sha256:id", tag=lambda repository, tag: None)
+
+    def remove(reference, force, noprune):
+        raise docker.errors.APIError("conflict")
+
+    registry = _docker_registry(lambda reference: image, remove)
+    uri, _ = registry.promote(
+        build=SimpleNamespace(project=SimpleNamespace(public_id="project-id")),
+        version=SimpleNamespace(version="3"),
+        image_uri="image-project-id:build-build-id",
+    )
+
+    assert uri == "image-project-id:v3"
+
+
+def test_docker_promotion_fails_clearly_when_image_is_gone():
+    def get(reference):
+        raise docker.errors.NotFound("gone")
+
+    registry = _docker_registry(get, lambda *args, **kwargs: None)
+    with pytest.raises(RuntimeError, match="no longer exists"):
+        registry.promote(
+            build=SimpleNamespace(project=SimpleNamespace(public_id="project-id")),
+            version=SimpleNamespace(version="3"),
+            image_uri="image-project-id:build-build-id",
+        )
 
 
 def test_harbor_promotion_retags_digest_and_removes_temporary_tag(settings):

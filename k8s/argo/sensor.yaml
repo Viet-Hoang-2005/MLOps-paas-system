@@ -44,6 +44,20 @@ spec:
               - {name: project_id, path: body.project_id}
               - {name: image_repository, path: body.image_repository}
               - {name: image_tag, path: body.image_tag}
+    - name: cancel-build-dep
+      eventSourceName: webhook-eventsource
+      eventName: cancel-build
+      filters:
+        data:
+          - path: body.build_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.project_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.tenant_id
+            type: string
+            value: ['^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
     - name: deploy-dep
       eventSourceName: webhook-eventsource
       eventName: deploy
@@ -329,6 +343,35 @@ spec:
                 dependencyName: build-dep
                 dataKey: body.label_mapping_filename
               dest: spec.arguments.parameters.14.value
+    - template:
+        name: cancel-build-workflow-trigger
+        conditions: "cancel-build-dep"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: cancel-build-operation-
+                namespace: mlops-execution
+              spec:
+                workflowTemplateRef:
+                  name: mlops-paas-job-submit-template
+                ttlStrategy:
+                  secondsAfterCompletion: 300
+                podGC:
+                  strategy: OnPodCompletion
+                arguments:
+                  parameters:
+                    - {name: execution_kind, value: "cancel-build"}
+                    - {name: execution_payload, value: ""}
+          parameters:
+            - src:
+                dependencyName: cancel-build-dep
+                dataTemplate: '{{ .Input.body | toJson }}'
+              dest: spec.arguments.parameters.1.value
+
     - template:
         name: deploy-workflow-trigger
         conditions: "deploy-dep"

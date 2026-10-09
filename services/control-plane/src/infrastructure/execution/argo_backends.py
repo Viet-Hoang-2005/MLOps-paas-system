@@ -113,7 +113,19 @@ class ArgoBuildBackend(_ArgoBackend):
             return self.trigger(payload)
 
     def cancel(self, build):
-        return None
+        """Ask the cluster to terminate the build's Workflow; late output is cleaned up by callbacks."""
+        if not settings.ARGO_CANCEL_BUILD_WEBHOOK_URL:
+            return None
+        project = build.project
+        response = self.client.trigger(
+            settings.ARGO_CANCEL_BUILD_WEBHOOK_URL,
+            {
+                "build_id": str(build.public_id),
+                "project_id": str(project.public_id),
+                "tenant_id": project.owner.tenant_id,
+            },
+        )
+        return {"dispatched": True, "response": response}
 
 
 class ArgoTrainingBackend(_ArgoBackend):

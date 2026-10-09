@@ -104,6 +104,31 @@ def submit(api, payload, kind):
     return created
 
 
+def cancel_build(api, payload):
+    """Terminate the Workflow of one build; ownership comes from labels set at creation."""
+    build_id = payload.get("build_id", "")
+    if not re.fullmatch(UUID, build_id) or not re.fullmatch(UUID, payload.get("project_id", "")) or not re.fullmatch("T-" + UUID, payload.get("tenant_id", "")):
+        raise ValueError("Invalid build identity.")
+    labels = {
+        "mlops.io/tenant-id": payload["tenant_id"],
+        "mlops.io/project-id": payload["project_id"],
+        "mlops.io/build-id": build_id,
+    }
+    selector = urllib.parse.urlencode({"labelSelector": ",".join(f"{key}={value}" for key, value in labels.items())})
+    for workflow in (api.request("GET", f"{workflow_path()}?{selector}") or {}).get("items", []):
+        verify(workflow, labels)
+        if workflow.get("status", {}).get("phase") in {"Succeeded", "Failed", "Error"}:
+            continue
+        name = workflow["metadata"]["name"]
+        for attempt in range(3):
+            try:
+                api.request("PATCH", workflow_path(name), {"spec": {"shutdown": "Terminate"}})
+                break
+            except RuntimeError as exc:
+                if attempt == 2 or "409" not in str(exc):
+                    raise
+
+
 def reconcile(api, payload):
     kind = payload["kind"]
     name, labels = identity(payload, kind)
@@ -169,7 +194,10 @@ def main():
     payload = json.loads(os.environ["EXECUTION_PAYLOAD"])
     api = Kubernetes()
     if sys.argv[1] == "submit":
-        submit(api, payload, os.environ["EXECUTION_KIND"])
+        if os.environ["EXECUTION_KIND"] == "cancel-build":
+            cancel_build(api, payload)
+        else:
+            submit(api, payload, os.environ["EXECUTION_KIND"])
         return
     name, _ = identity(payload, payload["kind"])
     expected_path = f"/internal/executions/{payload['kind']}/{payload['resource_id']}/observations/"

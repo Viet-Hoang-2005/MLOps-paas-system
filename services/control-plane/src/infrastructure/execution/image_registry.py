@@ -1,3 +1,4 @@
+import docker.errors
 from django.conf import settings
 
 from infrastructure.docker import DockerClient
@@ -11,14 +12,32 @@ class DockerImageRegistry:
         self.docker = docker_client or DockerClient()
 
     def promote(self, *, build, version, image_uri, image_digest=""):
-        image = self.docker.client.images.get(image_digest or image_uri)
         repository = image_repository(build.project.public_id)
         tag = version_image_tag(version.version)
+        final_reference = tagged_image_reference(repository, tag)
+        # A retry after a failed registration phase finds the temporary tag already
+        # removed, so fall back to the final tag instead of failing for good.
+        candidates = [image_digest or image_uri, image_uri, final_reference]
+        image = None
+        for candidate in dict.fromkeys(candidates):
+            try:
+                image = self.docker.client.images.get(candidate)
+                break
+            except docker.errors.NotFound:
+                continue
+        if image is None:
+            raise RuntimeError("Docker image to register no longer exists locally.")
         image.tag(repository, tag=tag)
         identity = image.attrs.get("Id") or image.id or image_digest
-        if image_uri != tagged_image_reference(repository, tag):
-            self.docker.client.images.remove(image_uri, force=False, noprune=False)
-        return tagged_image_reference(repository, tag), identity
+        if image_uri != final_reference:
+            try:
+                self.docker.client.images.remove(image_uri, force=False, noprune=False)
+            except docker.errors.NotFound:
+                pass
+            except docker.errors.APIError:
+                # The temporary tag is only cosmetic once the final tag exists.
+                pass
+        return final_reference, identity
 
 
 class HarborImageRegistry:

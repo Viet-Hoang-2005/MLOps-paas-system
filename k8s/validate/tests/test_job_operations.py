@@ -1,4 +1,5 @@
 import importlib.util
+import urllib.parse
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -220,10 +221,65 @@ def test_operational_workflows_have_ttl_and_pod_gc():
     assert delete_doc["spec"]["podGC"]["strategy"] == "OnPodCompletion"
 
     sensor = yaml.safe_load((root / "argo/sensor.yaml").read_text())
-    op_triggers = ["drift-workflow-trigger", "delete-workflow-trigger", "train-workflow-trigger", "cancel-train-workflow-trigger", "reconcile-job-trigger"]
+    op_triggers = ["cancel-build-workflow-trigger", "drift-workflow-trigger", "delete-workflow-trigger", "train-workflow-trigger", "cancel-train-workflow-trigger", "reconcile-job-trigger"]
     for t in sensor["spec"]["triggers"]:
         if t["template"]["name"] in op_triggers:
             wf_spec = t["template"]["k8s"]["source"]["resource"]["spec"]
             assert wf_spec["ttlStrategy"]["secondsAfterCompletion"] == 300
             assert wf_spec["podGC"]["strategy"] == "OnPodCompletion"
 
+
+
+BUILD_ID = "00000000-0000-0000-0000-000000000004"
+
+
+def build_payload():
+    return {"build_id": BUILD_ID, "project_id": PROJECT, "tenant_id": TENANT}
+
+
+def build_workflow(phase="Running", name="build-model-job-abc"):
+    labels = {"mlops.io/tenant-id": TENANT, "mlops.io/project-id": PROJECT, "mlops.io/build-id": BUILD_ID}
+    return {"metadata": {"name": name, "labels": labels}, "status": {"phase": phase}}
+
+
+def test_cancel_build_terminates_only_running_owned_workflows():
+    api = Mock()
+    api.request.side_effect = [
+        {"items": [build_workflow(), build_workflow("Succeeded", "build-model-job-done")]},
+        None,
+    ]
+    ops.cancel_build(api, build_payload())
+    listing = api.request.call_args_list[0]
+    assert listing.args[0] == "GET"
+    for label in (f"mlops.io/build-id={BUILD_ID}", f"mlops.io/project-id={PROJECT}"):
+        assert urllib.parse.quote(label, safe="") in listing.args[1]
+    patches = [call for call in api.request.call_args_list if call.args[0] == "PATCH"]
+    assert [call.args[1] for call in patches] == [ops.workflow_path("build-model-job-abc")]
+    assert patches[0].args[2] == {"spec": {"shutdown": "Terminate"}}
+
+
+def test_cancel_build_refuses_foreign_workflow_and_bad_identity():
+    foreign = build_workflow()
+    foreign["metadata"]["labels"]["mlops.io/project-id"] = "00000000-0000-0000-0000-0000000000ff"
+    api = Mock()
+    api.request.return_value = {"items": [foreign]}
+    with pytest.raises(ValueError, match="ownership"):
+        ops.cancel_build(api, build_payload())
+    assert all(call.args[0] != "PATCH" for call in api.request.call_args_list)
+    with pytest.raises(ValueError, match="identity"):
+        ops.cancel_build(api, {**build_payload(), "build_id": "../x"})
+
+
+def test_build_template_labels_workflow_and_keeps_callback_secret_away_from_user_code():
+    root = Path(__file__).parents[3] / "k8s/argo"
+    template = yaml.safe_load((root / "workflows/build-workflowtemplate.yaml").read_text(encoding="utf-8"))
+    labels = template["spec"]["workflowMetadata"]["labelsFrom"]
+    assert set(labels) == {"mlops.io/build-id", "mlops.io/project-id", "mlops.io/tenant-id"}
+    steps = {item["name"]: item for item in template["spec"]["templates"]}
+    prepare_env = {item["name"] for item in steps["prepare-package"]["container"]["env"]}
+    assert "CONTROL_PLANE_WEBHOOK_SECRET" not in prepare_env
+    assert "CONTROL_PLANE_WEBHOOK_SECRET" in {item["name"] for item in steps["notify-success"]["container"]["env"]}
+    sensor = yaml.safe_load((root / "sensor.yaml").read_text(encoding="utf-8"))
+    assert "cancel-build-dep" in {dep["name"] for dep in sensor["spec"]["dependencies"]}
+    source = yaml.safe_load((root / "eventsource.yaml").read_text(encoding="utf-8"))
+    assert "cancel-build" in source["spec"]["webhook"]

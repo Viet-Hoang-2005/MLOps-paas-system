@@ -31,6 +31,7 @@ data:
   TRUSTED_PROXY_COUNT: "1"
   AUTH_COOKIE_SECURE: "true"
   ARGO_BUILD_WEBHOOK_URL: "http://webhook-eventsource-eventsource-svc.argo-events.svc.cluster.local:12000/build"
+  ARGO_CANCEL_BUILD_WEBHOOK_URL: "http://webhook-eventsource-eventsource-svc.argo-events.svc.cluster.local:12000/cancel-build"
   ARGO_TRAINING_WEBHOOK_URL: "http://webhook-eventsource-eventsource-svc.argo-events.svc.cluster.local:12000/train"
   ARGO_CANCEL_TRAINING_WEBHOOK_URL: "http://webhook-eventsource-eventsource-svc.argo-events.svc.cluster.local:12000/cancel-train"
   ARGO_DEPLOY_WEBHOOK_URL: "http://webhook-eventsource-eventsource-svc.argo-events.svc.cluster.local:12000/deploy"
