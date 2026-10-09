@@ -117,6 +117,14 @@ module "alb" {
   idle_timeout_seconds = var.alb_idle_timeout_seconds
 }
 
+module "billing" {
+  count                  = (var.enable_billing_alerts && local.enable_k3s_compute_stack) ? 1 : 0
+  source                 = "./modules/billing"
+  credit_limit_amount    = var.billing_credit_limit
+  alert_recipient_emails = var.billing_alert_emails
+  budget_time_unit       = "ANNUALLY"
+}
+
 check "nat_gateway_requires_network" {
   assert {
     condition     = !var.enable_nat_gateway || var.enable_network

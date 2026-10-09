@@ -102,3 +102,8 @@ output "acm_ssl_validation_records" {
   description = "CNAME records to copy to Cloudflare DNS table to validate ACM SSL Certificate"
   value       = var.enable_acm_certificate ? module.dns[0].acm_domain_validation_options : null
 }
+
+output "credit_budget_name" {
+  description = "Name of the AWS Credit Budget"
+  value       = (var.enable_billing_alerts && local.enable_k3s_compute_stack) ? module.billing[0].budget_name : null
+}

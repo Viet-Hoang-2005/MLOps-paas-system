@@ -158,3 +158,22 @@ variable "karpenter_cluster_name" {
   type        = string
   default     = "mlops-paas-cluster"
 }
+
+variable "enable_billing_alerts" {
+  description = "Create AWS Budgets and Cost Anomaly Detection to monitor credit usage."
+  type        = bool
+  default     = true
+}
+
+variable "billing_credit_limit" {
+  description = "Total AWS Credit limit or budget amount in USD to track"
+  type        = number
+  default     = 200
+}
+
+variable "billing_alert_emails" {
+  description = "Email addresses to receive budget and cost anomaly notifications"
+  type        = list(string)
+  default     = ["tnvhoang2005@gmail.com"]
+}
+
