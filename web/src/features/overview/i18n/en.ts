@@ -1,4 +1,5 @@
 export const overviewEn = {
+  pageTitle: "Overview Project",
   workflow: {
     pending: "Pending",
     queued: "Queued",
@@ -162,6 +163,9 @@ export const overviewEn = {
     selectAttributeFile: "Choose {{name}} file",
     removeAttribute: "Remove",
     removeFailed: "Failed to remove attribute.",
+    removeFeatureImportance: "Remove feature importance",
+    removeHyperparameters: "Remove hyperparameters",
+    removeLabelMapping: "Remove label mapping",
     invalidJsonFile: "File must be a valid JSON format.",
     invalidLabelMappingFile: "File must be a valid JSON format.",
     noAttributesPlaceholder: "No attributes configured",
@@ -183,6 +187,7 @@ export const overviewEn = {
     savingFile: "Saving…",
     fileSaved: "File saved successfully.",
     fileSaveFailed: "Failed to save file.",
+    downloadFile: "Download",
     deleteFile: "Delete",
     deletingFile: "Deleting…",
     fileDeleted: "File removed successfully.",

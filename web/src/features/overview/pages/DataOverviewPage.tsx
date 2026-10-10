@@ -12,7 +12,15 @@ import { DataViewer } from "@/shared/components/DataViewer";
 import { Loading } from "@/shared/components/Loading";
 import { Placeholder } from "@/shared/components/Placeholder";
 import { toast } from "@/shared/types/toastStore";
-import { GitBranch, Lock, RotateCcw, Save, Table as TableIcon, Trash2 } from "lucide-react";
+import {
+  Download,
+  GitBranch,
+  Lock,
+  RotateCcw,
+  Save,
+  Table as TableIcon,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -60,6 +68,10 @@ export function DataOverviewPage({
   const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  const fileName = isPreview
+    ? (previewReference.asset?.name || "reference_data.csv")
+    : (referenceDataName || "reference_data.csv");
+
   const isDirty = isPreview && editedCsv !== null && editedCsv !== initialData;
 
   const handleDiscard = () => {
@@ -67,12 +79,25 @@ export function DataOverviewPage({
     setRevertKey((k) => k + 1);
   };
 
+  const handleDownload = () => {
+    const content = isPreview ? csvContent : (reference.data || "");
+    if (!content) return;
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleSave = async () => {
     if (!isPreview || !isDirty || saving) return;
     try {
       setSaving(true);
-      const filename = previewReference.asset?.name || "reference_data.csv";
-      const file = new File([csvContent], filename, {
+      const file = new File([csvContent], fileName, {
         type: "text/csv",
       });
       await uploadPreviewSingleAsset(modelId, "reference_data", file);
@@ -187,10 +212,6 @@ export function DataOverviewPage({
     );
   }
 
-  const fileName = isPreview
-    ? (previewReference.asset?.name || "reference_data.csv")
-    : (referenceDataName || "reference_data.csv");
-
   return (
     <section
       role="tabpanel"
@@ -206,7 +227,6 @@ export function DataOverviewPage({
             <DataViewer
               key={revertKey}
               title={fileName}
-              icon={<TableIcon className="h-4 w-4 text-color-primary shrink-0" />}
               badge={
                 <>
                   <Badge variant="info">
@@ -221,36 +241,46 @@ export function DataOverviewPage({
               }
               actions={
                 <>
-                  {isDirty && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleDiscard}
-                      disabled={saving}
-                      icon={<RotateCcw className="h-3.5 w-3.5" />}
-                    >
-                      {t("workflow.discardChanges")}
-                    </Button>
-                  )}
                   <Button
                     variant="primary"
-                    size="sm"
+                    size="md"
                     onClick={handleSave}
                     disabled={!isDirty || saving}
                     loading={saving}
-                    icon={<Save className="h-3.5 w-3.5" />}
+                    icon={<Save className="h-4 w-4" />}
                   >
                     {saving ? t("workflow.savingFile") : t("workflow.saveFile")}
                   </Button>
+                  {isDirty && (
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={handleDiscard}
+                      disabled={saving}
+                      icon={<RotateCcw className="h-4 w-4" />}
+                      title={t("workflow.discardChanges")}
+                      aria-label={t("workflow.discardChanges")}
+                    >
+                    </Button>
+                  )}
                   <Button
-                    variant="danger"
-                    size="sm"
+                    size="icon"
+                    variant="secondary"
+                    onClick={handleDownload}
+                    disabled={saving || deleting}
+                    icon={<Download className="h-4 w-4" />}
+                    title={t("workflow.downloadFile")}
+                    aria-label={t("workflow.downloadFile")}
+                  />
+                  <Button
+                    size="icon"
+                    variant="secondary"
                     onClick={() => setDeleteOpen(true)}
                     disabled={saving || deleting}
-                    icon={<Trash2 className="h-3.5 w-3.5" />}
-                  >
-                    {t("workflow.deleteFile")}
-                  </Button>
+                    icon={<Trash2 className="h-4 w-4" />}
+                    title={t("workflow.deleteFile")}
+                    aria-label={t("workflow.deleteFile")}
+                  />
                 </>
               }
               initialCsvText={initialData}
@@ -273,7 +303,6 @@ export function DataOverviewPage({
         >
           <DataViewer
             title={fileName}
-            icon={<TableIcon className="h-4 w-4 text-color-muted-foreground shrink-0" />}
             badge={
               <Badge variant="neutral">
                 <Lock className="h-3 w-3 mr-1 inline" />
@@ -281,9 +310,19 @@ export function DataOverviewPage({
               </Badge>
             }
             actions={
-              <span className="text-style-caption text-color-muted-foreground">
-                {t("workflow.immutableNotice")}
-              </span>
+              <>
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  onClick={handleDownload}
+                  icon={<Download className="h-4 w-4" />}
+                  title={t("workflow.downloadFile")}
+                  aria-label={t("workflow.downloadFile")}
+                />
+                <span className="text-style-caption text-color-muted-foreground">
+                  {t("workflow.immutableNotice")}
+                </span>
+              </>
             }
             initialCsvText={reference.data || ""}
             readOnly={true}

@@ -11,6 +11,7 @@ class DriftRunSerializer(serializers.ModelSerializer):
     report_html_uri = serializers.SerializerMethodField()
     report_json_uri = serializers.SerializerMethodField()
     summary_uri = serializers.SerializerMethodField()
+    production_records = serializers.SerializerMethodField()
 
     def get_report_html_uri(self, run):
         return report_uri_for_run(run, "report_html_uri")
@@ -20,6 +21,24 @@ class DriftRunSerializer(serializers.ModelSerializer):
 
     def get_summary_uri(self, run):
         return report_uri_for_run(run, "summary_uri")
+
+    def get_production_records(self, run):
+        if isinstance(run.summary, dict):
+            for key in ("production_records", "samples", "production_samples", "records_count"):
+                val = run.summary.get(key)
+                if val is not None:
+                    return val
+        if run.evidence_window_id:
+            return run.evidence_window.samples.count()
+        try:
+            from apps.production.models import PredictionRecord
+            return PredictionRecord.objects.filter(
+                project=run.monitor.version.project,
+                model_version=run.monitor.version,
+                created_at__lte=run.created_at,
+            ).count()
+        except Exception:
+            return None
 
     class Meta:
         model = DriftRun
@@ -36,6 +55,7 @@ class DriftRunSerializer(serializers.ModelSerializer):
             "report_html_uri",
             "report_json_uri",
             "summary_uri",
+            "production_records",
             "drift_score",
             "has_drift",
             "summary",

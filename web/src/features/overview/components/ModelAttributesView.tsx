@@ -11,12 +11,12 @@ import { previewKeys } from "@/features/projects/hooks/usePreview";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ModelMetricsCard } from "./ModelMetricsCard";
-import { ModelHyperparametersCard } from "./ModelHyperparametersCard";
-import { ModelFeatureImportanceCard } from "./ModelFeatureImportanceCard";
-import { ModelLabelMappingCard } from "./ModelLabelMappingCard";
-import { ModelInputSchemaCard } from "./ModelInputSchemaCard";
-import { ModelInsightsCard } from "./ModelInsightsCard";
+import { MetricsCard } from "./MetricsCard";
+import { HyperparametersCard } from "./HyperparametersCard";
+import { FeatureImportanceCard } from "./FeatureImportanceCard";
+import { LabelMappingCard } from "./LabelMappingCard";
+import { InputSchemaCard } from "./InputSchemaCard";
+import { InsightsCard } from "./InsightsCard";
 
 export interface ModelAttributesViewProps {
   attributes?: ModelAttributesResponse | null;
@@ -81,7 +81,7 @@ export function ModelAttributesView({
     <div role="tabpanel" className="space-y-6">
       {/* Row 1 (2 cols): Feature Importance (50%) + Label Mapping (50%) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-stretch">
-        <ModelFeatureImportanceCard
+        <FeatureImportanceCard
           featureImportance={featureImportance}
           insights={insights}
           summarySource={attributes?.summary_sources?.feature_importance}
@@ -100,7 +100,7 @@ export function ModelAttributesView({
           }
           onRefresh={handleRefresh}
         />
-        <ModelLabelMappingCard
+        <LabelMappingCard
           labelMapping={labelMapping}
           filename={
             labelMapping?.filename || getArtifactFilename("label_mapping")
@@ -120,7 +120,7 @@ export function ModelAttributesView({
       
       {/* Row 2 (2 cols): Evaluation Metrics (50%) + Hyperparameters (50%) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-stretch">
-        <ModelMetricsCard
+        <MetricsCard
           metrics={metrics}
           summarySources={attributes?.summary_sources?.metrics}
           filename={getArtifactFilename("metrics")}
@@ -135,7 +135,7 @@ export function ModelAttributesView({
           }
           onRefresh={handleRefresh}
         />
-        <ModelHyperparametersCard
+        <HyperparametersCard
           params={params}
           summarySources={attributes?.summary_sources?.params}
           filename={getArtifactFilename("params")}
@@ -153,7 +153,7 @@ export function ModelAttributesView({
       </div>
 
       {/* Row 3 (1 col - Full Width 100%): Input Schema */}
-      <ModelInputSchemaCard
+      <InputSchemaCard
         inputSchema={inputSchema}
         filename={
           inputSchema?.filename || getArtifactFilename("input_schema")
@@ -171,7 +171,7 @@ export function ModelAttributesView({
       />
 
       {/* Row 4 (1 col - Full Width 100%): Model Insights */}
-      <ModelInsightsCard
+      <InsightsCard
         insights={insights}
         summarySource={attributes?.summary_sources?.model_insights}
         filename={
@@ -235,12 +235,3 @@ export function ModelAttributesView({
 }
 
 export default ModelAttributesView;
-
-export {
-  ModelMetricsCard,
-  ModelHyperparametersCard,
-  ModelFeatureImportanceCard,
-  ModelLabelMappingCard,
-  ModelInputSchemaCard,
-  ModelInsightsCard,
-};

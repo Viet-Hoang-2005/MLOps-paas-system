@@ -408,6 +408,8 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
         "missing_features": missing_features,
         "extra_features": extra_features,
         "data_quality": data_quality,
+        "production_records": len(production_df),
+        "samples": len(production_df),
     }
     summary["report_artifacts"] = save_drift_report(report, result_dict, summary)
 

@@ -11,7 +11,7 @@ import {
   AttributeMissingVersionCard,
 } from "./AttributeEmptyStateCards";
 
-export interface ModelFeatureImportanceCardProps {
+export interface FeatureImportanceCardProps {
   featureImportance?: { items?: ModelInsightItem[] } | null;
   insights?: { kind?: string; items?: ModelInsightItem[] } | null;
   summarySource?: string | null;
@@ -24,7 +24,7 @@ export interface ModelFeatureImportanceCardProps {
   className?: string;
 }
 
-export function ModelFeatureImportanceCard({
+export function FeatureImportanceCard({
   featureImportance,
   insights,
   summarySource,
@@ -35,7 +35,7 @@ export function ModelFeatureImportanceCard({
   onRequestRemove,
   onRefresh,
   className = "",
-}: ModelFeatureImportanceCardProps) {
+}: FeatureImportanceCardProps) {
   const { t, i18n } = useTranslation("overview");
   const [showAllInsights, setShowAllInsights] = useState(false);
 
@@ -135,12 +135,14 @@ export function ModelFeatureImportanceCard({
               )}
               {isPreview && onRequestRemove && (
                 <Button
-                  size="sm"
+                  size="icon"
+                  border={false}
                   variant="secondary"
-                  icon={<Trash2 className="h-3.5 w-3.5 text-color-danger" />}
+                  icon={<Trash2 className="h-4 w-4" />}
                   onClick={onRequestRemove}
+                  title={t("workflow.removeFeatureImportance")}
+                  aria-label={t("workflow.removeFeatureImportance")}
                 >
-                  {t("workflow.removeAttribute")}
                 </Button>
               )}
             </div>
@@ -189,5 +191,5 @@ export function ModelFeatureImportanceCard({
   );
 }
 
-export default ModelFeatureImportanceCard;
+export default FeatureImportanceCard;
 

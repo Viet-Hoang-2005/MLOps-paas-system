@@ -34,7 +34,7 @@ export function Placeholder({
     >
       <div className="flex flex-1 flex-col items-center justify-center text-center">
         {icon && (
-          <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-surface bg-muted text-color-foreground">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-surface bg-muted text-color-foreground">
             {icon}
           </div>
         )}

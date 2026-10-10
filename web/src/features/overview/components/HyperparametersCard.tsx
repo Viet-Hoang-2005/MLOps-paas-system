@@ -8,7 +8,7 @@ import {
   AttributeMissingVersionCard,
 } from "./AttributeEmptyStateCards";
 
-export interface ModelHyperparametersCardProps {
+export interface HyperparametersCardProps {
   params?: Record<string, unknown> | null;
   summarySources?: Record<string, string>;
   filename?: string;
@@ -20,7 +20,7 @@ export interface ModelHyperparametersCardProps {
   className?: string;
 }
 
-export function ModelHyperparametersCard({
+export function HyperparametersCard({
   params,
   summarySources,
   filename,
@@ -30,7 +30,7 @@ export function ModelHyperparametersCard({
   onRequestRemove,
   onRefresh,
   className = "",
-}: ModelHyperparametersCardProps) {
+}: HyperparametersCardProps) {
   const { t } = useTranslation("overview");
   const hasParams = Boolean(params && Object.keys(params).length > 0);
 
@@ -84,12 +84,14 @@ export function ModelHyperparametersCard({
                 )}
                 {isPreview && onRequestRemove && (
                   <Button
-                    size="sm"
+                    size="icon"
+                    border={false}
                     variant="secondary"
-                    icon={<Trash2 className="h-3.5 w-3.5 text-color-danger" />}
+                    icon={<Trash2 className="h-4 w-4" />}
                     onClick={onRequestRemove}
+                    title={t("workflow.removeHyperparameters")}
+                    aria-label={t("workflow.removeHyperparameters")}
                   >
-                    {t("workflow.removeAttribute")}
                   </Button>
                 )}
               </div>
@@ -127,5 +129,5 @@ export function ModelHyperparametersCard({
   );
 }
 
-export default ModelHyperparametersCard;
+export default HyperparametersCard;
 

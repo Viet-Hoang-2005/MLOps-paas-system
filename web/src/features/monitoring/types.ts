@@ -10,6 +10,7 @@ export interface DriftMonitoringResult {
   report_html_uri: string;
   report_json_uri: string;
   summary_uri: string;
+  production_records?: number | null;
   drift_score: number | null;
   has_drift: boolean | null;
   summary: Record<string, unknown>;

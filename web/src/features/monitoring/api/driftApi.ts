@@ -21,6 +21,22 @@ export const listProductionData = async (
     )
   ).data;
 
+export const getProductionDataCount = async (
+  projectId: string,
+  versionId?: string,
+): Promise<number> => {
+  try {
+    const { data } = await apiClient.get<{ count: number }>(
+      controlPlaneURL(`/models/${projectId}/production-data/`),
+      { params: { count: true, version_id: versionId } },
+    );
+    return data.count;
+  } catch {
+    const records = await listProductionData(projectId, 100, versionId);
+    return records.length;
+  }
+};
+
 export const getMonitorReferenceText = async (
   id: string,
   signal?: AbortSignal,
@@ -90,6 +106,29 @@ export const getDriftMonitor = async (
 export const deleteDriftMonitoringJob = async (id: string): Promise<void> => {
   await apiClient.delete(controlPlaneURL(`/drift-monitors/${id}/`));
 };
+
+export const deleteDriftMonitoringRun = async (runId: string): Promise<void> => {
+  await apiClient.delete(controlPlaneURL(`/drift-monitors/runs/${runId}/`));
+};
+
+export const cancelDriftMonitoringRun = async (
+  runId: string,
+): Promise<DriftMonitoringResult> =>
+  (
+    await apiClient.post<DriftMonitoringResult>(
+      controlPlaneURL(`/drift-monitors/runs/${runId}/cancel/`),
+    )
+  ).data;
+
+export const cancelDriftMonitoringJob = async (
+  monitorId: string,
+): Promise<DriftMonitoringResult> =>
+  (
+    await apiClient.post<DriftMonitoringResult>(
+      controlPlaneURL(`/drift-monitors/${monitorId}/cancel/`),
+    )
+  ).data;
+
 
 export const runDriftMonitoringJob = async (
   id: string,

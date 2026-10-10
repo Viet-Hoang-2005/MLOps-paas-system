@@ -1,4 +1,5 @@
 export const overviewVi = {
+  pageTitle: "Tổng quan dự án",
   workflow: {
     pending: "Đang chờ",
     queued: "Đã vào hàng đợi",
@@ -163,6 +164,9 @@ export const overviewVi = {
     selectAttributeFile: "Chọn tệp {{name}}",
     removeAttribute: "Gỡ bỏ",
     removeFailed: "Gỡ bỏ thuộc tính thất bại.",
+    removeFeatureImportance: "Gỡ bỏ đặc trưng quan trọng",
+    removeHyperparameters: "Gỡ bỏ siêu tham số",
+    removeLabelMapping: "Gỡ bỏ ánh xạ nhãn",
     invalidJsonFile: "Tệp phải có định dạng JSON hợp lệ.",
     invalidLabelMappingFile: "Tệp phải có định dạng JSON hợp lệ.",
     noAttributesPlaceholder: "Chưa có thuộc tính nào",
@@ -184,6 +188,7 @@ export const overviewVi = {
     savingFile: "Đang lưu…",
     fileSaved: "Đã lưu tệp thành công.",
     fileSaveFailed: "Lưu tệp thất bại.",
+    downloadFile: "Tải xuống",
     deleteFile: "Xóa",
     deletingFile: "Đang xóa…",
     fileDeleted: "Đã xóa tệp thành công.",

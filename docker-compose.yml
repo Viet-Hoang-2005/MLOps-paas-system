@@ -31,6 +31,9 @@ services:
       DB_NAME: ${DB_NAME}
       DB_SCHEMA: ${DB_SCHEMA:-control_plane}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/3
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/4
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       EMAIL_HOST_USER: ${EMAIL_HOST_USER}
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
       GOOGLE_OAUTH2_CLIENT_ID: ${GOOGLE_OAUTH2_CLIENT_ID}
@@ -115,6 +118,7 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/3
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/4
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDPANDA_BROKERS: redpanda:9092
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
@@ -182,6 +186,7 @@ services:
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/3
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/4
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       LOCAL_EXECUTION_WATCH_ENABLED: "true"
       EXECUTION_WATCH_ENABLED: ${EXECUTION_WATCH_ENABLED:-true}
     volumes:
@@ -218,6 +223,7 @@ services:
       REDPANDA_BROKERS: redpanda:9092
       KAFKA_TOPIC: ${KAFKA_TOPIC:-mlops_paas_production_data}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       JWKS_URL: http://control-plane:8000/api/auth/.well-known/jwks.json
       LOCAL_RUNTIME_METRICS_ENABLED: "true"
     labels:

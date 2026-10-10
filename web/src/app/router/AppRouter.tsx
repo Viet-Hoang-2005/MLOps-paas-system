@@ -94,6 +94,9 @@ const EvolutionPage = lazy(
 const DriftMonitoringPage = lazy(
   () => import("@/features/monitoring/pages/DriftMonitoringPage"),
 );
+const DriftMonitoringDetailPage = lazy(
+  () => import("@/features/monitoring/pages/DriftMonitoringDetailPage"),
+);
 const CreateDriftMonitoringPage = lazy(
   () => import("@/features/monitoring/pages/CreateDriftMonitoringPage"),
 );
@@ -150,6 +153,10 @@ const router = createBrowserRouter(
           <Route path="deployment" element={<DeploymentPage />} />
           <Route path="monitoring" element={<DriftMonitoringPage />} />
           <Route
+            path="monitoring/:monitorId"
+            element={<DriftMonitoringDetailPage />}
+          />
+          <Route
             path="monitoring/report/:runId"
             element={<DriftReportPage />}
           />
@@ -170,6 +177,10 @@ const router = createBrowserRouter(
         <Route
           path="monitoring/:monitorId/edit"
           element={<CreateDriftMonitoringPage />}
+        />
+        <Route
+          path="monitoring/:monitorId"
+          element={<DriftMonitoringDetailPage />}
         />
         <Route path="training/new" element={<CreateTrainingJobPage />}>
           <Route index element={<Navigate to="metadata" replace />} />

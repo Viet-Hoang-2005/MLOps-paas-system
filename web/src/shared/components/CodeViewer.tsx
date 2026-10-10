@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import type { EditorProps } from "@monaco-editor/react";
-import { FileCode } from "lucide-react";
+import { Code } from "lucide-react";
 import { Skeleton } from "./Skeleton";
 import type { ButtonProps } from "@/shared/components/Button";
 import { Button } from "@/shared/components/Button";
@@ -76,7 +76,7 @@ export function CodeViewer({
         )}
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          {icon ?? <FileCode className="h-4 w-4 text-color-primary shrink-0" />}
+          {icon ?? <Code className="h-4 w-4 text-color-primary shrink-0" />}
           {typeof title === "string" ? (
             <span className="truncate font-mono text-style-body font-semibold text-color-foreground">
               {title}

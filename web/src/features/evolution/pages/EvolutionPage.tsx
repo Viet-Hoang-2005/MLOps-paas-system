@@ -19,7 +19,7 @@ import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { Callout } from "@/shared/components/Callout";
 import { PageHeader } from "@/shared/components/PageHeader";
-import { GitBranch, GitCompare, RefreshCw } from "lucide-react";
+import { GitBranch, GitCompare } from "lucide-react";
 import { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -80,16 +80,6 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader title={t("workspace.title")} />
-      <div className="flex justify-end">
-        <Button
-          variant="secondary"
-          icon={<RefreshCw className="h-4 w-4" />}
-          loading={state.versions.isFetching || state.detail.isFetching}
-          onClick={() => void state.refresh()}
-        >
-          {t("workspace.refresh")}
-        </Button>
-      </div>
       {state.loading ? (
         <p role="status">{t("workspace.loading")}</p>
       ) : blocked ? (

@@ -50,7 +50,6 @@ import {
 export default function ProjectOverviewPage() {
   const { modelId } = useParams();
   const { t } = useTranslation("overview");
-  const { t: tCommon } = useTranslation("common");
   const { selectedModel, loading: isModelLoading } = useModelSelection();
   const { resolvedTheme } = useTheme();
   const navigate = useNavigate();
@@ -132,9 +131,9 @@ export default function ProjectOverviewPage() {
     }
     return (
       <div className="flex w-full flex-1 flex-col space-y-6">
-        <PageHeader title={tCommon("navigation.home")} />
+        <PageHeader title={t("pageTitle")} />
         <NoProjectPlaceholder
-          title={tCommon("navigation.home")}
+          title={t("pageTitle")}
           description={t("workflow.noProjectOverview")}
           icon={<Home className="h-6 w-6" />}
         />
@@ -153,7 +152,7 @@ export default function ProjectOverviewPage() {
 
   return (
     <div className="flex w-full flex-1 flex-col space-y-6">
-      <PageHeader title={tCommon("navigation.home")} />
+      <PageHeader title={t("pageTitle")} />
       <section className="space-y-4 rounded-surface border border-border bg-surface p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">

@@ -72,6 +72,12 @@ class ProductionDataEndpoint(APIView):
         project = project_for_user(request.user, project_id)
         serializer = ProductionDataQuerySerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
+        if serializer.validated_data.get("count"):
+            from apps.production.models import PredictionRecord
+            qs = PredictionRecord.objects.filter(project=project)
+            if serializer.validated_data.get("version_id"):
+                qs = qs.filter(model_version__public_id=serializer.validated_data["version_id"])
+            return Response({"count": qs.count()})
         return Response(
             latest_production_data(
                 project,

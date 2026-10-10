@@ -29,6 +29,7 @@ export const commonEn = {
     collapseGroup: "Collapse group",
     search: "Search",
     clear: "Clear",
+    download: "Download",
   },
   navigation: {
     primary: "Primary navigation",

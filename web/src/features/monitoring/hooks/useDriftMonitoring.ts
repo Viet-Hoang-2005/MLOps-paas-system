@@ -1,6 +1,11 @@
 import {
+  cancelDriftMonitoringJob,
+  cancelDriftMonitoringRun,
   createDriftMonitoringJob,
   deleteDriftMonitoringJob,
+  deleteDriftMonitoringRun,
+  getDriftMonitor,
+  getProductionDataCount,
   listDriftMonitoringJobs,
   listDriftMonitoringResults,
   listProductionData,
@@ -27,6 +32,14 @@ export function useDriftMonitoringJobs(modelId?: string) {
   });
 }
 
+export function useDriftMonitor(jobId?: string) {
+  return useQuery({
+    queryKey: driftQueryKeys.configuration(jobId ?? ""),
+    queryFn: () => getDriftMonitor(jobId!),
+    enabled: Boolean(jobId),
+  });
+}
+
 export function useDriftMonitoringResults(jobId?: string) {
   return useQuery({
     queryKey: driftQueryKeys.results(jobId ?? ""),
@@ -48,13 +61,18 @@ export function useCreateDriftMonitoringJob() {
 
 export function useDeleteDriftMonitoringJob() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation("monitoring");
   return useMutation({
     mutationFn: async (payload: { id: string; project_id: string }) =>
       deleteDriftMonitoringJob(payload.id),
-    onSuccess: (_, variables) =>
+    onSuccess: (_, variables) => {
+      toast.success(t("messages.deleted"));
       queryClient.invalidateQueries({
         queryKey: driftQueryKeys.monitors(variables.project_id),
-      }),
+      });
+    },
+    onError: (error: unknown) =>
+      toast.error(getApiErrorMessage(error, t("messages.deleteFailed"))),
   });
 }
 
@@ -93,3 +111,73 @@ export function useProductionData(modelId?: string, versionId?: string) {
     enabled: Boolean(modelId),
   });
 }
+
+export function useProductionDataCount(projectId?: string, versionId?: string) {
+  return useQuery({
+    queryKey: [...driftQueryKeys.all, "production-count", projectId ?? "", versionId ?? ""],
+    queryFn: () => getProductionDataCount(projectId!, versionId),
+    enabled: Boolean(projectId),
+    refetchInterval: 15000,
+  });
+}
+
+export function useDeleteDriftMonitoringRun(monitorId?: string) {
+  const queryClient = useQueryClient();
+  const { t } = useTranslation("monitoring");
+  return useMutation({
+    mutationFn: async (runId: string) => deleteDriftMonitoringRun(runId),
+    onSuccess: () => {
+      toast.success(t("messages.runDeleted"));
+      if (monitorId) {
+        void queryClient.invalidateQueries({
+          queryKey: driftQueryKeys.results(monitorId),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: driftQueryKeys.configuration(monitorId),
+        });
+      }
+    },
+    onError: (error: unknown) =>
+      toast.error(getApiErrorMessage(error, t("messages.runDeleteFailed"))),
+  });
+}
+
+export function useCancelDriftMonitoringRun(monitorId?: string) {
+  const queryClient = useQueryClient();
+  const { t } = useTranslation("monitoring");
+  return useMutation({
+    mutationFn: async ({
+      runId,
+      monitorId: mId,
+    }: {
+      runId?: string;
+      monitorId?: string;
+    }) => {
+      if (runId) {
+        return cancelDriftMonitoringRun(runId);
+      }
+      if (mId) {
+        return cancelDriftMonitoringJob(mId);
+      }
+      throw new Error("Missing runId or monitorId");
+    },
+    onSuccess: () => {
+      toast.success(t("messages.runCancelled"));
+      const targetMonitorId = monitorId;
+      if (targetMonitorId) {
+        void queryClient.invalidateQueries({
+          queryKey: driftQueryKeys.results(targetMonitorId),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: driftQueryKeys.configuration(targetMonitorId),
+        });
+      }
+      void queryClient.invalidateQueries({
+        queryKey: driftQueryKeys.all,
+      });
+    },
+    onError: (error: unknown) =>
+      toast.error(getApiErrorMessage(error, t("messages.runCancelFailed"))),
+  });
+}
+

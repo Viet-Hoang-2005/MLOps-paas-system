@@ -61,7 +61,7 @@ export default function DriftReportPage() {
       <PageHeader title={t("reportPage.title")} back>
         {reportUrl && (
           <Button
-            size="md"
+            size="sm"
             icon={<Download className="w-4 h-4" />}
             onClick={handleDownload}
           >

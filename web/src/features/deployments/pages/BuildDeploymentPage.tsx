@@ -90,7 +90,7 @@ function BuildDeploymentContent() {
         value: `preview:${project.id}`,
         label: project.name,
         badge: (
-          <Badge variant="info" className="ml-auto shrink-0">
+          <Badge variant="info" className="shrink-0">
             {t("workflow.previewBadge")}
           </Badge>
         ),
@@ -109,7 +109,7 @@ function BuildDeploymentContent() {
         value: `training:${job.project_id}:${job.id}`,
         label: displayName,
         badge: (
-          <Badge variant="success" className="ml-auto shrink-0">
+          <Badge variant="success" className="shrink-0">
             {t("workflow.trainedBadge")}
           </Badge>
         ),

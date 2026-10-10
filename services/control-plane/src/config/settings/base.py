@@ -1,6 +1,6 @@
 from datetime import timedelta
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
@@ -145,14 +145,33 @@ AUTH_COOKIE_PATH = env("AUTH_COOKIE_PATH", "/api/auth/")
 STATIC_URL = "/static/"
 STATIC_ROOT = SERVICE_ROOT / "staticfiles"
 
-REDIS_URL = env("REDIS_URL", "redis://redis:6379/1")
+REDIS_PASSWORD = env("REDIS_PASSWORD", "")
+
+
+def _inject_redis_password(url: str, password: str) -> str:
+    if not url or not password:
+        return url
+    parsed = urlsplit(url)
+    if parsed.password:
+        return url
+    username = parsed.username or ""
+    auth = f"{username}:{quote(password, safe='')}@"
+    host_port = parsed.netloc.split("@")[-1]
+    return urlunsplit((parsed.scheme, f"{auth}{host_port}", parsed.path, parsed.query, parsed.fragment))
+
+
+def _derive_redis_url(base_url: str, db: int) -> str:
+    parsed = urlsplit(base_url)
+    return urlunsplit((parsed.scheme, parsed.netloc, f"/{db}", parsed.query, parsed.fragment))
+
+
+REDIS_URL = _inject_redis_password(env("REDIS_URL", "redis://redis:6379/1"), REDIS_PASSWORD)
 REDIS_CONNECTION_MODE = env("REDIS_CONNECTION_MODE", "direct")
 if REDIS_CONNECTION_MODE not in {"direct", "sentinel"}:
     raise ImproperlyConfigured("REDIS_CONNECTION_MODE must be direct or sentinel")
 LOKI_URL = str(env("LOKI_URL", "")).rstrip("/")
 REDPANDA_BROKERS = env("REDPANDA_BROKERS", "redpanda:9092")
 if REDIS_CONNECTION_MODE == "sentinel":
-    REDIS_PASSWORD = env("REDIS_PASSWORD", "")
     REDIS_SENTINEL_PASSWORD = env("REDIS_SENTINEL_PASSWORD", "")
     REDIS_SENTINEL_MASTER_NAME = env("REDIS_SENTINEL_MASTER_NAME", "")
     REDIS_SENTINELS = []
@@ -211,8 +230,16 @@ if REDIS_CONNECTION_MODE == "sentinel":
 else:
     CACHES = {"default": {"BACKEND": "django_redis.cache.RedisCache", "LOCATION": REDIS_URL}}
     CHANNEL_LAYERS = {"default": {"BACKEND": "channels_redis.core.RedisChannelLayer", "CONFIG": {"hosts": [REDIS_URL]}}}
-    CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://redis:6379/3")
-    CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", "redis://redis:6379/4")
+    default_broker_url = _derive_redis_url(REDIS_URL, 3)
+    default_result_backend = _derive_redis_url(REDIS_URL, 4)
+    CELERY_BROKER_URL = _inject_redis_password(
+        env("CELERY_BROKER_URL", default_broker_url),
+        REDIS_PASSWORD,
+    )
+    CELERY_RESULT_BACKEND = _inject_redis_password(
+        env("CELERY_RESULT_BACKEND", default_result_backend),
+        REDIS_PASSWORD,
+    )
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = env_int("CELERY_TASK_TIME_LIMIT", 43200)
 CELERY_TASK_SOFT_TIME_LIMIT = env_int("CELERY_TASK_SOFT_TIME_LIMIT", 42600)

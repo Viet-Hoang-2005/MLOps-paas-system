@@ -9,7 +9,7 @@ import {
   AttributeMissingVersionCard,
 } from "./AttributeEmptyStateCards";
 
-export interface ModelMetricsCardProps {
+export interface MetricsCardProps {
   metrics?: Record<string, unknown> | null;
   summarySources?: Record<string, string>;
   filename?: string;
@@ -21,7 +21,7 @@ export interface ModelMetricsCardProps {
   className?: string;
 }
 
-export function ModelMetricsCard({
+export function MetricsCard({
   metrics,
   summarySources,
   filename,
@@ -31,7 +31,7 @@ export function ModelMetricsCard({
   onRequestRemove,
   onRefresh,
   className = "",
-}: ModelMetricsCardProps) {
+}: MetricsCardProps) {
   const { t, i18n } = useTranslation("overview");
   const hasMetrics = Boolean(metrics && Object.keys(metrics).length > 0);
 
@@ -85,12 +85,14 @@ export function ModelMetricsCard({
                 )}
                 {isPreview && onRequestRemove && (
                   <Button
-                    size="sm"
+                    size="icon"
+                    border={false}
                     variant="secondary"
-                    icon={<Trash2 className="h-3.5 w-3.5 text-color-danger" />}
+                    icon={<Trash2 className="h-4 w-4" />}
                     onClick={onRequestRemove}
+                    title={t("workflow.removeAttribute")}
+                    aria-label={t("workflow.removeAttribute")}
                   >
-                    {t("workflow.removeAttribute")}
                   </Button>
                 )}
               </div>
@@ -138,5 +140,5 @@ export function ModelMetricsCard({
   );
 }
 
-export default ModelMetricsCard;
+export default MetricsCard;
 

@@ -23,6 +23,7 @@ export const commonVi = {
     collapseGroup: "Thu gọn nhóm",
     search: "Tìm kiếm",
     clear: "Xóa",
+    download: "Tải xuống",
   },
   navigation: {
     primary: "Điều hướng chính",

@@ -12,7 +12,15 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { Loading } from "@/shared/components/Loading";
 import { Placeholder } from "@/shared/components/Placeholder";
 import { toast } from "@/shared/types/toastStore";
-import { FileCode, GitBranch, Lock, RotateCcw, Save, Trash2 } from "lucide-react";
+import {
+  Download,
+  Code,
+  GitBranch,
+  Lock,
+  RotateCcw,
+  Save,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -57,18 +65,35 @@ export function CodeOverviewPage({
   const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  const fileName = isPreview
+    ? (previewSource.asset?.name || "source_code.py")
+    : "source_code.py";
+
   const isDirty = isPreview && editedCode !== null && editedCode !== initialCode;
 
   const handleDiscard = () => {
     setEditedCode(null);
   };
 
+  const handleDownload = () => {
+    const content = isPreview ? codeContent : (source.data || "");
+    if (!content) return;
+    const blob = new Blob([content], { type: "text/x-python;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleSave = async () => {
     if (!isPreview || !isDirty || saving) return;
     try {
       setSaving(true);
-      const filename = previewSource.asset?.name || "source_code.py";
-      const file = new File([codeContent], filename, {
+      const file = new File([codeContent], fileName, {
         type: "text/x-python",
       });
       await uploadPreviewSingleAsset(modelId, "source_code", file);
@@ -166,7 +191,7 @@ export function CodeOverviewPage({
       <Placeholder
         role="tabpanel"
         className="flex-1 min-h-105"
-        icon={<FileCode className="h-6 w-6 text-color-primary" />}
+        icon={<Code className="h-6 w-6 text-color-primary" />}
         title={t("workflow.noRunningCodeTitle")}
         description={t("workflow.noRunningCodeDesc")}
         action={
@@ -188,10 +213,6 @@ export function CodeOverviewPage({
     );
   }
 
-  const fileName = isPreview
-    ? (previewSource.asset?.name || "source_code.py")
-    : "source_code.py";
-
   return (
     <section
       role="tabpanel"
@@ -206,7 +227,6 @@ export function CodeOverviewPage({
           >
             <CodeViewer
               title={fileName}
-              icon={<FileCode className="h-4 w-4 text-color-primary shrink-0" />}
               badge={
                 <>
                   <Badge variant="info">
@@ -221,36 +241,46 @@ export function CodeOverviewPage({
               }
               actions={
                 <>
-                  {isDirty && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleDiscard}
-                      disabled={saving}
-                      icon={<RotateCcw className="h-3.5 w-3.5" />}
-                    >
-                      {t("workflow.discardChanges")}
-                    </Button>
-                  )}
                   <Button
                     variant="primary"
-                    size="sm"
+                    size="md"
                     onClick={handleSave}
                     disabled={!isDirty || saving}
                     loading={saving}
-                    icon={<Save className="h-3.5 w-3.5" />}
+                    icon={<Save className="h-4 w-4" />}
                   >
                     {saving ? t("workflow.savingFile") : t("workflow.saveFile")}
                   </Button>
+                  {isDirty && (
+                    <Button
+                      size="icon"
+                      variant="secondary"  
+                      onClick={handleDiscard}
+                      disabled={saving}
+                      icon={<RotateCcw className="h-4 w-4" />}
+                      title={t("workflow.discardChanges")}
+                      aria-label={t("workflow.discardChanges")}
+                    >
+                    </Button>
+                  )}
                   <Button
-                    variant="danger"
-                    size="sm"
+                    size="icon"
+                    variant="secondary"
+                    onClick={handleDownload}
+                    disabled={saving || deleting}
+                    icon={<Download className="h-4 w-4" />}
+                    title={t("workflow.downloadFile")}
+                    aria-label={t("workflow.downloadFile")}
+                  />
+                  <Button
+                    size="icon"
+                    variant="secondary"
                     onClick={() => setDeleteOpen(true)}
                     disabled={saving || deleting}
-                    icon={<Trash2 className="h-3.5 w-3.5" />}
-                  >
-                    {t("workflow.deleteFile")}
-                  </Button>
+                    icon={<Trash2 className="h-4 w-4" />}
+                    title={t("workflow.deleteFile")}
+                    aria-label={t("workflow.deleteFile")}
+                  />
                 </>
               }
               language="python"
@@ -285,7 +315,6 @@ export function CodeOverviewPage({
         >
           <CodeViewer
             title={fileName}
-            icon={<FileCode className="h-4 w-4 text-color-muted-foreground shrink-0" />}
             badge={
               <Badge variant="neutral">
                 <Lock className="h-3 w-3 mr-1 inline" />
@@ -293,9 +322,19 @@ export function CodeOverviewPage({
               </Badge>
             }
             actions={
-              <span className="text-style-caption text-color-muted-foreground">
-                {t("workflow.immutableNotice")}
-              </span>
+              <>
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  onClick={handleDownload}
+                  icon={<Download className="h-4 w-4" />}
+                  title={t("workflow.downloadFile")}
+                  aria-label={t("workflow.downloadFile")}
+                />
+                <span className="text-style-caption text-color-muted-foreground">
+                  {t("workflow.immutableNotice")}
+                </span>
+              </>
             }
             language="python"
             theme={theme === "dark" ? "vs-dark" : "light"}

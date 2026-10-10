@@ -104,7 +104,7 @@ function parseSchemaToFields(schema: unknown): ParsedSchemaField[] | null {
   return null;
 }
 
-export interface ModelInputSchemaCardProps {
+export interface InputSchemaCardProps {
   inputSchema?: { filename?: string; schema?: unknown } | null;
   filename?: string;
   projectId: string;
@@ -115,7 +115,7 @@ export interface ModelInputSchemaCardProps {
   className?: string;
 }
 
-export function ModelInputSchemaCard({
+export function InputSchemaCard({
   inputSchema,
   filename,
   projectId,
@@ -124,7 +124,7 @@ export function ModelInputSchemaCard({
   onRequestRemove,
   onRefresh,
   className = "",
-}: ModelInputSchemaCardProps) {
+}: InputSchemaCardProps) {
   const { t } = useTranslation("overview");
   const [schemaRawView, setSchemaRawView] = useState(false);
   const [copiedSchema, setCopiedSchema] = useState(false);
@@ -231,12 +231,14 @@ export function ModelInputSchemaCard({
               </Button>
               {isPreview && onRequestRemove && (
                 <Button
-                  size="sm"
+                  size="icon"
+                  border={false}
                   variant="secondary"
-                  icon={<Trash2 className="h-3.5 w-3.5 text-color-danger" />}
+                  icon={<Trash2 className="h-4 w-4" />}
                   onClick={onRequestRemove}
+                  title={t("workflow.removeAttribute")}
+                  aria-label={t("workflow.removeAttribute")}
                 >
-                  {t("workflow.removeAttribute")}
                 </Button>
               )}
             </div>
@@ -294,5 +296,5 @@ export function ModelInputSchemaCard({
   );
 }
 
-export default ModelInputSchemaCard;
+export default InputSchemaCard;
 

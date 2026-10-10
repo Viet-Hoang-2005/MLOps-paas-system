@@ -41,7 +41,6 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 export default function DeploymentPage() {
   const { modelId } = useParams();
   const { t, i18n } = useTranslation("projects");
-  const { t: tCommon } = useTranslation("common");
   const { selectedModel, loading: isModelLoading } = useModelSelection();
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -96,7 +95,11 @@ export default function DeploymentPage() {
     {
       accessorKey: "created_at",
       header: t("workflow.builtAt"),
-      cell: ({ row }) => formatDateTime(row.original.created_at, i18n.language),
+      cell: ({ row }) => (
+        <span className="text-color-muted-foreground">
+          {formatDateTime(row.original.created_at, i18n.language)}
+        </span>
+      ),
     },
     {
       id: "source",
@@ -242,9 +245,9 @@ export default function DeploymentPage() {
     }
     return (
       <div className="flex w-full flex-1 flex-col space-y-6">
-        <PageHeader title={t("workflow.deployment")} />
+        <PageHeader title={t("workflow.deploymentModel")} />
         <NoProjectPlaceholder
-          title={tCommon("navigation.deployment")}
+          title={t("workflow.deploymentModel")}
           description={t("workflow.noProjectDeployment")}
           icon={<Box className="h-6 w-6" />}
         />
@@ -253,7 +256,7 @@ export default function DeploymentPage() {
   }
   return (
     <div className="space-y-6">
-      <PageHeader title={t("workflow.deployment")} />
+      <PageHeader title={t("workflow.deploymentModel")} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="w-full sm:w-60">

@@ -164,3 +164,16 @@ def poll_drift_run_status(self, run_id):
         return "failed"
 
     return run.status
+
+
+@shared_task(bind=True, soft_time_limit=30, time_limit=35)
+def cancel_drift_run(self, run_id):
+    from .models import DriftRun
+    from infrastructure.execution import drift_backend
+
+    try:
+        run = DriftRun.objects.select_related("monitor").get(public_id=run_id)
+        drift_backend(run.monitor.backend).cancel(run)
+    except Exception:
+        pass
+    return "cancelled"

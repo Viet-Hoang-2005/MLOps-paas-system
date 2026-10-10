@@ -108,6 +108,31 @@ export function ModelProjectTable({
         ),
       },
       {
+        id: "version",
+        header: t("workflow.modelVersion"),
+        accessorFn: (row) =>
+          row.active_endpoint?.version_number ??
+          row.latest_version_number ??
+          row.version ??
+          "",
+        cell: ({ row }) => {
+          const rawVersion =
+            row.original.active_endpoint?.version_number ??
+            row.original.latest_version_number ??
+            (row.original.version || null);
+          const displayVersion = rawVersion
+            ? rawVersion.startsWith("v")
+              ? rawVersion
+              : `v${rawVersion}`
+            : "—";
+          return (
+            <span className="font-mono whitespace-nowrap">
+              {displayVersion}
+            </span>
+          );
+        },
+      },
+      {
         accessorKey: "lifecycle_status",
         header: t("workflow.status"),
         cell: ({ row }) => {
@@ -141,7 +166,7 @@ export function ModelProjectTable({
         accessorKey: "updated_at",
         header: t("updated"),
         cell: ({ row }) => (
-          <span className="whitespace-nowrap">
+          <span className="whitespace-nowrap text-color-muted-foreground">
             {formatDateTime(row.original.updated_at, i18n.language)}
           </span>
         ),

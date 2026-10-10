@@ -9,7 +9,7 @@ import {
   AttributeMissingVersionCard,
 } from "./AttributeEmptyStateCards";
 
-export interface ModelLabelMappingCardProps {
+export interface LabelMappingCardProps {
   labelMapping?: { filename?: string; mapping?: unknown } | null;
   filename?: string;
   projectId: string;
@@ -20,7 +20,7 @@ export interface ModelLabelMappingCardProps {
   className?: string;
 }
 
-export function ModelLabelMappingCard({
+export function LabelMappingCard({
   labelMapping,
   filename,
   projectId,
@@ -29,7 +29,7 @@ export function ModelLabelMappingCard({
   onRequestRemove,
   onRefresh,
   className = "",
-}: ModelLabelMappingCardProps) {
+}: LabelMappingCardProps) {
   const { t } = useTranslation("overview");
 
   const effectiveFilename = filename || labelMapping?.filename;
@@ -108,12 +108,14 @@ export function ModelLabelMappingCard({
                 )}
                 {isPreview && onRequestRemove && (
                   <Button
-                    size="sm"
+                    size="icon"
+                    border={false}
                     variant="secondary"
-                    icon={<Trash2 className="h-3.5 w-3.5 text-color-danger" />}
+                    icon={<Trash2 className="h-4 w-4" />}
                     onClick={onRequestRemove}
+                    title={t("workflow.removeLabelMapping")}
+                    aria-label={t("workflow.removeLabelMapping")}
                   >
-                    {t("workflow.removeAttribute")}
                   </Button>
                 )}
               </div>
@@ -154,4 +156,4 @@ export function ModelLabelMappingCard({
   );
 }
 
-export default ModelLabelMappingCard;
+export default LabelMappingCard;

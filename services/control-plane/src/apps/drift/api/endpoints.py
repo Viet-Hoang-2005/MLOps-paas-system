@@ -82,3 +82,37 @@ class DriftRunReportURLEndpoint(APIView):
             raise Conflict("The completed drift run does not have an HTML report.")
         return Response({"url": S3Storage().presigned_get(report_uri, 900)})
 
+
+class DriftRunDetailEndpoint(APIView):
+    def delete(self, request, run_id):
+        run = run_for_user(request.user, run_id)
+        run.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DriftRunCancelEndpoint(APIView):
+    def post(self, request, run_id):
+        from apps.drift.services.runs import request_cancel
+
+        run = run_for_user(request.user, run_id)
+        run = request_cancel(run)
+        return Response(DriftRunSerializer(run).data, status=status.HTTP_200_OK)
+
+
+class DriftMonitorCancelEndpoint(APIView):
+    def post(self, request, monitor_id):
+        from apps.drift.services.runs import request_cancel
+
+        monitor = monitor_for_user(request.user, monitor_id)
+        active_run = (
+            monitor.runs.filter(status__in=["pending", "queued", "running"])
+            .order_by("-created_at")
+            .first()
+        )
+        if not active_run:
+            raise Conflict("No active run found for this monitor.")
+        active_run = request_cancel(active_run)
+        return Response(DriftRunSerializer(active_run).data, status=status.HTTP_200_OK)
+
+
+

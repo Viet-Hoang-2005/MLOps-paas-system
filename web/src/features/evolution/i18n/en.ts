@@ -1,6 +1,6 @@
 export const registryEn = {
   workspace: {
-    title: "Evolution",
+    title: "Evolution Model",
     lineage: "Version lineage",
     running: "Running",
     details: "Details",
@@ -63,8 +63,7 @@ export const registryEn = {
     addSourceCode: "Add Supplemental Source Code",
     uploadSourceHint: "Upload a main Python script (.py, max 5 MB).",
     addReferenceData: "Add Supplemental Reference Data",
-    uploadRefHint:
-      "Upload reference tabular dataset (.csv, max 100 MB).",
+    uploadRefHint: "Upload reference tabular dataset (.csv, max 100 MB).",
     previewDataset: "Preview Reference Dataset",
     previewDatasetTitle: "Preview Dataset ({{name}})",
     immutableBadge: "Immutable",
@@ -77,8 +76,7 @@ export const registryEn = {
     sizeErrorSource: "Source code file must be smaller than 5 MB.",
     formatErrorSource: "Only .py files are supported for source code.",
     sizeErrorRef: "Reference data file must be smaller than 100 MB.",
-    formatErrorRef:
-      "Only .csv files are supported for reference data.",
+    formatErrorRef: "Only .csv files are supported for reference data.",
     previewEmpty: "No rows available in preview",
     clear: "Clear",
     selectSourceFile: "Select .py file",

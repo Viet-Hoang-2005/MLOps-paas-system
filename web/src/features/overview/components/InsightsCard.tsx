@@ -9,7 +9,7 @@ import {
   AttributeMissingVersionCard,
 } from "./AttributeEmptyStateCards";
 
-export interface ModelInsightsCardProps {
+export interface InsightsCardProps {
   insights?: ModelInsightsSummary | Record<string, unknown> | null;
   summarySource?: string | null;
   filename?: string;
@@ -21,7 +21,7 @@ export interface ModelInsightsCardProps {
   className?: string;
 }
 
-export function ModelInsightsCard({
+export function InsightsCard({
   insights,
   summarySource,
   filename,
@@ -31,7 +31,7 @@ export function ModelInsightsCard({
   onRequestRemove,
   onRefresh,
   className = "",
-}: ModelInsightsCardProps) {
+}: InsightsCardProps) {
   const { t } = useTranslation("overview");
 
   const hasInsights = Boolean(
@@ -100,12 +100,14 @@ export function ModelInsightsCard({
                 )}
                 {isPreview && onRequestRemove && (
                   <Button
-                    size="sm"
+                    size="icon"
+                    border={false}
                     variant="secondary"
-                    icon={<Trash2 className="h-3.5 w-3.5 text-color-danger" />}
+                    icon={<Trash2 className="h-4 w-4" />}
                     onClick={onRequestRemove}
+                    title={t("workflow.removeAttribute")}
+                    aria-label={t("workflow.removeAttribute")}
                   >
-                    {t("workflow.removeAttribute")}
                   </Button>
                 )}
               </div>
@@ -120,5 +122,5 @@ export function ModelInsightsCard({
   );
 }
 
-export default ModelInsightsCard;
+export default InsightsCard;
 

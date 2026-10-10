@@ -19,6 +19,21 @@ class RedisSentinelClientTests(SimpleTestCase):
         redis_client(db=3)
         from_url.assert_called_once_with("redis://local:6379/3")
 
+    def test_direct_mode_derives_authenticated_celery_urls(self):
+        from config.settings.base import _derive_redis_url, _inject_redis_password
+
+        url = _inject_redis_password("redis://redis:6379/1", "secret")
+        self.assertEqual(url, "redis://:secret@redis:6379/1")
+
+        url_with_pass = _inject_redis_password("redis://:existing@redis:6379/1", "secret")
+        self.assertEqual(url_with_pass, "redis://:existing@redis:6379/1")
+
+        broker_url = _derive_redis_url(url, 3)
+        self.assertEqual(broker_url, "redis://:secret@redis:6379/3")
+
+        backend_url = _derive_redis_url(url, 4)
+        self.assertEqual(backend_url, "redis://:secret@redis:6379/4")
+
     @override_settings(
         REDIS_CONNECTION_MODE="sentinel",
         REDIS_SENTINELS=[("sentinel-0", 26379), ("sentinel-1", 26379), ("sentinel-2", 26379)],

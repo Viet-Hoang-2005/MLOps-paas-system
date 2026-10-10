@@ -4,7 +4,7 @@ export const trainingEn = {
       "These inputs were frozen when the job was created; workspace edits do not change them.",
     openBuild: "Build, register and deploy",
   },
-  title: "Model Training",
+  title: "Training Model",
   create: "Create training job",
   empty: "Create a training job to track runtime progress and artifacts.",
   description:
@@ -300,7 +300,8 @@ export const trainingEn = {
       checksumLabel: "Checksum (SHA-256):",
       metricsLabel: "Metrics",
       paramsLabel: "Parameters",
-      stagedRefNotice: "New dataset file staged ({{name}}). Save changes to compute preview.",
+      stagedRefNotice:
+        "New dataset file staged ({{name}}). Save changes to compute preview.",
       totalRows: "total rows",
       nullValue: "null",
     },

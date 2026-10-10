@@ -87,3 +87,5 @@ session.clearAuthSession();
 check(() => assert.equal(calls, 1));
 
 console.log(`auth cache checks passed (${checks})`);
+process.exit(0);
+

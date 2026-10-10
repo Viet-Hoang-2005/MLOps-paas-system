@@ -12,7 +12,9 @@ import { getApiErrorMessage } from "@/shared/api/errors";
 import { Button } from "@/shared/components/Button";
 import { Callout } from "@/shared/components/Callout";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
+import { Loading } from "@/shared/components/Loading";
 import { PageHeader } from "@/shared/components/PageHeader";
+import { toast } from "@/shared/types/toastStore";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -41,8 +43,23 @@ export default function NewModelProjectPage() {
   const [removedAssetKinds, setRemovedAssetKinds] = useState<Set<string>>(
     new Set(),
   );
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isIndeterminate, setIsIndeterminate] = useState(false);
+  const [uploadStatusText, setUploadStatusText] = useState("");
   const allowExit = useRef(false);
   const initialized = useRef(false);
+
+  const getFileKindLabel = (kind: string, filename?: string) => {
+    let baseLabel = t("workflow.uploadingFile");
+    if (kind === "source_artifact") {
+      baseLabel = t("workflow.uploadingArtifact");
+    } else if (kind === "source_code") {
+      baseLabel = t("workflow.uploadingCode");
+    } else if (kind === "reference_data") {
+      baseLabel = t("workflow.uploadingData");
+    }
+    return filename ? `${baseLabel} (${filename})` : baseLabel;
+  };
 
   const existingArtifact = preview.data?.assets.find(
     (asset) =>
@@ -158,16 +175,80 @@ export default function NewModelProjectPage() {
 
   const save = useMutation({
     mutationFn: async () => {
+      const fileEntries: Array<[string, File | null | undefined]> = [
+        ["source_artifact", form.source_artifact],
+        ["source_code", form.source_code_file],
+        ["reference_data", form.reference_data_file],
+        ["label_mapping", form.label_mapping_file],
+        ["metrics", form.metrics_file],
+        ["params", form.params_file],
+        ["model_insights", form.model_insights_file],
+        ["feature_importance", form.feature_importance_file],
+        ["input_schema", form.input_schema_file],
+      ];
+      const pendingFiles = fileEntries
+        .filter((entry): entry is [string, File] => Boolean(entry[1]))
+        .map(([kind, file]) => ({ kind, file }));
+
+      const totalBytes = pendingFiles.reduce(
+        (acc, item) => acc + item.file.size,
+        0,
+      );
+
+      if (pendingFiles.length === 0) {
+        setIsIndeterminate(true);
+        setUploadStatusText(t("workflow.validatingAndSaving"));
+      } else {
+        setIsIndeterminate(false);
+        setUploadProgress(0);
+        setUploadStatusText(
+          getFileKindLabel(pendingFiles[0].kind, pendingFiles[0].file.name),
+        );
+      }
+
+      const uploadedBytesMap = new Map<string, number>();
+
+      const handleProgress = (kind: string, percent: number) => {
+        const currentFile = pendingFiles.find((f) => f.kind === kind);
+        const currentFileSize = currentFile?.file.size ?? 0;
+        const currentLoaded = Math.round((percent / 100) * currentFileSize);
+        uploadedBytesMap.set(kind, currentLoaded);
+
+        const totalLoaded = Array.from(uploadedBytesMap.values()).reduce(
+          (a, b) => a + b,
+          0,
+        );
+        const calculatedPercent =
+          totalBytes > 0
+            ? Math.min(99, Math.round((totalLoaded / totalBytes) * 100))
+            : 100;
+
+        setUploadProgress(calculatedPercent);
+        if (calculatedPercent >= 99) {
+          setUploadStatusText(t("workflow.validatingAndSaving"));
+        } else {
+          setUploadStatusText(getFileKindLabel(kind, currentFile?.file.name));
+        }
+      };
+
+      let resultId: string;
       if (modelId) {
         await updatePreview(
           modelId,
           preview.data!.revision,
           form,
           Array.from(removedAssetKinds),
+          handleProgress,
         );
-        return modelId;
+        resultId = modelId;
+      } else {
+        const created = await createPreviewProject(form, handleProgress);
+        resultId = created.id;
       }
-      return (await createPreviewProject(form)).id;
+
+      setUploadProgress(100);
+      setUploadStatusText(t("workflow.validatingAndSaving"));
+      return resultId;
     },
     onSuccess: async (id) => {
       allowExit.current = true;
@@ -180,6 +261,9 @@ export default function NewModelProjectPage() {
           queryKey: previewKeys.detail(modelId),
         });
       }
+      toast.success(
+        t(modelId ? "messages.updateSuccess" : "messages.createSuccess"),
+      );
       navigate(`/dashboard/projects/${id}/overview`);
     },
   });
@@ -236,11 +320,29 @@ export default function NewModelProjectPage() {
           )}
         </div>
 
+        {save.isPending && (
+          <div className="rounded-surface border border-border bg-surface p-4 shadow-sm">
+            <Loading
+              variant="progress"
+              size="md"
+              value={uploadProgress}
+              max={100}
+              indeterminate={isIndeterminate}
+              showPercent={!isIndeterminate}
+              text={uploadStatusText}
+              description={
+                isIndeterminate ? undefined : t("workflow.uploadWaitHint")
+              }
+            />
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <Button
             type="button"
             variant="secondary"
             fullWidth
+            disabled={save.isPending}
             onClick={() => navigate(-1)}
           >
             {t("workflow.cancel")}
