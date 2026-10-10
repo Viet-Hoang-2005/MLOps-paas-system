@@ -20,4 +20,6 @@ export const driftQueryKeys = {
     [...driftQueryKeys.all, "upload-preview", id] as const,
   referenceFiles: (modelId: string) =>
     [...driftQueryKeys.all, "reference-files", modelId] as const,
+  reportData: (runId: string) =>
+    [...driftQueryKeys.all, "report-data", runId] as const,
 };

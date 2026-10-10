@@ -6,8 +6,16 @@ export interface ChartDataPoint {
   value: number | null;
 }
 
-export interface ChartProps {
+export interface ChartSeries {
+  name?: string;
   data: ChartDataPoint[];
+  color?: string;
+  fillColor?: string;
+}
+
+export interface ChartProps {
+  data?: ChartDataPoint[];
+  series?: ChartSeries[];
   valueFormatter?: (value: number) => string;
   timeFormatter?: (timestamp: number) => string;
   emptyText?: string;
@@ -16,8 +24,18 @@ export interface ChartProps {
   allowNegative?: boolean;
 }
 
+const DEFAULT_SERIES_STYLES = [
+  { color: "text-color-chart-1", fillColor: "fill-chart-1" },
+  { color: "text-color-chart-2", fillColor: "fill-chart-2" },
+  { color: "text-color-chart-3", fillColor: "fill-chart-3" },
+  { color: "text-color-chart-4", fillColor: "fill-chart-4" },
+  { color: "text-color-chart-5", fillColor: "fill-chart-5" },
+  { color: "text-color-chart-6", fillColor: "fill-chart-6" },
+];
+
 export function Chart({
   data,
+  series,
   valueFormatter = (val: number) => String(val),
   timeFormatter = (ts: number) => String(ts),
   emptyText = "No data",
@@ -26,19 +44,52 @@ export function Chart({
   allowNegative = false,
 }: ChartProps) {
   const gradientId = useId();
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [hoverTime, setHoverTime] = useState<number | null>(null);
 
-  const validPoints = useMemo(() => {
-    return data.filter(
-      (point): point is { timestamp: number; value: number } =>
-        point.value !== null && !Number.isNaN(point.value),
-    );
-  }, [data]);
+  const normalizedSeries = useMemo(() => {
+    if (series && series.length > 0) {
+      return series.map((s, idx) => ({
+        name: s.name || "",
+        data: s.data,
+        color:
+          s.color ||
+          DEFAULT_SERIES_STYLES[idx % DEFAULT_SERIES_STYLES.length].color,
+        fillColor:
+          s.fillColor ||
+          DEFAULT_SERIES_STYLES[idx % DEFAULT_SERIES_STYLES.length].fillColor,
+      }));
+    }
+    if (data && data.length > 0) {
+      return [
+        {
+          name: "",
+          data,
+          color: "text-color-primary",
+          fillColor: "fill-primary",
+        },
+      ];
+    }
+    return [];
+  }, [series, data]);
+
+  const seriesWithValidPoints = useMemo(() => {
+    return normalizedSeries.map((s) => ({
+      ...s,
+      validPoints: s.data.filter(
+        (point): point is { timestamp: number; value: number } =>
+          point.value !== null && !Number.isNaN(point.value),
+      ),
+    }));
+  }, [normalizedSeries]);
+
+  const allValidPoints = useMemo(() => {
+    return seriesWithValidPoints.flatMap((s) => s.validPoints);
+  }, [seriesWithValidPoints]);
 
   const chartGeometry = useMemo(() => {
-    if (validPoints.length < 2) return null;
+    if (allValidPoints.length < 2) return null;
 
-    const values = validPoints.map((p) => p.value);
+    const values = allValidPoints.map((p) => p.value);
     let minVal = Math.min(...values);
     let maxVal = Math.max(...values);
 
@@ -53,8 +104,9 @@ export function Chart({
       : Math.max(0, minVal - valueRange * 0.05);
     const yMax = maxVal + valueRange * 0.05;
 
-    const minTime = validPoints[0].timestamp;
-    const maxTime = validPoints[validPoints.length - 1].timestamp;
+    const allTimestamps = allValidPoints.map((p) => p.timestamp);
+    const minTime = Math.min(...allTimestamps);
+    const maxTime = Math.max(...allTimestamps);
     const timeRange = maxTime - minTime || 1;
 
     const vbWidth = 500;
@@ -67,20 +119,34 @@ export function Chart({
     const plotWidth = vbWidth - padLeft - padRight;
     const plotHeight = vbHeight - padTop - padBottom;
 
-    const coords = validPoints.map((p) => {
-      const x = padLeft + ((p.timestamp - minTime) / timeRange) * plotWidth;
-      const y =
-        padTop +
-        plotHeight -
-        ((p.value - yMin) / (yMax - yMin || 1)) * plotHeight;
-      return { ...p, x, y };
+    const computedSeries = seriesWithValidPoints.map((s) => {
+      const coords = s.validPoints.map((p) => {
+        const x = padLeft + ((p.timestamp - minTime) / timeRange) * plotWidth;
+        const y =
+          padTop +
+          plotHeight -
+          ((p.value - yMin) / (yMax - yMin || 1)) * plotHeight;
+        return { ...p, x, y };
+      });
+
+      const pathD = coords.reduce((acc, pt, idx) => {
+        return idx === 0 ? `M ${pt.x},${pt.y}` : `${acc} L ${pt.x},${pt.y}`;
+      }, "");
+
+      const areaD =
+        coords.length > 0
+          ? `${pathD} L ${coords[coords.length - 1].x},${padTop + plotHeight} L ${coords[0].x},${padTop + plotHeight} Z`
+          : "";
+
+      return {
+        name: s.name,
+        color: s.color,
+        fillColor: s.fillColor,
+        coords,
+        pathD,
+        areaD,
+      };
     });
-
-    const pathD = coords.reduce((acc, pt, idx) => {
-      return idx === 0 ? `M ${pt.x},${pt.y}` : `${acc} L ${pt.x},${pt.y}`;
-    }, "");
-
-    const areaD = `${pathD} L ${coords[coords.length - 1].x},${padTop + plotHeight} L ${coords[0].x},${padTop + plotHeight} Z`;
 
     const ticks = [
       { value: yMax, y: padTop },
@@ -95,16 +161,14 @@ export function Chart({
       padRight,
       padTop,
       padBottom,
-      coords,
-      pathD,
-      areaD,
+      computedSeries,
       ticks,
       minTime,
       maxTime,
     };
-  }, [validPoints, height, allowNegative]);
+  }, [allValidPoints, seriesWithValidPoints, height, allowNegative]);
 
-  if (!chartGeometry || validPoints.length < 2) {
+  if (!chartGeometry || allValidPoints.length < 2) {
     return (
       <div
         className={cn(
@@ -125,31 +189,73 @@ export function Chart({
     padRight,
     padTop,
     padBottom,
-    coords,
-    pathD,
-    areaD,
+    computedSeries,
     ticks,
     minTime,
     maxTime,
   } = chartGeometry;
 
-  const activePoint = hoverIndex !== null ? coords[hoverIndex] : null;
-
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const mouseX = ((e.clientX - rect.left) / rect.width) * vbWidth;
 
-    let closestIdx = 0;
+    let closestTime = minTime;
     let closestDist = Infinity;
-    for (let i = 0; i < coords.length; i++) {
-      const dist = Math.abs(coords[i].x - mouseX);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closestIdx = i;
+    for (const s of computedSeries) {
+      for (const pt of s.coords) {
+        const dist = Math.abs(pt.x - mouseX);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestTime = pt.timestamp;
+        }
       }
     }
-    setHoverIndex(closestIdx);
+    setHoverTime(closestTime);
   };
+
+  const activePoints =
+    hoverTime !== null
+      ? computedSeries
+          .map((s) => {
+            const pt = s.coords.find((p) => p.timestamp === hoverTime);
+            if (!pt) return null;
+            return {
+              ...pt,
+              name: s.name,
+              color: s.color,
+              fillColor: s.fillColor,
+            };
+          })
+          .filter(
+            (
+              item,
+            ): item is {
+              timestamp: number;
+              value: number;
+              x: number;
+              y: number;
+              name: string;
+              color: string;
+              fillColor: string;
+            } => item !== null,
+          )
+      : [];
+
+  const activeX = activePoints.length > 0 ? activePoints[0].x : null;
+  const xRatio = activeX !== null ? activeX / vbWidth : 0.5;
+  const minY =
+    activePoints.length > 0 ? Math.min(...activePoints.map((p) => p.y)) : 0;
+  const yRatio = minY / vbHeight;
+
+  const tooltipXClass =
+    xRatio > 0.65
+      ? "-translate-x-full -ml-2"
+      : xRatio < 0.25
+        ? "translate-x-0 ml-2"
+        : "-translate-x-1/2";
+
+  const tooltipYClass =
+    yRatio < 0.25 ? "translate-y-2" : "-translate-y-full -mt-2";
 
   return (
     <div
@@ -160,23 +266,32 @@ export function Chart({
           viewBox={`0 0 ${vbWidth} ${vbHeight}`}
           className="w-full overflow-visible"
           onMouseMove={handleMouseMove}
-          onMouseLeave={() => setHoverIndex(null)}
+          onMouseLeave={() => setHoverTime(null)}
         >
           <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop
-                offset="0%"
-                stopColor="currentColor"
-                stopOpacity="0.2"
-                className="text-color-primary"
-              />
-              <stop
-                offset="100%"
-                stopColor="currentColor"
-                stopOpacity="0"
-                className="text-color-primary"
-              />
-            </linearGradient>
+            {computedSeries.map((s, idx) => (
+              <linearGradient
+                key={idx}
+                id={`${gradientId}-${idx}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop
+                  offset="0%"
+                  stopColor="currentColor"
+                  stopOpacity={computedSeries.length > 1 ? 0.12 : 0.2}
+                  className={s.color}
+                />
+                <stop
+                  offset="100%"
+                  stopColor="currentColor"
+                  stopOpacity="0"
+                  className={s.color}
+                />
+              </linearGradient>
+            ))}
           </defs>
 
           {/* Grid lines and Y-axis tick values */}
@@ -202,65 +317,107 @@ export function Chart({
             </g>
           ))}
 
-          {/* Area fill */}
-          <path d={areaD} fill={`url(#${gradientId})`} />
+          {/* Area fills */}
+          {computedSeries.map((s, idx) => (
+            <path
+              key={`area-${idx}`}
+              d={s.areaD}
+              fill={`url(#${gradientId}-${idx})`}
+            />
+          ))}
 
-          {/* Line stroke */}
-          <path
-            d={pathD}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-color-primary"
-          />
+          {/* Line strokes */}
+          {computedSeries.map((s, idx) => (
+            <path
+              key={`line-${idx}`}
+              d={s.pathD}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={s.color}
+            />
+          ))}
 
-          {/* Hover indicator */}
-          {activePoint && (
-            <g>
-              <line
-                x1={activePoint.x}
-                y1={padTop}
-                x2={activePoint.x}
-                y2={vbHeight - padBottom}
-                stroke="currentColor"
-                strokeDasharray="2 2"
-                className="text-border"
-              />
+          {/* Hover indicator vertical line */}
+          {activeX !== null && (
+            <line
+              x1={activeX}
+              y1={padTop}
+              x2={activeX}
+              y2={vbHeight - padBottom}
+              stroke="currentColor"
+              strokeDasharray="2 2"
+              className="text-border"
+            />
+          )}
+
+          {/* Hover indicator circles */}
+          {activePoints.map((pt, i) => (
+            <g key={i}>
               <circle
-                cx={activePoint.x}
-                cy={activePoint.y}
+                cx={pt.x}
+                cy={pt.y}
                 r={6}
-                className="fill-primary/20"
+                className={cn(pt.fillColor, "opacity-20")}
               />
               <circle
-                cx={activePoint.x}
-                cy={activePoint.y}
+                cx={pt.x}
+                cy={pt.y}
                 r={3.5}
-                className="fill-primary stroke-surface"
+                className={cn(pt.fillColor, "stroke-surface")}
                 strokeWidth={2}
               />
             </g>
-          )}
+          ))}
         </svg>
 
-        {/* Hover Tooltip showing both X (timestamp) and Y (value) */}
-        {activePoint && (
+        {/* Hover Tooltip */}
+        {activeX !== null && hoverTime !== null && activePoints.length > 0 && (
           <div
-            className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-control border border-border bg-popover px-2.5 py-1.5 shadow-overlay"
+            className={cn(
+              "pointer-events-none absolute z-20 rounded-control border border-border bg-popover px-2.5 py-1.5 shadow-overlay whitespace-nowrap",
+              tooltipXClass,
+              tooltipYClass,
+            )}
             style={{
-              left: `${(activePoint.x / vbWidth) * 100}%`,
-              top: `${(activePoint.y / vbHeight) * 100}%`,
-              marginTop: "-8px",
+              left: `${(activeX / vbWidth) * 100}%`,
+              top: `${(minY / vbHeight) * 100}%`,
             }}
           >
             <div className="text-style-caption text-color-muted-foreground">
-              {timeFormatter(activePoint.timestamp)}
+              {timeFormatter(hoverTime)}
             </div>
-            <div className="text-style-caption font-semibold text-color-foreground">
-              {valueFormatter(activePoint.value)}
-            </div>
+            {activePoints.length === 1 && !activePoints[0].name ? (
+              <div className="text-style-caption font-semibold text-color-foreground">
+                {valueFormatter(activePoints[0].value)}
+              </div>
+            ) : (
+              <div className="mt-1 space-y-1">
+                {activePoints.map((pt, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 text-style-caption"
+                  >
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full shrink-0",
+                        pt.color.replace("text-color-", "bg-"),
+                      )}
+                    />
+                    {pt.name && (
+                      <span className="text-color-muted-foreground">
+                        {pt.name}:
+                      </span>
+                    )}
+                    <span className="font-semibold text-color-foreground font-mono">
+                      {valueFormatter(pt.value)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

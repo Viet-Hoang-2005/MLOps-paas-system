@@ -5,6 +5,7 @@ import {
   deleteDriftMonitoringJob,
   deleteDriftMonitoringRun,
   getDriftMonitor,
+  getDriftReportData,
   getProductionDataCount,
   listDriftMonitoringJobs,
   listDriftMonitoringResults,
@@ -180,4 +181,13 @@ export function useCancelDriftMonitoringRun(monitorId?: string) {
       toast.error(getApiErrorMessage(error, t("messages.runCancelFailed"))),
   });
 }
+
+export function useDriftReportData(runId?: string) {
+  return useQuery({
+    queryKey: driftQueryKeys.reportData(runId ?? ""),
+    queryFn: () => getDriftReportData(runId!),
+    enabled: Boolean(runId),
+  });
+}
+
 

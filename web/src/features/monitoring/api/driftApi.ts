@@ -6,6 +6,7 @@ import type {
   DriftMonitoringJob,
   DriftMonitoringResult,
   DriftMonitorInput,
+  DriftReportData,
   ProductionDataRecord,
 } from "@/features/monitoring/types";
 
@@ -149,3 +150,13 @@ export const getDriftReportDownloadUrl = async (
       controlPlaneURL(`/drift-monitors/runs/${runId}/report-url/`),
     )
   ).data.url;
+
+export const getDriftReportData = async (
+  runId: string,
+): Promise<DriftReportData> =>
+  (
+    await apiClient.get<DriftReportData>(
+      controlPlaneURL(`/drift-monitors/runs/${runId}/report-data/`),
+    )
+  ).data;
+

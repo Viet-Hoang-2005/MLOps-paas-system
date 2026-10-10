@@ -142,7 +142,7 @@ export function Table<T>({
         </table>
       </div>
       {!loading && table.getPageCount() > 1 && (
-        <div className="flex items-center justify-between border-t border-border bg-surface-muted px-4 py-3 text-style-caption text-color-foreground-subtle">
+        <div className="flex items-center justify-between border-t border-border bg-surface-muted px-4 py-3 text-style-control text-color-foreground-subtle">
           <span>
             {t("pagination.page", {
               current: table.getState().pagination.pageIndex + 1,
@@ -152,21 +152,25 @@ export function Table<T>({
           <div className="flex gap-2">
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
+              border={false}
               disabled={!table.getCanPreviousPage()}
               onClick={() => table.previousPage()}
-              icon={<ChevronLeft className="h-4 w-4" />}
+              icon={<ChevronLeft className="h-5 w-5" />}
+              title={t("pagination.previous")}
+              aria-label={t("pagination.previous")}
             >
-              {t("pagination.previous")}
             </Button>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
+              border={false}
               disabled={!table.getCanNextPage()}
               onClick={() => table.nextPage()}
+              title={t("pagination.next")}
+              aria-label={t("pagination.next")}
             >
-              {t("pagination.next")}
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-5 w-5" />
             </Button>
           </div>
         </div>

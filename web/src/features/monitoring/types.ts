@@ -51,3 +51,50 @@ export interface ProductionDataRecord {
   features: Record<string, unknown>;
   prediction: string | null;
 }
+
+export interface DriftDistribution {
+  small_distribution?: {
+    x: (string | number)[];
+    y: number[];
+  };
+}
+
+export interface DriftColumnReport {
+  column_name: string;
+  column_type: "num" | "cat" | string;
+  stattest_name: string;
+  stattest_threshold: number;
+  drift_score: number;
+  drift_detected: boolean;
+  current?: DriftDistribution;
+  reference?: DriftDistribution;
+}
+
+export interface DriftReportData {
+  run_id: string;
+  monitor_id: string;
+  project_id: string;
+  project_name: string;
+  version: string;
+  status: string;
+  created_at: string | null;
+  dataset_drift: boolean;
+  drift_share: number;
+  drift_score: number;
+  number_of_columns: number;
+  number_of_drifted_columns: number;
+  production_records: number;
+  data_quality?: {
+    status?: string;
+    missing_features_count?: number;
+    extra_features_count?: number;
+    high_null_features?: string[];
+    [key: string]: unknown;
+  };
+  columns: DriftColumnReport[];
+  artifacts: {
+    html_url: string | null;
+    json_url: string | null;
+  };
+}
+

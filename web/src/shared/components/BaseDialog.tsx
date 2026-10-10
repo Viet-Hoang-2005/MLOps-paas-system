@@ -29,7 +29,7 @@ export default function BaseDialog({
         <Dialog.Content
           onCloseAutoFocus={onCloseAutoFocus}
           className={cn(
-            "fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[min(92vw,34rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-overlay border border-border bg-surface shadow-(--shadow-overlay) animate-fade-in",
+            "fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[min(92vw,34rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overflow-x-hidden rounded-overlay border border-border bg-surface shadow-(--shadow-overlay) animate-fade-in",
             className,
           )}
         >
