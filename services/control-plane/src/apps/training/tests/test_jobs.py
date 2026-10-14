@@ -34,7 +34,7 @@ def test_training_job_paths_are_project_scoped(monkeypatch):
     assert job.code_snapshot_uri.endswith(f"{prefix}/input/code/source.zip")
     assert job.data_snapshot_uri.endswith(f"{prefix}/input/data/data.zip")
     assert job.output_uri.endswith(f"{prefix}/output/model.tar.gz")
-    assert job.mlflow_artifact_uri.endswith(f"{prefix}/mlflow/")
+    assert job.mlflow_artifact_uri.endswith(f"{prefix}/mlflow/artifacts/")
     assert "other-tenant" not in job.code_snapshot_uri
     assert "other-tenant" not in job.data_snapshot_uri
 

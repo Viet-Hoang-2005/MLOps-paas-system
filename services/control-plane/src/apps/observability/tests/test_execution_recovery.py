@@ -348,7 +348,7 @@ def test_delete_request_requires_runtime_cleanup_before_hard_delete(job, monkeyp
 
 
 def test_stale_dispatch_cannot_create_a_runtime(job):
-    token = executions.claim("training", job.public_id)[0][1]
+    executions.claim("training", job.public_id)
     job.refresh_from_db()
     TrainingJob.objects.filter(pk=job.pk).update(execution_check_lease_until=timezone.now() - timedelta(seconds=1))
     docker_client = SimpleNamespace(run=Mock(), client=Mock())

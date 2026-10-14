@@ -11,8 +11,10 @@ def test_training_artifacts_require_presigned_http_urls():
 
 
 def test_mlflow_artifact_uri_is_proxied_through_tracking_server():
-    uri = runner.mlflow_proxy_artifact_uri("s3://bucket/users/tenant/job/mlflow/")
-    assert uri == "mlflow-artifacts:/users/tenant/job/mlflow/"
+    uri = runner.mlflow_proxy_artifact_uri(
+        "s3://bucket/users/tenant/models/project/training/jobs/job/mlflow/artifacts/"
+    )
+    assert uri == "mlflow-artifacts:/users/tenant/models/project/training/jobs/job/mlflow/artifacts/"
 
 
 def test_mlflow_artifact_uri_requires_s3_location():

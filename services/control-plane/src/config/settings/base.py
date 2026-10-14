@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "apps.catalog.apps.CatalogConfig",
     "apps.registry.apps.RegistryConfig",
     "apps.training.apps.TrainingConfig",
+    "apps.mlflow.apps.MLflowConfig",
     "apps.deployment.apps.DeploymentConfig",
     "apps.drift.apps.DriftConfig",
     "apps.observability.apps.ObservabilityConfig",
@@ -379,3 +380,7 @@ GITHUB_OAUTH_REDIRECT_URI = env("GITHUB_OAUTH_REDIRECT_URI", "http://localhost:5
 LOGGING_CONFIG = "common.logging.configure_logging"
 LOGGING = {"version": 1}
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+
+# MLflow Artifact Limits (default: 5 GiB)
+MLFLOW_MAX_ARTIFACT_UPLOAD_SIZE_BYTES = env_int("MLFLOW_MAX_ARTIFACT_UPLOAD_SIZE_BYTES", 5 * 1024 * 1024 * 1024)
+MLFLOW_MAX_ARTIFACT_DOWNLOAD_SIZE_BYTES = env_int("MLFLOW_MAX_ARTIFACT_DOWNLOAD_SIZE_BYTES", 5 * 1024 * 1024 * 1024)

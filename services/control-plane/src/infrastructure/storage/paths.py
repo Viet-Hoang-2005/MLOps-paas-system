@@ -67,6 +67,10 @@ def training_mlflow_prefix(tenant_id, project_id, job_id):
     return f"{training_job_prefix(tenant_id, project_id, job_id)}/mlflow/"
 
 
+def training_mlflow_artifacts_prefix(tenant_id, project_id, job_id):
+    return f"{training_mlflow_prefix(tenant_id, project_id, job_id)}artifacts/"
+
+
 def version_prefix(tenant_id, project_id, version_id):
     return f"{project_prefix(tenant_id, project_id)}/versions/{_clean(version_id)}"
 

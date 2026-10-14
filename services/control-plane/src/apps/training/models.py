@@ -89,6 +89,8 @@ class TrainingJob(ExecutionWatch):
         started = self.runtime_started_at or self.started_at or self.created_at or self.completed_at
         self.runtime_seconds = max(0, int((self.completed_at - started).total_seconds()))
         self.status = status
+        if self.pk:
+            self.capabilities.filter(purpose="tracking").delete()
 
 
 class TrainingJobCapability(models.Model):

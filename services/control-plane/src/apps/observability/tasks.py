@@ -1,5 +1,7 @@
 from celery import shared_task
 
+from infrastructure.redpanda import RedpandaProducer
+
 
 @shared_task(ignore_result=True)
 def scan_job_executions():
@@ -11,8 +13,6 @@ def scan_job_executions():
 def reconcile_job_execution(kind, public_id, token):
     from apps.observability.services.executions import reconcile
     return reconcile(kind, public_id, token)
-
-from infrastructure.redpanda import RedpandaProducer
 
 
 @shared_task(bind=True, autoretry_for=(BufferError,), retry_backoff=True, max_retries=8)

@@ -197,7 +197,7 @@ class TrainingRuntimeCapabilitiesEndpoint(APIView):
                 "backend": settings.TRAINING_BACKEND,
                 "cpu_profiles": [
                     {"id": name, "vcpu": cpu, "memory_mb": memory}
-                    for name, (cpu, memory) in zip(("small", "medium", "large"), CPU_PROFILES)
+                    for name, (cpu, memory) in zip(("small", "medium", "large"), CPU_PROFILES, strict=True)
                 ],
                 "accelerators": accelerators,
             }

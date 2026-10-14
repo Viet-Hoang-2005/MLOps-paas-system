@@ -38,6 +38,36 @@ class S3Storage:
         )
         return StoredObject(key, f"s3://{self.bucket}/{key}", checksum, len(payload), content_type)
 
+    def upload_fileobj(
+        self,
+        fileobj,
+        key: str,
+        content_type: str = "application/octet-stream",
+        checksum: str = "",
+        size_bytes: int = 0,
+    ) -> StoredObject:
+        extra_args = {"ContentType": content_type}
+        if checksum:
+            extra_args["Metadata"] = {"sha256": checksum}
+        self.client.upload_fileobj(
+            Fileobj=fileobj,
+            Bucket=self.bucket,
+            Key=key,
+            ExtraArgs=extra_args,
+        )
+        return StoredObject(
+            key=key,
+            uri=f"s3://{self.bucket}/{key}",
+            checksum=checksum,
+            size_bytes=size_bytes,
+            content_type=content_type,
+        )
+
+    def open_stream(self, uri: str):
+        bucket, key = self.parse_uri(uri)
+        response = self.client.get_object(Bucket=bucket, Key=key)
+        return response["Body"], response.get("ContentLength"), response.get("ContentType", "application/octet-stream")
+
     def download_file(self, uri, destination):
         bucket, key = self.parse_uri(uri)
         self.client.download_file(bucket, key, str(destination))

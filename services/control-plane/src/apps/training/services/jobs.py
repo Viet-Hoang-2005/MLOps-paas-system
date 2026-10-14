@@ -214,6 +214,7 @@ def cancel_job(job):
         job.status = "cancelling"
         job.deletion_error = ""
         job.save(update_fields=["status", "deletion_error", "updated_at"])
+        job.capabilities.filter(purpose="tracking").delete()
         record_training_event(
             job=job,
             event_type="cancellation_requested",
@@ -236,6 +237,7 @@ def request_job_deletion(job):
 
         job.deletion_requested_at = timezone.now()
         job.deletion_error = ""
+        job.capabilities.filter(purpose="tracking").delete()
         if job.status in ACTIVE_STATUSES:
             job.status = "cancelling"
             task = cancel_training_job

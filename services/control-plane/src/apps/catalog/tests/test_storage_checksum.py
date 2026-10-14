@@ -1,5 +1,4 @@
 import hashlib
-import io
 from unittest.mock import MagicMock
 
 from infrastructure.storage.s3 import S3Storage

@@ -7,7 +7,7 @@ from apps.deployment.api.webhooks import BuildWebhookEndpoint, DeploymentWebhook
 from apps.drift.api.webhooks import AutomaticDriftWebhookEndpoint, DriftRunWebhookEndpoint
 from apps.observability.api.endpoints import ProductionDataEndpoint
 from apps.observability.api.executions import ExecutionObservationEndpoint
-from apps.training.api.mlflow_compat import (
+from apps.mlflow.views import (
     MLflowArtifactsMultipartFallbackView,
     MLflowArtifactsProxyView,
 )
@@ -23,7 +23,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.auth.api.urls")),
     path("api/api-keys/", include("apps.access.api.urls")),
-    path("api/2.0/mlflow/", include("apps.training.api.mlflow_urls")),
+    path("api/2.0/mlflow/", include("apps.mlflow.urls")),
     # MLflow Root Artifact Proxy routes (for root or non-prefixed tracking URIs)
     path("api/2.0/mlflow-artifacts/artifacts/<path:subpath>", MLflowArtifactsProxyView.as_view()),
     path("api/2.0/mlflow-artifacts/artifacts", MLflowArtifactsProxyView.as_view()),

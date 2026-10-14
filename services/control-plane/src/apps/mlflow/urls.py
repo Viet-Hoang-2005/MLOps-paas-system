@@ -1,5 +1,5 @@
 from django.urls import path
-from .mlflow_compat import (
+from .views import (
     MLflowArtifactsListView,
     MLflowArtifactsMultipartFallbackView,
     MLflowArtifactsProxyView,

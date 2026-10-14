@@ -39,7 +39,7 @@ def api_test_continuous(samples_per_class=1):
             sample_df = sample_df.sample(frac=1, random_state=None).reset_index(drop=True)
 
             # Duyệt qua toàn bộ dữ liệu đã bốc mẫu và gửi từng dòng lên API để kiểm tra dự đoán
-            for index, row in sample_df.iterrows():
+            for _index, row in sample_df.iterrows():
                 print("-" * 50)
 
                 # Tách nhãn thực tế và đặc trưng từ dòng dữ liệu

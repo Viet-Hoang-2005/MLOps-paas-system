@@ -349,13 +349,10 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
     )
 
     result_dict = report.as_dict()
-    dataset_drift_metrics = {}
     data_drift_table = {}
 
     for item in result_dict.get("metrics", []):
         result_data = item.get("result", {})
-        if "dataset_drift" in result_data and "share_of_drifted_columns" in result_data:
-            dataset_drift_metrics = result_data
         if "drift_by_columns" in result_data:
             data_drift_table = result_data
 
