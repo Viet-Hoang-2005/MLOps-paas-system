@@ -3,7 +3,7 @@ import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPl
 import { formatDateTime, formatNumber } from "@/shared/i18n/formatters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { BrainCircuit, Eye, Rocket, RotateCcw, Trash2 } from "lucide-react";
+import { BrainCircuit, Eye, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
@@ -489,7 +489,7 @@ export default function TrainingModelPage() {
         />
         <Button
           size="md"
-          icon={<Rocket className="h-4 w-4" />}
+          icon={<Plus className="h-4 w-4" />}
           onClick={() => navigate("/dashboard/training/new/metadata")}
         >
           {t("newJob")}

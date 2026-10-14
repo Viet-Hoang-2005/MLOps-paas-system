@@ -58,6 +58,7 @@ export interface ModelProject {
   lifecycle_status?: ModelLifecycleStatus;
   latest_version_id?: ResourceId | null;
   latest_version_number?: string | null;
+  running_version_number?: string | null;
   deployment_id?: ResourceId;
   source_code?: ProjectAssetSummary | null;
   reference_data?: ProjectAssetSummary | null;

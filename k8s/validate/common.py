@@ -37,6 +37,7 @@ PRODUCTION_NAMESPACES = {
     "external-secrets",
     "gpu-operator",
     "harbor",
+    "headlamp",
     "karpenter",
     "keda",
     "kubeflow",

@@ -304,13 +304,16 @@ export function DataOverviewPage({
           <DataViewer
             title={fileName}
             badge={
-              <Badge variant="neutral">
+              <Badge variant="neutral" hideIcon>
                 <Lock className="h-3 w-3 mr-1 inline" />
                 {t("workflow.immutableBadge")}
               </Badge>
             }
             actions={
               <>
+                <span className="text-style-caption text-color-muted-foreground">
+                  {t("workflow.immutableNotice")}
+                </span>
                 <Button
                   size="icon"
                   variant="secondary"
@@ -319,9 +322,6 @@ export function DataOverviewPage({
                   title={t("workflow.downloadFile")}
                   aria-label={t("workflow.downloadFile")}
                 />
-                <span className="text-style-caption text-color-muted-foreground">
-                  {t("workflow.immutableNotice")}
-                </span>
               </>
             }
             initialCsvText={reference.data || ""}

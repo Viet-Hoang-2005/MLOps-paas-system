@@ -25,7 +25,10 @@ spec:
     - registry.k8s.io/nfd/charts
     - https://helm.ngc.nvidia.com/nvidia
     - ghcr.io/ot-container-kit/charts
+    - https://kubernetes-sigs.github.io/headlamp
   destinations:
+    - namespace: headlamp
+      server: https://kubernetes.default.svc
     - namespace: mlops-logging
       server: https://kubernetes.default.svc
     - namespace: mlops-execution

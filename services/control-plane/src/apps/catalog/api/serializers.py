@@ -15,6 +15,7 @@ class ModelProjectSerializer(serializers.ModelSerializer):
     reference_data = serializers.SerializerMethodField()
     latest_version_id = serializers.SerializerMethodField()
     latest_version_number = serializers.SerializerMethodField()
+    running_version_number = serializers.SerializerMethodField()
     preview_revision = serializers.IntegerField(source="preview.revision", read_only=True)
     preview_changed = serializers.SerializerMethodField()
 
@@ -33,6 +34,7 @@ class ModelProjectSerializer(serializers.ModelSerializer):
             "lifecycle_status",
             "latest_version_id",
             "latest_version_number",
+            "running_version_number",
             "active_endpoint",
             "is_active",
             "deletion_state",
@@ -118,6 +120,11 @@ class ModelProjectSerializer(serializers.ModelSerializer):
             return instance.active_deployment.version.version
         latest = instance.versions.order_by("-registered_at", "-id").first()
         return latest.version if latest else None
+
+    def get_running_version_number(self, instance):
+        if self._has_running(instance):
+            return instance.active_deployment.version.version
+        return None
 
     def _asset_summary(self, instance, kind):
         if not self._has_running(instance):

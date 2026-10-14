@@ -34,6 +34,7 @@ core_addon_application_names:
   - mlops-prod-addon-kyverno
   - mlops-prod-addon-loki
   - mlops-prod-addon-alloy
+  - mlops-prod-addon-headlamp
 core_cluster_application_names:
   - mlops-prod-cluster-namespaces
   - mlops-prod-cluster-storage
@@ -51,6 +52,7 @@ core_addon_workloads:
   - {namespace: kyverno, release: kyverno}
   - {namespace: mlops-logging, release: loki}
   - {namespace: mlops-logging, release: alloy}
+  - {namespace: headlamp, release: headlamp}
 core_addon_crds:
   - externalsecrets.external-secrets.io
   - clusters.postgresql.cnpg.io

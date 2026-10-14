@@ -9,7 +9,7 @@ import { PageHeader } from "@/shared/components/PageHeader";
 import { Table } from "@/shared/components/Table";
 import { formatDateTime } from "@/shared/i18n/formatters";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Edit3, KeyRound, RefreshCw, Trash2 } from "lucide-react";
+import { Edit3, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -145,7 +145,7 @@ export default function DeveloperSettingPage() {
           <Button
             id="btn-create-api-key"
             size="md"
-            icon={<KeyRound className="h-4 w-4" />}
+            icon={<Plus className="h-4 w-4" />}
             onClick={() => navigate("/dashboard/api-tokens/new")}
           >
             {t("apiKey.createTitle")}

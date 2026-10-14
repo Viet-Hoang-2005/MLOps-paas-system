@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-addon-headlamp
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-40"
+  labels:
+    mlops-paas.io/plane: addon
+    mlops-paas.io/component: headlamp
+spec:
+  project: mlops-addons
+  info:
+    - name: Owner
+      value: Platform Engineering
+    - name: Source
+      value: kubernetes-sigs.github.io/headlamp/headlamp@0.45.0
+    - name: Runbook
+      value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
+  source:
+    repoURL: https://kubernetes-sigs.github.io/headlamp
+    chart: headlamp
+    targetRevision: 0.45.0
+    helm:
+      releaseName: headlamp
+      values: |
+        nodeSelector:
+          workload-type: worker
+        ingress:
+          enabled: false
+        config:
+          inCluster: true
+          unsafeUseServiceAccountToken: true
+        serviceAccount:
+          create: true
+          name: headlamp
+        clusterRoleBinding:
+          create: true
+          clusterRoleName: headlamp-read-only
+        extraManifests:
+          - |
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRole
+            metadata:
+              name: headlamp-read-only
+              labels:
+                app.kubernetes.io/name: headlamp
+            rules:
+              - apiGroups: ["*"]
+                resources: ["*"]
+                verbs: ["get", "list", "watch"]
+              - apiGroups: [""]
+                resources: ["pods/log", "pods/status"]
+                verbs: ["get", "list", "watch"]
+              - apiGroups: ["authorization.k8s.io"]
+                resources:
+                  - selfsubjectaccessreviews
+                  - selfsubjectrulesreviews
+                verbs: ["create"]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: headlamp
+

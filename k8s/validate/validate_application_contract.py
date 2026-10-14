@@ -93,6 +93,7 @@ def validate_lifecycle(context: ValidationContext) -> list[str]:
         "mlops-prod-addon-argo-events",
         "mlops-prod-addon-monitoring",
         "mlops-prod-addon-kyverno",
+        "mlops-prod-addon-headlamp",
     ):
         expected_waves[name] = "-40"
 

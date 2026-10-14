@@ -109,17 +109,19 @@ export function ModelProjectTable({
       },
       {
         id: "version",
-        header: t("workflow.modelVersion"),
+        header: t("workflow.runningVersion"),
         accessorFn: (row) =>
-          row.active_endpoint?.version_number ??
-          row.latest_version_number ??
-          row.version ??
+          row.running_version_number ??
+          (row.lifecycle_status === "running"
+            ? row.active_endpoint?.version_number
+            : null) ??
           "",
         cell: ({ row }) => {
           const rawVersion =
-            row.original.active_endpoint?.version_number ??
-            row.original.latest_version_number ??
-            (row.original.version || null);
+            row.original.running_version_number ??
+            (row.original.lifecycle_status === "running"
+              ? row.original.active_endpoint?.version_number
+              : null);
           const displayVersion = rawVersion
             ? rawVersion.startsWith("v")
               ? rawVersion

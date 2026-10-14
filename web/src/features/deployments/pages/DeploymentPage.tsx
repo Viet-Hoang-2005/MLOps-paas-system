@@ -33,7 +33,7 @@ import { Select, type SelectOption } from "@/shared/components/Select";
 import { Table } from "@/shared/components/Table";
 import { formatDateTime } from "@/shared/i18n/formatters";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Box, Play, RotateCcw, Trash2 } from "lucide-react";
+import { Box, Play, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
@@ -270,7 +270,7 @@ export default function DeploymentPage() {
         </div>
         <Button
           size="md"
-          icon={<Play className="h-4 w-4" />}
+          icon={<Plus className="h-4 w-4" />}
           onClick={() => navigate(buildDeploymentPath())}
         >
           {t("workflow.deployTheModel")}

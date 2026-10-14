@@ -268,3 +268,29 @@ def test_running_insights_keep_registered_and_supplemental_content():
     assert response.data["model_insights"] == {"kind": "model_insights", "registered": True}
     assert response.data["supplemental_summaries"]["model_insights"] == {"supplemental": True}
 
+
+@pytest.mark.django_db
+def test_running_version_number_in_project_serializer():
+    owner = get_user_model().objects.create_user("running-v-owner@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Running Version Project")
+    v1 = ModelVersion.objects.create(project=project, version="1")
+    ModelVersion.objects.create(project=project, version="2")
+    build = Build.objects.create(project=project, version=v1, status="ready")
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    # Registered but not running: latest is 2, running is None
+    res = client.get(f"/api/models/{project.public_id}/")
+    assert res.status_code == 200
+    assert res.data["latest_version_number"] == "2"
+    assert res.data["running_version_number"] is None
+
+    # Running v1: running is 1
+    project.active_deployment = Deployment.objects.create(version=v1, build=build, status="succeeded")
+    project.save(update_fields=["active_deployment"])
+
+    res = client.get(f"/api/models/{project.public_id}/")
+    assert res.status_code == 200
+    assert res.data["running_version_number"] == "1"
+
+

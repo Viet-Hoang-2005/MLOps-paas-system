@@ -40,9 +40,9 @@ Hệ thống được chia thành 5 mặt phẳng độc lập tương ứng v�
 
 | Mặt phẳng (Plane) | Đường dẫn mã nguồn | Argo CD AppProject | Trách nhiệm chính |
 |---|---|---|---|
-| **GitOps Control Plane** | `k8s/gitops/production` | `default` | Ứng dụng gốc `mlops-paas-system` quản lý AppProject và 34 Child Application. |
+| **GitOps Control Plane** | `k8s/gitops/production` | `default` | Ứng dụng gốc `mlops-paas-system` quản lý AppProject và 35 Child Application. |
 | **Cluster Plane** | `k8s/cluster` | `mlops-cluster` | Cấu hình nền tảng cấp cụm: Namespace, StorageClass (`ebs-gp3`), `ClusterSecretStore`, Kyverno Policies, Karpenter Capacity. |
-| **Add-ons Plane** | Charts upstream được ghim | `mlops-addons` | Các Controller/CRD cơ sở: AWS EBS CSI, External Secrets Operator (ESO), CloudNative-PG, Redis Operator, KEDA, Prometheus Stack, Loki, Alloy, Kyverno, Kubeflow Training. |
+| **Add-ons Plane** | Charts upstream được ghim | `mlops-addons` | Các Controller/CRD cơ sở: AWS EBS CSI, External Secrets Operator (ESO), CloudNative-PG, Redis Operator, KEDA, Prometheus Stack, Loki, Alloy, Kyverno, Kubeflow Training, Headlamp Dashboard. |
 | **Platform Plane** | `k8s/platform` | `mlops-platform` | Các dịch vụ dữ liệu & chia sẻ dùng chung: CSDL PostgreSQL HA, Redis HA + Sentinel, Redpanda Kafka, Harbor Registry, Traefik Routing & Cloudflare Tunnel. |
 | **Execution Plane** | `k8s/argo` | `mlops-execution` | Động cơ pipeline MLOps: Argo Events (EventBus, EventSource, Sensor) và các mẫu Argo WorkflowTemplates (Build, Deploy, Delete, Drift, Training). |
 | **Workloads Plane** | `k8s/apps/overlays/production` | `mlops-workloads` | Các microservices nghiệp vụ của tenant và hệ thống: Control Plane API, Celery Worker, Model Server, Redpanda Consumer, Web Frontend. |
@@ -100,7 +100,7 @@ k8s/
 │       ├── kustomization.yaml          # Tổng hợp projects, repositories và applications
 │       ├── projects/                   # 5 AppProject kiểm soát phạm vi và quyền hạn
 │       ├── repositories/               # Cấu hình Git repository nguồn
-│       └── applications/               # Định nghĩa 34 Argo CD Child Application
+│       └── applications/               # Định nghĩa 35 Argo CD Child Application
 │           ├── cluster/                # Ứng dụng cấu hình cụm
 │           ├── addons/                 # Ứng dụng cài đặt các Helm Chart bên thứ ba
 │           ├── platform/               # Ứng dụng dịch vụ nền tảng (DB, Cache, Broker, Logging)

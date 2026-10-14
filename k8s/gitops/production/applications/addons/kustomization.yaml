@@ -18,3 +18,5 @@ resources:
   - kubeflow-training.yaml
   - node-feature-discovery.yaml
   - gpu-operator.yaml
+  - headlamp.yaml
+
