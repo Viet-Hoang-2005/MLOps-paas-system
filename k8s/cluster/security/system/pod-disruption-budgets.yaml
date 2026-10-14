@@ -1,0 +1,68 @@
+# pod-disruption-budgets.yaml: Bảo vệ các service khỏi downtime khi bảo trì node (kubectl drain / rolling update)
+
+# NHÓM 1: CÁC DỊCH VỤ HIGH AVAILABILITY (2 REPLICAS)
+# 1. PDB cho Django Control Plane API
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mlops-paas-control-plane-pdb
+  namespace: mlops-control-plane
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: mlops-paas-control-plane
+
+# 2. PDB cho Celery Worker (Xử lý tác vụ nền & MLOps Pipelines)
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mlops-paas-celery-worker-pdb
+  namespace: mlops-control-plane
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: mlops-paas-celery-worker
+
+# 3. PDB cho Model Server Gateway (Phục vụ suy luận thời gian thực)
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mlops-paas-model-server-pdb
+  namespace: mlops-model-server
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: mlops-paas-model-server
+
+# NHÓM 2: CÁC DỊCH VỤ ĐƠN LẺ (1 REPLICA)
+# 4. PDB cho Frontend Web Dashboard
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mlops-paas-web-pdb
+  namespace: mlops-web
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: mlops-paas-web
+
+# 5. PDB cho Cloudflare Zero Trust Tunnel
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cloudflared-pdb
+  namespace: cloudflare
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: cloudflared

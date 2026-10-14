@@ -14,11 +14,11 @@ spec:
       key: REDIS_SENTINEL_PASSWORD
     resources:
       requests:
-        cpu: 25m
-        memory: 64Mi
+        cpu: 15m
+        memory: 32Mi
       limits:
-        cpu: 200m
-        memory: 128Mi
+        cpu: 100m
+        memory: 64Mi
   redisSentinelConfig:
     redisReplicationName: mlops-paas-redis-ha
     masterGroupName: mlops-paas-redis
@@ -61,8 +61,8 @@ spec:
     image: quay.io/opstree/redis-exporter:v1.44.0
     resources:
       requests:
-        cpu: 25m
-        memory: 64Mi
+        cpu: 15m
+        memory: 32Mi
       limits:
-        cpu: 200m
-        memory: 128Mi
+        cpu: 100m
+        memory: 64Mi

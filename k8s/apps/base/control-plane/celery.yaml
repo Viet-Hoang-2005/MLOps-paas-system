@@ -87,8 +87,8 @@ spec:
               cpu: 100m
               memory: 256Mi
             limits:
-              cpu: 1000m
-              memory: 1Gi
+              cpu: 800m
+              memory: 768Mi
 
 ---
 apiVersion: apps/v1
@@ -151,11 +151,11 @@ spec:
                 name: mlops-paas-control-plane-config
           resources:
             requests:
-              cpu: 50m
-              memory: 128Mi
+              cpu: 30m
+              memory: 64Mi
             limits:
-              cpu: 250m
-              memory: 256Mi
+              cpu: 150m
+              memory: 128Mi
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -215,8 +215,8 @@ spec:
                 name: mlops-paas-control-plane-config
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 50m
+              memory: 128Mi
             limits:
-              cpu: 500m
-              memory: 1Gi
+              cpu: 300m
+              memory: 512Mi

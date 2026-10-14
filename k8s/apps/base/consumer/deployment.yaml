@@ -65,8 +65,8 @@ spec:
           # Cấu hình tài nguyên cho Consumer
           resources:
             requests:
-              cpu: 150m
-              memory: 384Mi
+              cpu: 100m
+              memory: 256Mi
             limits:
-              cpu: 750m
-              memory: 768Mi
+              cpu: 500m
+              memory: 512Mi

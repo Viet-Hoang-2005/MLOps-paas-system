@@ -41,11 +41,25 @@ spec:
             templateReferencing: Secure
           nodeSelector:
             workload-type: worker
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
         server:
           authModes:
             - server
           nodeSelector:
             workload-type: worker
+          resources:
+            requests:
+              cpu: 30m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: argo

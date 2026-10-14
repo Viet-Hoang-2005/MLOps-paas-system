@@ -1,0 +1,272 @@
+# 1. Bảo vệ Database PostgreSQL (Namespace: mlops-postgres)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-postgres
+  namespace: mlops-postgres
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: mlops-paas-postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    # 1.1. Nội bộ các Pod Postgres đồng bộ Replication (cùng namespace)
+    - from:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: mlops-paas-postgres
+    # 1.2. CloudNativePG Operator quản lý cluster
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+    # 1.3. Control Plane, Consumer, Model Server truy cập DB (cổng 5432)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-control-plane
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-consumer
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-model-server
+      ports:
+        - protocol: TCP
+          port: 5432
+    # 1.4. Prometheus cào metrics (cổng 9187)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9187
+
+---
+# 2. Bảo vệ Redis & Sentinel (Namespace: mlops-redis)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-redis
+  namespace: mlops-redis
+spec:
+  podSelector:
+    matchLabels:
+      app: mlops-paas-redis-ha
+  policyTypes:
+    - Ingress
+  ingress:
+    # 2.1. Nội bộ Redis & Sentinel giao tiếp với nhau
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 26379
+    # 2.2. Control Plane & Model Server truy cập Redis & Sentinel
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-control-plane
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-model-server
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 26379
+    # 2.3. Prometheus cào metrics exporter (cổng 9121)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9121
+
+---
+# 3.Bảo vệ message queue Redpanda Kafka (Namespace: mlops-redpanda)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-redpanda
+  namespace: mlops-redpanda
+spec:
+  podSelector:
+    matchLabels:
+      app: redpanda
+  policyTypes:
+    - Ingress
+  ingress:
+    # 3.1. Nội bộ Redpanda
+    - from:
+        - podSelector:
+            matchLabels:
+              app: redpanda
+    # 3.2. Model Server (Producer), Consumer (Consumer), Argo Workflows đẩy/tiêu thụ data
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-model-server
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-consumer
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-execution
+      ports:
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 19092
+    # 3.3. Prometheus cào metrics admin (cổng 9644)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9644
+
+---
+# 4. Bảo vệ Django Control Plane (Namespace: mlops-control-plane)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-control-plane
+  namespace: mlops-control-plane
+spec:
+  podSelector:
+    matchLabels:
+      app: mlops-paas-control-plane
+  policyTypes:
+    - Ingress
+  ingress:
+    # 4.1. Traefik Ingress nhận traffic bên ngoài vào API
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8000
+    # 4.2. Consumer và Workflows gọi Webhook đồng bộ trạng thái
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-consumer
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-execution
+      ports:
+        - protocol: TCP
+          port: 8000
+    # 4.3. Prometheus cào metrics
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8000
+
+---
+# 5. Bảo vệ Frontend Web (Namespace: mlops-web)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-web
+  namespace: mlops-web
+spec:
+  podSelector:
+    matchLabels:
+      app: mlops-paas-web
+  policyTypes:
+    - Ingress
+  ingress:
+    # 5.1. Traefik Ingress (từ kube-system)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 80
+    # 5.2. Cloudflare Tunnel (từ namespace cloudflare)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cloudflare
+          podSelector:
+            matchLabels:
+              app: cloudflared
+      ports:
+        - protocol: TCP
+          port: 80
+
+---
+# 6. Bảo vệ Model Server Gateway (Namespace: mlops-model-server)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-model-server
+  namespace: mlops-model-server
+spec:
+  podSelector:
+    matchLabels:
+      app: mlops-paas-model-server
+  policyTypes:
+    - Ingress
+  ingress:
+    # 6.1. Traefik Ingress chuyển tiếp traffic suy luận (/predict, /feedback)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 5000
+    # 6.2. Control Plane gọi test model
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-control-plane
+      ports:
+        - protocol: TCP
+          port: 5000
+    # 6.3. Prometheus cào metrics
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 5000
+
+---
+# 7. Khóa hoàn toàn ingress của Consumer (Namespace: mlops-consumer)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-consumer-deny-ingress
+  namespace: mlops-consumer
+spec:
+  podSelector:
+    matchLabels:
+      app: mlops-paas-consumer
+  policyTypes:
+    - Ingress
+  # ingress: [] (để trống đồng nghĩa chặn 100% kết nối đến nó, chỉ cho phép nó gọi ra ngoài)

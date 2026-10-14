@@ -93,7 +93,10 @@ k8s/
 │   ├── namespaces/                     # Định nghĩa toàn bộ production namespaces
 │   ├── storage/                        # Khai báo AWS EBS gp3 StorageClass
 │   ├── secret-store/                   # ClusterSecretStore liên kết AWS Secrets Manager
-│   ├── policies/                       # Chính sách bảo mật kiểm tra chữ ký ảnh (Kyverno)
+│   ├── security/                       # Bảo mật cụm phân tách theo miền nghiệp vụ
+│   │   ├── image/                      # Kiểm tra chữ ký ảnh container (Kyverno)
+│   │   ├── network/                    # Zero-Trust NetworkPolicy
+│   │   └── system/                     # PodDisruptionBudgets bảo vệ tính sẵn sàng
 │   └── karpenter/                      # EC2NodeClass & NodePools mở rộng tài nguyên tính toán
 ├── gitops/                             # Định nghĩa cấu trúc phân tầng Argo CD (App-of-Apps)
 │   └── production/                     # Môi trường production
@@ -128,7 +131,6 @@ k8s/
 │   │   └── web/                        # Deployment ReactJS frontend dashboard
 │   └── overlays/                       # Cấu hình ghi đè theo môi trường (Environment Overlays)
 │       └── production/                 # Overlay cụ thể cho Production (Image tags, Ingress, Secrets)
-├── security/                           # Các chính sách bảo mật NetworkPolicy dự phòng mở rộng
 └── validate/                           # Bộ kiểm thử tự động xác thực tính toàn vẹn Manifest
     ├── tests/                          # 14 bài test tự động với pytest
     ├── validate_gitops.py              # Kiểm tra cấu trúc phân rã GitOps

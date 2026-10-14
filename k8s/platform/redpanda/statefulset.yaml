@@ -37,7 +37,7 @@ spec:
         - --smp
         - "1"
         - --memory
-        - 1G
+        - 768M
         - --reserve-memory
         - 0M
         - --kafka-addr
@@ -54,11 +54,11 @@ spec:
         resources:
           # Ép xung tự bảo vệ: Không để Redpanda hút cạn RAM của Worker Node.
           limits:
-            memory: "2Gi"
+            memory: "1536Mi"
             cpu: "1000m"
           requests:
-            memory: "1Gi"
-            cpu: "200m"
+            memory: "768Mi"
+            cpu: "150m"
         volumeMounts:
         - name: redpanda-data
           mountPath: /var/lib/redpanda/data

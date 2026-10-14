@@ -15,7 +15,7 @@ IMDSv2 and hop limit 1.
 
 The current rollout intentionally defers custom NetworkPolicies and PDBs until
 core stability. Treat that as an explicit security gap and do not claim tenant
-network isolation is active merely because manifests exist under `k8s/security`.
+network isolation is active merely because manifests exist under `k8s/cluster/security`.
 
 Harbor automation uses a least-privilege robot account. Store image digest as immutable identity and verify signatures where the pipeline supports them.
 

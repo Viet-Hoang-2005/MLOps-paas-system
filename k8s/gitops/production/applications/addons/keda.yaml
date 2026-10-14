@@ -29,13 +29,25 @@ spec:
         resources:
           operator:
             requests:
-              cpu: 50m
+              cpu: 30m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
           metricServer:
             requests:
-              cpu: 50m
+              cpu: 30m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
           webhooks:
             requests:
-              cpu: 25m
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
         metricsServer:
           nodeSelector:
             workload-type: worker

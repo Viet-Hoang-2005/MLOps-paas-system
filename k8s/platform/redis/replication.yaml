@@ -14,11 +14,11 @@ spec:
       key: REDIS_PASSWORD
     resources:
       requests:
-        cpu: 100m
-        memory: 512Mi
+        cpu: 50m
+        memory: 256Mi
       limits:
-        cpu: 1000m
-        memory: 1Gi
+        cpu: 500m
+        memory: 512Mi
   redisConfig:
     maxMemoryPercentOfLimit: 50
     additionalRedisConfig: redis-ha-config
@@ -52,8 +52,8 @@ spec:
     image: quay.io/opstree/redis-exporter:v1.44.0
     resources:
       requests:
-        cpu: 25m
-        memory: 64Mi
+        cpu: 15m
+        memory: 32Mi
       limits:
-        cpu: 200m
-        memory: 128Mi
+        cpu: 100m
+        memory: 64Mi

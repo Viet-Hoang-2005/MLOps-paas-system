@@ -10,7 +10,7 @@ metadata:
   labels:
     app: cloudflared
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: cloudflared
@@ -53,8 +53,8 @@ spec:
           # Cấu hình tài nguyên cho Cloudflared
           resources:
             requests:
-              cpu: 50m
+              cpu: 30m
               memory: 64Mi
             limits:
-              cpu: 200m
+              cpu: 150m
               memory: 128Mi

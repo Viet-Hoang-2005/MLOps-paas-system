@@ -31,8 +31,12 @@ spec:
             nodeSelector:
               workload-type: worker
             resources:
+              requests:
+                cpu: 150m
+                memory: 512Mi
               limits:
-                memory: 1500Mi
+                cpu: 1000m
+                memory: 1024Mi
             storageSpec:
               volumeClaimTemplate:
                 spec:
@@ -44,6 +48,13 @@ spec:
             serviceMonitorSelectorNilUsesHelmValues: false
             ruleSelectorNilUsesHelmValues: false
         grafana:
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
           additionalDataSources:
             - name: Runtime logs
               type: loki
