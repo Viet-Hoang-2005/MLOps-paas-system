@@ -5,6 +5,7 @@ import { Activity, Cpu, HardDrive, RefreshCw, Rocket } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useTrainingJobDetailContext } from "@/features/training/trainingJobDetailContext";
+import { TrainingJobModelMetrics } from "@/features/training/components/TrainingJobModelMetrics";
 
 export default function TrainingJobMetricsPage() {
   const { t, i18n } = useTranslation("training");
@@ -23,35 +24,7 @@ export default function TrainingJobMetricsPage() {
     refreshMetrics,
   } = useTrainingJobDetailContext();
 
-  if (!metrics?.metrics_available && activeStatuses.includes(job.status)) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-surface border border-dashed border-border bg-muted px-4 py-16 text-center shadow-sm">
-        <Activity className="mb-4 h-10 w-10 text-color-muted-foreground" />
-        <p className="text-style-heading text-color-foreground">
-          {t("detail.metricsPage.starting")}
-        </p>
-        <p className="mt-2 max-w-md text-style-body text-color-muted-foreground">
-          {t("detail.metricsPage.startingDescription")}
-        </p>
-      </div>
-    );
-  }
-
-  if (!metrics?.metrics_available) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-surface border border-border bg-surface px-4 py-16 text-center shadow-sm">
-        <Activity className="mb-4 h-10 w-10 text-color-muted-foreground" />
-        <p className="text-style-heading text-color-foreground">
-          {t("detail.metricsPage.empty")}
-        </p>
-        <p className="mt-2 text-style-body text-color-muted-foreground">
-          {t("detail.metricsPage.emptyDescription")}
-        </p>
-      </div>
-    );
-  }
-
-  const latest = metrics.latest;
+  const latest = metrics?.latest;
   const highCpu = latest?.cpu_percent != null && latest.cpu_percent > 85;
   const highRam = latest?.memory_percent != null && latest.memory_percent > 85;
   const memoryValue =
@@ -71,7 +44,7 @@ export default function TrainingJobMetricsPage() {
         ? t("detail.metricsPage.memoryUsed", {
             memory: formatMegabytes(latest.memory_used_mb),
           })
-        : metrics.message || t("detail.metricsPage.waitingRunner");
+        : metrics?.message || t("detail.metricsPage.waitingRunner");
   const gpuValue =
     latest?.gpu_available && latest.gpu_percent != null
       ? formatMetricPercent(latest.gpu_percent)
@@ -87,8 +60,14 @@ export default function TrainingJobMetricsPage() {
   const refreshing = loadingMetrics || refreshingSection === "metrics";
 
   return (
-    <div className="animate-in space-y-4 fade-in duration-300">
-      <div className="rounded-surface border border-border bg-surface p-6 shadow-sm">
+    <div className="animate-in space-y-6 fade-in duration-300">
+      {/* 1. Experiment Tracking: Loss Curves, Hyperparameters, Summary */}
+      <section className="space-y-4">
+        <TrainingJobModelMetrics jobId={job.id} jobStatus={job.status} />
+      </section>
+
+      {/* 2. Container System Resources: CPU, RAM, GPU */}
+      <section className="rounded-surface border border-border bg-surface p-6 shadow-sm">
         <div className="mb-6 flex items-center justify-between gap-3 border-b border-border pb-4">
           <p className="flex items-center gap-2 text-style-overline uppercase text-color-foreground">
             <Activity className="h-4 w-4 text-color-info" />
@@ -102,7 +81,9 @@ export default function TrainingJobMetricsPage() {
                       timeStyle: "medium",
                     }),
                   })
-                : t("detail.metricsPage.pending")}
+                : activeStatuses.includes(job.status)
+                  ? t("detail.metricsPage.starting")
+                  : t("detail.metricsPage.pending")}
             </span>
             <button
               type="button"
@@ -117,46 +98,55 @@ export default function TrainingJobMetricsPage() {
             </button>
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <MetricCell
-            icon={<Cpu className="h-3.5 w-3.5" />}
-            label={t("detail.metricsPage.cpu")}
-            value={
-              latest?.cpu_percent == null
-                ? "-"
-                : formatMetricPercent(latest.cpu_percent)
-            }
-            detail={
-              latest?.cpu_limit_cores
-                ? t("detail.metricsPage.cpuLimit", {
-                    count: latest.cpu_limit_cores,
-                  })
-                : t("detail.metricsPage.cpuUsage")
-            }
-            warning={highCpu}
-            progress={latest?.cpu_percent}
-            progressColor={highCpu ? "bg-warning" : "bg-success"}
-          />
-          <MetricCell
-            icon={<HardDrive className="h-3.5 w-3.5" />}
-            label={t("detail.metricsPage.ram")}
-            value={memoryValue}
-            detail={memoryDetail}
-            warning={highRam}
-            progress={latest?.memory_percent}
-            progressColor={highRam ? "bg-danger" : "bg-info"}
-          />
-          <MetricCell
-            icon={<Rocket className="h-3.5 w-3.5" />}
-            label={t("detail.metricsPage.gpu")}
-            value={gpuValue}
-            detail={gpuDetail}
-            muted={!latest?.gpu_available}
-            progress={latest?.gpu_percent}
-            progressColor="bg-chart-3"
-          />
-        </div>
-      </div>
+
+        {metrics?.metrics_available ? (
+          <div className="grid gap-4 sm:grid-cols-3">
+            <MetricCell
+              icon={<Cpu className="h-3.5 w-3.5" />}
+              label={t("detail.metricsPage.cpu")}
+              value={
+                latest?.cpu_percent == null
+                  ? "-"
+                  : formatMetricPercent(latest.cpu_percent)
+              }
+              detail={
+                latest?.cpu_limit_cores
+                  ? t("detail.metricsPage.cpuLimit", {
+                      count: latest.cpu_limit_cores,
+                    })
+                  : t("detail.metricsPage.cpuUsage")
+              }
+              warning={highCpu}
+              progress={latest?.cpu_percent}
+              progressColor={highCpu ? "bg-warning" : "bg-success"}
+            />
+            <MetricCell
+              icon={<HardDrive className="h-3.5 w-3.5" />}
+              label={t("detail.metricsPage.ram")}
+              value={memoryValue}
+              detail={memoryDetail}
+              warning={highRam}
+              progress={latest?.memory_percent}
+              progressColor={highRam ? "bg-danger" : "bg-info"}
+            />
+            <MetricCell
+              icon={<Rocket className="h-3.5 w-3.5" />}
+              label={t("detail.metricsPage.gpu")}
+              value={gpuValue}
+              detail={gpuDetail}
+              muted={!latest?.gpu_available}
+              progress={latest?.gpu_percent}
+              progressColor="bg-chart-3"
+            />
+          </div>
+        ) : (
+          <div className="py-6 text-center text-style-caption text-color-muted-foreground">
+            {activeStatuses.includes(job.status)
+              ? t("detail.metricsPage.startingDescription")
+              : t("detail.metricsPage.emptyDescription")}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

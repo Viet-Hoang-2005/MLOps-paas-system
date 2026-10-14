@@ -322,6 +322,15 @@ export const trainingVi = {
       cpu: "CPU",
       ram: "RAM",
       gpu: "GPU",
+      noModelMetricsTitle: "Chưa có log theo dõi thử nghiệm",
+      noModelMetricsHint:
+        "Gọi mlflow.autolog() hoặc mlflow.log_metric() trong mã nguồn để truyền biểu đồ loss huấn luyện thời gian thực tại đây.",
+      hyperparameters: "Siêu tham số (Hyperparameters)",
+      trainingCurves: "Đường cong huấn luyện & Đánh giá (Lịch sử bước)",
+      liveStreaming: "Đang phát trực tiếp",
+      steps: "bước",
+      step: "Bước",
+      insufficientPoints: "Chưa đủ điểm dữ liệu",
     },
   },
   createFlow: {

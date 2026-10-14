@@ -56,7 +56,7 @@ data:
   MODEL_RUNTIME_NAMESPACE: "mlops-model-runtimes"
   MODEL_SERVER_PUBLIC_URL: "https://mlops-nids-nt114.id.vn"
   MODEL_SERVER_INTERNAL_URL: "http://traefik.kube-system.svc.cluster.local:5000"
-  MLFLOW_TRACKING_URI: "http://mlflow-server.mlflow-server.svc.cluster.local:5000"
+  MLFLOW_TRACKING_URI: "http://mlops-paas-control-plane.mlops-control-plane.svc.cluster.local:8000/api/2.0/mlflow"
   MLFLOW_TRACKING_REQUIRED: "true"
   PROMETHEUS_INTERNAL_URL: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
   LOKI_URL: "http://loki.mlops-logging.svc.cluster.local:3100"

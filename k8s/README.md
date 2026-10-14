@@ -29,9 +29,7 @@ Trong kiến trúc tổng thể, `k8s/` đóng vai trò là **Nguồn chân lý 
 [1. Cluster]    [2. Addons]       [3. Platform]      [4. Execution]   [5. Workloads]
 - Namespaces    - EBS CSI         - Postgres HA      - EventBus       - Control Plane
 - StorageClass  - ExternalSecrets - Redis HA         - EventSource    - Celery Worker
-- SecretStore   - CNPG Operator   - Redpanda Kafka   - Sensors        - Model Server
-- Kyverno       - Redis Operator  - Harbor Registry  - Templates      - Consumer
-- Karpenter     - KEDA / Loki     - MLflow Server    - Pipelines      - Web Frontend
+- Karpenter     - KEDA / Loki     - Observability    - Pipelines      - Web Frontend
 ```
 
 ---
@@ -45,7 +43,7 @@ Hệ thống được chia thành 5 mặt phẳng độc lập tương ứng v�
 | **GitOps Control Plane** | `k8s/gitops/production` | `default` | Ứng dụng gốc `mlops-paas-system` quản lý AppProject và 34 Child Application. |
 | **Cluster Plane** | `k8s/cluster` | `mlops-cluster` | Cấu hình nền tảng cấp cụm: Namespace, StorageClass (`ebs-gp3`), `ClusterSecretStore`, Kyverno Policies, Karpenter Capacity. |
 | **Add-ons Plane** | Charts upstream được ghim | `mlops-addons` | Các Controller/CRD cơ sở: AWS EBS CSI, External Secrets Operator (ESO), CloudNative-PG, Redis Operator, KEDA, Prometheus Stack, Loki, Alloy, Kyverno, Kubeflow Training. |
-| **Platform Plane** | `k8s/platform` | `mlops-platform` | Các dịch vụ dữ liệu & chia sẻ dùng chung: CSDL PostgreSQL HA, Redis HA + Sentinel, Redpanda Kafka, Harbor Registry, MLflow, Traefik Routing & Cloudflare Tunnel. |
+| **Platform Plane** | `k8s/platform` | `mlops-platform` | Các dịch vụ dữ liệu & chia sẻ dùng chung: CSDL PostgreSQL HA, Redis HA + Sentinel, Redpanda Kafka, Harbor Registry, Traefik Routing & Cloudflare Tunnel. |
 | **Execution Plane** | `k8s/argo` | `mlops-execution` | Động cơ pipeline MLOps: Argo Events (EventBus, EventSource, Sensor) và các mẫu Argo WorkflowTemplates (Build, Deploy, Delete, Drift, Training). |
 | **Workloads Plane** | `k8s/apps/overlays/production` | `mlops-workloads` | Các microservices nghiệp vụ của tenant và hệ thống: Control Plane API, Celery Worker, Model Server, Redpanda Consumer, Web Frontend. |
 
@@ -113,7 +111,6 @@ k8s/
 │   ├── redis/                          # Redis HA Replication (2 nodes) + Redis Sentinel (3 nodes)
 │   ├── redpanda/                       # Redpanda Kafka Broker StatefulSet & Services
 │   ├── harbor/                         # Cấu hình Container Registry nội bộ Harbor
-│   ├── mlflow/                         # MLflow Tracking Server Deployment & Services
 │   ├── observability/                  # ServiceMonitors, PodMonitors, PrometheusRules
 │   ├── cloudflare/                     # Cloudflare Tunnel Daemon kết nối ra ngoài an toàn
 │   └── routing/                        # Traefik IngressRoute, Middleware định tuyến tên miền

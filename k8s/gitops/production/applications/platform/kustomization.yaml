@@ -6,7 +6,6 @@ resources:
   - redis.yaml
   - redpanda.yaml
   - harbor.yaml
-  - mlflow.yaml
   - observability.yaml
   - cloudflare.yaml
   - routing.yaml

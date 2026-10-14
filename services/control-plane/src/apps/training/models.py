@@ -97,6 +97,7 @@ class TrainingJobCapability(models.Model):
         ("output_upload", "Output upload"),
         ("trusted_reporter", "Trusted reporter"),
         ("cancel_reporter", "Cancellation reporter"),
+        ("tracking", "Tracking reporter"),
     )
 
     job = models.ForeignKey(TrainingJob, on_delete=models.CASCADE, related_name="capabilities")
@@ -111,6 +112,57 @@ class TrainingJobCapability(models.Model):
 
     def __str__(self):
         return f"{self.job.public_id}/{self.purpose}"
+
+
+class TrainingJobMetric(models.Model):
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    job = models.ForeignKey(TrainingJob, on_delete=models.CASCADE, related_name="step_metrics")
+    name = models.CharField(max_length=160, db_index=True)
+    value = models.FloatField()
+    step = models.IntegerField(default=0, db_index=True)
+    timestamp = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["job", "name", "step"], name="train_metric_job_step_idx"),
+            models.Index(fields=["job", "created_at"], name="train_metric_job_created_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.job.public_id}:{self.name}[{self.step}]={self.value}"
+
+
+class TrainingJobParam(models.Model):
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    job = models.ForeignKey(TrainingJob, on_delete=models.CASCADE, related_name="hyperparameters")
+    name = models.CharField(max_length=160)
+    value = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["job", "name"], name="training_job_param_unique"),
+        ]
+
+    def __str__(self):
+        return f"{self.job.public_id}:{self.name}={self.value}"
+
+
+class TrainingJobTag(models.Model):
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    job = models.ForeignKey(TrainingJob, on_delete=models.CASCADE, related_name="tags")
+    name = models.CharField(max_length=160)
+    value = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["job", "name"], name="training_job_tag_unique"),
+        ]
+
+    def __str__(self):
+        return f"{self.job.public_id}:{self.name}"
 
 
 class TrainingOutput(models.Model):
@@ -145,3 +197,4 @@ class TrainingOutput(models.Model):
 
     def __str__(self):
         return f"{self.job.public_id}/{self.relative_path}"
+

@@ -82,6 +82,7 @@ export const projectsVi = {
     noProjectEvolution:
       "Chưa có Dự án mô hình nào. Hãy tạo một Dự án mô hình mới để quản lý lịch sử phiên bản và vòng đời tiến hóa của mô hình.",
     deploy: "Triển khai",
+    deployTheModel: "Triển khai mô hình",
     build: "Build Image",
     stopBuild: "Stop build",
     rebuild: "Re-build",

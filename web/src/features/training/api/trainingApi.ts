@@ -240,3 +240,22 @@ export const getJobReferencePreview = async (
       controlPlaneURL(`/training-jobs/${jobId}/reference-preview/`),
     )
   ).data;
+
+export const getTrainingJobMetricsHistory = async (
+  jobId: string,
+): Promise<import("@/features/training/types").TrainingJobMetricsHistoryResponse> =>
+  (
+    await apiClient.get<import("@/features/training/types").TrainingJobMetricsHistoryResponse>(
+      controlPlaneURL(`/training-jobs/${jobId}/metrics-history/`),
+    )
+  ).data;
+
+export const compareTrainingRuns = async (
+  jobIds: string[],
+): Promise<import("@/features/training/types").TrainingRunsCompareResponse> =>
+  (
+    await apiClient.get<import("@/features/training/types").TrainingRunsCompareResponse>(
+      controlPlaneURL(`/training-jobs/compare/?job_ids=${jobIds.join(",")}`),
+    )
+  ).data;
+

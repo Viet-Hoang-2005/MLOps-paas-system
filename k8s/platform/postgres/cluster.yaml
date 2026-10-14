@@ -8,7 +8,7 @@ kind: Cluster
 metadata:
   name: mlops-paas-postgres
   annotations:
-    description: "CloudNativePG cluster for MLflow metadata and PaaS baseline data storage"
+    description: "CloudNativePG cluster for MLops data and training metadata storage"
 spec:
   # Chạy 2 instances để đảm bảo tính sẵn sàng cao (High Availability)
   # Node 1: Primary (RW), Node 2: Standby (RO)
@@ -25,7 +25,6 @@ spec:
         name: postgres-bootstrap-secret
       postInitApplicationSQL:
         - "CREATE SCHEMA IF NOT EXISTS control_plane;"
-        - "CREATE SCHEMA IF NOT EXISTS mlflow;"
 
   # Cấu hình Storage cho mỗi instance
   storage:
@@ -40,7 +39,7 @@ spec:
     podAntiAffinityType: preferred
     topologyKey: kubernetes.io/hostname
 
-  # Tuning PostgreSQL parameters cho MLflow workload
+  # Tuning PostgreSQL parameters
   postgresql:
     parameters:
       shared_buffers: "256MB"

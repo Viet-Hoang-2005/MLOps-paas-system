@@ -7,6 +7,10 @@ from apps.deployment.api.webhooks import BuildWebhookEndpoint, DeploymentWebhook
 from apps.drift.api.webhooks import AutomaticDriftWebhookEndpoint, DriftRunWebhookEndpoint
 from apps.observability.api.endpoints import ProductionDataEndpoint
 from apps.observability.api.executions import ExecutionObservationEndpoint
+from apps.training.api.mlflow_compat import (
+    MLflowArtifactsMultipartFallbackView,
+    MLflowArtifactsProxyView,
+)
 from apps.training.api.webhooks import (
     TrainingCancellationWebhookEndpoint,
     TrainingJobWebhookEndpoint,
@@ -19,6 +23,14 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.auth.api.urls")),
     path("api/api-keys/", include("apps.access.api.urls")),
+    path("api/2.0/mlflow/", include("apps.training.api.mlflow_urls")),
+    # MLflow Root Artifact Proxy routes (for root or non-prefixed tracking URIs)
+    path("api/2.0/mlflow-artifacts/artifacts/<path:subpath>", MLflowArtifactsProxyView.as_view()),
+    path("api/2.0/mlflow-artifacts/artifacts", MLflowArtifactsProxyView.as_view()),
+    path("mlflow-artifacts/artifacts/<path:subpath>", MLflowArtifactsProxyView.as_view()),
+    path("mlflow-artifacts/artifacts", MLflowArtifactsProxyView.as_view()),
+    path("api/2.0/mlflow-artifacts/mpu/<path:subpath>", MLflowArtifactsMultipartFallbackView.as_view()),
+    path("mlflow-artifacts/mpu/<path:subpath>", MLflowArtifactsMultipartFallbackView.as_view()),
     path(
         "api/models/<uuid:project_id>/production-data/",
         ProductionDataEndpoint.as_view(),

@@ -41,7 +41,6 @@ PRODUCTION_NAMESPACES = {
     "keda",
     "kubeflow",
     "kyverno",
-    "mlflow-server",
     "monitoring",
     "mlops-logging",
     "mlops-cluster-config",
@@ -81,7 +80,6 @@ EXTERNAL_SECRET_OWNERS = {
     },
     "k8s/platform/postgres": {("mlops-postgres", "postgres-bootstrap-secret")},
     "k8s/platform/redis": {("mlops-redis", "redis-ha-secret")},
-    "k8s/platform/mlflow": {("mlflow-server", "mlflow-secret")},
     "k8s/platform/cloudflare": {("cloudflare", "tunnel-token")},
     "k8s/argo": {
         ("mlops-execution", "argo-build-callback-secret"),

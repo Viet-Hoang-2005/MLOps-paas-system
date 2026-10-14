@@ -81,6 +81,7 @@ export const catalogEn = {
     noProjectEvolution:
       "No model project found. Create a new model project to track version lineage and model evolution.",
     deploy: "Deploy",
+    deployTheModel: "Deploy the model",
     build: "Build Image",
     stopBuild: "Stop build",
     rebuild: "Re-build",

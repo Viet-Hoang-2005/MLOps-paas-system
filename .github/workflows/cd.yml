@@ -16,7 +16,6 @@ on:
           - consumer
           - packager
           - evidently
-          - mlflow
           - model_server
           - machine_learning_serving
           - deep_learning_serving
@@ -35,7 +34,6 @@ jobs:
       consumer: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.consumer == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'consumer')) }}
       packager: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.packager == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'packager')) }}
       evidently: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.evidently == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'evidently')) }}
-      mlflow: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.mlflow == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'mlflow')) }}
       model_server: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.model_server == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'model_server')) }}
       machine_learning_serving: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.machine_learning_serving == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'machine_learning_serving')) }}
       deep_learning_serving: ${{ (github.event_name != 'workflow_dispatch' && steps.filter.outputs.deep_learning_serving == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.component == 'all' || inputs.component == 'deep_learning_serving')) }}
@@ -59,8 +57,6 @@ jobs:
               - 'services/model-packager/**'
             evidently:
               - 'services/evidently/**'
-            mlflow:
-              - 'services/mlflow/**'
             model_server:
               - 'services/model-server/**'
             machine_learning_serving:
@@ -84,7 +80,6 @@ jobs:
               "consumer": selected("consumer") if is_manual else "${{ steps.filter.outputs.consumer }}" == "true",
               "packager": selected("packager") if is_manual else "${{ steps.filter.outputs.packager }}" == "true",
               "evidently": selected("evidently") if is_manual else "${{ steps.filter.outputs.evidently }}" == "true",
-              "mlflow": selected("mlflow") if is_manual else "${{ steps.filter.outputs.mlflow }}" == "true",
               "model_server": selected("model_server") if is_manual else "${{ steps.filter.outputs.model_server }}" == "true",
               "machine_learning_serving": selected("machine_learning_serving") if is_manual else "${{ steps.filter.outputs.machine_learning_serving }}" == "true",
               "deep_learning_serving": selected("deep_learning_serving") if is_manual else "${{ steps.filter.outputs.deep_learning_serving }}" == "true",
@@ -96,7 +91,6 @@ jobs:
               "consumer": {"name": "Redpanda Consumer", "id": "consumer", "context": "services/consumer", "dockerfile": "services/consumer/Dockerfile", "image": "mlops-paas-consumer"},
               "packager": {"name": "Model Packager", "id": "packager", "context": "services/model-packager", "dockerfile": "services/model-packager/Dockerfile", "image": "mlops-paas-model-packager"},
               "evidently": {"name": "Evidently Drift", "id": "evidently", "context": "services/evidently", "dockerfile": "services/evidently/Dockerfile", "image": "mlops-paas-evidently"},
-              "mlflow": {"name": "MLflow Tracking Server", "id": "mlflow", "context": "services/mlflow", "dockerfile": "services/mlflow/Dockerfile", "image": "mlops-paas-mlflow"},
               "model_server": {"name": "Model Server", "id": "model_server", "context": "services/model-server", "dockerfile": "services/model-server/Dockerfile", "image": "mlops-paas-model-server"},
               "machine_learning_serving": {"name": "Machine Learning Serving Base Image", "id": "machine_learning_serving", "context": "services/machine-learning-serving", "dockerfile": "services/machine-learning-serving/Dockerfile", "image": "machine-learning-serving"},
               "deep_learning_serving": {"name": "Deep Learning Serving Base Image", "id": "deep_learning_serving", "context": "services/deep-learning-serving", "dockerfile": "services/deep-learning-serving/Dockerfile", "image": "deep-learning-serving"},
@@ -105,7 +99,7 @@ jobs:
           targets = [configs[k] for k, v in changed.items() if v]
           gitops_components = {
               "frontend", "control_plane", "consumer", "packager", "evidently",
-              "mlflow", "model_server", "training_runner",
+              "model_server", "training_runner",
           }
           gitops_promotion = any(changed[key] for key in gitops_components)
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
@@ -235,10 +229,6 @@ jobs:
             (cd k8s/apps/overlays/production/model-server && kustomize edit set image mlops-paas-model-server=$REG/mlops-paas-model-server:$SHA)
           fi
           
-          if [ "${{ needs.detect-changes.outputs.mlflow }}" == "true" ]; then
-            (cd k8s/platform/mlflow && kustomize edit set image mlops-paas-mlflow=$REG/mlops-paas-mlflow:$SHA)
-          fi
-          
           # 2. Update Argo Workflow Templates (packager and evidently)
           if [ "${{ needs.detect-changes.outputs.packager }}" == "true" ]; then
             yq e -i '(.spec.templates[] | select(.name == "prepare-package" or .name == "notify-success") | .container.image) = "'$REG'/mlops-paas-model-packager:'$SHA'"' k8s/argo/workflows/build-workflowtemplate.yaml
@@ -264,7 +254,6 @@ jobs:
           CONSUMER_TAG="no change"
           PACKAGER_TAG="no change"
           EVIDENTLY_TAG="no change"
-          MLFLOW_TAG="no change"
           MODEL_SERVER_TAG="no change"
           MACHINE_LEARNING_SERVING_TAG="no change"
           DEEP_LEARNING_SERVING_TAG="no change"
@@ -288,10 +277,6 @@ jobs:
 
           if [ "${{ needs.detect-changes.outputs.evidently }}" == "true" ]; then
             EVIDENTLY_TAG="$REG/mlops-paas-evidently:$SHA"
-          fi
-
-          if [ "${{ needs.detect-changes.outputs.mlflow }}" == "true" ]; then
-            MLFLOW_TAG="$REG/mlops-paas-mlflow:$SHA"
           fi
 
           if [ "${{ needs.detect-changes.outputs.model_server }}" == "true" ]; then
@@ -321,7 +306,6 @@ jobs:
             echo "| **Redpanda Consumer** (\`mlops-paas-consumer\`) | \`$CONSUMER_TAG\` | GitOps promotion |"
             echo "| **Model Packager** (\`mlops-paas-model-packager\`) | \`$PACKAGER_TAG\` | GitOps promotion |"
             echo "| **Evidently Drift** (\`mlops-paas-evidently\`) | \`$EVIDENTLY_TAG\` | GitOps promotion |"
-            echo "| **MLflow Tracking Server** (\`mlops-paas-mlflow\`) | \`$MLFLOW_TAG\` | GitOps promotion |"
             echo "| **Model Server** (\`mlops-paas-model-server\`) | \`$MODEL_SERVER_TAG\` | GitOps promotion |"
             echo "| **Machine Learning Serving Base** (\`machine-learning-serving\`) | \`$MACHINE_LEARNING_SERVING_TAG\` | Registry base image |"
             echo "| **Deep Learning Serving Base** (\`deep-learning-serving\`) | \`$DEEP_LEARNING_SERVING_TAG\` | Registry base image |"

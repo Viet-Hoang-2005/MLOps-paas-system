@@ -78,7 +78,7 @@ export default function DeploymentPage() {
       cell: ({ row }) => (
         <button
           type="button"
-          className="text-color-primary"
+          className="text-color-primary hover:underline"
           onClick={() =>
             navigate(
               buildDeploymentPath({
@@ -273,7 +273,7 @@ export default function DeploymentPage() {
           icon={<Play className="h-4 w-4" />}
           onClick={() => navigate(buildDeploymentPath())}
         >
-          {t("workflow.deploy")}
+          {t("workflow.deployTheModel")}
         </Button>
       </div>
 

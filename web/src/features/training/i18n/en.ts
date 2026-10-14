@@ -324,6 +324,15 @@ export const trainingEn = {
       cpu: "CPU",
       ram: "RAM",
       gpu: "GPU",
+      noModelMetricsTitle: "No Experiment Tracking Logs Yet",
+      noModelMetricsHint:
+        "Call mlflow.autolog() or mlflow.log_metric() in your script to stream realtime training loss curves here.",
+      hyperparameters: "Hyperparameters",
+      trainingCurves: "Training & Validation Curves (Step History)",
+      liveStreaming: "Live streaming",
+      steps: "steps",
+      step: "Step",
+      insufficientPoints: "Insufficient data points",
     },
   },
   createFlow: {

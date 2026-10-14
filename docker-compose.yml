@@ -63,9 +63,8 @@ services:
       ENABLE_GPU_TRAINING: ${ENABLE_GPU_TRAINING:-False}
       TRAINING_MAX_ACTIVE_JOBS_PER_TENANT: ${TRAINING_MAX_ACTIVE_JOBS_PER_TENANT:-1}
       MLFLOW_TRACKING_REQUIRED: ${MLFLOW_TRACKING_REQUIRED:-false}
-      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://control-plane:8000/api/2.0/mlflow}
       MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:-mlops-paas-training}
-      MLFLOW_UI_URL: ${MLFLOW_UI_URL:-http://localhost:5003}
       MODEL_SERVER_PUBLIC_URL: ${MODEL_SERVER_PUBLIC_URL:-http://localhost:5002}
       MODEL_SERVER_INTERNAL_URL: ${MODEL_SERVER_INTERNAL_URL:-http://traefik:5000}
       MODEL_PACKAGER_URL: ${MODEL_PACKAGER_URL:-http://model-packager:7000}
@@ -142,7 +141,7 @@ services:
       CONTROL_PLANE_INTERNAL_URL: ${CONTROL_PLANE_INTERNAL_URL:-http://control-plane:8000}
       CONTROL_PLANE_WEBHOOK_SECRET: ${CONTROL_PLANE_WEBHOOK_SECRET:-super-secret-key}
       DOCKER_NETWORK_NAME: ${DOCKER_NETWORK_NAME:-mlops_paas_network}
-      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://control-plane:8000/api/2.0/mlflow}
       MODEL_SERVER_PUBLIC_URL: ${MODEL_SERVER_PUBLIC_URL:-http://localhost:5002}
       MODEL_SERVER_INTERNAL_URL: ${MODEL_SERVER_INTERNAL_URL:-http://traefik:5000}
       HARBOR_REGISTRY_URL: ${HARBOR_REGISTRY_URL-}
@@ -390,7 +389,7 @@ services:
       retries: 5
       start_period: 10s
 
-  # 6.1 Init Container để tạo schema cho Control Plane và MLflow
+  # 6.1 Init Container để tạo schema cho Control Plane
   schema-init:
     image: postgres:15-alpine
     container_name: postgres_schema_init
@@ -400,7 +399,7 @@ services:
     command: >
       sh -c "until pg_isready -h postgres -U ${DB_USER} -d ${DB_NAME}; do sleep 2; done;
       psql -h postgres -U ${DB_USER} -d ${DB_NAME} -v ON_ERROR_STOP=1
-      -c 'CREATE SCHEMA IF NOT EXISTS ${DB_SCHEMA:-control_plane}; CREATE SCHEMA IF NOT EXISTS mlflow;'"
+      -c 'CREATE SCHEMA IF NOT EXISTS ${DB_SCHEMA:-control_plane};'"
     depends_on:
       postgres:
         condition: service_healthy
@@ -541,42 +540,8 @@ services:
     networks:
       - mlops_paas_network
 
-  # 9. MLflow Tracking Server
-  mlflow:
-    build:
-      context: ./services/mlflow
-      dockerfile: Dockerfile
-    image: mlops-paas-mlflow:v2.14.1
-    container_name: mlflow
-    restart: unless-stopped
-    command: >
-      mlflow server
-      --host 0.0.0.0
-      --port 5000
-      --backend-store-uri postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@postgres:${DB_PORT:-5432}/${DB_NAME}?options=-c%20search_path%3Dmlflow
-      --serve-artifacts
-      --artifacts-destination s3://${AWS_BUCKET_NAME:-mlops-paas-artifacts}
-    ports:
-      - "5003:5000"
-    environment:
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_PORT: ${DB_PORT:-5432}
-      AWS_BUCKET_NAME: ${AWS_BUCKET_NAME:-mlops-paas-artifacts}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
-      MLFLOW_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      schema-init:
-        condition: service_completed_successfully
-    networks:
-      - mlops_paas_network
-
 # Mạng nội bộ cho các container
+
 networks:
   mlops_paas_network:
     name: ${DOCKER_NETWORK_NAME:-mlops_paas_network}

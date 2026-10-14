@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import cast
 from urllib.parse import urlsplit, urlunsplit
 
-_context: contextvars.ContextVar[dict[str, object]] = contextvars.ContextVar("mlops_log_context", default=None)
+_context: contextvars.ContextVar[dict[str, object] | None] = contextvars.ContextVar("mlops_log_context", default=None)
 _service = "backend"
 _output_lock = threading.RLock()
 _SECRET_KEY = (
@@ -153,11 +153,13 @@ def sanitize(value, limit=2048):
 
 
 def current_context():
-    return dict(_context.get())
+    ctx = _context.get()
+    return dict(ctx) if ctx is not None else {}
 
 
 def bind_context(**fields):
-    return _context.set({**_context.get(), **{k: v for k, v in fields.items() if k in _FIELDS}})
+    current = _context.get() or {}
+    return _context.set({**current, **{k: v for k, v in fields.items() if k in _FIELDS}})
 
 
 def reset_context(token):

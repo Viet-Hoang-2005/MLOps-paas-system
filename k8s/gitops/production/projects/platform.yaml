@@ -24,8 +24,6 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: harbor
       server: https://kubernetes.default.svc
-    - namespace: mlflow-server
-      server: https://kubernetes.default.svc
     - namespace: monitoring
       server: https://kubernetes.default.svc
   clusterResourceBlacklist:

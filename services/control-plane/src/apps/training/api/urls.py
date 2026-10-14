@@ -15,10 +15,16 @@ from .endpoints import (
     TrainingJobSubmitEndpoint,
     TrainingRuntimeCapabilitiesEndpoint,
 )
+from .metrics_endpoints import (
+    TrainingJobMetricsHistoryEndpoint,
+    TrainingJobsCompareEndpoint,
+)
 
 urlpatterns = [
     path("", TrainingJobListCreateEndpoint.as_view(), name="training-job-list"),
+    path("compare/", TrainingJobsCompareEndpoint.as_view(), name="training-jobs-compare"),
     path("<uuid:job_id>/", TrainingJobDetailEndpoint.as_view(), name="training-job-detail"),
+    path("<uuid:job_id>/metrics-history/", TrainingJobMetricsHistoryEndpoint.as_view(), name="training-job-metrics-history"),
     path("<uuid:job_id>/submit/", TrainingJobSubmitEndpoint.as_view(), name="training-job-submit"),
     path("<uuid:job_id>/retry/", TrainingJobRetryEndpoint.as_view(), name="training-job-retry"),
     path("<uuid:job_id>/cancel/", TrainingJobCancelEndpoint.as_view(), name="training-job-cancel"),

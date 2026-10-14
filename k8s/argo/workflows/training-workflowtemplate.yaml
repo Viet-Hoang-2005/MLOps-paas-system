@@ -38,6 +38,8 @@ spec:
           - {name: max_runtime_seconds}
           - {name: input_download_url}
           - {name: input_download_capability}
+          - {name: mlflow_tracking_uri, value: ""}
+          - {name: mlflow_tracking_token, value: ""}
       steps:
         - - name: run-cpu-pytorch-job
             template: cpu-pytorch-job
@@ -60,6 +62,8 @@ spec:
                 - {name: max_runtime_seconds, value: "{{inputs.parameters.max_runtime_seconds}}"}
                 - {name: input_download_url, value: "{{inputs.parameters.input_download_url}}"}
                 - {name: input_download_capability, value: "{{inputs.parameters.input_download_capability}}"}
+                - {name: mlflow_tracking_uri, value: "{{inputs.parameters.mlflow_tracking_uri}}"}
+                - {name: mlflow_tracking_token, value: "{{inputs.parameters.mlflow_tracking_token}}"}
           - name: run-gpu-pytorch-job
             template: gpu-pytorch-job
             when: "'{{inputs.parameters.accelerator_type}}' == 'gpu' && {{inputs.parameters.accelerator_count}} > 0"
@@ -82,6 +86,8 @@ spec:
                 - {name: max_runtime_seconds, value: "{{inputs.parameters.max_runtime_seconds}}"}
                 - {name: input_download_url, value: "{{inputs.parameters.input_download_url}}"}
                 - {name: input_download_capability, value: "{{inputs.parameters.input_download_capability}}"}
+                - {name: mlflow_tracking_uri, value: "{{inputs.parameters.mlflow_tracking_uri}}"}
+                - {name: mlflow_tracking_token, value: "{{inputs.parameters.mlflow_tracking_token}}"}
     - name: cpu-pytorch-job
       inputs:
         parameters:
@@ -101,6 +107,8 @@ spec:
           - {name: max_runtime_seconds}
           - {name: input_download_url}
           - {name: input_download_capability}
+          - {name: mlflow_tracking_uri, value: ""}
+          - {name: mlflow_tracking_token, value: ""}
       resource:
         action: create
         setOwnerReference: true
@@ -168,6 +176,8 @@ spec:
                           - {name: S3_INPUT_DOWNLOAD_CAPABILITY, value: {{=toJson(inputs.parameters.input_download_capability)}}}
                           - {name: ENTRY_POINT, value: {{=toJson(inputs.parameters.entry_point)}}}
                           - {name: MODEL_VERSION, value: {{=toJson(inputs.parameters.model_version)}}}
+                          - {name: MLFLOW_TRACKING_URI, value: {{=toJson(inputs.parameters.mlflow_tracking_uri)}}}
+                          - {name: MLFLOW_TRACKING_TOKEN, value: {{=toJson(inputs.parameters.mlflow_tracking_token)}}}
     - name: gpu-pytorch-job
       inputs:
         parameters:
@@ -188,6 +198,8 @@ spec:
           - {name: max_runtime_seconds}
           - {name: input_download_url}
           - {name: input_download_capability}
+          - {name: mlflow_tracking_uri, value: ""}
+          - {name: mlflow_tracking_token, value: ""}
       resource:
         action: create
         setOwnerReference: true
@@ -263,6 +275,8 @@ spec:
                           - {name: S3_INPUT_DOWNLOAD_CAPABILITY, value: {{=toJson(inputs.parameters.input_download_capability)}}}
                           - {name: ENTRY_POINT, value: {{=toJson(inputs.parameters.entry_point)}}}
                           - {name: MODEL_VERSION, value: {{=toJson(inputs.parameters.model_version)}}}
+                          - {name: MLFLOW_TRACKING_URI, value: {{=toJson(inputs.parameters.mlflow_tracking_uri)}}}
+                          - {name: MLFLOW_TRACKING_TOKEN, value: {{=toJson(inputs.parameters.mlflow_tracking_token)}}}
     - name: report-status
       container:
         image: curlimages/curl:latest

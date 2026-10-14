@@ -13,7 +13,7 @@ import { Table } from "@/shared/components/Table";
 import { formatDateTime } from "@/shared/i18n/formatters";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { PenLine, Settings2, Trash } from "lucide-react";
+import { PenLine, Settings2, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -200,7 +200,7 @@ export function ModelProjectTable({
               size="icon"
               variant="danger"
               border={false}
-              icon={<Trash className="h-4 w-4" />}
+              icon={<Trash2 className="h-4 w-4" />}
               onClick={() => setDeletingProject(row.original)}
               aria-label={t("workflow.delete")}
               title={t("workflow.delete")}

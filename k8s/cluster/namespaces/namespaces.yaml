@@ -71,13 +71,6 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: mlflow-server
-  labels:
-    app: mlflow-server
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: user-jobs
 ---
 apiVersion: v1

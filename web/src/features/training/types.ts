@@ -239,3 +239,45 @@ export interface ReferenceDataPreview {
   total_rows: number;
 }
 
+export interface MetricHistoryPoint {
+  step: number;
+  value: number;
+  timestamp?: string | null;
+}
+
+export interface MetricHistorySeries {
+  name: string;
+  points: MetricHistoryPoint[];
+}
+
+export interface TrainingJobMetricsHistoryResponse {
+  job_id: ResourceId;
+  name: string;
+  status: TrainingJobStatus;
+  model_flavor: ModelFlavor;
+  started_at?: string | null;
+  completed_at?: string | null;
+  runtime_seconds: number;
+  params: Record<string, string>;
+  metrics_summary: Record<string, number>;
+  series: MetricHistorySeries[];
+}
+
+export interface TrainingRunComparison {
+  job_id: ResourceId;
+  name: string;
+  status: TrainingJobStatus;
+  model_flavor: ModelFlavor;
+  runtime_seconds: number;
+  created_at: string;
+  params: Record<string, string>;
+  metrics_summary: Record<string, number>;
+  series: MetricHistorySeries[];
+}
+
+export interface TrainingRunsCompareResponse {
+  runs: TrainingRunComparison[];
+  metric_names: string[];
+  param_names: string[];
+}
+

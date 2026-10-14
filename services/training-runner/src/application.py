@@ -346,16 +346,20 @@ def log_to_mlflow(
         if not exp_name:
             exp_name = f"tenant-{tenant_id}" if tenant_id else "default-tenant"
         artifact_root = os.environ.get("MLFLOW_ARTIFACT_ROOT", "").strip()
-        if not artifact_root:
-            raise RuntimeError("MLFLOW_ARTIFACT_ROOT is required for job-scoped MLflow artifacts")
-        artifact_proxy_root = mlflow_proxy_artifact_uri(artifact_root)
+        artifact_proxy_root = mlflow_proxy_artifact_uri(artifact_root) if artifact_root else None
         try:
             exp = mlflow.get_experiment_by_name(exp_name)
             if not exp:
-                mlflow.create_experiment(exp_name, artifact_location=artifact_proxy_root)
+                if artifact_proxy_root:
+                    mlflow.create_experiment(exp_name, artifact_location=artifact_proxy_root)
+                else:
+                    mlflow.create_experiment(exp_name)
         except Exception:
             pass
-        mlflow.set_experiment(exp_name)
+        try:
+            mlflow.set_experiment(exp_name)
+        except Exception:
+            pass
 
         run_name = f"job-{training_job_id}" if training_job_id else "training-job"
         with mlflow.start_run(run_name=run_name):
@@ -685,7 +689,16 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
 
     env = {
         name: os.environ[name]
-        for name in ("HOME", "LANG", "LC_ALL", "PATH", "PYTHONPATH", "TZ")
+        for name in (
+            "HOME",
+            "LANG",
+            "LC_ALL",
+            "PATH",
+            "PYTHONPATH",
+            "TZ",
+            "MLFLOW_TRACKING_URI",
+            "MLFLOW_TRACKING_TOKEN",
+        )
         if os.environ.get(name)
     }
     env.update(
