@@ -20,7 +20,7 @@ import { CardSummary } from "@/shared/components/Card";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { DataViewer } from "@/shared/components/DataViewer";
 import { FileDropzone } from "@/shared/components/FileDropzone";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { TerminalViewer } from "@/shared/components/TerminalViewer";
 import { formatNumber } from "@/shared/i18n/formatters";
 import { toast } from "@/shared/types/toastStore";
@@ -476,7 +476,7 @@ export function ModelPredictionsTesting({ model }: { model: ModelProject }) {
       />
       <section className="space-y-6 rounded-surface border border-border bg-surface p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <StepTitle
+          <Title
             title={t("testingPage.title")}
             subtitle={t("testingPage.description", {
               model: model.name || t("testingPage.selectedModelFallback"),

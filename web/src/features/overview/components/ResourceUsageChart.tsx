@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useRuntimeMetrics } from "@/features/overview/hooks/useRuntimeMetrics";
 import { Chart } from "@/shared/components/Chart";
 import { Select } from "@/shared/components/Select";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { formatDateTime, formatNumber } from "@/shared/i18n/formatters";
 
 export function ResourceUsageChart({
@@ -32,7 +32,7 @@ export function ResourceUsageChart({
   return (
     <section className="space-y-6 rounded-surface border border-border bg-surface p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <StepTitle
+        <Title
           title={t("workflow.resourceUsage")}
           subtitle={t("workflow.realtimeHint")}
           className="mb-0"

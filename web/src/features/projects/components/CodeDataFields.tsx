@@ -1,4 +1,4 @@
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { FileDropzone } from "@/shared/components/FileDropzone";
 import { toast } from "@/shared/types/toastStore";
 import { useTranslation } from "react-i18next";
@@ -46,7 +46,7 @@ export function CodeDataFields({
 
   return (
     <section className="space-y-5">
-      <StepTitle
+      <Title
         title={t("uploadFlow.metadata.sourcesTitle")}
         description={t("uploadFlow.metadata.sourcesDescription")}
       />

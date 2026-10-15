@@ -238,10 +238,11 @@ check(() =>
 );
 check(() =>
   assert.deepEqual(state.EVOLUTION_TABS, [
-    "details",
-    "insights",
-    "metrics",
-    "history",
+    "information",
+    "monitoring",
+    "attributes",
+    "code",
+    "data",
   ]),
 );
 
@@ -286,22 +287,10 @@ check(() =>
     b,
   ),
 );
-const { VersionDetails } = await load(
-  "features/evolution/components/VersionDetails.tsx",
-);
-const { VersionInsights } = await load(
-  "features/evolution/components/VersionInsights.tsx",
-);
-const { VersionMetrics } = await load(
-  "features/evolution/components/VersionMetrics.tsx",
+const { SnapshotMetadata } = await load(
+  "features/evolution/components/SnapshotMetadata.tsx",
 );
 const { Chart } = await load("shared/components/Chart.tsx");
-const { VersionHistory } = await load(
-  "features/evolution/components/VersionHistory.tsx",
-);
-const { VersionDriftSummary } = await load(
-  "features/evolution/components/VersionDriftSummary.tsx",
-);
 for (const language of ["en", "vi"]) {
   const instance = i18next.createInstance();
   await instance.init({
@@ -374,81 +363,13 @@ for (const language of ["en", "vi"]) {
   );
   check(() =>
     assert.match(
-      render(VersionDetails, {
-        version: { ...a, source_job_id: "training" },
-        build,
-      }),
-      /training\/jobs\/training\/overview/,
-    ),
-  );
-  check(() =>
-    assert.match(render(VersionDetails, { version: a }), /numpy&gt;=1.24/),
-  );
-  check(() =>
-    assert.match(
-      render(VersionMetrics, { version: a }),
-      new RegExp(language === "en" ? "No metrics recorded" : "Chưa có metric"),
-    ),
-  );
-  check(() =>
-    assert.match(
-      render(VersionMetrics, {
-        version: { ...a, metrics_summary: { accuracy: 0 } },
-      }),
-      /accuracy/,
-    ),
-  );
-  check(() =>
-    assert.match(
-      render(VersionInsights, { version: a }),
-      new RegExp(language === "en" ? "No model insights" : "Chưa có phân tích"),
-    ),
-  );
-  check(() =>
-    assert.doesNotMatch(
-      render(VersionInsights, {
+      render(SnapshotMetadata, {
         version: {
           ...a,
-          insights_summary: { items: [{ name: "feature", value: 0 }] },
+          metrics_summary: { accuracy: 0.95 },
         },
       }),
-      /NaN|Infinity/,
-    ),
-  );
-  check(() =>
-    assert.match(
-      render(VersionHistory, { events: [] }),
-      new RegExp(language === "en" ? "No lifecycle events" : "Chưa có sự kiện"),
-    ),
-  );
-  check(() =>
-    assert.match(
-      render(VersionHistory, {
-        events: [
-          {
-            id: "event",
-            event_type: "registered",
-            created_at: a.registered_at,
-            from_state: "",
-            to_state: "",
-            metadata: {},
-          },
-        ],
-      }),
-      new RegExp(language === "en" ? "Model registered" : "Đã đăng ký mô hình"),
-    ),
-  );
-  check(() =>
-    assert.match(
-      render(VersionDriftSummary, {
-        monitors,
-        projectId: "project",
-        versionId: "1",
-        loading: false,
-        error: null,
-        retry() {},
-      }),
-      /monitorId=current/,
+      /accuracy/,
     ),
   );
 }

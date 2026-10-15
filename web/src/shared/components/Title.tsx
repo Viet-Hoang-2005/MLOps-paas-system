@@ -1,7 +1,7 @@
 import { isValidElement, type ElementType, type ReactNode } from "react";
 import { cn } from "@/shared/lib/cn";
 
-export interface StepTitleProps {
+export interface TitleProps {
   title: ReactNode;
   subtitle?: string;
   description?: string;
@@ -11,7 +11,7 @@ export interface StepTitleProps {
   action?: ReactNode;
 }
 
-export function StepTitle({
+export function Title({
   title,
   subtitle,
   description,
@@ -19,7 +19,7 @@ export function StepTitle({
   className,
   badge,
   action,
-}: StepTitleProps) {
+}: TitleProps) {
   const text = subtitle || description;
   let iconNode: ReactNode = null;
   if (isValidElement(icon)) {

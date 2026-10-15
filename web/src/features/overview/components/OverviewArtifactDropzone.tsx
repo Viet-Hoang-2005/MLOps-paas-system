@@ -119,7 +119,7 @@ export function OverviewArtifactDropzone({
                 ? t("workflow.uploadSourceTitle")
                 : t("workflow.uploadRefTitle")}
             </span>
-            <Badge variant="neutral">
+            <Badge variant="info">
               {t("workflow.uploadPreviewNoticeTitle")}
             </Badge>
           </div>

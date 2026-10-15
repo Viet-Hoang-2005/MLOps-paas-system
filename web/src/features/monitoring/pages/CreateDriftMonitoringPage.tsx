@@ -11,7 +11,7 @@ import { PageHeader } from "@/shared/components/PageHeader";
 import { Placeholder } from "@/shared/components/Placeholder";
 import { Select } from "@/shared/components/Select";
 import { Slider } from "@/shared/components/Slider";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { formatNumber } from "@/shared/i18n/formatters";
 import { Database } from "lucide-react";
 import Papa from "papaparse";
@@ -186,7 +186,7 @@ function CreateDriftMonitorContent({
               }))}
           />
           <section className="space-y-4">
-            <StepTitle
+            <Title
               title={t("createPage.referenceTitle")}
               description={t("referenceSnapshotHint")}
             />
@@ -223,7 +223,7 @@ function CreateDriftMonitorContent({
             />
           </section>
           <section className="space-y-4 border-t border-border pt-6">
-            <StepTitle
+            <Title
               title={t("createPage.thresholdTitle")}
               description={t("createPage.thresholdDescription")}
             />
@@ -251,7 +251,7 @@ function CreateDriftMonitorContent({
             </div>
           </section>
           <section className="space-y-4 border-t border-border pt-6">
-            <StepTitle
+            <Title
               title={t("createPage.previewTitle")}
               description={t("createPage.previewDescription")}
             />

@@ -1,25 +1,34 @@
 import { RouteFallback } from "@/app/router/RouteFallback";
 import { useEvolution } from "@/features/evolution/hooks/useEvolution";
 import {
-  EVOLUTION_TABS,
   evolutionParams,
+  normalizeEvolutionTab,
 } from "@/features/evolution/evolutionState";
 import { VersionLineage } from "@/features/evolution/components/VersionLineage";
-import { VersionDetails } from "@/features/evolution/components/VersionDetails";
-import { VersionInsights } from "@/features/evolution/components/VersionInsights";
-import { VersionMetrics } from "@/features/evolution/components/VersionMetrics";
-import { VersionHistory } from "@/features/evolution/components/VersionHistory";
-import { VersionDriftSummary } from "@/features/evolution/components/VersionDriftSummary";
-import { VersionComparisonDialog } from "@/features/evolution/components/VersionComparisonDialog";
+import { InformationEvolutionPage } from "@/features/evolution/pages/InformationEvolutionPage";
+import { MonitoringEvolutionPage } from "@/features/evolution/pages/MonitoringEvolutionPage";
+import { AttributesEvolutionPage } from "@/features/evolution/pages/AttributesEvolutionPage";
+import { CodeEvolutionPage } from "@/features/evolution/pages/CodeEvolutionPage";
+import { DataEvolutionPage } from "@/features/evolution/pages/DataEvolutionPage";
+import { ComparisonVersionDialog } from "@/features/evolution/components/ComparisonVersionDialog";
 import { runDeploymentPath } from "@/features/deployments/navigation";
 import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
 import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { Callout } from "@/shared/components/Callout";
 import { PageHeader } from "@/shared/components/PageHeader";
-import { GitBranch, GitCompare } from "lucide-react";
+import { PageTabs } from "@/shared/components/PageTabs";
+import {
+  Activity,
+  Code,
+  FileSpreadsheet,
+  GitBranch,
+  GitCompare,
+  Info,
+  SlidersHorizontal,
+  Play,
+} from "lucide-react";
 import { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -28,12 +37,12 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
-import * as Tabs from "@radix-ui/react-tabs";
 
 export default function EvolutionPage() {
   const { modelId } = useParams();
   const { t } = useTranslation("evolution");
   const { selectedModel, loading } = useModelSelection();
+
   if (modelId) return <EvolutionWorkspace key={modelId} projectId={modelId} />;
   if (loading) return <RouteFallback />;
   if (selectedModel)
@@ -61,218 +70,262 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
   const [compare, setCompare] = useState(false);
   const compareButton = useRef<HTMLButtonElement | null>(null);
   const navigate = useNavigate();
+
   const state = useEvolution(projectId, params.get("versionId"));
-  const tab = params.get("tab") ?? "details";
+  const tab = normalizeEvolutionTab(params.get("tab"));
   const version = state.version;
-  // A failed background refresh keeps the last loaded data on screen. Only a failure with
-  // nothing to show replaces the page; otherwise it is a banner with a retry.
+
   const loadFailed = Boolean(state.error);
   const blocked = loadFailed && (!state.versions.data || !state.project.data);
   const staleRefresh = loadFailed && !blocked;
+
   const select = (id: string) => {
     setCompare(false);
     setParams((previous) => evolutionParams(previous, { versionId: id }));
   };
+
   const changeTab = (value: string) =>
     setParams((previous) =>
       evolutionParams(previous, { tab: value, versionId: state.selected?.id }),
     );
+
   return (
-    <div className="space-y-6">
-      <PageHeader title={t("workspace.title")} />
-      {state.loading ? (
-        <p role="status">{t("workspace.loading")}</p>
-      ) : blocked ? (
-        <div role="alert" className="space-y-3">
-          <p>{getApiErrorMessage(state.error, t("workspace.loadFailed"))}</p>
-          <Button variant="secondary" onClick={() => void state.refresh()}>
-            {t("workspace.retry")}
-          </Button>
+    <div className="flex flex-col lg:flex-row items-stretch gap-6 min-h-0 flex-1 lg:h-[calc(100vh-7rem)] lg:max-h-[calc(100vh-7rem)]">
+      {/* Main Content Area */}
+      <div className="flex-1 min-w-0 flex flex-col h-full min-h-0 gap-6 w-full">
+        <div className="shrink-0">
+          <PageHeader title={t("workspace.title")} />
         </div>
-      ) : (
-        <>
-          {staleRefresh && (
-            <Callout
-              variant="danger"
-              role="alert"
-              description={`${t("workspace.staleData")} ${getApiErrorMessage(state.error, t("workspace.loadFailed"))}`}
-              action={
+        {state.loading ? (
+          <p role="status">{t("workspace.loading")}</p>
+        ) : blocked ? (
+          <div role="alert" className="space-y-3">
+            <p>{getApiErrorMessage(state.error, t("workspace.loadFailed"))}</p>
+            <Button variant="secondary" onClick={() => void state.refresh()}>
+              {t("workspace.retry")}
+            </Button>
+          </div>
+        ) : (
+          <>
+            {staleRefresh && (
+              <div className="shrink-0">
+                <Callout
+                  variant="danger"
+                  role="alert"
+                  description={`${t("workspace.staleData")} ${getApiErrorMessage(state.error, t("workspace.loadFailed"))}`}
+                  action={
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void state.refresh()}
+                    >
+                      {t("workspace.retry")}
+                    </Button>
+                  }
+                />
+              </div>
+            )}
+
+            {params.has("versionId") && !state.selected ? (
+              <p role="alert">{t("workspace.notFound")}</p>
+            ) : !state.selected ? (
+              <p className="rounded-surface border border-dashed border-border p-10 text-center text-color-muted-foreground">
+                {t("workspace.empty")}
+              </p>
+            ) : state.detail.error && !version ? (
+              <div role="alert" className="space-y-3">
+                <p>
+                  {getApiErrorMessage(
+                    state.detail.error,
+                    t("workspace.loadFailed"),
+                  )}
+                </p>
                 <Button
-                  size="sm"
                   variant="secondary"
-                  onClick={() => void state.refresh()}
+                  onClick={() => void state.detail.refetch()}
                 >
                   {t("workspace.retry")}
                 </Button>
-              }
-            />
-          )}
-          {(state.versions.data?.length ?? 0) > 0 && (
-            <VersionLineage
-              versions={state.versions.data!}
-              selectedId={state.selected?.id}
-              runningId={state.runningId}
-              onSelect={select}
-            />
-          )}
-          {params.has("versionId") && !state.selected ? (
-            <p role="alert">{t("workspace.notFound")}</p>
-          ) : !state.selected ? (
-            <p className="rounded-surface border border-dashed border-border p-10 text-center text-color-muted-foreground">
-              {t("workspace.empty")}
-            </p>
-          ) : state.detail.error && !version ? (
-            <div role="alert" className="space-y-3">
-              <p>
-                {getApiErrorMessage(
-                  state.detail.error,
-                  t("workspace.loadFailed"),
-                )}
-              </p>
-              <Button
-                variant="secondary"
-                onClick={() => void state.detail.refetch()}
-              >
-                {t("workspace.retry")}
-              </Button>
-            </div>
-          ) : !version ? (
-            <p role="status">{t("workspace.loading")}</p>
-          ) : (
-            <section className="overflow-hidden rounded-surface border border-border bg-surface">
-              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border p-6">
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h2 className="break-all text-style-section-title">
-                      {state.project.data?.name}{" "}
-                      <span className="text-color-muted-foreground">{`v${version.version}`}</span>
-                    </h2>
-                    {state.runningId === version.id && (
-                      <Badge variant="success">{t("workspace.running")}</Badge>
+              </div>
+            ) : !version ? (
+              <p role="status">{t("workspace.loading")}</p>
+            ) : (
+              <>
+                {/* Heading section */}
+                <section className="shrink-0 space-y-4 rounded-surface border border-border bg-surface p-6">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="space-y-2 min-w-0 flex-1">
+                      <h1 className="text-style-page-title text-color-foreground">
+                        {state.project.data?.name}
+                      </h1>
+                      <p className="text-color-muted-foreground">
+                        {state.project.data?.description ||
+                          t("workspace.noDescription")}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button
+                        size="md"
+                        variant="primary"
+                        icon={<Play className="h-4 w-4"/>}
+                        disabled={
+                          !state.deployableBuild || Boolean(state.builds.error)
+                        }
+                        onClick={() =>
+                          state.deployableBuild &&
+                          navigate(
+                            runDeploymentPath(
+                              projectId,
+                              state.deployableBuild.id,
+                            ),
+                          )
+                        }
+                      >
+                        {t("workspace.openDeployment")}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        icon={<GitCompare className="h-4 w-4" />}
+                        aria-label={t("workspace.compare")}
+                        title={t("workspace.compare")}
+                        disabled={(state.versions.data?.length ?? 0) < 2}
+                        onClick={(event) => {
+                          compareButton.current = event.currentTarget;
+                          setCompare(true);
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {state.builds.error && (
+                    <div role="alert" className="pt-2">
+                      <p className="text-color-danger text-style-caption">
+                        {getApiErrorMessage(
+                          state.builds.error,
+                          t("workspace.loadFailed"),
+                        )}
+                      </p>
+                    </div>
+                  )}
+                  {!state.builds.isLoading && !state.deployableBuild && (
+                    <p className="text-style-caption text-color-muted-foreground">
+                      {t("workspace.deploymentUnavailable")}
+                    </p>
+                  )}
+                </section>
+
+                {/* Body Card wrapping PageTabs and Tab Contents */}
+                <section className="flex-1 min-h-0 rounded-surface border border-border bg-surface flex flex-col overflow-hidden shadow-xs">
+                  {/* Page Tabs Header */}
+                  <div className="border-b border-border px-6 pt-2 shrink-0 bg-surface">
+                    <PageTabs
+                      tabs={[
+                        {
+                          label: t("workspace.information"),
+                          icon: Info,
+                          isActive: tab === "information",
+                          onClick: () => changeTab("information"),
+                        },
+                        {
+                          label: t("workspace.monitoring"),
+                          icon: Activity,
+                          isActive: tab === "monitoring",
+                          onClick: () => changeTab("monitoring"),
+                        },
+                        {
+                          label: t("workspace.attributes"),
+                          icon: SlidersHorizontal,
+                          isActive: tab === "attributes",
+                          onClick: () => changeTab("attributes"),
+                        },
+                        {
+                          label: t("workspace.code"),
+                          icon: Code,
+                          isActive: tab === "code",
+                          onClick: () => changeTab("code"),
+                        },
+                        {
+                          label: t("workspace.data"),
+                          icon: FileSpreadsheet,
+                          isActive: tab === "data",
+                          onClick: () => changeTab("data"),
+                        },
+                      ]}
+                    />
+                  </div>
+
+                  {/* Tab Contents with separate scrollbar */}
+                  <div
+                    key={tab}
+                    className="flex-1 min-h-0 overflow-y-auto p-6 custom-scrollbar overscroll-contain flex flex-col"
+                    onWheel={(e) => e.stopPropagation()}
+                  >
+                    {tab === "information" && (
+                      <InformationEvolutionPage
+                        version={version}
+                        build={state.build}
+                        runningId={state.runningId}
+                      />
+                    )}
+                    {tab === "monitoring" && (
+                      <MonitoringEvolutionPage
+                        projectId={projectId}
+                        versionId={version.id}
+                      />
+                    )}
+                    {tab === "attributes" && (
+                      <AttributesEvolutionPage
+                        projectId={projectId}
+                        version={version}
+                      />
+                    )}
+                    {tab === "code" && (
+                      <CodeEvolutionPage
+                        projectId={projectId}
+                        version={version}
+                      />
+                    )}
+                    {tab === "data" && (
+                      <DataEvolutionPage
+                        projectId={projectId}
+                        version={version}
+                      />
                     )}
                   </div>
-                  <p className="text-style-body text-color-muted-foreground">
-                    {version.flavor} ·{" "}
-                    {t(
-                      version.source_job_id
-                        ? "workspace.trained"
-                        : "workspace.preview",
-                    )}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    variant="secondary"
-                    icon={<GitCompare className="h-4 w-4" />}
-                    disabled={(state.versions.data?.length ?? 0) < 2}
-                    onClick={(event) => {
-                      compareButton.current = event.currentTarget;
-                      setCompare(true);
-                    }}
-                  >
-                    {t("workspace.compare")}
-                  </Button>
-                  <Button
-                    disabled={
-                      !state.deployableBuild || Boolean(state.builds.error)
-                    }
-                    onClick={() =>
-                      state.deployableBuild &&
-                      navigate(
-                        runDeploymentPath(projectId, state.deployableBuild.id),
-                      )
-                    }
-                  >
-                    {t("workspace.openDeployment")}
-                  </Button>
-                </div>
-              </div>
-              {state.builds.error && (
-                <div role="alert" className="p-4">
-                  <p>
-                    {getApiErrorMessage(
-                      state.builds.error,
-                      t("workspace.loadFailed"),
-                    )}
-                  </p>
-                  <Button
-                    variant="secondary"
-                    onClick={() => void state.builds.refetch()}
-                  >
-                    {t("workspace.retry")}
-                  </Button>
-                </div>
-              )}
-              {!state.builds.isLoading && !state.deployableBuild && (
-                <p className="px-6 pt-4 text-style-caption text-color-muted-foreground">
-                  {t("workspace.deploymentUnavailable")}
-                </p>
-              )}
-              {!EVOLUTION_TABS.some((value) => value === tab) ? (
-                <div role="alert" className="space-y-3 p-6">
-                  <p>{t("workspace.invalidTab")}</p>
-                  <Button
-                    variant="secondary"
-                    onClick={() => changeTab("details")}
-                  >
-                    {t("workspace.backToDetails")}
-                  </Button>
-                </div>
-              ) : (
-                <Tabs.Root value={tab} onValueChange={changeTab}>
-                  <Tabs.List
-                    aria-label={t("workspace.title")}
-                    className="flex overflow-x-auto border-b border-border bg-muted px-4 pt-2"
-                  >
-                    {EVOLUTION_TABS.map((value) => (
-                      <Tabs.Trigger
-                        key={value}
-                        value={value}
-                        className="shrink-0 border-b-2 border-transparent px-4 py-3 text-style-body-strong text-color-muted-foreground hover:text-color-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=active]:border-primary data-[state=active]:text-color-primary"
-                      >
-                        {t(`workspace.${value}`)}
-                      </Tabs.Trigger>
-                    ))}
-                  </Tabs.List>
-                  <Tabs.Content value="details" className="space-y-6 p-6">
-                    <VersionDetails
-                      key={version.id}
-                      version={version}
-                      build={state.build}
-                    />
-                    <VersionDriftSummary
-                      monitors={state.monitors.data ?? []}
-                      projectId={projectId}
-                      versionId={version.id}
-                      loading={state.monitors.isLoading}
-                      error={state.monitors.error}
-                      retry={() => void state.monitors.refetch()}
-                    />
-                  </Tabs.Content>
-                  <Tabs.Content value="insights" className="p-6">
-                    <VersionInsights key={version.id} version={version} />
-                  </Tabs.Content>
-                  <Tabs.Content value="metrics" className="p-6">
-                    <VersionMetrics key={version.id} version={version} />
-                  </Tabs.Content>
-                  <Tabs.Content value="history" className="p-6">
-                    <VersionHistory events={version.events} />
-                  </Tabs.Content>
-                </Tabs.Root>
-              )}
-            </section>
-          )}
-          {compare && version && (
-            <VersionComparisonDialog
-              key={version.id}
-              projectId={projectId}
-              versions={state.versions.data ?? []}
-              selectedId={version.id}
-              onClose={() => setCompare(false)}
-              restoreFocus={() => compareButton.current?.focus()}
-            />
-          )}
-        </>
+                </section>
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Outermost right: Vertical Version Lineage */}
+      {!state.loading && !blocked && (state.versions.data?.length ?? 0) > 0 && (
+        <aside
+          className="custom-scrollbar w-full lg:w-20 shrink-0 sticky top-0 lg:h-full lg:max-h-[calc(100vh-7rem)] rounded-surface border border-border bg-surface py-5 px-2 flex flex-col items-center overflow-x-auto lg:overflow-y-auto overscroll-contain shadow-xs"
+          onWheel={(e) => e.stopPropagation()}
+        >
+          <VersionLineage
+            versions={state.versions.data!}
+            selectedId={state.selected?.id}
+            runningId={state.runningId}
+            projectStatus={state.project.data?.lifecycle_status}
+            onSelect={select}
+            orientation="vertical"
+          />
+        </aside>
+      )}
+
+      {compare && version && (
+        <ComparisonVersionDialog
+          key={version.id}
+          projectId={projectId}
+          versions={state.versions.data ?? []}
+          selectedId={version.id}
+          onClose={() => setCompare(false)}
+          restoreFocus={() => compareButton.current?.focus()}
+        />
       )}
     </div>
   );

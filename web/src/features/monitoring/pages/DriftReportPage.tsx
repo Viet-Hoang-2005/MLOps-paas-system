@@ -95,7 +95,7 @@ export default function DriftReportPage() {
         accessorKey: "column_type",
         header: t("reportPage.columns.type"),
         cell: ({ row }) => (
-          <Badge variant="neutral" hideIcon={true} border={true} size="sm">
+          <Badge variant="neutral">
             {row.original.column_type === "num"
               ? t("reportPage.numerical")
               : t("reportPage.categorical")}

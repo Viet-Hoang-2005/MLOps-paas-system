@@ -6,7 +6,7 @@ import type {
 import { useTranslation } from "react-i18next";
 import { FileDropzone } from "@/shared/components/FileDropzone";
 import { Picker } from "@/shared/components/Picker";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { Switch } from "@/shared/components/Switch";
 import { TextArea } from "@/shared/components/TextArea";
 import { toast } from "@/shared/types/toastStore";
@@ -205,7 +205,7 @@ export function ModelArtifactFields({
   return (
     <div className="flex flex-col gap-8">
       <section className="space-y-5">
-        <StepTitle
+        <Title
           title={t("uploadFlow.build.flavorTitle")}
           description={t("uploadFlow.build.flavorDescription")}
         />
@@ -239,7 +239,7 @@ export function ModelArtifactFields({
 
       <section className="space-y-5">
         <div className="flex items-center justify-between gap-4">
-          <StepTitle
+          <Title
             title={t("uploadFlow.build.artifactTitle")}
             description={t("uploadFlow.build.artifactDescription")}
           />
@@ -471,7 +471,7 @@ export function ModelArtifactFields({
       <hr className="border-border" />
 
       <section className="space-y-5">
-        <StepTitle
+        <Title
           title={t("uploadFlow.build.requirementsTitle")}
           description={t("uploadFlow.build.requirementsDescription")}
         />

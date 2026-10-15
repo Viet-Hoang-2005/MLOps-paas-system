@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useCreateTrainingJob } from "@/features/training/trainingFlowContext";
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { Switch } from "@/shared/components/Switch";
 import { Picker } from "@/shared/components/Picker";
 import { Select } from "@/shared/components/Select";
@@ -18,7 +18,7 @@ export default function MetadataTrainingJobPage() {
   return (
     <>
       <div className="space-y-6 rounded-surface border border-border bg-surface p-6">
-        <StepTitle
+        <Title
           title={t("createFlow.metadata.title")}
           subtitle={t("createFlow.metadata.description")}
         />

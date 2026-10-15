@@ -10,7 +10,7 @@ import { Button } from "@/shared/components/Button";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { VersionRecords } from "./VersionRecords";
 
-export function VersionComparisonDialog({
+export function ComparisonVersionDialog({
   projectId,
   versions,
   selectedId,

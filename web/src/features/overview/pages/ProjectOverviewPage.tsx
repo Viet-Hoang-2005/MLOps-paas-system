@@ -275,6 +275,7 @@ export default function ProjectOverviewPage() {
           modelId={modelId!}
           effectiveVersionId={effectiveVersionId}
           isPreview={isPreview}
+          sourceCodeName={model.source_code?.name}
           source={{
             data: source.data,
             isLoading: source.isLoading,

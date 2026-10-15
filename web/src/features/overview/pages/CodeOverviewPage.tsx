@@ -29,6 +29,7 @@ export interface CodeOverviewPageProps {
   modelId: string;
   effectiveVersionId?: string;
   isPreview: boolean;
+  sourceCodeName?: string;
   source: {
     data?: string;
     isLoading: boolean;
@@ -48,6 +49,7 @@ export function CodeOverviewPage({
   modelId,
   effectiveVersionId,
   isPreview,
+  sourceCodeName,
   source,
   previewSource,
   theme = "light",
@@ -66,8 +68,8 @@ export function CodeOverviewPage({
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const fileName = isPreview
-    ? (previewSource.asset?.name || "source_code.py")
-    : "source_code.py";
+    ? (previewSource.asset?.name || sourceCodeName || "unknown")
+    : (sourceCodeName || "unknown");
 
   const isDirty = isPreview && editedCode !== null && editedCode !== initialCode;
 
@@ -242,8 +244,8 @@ export function CodeOverviewPage({
               actions={
                 <>
                   <Button
-                    variant="primary"
-                    size="md"
+                    size="sm"
+                    variant="secondary"
                     onClick={handleSave}
                     disabled={!isDirty || saving}
                     loading={saving}
@@ -253,34 +255,33 @@ export function CodeOverviewPage({
                   </Button>
                   {isDirty && (
                     <Button
-                      size="icon"
-                      variant="secondary"  
+                      size="sm"
+                      variant="secondary"
                       onClick={handleDiscard}
                       disabled={saving}
                       icon={<RotateCcw className="h-4 w-4" />}
-                      title={t("workflow.discardChanges")}
-                      aria-label={t("workflow.discardChanges")}
                     >
+                      {t("workflow.discardChanges")}
                     </Button>
                   )}
                   <Button
-                    size="icon"
+                    size="sm"
                     variant="secondary"
                     onClick={handleDownload}
                     disabled={saving || deleting}
                     icon={<Download className="h-4 w-4" />}
-                    title={t("workflow.downloadFile")}
-                    aria-label={t("workflow.downloadFile")}
-                  />
+                  >
+                    {t("workflow.downloadFile")}
+                  </Button>
                   <Button
-                    size="icon"
+                    size="sm"
                     variant="secondary"
                     onClick={() => setDeleteOpen(true)}
                     disabled={saving || deleting}
                     icon={<Trash2 className="h-4 w-4" />}
-                    title={t("workflow.deleteFile")}
-                    aria-label={t("workflow.deleteFile")}
-                  />
+                  >
+                    {t("workflow.deleteFile")}
+                  </Button>
                 </>
               }
               language="python"
@@ -316,24 +317,21 @@ export function CodeOverviewPage({
           <CodeViewer
             title={fileName}
             badge={
-              <Badge variant="neutral" hideIcon>
+              <Badge variant="neutral">
                 <Lock className="h-3 w-3 mr-1 inline" />
                 {t("workflow.immutableBadge")}
               </Badge>
             }
             actions={
               <>
-                <span className="text-style-caption text-color-muted-foreground">
-                  {t("workflow.immutableNotice")}
-                </span>
                 <Button
-                  size="icon"
+                  size="sm"
                   variant="secondary"
                   onClick={handleDownload}
                   icon={<Download className="h-4 w-4" />}
-                  title={t("workflow.downloadFile")}
-                  aria-label={t("workflow.downloadFile")}
-                />
+                >
+                  {t("workflow.downloadFile")}
+                </Button>
               </>
             }
             language="python"

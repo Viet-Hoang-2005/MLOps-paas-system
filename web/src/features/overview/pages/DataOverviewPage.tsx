@@ -242,8 +242,8 @@ export function DataOverviewPage({
               actions={
                 <>
                   <Button
-                    variant="primary"
-                    size="md"
+                    variant="secondary"
+                    size="sm"
                     onClick={handleSave}
                     disabled={!isDirty || saving}
                     loading={saving}
@@ -254,33 +254,32 @@ export function DataOverviewPage({
                   {isDirty && (
                     <Button
                       variant="secondary"
-                      size="icon"
+                      size="sm"
                       onClick={handleDiscard}
                       disabled={saving}
                       icon={<RotateCcw className="h-4 w-4" />}
-                      title={t("workflow.discardChanges")}
-                      aria-label={t("workflow.discardChanges")}
                     >
+                      {t("workflow.discardChanges")}
                     </Button>
                   )}
                   <Button
-                    size="icon"
+                    size="sm"
                     variant="secondary"
                     onClick={handleDownload}
                     disabled={saving || deleting}
                     icon={<Download className="h-4 w-4" />}
-                    title={t("workflow.downloadFile")}
-                    aria-label={t("workflow.downloadFile")}
-                  />
+                  >
+                    {t("workflow.downloadFile")}
+                  </Button>
                   <Button
                     size="icon"
                     variant="secondary"
                     onClick={() => setDeleteOpen(true)}
                     disabled={saving || deleting}
                     icon={<Trash2 className="h-4 w-4" />}
-                    title={t("workflow.deleteFile")}
-                    aria-label={t("workflow.deleteFile")}
-                  />
+                  >
+                    {t("workflow.deleteFile")}
+                  </Button>
                 </>
               }
               initialCsvText={initialData}
@@ -304,24 +303,21 @@ export function DataOverviewPage({
           <DataViewer
             title={fileName}
             badge={
-              <Badge variant="neutral" hideIcon>
+              <Badge variant="neutral">
                 <Lock className="h-3 w-3 mr-1 inline" />
                 {t("workflow.immutableBadge")}
               </Badge>
             }
             actions={
               <>
-                <span className="text-style-caption text-color-muted-foreground">
-                  {t("workflow.immutableNotice")}
-                </span>
                 <Button
-                  size="icon"
+                  size="sm"
                   variant="secondary"
                   onClick={handleDownload}
                   icon={<Download className="h-4 w-4" />}
-                  title={t("workflow.downloadFile")}
-                  aria-label={t("workflow.downloadFile")}
-                />
+                >
+                  {t("workflow.downloadFile")}
+                </Button>
               </>
             }
             initialCsvText={reference.data || ""}

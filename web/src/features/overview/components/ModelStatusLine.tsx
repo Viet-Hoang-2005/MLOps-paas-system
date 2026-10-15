@@ -7,7 +7,7 @@ import {
   ProgressLine,
   type ProgressLineStep,
 } from "@/shared/components/ProgressLine";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { toast } from "@/shared/types/toastStore";
 import { Activity, Bot, Check, Copy, Package, GitBranch } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -111,7 +111,7 @@ export function ModelStatusLine({
   return (
     <section className="space-y-6 rounded-surface border border-border bg-surface p-6">
       <div className="flex items-start justify-between gap-4">
-        <StepTitle
+        <Title
           title={t("workflow.modelStatus")}
           subtitle={healthSubtitle}
           className="mb-0"

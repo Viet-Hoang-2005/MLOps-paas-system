@@ -2,7 +2,7 @@ import type { ModelInsightItem } from "@/shared/api/catalogApi";
 import { formatNumber } from "@/shared/i18n/formatters";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { BarChart3, FileCode, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -93,7 +93,7 @@ export function FeatureImportanceCard({
       className={`rounded-surface border border-border bg-surface p-6 flex flex-col justify-between ${className}`}
     >
       <div>
-        <StepTitle
+        <Title
           icon={<BarChart3 className="h-5 w-5 text-color-primary" />}
           title={
             <span className="flex items-center gap-2">

@@ -18,7 +18,7 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageBody } from "@/shared/components/PageBody";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Placeholder } from "@/shared/components/Placeholder";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { Table } from "@/shared/components/Table";
 import { TerminalViewer } from "@/shared/components/TerminalViewer";
 import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
@@ -314,7 +314,7 @@ export default function DriftMonitoringDetailPage() {
       <PageBody className="p-6 space-y-6">
         <div className="flex flex-col space-y-4">
           <div className="flex justify-between items-start">
-            <StepTitle
+            <Title
               title={t("configuration")}
               description={t("configurationDescription")}
             />
@@ -404,7 +404,7 @@ export default function DriftMonitoringDetailPage() {
         </div>
 
         <div className="border-t border-border pt-6 space-y-4">
-          <StepTitle
+          <Title
             title={t("history")}
             description={t("historyDescription")}
           />

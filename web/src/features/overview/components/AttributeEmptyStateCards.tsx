@@ -4,7 +4,7 @@ import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { FileDropzone } from "@/shared/components/FileDropzone";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { toast } from "@/shared/types/toastStore";
 import { useMutation } from "@tanstack/react-query";
 import { GitBranch, Lock, Upload } from "lucide-react";
@@ -87,7 +87,7 @@ export function AttributeDropzoneCard({
       className={`rounded-surface border border-border bg-surface p-6 flex flex-col justify-between ${className}`}
     >
       <div>
-        <StepTitle
+        <Title
           icon={icon}
           title={title}
           description={hint}
@@ -177,7 +177,7 @@ export function AttributeMissingVersionCard({
       className={`rounded-surface border border-border bg-surface p-6 flex flex-col justify-between ${className}`}
     >
       <div>
-        <StepTitle
+        <Title
           icon={icon}
           title={title}
           badge={

@@ -1,6 +1,6 @@
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { toast } from "@/shared/types/toastStore";
 import {
   Check,
@@ -183,7 +183,7 @@ export function InputSchemaCard({
       className={`rounded-surface border border-border bg-surface p-6 flex flex-col justify-between ${className}`}
     >
       <div>
-        <StepTitle
+        <Title
           icon={<Table className="h-5 w-5 text-color-primary" />}
           title={t("workflow.inputSchemaTitle")}
           className="mb-6"

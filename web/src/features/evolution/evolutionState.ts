@@ -8,12 +8,25 @@ import { isDeployableBuild } from "@/features/deployments/deploymentEligibility"
 import type { DriftMonitoringJob } from "@/features/monitoring/types";
 
 export const EVOLUTION_TABS = [
-  "details",
-  "insights",
-  "metrics",
-  "history",
+  "information",
+  "monitoring",
+  "attributes",
+  "code",
+  "data",
 ] as const;
 export type EvolutionTab = (typeof EVOLUTION_TABS)[number];
+
+export function normalizeEvolutionTab(tab?: string | null): EvolutionTab {
+  if (!tab) return "information";
+  if (tab === "details" || tab === "history") return "information";
+  if (tab === "metrics" || tab === "insights") return "attributes";
+  if (tab === "monitoring") return "monitoring";
+  if (tab === "attributes") return "attributes";
+  if (tab === "code" || tab === "source_code") return "code";
+  if (tab === "data" || tab === "reference_data") return "data";
+  if (EVOLUTION_TABS.some((t) => t === tab)) return tab as EvolutionTab;
+  return "information";
+}
 
 export function evolutionParams(
   current: URLSearchParams,

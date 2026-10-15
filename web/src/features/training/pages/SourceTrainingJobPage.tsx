@@ -11,7 +11,7 @@ import type { ModelFlavor } from "@/features/projects/types";
 import { Button } from "@/shared/components/Button";
 import { FileDropzone } from "@/shared/components/FileDropzone";
 import { Picker } from "@/shared/components/Picker";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { TextArea } from "@/shared/components/TextArea";
 
 export default function SourceTrainingJobPage() {
@@ -26,7 +26,7 @@ export default function SourceTrainingJobPage() {
   return (
     <>
       <div className="space-y-8 rounded-surface border border-border bg-surface p-6">
-        <StepTitle
+        <Title
           title={t("createFlow.source.title")}
           subtitle={t("createFlow.source.description")}
         />

@@ -1,6 +1,6 @@
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { FileCode, ListTree, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -90,7 +90,7 @@ export function LabelMappingCard({
       className={`rounded-surface border border-border bg-surface p-6 flex flex-col justify-between ${className}`}
     >
       <div>
-        <StepTitle
+        <Title
           icon={<ListTree className="h-5 w-5 text-color-primary" />}
           title={t("workflow.labelMappingTitle")}
           className="mb-6"

@@ -1,7 +1,7 @@
 import type { ModelInsightsSummary } from "@/shared/api/catalogApi";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { FileCode, Layers, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -73,7 +73,7 @@ export function InsightsCard({
       className={`rounded-surface border border-border bg-surface p-6 flex flex-col justify-between ${className}`}
     >
       <div>
-        <StepTitle
+        <Title
           icon={<Layers className="h-5 w-5 text-color-primary" />}
           title={
             <span className="flex items-center gap-2">

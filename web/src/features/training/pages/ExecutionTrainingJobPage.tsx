@@ -9,7 +9,7 @@ import { Button } from "@/shared/components/Button";
 import { Slider } from "@/shared/components/Slider";
 import { StatePanel } from "@/shared/components/StatePanel";
 import { ExecutionObservation } from "@/shared/components/ExecutionObservation";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import {
   TerminalActionButton,
   TerminalViewer,
@@ -109,7 +109,7 @@ export default function ExecutionTrainingJobPage() {
   return (
     <>
       <div className="space-y-6 rounded-surface border border-border bg-surface p-6">
-        <StepTitle
+        <Title
           title={t("createFlow.execution.title")}
           subtitle={t("createFlow.execution.description")}
         />

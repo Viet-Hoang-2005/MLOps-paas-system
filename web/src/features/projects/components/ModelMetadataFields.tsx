@@ -5,7 +5,7 @@ import type {
   ProjectMetadataForm,
 } from "@/features/projects/types";
 import { Input } from "@/shared/components/Input";
-import { StepTitle } from "@/shared/components/StepTitle";
+import { Title } from "@/shared/components/Title";
 import { TextArea } from "@/shared/components/TextArea";
 
 interface ModelMetadataFieldsProps {
@@ -24,7 +24,7 @@ export function ModelMetadataFields({
   const { t } = useTranslation("deployments");
   return (
     <section className="space-y-5">
-      <StepTitle
+      <Title
         title={t("uploadFlow.metadata.title")}
         description={t("uploadFlow.metadata.description")}
       />
