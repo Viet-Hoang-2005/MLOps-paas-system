@@ -1,14 +1,16 @@
-import { ApiModal } from "@/features/api-keys/components/ApiModal";
+import { ApiKeyDialog } from "@/features/api-keys/components/ApiKeyDialog";
 import { useApiKeyForm } from "@/features/api-keys/hooks/useApiKeyForm";
 import { useApiTokens } from "@/features/api-keys/hooks/useApiTokens";
 import type { APIKeyRecord } from "@/features/api-keys/types";
 import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
 import type { ModelProject } from "@/features/projects/types";
+import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
-import { PageBody } from "@/shared/components/PageBody";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Table } from "@/shared/components/Table";
+import { TextArea } from "@/shared/components/TextArea";
+import { Title } from "@/shared/components/Title";
 import { toast } from "@/shared/types/toastStore";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Copy } from "lucide-react";
@@ -88,10 +90,59 @@ export default function ApiKeyPage() {
       accessorKey: "name",
       header: t("apiKey.name"),
       cell: ({ row }) => (
-        <span className="font-medium text-color-foreground">
+        <span className="font-semibold text-color-foreground">
           {row.original.name}
         </span>
       ),
+    },
+    {
+      accessorKey: "flavor",
+      header: t("apiKey.flavor"),
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap text-color-foreground">
+          {row.original.flavor || "—"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "access_mode",
+      header: t("apiKey.accessMode"),
+      cell: ({ row }) => (
+        <Badge variant="neutral">
+          {row.original.access_mode === "private"
+            ? t("apiKey.private")
+            : t("apiKey.public")}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: "lifecycle_status",
+      header: t("apiKey.modelStatus"),
+      cell: ({ row }) => {
+        const deletionState = row.original.deletion_state;
+        const lifecycleStatus = row.original.lifecycle_status ?? "registered";
+        const variant =
+          deletionState === "delete_failed"
+            ? "danger"
+            : deletionState === "deleting"
+              ? "warning"
+              : lifecycleStatus === "running"
+                ? "success"
+                : "neutral";
+
+        const label =
+          deletionState === "delete_failed"
+            ? t("apiKey.modelDeleteFailed")
+            : deletionState === "deleting"
+              ? t("apiKey.deleting")
+              : lifecycleStatus === "running"
+                ? t("apiKey.running")
+                : lifecycleStatus === "preview"
+                  ? t("apiKey.preview")
+                  : t("apiKey.registered");
+
+        return <Badge variant={variant}>{label}</Badge>;
+      },
     },
     {
       accessorKey: "description",
@@ -111,47 +162,52 @@ export default function ApiKeyPage() {
         back
       />
 
-      <PageBody className="p-6 space-y-6">
-        <div className="space-y-4">
-          <Input
-            id="input-api-key-name"
-            label={t("apiKey.keyName")}
-            placeholder={t("apiKey.namePlaceholder")}
-            value={apiKeyName}
-            onChange={(event) => setApiKeyName(event.target.value)}
-          />
-          <label
-            htmlFor="input-api-key-description"
-            className="flex flex-col gap-2 text-style-body-strong text-color-foreground"
-          >
-            {t("apiKey.description")}
-            <textarea
+      <div className="space-y-6">
+        <div className="space-y-8 rounded-surface border border-border bg-surface p-6">
+          <section className="space-y-5">
+            <Title
+              title={t("apiKey.metadataTitle")}
+              description={t("apiKey.metadataDescription")}
+            />
+            <Input
+              id="input-api-key-name"
+              label={t("apiKey.keyName")}
+              placeholder={t("apiKey.namePlaceholder")}
+              value={apiKeyName}
+              onChange={(event) => setApiKeyName(event.target.value)}
+            />
+            <TextArea
               id="input-api-key-description"
-              className="min-h-24 w-full resize-none rounded-control border border-border bg-surface px-4 py-3 text-style-body text-color-foreground outline-none transition-colors duration-200 placeholder:text-color-muted-foreground hover:border-primary focus:border-primary"
+              label={t("apiKey.description")}
               placeholder={t("apiKey.descriptionPlaceholder")}
               value={apiKeyDescription}
-              onChange={(event) => setApiKeyDescription(event.target.value)}
+              onChange={(val) => setApiKeyDescription(val)}
             />
-          </label>
-          <div className="flex flex-col gap-2 pt-2">
-            <span className="text-style-body-strong text-color-foreground">
-              {t("apiKey.scope")}
-            </span>
-            <div className="rounded-surface border border-border bg-surface overflow-hidden mt-1">
-              <Table
-                columns={columns}
-                data={privateModels}
-                getRowId={(model) => model.id}
-                pageSize={5}
-                emptyMessage={t("apiKey.noPrivateModels")}
-              />
-            </div>
-          </div>
+          </section>
 
-          <div className="flex flex-col gap-2 pt-4">
-            <span className="text-style-body-strong text-color-foreground">
-              {t("apiKey.python")}
-            </span>
+          <hr className="border-border" />
+
+          <section className="space-y-5">
+            <Title
+              title={t("apiKey.scope")}
+              description={t("apiKey.scopeDescription")}
+            />
+            <Table
+              columns={columns}
+              data={privateModels}
+              getRowId={(model) => model.id}
+              pageSize={5}
+              emptyMessage={t("apiKey.noPrivateModels")}
+            />
+          </section>
+
+          <hr className="border-border" />
+
+          <section className="space-y-5">
+            <Title
+              title={t("apiKey.python")}
+              description={t("apiKey.pythonDescription")}
+            />
             <div className="relative overflow-hidden rounded-surface border border-terminal-border bg-terminal">
               <pre className="custom-scrollbar overflow-x-auto p-4 font-mono text-style-code-sm text-color-terminal-foreground">
                 <span className="text-color-syntax-keyword">import</span>{" "}
@@ -223,6 +279,7 @@ export default function ApiKeyPage() {
                 <span className="text-color-syntax-function">json</span>())
               </pre>
               <button
+                type="button"
                 onClick={() => {
                   navigator.clipboard.writeText(
                     `import requests\n\nAPI_URL = "http://localhost:5000/predict"\nAPI_KEY = "your_api_key_here"\n\nheaders = {\n    "X-API-Key": API_KEY,\n    "Content-Type": "application/json"\n}\n\npayload = {\n    "features": {\n        "Src Port": 443,\n        # Add other features...\n    }\n}\n\nresponse = requests.post(API_URL, json=payload, headers=headers)\nprint(response.json())`,
@@ -235,24 +292,33 @@ export default function ApiKeyPage() {
                 <Copy className="h-4 w-4" />
               </button>
             </div>
-          </div>
+          </section>
         </div>
 
-        <div className="mt-6 flex justify-end gap-3 border-t border-border pt-6">
+        <div className="grid grid-cols-2 gap-4">
           <Button
+            type="button"
             variant="secondary"
+            fullWidth
+            disabled={saving}
             onClick={() => navigate("/dashboard/api-keys")}
           >
             {t("apiKey.cancel")}
           </Button>
-          <Button loading={saving} onClick={handleSaveAPIKey}>
+          <Button
+            type="button"
+            fullWidth
+            loading={saving}
+            onClick={handleSaveAPIKey}
+          >
             {keyId ? t("apiKey.save") : t("apiKey.createTitle")}
           </Button>
         </div>
-      </PageBody>
+        <div className="h-0.5 shrink-0" aria-hidden="true" />
+      </div>
 
       {createdApiKey && (
-        <ApiModal
+        <ApiKeyDialog
           title={t("apiKey.createdTitle")}
           description={t("apiKey.createdDescription")}
           apiKey={createdApiKey.api_key}

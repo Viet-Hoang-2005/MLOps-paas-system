@@ -53,8 +53,6 @@ export default function ModelProjectPage() {
         </Button>
       </div>
       {projects.isError && (
-        // A failed background refresh keeps the last loaded list on screen; only a failed
-        // first load, with nothing to show, replaces the table.
         <Callout
           variant="danger"
           role="alert"

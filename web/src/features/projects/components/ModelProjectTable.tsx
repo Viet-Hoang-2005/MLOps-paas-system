@@ -108,35 +108,19 @@ export function ModelProjectTable({
         ),
       },
       {
-        id: "version",
-        header: t("workflow.runningVersion"),
-        accessorFn: (row) =>
-          row.running_version_number ??
-          (row.lifecycle_status === "running"
-            ? row.active_endpoint?.version_number
-            : null) ??
-          "",
-        cell: ({ row }) => {
-          const rawVersion =
-            row.original.running_version_number ??
-            (row.original.lifecycle_status === "running"
-              ? row.original.active_endpoint?.version_number
-              : null);
-          const displayVersion = rawVersion
-            ? rawVersion.startsWith("v")
-              ? rawVersion
-              : `v${rawVersion}`
-            : "—";
-          return (
-            <span className="font-mono whitespace-nowrap">
-              {displayVersion}
-            </span>
-          );
-        },
+        accessorKey: "access_mode",
+        header: t("workflow.accessMode"),
+        cell: ({ row }) => (
+          <Badge variant="neutral">
+            {row.original.access_mode === "public"
+              ? t("workflow.public")
+              : t("workflow.private")}
+          </Badge>
+        ),
       },
       {
         accessorKey: "lifecycle_status",
-        header: t("workflow.status"),
+        header: t("workflow.modelStatus"),
         cell: ({ row }) => {
           const deletionState = row.original.deletion_state;
           const lifecycleStatus = row.original.lifecycle_status ?? "preview";
@@ -161,6 +145,33 @@ export function ModelProjectTable({
                 ? ` · ${t("workflow.previewChanged")}`
                 : ""}
             </Badge>
+          );
+        },
+      },
+      {
+        id: "version",
+        header: t("workflow.runningVersion"),
+        accessorFn: (row) =>
+          row.running_version_number ??
+          (row.lifecycle_status === "running"
+            ? row.active_endpoint?.version_number
+            : null) ??
+          "",
+        cell: ({ row }) => {
+          const rawVersion =
+            row.original.running_version_number ??
+            (row.original.lifecycle_status === "running"
+              ? row.original.active_endpoint?.version_number
+              : null);
+          const displayVersion = rawVersion
+            ? rawVersion.startsWith("v")
+              ? rawVersion
+              : `v${rawVersion}`
+            : "—";
+          return (
+            <span className="font-mono whitespace-nowrap">
+              {displayVersion}
+            </span>
           );
         },
       },

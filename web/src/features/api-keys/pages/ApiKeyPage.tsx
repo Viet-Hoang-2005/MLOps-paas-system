@@ -1,4 +1,4 @@
-import { ApiModal } from "@/features/api-keys/components/ApiModal";
+import { ApiKeyDialog } from "@/features/api-keys/components/ApiKeyDialog";
 import { useApiTokens as useApiKeys } from "@/features/api-keys/hooks/useApiTokens";
 import type { APIKeyRecord } from "@/features/api-keys/types";
 import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
@@ -6,11 +6,12 @@ import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageHeader } from "@/shared/components/PageHeader";
+import { Select, type SelectOption } from "@/shared/components/Select";
 import { Table } from "@/shared/components/Table";
 import { formatDateTime } from "@/shared/i18n/formatters";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Edit3, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
@@ -18,8 +19,11 @@ export default function DeveloperSettingPage() {
   const { t, i18n } = useTranslation("settings");
   const navigate = useNavigate();
   const { data: modelsData } = useModelProjects();
-  const models = modelsData?.models ?? [];
-  const modelIdToName = Object.fromEntries(models.map((m) => [m.id, m.name]));
+  const models = useMemo(() => modelsData?.models ?? [], [modelsData?.models]);
+  const modelIdToName = useMemo(
+    () => Object.fromEntries(models.map((m) => [m.id, m.name])),
+    [models],
+  );
 
   const {
     apiKeys,
@@ -37,22 +41,55 @@ export default function DeveloperSettingPage() {
     key: APIKeyRecord;
   } | null>(null);
 
+  const [scopeFilter, setScopeFilter] = useState("all");
+
+  const scopeOptions = useMemo<SelectOption[]>(() => {
+    const options: SelectOption[] = [
+      { value: "all", label: t("apiKey.allScopes") },
+      { value: "all_models", label: t("apiKey.allModels") },
+    ];
+    const seenIds = new Set<string>();
+    for (const model of models) {
+      seenIds.add(model.id);
+      options.push({
+        value: model.id,
+        label: model.name,
+      });
+    }
+    for (const key of apiKeys) {
+      for (const id of key.allowed_models || []) {
+        if (!seenIds.has(id)) {
+          seenIds.add(id);
+          options.push({
+            value: id,
+            label: modelIdToName[id] || t("apiKey.unknownModel", { id }),
+          });
+        }
+      }
+    }
+    return options;
+  }, [apiKeys, modelIdToName, models, t]);
+
+  const filteredApiKeys = useMemo(() => {
+    if (scopeFilter === "all") return apiKeys;
+    if (scopeFilter === "all_models") {
+      return apiKeys.filter((key) => key.scope === "all");
+    }
+    return apiKeys.filter((key) => key.allowed_models?.includes(scopeFilter));
+  }, [apiKeys, scopeFilter]);
+
   const columns: ColumnDef<APIKeyRecord>[] = [
-    {
-      id: "index",
-      header: "#",
-      enableSorting: false,
-      cell: ({ row }) => (
-        <span className="text-color-muted-foreground">{row.index + 1}</span>
-      ),
-    },
     {
       accessorKey: "name",
       header: t("apiKey.name"),
       cell: ({ row }) => (
-        <span className="font-semibold text-color-foreground">
+        <button
+          type="button"
+          className="text-left text-color-primary hover:underline"
+          onClick={() => navigate(`/dashboard/api-keys/${row.original.id}`)}
+        >
           {row.original.name}
-        </span>
+        </button>
       ),
     },
     {
@@ -107,7 +144,7 @@ export default function DeveloperSettingPage() {
           <div className="flex items-center gap-1">
             <Button
               size="icon"
-              variant="ghost"
+              border={false}
               aria-label={t("apiKey.edit")}
               title={t("apiKey.edit")}
               icon={<Edit3 className="h-4 w-4" />}
@@ -115,7 +152,7 @@ export default function DeveloperSettingPage() {
             />
             <Button
               size="icon"
-              variant="ghost"
+              border={false}
               aria-label={t("apiKey.regenerate")}
               title={t("apiKey.regenerate")}
               icon={<RefreshCw className="h-4 w-4" />}
@@ -125,6 +162,7 @@ export default function DeveloperSettingPage() {
             />
             <Button
               size="icon"
+              border={false}
               aria-label={t("apiKey.delete")}
               title={t("apiKey.delete")}
               variant="danger-outline"
@@ -139,31 +177,43 @@ export default function DeveloperSettingPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={t("apiKey.developerTitle")}
-        actions={
-          <Button
-            id="btn-create-api-key"
-            size="md"
-            icon={<Plus className="h-4 w-4" />}
-            onClick={() => navigate("/dashboard/api-keys/new")}
-          >
-            {t("apiKey.createTitle")}
-          </Button>
-        }
-      />
+      <PageHeader title={t("apiKey.developerTitle")} />
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="w-full sm:w-64">
+          <Select
+            className="h-10 text-style-body"
+            value={scopeFilter}
+            onChange={setScopeFilter}
+            options={scopeOptions}
+            placeholder={t("apiKey.filterByScope")}
+          />
+        </div>
+        <Button
+          id="btn-create-api-key"
+          size="md"
+          icon={<Plus className="h-4 w-4" />}
+          onClick={() => navigate("/dashboard/api-keys/new")}
+        >
+          {t("apiKey.createTitle")}
+        </Button>
+      </div>
 
       <Table
         columns={columns}
-        data={apiKeys}
+        data={filteredApiKeys}
         getRowId={(key) => key.id}
         loading={loading}
         pageSize={10}
-        emptyMessage={t("apiKey.empty")}
+        emptyMessage={
+          scopeFilter !== "all"
+            ? t("apiKey.noMatchingKeys")
+            : t("apiKey.empty")
+        }
       />
 
       {createdApiKey && (
-        <ApiModal
+        <ApiKeyDialog
           title={t("apiKey.regeneratedTitle")}
           description={t("apiKey.regeneratedDescription")}
           apiKey={createdApiKey.api_key}

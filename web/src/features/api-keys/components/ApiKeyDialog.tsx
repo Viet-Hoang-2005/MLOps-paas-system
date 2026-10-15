@@ -1,9 +1,10 @@
 import { Clipboard, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Button } from "@/shared/components/Button";
+import { Callout } from "@/shared/components/Callout";
 import { useTranslation } from "react-i18next";
 
-interface ApiModalProps {
+interface ApiKeyDialogProps {
   title: string;
   description: string;
   apiKey: string;
@@ -11,13 +12,13 @@ interface ApiModalProps {
   onCopy: () => void;
 }
 
-export function ApiModal({
+export function ApiKeyDialog({
   title,
   description,
   apiKey,
   onClose,
   onCopy,
-}: ApiModalProps) {
+}: ApiKeyDialogProps) {
   const { t } = useTranslation("settings");
   if (typeof document === "undefined") return null;
 
@@ -38,25 +39,24 @@ export function ApiModal({
           </button>
         </div>
         <div className="px-5 py-5">
-          <div className="rounded-surface border border-warning-border bg-warning-subtle px-4 py-3 text-style-body text-color-warning">
-            {description}
-          </div>
+          <Callout variant="warning" description={description} />
           <div className="mt-4 rounded-surface border border-border bg-muted p-3">
             <p className="mb-2 text-style-overline uppercase text-color-muted-foreground">
               {t("apiDialog.label")}
             </p>
             <div className="flex items-center gap-2">
-              <code className="min-w-0 flex-1 break-all rounded-compact bg-surface px-3 py-2 text-style-body-strong text-color-foreground">
+              <code className="min-w-0 flex-1 break-all rounded-compact bg-surface px-3 py-2 text-style-body-lg text-color-foreground">
                 {apiKey}
               </code>
-              <button
-                type="button"
+              <Button
+                size="icon"
+                variant="secondary"
                 onClick={onCopy}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-surface border border-border bg-surface text-color-muted-foreground hover:text-color-foreground"
+                icon={<Clipboard className="h-4 w-4" />}
+                title={t("apiDialog.copy")}
                 aria-label={t("apiDialog.copy")}
-              >
-                <Clipboard className="h-4 w-4" />
-              </button>
+                >
+              </Button> 
             </div>
           </div>
           <div className="mt-6 flex justify-end">
