@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "apps.observability.apps.ObservabilityConfig",
     "apps.production.apps.ProductionConfig",
     "apps.ct.apps.ContinuousTrainingConfig",
+    "apps.notifications.apps.NotificationsConfig",
 ]
 
 MIDDLEWARE = [

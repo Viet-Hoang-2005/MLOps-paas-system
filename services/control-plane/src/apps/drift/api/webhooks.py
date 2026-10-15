@@ -108,6 +108,11 @@ class DriftRunWebhookEndpoint(APIView):
                 phase="summary_updated" if already_completed else None,
                 source="webhook",
             )
+        try:
+            from apps.notifications.hooks import notify_drift_result
+            notify_drift_result(run)
+        except Exception:
+            pass
         return Response({"status": run.status})
 
 

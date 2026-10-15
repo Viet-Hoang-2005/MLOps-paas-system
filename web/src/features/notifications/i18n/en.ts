@@ -1,6 +1,49 @@
 export const notificationsEn = {
-  title: "Notification",
-  comingSoon: "Notifications are coming soon",
-  description:
-    "Operational notifications are not part of the current Control Plane contract yet. Build, deployment, training, and drift status remain available in their respective pages.",
+  title: "Notifications",
+  pageSubtitle: "Monitor training workflows, image packaging, endpoint deployments, and system alerts.",
+  searchPlaceholder: "Search notifications...",
+  actions: {
+    markAllAsRead: "Mark all as read",
+    markAsRead: "Mark as read",
+    delete: "Delete notification",
+    viewAll: "View all notifications",
+    viewDetails: "View details",
+    refresh: "Refresh",
+  },
+  filters: {
+    all: "All",
+    unread: "Unread",
+    training: "Training",
+    build: "Packaging",
+    deployment: "Deployment",
+    drift: "Data Drift",
+    alert: "Alerts",
+  },
+  types: {
+    training: "Training",
+    build: "Packaging",
+    deployment: "Deployment",
+    drift: "Data Drift",
+    alert: "Alert",
+    system: "System",
+  },
+  levels: {
+    info: "Info",
+    success: "Success",
+    warning: "Warning",
+    error: "Error",
+  },
+  status: {
+    unread: "Unread",
+    unreadCount: "unread",
+    loading: "Loading notifications...",
+    emptyTitle: "No notifications",
+    emptyDescription: "You're all caught up with the latest updates.",
+    emptyFiltered: "No notifications match the selected filter.",
+  },
+  pagination: {
+    prev: "Previous",
+    next: "Next",
+    showing: "Showing {{count}} notifications",
+  },
 } as const;

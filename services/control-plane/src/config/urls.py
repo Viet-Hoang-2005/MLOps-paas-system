@@ -11,6 +11,7 @@ from apps.mlflow.views import (
     MLflowArtifactsMultipartFallbackView,
     MLflowArtifactsProxyView,
 )
+from apps.notifications.api.webhooks import AlertWebhookEndpoint
 from apps.training.api.webhooks import (
     TrainingCancellationWebhookEndpoint,
     TrainingJobWebhookEndpoint,
@@ -55,6 +56,8 @@ urlpatterns = [
     ),
     path("internal/training-jobs/<uuid:job_id>/output-upload-url/", TrainingOutputUploadURLEndpoint.as_view()),
     path("internal/training-jobs/<uuid:job_id>/input-download-urls/", TrainingInputDownloadURLEndpoint.as_view()),
+    path("api/notifications/", include("apps.notifications.api.urls")),
     path("internal/webhooks/drift-runs/<uuid:run_id>/", DriftRunWebhookEndpoint.as_view()),
     path("internal/webhooks/automatic-drift/", AutomaticDriftWebhookEndpoint.as_view()),
+    path("internal/webhooks/alerts/", AlertWebhookEndpoint.as_view()),
 ]

@@ -105,6 +105,11 @@ class DeploymentWebhookEndpoint(APIView):
                     event_type="deployment.changed",
                     payload={"deployment_id": str(deployment.public_id), "status": result},
                 )
+        try:
+            from apps.notifications.hooks import notify_deployment_result
+            notify_deployment_result(deployment)
+        except Exception:
+            pass
         return Response({"status": result})
 
 
@@ -227,6 +232,11 @@ class BuildWebhookEndpoint(APIView):
             source="webhook",
             reason="Build reporter confirmed failure" if build.status == "failed" else None,
         )
+        try:
+            from apps.notifications.hooks import notify_build_result
+            notify_build_result(build)
+        except Exception:
+            pass
         return Response(
             {
                 "status": build.status,

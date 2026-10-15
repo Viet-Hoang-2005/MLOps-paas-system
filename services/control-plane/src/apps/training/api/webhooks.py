@@ -122,6 +122,11 @@ class TrainingJobWebhookEndpoint(APIView):
                 reason="Training reporter confirmed failure" if job.status == "failed" else None,
             )
         append_training_log(job.public_id, f"[SYSTEM] Training reached terminal status: {job.status}.")
+        try:
+            from apps.notifications.hooks import notify_training_result
+            notify_training_result(job)
+        except Exception:
+            pass
         return Response({"status": job.status})
 
 

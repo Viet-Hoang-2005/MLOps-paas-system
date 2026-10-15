@@ -2,7 +2,6 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Popover from "@radix-ui/react-popover";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Bell,
   Check,
   ChevronDown,
   ChevronUp,
@@ -25,6 +24,7 @@ import { routes } from "@/app/router/paths";
 import { useTheme } from "@/app/theme/useTheme";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
+import { NotificationDropdown } from "@/features/notifications/components/NotificationDropdown";
 import { getProfile } from "@/features/settings/api/profileApi";
 import { settingsQueryKeys } from "@/features/settings/queryKeys";
 import type { UserProfile } from "@/features/settings/types";
@@ -294,14 +294,7 @@ export default function Header({
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
 
-        <Button
-          size="icon"
-          aria-label={t("navigation.notification")}
-          title={t("navigation.notification")}
-          icon={<Bell className="h-5 w-5" />}
-          variant="secondary"
-          onClick={() => navigate("/dashboard/notifications")}
-        />
+        <NotificationDropdown />
 
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
