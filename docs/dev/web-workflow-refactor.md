@@ -131,7 +131,7 @@ Chuẩn hóa dưới `web/src/features/`:
 | `monitoring` | Drift configuration, run history, report và model metrics |
 | `training` | Workspace, training jobs và reference selection |
 | `evolution` | Version snapshots, lineage, so sánh và triển khai |
-| `api-tokens` | API key hiện tại, tách khỏi Settings |
+| `api-keys` | API key hiện tại, tách khỏi Settings |
 | `auth`, `settings`, `notifications` | Giữ trách nhiệm riêng |
 
 Giữ hướng phụ thuộc `app → features → shared`. Router/layout điều phối các feature; page là coordinator, React Query hook quản lý server state, API module quản lý contract HTTP. Tránh dependency vòng khi chuyển file và DTO sang owner mới.
@@ -165,7 +165,7 @@ Sidebar hiển thị theo thứ tự:
 | Evolution | `/dashboard/projects/:projectId/evolution` |
 | Notification | `/dashboard/notifications` |
 | Setting | `/dashboard/settings/profile` |
-| API Token | `/dashboard/api-tokens` |
+| API Token | `/dashboard/api-keys` |
 
 Form tạo và trang chi tiết dùng route riêng chứa build/job/run/version UUID khi resource đã tồn tại. Form tạo Deployment, Training và Drift có selector project riêng; không phụ thuộc lựa chọn ngầm từ Header. API Token giữ semantics API key hiện tại, không tự mở rộng thành một hệ thống personal access token mới.
 
@@ -286,7 +286,7 @@ Phụ thuộc giai đoạn 1.
 
 Phụ thuộc contract giai đoạn 1–2.
 
-- [x] Tổ chức lại feature theo projects/deployments/monitoring/training/evolution/api-tokens.
+- [x] Tổ chức lại feature theo projects/deployments/monitoring/training/evolution/api-keys.
 - [x] Thay route, Sidebar, Header coordinator và link trong notification/action liên quan.
 - [x] Xây form New/Edit Preview dùng chung các phần nhập liệu phù hợp.
 - [x] Xây Overview với bốn tab và nguồn snapshot Running.

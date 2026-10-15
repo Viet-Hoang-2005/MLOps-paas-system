@@ -52,7 +52,7 @@ Compose có tên container cố định nên stack mới không thể chạy son
 | Metric local | `GET /api/observability/models/<project>/runtime-metrics/`; snapshot realtime, không có lịch sử |
 | Delete project | `DELETE /api/models/<project>/`; async hard cleanup, lỗi giữ `delete_failed` để retry |
 
-Các route Web bắt đầu ở `/dashboard/projects`. Trang chính theo `/dashboard/projects/<project>/{overview,deployment,monitoring,training,evolution}`. Form tạo deployment và monitoring có selector riêng; Header chọn project ở trang chi tiết sẽ về Overview. API Token ở `/dashboard/api-tokens`, không còn nằm trong Settings.
+Các route Web bắt đầu ở `/dashboard/projects`. Trang chính theo `/dashboard/projects/<project>/{overview,deployment,monitoring,training,evolution}`. Form tạo deployment và monitoring có selector riêng; Header chọn project ở trang chi tiết sẽ về Overview. API Token ở `/dashboard/api-keys`, không còn nằm trong Settings.
 
 Preview thay đổi không ảnh hưởng snapshot đang Running. Build thành công chỉ bật Register; Register xong mới mở bước Deploy. Deployment mới chỉ trở thành Running sau readiness; lỗi không thay bản đang phục vụ. Khi chuyển Running, monitor cũ ngừng auto-trigger và giữ lịch sử; tạo monitor mới thủ công.
 

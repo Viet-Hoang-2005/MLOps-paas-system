@@ -43,7 +43,7 @@ export const commonEn = {
     modelTraining: "Training",
     modelEvolution: "Evolution",
     management: "Model Project",
-    apiTokens: "API Token",
+    apiKeys: "API Keys",
     notification: "Notification",
     setting: "Setting",
   },

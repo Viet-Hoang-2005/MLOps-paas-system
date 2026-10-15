@@ -4,6 +4,7 @@ import { useProfileSettings } from "@/features/settings/hooks/useProfileSettings
 import type { UserProfile } from "@/features/settings/types";
 import BaseDialog from "@/shared/components/BaseDialog";
 import { Button } from "@/shared/components/Button";
+import { Title } from "@/shared/components/Title";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { Input, InputPassword } from "@/shared/components/Input";
 import { OTPInput } from "@/shared/components/OTPInput";
@@ -204,7 +205,7 @@ export default function ProfileSettingPage() {
 
   return (
     <div className="flex w-full flex-1 flex-col space-y-6">
-      <PageHeader title={t("profile")} />
+      <PageHeader title={t("setting")} />
       <section className="flex flex-1 flex-col gap-6 lg:grid lg:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="flex flex-col h-full">
           <div className="flex flex-1 flex-col rounded-surface border border-border bg-surface">
@@ -310,43 +311,44 @@ export default function ProfileSettingPage() {
         <div className="flex flex-1 flex-col rounded-surface border border-border bg-surface p-6 h-full">
           <div className="flex flex-1 flex-col justify-between space-y-6">
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-style-heading text-color-foreground">
-                  {t("profileInformation")}
-                </h3>
-                {editingProfile ? (
-                  <div className="flex gap-2">
+              <Title
+                title={t("profileInformation")}
+                description={t("profileInformationDescription")}
+                action={
+                  editingProfile ? (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        size="md"
+                        onClick={handleCancelEdit}
+                      >
+                        {t("apiKey.cancel")}
+                      </Button>
+                      <Button
+                        id="btn-save-profile"
+                        size="md"
+                        loading={saving}
+                        disabled={loading || !profileChanged}
+                        onClick={handleSave}
+                      >
+                        {t("apiKey.save")}
+                      </Button>
+                    </div>
+                  ) : (
                     <Button
+                      id="btn-edit-profile"
                       variant="secondary"
                       size="md"
-                      onClick={handleCancelEdit}
+                      onClick={() => setEditingProfile(true)}
+                      disabled={loading}
                     >
-                      {t("apiKey.cancel")}
+                      <Edit3 className="h-4 w-4" />
+                      {t("editProfile")}
                     </Button>
-                    <Button
-                      id="btn-save-profile"
-                      size="md"
-                      loading={saving}
-                      disabled={loading || !profileChanged}
-                      onClick={handleSave}
-                    >
-                      {t("apiKey.save")}
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    id="btn-edit-profile"
-                    variant="secondary"
-                    size="md"
-                    onClick={() => setEditingProfile(true)}
-                    disabled={loading}
-                  >
-                    <Edit3 className="h-4 w-4" />
-                    {t("editProfile")}
-                  </Button>
-                )}
-              </div>
-
+                  )
+                }
+              />
+                
               <div className="grid gap-4 md:grid-cols-2">
                 <Input
                   id="profile-full-name"

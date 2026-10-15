@@ -14,8 +14,12 @@ export const registryEn = {
     data: "References Data",
     modelStatus: "Model Status",
     modelVersion: "Model Version",
-    buildAndRegisterTitle: "Build & Register Information",
+    buildAndRegisterTitle: "Build & Register",
+    buildAndRegisterDesc:
+      "Container image URI and build identification used to register this version.",
     evidentlyRuns: "Evidently Drift Runs",
+    evidentlyRunsDesc:
+      "History of data drift detection executions and quality reports for this model version.",
     totalRuns: "Total Runs",
     driftDetectedCount: "Drift Detected",
     healthyCount: "Healthy",
@@ -81,12 +85,16 @@ export const registryEn = {
     deploymentUnavailable:
       "No successful, registered, non-deleted Build is available for this version.",
     artifacts: "Artifacts",
+    artifactsDesc:
+      "Model binaries, assets, and supplemental files associated with this version.",
     artifactCount: "Artifacts",
     name: "Name",
     kind: "Type",
     size: "Size",
     checksum: "Checksum",
     requirements: "Requirements",
+    requirementsDesc:
+      "Python environment dependencies and library versions used during model execution.",
     parameters: "Parameters",
     value: "Value",
     missing: "Not available",

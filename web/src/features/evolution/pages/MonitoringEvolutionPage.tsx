@@ -194,7 +194,13 @@ export function MonitoringEvolutionPage({
   return (
     <div className="space-y-6">
       <section className="space-y-4">
-        <Title title={t("workspace.evidentlyRuns", "Evidently Drift Runs")} />
+        <Title
+          title={t("workspace.evidentlyRuns", "Evidently Drift Runs")}
+          description={t(
+            "workspace.evidentlyRunsDesc",
+            "History of data drift detection executions and quality reports for this model version.",
+          )}
+        />
 
         {/* 4 CardSummary for Evidently Data Drift Job */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

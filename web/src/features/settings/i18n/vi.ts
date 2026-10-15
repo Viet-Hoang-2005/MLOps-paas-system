@@ -1,6 +1,6 @@
 export const settingsVi = {
   title: "Cài đặt",
-  profile: "Hồ sơ",
+  setting: "Cài đặt",
   developer: "Nhà phát triển",
   apiKeys: "Khóa API",
   editProfile: "Chỉnh sửa hồ sơ",
@@ -10,6 +10,8 @@ export const settingsVi = {
   changeAvatar: "Đổi ảnh đại diện",
   removeAvatar: "Xóa ảnh đại diện",
   profileInformation: "Thông tin hồ sơ",
+  profileInformationDescription:
+    "Quản lý thông tin cá nhân và thông tin nghề nghiệp của bạn.",
   fullName: "Họ và tên",
   pronouns: "Đại từ xưng hô",
   company: "Công ty",
@@ -56,7 +58,7 @@ export const settingsVi = {
     editTitle: "Chỉnh sửa khóa API",
     createTitle: "Tạo khóa API",
     back: "Quay lại Cài đặt nhà phát triển",
-    apiName: "Tên API",
+    keyName: "Tên khóa API",
     namePlaceholder: "Ví dụ: Client dự đoán production",
     descriptionPlaceholder: "Khóa API này sẽ dùng để làm gì?",
     scope: "Phạm vi khóa API",

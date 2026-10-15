@@ -171,6 +171,7 @@ export function InformationEvolutionPage({
       <section className="space-y-4">
         <Title
           title={t("workspace.buildAndRegisterTitle")}
+          description={t("workspace.buildAndRegisterDesc")}
           action={
             version.source_job_id ? (
               <Link
@@ -212,7 +213,10 @@ export function InformationEvolutionPage({
 
       {/* Artifacts Table */}
       <section className="space-y-4">
-        <Title title={t("workspace.artifacts")} />
+        <Title
+          title={t("workspace.artifacts")}
+          description={t("workspace.artifactsDesc")}
+        />
         <Table
           data={version.artifacts}
           columns={artifactColumns}
@@ -223,7 +227,10 @@ export function InformationEvolutionPage({
 
       {/* Requirements */}
       <section className="space-y-4">
-        <Title title={t("workspace.requirements")} />
+        <Title
+          title={t("workspace.requirements")}
+          description={t("workspace.requirementsDesc")}
+        />
         <TextArea
           id="evolution-requirements"
           readOnly

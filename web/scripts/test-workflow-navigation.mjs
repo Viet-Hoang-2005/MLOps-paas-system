@@ -38,7 +38,7 @@ for (const path of [
   "/dashboard/deployments/new",
   "/dashboard/training/jobs/job-id/config",
   "/dashboard/settings/profile",
-  "/dashboard/api-tokens",
+  "/dashboard/api-keys",
   "/dashboard/notifications",
 ]) {
   assert.equal(

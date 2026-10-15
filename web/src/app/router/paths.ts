@@ -10,5 +10,5 @@ export const routes = {
   evolution: "/dashboard/evolution",
   notifications: "/dashboard/notifications",
   profile: "/dashboard/settings/profile",
-  apiTokens: "/dashboard/api-tokens",
+  apiKeys: "/dashboard/api-keys",
 } as const;

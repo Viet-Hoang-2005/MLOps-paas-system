@@ -1,12 +1,9 @@
-import {
-  createAPIKey,
-  updateAPIKey,
-} from "@/features/api-tokens/api/apiKeysApi";
-import { apiTokenQueryKeys } from "@/features/api-tokens/queryKeys";
+import { createAPIKey, updateAPIKey } from "@/features/api-keys/api/apiKeysApi";
+import { apiTokenQueryKeys } from "@/features/api-keys/queryKeys";
 import type {
   APIKeyRecord,
   CreatedAPIKeyResponse,
-} from "@/features/api-tokens/types";
+} from "@/features/api-keys/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { toast } from "@/shared/types/toastStore";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -77,7 +74,7 @@ export function useApiKeyForm(initialData?: APIKeyRecord | null) {
     onSuccess: async () => {
       toast.success(t("apiKey.updateSuccess"));
       await refreshAPIKeys();
-      navigate("/dashboard/api-tokens");
+      navigate("/dashboard/api-keys");
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, t("apiKey.updateFailed")));

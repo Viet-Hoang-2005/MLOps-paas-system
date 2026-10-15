@@ -1,6 +1,6 @@
 export const settingsEn = {
   title: "Settings",
-  profile: "Profile",
+  setting: "Setting",
   developer: "Developer",
   apiKeys: "API keys",
   editProfile: "Edit Profile",
@@ -10,6 +10,8 @@ export const settingsEn = {
   changeAvatar: "Change Avatar",
   removeAvatar: "Remove Avatar",
   profileInformation: "Profile Information",
+  profileInformationDescription:
+    "Manage your personal details and professional background.",
   fullName: "Full Name",
   pronouns: "Pronouns",
   company: "Company",
@@ -52,7 +54,7 @@ export const settingsEn = {
     editTitle: "Edit API Key",
     createTitle: "Create API Key",
     back: "Back to Developer Settings",
-    apiName: "API Name",
+    keyName: "API Key Name",
     namePlaceholder: "e.g. Production Inference Client",
     descriptionPlaceholder: "What will this API key be used for?",
     scope: "API Key Scope",

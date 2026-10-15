@@ -1,4 +1,4 @@
 export const apiTokenQueryKeys = {
-  all: ["api-tokens"] as const,
+  all: ["api-keys"] as const,
   apiKeys: () => [...apiTokenQueryKeys.all, "keys"] as const,
 };

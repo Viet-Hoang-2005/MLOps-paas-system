@@ -1,6 +1,7 @@
-import { ApiModal } from "@/features/api-tokens/components/ApiModal";
-import { useApiKeyForm } from "@/features/api-tokens/hooks/useApiKeyForm";
-import { useApiTokens } from "@/features/api-tokens/hooks/useApiTokens";
+import { ApiModal } from "@/features/api-keys/components/ApiModal";
+import { useApiKeyForm } from "@/features/api-keys/hooks/useApiKeyForm";
+import { useApiTokens } from "@/features/api-keys/hooks/useApiTokens";
+import type { APIKeyRecord } from "@/features/api-keys/types";
 import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
 import type { ModelProject } from "@/features/projects/types";
 import { Button } from "@/shared/components/Button";
@@ -21,9 +22,9 @@ export default function ApiKeyPage() {
   const navigate = useNavigate();
   const { apiKeys } = useApiTokens();
 
-  const editingKey = useMemo(() => {
+  const editingKey = useMemo<APIKeyRecord | null>(() => {
     if (!keyId) return null;
-    return apiKeys.find((key) => key.id === keyId) || null;
+    return apiKeys.find((key: APIKeyRecord) => key.id === keyId) || null;
   }, [keyId, apiKeys]);
 
   const {
@@ -54,7 +55,7 @@ export default function ApiKeyPage() {
 
   const handleDone = () => {
     setCreatedApiKey(null);
-    navigate("/dashboard/api-tokens");
+    navigate("/dashboard/api-keys");
   };
 
   const privateModels = useMemo(() => {
@@ -114,7 +115,7 @@ export default function ApiKeyPage() {
         <div className="space-y-4">
           <Input
             id="input-api-key-name"
-            label={t("apiKey.apiName")}
+            label={t("apiKey.keyName")}
             placeholder={t("apiKey.namePlaceholder")}
             value={apiKeyName}
             onChange={(event) => setApiKeyName(event.target.value)}
@@ -240,7 +241,7 @@ export default function ApiKeyPage() {
         <div className="mt-6 flex justify-end gap-3 border-t border-border pt-6">
           <Button
             variant="secondary"
-            onClick={() => navigate("/dashboard/api-tokens")}
+            onClick={() => navigate("/dashboard/api-keys")}
           >
             {t("apiKey.cancel")}
           </Button>

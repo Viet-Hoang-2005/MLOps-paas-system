@@ -64,7 +64,7 @@ src/
   shared/    HTTP/error foundation, shared types, utilities, and UI primitives
 ```
 
-The active domains are `auth`, `projects`, `deployments`, `training`, `evolution`, `monitoring`, `api-tokens`, `settings`, and `notifications`.
+The active domains are `auth`, `projects`, `deployments`, `training`, `evolution`, `monitoring`, `api-keys`, `settings`, and `notifications`.
 
 Architecture rules:
 

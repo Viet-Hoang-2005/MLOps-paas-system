@@ -1,11 +1,11 @@
-import { apiClient } from "@/shared/api/client";
-import { controlPlaneURL } from "@/shared/api/config";
 import type {
   APIKeyListResponse,
   APIKeyRecord,
   CreateAPIKeyRequest,
   CreatedAPIKeyResponse,
-} from "@/features/api-tokens/types";
+} from "@/features/api-keys/types";
+import { apiClient } from "@/shared/api/client";
+import { controlPlaneURL } from "@/shared/api/config";
 import type { MessageResponse } from "@/shared/types";
 
 interface APIKeyDTO {

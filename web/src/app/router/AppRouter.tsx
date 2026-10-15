@@ -107,9 +107,9 @@ const ProfileSettingPage = lazy(
   () => import("@/features/settings/pages/ProfileSettingPage"),
 );
 const ApiTokensPage = lazy(
-  () => import("@/features/api-tokens/pages/ApiTokensPage"),
+  () => import("@/features/api-keys/pages/ApiKeyPage"),
 );
-const ApiKeyPage = lazy(() => import("@/features/api-tokens/pages/ApiKeyPage"));
+const ApiKeyPage = lazy(() => import("@/features/api-keys/pages/CreateApiKeyPage"));
 const NotFoundPage = lazy(() => import("./NotFoundPage"));
 const ProjectRouteBoundary = lazy(() => import("./ProjectRouteBoundary"));
 
@@ -198,9 +198,9 @@ const router = createBrowserRouter(
         </Route>
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="settings/profile" element={<ProfileSettingPage />} />
-        <Route path="api-tokens" element={<ApiTokensPage />} />
-        <Route path="api-tokens/new" element={<ApiKeyPage />} />
-        <Route path="api-tokens/:keyId" element={<ApiKeyPage />} />
+        <Route path="api-keys" element={<ApiTokensPage />} />
+        <Route path="api-keys/new" element={<ApiKeyPage />} />
+        <Route path="api-keys/:keyId" element={<ApiKeyPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />

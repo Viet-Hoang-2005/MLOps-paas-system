@@ -2,25 +2,36 @@ import {
   deleteAPIKey,
   listAPIKeys,
   regenerateAPIKey,
-} from "@/features/api-tokens/api/apiKeysApi";
-import { apiTokenQueryKeys } from "@/features/api-tokens/queryKeys";
+} from "@/features/api-keys/api/apiKeysApi";
+import { apiTokenQueryKeys } from "@/features/api-keys/queryKeys";
 import type {
+  APIKeyListResponse,
   APIKeyRecord,
   CreatedAPIKeyResponse,
-} from "@/features/api-tokens/types";
+} from "@/features/api-keys/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { toast } from "@/shared/types/toastStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-export function useApiTokens() {
+export interface UseApiKeysReturn {
+  apiKeys: APIKeyRecord[];
+  loading: boolean;
+  createdApiKey: CreatedAPIKeyResponse | null;
+  setCreatedApiKey: (key: CreatedAPIKeyResponse | null) => void;
+  handleDeleteAPIKey: (apiKey: APIKeyRecord) => Promise<void>;
+  handleRegenerateAPIKey: (apiKey: APIKeyRecord) => Promise<void>;
+  handleCopyCreatedKey: () => Promise<void>;
+}
+
+export function useApiTokens(): UseApiKeysReturn {
   const queryClient = useQueryClient();
   const { t } = useTranslation("settings");
   const [createdApiKey, setCreatedApiKey] =
     useState<CreatedAPIKeyResponse | null>(null);
 
-  const apiKeysQuery = useQuery({
+  const apiKeysQuery = useQuery<APIKeyListResponse>({
     queryKey: apiTokenQueryKeys.apiKeys(),
     queryFn: listAPIKeys,
   });
@@ -89,3 +100,5 @@ export function useApiTokens() {
     handleCopyCreatedKey,
   };
 }
+
+export { useApiTokens as useApiKeys };

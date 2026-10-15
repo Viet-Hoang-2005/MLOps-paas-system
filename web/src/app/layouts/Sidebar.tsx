@@ -50,10 +50,10 @@ const utilityItems = [
     match: "/dashboard/settings",
   },
   {
-    key: "apiTokens",
-    to: routes.apiTokens,
+    key: "apiKeys",
+    to: routes.apiKeys,
     icon: KeyRound,
-    match: routes.apiTokens,
+    match: routes.apiKeys,
   },
 ] as const;
 

@@ -54,7 +54,7 @@ export function CodeEvolutionPage({
   );
 
   const codeContent = sourceQuery.data || "";
-  const fileName = sourceArtifact?.name || "train.py";
+  const fileName = sourceArtifact?.name || "unknown";
 
   const handleDownload = () => {
     if (!codeContent) return;

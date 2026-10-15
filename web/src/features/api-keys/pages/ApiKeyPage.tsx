@@ -1,6 +1,6 @@
-import { ApiModal } from "@/features/api-tokens/components/ApiModal";
-import { useApiTokens } from "@/features/api-tokens/hooks/useApiTokens";
-import type { APIKeyRecord } from "@/features/api-tokens/types";
+import { ApiModal } from "@/features/api-keys/components/ApiModal";
+import { useApiTokens as useApiKeys } from "@/features/api-keys/hooks/useApiTokens";
+import type { APIKeyRecord } from "@/features/api-keys/types";
 import { useModelProjects } from "@/features/projects/hooks/useModelProjects";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
@@ -29,7 +29,7 @@ export default function DeveloperSettingPage() {
     handleDeleteAPIKey,
     handleRegenerateAPIKey,
     handleCopyCreatedKey,
-  } = useApiTokens();
+  } = useApiKeys();
 
   const handleDone = () => setCreatedApiKey(null);
   const [pendingAction, setPendingAction] = useState<{
@@ -111,7 +111,7 @@ export default function DeveloperSettingPage() {
               aria-label={t("apiKey.edit")}
               title={t("apiKey.edit")}
               icon={<Edit3 className="h-4 w-4" />}
-              onClick={() => navigate(`/dashboard/api-tokens/${record.id}`)}
+              onClick={() => navigate(`/dashboard/api-keys/${record.id}`)}
             />
             <Button
               size="icon"
@@ -146,7 +146,7 @@ export default function DeveloperSettingPage() {
             id="btn-create-api-key"
             size="md"
             icon={<Plus className="h-4 w-4" />}
-            onClick={() => navigate("/dashboard/api-tokens/new")}
+            onClick={() => navigate("/dashboard/api-keys/new")}
           >
             {t("apiKey.createTitle")}
           </Button>

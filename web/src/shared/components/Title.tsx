@@ -31,19 +31,26 @@ export function Title({
 
   return (
     <div className={cn("mb-4", className)}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-style-section-title text-color-foreground">
-          {iconNode}
-          <span>{title}</span>
-          {badge}
-        </h2>
+      <div
+        className={cn(
+          "flex flex-wrap justify-between gap-3",
+          text ? "items-start" : "items-center",
+        )}
+      >
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-style-section-title text-color-foreground">
+            {iconNode}
+            <span>{title}</span>
+            {badge}
+          </h2>
+          {text && (
+            <p className="mt-1 text-style-body text-color-muted-foreground">
+              {text}
+            </p>
+          )}
+        </div>
         {action}
       </div>
-      {text && (
-        <p className="mt-1 text-style-body text-color-muted-foreground">
-          {text}
-        </p>
-      )}
     </div>
   );
 }

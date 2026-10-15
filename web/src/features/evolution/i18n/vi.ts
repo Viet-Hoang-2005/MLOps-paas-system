@@ -15,7 +15,11 @@ export const evolutionVi = {
     modelStatus: "Trạng thái Model",
     modelVersion: "Phiên bản Model",
     buildAndRegisterTitle: "Thông tin Build & Đăng ký",
+    buildAndRegisterDesc:
+      "URI của container image và mã định danh build dùng để đăng ký phiên bản này.",
     evidentlyRuns: "Các lượt chạy kiểm tra Drift",
+    evidentlyRunsDesc:
+      "Lịch sử các lượt chạy phát hiện data drift và báo cáo chất lượng cho phiên bản mô hình này.",
     totalRuns: "Số lượng lần chạy",
     driftDetectedCount: "Số lần phát hiện Data Drift",
     healthyCount: "Số lần Healthy",
@@ -80,12 +84,16 @@ export const evolutionVi = {
     deploymentUnavailable:
       "Không có Build thành công, đã đăng ký và chưa bị xóa cho phiên bản này.",
     artifacts: "Artifact",
+    artifactsDesc:
+      "Tệp nhị phân mô hình, tài sản và các tệp bổ sung liên kết với phiên bản này.",
     artifactCount: "Artifact",
     name: "Tên",
     kind: "Loại",
     size: "Dung lượng",
     checksum: "Mã kiểm tra (Checksum)",
     requirements: "Thư viện phụ thuộc",
+    requirementsDesc:
+      "Các thư viện phụ thuộc của môi trường Python và phiên bản thư viện dùng khi thực thi mô hình.",
     parameters: "Tham số",
     value: "Giá trị",
     missing: "Không có dữ liệu",
