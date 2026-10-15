@@ -1,0 +1,95 @@
+# servicemonitor.yaml: Unified Prometheus ServiceMonitor configuration for MLOps PaaS
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: model-server-monitor
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  selector:
+    matchExpressions:
+      # Scrape both dynamic serving workers and the central model gateway.
+      - key: component
+        operator: In
+        values:
+          - model-server
+          - model-gateway
+  namespaceSelector:
+    matchNames:
+      - mlops-model-server
+      - mlops-model-runtimes
+  targetLabels:
+    - app
+    - component
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: control-plane-monitor
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - mlops-control-plane
+  selector:
+    matchLabels:
+      app: mlops-paas-control-plane
+  endpoints:
+    - port: http
+      path: /health/metrics
+      interval: 15s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-ha-monitor
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - mlops-redis
+  selector:
+    matchLabels:
+      app: mlops-paas-redis-ha
+      app.kubernetes.io/component: metrics
+      redis_setup_type: replication
+      role: replication
+  endpoints:
+    - port: redis-exporter
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-sentinel-monitor
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - mlops-redis
+  selector:
+    matchLabels:
+      app: mlops-paas-redis-ha-sentinel
+      app.kubernetes.io/component: metrics
+      redis_setup_type: sentinel
+      role: sentinel
+  endpoints:
+    - port: redis-exporter
+      interval: 30s
+      scrapeTimeout: 10s
+

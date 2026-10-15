@@ -107,15 +107,15 @@ MLOps PaaS được xây dựng theo kiến trúc phân tách rõ ràng giữa *
 
 **1. Quy trình Đóng gói & Triển khai Mô hình (Build & Deploy Workflow)**
 
-![Build and Deploy Workflow](images/build-deploy-workflow-dark.png)
+![Build and Deploy Workflow](pictures/build-deploy-workflow-dark.png)
 
 **2. Quy trình Huấn luyện & Điều phối Tài nguyên (Training Workflow)**
 
-![Training Workflow](images/training-workflow-dark.png)
+![Training Workflow](pictures/training-workflow-dark.png)
 
 **3. Quy trình Giám sát & Phát hiện Độ lệch Dữ liệu (Data Drift Workflow)**
 
-![Data Drift Workflow](images/data-drift-workflow-dark.png)
+![Data Drift Workflow](pictures/data-drift-workflow-dark.png)
 
 > [!TIP]
 > **Tài liệu Kỹ thuật Chi tiết:** Xem toàn bộ 7 sơ đồ luồng chi tiết (Cloud IaaS, Ansible Bootstrap, K3s GitOps 5 Sync Waves, Microservices Interaction, Training/Build/Inference Lifecycles) tại [**`ARCHITECTURE.md`**](ARCHITECTURE.md).

@@ -12,9 +12,6 @@ Pillow==10.3.0
 django-cors-headers==4.3.1
 confluent-kafka==2.3.0
 docker==7.1.0
-channels==4.1.0
-channels-redis==4.2.0
-daphne==4.1.2
 mlflow==2.14.1
 whitenoise==6.6.0
 celery[redis]==5.4.0

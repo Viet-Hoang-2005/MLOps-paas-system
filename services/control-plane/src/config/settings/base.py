@@ -15,7 +15,6 @@ DEBUG = False
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,control-plane")
 
 INSTALLED_APPS = [
-    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -27,7 +26,6 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "storages",
-    "channels",
     "apps.auth.apps.AuthConfig",
     "apps.access.apps.AccessConfig",
     "apps.catalog.apps.CatalogConfig",
@@ -196,22 +194,6 @@ if REDIS_CONNECTION_MODE == "sentinel":
             },
         }
     }
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels_redis.core.RedisChannelLayer",
-            "CONFIG": {
-                "hosts": [
-                    {
-                        "sentinels": REDIS_SENTINELS,
-                        "master_name": REDIS_SENTINEL_MASTER_NAME,
-                        "db": 1,
-                        "password": REDIS_PASSWORD,
-                        "sentinel_kwargs": sentinel_kwargs,
-                    }
-                ]
-            },
-        }
-    }
 
     def _celery_sentinel_urls(db: int) -> str:
         return ";".join(
@@ -230,7 +212,6 @@ if REDIS_CONNECTION_MODE == "sentinel":
     }
 else:
     CACHES = {"default": {"BACKEND": "django_redis.cache.RedisCache", "LOCATION": REDIS_URL}}
-    CHANNEL_LAYERS = {"default": {"BACKEND": "channels_redis.core.RedisChannelLayer", "CONFIG": {"hosts": [REDIS_URL]}}}
     default_broker_url = _derive_redis_url(REDIS_URL, 3)
     default_result_backend = _derive_redis_url(REDIS_URL, 4)
     CELERY_BROKER_URL = _inject_redis_password(

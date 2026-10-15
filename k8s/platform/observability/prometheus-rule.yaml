@@ -14,7 +14,7 @@ spec:
       rules:
         # Cảnh báo khi Control Plane pod không còn chạy
         - alert: ControlPlanePodsUnavailable
-          expr: kube_deployment_status_replicas_available{deployment="mlops-paas-control-plane"} < 1
+          expr: kube_deployment_status_replicas_available{namespace="mlops-control-plane", deployment="mlops-paas-control-plane"} < 1
           for: 1m
           labels:
             severity: critical
@@ -23,9 +23,20 @@ spec:
             summary: "Control Plane Pods unavailable"
             description: "The mlops-paas-control-plane deployment has 0 available replicas!"
 
+        # Cảnh báo khi Celery Worker pod không còn chạy (ảnh hưởng pipeline training, build, drift)
+        - alert: CeleryWorkersUnavailable
+          expr: kube_deployment_status_replicas_available{namespace="mlops-control-plane", deployment="mlops-paas-celery-worker"} < 1
+          for: 2m
+          labels:
+            severity: critical
+            team: mlops
+          annotations:
+            summary: "Celery Worker deployment has 0 available replicas"
+            description: "Background ML tasks (training, packaging, drift checks) are halted!"
+
         # Cảnh báo khi Consumer pod không còn chạy
         - alert: ConsumerPodsUnavailable
-          expr: kube_deployment_status_replicas_available{deployment="mlops-paas-consumer"} < 1
+          expr: kube_deployment_status_replicas_available{namespace="mlops-consumer", deployment="mlops-paas-consumer"} < 1
           for: 1m
           labels:
             severity: critical
@@ -36,7 +47,7 @@ spec:
 
         # Cảnh báo khi Frontend Web pod không còn chạy
         - alert: WebPodsUnavailable
-          expr: kube_deployment_status_replicas_available{deployment="mlops-paas-web"} < 1
+          expr: kube_deployment_status_replicas_available{namespace="mlops-web", deployment="mlops-paas-web"} < 1
           for: 1m
           labels:
             severity: critical
@@ -44,6 +55,45 @@ spec:
           annotations:
             summary: "Frontend Web Pods unavailable"
             description: "The mlops-paas-web deployment has 0 available replicas!"
+
+        # Cảnh báo khi tỷ lệ lỗi HTTP 5xx của Control Plane vượt 5%
+        - alert: ControlPlaneHighErrorRate
+          expr: |
+            sum(rate(control_plane_api_requests_total{status=~"5.."}[5m])) /
+            clamp_min(sum(rate(control_plane_api_requests_total[5m])), 0.001) > 0.05
+          for: 2m
+          labels:
+            severity: critical
+            team: mlops
+          annotations:
+            summary: "Control Plane 5xx error rate > 5%"
+            description: "Control plane API is experiencing elevated server errors ({{ $value | humanizePercentage }})."
+
+        # Cảnh báo khi p95 latency của Control Plane vượt 2 giây
+        - alert: ControlPlaneHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(control_plane_api_request_duration_seconds_bucket[5m])) by (le)
+            ) > 2.0
+          for: 3m
+          labels:
+            severity: warning
+            team: mlops
+          annotations:
+            summary: "Control Plane p95 latency > 2s"
+            description: "Current Control Plane API p95 latency is {{ $value | humanizeDuration }}."
+
+        # Cảnh báo khi tỷ lệ thất bại của Celery task tăng cao
+        - alert: CeleryHighTaskFailureRate
+          expr: |
+            sum(rate(control_plane_celery_tasks_total{status="failure"}[5m])) > 0.1
+          for: 3m
+          labels:
+            severity: warning
+            team: mlops
+          annotations:
+            summary: "High Celery task failure rate"
+            description: "Background tasks are failing at {{ $value }} errors/sec."
 
         # Cảnh báo khi p95 latency của đường predict qua gateway vượt ngưỡng 500ms
         - alert: HighServiceLatency
@@ -75,17 +125,17 @@ spec:
     # Nhóm 2: AI Inference & Model Endpoints
     - name: paas.inference
       rules:
-        # Cảnh báo khi lượng lỗi suy luận tăng cao
+        # Cảnh báo khi lượng lỗi suy luận tăng cao theo từng Model & Version
         - alert: HighInferenceErrors
           expr: |
-            rate(paas_predictions_total{status=~"error.*"}[5m]) > 5
+            sum(rate(paas_predictions_total{status=~"error.*"}[5m])) by (project_id, model_version_id) > 5
           for: 2m
           labels:
             severity: warning
             team: mlops
           annotations:
             summary: "High Model Inference Errors"
-            description: "Model Endpoint is generating {{ $value }} errors/sec."
+            description: "Model project {{ $labels.project_id }} (version {{ $labels.model_version_id }}) is generating {{ $value }} errors/sec."
 
     # Nhóm 3: Database Health
     - name: paas.database

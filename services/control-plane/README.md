@@ -149,7 +149,7 @@ services/control-plane/
 ├── staticfiles/                       # Thư mục chứa static files thu thập bởi collectstatic
 `-- src/
     ├── config/                        # Cấu hình dự án Django & Celery
-    │   ├── asgi.py                    # Cấu hình ASGI (hỗ trợ Channels/WebSockets)
+    │   ├── asgi.py                    # Cấu hình ASGI tiêu chuẩn của Django
     │   ├── wsgi.py                    # Cấu hình WSGI tiêu chuẩn cho Gunicorn
     │   ├── celery.py                  # Khởi tạo instance Celery app
     │   ├── urls.py                    # Root URL router kết nối toàn bộ public API và webhooks
