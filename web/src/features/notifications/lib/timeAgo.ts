@@ -1,6 +1,9 @@
 export function formatTimeAgo(isoString: string, locale: string = "vi"): string {
   try {
     const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) {
+      return isoString;
+    }
     const now = new Date();
     const diffSeconds = Math.round((date.getTime() - now.getTime()) / 1000);
 

@@ -111,10 +111,7 @@ cluster smoke below is required before production enablement.
 Backend regression uses `config.settings.test`. Lease concurrency requires
 `config.settings.integration_postgres` with `PGTEST_HOST/PORT/DB/USER/PASSWORD` pointing to
 a separate disposable PostgreSQL server. Never point these at application data.
-Run `web/scripts/test-inference.mjs` for isolated client regression. Browser smoke
-is `web/scripts/smoke-inference-browser.mjs`; set `P1_PLAYWRIGHT_MODULE` to the
-installed Playwright `index.mjs`, install Chromium and run the existing Vite server
-at `http://localhost:5173`. Fixture tokens are consumed in memory and must not be
+Run frontend unit tests with `pnpm test:run` in `web/` (including `src/shared/api/inferenceClient.test.ts` for isolated client regression). Fixture tokens are consumed in memory and must not be
 logged or retained. If interrupted, invoke `p1_inference_fixture.py` with
 `P1_FIXTURE_MODE='cleanup'` and remove only `mlops-p1-inference-*` test containers.
 

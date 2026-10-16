@@ -1,15 +1,77 @@
-.git
-.env
-.env.*
-!.env.example
+# Version control
+.git/
+.gitignore
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-__pycache__/
-*.py[cod]
+
+# Test & Coverage artifacts
+tests/
+**/tests/
+**/test_*.py
+**/*_test.py
+requirements-test.txt
 .coverage
+coverage.xml
 htmlcov/
+test-results.xml
+ruff_report.json
+trivy-report.json
+ci-*.json
+pr_comment.md
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# Databases, BentoML & Model artifacts
 *.db
 *.sqlite*
+.bentoml/
+bentos/
+models/
+*.pt
+*.pth
+*.onnx
+*.bin
+
+# IDEs & Editors
+.vscode/
+.idea/
+.claude/
+.codex/
+.antigravity/
+*.swp
+*.swo
+*~
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Logs
 *.log
-tests/
+logs/
+
+# Documentation
+README.md
+*.md
+
+# Dockerfiles
+Dockerfile*
+.dockerignore

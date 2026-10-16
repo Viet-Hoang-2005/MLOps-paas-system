@@ -14,9 +14,12 @@
 
 ## Gates
 
-`pnpm lint` runs ESLint, architecture checks, the i18n hard-code checker, and
-the color-token checker. `pnpm build` performs TypeScript/Vite production
-validation. Keep the eager application chunk under the configured 500 kB
-threshold and preserve lazy Monaco/tooling chunks.
+`pnpm lint` runs ESLint. `pnpm test:quality` runs architecture checks, the i18n
+completeness and hard-coded string checker, and design token checkers (colors, radii,
+typography). `pnpm build` performs TypeScript/Vite production validation. Keep the
+eager application chunk under the configured 500 kB threshold and preserve lazy
+Monaco/tooling chunks.
 
-`pnpm test:i18n` validates selection/storage and bilingual resources, including negative fixtures. The CI frontend matrix entry runs `check-i18n.mjs` and this test and reports its outcome in the existing quality Summary.
+`pnpm test:run` runs all unit, router, and feature tests. `pnpm test:coverage` runs
+tests with V8 coverage generation and reports terminal/LCOV results. The CI pipeline
+runs `pnpm test:coverage` and exports JUnit results.

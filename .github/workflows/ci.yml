@@ -90,8 +90,9 @@ jobs:
               "training_runner": {"name": "Training Runner", "id": "training_runner", "context": "services/training-runner", "dockerfile": "services/training-runner/Dockerfile", "image": "mlops-paas-training-runner"}
           }
           backend_keys = ["control_plane", "consumer", "packager", "evidently", "model_server", "machine_learning_serving", "deep_learning_serving", "training_runner"]
+          unit_keys = ["frontend", *backend_keys]
           quality_targets = [configs[k] for k, value in changed.items() if value or (k != "frontend" and shared_quality)]
-          unit_test_targets = [configs[k] for k in backend_keys if changed[k] or shared_tests]
+          unit_test_targets = [configs[k] for k in unit_keys if changed[k] or (k != "frontend" and shared_tests)]
           image_targets = [configs[k] for k, value in changed.items() if value]
           infra_changed = {
               "kubernetes": "${{ steps.filter.outputs.k8s }}" == "true",
@@ -106,7 +107,7 @@ jobs:
           infra_targets = [target for target in infra_configs if infra_changed[target["id"]] or run_all]
           if run_all:
               quality_targets = [configs[k] for k in configs]
-              unit_test_targets = [configs[k] for k in backend_keys]
+              unit_test_targets = [configs[k] for k in unit_keys]
               image_targets = [configs[k] for k in configs]
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"quality_targets={json.dumps(quality_targets)}\n")
@@ -154,7 +155,6 @@ jobs:
     name: "Code Quality (${{ matrix.target.name }})"
     needs: [detect-changes, workflow-lint]
     if: needs.detect-changes.result == 'success' && needs.workflow-lint.result == 'success' && needs.detect-changes.outputs.quality_targets != '[]'
-    continue-on-error: true
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -330,10 +330,10 @@ jobs:
           path: ${{ matrix.target.context }}/ruff_report.json
           if-no-files-found: ignore
 
-  services-unit-tests:
+  unit-tests:
     name: "Unit Tests (${{ matrix.target.name }})"
     needs: [detect-changes, workflow-lint, code-quality]
-    if: always() && needs.detect-changes.result == 'success' && needs.workflow-lint.result == 'success' && needs.detect-changes.outputs.unit_test_targets != '[]'
+    if: needs.detect-changes.result == 'success' && needs.workflow-lint.result == 'success' && needs.code-quality.result == 'success' && needs.detect-changes.outputs.unit_test_targets != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -341,7 +341,28 @@ jobs:
         target: ${{ fromJSON(needs.detect-changes.outputs.unit_test_targets) }}
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        if: matrix.target.id == 'frontend'
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        if: matrix.target.id == 'frontend'
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install frontend dependencies
+        if: matrix.target.id == 'frontend'
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+      - name: Run frontend unit tests with coverage
+        id: frontend_tests
+        if: matrix.target.id == 'frontend'
+        continue-on-error: true
+        working-directory: web
+        run: pnpm run test:coverage -- --reporter=default --reporter=junit --outputFile=test-results.xml
       - name: Setup Python
+        if: matrix.target.id != 'frontend'
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
@@ -351,6 +372,7 @@ jobs:
             ${{ matrix.target.context }}/requirements-test.txt
             services/requirements-test.txt
       - name: Install dependencies
+        if: matrix.target.id != 'frontend'
         working-directory: ${{ matrix.target.context }}
         run: |
           if [ -f requirements-test.txt ]; then
@@ -372,7 +394,7 @@ jobs:
         run: python -m pytest src --junitxml=test-results.xml --cov=src/apps --cov-report=term-missing --cov-report=xml --cov-fail-under=70
       - name: Run runtime service unit tests with coverage
         id: runtime_service_tests
-        if: matrix.target.id != 'control_plane'
+        if: matrix.target.id != 'control_plane' && matrix.target.id != 'frontend'
         continue-on-error: true
         working-directory: ${{ matrix.target.context }}
         run: python -m pytest tests --junitxml=test-results.xml --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=70
@@ -385,24 +407,39 @@ jobs:
           import xml.etree.ElementTree as ET
           from pathlib import Path
 
-          test_result = "${{ steps.control_plane_tests.outcome }}"
-          if test_result == "skipped":
+          target_id = "${{ matrix.target.id }}"
+          if target_id == "frontend":
+              test_result = "${{ steps.frontend_tests.outcome }}"
+          elif target_id == "control_plane":
+              test_result = "${{ steps.control_plane_tests.outcome }}"
+          else:
               test_result = "${{ steps.runtime_service_tests.outcome }}"
+
           junit_path = Path("test-results.xml")
           coverage_path = Path("coverage.xml")
-          if not junit_path.exists() or not coverage_path.exists():
+          cov_summary_path = Path("coverage/coverage-summary.json")
+
+          if not junit_path.exists() or (target_id != "frontend" and not coverage_path.exists()) or (target_id == "frontend" and not cov_summary_path.exists()):
               display = "Failed (test execution error)"
           else:
-              suite = ET.parse(junit_path).getroot()
+              root = ET.parse(junit_path).getroot()
+              suite = root if root.tag == "testsuites" else root
               tests = int(suite.attrib.get("tests", 0))
               failures = int(suite.attrib.get("failures", 0))
               errors = int(suite.attrib.get("errors", 0))
               skipped = int(suite.attrib.get("skipped", 0))
               passed = tests - failures - errors - skipped
-              coverage = float(ET.parse(coverage_path).getroot().attrib["line-rate"]) * 100
+
+              if target_id == "frontend":
+                  cov_json = json.loads(cov_summary_path.read_text(encoding="utf-8"))
+                  coverage = float(cov_json.get("total", {}).get("lines", {}).get("pct", 0.0))
+              else:
+                  coverage = float(ET.parse(coverage_path).getroot().attrib["line-rate"]) * 100
+
               status = "Passed" if test_result == "success" else "Failed"
               display = f"{status} ({passed} passed, {coverage:.2f}% coverage)"
-          Path("ci-unit-${{ matrix.target.id }}.json").write_text(
+
+          Path(f"ci-unit-{target_id}.json").write_text(
               json.dumps({"display": display}), encoding="utf-8"
           )
           PY
@@ -411,7 +448,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.target.id }}
-          path: ${{ matrix.target.context }}/coverage.xml
+          path: |
+            ${{ matrix.target.context }}/coverage.xml
+            ${{ matrix.target.context }}/coverage/lcov.info
           if-no-files-found: ignore
       - name: Upload unit test summary
         if: always()
@@ -423,7 +462,7 @@ jobs:
       - name: Enforce unit test result
         if: always()
         run: |
-          if [ "${{ steps.control_plane_tests.outcome }}" = "failure" ] || [ "${{ steps.runtime_service_tests.outcome }}" = "failure" ]; then
+          if [ "${{ steps.frontend_tests.outcome }}" = "failure" ] || [ "${{ steps.control_plane_tests.outcome }}" = "failure" ] || [ "${{ steps.runtime_service_tests.outcome }}" = "failure" ]; then
             exit 1
           fi
 
@@ -550,13 +589,13 @@ jobs:
     needs:
       - detect-changes
       - workflow-lint
-      - services-unit-tests
+      - unit-tests
     if: >-
       always() &&
       needs.detect-changes.result == 'success' &&
       needs.workflow-lint.result == 'success' &&
       needs.detect-changes.outputs.image_targets != '[]' &&
-      (needs.services-unit-tests.result == 'success' || needs.services-unit-tests.result == 'skipped')
+      (needs.unit-tests.result == 'success' || needs.unit-tests.result == 'skipped')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -630,7 +669,7 @@ jobs:
         workflow-lint,
         secret-scan,
         code-quality,
-        services-unit-tests,
+        unit-tests,
         infra-validate,
         images-scan,
       ]
@@ -681,8 +720,6 @@ jobs:
           result_files = Path("ci-results")
           def service_result(kind, service_id, scheduled):
               if service_id not in scheduled:
-                  if kind == "unit" and service_id == "frontend":
-                      return "N/A (frontend has no unit-test matrix)"
                   return "Skipped (no changes)"
               if kind == "trivy" and image_scan_result == "skipped":
                   return "Skipped (unit tests failed)"
@@ -710,7 +747,7 @@ jobs:
           summary.append(f"**Secret Security (GitLeaks)**: {fmt(secret_res)}\n")
 
           rows = []
-          if "frontend" in quality_ids or "frontend" in image_ids:
+          if "frontend" in quality_ids or "frontend" in unit_ids or "frontend" in image_ids:
               rows.append(
                   f"| **Frontend Web** | {service_result('quality', 'frontend', quality_ids)} | "
                   f"{service_result('unit', 'frontend', unit_ids)} | "

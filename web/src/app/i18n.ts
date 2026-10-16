@@ -33,18 +33,23 @@ const browserStorage = () => {
     return undefined;
   }
 };
-const initialLanguage = detectLanguage(
-  browserStorage(),
-  navigator.languages ?? [navigator.language],
-);
-document.documentElement.lang = initialLanguage;
+const browserLanguages =
+  typeof navigator !== "undefined"
+    ? (navigator.languages ?? [navigator.language])
+    : ["en"];
+const initialLanguage = detectLanguage(browserStorage(), browserLanguages);
+if (typeof document !== "undefined") {
+  document.documentElement.lang = initialLanguage;
+}
 i18n.on("languageChanged", (value) => {
   const language = normalizeLanguage(value) ?? "en";
-  document.documentElement.lang = language;
+  if (typeof document !== "undefined") {
+    document.documentElement.lang = language;
+  }
   persistLanguage(browserStorage(), language);
 });
 
-const resources = {
+export const resources = {
   vi: {
     auth: authVi,
     deployments: deploymentsVi,

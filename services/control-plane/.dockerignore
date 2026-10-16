@@ -1,14 +1,72 @@
-.git
-.pytest_cache
-.mypy_cache
-.ruff_cache
-__pycache__
+# Version control
+.git/
+.gitignore
+
+# Python bytecode & cache
+__pycache__/
 *.py[cod]
-*.db
-*.sqlite
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Test & Coverage artifacts
+tests/
+**/tests/
+**/test_*.py
+**/*_test.py
+requirements-test.txt
+.coverage
+coverage.xml
+htmlcov/
+test-results.xml
+ruff_report.json
+trivy-report.json
+ci-*.json
+pr_comment.md
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment & Secrets
 .env
 .env.*
-staticfiles
-htmlcov
-.coverage
-tests/
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# Static files & Databases
+staticfiles/
+*.db
+*.sqlite*
+
+# IDEs & Editors
+.vscode/
+.idea/
+.claude/
+.codex/
+.antigravity/
+*.swp
+*.swo
+*~
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Documentation & Tool configs
+README.md
+*.md
+pyrefly.toml
+
+# Dockerfiles
+Dockerfile*
+.dockerignore

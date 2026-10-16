@@ -1,6 +1,7 @@
 import { Button } from "@/shared/components/Button";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Search } from "@/shared/components/Search";
+import { Select, type SelectOption } from "@/shared/components/Select";
 import { cn } from "@/shared/lib/cn";
 import {
   Activity,
@@ -78,95 +79,134 @@ export default function NotificationsPage() {
     setPage(1);
   };
 
-  const filterTabs: Array<{ id: FilterTab; label: string; icon: React.ReactNode }> = [
-    { id: "all", label: t("filters.all"), icon: <Inbox className="h-4 w-4" /> },
-    { id: "unread", label: t("filters.unread"), icon: <Bell className="h-4 w-4" /> },
-    { id: "training", label: t("filters.training"), icon: <Cpu className="h-4 w-4" /> },
-    { id: "build", label: t("filters.build"), icon: <Box className="h-4 w-4" /> },
-    { id: "deployment", label: t("filters.deployment"), icon: <Rocket className="h-4 w-4" /> },
-    { id: "drift", label: t("filters.drift"), icon: <Activity className="h-4 w-4" /> },
-    { id: "alert", label: t("filters.alert"), icon: <AlertTriangle className="h-4 w-4" /> },
-  ];
+  const filterOptions = useMemo<SelectOption[]>(() => [
+    {
+      value: "all",
+      label: (
+        <span className="flex items-center gap-2">
+          <Inbox className="h-4 w-4 text-color-foreground-muted" />
+          <span>{t("filters.all")}</span>
+        </span>
+      ),
+    },
+    {
+      value: "unread",
+      label: (
+        <span className="flex items-center gap-2">
+          <Bell className="h-4 w-4 text-color-foreground-muted" />
+          <span>{t("filters.unread")}</span>
+        </span>
+      ),
+      badge: unreadCount > 0 ? (
+        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-style-caption-strong text-color-danger-foreground">
+          {unreadCount}
+        </span>
+      ) : undefined,
+    },
+    {
+      value: "training",
+      label: (
+        <span className="flex items-center gap-2">
+          <Cpu className="h-4 w-4 text-color-foreground-muted" />
+          <span>{t("filters.training")}</span>
+        </span>
+      ),
+    },
+    {
+      value: "build",
+      label: (
+        <span className="flex items-center gap-2">
+          <Box className="h-4 w-4 text-color-foreground-muted" />
+          <span>{t("filters.build")}</span>
+        </span>
+      ),
+    },
+    {
+      value: "deployment",
+      label: (
+        <span className="flex items-center gap-2">
+          <Rocket className="h-4 w-4 text-color-foreground-muted" />
+          <span>{t("filters.deployment")}</span>
+        </span>
+      ),
+    },
+    {
+      value: "drift",
+      label: (
+        <span className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-color-foreground-muted" />
+          <span>{t("filters.drift")}</span>
+        </span>
+      ),
+    },
+    {
+      value: "alert",
+      label: (
+        <span className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-color-foreground-muted" />
+          <span>{t("filters.alert")}</span>
+        </span>
+      ),
+    },
+  ], [t, unreadCount]);
 
   return (
     <section className="flex flex-1 flex-col gap-6">
       <PageHeader
         title={t("title")}
         actions={
-          <div className="flex items-center gap-2">
+          unreadCount > 0 ? (
             <Button
-              variant="secondary"
+              variant="primary"
               size="sm"
               className="gap-1.5"
-              disabled={isFetching}
-              onClick={() => refetch()}
+              disabled={isMarkingAll}
+              onClick={() => markAllRead()}
             >
-              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
-              <span>{t("actions.refresh")}</span>
+              <CheckCheck className="h-4 w-4" />
+              <span>{t("actions.markAllAsRead")}</span>
             </Button>
-
-            {unreadCount > 0 && (
-              <Button
-                variant="primary"
-                size="sm"
-                className="gap-1.5"
-                disabled={isMarkingAll}
-                onClick={() => markAllRead()}
-              >
-                <CheckCheck className="h-4 w-4" />
-                <span>{t("actions.markAllAsRead")}</span>
-              </Button>
-            )}
-          </div>
+          ) : undefined
         }
       />
 
-      {/* Filter and Search Bar */}
+      {/* Search, Refresh and Type Filter Bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4">
-        {/* Horizontal filter tabs */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-          {filterTabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => handleTabChange(tab.id)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-control px-3 py-1.5 text-style-caption-strong transition-all whitespace-nowrap",
-                  isActive
-                    ? "bg-primary text-color-primary-foreground shadow-xs"
-                    : "text-color-foreground-muted hover:bg-surface-hover hover:text-color-foreground",
-                )}
-              >
-                {tab.icon}
-                <span>{tab.label}</span>
-                {tab.id === "unread" && unreadCount > 0 && (
-                  <span
-                    className={cn(
-                      // typography-ignore: notification count micro-badge
-                      "ml-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold",
-                      isActive ? "bg-surface text-color-primary" : "bg-danger text-color-danger-foreground",
-                    )}
-                  >
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        {/* Left: Search component + Refresh button */}
+        <div className="flex flex-1 items-center gap-2">
+          <div className="w-full sm:w-72">
+            <Search
+              placeholder={t("searchPlaceholder")}
+              value={searchQuery}
+              onChange={handleSearchChange}
+              onClear={() => {
+                setSearchQuery("");
+                setPage(1);
+              }}
+            />
+          </div>
+
+          <Button
+            variant="secondary"
+            size="md"
+            className="shrink-0 gap-1.5"
+            disabled={isFetching}
+            onClick={() => refetch()}
+            title={t("actions.refresh")}
+          >
+            <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+            <span>{t("actions.refresh")}</span>
+          </Button>
         </div>
 
-        {/* Search Box */}
-        <div className="w-full sm:w-72 shrink-0">
-          <Search
-            placeholder={t("searchPlaceholder")}
-            value={searchQuery}
-            onChange={handleSearchChange}
-            onClear={() => {
-              setSearchQuery("");
-              setPage(1);
-            }}
+        {/* Right: Select component to filter notification types */}
+        <div className="w-full sm:w-60 shrink-0">
+          <Select
+            className="h-10 text-style-body"
+            value={activeTab}
+            onChange={(val) => handleTabChange(val as FilterTab)}
+            options={filterOptions}
+            placeholder={t("filters.all")}
           />
         </div>
       </div>

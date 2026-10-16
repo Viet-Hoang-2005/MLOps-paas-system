@@ -22,4 +22,4 @@ main.tsx → app → features → shared
 - Component: renders UI and emits user intent.
 - Shared primitive: knows no business domain.
 
-Architecture checks live in `web/scripts/check-architecture.mjs`; inspect it before changing import boundaries.
+Architecture checks live in `web/test/quality/architecture.test.ts` (run via `pnpm test:quality`); inspect it before changing import boundaries.
