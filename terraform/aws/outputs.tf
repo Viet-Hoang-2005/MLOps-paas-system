@@ -43,11 +43,6 @@ output "alb_target_group_arn" {
   value       = local.enable_alb_stack ? module.alb[0].target_group_arn : null
 }
 
-output "frontend_url" {
-  description = "Public URL for ReactJS Dashboard"
-  value       = local.enable_alb_stack ? "https://${var.domain_name}" : null
-}
-
 output "api_url" {
   description = "Public URL for Django Control Plane API"
   value       = local.enable_alb_stack ? "https://api.${var.domain_name}" : null

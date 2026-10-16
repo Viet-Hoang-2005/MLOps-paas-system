@@ -95,3 +95,42 @@ variable "min_tls_version" {
   type        = string
   default     = "1.2"
 }
+
+
+# Cloudflare Zero Trust Access (Protect Internal Dashboards with Email OTP)
+# 1. Argo Workflows Dashboard
+variable "enable_argo_workflow_access" {
+  description = "Whether to protect Argo Workflows with Cloudflare Zero Trust Access (Email OTP)"
+  type        = bool
+  default     = true
+}
+
+variable "argo_workflow_domain" {
+  description = "Full domain name of the Argo Workflows application to protect (defaults to workflow.<domain_name> if empty)"
+  type        = string
+  default     = ""
+}
+
+variable "argo_workflow_access_emails" {
+  description = "List of authorized email addresses who will receive One-Time PIN (OTP) to log in to Argo Workflows"
+  type        = list(string)
+  default     = []
+}
+
+variable "argo_workflow_session_duration" {
+  description = "Session validity duration before requiring a new OTP login for Argo Workflows (e.g. 24h, 8h)"
+  type        = string
+  default     = "24h"
+}
+
+# 2. Custom / Other Applications to protect with Cloudflare Access
+variable "custom_access_applications" {
+  description = "Map of any other custom applications to protect with Cloudflare Access Email OTP"
+  type = map(object({
+    name             = string
+    domain           = string
+    allowed_emails   = list(string)
+    session_duration = optional(string, "24h")
+  }))
+  default = {}
+}

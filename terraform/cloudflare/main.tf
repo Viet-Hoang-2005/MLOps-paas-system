@@ -32,3 +32,26 @@ module "security" {
   ssl_mode        = var.ssl_mode
   min_tls_version = var.min_tls_version
 }
+
+# Module 4: Cloudflare Zero Trust Access (Identity-Aware Proxy)
+# Bảo vệ các ứng dụng nội bộ (Argo Workflows,...) bằng xác thực mã OTP gửi qua Email
+locals {
+  access_applications = merge(
+    var.enable_argo_workflow_access && length(var.argo_workflow_access_emails) > 0 ? {
+      "argo-workflows" = {
+        name             = "Argo Workflows Dashboard"
+        domain           = var.argo_workflow_domain != "" ? var.argo_workflow_domain : "workflow.${var.domain_name}"
+        allowed_emails   = var.argo_workflow_access_emails
+        session_duration = var.argo_workflow_session_duration
+      }
+    } : {},
+    var.custom_access_applications
+  )
+}
+
+module "access" {
+  source = "./modules/access"
+
+  zone_id      = var.cloudflare_zone_id
+  applications = local.access_applications
+}

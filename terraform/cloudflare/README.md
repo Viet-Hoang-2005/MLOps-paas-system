@@ -86,10 +86,10 @@ flowchart TD
 ```text
 terraform/cloudflare/
 ├── provider.tf                  # Khai báo phiên bản provider (cloudflare ~> 4.40, random ~> 3.6) & Provider Token
-├── variables.tf                 # Khai báo biến đầu vào & cấu hình mặc định
+├── variables.tf                 # Khai báo biến đầu vào & cấu hình mặc định (kèm email OTP cho Argo Workflows)
 ├── terraform.tfvars.example     # File mẫu cấu hình biến người dùng
-├── main.tf                      # Root module kết nối 3 submodules
-├── outputs.tf                   # Xuất tunnel_token, endpoints, DNS status
+├── main.tf                      # Root module kết nối 4 submodules
+├── outputs.tf                   # Xuất tunnel_token, endpoints, Access Application ID
 ├── README.md                    # Tài liệu hướng dẫn sử dụng này
 └── modules/
     ├── dns/                     # Module quản lý toàn bộ bản ghi DNS
@@ -100,7 +100,11 @@ terraform/cloudflare/
     │   ├── main.tf
     │   ├── variables.tf
     │   └── outputs.tf
-    └── security/                # Module cấu hình SSL Full (Strict), HTTP/3, TLS 1.2+
+    ├── security/                # Module cấu hình SSL Full (Strict), HTTP/3, TLS 1.2+
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   └── outputs.tf
+    └── access/                  # Module cấu hình Cloudflare Access (Email OTP) cho Argo Workflows
         ├── main.tf
         ├── variables.tf
         └── outputs.tf
@@ -114,6 +118,7 @@ terraform/cloudflare/
 Tạo Cloudflare API Token tại [Cloudflare Dashboard Profile](https://dash.cloudflare.com/profile/api-tokens) với các quyền sau:
 - **Zone** - **DNS**: `Edit`
 - **Zone** - **Zone Settings**: `Edit`
+- **Zone** - **Access: Apps and Policies**: `Edit` (hoặc **Account** - **Access: Apps and Policies**: `Edit`)
 - **Account** - **Cloudflare Tunnel**: `Edit`
 
 Lấy `Account ID` (ở thanh bên phải Dashboard) và `Zone ID` (trong trang Tổng quan tên miền).

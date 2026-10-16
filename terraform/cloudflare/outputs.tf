@@ -66,4 +66,3 @@ output "configured_tunnel_services" {
   description = "Map of all subdomains and internal services exposed via the tunnel"
   value       = { for k, v in var.tunnel_services : k => v.service }
 }
-
