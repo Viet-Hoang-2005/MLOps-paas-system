@@ -28,7 +28,7 @@ Never embed passwords, tokens, private keys, real environment values, or SSH cre
 | **Redis** | `REDIS_CONNECTION_MODE=direct` | `REDIS_CONNECTION_MODE=sentinel` (3 Sentinels + Master) |
 | **Runtime Logs** | `LOG_STORAGE_BACKEND=redis` (Redis Streams) | `LOG_STORAGE_BACKEND=loki` (Grafana Loki + Signed Proxy) |
 | **Secrets Delivery** | `.env` file | AWS Secrets Manager + External Secrets Operator |
-| **AWS Infra Mode** | S3-only (`s3-only.tfvars`) | Full production infrastructure (`terraform.tfvars`) |
+| **Cloud Infra Mode** | S3-only (`terraform/aws/s3-only.tfvars`) | Full production (`terraform/aws/` & `terraform/cloudflare/`) |
 
 ## Validation
 

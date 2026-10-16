@@ -83,7 +83,13 @@ pnpm build
 
 #### Kiểm tra Terraform:
 ```bash
-cd infra/
+# 1. Kiểm tra Terraform AWS
+cd terraform/aws/
+terraform fmt -check -recursive
+terraform validate
+
+# 2. Kiểm tra Terraform Cloudflare
+cd ../cloudflare/
 terraform fmt -check -recursive
 terraform validate
 ```

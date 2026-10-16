@@ -55,7 +55,7 @@ jobs:
             ansible:
               - 'ansible/**'
             terraform:
-              - 'infra/**'
+              - 'terraform/**'
 
       - name: Generate Dynamic Matrix
         id: matrix
@@ -547,11 +547,12 @@ jobs:
       - name: Validate Terraform
         id: validate_terraform
         if: matrix.target.id == 'terraform'
-        working-directory: infra
         run: |
-          terraform fmt -check -recursive
-          terraform init -backend=false -input=false
-          terraform validate
+          for dir in terraform/aws terraform/cloudflare; do
+            echo "::group::Validating $dir"
+            (cd "$dir" && terraform fmt -check -recursive && terraform init -backend=false -input=false && terraform validate)
+            echo "::endgroup::"
+          done
       - name: Write infrastructure summary
         if: always()
         env:

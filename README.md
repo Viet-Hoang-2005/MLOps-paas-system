@@ -138,7 +138,7 @@ MLOps PaaS được xây dựng theo kiến trúc phân tách rõ ràng giữa *
 | **Cache & Task Broker** | Redis 7.4, Redis Sentinel HA | Broker/Result backend cho Celery, stream logs thời gian thực và cache gateway |
 | **Container Registry** | Harbor OCI Registry, Cosign Keyless | Lưu trữ image nội bộ, bảo mật chuỗi cung ứng với chữ ký số xác thực ảnh |
 | **Container Engine** | K3s (Lightweight Kubernetes v1.34), Docker | Nền tảng điều phối và thực thi container chuẩn hóa đám mây |
-| **Infrastructure as Code**| Terraform (AWS Provider) | Quản lý toàn bộ tài nguyên đám mây AWS (VPC, EC2, S3, ALB, IAM, Secrets) |
+| **Infrastructure as Code**| Terraform (AWS & Cloudflare Providers) | Quản lý tài nguyên đám mây AWS (VPC, EC2, S3, ALB, IAM) và Cloudflare (DNS, Tunnel, SSL) |
 | **Automation Bootstrap** | Ansible Automation Engine | Chuẩn hóa OS Ubuntu, cài đặt K3s embedded etcd, Helm và bootstrap Argo CD |
 | **GitOps Delivery** | Argo CD, Kustomize | Tự động hóa đồng bộ và kiểm soát triển khai ứng dụng khai báo (5 Sync Waves) |
 | **Workload Orchestration**| Argo Events, Argo Workflows, Kubeflow, Kaniko | Quản lý quy trình huấn luyện phân tán, build ảnh rootless và pipeline ML |
@@ -170,10 +170,9 @@ mlops-paas-system/
 │   ├── evidently/                     # Worker phân tích độ lệch dữ liệu (Data & Model Drift)
 │   └── mlflow/                        # Container cấu hình MLflow Tracking Server
 │
-├── infra/                             # Mã nguồn Terraform IaC (Quản lý hạ tầng AWS)
-│   ├── main.tf                        # Root module điều phối các tài nguyên đám mây
-│   ├── s3-only.tfvars                 # Tùy chọn chỉ tạo riêng S3 cho Docker Compose local
-│   └── modules/                       # 9 Modules: network, compute, security, storage, iam, alb, dns, secrets...
+├── terraform/                         # Mã nguồn Terraform IaC
+│   ├── aws/                           # Hạ tầng AWS: VPC, EC2, S3, ALB, IAM, Secrets Manager, Karpenter
+│   └── cloudflare/                    # Mạng biên Cloudflare: DNS CNAMEs, Zero Trust Tunnel, Zone Security
 │
 ├── ansible/                           # Ansible Playbooks: Tự động hóa chuẩn bị OS & K3s
 │   ├── site.yml                       # Playbook chính điều phối toàn bộ quá trình cài đặt
@@ -222,9 +221,13 @@ Truy cập Dashboard tại `http://localhost:5173` và Control Plane API tại `
 
 ### 6.2. Triển khai Sản xuất (Production K3s trên AWS)
 Quy trình sản xuất được tự động hóa qua 3 bước:
-1. **Terraform:** Tạo hạ tầng mạng VPC, EC2, ALB, S3, Secrets Manager:
+1. **Terraform (AWS & Cloudflare):** Tạo hạ tầng đám mây và mạng biên:
    ```bash
-   cd infra && terraform init && terraform apply
+   # 1. Triển khai AWS (VPC, EC2, ALB, S3, Secrets Manager)
+   cd terraform/aws && terraform init && terraform apply
+
+   # 2. Triển khai Cloudflare (DNS CNAMEs, Zero Trust Tunnel, Zone Security)
+   cd ../cloudflare && terraform init && terraform apply
    ```
 2. **Đồng bộ Bí mật:** Nạp secret lên AWS Secrets Manager qua script:
    ```bash
@@ -268,7 +271,8 @@ cd services/control-plane && python -m pytest
 | **Kiến trúc & Thiết kế** | [**`ARCHITECTURE.md`**](ARCHITECTURE.md) | Kiến trúc kỹ thuật trực quan hóa (Diagram-First), 7 sơ đồ luồng chi tiết |
 | **Cài đặt & Vận hành** | [**`INSTALL.md`**](INSTALL.md) | Hướng dẫn cài đặt chi tiết từng bước (Local Docker Compose & AWS K3s) |
 | **Kiểm thử & Nghiệm thu**| [**`TESTING.md`**](TESTING.md) | Bộ tiêu chuẩn Quality Gates, Unit tests, K8s validation và E2E verification |
-| **Hạ tầng AWS (IaaS)** | [**`infra/README.md`**](infra/README.md) | Tài liệu 9 modules Terraform, chế độ S3-only và dọn dẹp EBS |
+| **Hạ tầng AWS (IaaS)** | [**`terraform/aws/README.md`**](terraform/aws/README.md) | Tài liệu 9 modules Terraform AWS, chế độ S3-only và dọn dẹp EBS |
+| **Mạng biên Cloudflare** | [**`terraform/cloudflare/README.md`**](terraform/cloudflare/README.md) | Quản trị Cloudflare DNS, Zero Trust Tunnel K3s và tối ưu hóa Zone |
 | **Cài đặt Máy chủ K3s** | [**`ansible/README.md`**](ansible/README.md) | Tự động hóa chuẩn bị OS, K3s embedded etcd, Helm và Argo CD bootstrap |
 | **Quản trị Cụm K3s** | [**`k8s/README.md`**](k8s/README.md) | Khai báo 5 System Planes GitOps, Kustomize overlays và các fix chống drift |
 | **Điều phối Trung tâm** | [**`services/control-plane/README.md`**](services/control-plane/README.md) | Chi tiết 10 domain apps Django Monolith, phân tầng và lifecycle |

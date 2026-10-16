@@ -1,6 +1,6 @@
 # Hạ tầng Đám mây AWS — Terraform (Infrastructure as Code)
 
-Thư mục `infra/` chứa toàn bộ mã nguồn **Hạ tầng dưới dạng mã (Infrastructure as Code - IaC)** viết bằng Terraform, tự động hóa việc khởi tạo, cấu hình và quản trị toàn bộ tài nguyên trên **Amazon Web Services (AWS)** cho nền tảng MLOps PaaS.
+Thư mục `terraform/aws/` chứa toàn bộ mã nguồn **Hạ tầng dưới dạng mã (Infrastructure as Code - IaC)** viết bằng Terraform, tự động hóa việc khởi tạo, cấu hình và quản trị toàn bộ tài nguyên trên **Amazon Web Services (AWS)** cho nền tảng MLOps PaaS.
 
 ---
 
@@ -111,7 +111,7 @@ flowchart TD
 ## 2. Cấu trúc cây thư mục
 
 ```text
-infra/
+terraform/aws/
 ├── main.tf                     # File điều phối trung tâm: kích hoạt các module theo cờ tính năng
 ├── variables.tf                # Khai báo các biến cấu hình toàn cục và các feature flag
 ├── outputs.tf                  # Định nghĩa giá trị đầu ra (IPs, DNS, S3 name, IAM ARNs)
@@ -145,7 +145,7 @@ infra/
 Dùng khi bạn muốn dựng toàn bộ hệ thống production trên AWS EC2 & K3s:
 
 ```bash
-cd infra/
+cd terraform/aws/
 
 # 1. Khởi tạo Terraform và tải các module, provider
 terraform init
@@ -167,9 +167,13 @@ terraform plan
 # 4. Áp dụng triển khai hạ tầng
 terraform apply
 
-# 5. Xuất các thông số đầu ra để phục vụ Ansible
-terraform output
+# 5. Xuất các thông số đầu ra để phục vụ Ansible và Cloudflare Terraform
+terraform output -raw alb_dns
+terraform output -json acm_ssl_validation_records
 ```
+
+> [!NOTE]
+> **Bước tiếp theo (Cloudflare DNS & Tunnel):** Sau khi hoàn tất triển khai AWS, chuyển sang thư mục [`terraform/cloudflare/`](../cloudflare/) để cấu hình DNS CNAME và Zero Trust Tunnel.
 
 ---
 
@@ -178,7 +182,7 @@ terraform output
 Khi bạn chạy hệ thống MLOps PaaS ở máy cá nhân bằng `docker-compose.yml` nhưng muốn lưu trữ Artifacts/Models trực tiếp lên AWS S3 thật:
 
 ```bash
-cd infra/
+cd terraform/aws/
 
 # 1. Khởi tạo nếu chưa chạy
 terraform init
@@ -199,7 +203,7 @@ terraform apply -var-file="s3-only.tfvars"
 Để tránh phát sinh chi phí khi không sử dụng:
 
 ```bash
-cd infra/
+cd terraform/aws/
 
 # Hủy toàn bộ tài nguyên do Terraform quản lý
 terraform destroy

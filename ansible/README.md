@@ -27,7 +27,7 @@ Trong kiến trúc tổng thể của MLOps PaaS, Ansible đóng vai trò là **
 ### 1.2. Các thành phần chính
 
 1. **Dynamic Inventory (`inventory/terraform.py`):**
-   - Tự động đọc `terraform output -json` từ thư mục `infra/`.
+   - Tự động đọc `terraform output -json` từ thư mục `terraform/aws/`.
    - Phân loại các máy chủ thành các nhóm logic: `master` (Master node có Public IP) và `workers` (các Worker node có Private IP trong VPC).
    - Thiết lập cấu hình kết nối SSH ProxyJump tự động qua Master node để Ansible trên máy điều khiển có thể cấu hình các Worker node trong mạng nội bộ.
 
@@ -155,8 +155,8 @@ ansible/
 3. **Cập nhật dữ liệu từ Terraform:**
    Đảm bảo hạ tầng AWS đã được khởi tạo và Terraform outputs đã sẵn sàng:
    ```bash
-   terraform -chdir=infra apply -refresh-only
-   terraform -chdir=infra output -json
+   terraform -chdir=../terraform/aws apply -refresh-only
+   terraform -chdir=../terraform/aws output -json
    ```
 
 ---

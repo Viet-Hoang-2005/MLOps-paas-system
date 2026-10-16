@@ -63,9 +63,9 @@ flowchart LR
 
 ---
 
-## 2. Tầng 1: Cloud Infrastructure (Terraform + AWS)
+## 2. Tầng 1: Cloud Infrastructure & Edge Network (Terraform + AWS + Cloudflare)
 
-Tầng hạ tầng IaaS trên AWS được quản lý 100% bằng mã (Infrastructure as Code) thông qua Terraform:
+Tầng hạ tầng IaaS trên AWS và mạng biên Cloudflare được quản lý 100% bằng mã (Infrastructure as Code) thông qua Terraform (`terraform/aws/` và `terraform/cloudflare/`):
 
 ```mermaid
 flowchart TB
@@ -439,7 +439,8 @@ sequenceDiagram
 
 ## 8. Danh Mục Tài Liệu Kỹ Thuật Chi Tiết
 
-- [Tài liệu Kiến trúc & Vận hành Hạ Tầng AWS Terraform (`infra/`)](infra/README.md)
+- [Tài liệu Kiến trúc & Vận hành Hạ Tầng AWS Terraform (`terraform/aws/`)](terraform/aws/README.md)
+- [Tài liệu Quản trị Cloudflare DNS, Zero Trust Tunnel & Bảo mật Zone (`terraform/cloudflare/`)](terraform/cloudflare/README.md)
 - [Tài liệu Cấu hình Chuẩn hóa OS & K3s Bootstrap Ansible (`ansible/`)](ansible/README.md)
 - [Tài liệu Quản trị Cụm & Khai báo GitOps K3s (`k8s/`)](k8s/README.md)
 - [Tài liệu Control Plane Monolith Service (`services/control-plane/`)](services/control-plane/README.md)

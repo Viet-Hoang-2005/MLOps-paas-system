@@ -100,7 +100,7 @@ Giao diện sẽ sẵn sàng tại: `http://localhost:5173`.
 Nếu bạn muốn môi trường Docker Compose cục bộ lưu trữ Model Artifacts thật trên AWS S3 thay vì mock local, bạn có thể tạo riêng một bucket S3 duy nhất thông qua cấu hình `s3-only.tfvars`:
 
 ```bash
-cd infra/
+cd terraform/aws/
 terraform init
 terraform apply -var-file="s3-only.tfvars"
 ```
@@ -118,9 +118,6 @@ Sau đó, lấy tên bucket được xuất ra (`s3_bucket_name`) và điền v�
 | **Model Server Gateway** | `http://localhost:5002/` | Cổng tiếp nhận suy luận tập trung |
 | **ML Serving Worker** | `http://localhost:5001/health` | Phục vụ suy luận mô hình Scikit-Learn/XGBoost |
 | **DL Serving Worker** | `http://localhost:5004/health` | Phục vụ suy luận mô hình BentoML Deep Learning |
-| **MLflow Tracking UI** | `http://localhost:5003` | Theo dõi thí nghiệm và Model Registry |
-| **Redpanda Console** | `http://localhost:8081` | Quản trị trực quan Kafka Topics & Consumer Groups |
-| **pgAdmin 4 GUI** | `http://localhost:5050` | Giao diện quản trị PostgreSQL (admin@mlops.com / admin) |
 
 ---
 
@@ -149,25 +146,18 @@ Quy trình triển khai trên môi trường sản xuất tuân thủ kiến tr�
 
 ---
 
-### 2.2. Bước 1: Khởi tạo hạ tầng AWS IaaS (Terraform)
+### 2.2. Bước 1: Khởi tạo hạ tầng AWS & Cloudflare (Terraform)
 
-Di chuyển vào thư mục hạ tầng:
+#### Bước 1.1: Khởi tạo hạ tầng AWS IaaS
+Di chuyển vào thư mục hạ tầng AWS:
 ```bash
-cd infra/
+cd terraform/aws/
 terraform init
 terraform fmt -check -recursive
 terraform validate
 ```
 
-#### Bước 1.1: Khởi tạo chứng chỉ SSL/TLS ACM
-Tạo trước ACM Certificate để trích xuất CNAME DNS validation:
-```bash
-terraform apply -target='module.dns[0].aws_acm_certificate.mlops_cert'
-terraform output -json acm_ssl_validation_records
-```
-Tạo các bản ghi CNAME được xuất ra trên trang quản lý DNS (Cloudflare/Route 53), đợi chứng chỉ chuyển sang trạng thái `ISSUED`.
-
-#### Bước 1.2: Triển khai toàn bộ hạ tầng
+Triển khai toàn bộ hạ tầng AWS:
 ```bash
 terraform plan -out=tfplan
 terraform apply tfplan
@@ -180,6 +170,33 @@ Lệnh này sẽ tự động khởi tạo:
 - S3 Buckets (`mlops-paas-artifacts` và `mlops-paas-runtime-logs`).
 - 4 AWS Secrets Manager containers rỗng.
 - IAM Instance Profiles và Karpenter SQS interruption queue.
+
+Xuất các giá trị cần thiết cho Cloudflare:
+```bash
+terraform output -raw alb_dns
+terraform output -json acm_ssl_validation_records
+```
+
+#### Bước 1.2: Triển khai Cloudflare DNS, Zero Trust Tunnel & Bảo mật Zone
+Di chuyển sang thư mục Cloudflare:
+```bash
+cd ../cloudflare/
+cp terraform.tfvars.example terraform.tfvars
+```
+Chỉnh sửa `terraform.tfvars`:
+- Điền `cloudflare_api_token`, `cloudflare_account_id`, `cloudflare_zone_id`.
+- Dán giá trị `alb_dns_name` và mảng `acm_validation_records` vừa trích xuất từ AWS.
+- Cấu hình các dịch vụ nội bộ K3s trong `tunnel_services` (`@`, `argocd`, `workflow`, `grafana`).
+
+Khởi tạo và triển khai:
+```bash
+terraform init
+terraform apply
+```
+Lấy `tunnel_token` được sinh ra để chuẩn bị đồng bộ vào AWS Secrets Manager:
+```bash
+terraform output -raw tunnel_token
+```
 
 ---
 
@@ -265,7 +282,7 @@ ansible-playbook -i inventory/terraform.py site.yml --tags platform-training \
 
 Truy cập SSH vào Master Node thông qua ProxyJump:
 ```bash
-ssh -i ~/.ssh/aws_key ubuntu@$(cd ../infra && terraform output -raw master_public_ip)
+ssh -i ~/.ssh/aws_key ubuntu@$(cd ../terraform/aws && terraform output -raw master_public_ip)
 ```
 
 Kiểm tra trạng thái các node và ứng dụng GitOps:
@@ -288,7 +305,7 @@ Kiểm tra trạng thái Target Group trên AWS ALB từ máy điều khiển:
 ```bash
 aws elbv2 describe-target-health \
   --region ap-southeast-1 \
-  --target-group-arn "$(cd ../infra && terraform output -raw alb_target_group_arn)" \
+  --target-group-arn "$(cd ../terraform/aws && terraform output -raw alb_target_group_arn)" \
   --query 'TargetHealthDescriptions[*].[Target.Id,TargetHealth.State]' \
   --output table
 ```
@@ -305,7 +322,6 @@ Tất cả các targets phải hiển thị trạng thái `healthy`.
 | **Argo CD Dashboard** | `https://argocd.mlops-nids-nt114.id.vn` | Quản trị triển khai GitOps |
 | **Argo Workflows UI** | `https://workflow.mlops-nids-nt114.id.vn` | Giám sát các pipeline huấn luyện/đóng gói |
 | **Grafana Monitoring** | `https://grafana.mlops-nids-nt114.id.vn` | Dashboard quan sát tài nguyên và metrics |
-| **MLflow Server** | `https://mlflow.mlops-nids-nt114.id.vn` | Experiment Tracking & Model Registry |
 | **Harbor Registry** | `https://registry.mlops-nids-nt114.id.vn` | Private OCI Container Registry |
 
 ---
@@ -325,10 +341,15 @@ sudo k3s kubectl delete -f k8s/argocd/application.yaml --ignore-not-found
 sudo k3s kubectl delete pvc --all -A
 ```
 
-#### Bước 3.2: Tiêu hủy hạ tầng AWS qua Terraform
+#### Bước 3.2: Tiêu hủy hạ tầng Cloudflare & AWS qua Terraform
 Thoát SSH về máy điều khiển:
 ```bash
-cd infra/
+# 1. Tiêu hủy tài nguyên Cloudflare (DNS, Tunnel)
+cd terraform/cloudflare/
+terraform destroy
+
+# 2. Tiêu hủy tài nguyên AWS (VPC, EC2, ALB, S3, Secrets)
+cd ../aws/
 terraform plan -destroy -out=destroy.tfplan
 terraform apply destroy.tfplan
 ```

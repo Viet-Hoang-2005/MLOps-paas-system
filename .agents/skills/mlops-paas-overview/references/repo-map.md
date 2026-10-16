@@ -12,7 +12,7 @@
 | `services/training-runner/` | Untrusted training sandbox execution, presigned URL I/O, `METRIC_JSON` protocol, output bundling |
 | `services/evidently/` | Standalone statistical drift runner, K-S / Chi-square analysis, HTML/JSON/summary reports, CT trigger |
 | `services/mlflow/` | MLflow tracking server container setup |
-| `infra/` | Terraform AWS infrastructure (VPC, EC2, S3, IAM, ALB, DNS, Secrets Manager, Karpenter, S3-only mode) |
+| `terraform/` | Terraform IaC: AWS infrastructure (`terraform/aws/`) and Cloudflare DNS/Tunnel/Security (`terraform/cloudflare/`) |
 | `ansible/` | Automated Ubuntu OS preparation, K3s embedded etcd bootstrap, Helm CLI, Argo CD GitOps core handoff |
 | `k8s/` | Declarative GitOps resources, 5 System Planes (-50 to 20), Kustomize overlays, Argo Workflows/Events |
 | `docs/` | Technical specifications, backend layout rules, runtime logs architecture, continuous training designs |
@@ -35,5 +35,5 @@
 1. Executable source code and live PostgreSQL database migrations.
 2. Automated test suites asserting current contracts (`pytest`, `k8s/validate/tests/`).
 3. Kubernetes manifests, Terraform modules, Ansible roles, Docker Compose, and CI/CD pipelines.
-4. Focused service documentation (`services/*/README.md`, `infra/README.md`, `ansible/README.md`, `k8s/README.md`, `ARCHITECTURE.md`).
+4. Focused service documentation (`services/*/README.md`, `terraform/aws/README.md`, `terraform/cloudflare/README.md`, `ansible/README.md`, `k8s/README.md`, `ARCHITECTURE.md`).
 5. Supporting notes and example environment files (`.env.example`).

@@ -1,6 +1,6 @@
 # Terraform AWS Infrastructure
 
-The Terraform composition (`infra/`) provisions IaaS cloud resources across 9 dedicated modules:
+The Terraform composition (`terraform/aws/`) provisions IaaS cloud resources across 9 dedicated modules:
 
 ## Module Breakdown
 
@@ -21,12 +21,20 @@ The Terraform composition (`infra/`) provisions IaaS cloud resources across 9 de
 
 ## Deployment Modes
 
-1. **Full Production:** All modules enabled via `terraform.tfvars`. Deploys VPC, EC2 cluster, ALB, S3, Secrets Manager, and IAM.
+1. **Full Production:** All modules enabled via `terraform/aws/terraform.tfvars`. Deploys VPC, EC2 cluster, ALB, S3, Secrets Manager, and IAM.
 2. **S3-Only for Local Docker Compose:** Minimal deployment using `s3-only.tfvars`:
    ```bash
+   cd terraform/aws
    terraform apply -var-file="s3-only.tfvars"
    ```
    Provisions only the S3 artifacts bucket. In this mode, `worker_private_ips` outputs `null` (not `[]`) to keep the plan clean.
+
+## Handoff to Cloudflare Terraform (`terraform/cloudflare/`)
+
+Cloudflare DNS and Zero Trust Tunnel are managed independently under `terraform/cloudflare/` using **Method B (Decoupled State via `terraform.tfvars`)**:
+1. Run `terraform output -raw alb_dns` and `terraform output -json acm_ssl_validation_records` in `terraform/aws/`.
+2. Populate the outputs into `terraform/cloudflare/terraform.tfvars`.
+3. Apply Cloudflare Terraform to create ACM validation CNAMEs, ALB direct CNAMEs (`api`, `registry`), and Cloudflare Zero Trust Tunnel with ingress rules for K3s internal services (`@`, `argocd`, `workflow`, `grafana`).
 
 ## Teardown & Dynamic EBS Cleanup
 
