@@ -1,5 +1,5 @@
-variable "zone_id" {
-  description = "Cloudflare Zone ID where the protected domain resides"
+variable "account_id" {
+  description = "Cloudflare Account ID where Zero Trust Access is managed"
   type        = string
 }
 

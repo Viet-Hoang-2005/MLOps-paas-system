@@ -66,3 +66,19 @@ output "configured_tunnel_services" {
   description = "Map of all subdomains and internal services exposed via the tunnel"
   value       = { for k, v in var.tunnel_services : k => v.service }
 }
+
+# Cloudflare Zero Trust Access Outputs
+output "access_protected_applications" {
+  description = "Map of all applications actively protected by Cloudflare Access Email OTP"
+  value       = module.access.applications
+}
+
+output "argo_workflow_access_application_id" {
+  description = "ID of the Cloudflare Access Application protecting Argo Workflows"
+  value       = lookup(module.access.applications, "argo-workflows", null) != null ? module.access.applications["argo-workflows"].id : null
+}
+
+output "headlamp_access_application_id" {
+  description = "ID of the Cloudflare Access Application protecting Headlamp"
+  value       = lookup(module.access.applications, "headlamp", null) != null ? module.access.applications["headlamp"].id : null
+}
