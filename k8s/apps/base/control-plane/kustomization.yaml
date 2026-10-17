@@ -3,7 +3,8 @@ kind: Kustomization
 
 resources:
   - deployment.yaml
-  - celery.yaml
   - service.yaml
   - hpa.yaml
   - configmap.yaml
+  - celery-deployment.yaml
+  - celery-scaledobject.yaml

@@ -9,7 +9,7 @@ from k8s.validate.validate_execution_security import validate_runtime_health_pro
 
 class RuntimeHealthProcessTests(unittest.TestCase):
     def resources(self):
-        path = Path(__file__).resolve().parents[2] / "apps/base/control-plane/celery.yaml"
+        path = Path(__file__).resolve().parents[2] / "apps/base/control-plane/celery-deployment.yaml"
         return list(yaml.safe_load_all(path.read_text(encoding="utf-8")))
 
     def test_processes_are_scoped(self):

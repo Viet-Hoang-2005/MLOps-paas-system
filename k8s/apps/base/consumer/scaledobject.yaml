@@ -8,11 +8,11 @@ metadata:
     app: mlops-paas-consumer
 spec:
   scaleTargetRef:
-    name: mlops-paas-consumer     # Tên Deployment cần scale
-  minReplicaCount: 1              # Luôn duy trì ít nhất 1 pod để xử lý
-  maxReplicaCount: 4              # Tối đa 4 pods khi traffic cực lớn
-  pollingInterval: 30             # Kiểm tra lag mỗi 30 giây
-  cooldownPeriod:  300            # Chờ 5 phút sau khi hết lag mới giảm số pod
+    name: mlops-paas-consumer
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  pollingInterval: 30
+  cooldownPeriod: 300
   triggers:
     - type: kafka
       metadata:

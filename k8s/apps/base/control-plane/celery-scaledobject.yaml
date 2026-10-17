@@ -1,0 +1,43 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: mlops-paas-celery-redis-auth
+  labels:
+    app: mlops-paas-celery-worker
+spec:
+  secretTargetRef:
+    - parameter: password
+      name: celery-worker-secret
+      key: REDIS_PASSWORD
+    - parameter: sentinelPassword
+      name: celery-worker-secret
+      key: REDIS_SENTINEL_PASSWORD
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: mlops-paas-celery-scaler
+  labels:
+    app: mlops-paas-celery-worker
+spec:
+  scaleTargetRef:
+    name: mlops-paas-celery-worker
+  minReplicaCount: 2
+  maxReplicaCount: 5
+  pollingInterval: 15
+  cooldownPeriod: 180
+  triggers:
+    - type: redis-sentinel
+      metadata:
+        sentinelAddresses: mlops-paas-redis-ha-sentinel-0.mlops-paas-redis-ha-sentinel-headless.mlops-redis.svc.cluster.local:26379,mlops-paas-redis-ha-sentinel-1.mlops-paas-redis-ha-sentinel-headless.mlops-redis.svc.cluster.local:26379,mlops-paas-redis-ha-sentinel-2.mlops-paas-redis-ha-sentinel-headless.mlops-redis.svc.cluster.local:26379
+        sentinelMaster: mlops-paas-redis
+        listName: celery
+        listLength: "10"
+        databaseIndex: "3"
+      authenticationRef:
+        name: mlops-paas-celery-redis-auth
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "80"
+

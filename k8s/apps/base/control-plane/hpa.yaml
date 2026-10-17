@@ -8,11 +8,17 @@ spec:
     kind: Deployment
     name: mlops-paas-control-plane
   minReplicas: 2
-  maxReplicas: 4
+  maxReplicas: 5
   metrics:
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 60
+          averageUtilization: 65
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
