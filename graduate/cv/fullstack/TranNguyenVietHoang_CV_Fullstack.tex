@@ -74,7 +74,7 @@
 %-----------SUMMARY-----------
 \section{Summary}
 \begin{itemize}[leftmargin=0.15in, label={}]
-  \small{\item{Final-year Computer Networks student at UIT-VNU seeking a \textbf{Fullstack Intern} role. Hands-on experience building web applications with React/TypeScript and REST APIs with Spring Boot, Django, and FastAPI, from user workflows to deployment on AWS/GCP using Docker, Kubernetes, and CI/CD.}}
+  \small{\item{Final-year Computer Networks student at UIT-VNU seeking a \textbf{Fullstack Intern} role. Experienced in building web apps with React/TypeScript, developing RESTful APIs with Django, FastAPI, and Spring Boot, and deploying containerized services on AWS/GCP.}}
 \end{itemize}
 
 %-----------EDUCATION-----------
@@ -86,6 +86,31 @@
   \resumeItemListStart
     \resumeItem{GPA: 8.75/10.00}
   \resumeItemListEnd
+\resumeSubHeadingListEnd
+
+%-----------PROJECTS-----------
+\section{Projects}
+\resumeSubHeadingListStart
+
+\resumeProjectHeading
+{\textbf{MLOps PaaS System} $|$ \href{https://github.com/Viet-Hoang-2005/mlops-paas-system}{GitHub} $|$ \emph{React, TypeScript, Django, FastAPI, PostgreSQL, Redis, Celery, Redpanda, Docker, AWS, Kubernetes, Argo CD}}
+{3/2026 -- Present}
+\resumeItemListStart
+\resumeItem{Architected a multi-tenant MLOps platform featuring a React 19/TypeScript SPA and Django REST modular monolith (10 apps) with asymmetric RS256 JWT/JWKS authentication for project and model lifecycle.}
+\resumeItem{Built responsive dashboard interfaces using TanStack Query for server state/caching, Zod-validated multi-step forms (React Hook Form), S3 presigned direct uploads, and a real-time ANSI log streaming viewer.}
+\resumeItem{Developed a high-performance FastAPI inference gateway with dynamic routing, Celery/Redis async workers via \texttt{transaction.on\_commit} hooks, and Redpanda streaming for live telemetry and Evidently drift detection.}
+\resumeItem{Containerized services with multi-stage Docker builds and automated continuous GitOps deployment to Kubernetes via GitHub Actions and Argo CD.}
+\resumeItemListEnd
+
+\resumeProjectHeading
+{\textbf{SageLMS} $|$ \href{https://github.com/daithang59/sagelms}{GitHub} $|$ \emph{React, TypeScript, Spring Boot, FastAPI, LangChain, PostgreSQL, Redis, Docker, GCP, Kubernetes, GitHub Actions, FluxCD}}
+{4/2026 -- 6/2026}
+\resumeItemListStart
+\resumeItem{Connected React/TypeScript interfaces to Spring Boot APIs and PostgreSQL for course creation, lesson management, and enrollment, secured with JWT authentication via Spring Cloud Gateway.}
+\resumeItem{Built React assessment workflows with countdown timers, localStorage draft autosave, and automatic submission; connected test results to question reviews and instructor gradebooks.}
+\resumeItem{Integrated an AI tutor powered by FastAPI, LangChain, and Gemini with course context, real-time React chat UI, and automated CI/CD deployment to GKE using Docker, GitHub Actions, and FluxCD.}
+\resumeItemListEnd
+
 \resumeSubHeadingListEnd
 
 %-----------AWARDS-----------
@@ -100,40 +125,14 @@
   \resumeItemListEnd
 \resumeSubHeadingListEnd
 
-%-----------PROJECTS-----------
-\section{Projects}
-\resumeSubHeadingListStart
-
-\resumeProjectHeading
-{\textbf{MLOps PaaS System} $|$ \href{https://github.com/Viet-Hoang-2005/mlops-paas-system}{GitHub} $|$ \emph{React, TypeScript, Django, FastAPI, Redpanda, PostgreSQL, Redis, Docker, AWS, Kubernetes, GitHub Actions, Argo CD}}
-{3/2026 -- Present}
-\resumeItemListStart
-\resumeItem{Built a React/TypeScript dashboard with Django REST APIs for project creation, S3 artifact uploads, and model deployment; validated multi-step forms with React Hook Form and Zod.}
-\resumeItem{Connected training and build workflows to Celery/Redis background jobs, displaying runtime logs, metrics, and artifacts through API polling for deployment decisions.}
-\resumeItem{Secured tenant-scoped projects with JWT authentication and automatic token refresh; integrated FastAPI inference endpoints for testing deployed model versions from the dashboard.}
-\resumeItem{Published prediction events to Redpanda for Evidently drift analysis, enabling users to configure monitors and compare production inputs against reference data.}
-\resumeItem{Deployed Docker services to Kubernetes on AWS, automating image builds and deployment updates with GitHub Actions and Argo CD.}
-\resumeItemListEnd
-
-\resumeProjectHeading
-{\textbf{SageLMS} $|$ \href{https://github.com/daithang59/sagelms}{GitHub} $|$ \emph{React, TypeScript, Spring Boot, FastAPI, LangChain, PostgreSQL, Redis, Docker, GCP, Kubernetes, GitHub Actions, FluxCD}}
-{4/2026 -- 6/2026}
-\resumeItemListStart
-\resumeItem{Connected React/TypeScript screens to Spring Boot APIs and PostgreSQL for course creation, lesson management, and enrollment, with JWT authentication through Spring Cloud Gateway.}
-\resumeItem{Built React assessment workflows with countdown timers, localStorage draft autosave, and automatic submission; connected results to question review and instructor gradebooks.}
-\resumeItem{Integrated FastAPI, LangChain, and Gemini for AI tutoring with access-checked course/challenge context, paired with a React chat UI and persistent conversation history.}
-\resumeItem{Deployed Docker services to GKE with FluxCD; automated tests, Trivy vulnerability scans, and Cosign image signing in GitHub Actions pipelines.}
-\resumeItemListEnd
-
-\resumeSubHeadingListEnd
-
 %-----------RESEARCH-----------
 \section{Research}
 \resumeSubHeadingListStart
   \resumeProjectHeading
-    {\parbox[t]{0.78\textwidth}{\textbf{\href{https://csonet-conf.github.io/csonet26/index.html}{CSoNet 2026: A Drift-Aware MLOps Framework for Multi-Model Serving: A Network Intrusion Detection Case Study}}}}{Preview}
+    {\textbf{CSoNet 2026} $|$ \href{https://csonet-conf.github.io/csonet26/index.html}{\emph{A Drift-Aware MLOps Framework for Multi-Model Serving: A Network Intrusion Detection Case Study}}}{Accepted}
   \resumeItemListStart
-    \resumeItem{First author; proposed a cloud-native MLOps framework with decoupled control/data planes for multi-model lifecycle management; drift-triggered retraining on CIC-IDS2017 recovered Macro-F1 from 0.13--0.46 to 0.98--1.00 ($\Delta$+0.54--+0.87).}
+    \resumeItem{First author; proposed a tenant-aware control/data-plane MLOps architecture featuring a Native Registry and asynchronous production logging to trace model-version provenance, reference baselines, and monitoring reports across multi-model endpoints.}
+    \resumeItem{Validated across 120 CICIDS2017 windows: attack prevalence shifts flagged 74.2\%--98.1\% of features at Macro-F1 $\geq$ 0.999, while 25\% held-out attack replacement cut recall to 0.753 with only 1/5 KS-BH alerts, establishing human-reviewed update boundaries.}
   \resumeItemListEnd
 \resumeSubHeadingListEnd
 
