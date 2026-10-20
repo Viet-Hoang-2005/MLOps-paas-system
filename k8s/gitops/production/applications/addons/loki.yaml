@@ -83,7 +83,7 @@ spec:
               matchExpressions:
                 - key: kubernetes.io/metadata.name
                   operator: In
-                  values: [mlops-logging, mlops-control-plane, monitoring]
+                  values: [mlops-logging, mlops-paas-core, monitoring]
           metrics:
             namespaceSelector:
               matchLabels: {kubernetes.io/metadata.name: monitoring}

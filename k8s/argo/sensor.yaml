@@ -35,7 +35,7 @@ spec:
             value: ['^(manual_upload|training_job)$']
           - path: body.control_plane_webhook_url
             type: string
-            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-control-plane\.svc\.cluster\.local:8000)/internal/webhooks/builds/[0-9a-f-]{36}/$']
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/builds/[0-9a-f-]{36}/$']
         exprs:
           - expr: callback =~ build_id && image_repository =~ project_id && image_tag =~ build_id
             fields:
@@ -68,7 +68,7 @@ spec:
             value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
           - path: body.control_plane_webhook_url
             type: string
-            value: ['^http://mlops-paas-control-plane\.mlops-control-plane\.svc\.cluster\.local:8000/internal/webhooks/deployments/[0-9a-f-]{36}/$']
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/deployments/[0-9a-f-]{36}/$']
           - path: body.callback_token
             type: string
             value: ['^[0-9]{10}\.[0-9a-f]{64}$']
@@ -120,7 +120,7 @@ spec:
             value: ['^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
           - path: body.control_plane_webhook_url
             type: string
-            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-control-plane\.svc\.cluster\.local:8000)/internal/webhooks/drift-runs/[0-9a-f-]{36}/$']
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/drift-runs/[0-9a-f-]{36}/$']
         exprs:
           - expr: callback =~ job_id
             fields:
@@ -136,7 +136,7 @@ spec:
             value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
           - path: body.control_plane_webhook_url
             type: string
-            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-control-plane\.svc\.cluster\.local:8000)/internal/webhooks/project-deletions/[0-9a-f-]{36}/$']
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/project-deletions/[0-9a-f-]{36}/$']
         exprs:
           - expr: callback =~ project_id
             fields:
@@ -164,7 +164,7 @@ spec:
             value: ['^(none|gpu)$']
           - path: body.control_plane_webhook_url
             type: string
-            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-control-plane\.svc\.cluster\.local:8000)/internal/webhooks/training-jobs/[0-9a-f-]{36}/$']
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/training-jobs/[0-9a-f-]{36}/$']
         exprs:
           - expr: callback =~ job_id && job_name =~ job_id
             fields:
@@ -201,7 +201,7 @@ spec:
             value: ['^training-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
           - path: body.control_plane_callback_url
             type: string
-            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-control-plane\.svc\.cluster\.local:8000)/internal/webhooks/training-jobs/[0-9a-f-]{36}/cancellation/$']
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/training-jobs/[0-9a-f-]{36}/cancellation/$']
         exprs:
           - expr: callback =~ job_id && job_name =~ job_id
             fields:
@@ -227,7 +227,7 @@ spec:
             value: ['^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
           - path: body.callback_url
             type: string
-            value: ['^http://mlops-paas-control-plane\.mlops-control-plane\.svc\.cluster\.local:8000/internal/executions/(training|drift)/[0-9a-f-]{36}/observations/$']
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/executions/(training|drift)/[0-9a-f-]{36}/observations/$']
         exprs:
           - expr: callback =~ resource_id && callback =~ kind
             fields:

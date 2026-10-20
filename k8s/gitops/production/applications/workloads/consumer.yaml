@@ -32,3 +32,9 @@ spec:
       kind: ExternalSecret
       jsonPointers:
         - /metadata/annotations/force-sync
+    # Owned by mlops-paas-consumer-scaler (KEDA); self-heal would otherwise reset it.
+    - group: apps
+      kind: Deployment
+      name: mlops-paas-consumer
+      jsonPointers:
+        - /spec/replicas

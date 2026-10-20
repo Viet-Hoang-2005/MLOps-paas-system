@@ -32,3 +32,10 @@ spec:
       kind: ExternalSecret
       jsonPointers:
         - /metadata/annotations/force-sync
+    # Owned by mlops-paas-model-server-hpa; self-heal would otherwise reset it and
+    # restart the scale-up/scale-down cycle.
+    - group: apps
+      kind: Deployment
+      name: mlops-paas-model-server
+      jsonPointers:
+        - /spec/replicas

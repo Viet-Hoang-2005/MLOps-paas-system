@@ -202,7 +202,7 @@ def main():
     _name, _ = identity(payload, payload["kind"])
     expected_path = f"/internal/executions/{payload['kind']}/{payload['resource_id']}/observations/"
     url = urllib.parse.urlsplit(payload["callback_url"])
-    if url.scheme != "http" or url.netloc not in {"mlops-paas-control-plane:8000", "mlops-paas-control-plane.mlops-paas-core.svc.cluster.local:8000", "mlops-paas-control-plane.mlops-control-plane.svc.cluster.local:8000"} or url.path != expected_path or url.query:
+    if url.scheme != "http" or url.netloc not in {"mlops-paas-control-plane:8000", "mlops-paas-control-plane.mlops-paas-core.svc.cluster.local:8000"} or url.path != expected_path or url.query:
         raise ValueError("Invalid observation callback destination.")
     try:
         observation = reconcile(api, payload)

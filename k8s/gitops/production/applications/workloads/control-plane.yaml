@@ -39,3 +39,9 @@ spec:
       name: mlops-paas-control-plane
       jsonPointers:
         - /spec/replicas
+    # Owned by mlops-paas-celery-worker-scaler (KEDA); self-heal would otherwise reset it.
+    - group: apps
+      kind: Deployment
+      name: mlops-paas-celery-worker
+      jsonPointers:
+        - /spec/replicas

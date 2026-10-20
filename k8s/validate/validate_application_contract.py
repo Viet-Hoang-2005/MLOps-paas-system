@@ -52,6 +52,29 @@ def validate_workload_layout(context: ValidationContext) -> list[str]:
             for image in images
             if image != logical_image
         )
+        ignored_deployments = {
+            diff.get("name")
+            for diff in (application.get("spec") or {}).get("ignoreDifferences") or []
+            if diff.get("group") == "apps"
+            and diff.get("kind") == "Deployment"
+            and "/spec/replicas" in (diff.get("jsonPointers") or [])
+        }
+        autoscaled_deployments = set()
+        for resource in context.render(f"k8s/apps/base/{service}"):
+            kind = resource.get("kind")
+            spec = resource.get("spec") or {}
+            if kind == "HorizontalPodAutoscaler":
+                target = spec.get("scaleTargetRef") or {}
+                if target.get("kind") in {None, "Deployment"}:
+                    autoscaled_deployments.add(target.get("name"))
+            elif kind == "ScaledObject":
+                target = spec.get("scaleTargetRef") or {}
+                autoscaled_deployments.add(target.get("name"))
+        missing_ignores = autoscaled_deployments - ignored_deployments
+        if missing_ignores:
+            errors.append(
+                f"{app_name} must ignore /spec/replicas differences for autoscaled Deployments: {sorted(missing_ignores)}"
+            )
     return errors
 
 

@@ -13,6 +13,7 @@ from k8s.validate.common import ValidationContext, identity, repository_root
 from k8s.validate.validate_application_contract import (
     validate_lifecycle,
     validate_no_default_namespace,
+    validate_workload_layout,
 )
 from k8s.validate.validate_cluster_capacity import validate_pool
 from k8s.validate.validate_execution_security import (
@@ -102,6 +103,26 @@ class ValidatorNegativeTests(unittest.TestCase):
         }
         errors = validate_no_default_namespace(FakeContext(applications=[application]))
         self.assertTrue(any("must not target" in error for error in errors))
+
+    def test_workload_layout_rejects_missing_autoscaler_ignore_differences(self):
+        app = {
+            "metadata": {"name": "mlops-prod-workload-consumer"},
+            "spec": {
+                "source": {"path": "k8s/apps/overlays/production/consumer"},
+                "ignoreDifferences": [],
+            },
+        }
+        context = FakeContext(
+            applications=[app],
+            rendered={
+                "k8s/apps/base/consumer": [
+                    {"kind": "Deployment", "metadata": {"name": "mlops-paas-consumer"}, "spec": {"template": {"spec": {"containers": [{"image": "mlops-paas-consumer"}]}}}},
+                    {"kind": "ScaledObject", "spec": {"scaleTargetRef": {"name": "mlops-paas-consumer"}}},
+                ]
+            },
+        )
+        errors = validate_workload_layout(context)
+        self.assertTrue(any("must ignore /spec/replicas differences" in error for error in errors))
 
     def test_resource_ownership_rejects_duplicate_identity(self):
         application = lambda name, path: {
