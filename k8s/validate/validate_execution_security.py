@@ -121,7 +121,7 @@ def validate(context: ValidationContext) -> list[str]:
                             "kubernetes.io/metadata.name": "mlops-paas-core"
                         }
                     },
-                    "podSelector": {"matchLabels": {"app": "mlops-paas-celery-worker"}},
+                    "podSelector": {"matchLabels": {"app.kubernetes.io/name": "mlops-paas-celery-worker"}},
                 }
             ],
             "ports": [{"protocol": "TCP", "port": 12000}],
@@ -143,8 +143,8 @@ def validate(context: ValidationContext) -> list[str]:
             "Argo Events server bearer-token Secret must be synchronized by External Secrets"
         )
     for deployment_name, expected_secret in {
-        "mlops-paas-control-plane": "control-plane-api-secret",
-        "mlops-paas-celery-worker": "celery-worker-secret",
+        "mlops-paas-control-plane": "mlops-paas-control-plane-secret",
+        "mlops-paas-celery-worker": "mlops-paas-celery-worker-secret",
     }.items():
         deployment = find_resource(control_plane, "Deployment", deployment_name)
         pod_spec = ((deployment.get("spec") or {}).get("template") or {}).get(
@@ -230,7 +230,7 @@ def validate_runtime_health_processes(resources: list[dict]) -> list[str]:
                 if any(word in key for word in ("AWS_", "HARBOR_", "JWT_", "WEBHOOK", "DOCKER_HOST")):
                     errors.append(f"{name} receives unnecessary credential/configuration {key}")
                 secret = (env.get("valueFrom") or {}).get("secretKeyRef")
-                if secret and (key not in allowed_secrets or secret.get("name") != "celery-worker-secret" or secret.get("key") != key):
+                if secret and (key not in allowed_secrets or secret.get("name") != "mlops-paas-celery-worker-secret" or secret.get("key") != key):
                     errors.append(f"{name} must read only scoped DB/broker secret keys")
             if not any(env.get("name") == "DJANGO_SETTINGS_MODULE" and env.get("value") == "config.settings.health" for env in container.get("env") or []):
                 errors.append(f"{name} must use credential-minimal health settings")

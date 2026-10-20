@@ -6,12 +6,12 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: mlops-paas-postgres
+  name: postgresql
   annotations:
     description: "CloudNativePG cluster for MLops data and training metadata storage"
   labels:
     app.kubernetes.io/name: postgresql
-    app.kubernetes.io/instance: mlops-paas-postgres
+    app.kubernetes.io/instance: postgresql
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: database
     app.kubernetes.io/tier: data
@@ -21,7 +21,7 @@ spec:
   inheritedMetadata:
     labels:
       app.kubernetes.io/name: postgresql
-      app.kubernetes.io/instance: mlops-paas-postgres
+      app.kubernetes.io/instance: postgresql
       app.kubernetes.io/part-of: mlops-paas
       app.kubernetes.io/component: database
       app.kubernetes.io/tier: data
@@ -38,7 +38,7 @@ spec:
       database: mlops_paas_db
       owner: postgres
       secret:
-        name: postgres-bootstrap-secret
+        name: postgresql-bootstrap-secret
       postInitApplicationSQL:
         - "CREATE SCHEMA IF NOT EXISTS control_plane;"
 

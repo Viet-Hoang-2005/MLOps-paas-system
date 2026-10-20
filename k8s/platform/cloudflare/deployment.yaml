@@ -59,7 +59,7 @@ spec:
             - name: TUNNEL_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: tunnel-token
+                  name: cloudflared-tunnel-token
                   key: token
           
           # Cấu hình tài nguyên cho Cloudflared

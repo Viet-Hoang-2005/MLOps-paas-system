@@ -66,16 +66,16 @@ LEGACY_SHARED_SECRET_TARGETS = {
 }
 EXTERNAL_SECRET_OWNERS = {
     "k8s/apps/overlays/production/control-plane": {
-        ("mlops-paas-core", "control-plane-api-secret"),
-        ("mlops-paas-core", "celery-worker-secret"),
+        ("mlops-paas-core", "mlops-paas-control-plane-secret"),
+        ("mlops-paas-core", "mlops-paas-celery-worker-secret"),
     },
-    "k8s/apps/overlays/production/consumer": {("mlops-paas-core", "consumer-secret")},
+    "k8s/apps/overlays/production/consumer": {("mlops-paas-core", "mlops-paas-consumer-secret")},
     "k8s/apps/overlays/production/model-server": {
-        ("mlops-paas-core", "model-server-secret")
+        ("mlops-paas-core", "mlops-paas-model-server-secret")
     },
-    "k8s/platform/postgres": {("mlops-paas-data", "postgres-bootstrap-secret")},
+    "k8s/platform/postgres": {("mlops-paas-data", "postgresql-bootstrap-secret")},
     "k8s/platform/redis": {("mlops-paas-data", "redis-ha-secret")},
-    "k8s/platform/cloudflare": {("mlops-paas-routing", "tunnel-token")},
+    "k8s/platform/cloudflare": {("mlops-paas-routing", "cloudflared-tunnel-token")},
     "k8s/argo": {
         ("mlops-paas-execution", "argo-build-callback-secret"),
         ("mlops-paas-execution", "harbor-registry-dockerconfig"),

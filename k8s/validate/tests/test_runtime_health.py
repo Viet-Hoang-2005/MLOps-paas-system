@@ -25,7 +25,7 @@ class RuntimeHealthProcessTests(unittest.TestCase):
         resources = copy.deepcopy(self.resources())
         worker = next(r for r in resources if r["metadata"]["name"] == "mlops-paas-celery-health-worker")
         container = worker["spec"]["template"]["spec"]["containers"][0]
-        container["envFrom"].append({"secretRef": {"name": "celery-worker-secret"}})
+        container["envFrom"].append({"secretRef": {"name": "mlops-paas-celery-worker-secret"}})
         self.assertTrue(any("broad" in e for e in validate_runtime_health_processes(resources)))
 
     def test_celery_deployments_remain_separate(self):

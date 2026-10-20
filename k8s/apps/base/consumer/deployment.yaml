@@ -49,7 +49,7 @@ spec:
         - name: init-kafka-topic
           image: docker.redpanda.com/redpandadata/redpanda:v23.3.21
           command: ["/bin/sh", "-c"]
-          args: ["rpk topic create mlops_paas_production_data mlops_paas_production_data.dlq --brokers redpanda-service.mlops-paas-data.svc.cluster.local:9092 || true"]
+          args: ["rpk topic create mlops_paas_production_data mlops_paas_production_data.dlq --brokers redpanda.mlops-paas-data.svc.cluster.local:9092 || true"]
       containers:
         - name: consumer
           image: mlops-paas-consumer
@@ -62,17 +62,17 @@ spec:
             - name: CONTROL_PLANE_WEBHOOK_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: consumer-secret
+                  name: mlops-paas-consumer-secret
                   key: CONTROL_PLANE_WEBHOOK_SECRET
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: consumer-secret
+                  name: mlops-paas-consumer-secret
                   key: DB_USER
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: consumer-secret
+                  name: mlops-paas-consumer-secret
                   key: DB_PASSWORD
           # Cấu hình tài nguyên cho Consumer
           resources:

@@ -44,22 +44,22 @@ spec:
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: model-server-secret
+                  name: mlops-paas-model-server-secret
                   key: DB_USER
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: model-server-secret
+                  name: mlops-paas-model-server-secret
                   key: DB_PASSWORD
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: model-server-secret
+                  name: mlops-paas-model-server-secret
                   key: REDIS_PASSWORD
             - name: REDIS_SENTINEL_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: model-server-secret
+                  name: mlops-paas-model-server-secret
                   key: REDIS_SENTINEL_PASSWORD
           envFrom:
             - configMapRef:

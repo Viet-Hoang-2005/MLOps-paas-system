@@ -241,7 +241,7 @@
   kubernetes.core.k8s_info:
     api_version: postgresql.cnpg.io/v1
     kind: Cluster
-    name: mlops-paas-postgres
+    name: postgresql
     namespace: mlops-paas-data
     kubeconfig: "{{ k3s_remote_kubeconfig }}"
   register: verified_cnpg_cluster
@@ -264,8 +264,8 @@
     namespace: mlops-paas-data
     kubeconfig: "{{ k3s_remote_kubeconfig }}"
   loop:
-    - mlops-paas-redis-ha
-    - mlops-paas-redis-ha-sentinel
+    - redis-ha
+    - redis-ha-sentinel
   register: verified_redis_statefulsets
   when: verify_scope == 'platform'
 
@@ -289,8 +289,8 @@
       - "role={{ item.role }}"
     kubeconfig: "{{ k3s_remote_kubeconfig }}"
   loop:
-    - {app: mlops-paas-redis-ha, role: replication}
-    - {app: mlops-paas-redis-ha-sentinel, role: sentinel}
+    - {app: redis-ha, role: replication}
+    - {app: redis-ha-sentinel, role: sentinel}
   register: verified_redis_pods
   when: verify_scope == 'platform'
 

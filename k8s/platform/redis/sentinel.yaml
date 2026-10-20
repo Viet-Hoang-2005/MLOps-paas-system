@@ -1,12 +1,12 @@
 apiVersion: redis.redis.opstreelabs.in/v1beta2
 kind: RedisSentinel
 metadata:
-  name: mlops-paas-redis-ha
+  name: redis-ha
   annotations:
     argocd.argoproj.io/sync-wave: "1"
   labels:
     app.kubernetes.io/name: redis-sentinel
-    app.kubernetes.io/instance: mlops-paas-redis-ha
+    app.kubernetes.io/instance: redis-ha
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: sentinel
     app.kubernetes.io/tier: data
@@ -28,8 +28,8 @@ spec:
         cpu: 100m
         memory: 64Mi
   redisSentinelConfig:
-    redisReplicationName: mlops-paas-redis-ha
-    masterGroupName: mlops-paas-redis
+    redisReplicationName: redis-ha
+    masterGroupName: redis-master
     redisReplicationPassword:
       secretKeyRef:
         name: redis-ha-secret
@@ -53,7 +53,7 @@ spec:
       requiredDuringSchedulingIgnoredDuringExecution:
         - labelSelector:
             matchLabels:
-              app: mlops-paas-redis-ha-sentinel
+              app: redis-ha-sentinel
               role: sentinel
           topologyKey: kubernetes.io/hostname
   tolerations:

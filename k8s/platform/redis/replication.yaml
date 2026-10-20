@@ -1,12 +1,12 @@
 apiVersion: redis.redis.opstreelabs.in/v1beta2
 kind: RedisReplication
 metadata:
-  name: mlops-paas-redis-ha
+  name: redis-ha
   annotations:
     argocd.argoproj.io/sync-wave: "0"
   labels:
     app.kubernetes.io/name: redis
-    app.kubernetes.io/instance: mlops-paas-redis-ha
+    app.kubernetes.io/instance: redis-ha
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: cache
     app.kubernetes.io/tier: data
@@ -49,7 +49,7 @@ spec:
       requiredDuringSchedulingIgnoredDuringExecution:
         - labelSelector:
             matchLabels:
-              app: mlops-paas-redis-ha
+              app: redis-ha
               role: replication
           topologyKey: kubernetes.io/hostname
   pdb:

@@ -3,7 +3,7 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: mlops-paas-postgres-monitor
+  name: postgresql-monitor
   namespace: monitoring
   labels:
     release: monitoring
@@ -20,7 +20,7 @@ spec:
   # Bộ lọc nhận diện chính xác các Pod thuộc cụm DB
   selector:
     matchLabels:
-      cnpg.io/cluster: mlops-paas-postgres 
+      cnpg.io/cluster: postgresql 
 
   # Cấu hình cổng và tần suất thu thập
   podMetricsEndpoints:

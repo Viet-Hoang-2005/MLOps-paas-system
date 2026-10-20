@@ -13,16 +13,16 @@ metadata:
 spec:
   secretTargetRef:
     - parameter: password
-      name: celery-worker-secret
+      name: mlops-paas-celery-worker-secret
       key: REDIS_PASSWORD
     - parameter: sentinelPassword
-      name: celery-worker-secret
+      name: mlops-paas-celery-worker-secret
       key: REDIS_SENTINEL_PASSWORD
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
-  name: mlops-paas-celery-scaler
+  name: mlops-paas-celery-worker-scaler
   labels:
     app.kubernetes.io/name: mlops-paas-celery-worker
     app.kubernetes.io/instance: mlops-paas-celery-worker
@@ -41,8 +41,8 @@ spec:
   triggers:
     - type: redis-sentinel
       metadata:
-        sentinelAddresses: mlops-paas-redis-ha-sentinel-0.mlops-paas-redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,mlops-paas-redis-ha-sentinel-1.mlops-paas-redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,mlops-paas-redis-ha-sentinel-2.mlops-paas-redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
-        sentinelMaster: mlops-paas-redis
+        sentinelAddresses: redis-ha-sentinel-0.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-1.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-2.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
+        sentinelMaster: redis-master
         listName: celery
         listLength: "10"
         databaseIndex: "3"

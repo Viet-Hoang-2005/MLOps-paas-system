@@ -37,7 +37,7 @@ class RedisSentinelClientTests(SimpleTestCase):
     @override_settings(
         REDIS_CONNECTION_MODE="sentinel",
         REDIS_SENTINELS=[("sentinel-0", 26379), ("sentinel-1", 26379), ("sentinel-2", 26379)],
-        REDIS_SENTINEL_MASTER_NAME="mlops-paas-redis",
+        REDIS_SENTINEL_MASTER_NAME="redis-master",
         REDIS_PASSWORD="redis-password",
         REDIS_SENTINEL_PASSWORD="sentinel-password",
     )
@@ -52,5 +52,5 @@ class RedisSentinelClientTests(SimpleTestCase):
             socket_timeout=2,
         )
         sentinel_class.return_value.master_for.assert_called_once_with(
-            "mlops-paas-redis", db=1, password="redis-password"
+            "redis-master", db=1, password="redis-password"
         )

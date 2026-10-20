@@ -193,7 +193,7 @@ spec:
     - name: paas.redis-ha
       rules:
         - alert: RedisHAReplicasUnavailable
-          expr: kube_statefulset_status_replicas_ready{namespace="mlops-paas-data",statefulset="mlops-paas-redis-ha"} < 2 or kube_statefulset_status_replicas_ready{namespace="mlops-paas-data",statefulset="mlops-paas-redis-ha-sentinel"} < 3
+          expr: kube_statefulset_status_replicas_ready{namespace="mlops-paas-data",statefulset="redis-ha"} < 2 or kube_statefulset_status_replicas_ready{namespace="mlops-paas-data",statefulset="redis-ha-sentinel"} < 3
           for: 3m
           labels:
             severity: critical

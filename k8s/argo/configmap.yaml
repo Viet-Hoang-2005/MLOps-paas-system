@@ -9,7 +9,7 @@ data:
   LOG_SUMMARY_INTERVAL_SECONDS: "60"
   AWS_DEFAULT_REGION: "ap-southeast-1"
   AWS_BUCKET_NAME: "mlops-paas-artifacts"
-  DB_HOST_RO: "mlops-paas-postgres-ro.mlops-paas-data.svc.cluster.local"
+  DB_HOST_RO: "postgresql-ro.mlops-paas-data.svc.cluster.local"
   DB_PORT: "5432"
   DB_NAME: "mlops_paas_db"
   HARBOR_REGISTRY_URL: "registry.mlops-nids-nt114.id.vn"

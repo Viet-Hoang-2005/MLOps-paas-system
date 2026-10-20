@@ -15,7 +15,7 @@ metadata:
     mlops.io/domain: messaging
     app.kubernetes.io/managed-by: kustomize
 spec:
-  serviceName: redpanda-service
+  serviceName: redpanda
   replicas: 1
   selector:
     matchLabels:
@@ -55,7 +55,7 @@ spec:
         - --kafka-addr
         - PLAINTEXT://0.0.0.0:9092,OUTSIDE://0.0.0.0:19092
         - --advertise-kafka-addr
-        - PLAINTEXT://redpanda-0.redpanda-service.mlops-paas-data.svc.cluster.local:9092,OUTSIDE://localhost:19092
+        - PLAINTEXT://redpanda-0.redpanda.mlops-paas-data.svc.cluster.local:9092,OUTSIDE://localhost:19092
         ports:
         - containerPort: 9092
           name: kafka
@@ -88,7 +88,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: redpanda-service
+  name: redpanda
   labels:
     app.kubernetes.io/name: redpanda
     app.kubernetes.io/instance: redpanda

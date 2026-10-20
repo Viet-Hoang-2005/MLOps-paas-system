@@ -16,7 +16,7 @@ spec:
               kubernetes.io/metadata.name: mlops-paas-core
           podSelector:
             matchLabels:
-              app: mlops-paas-celery-worker
+              app.kubernetes.io/name: mlops-paas-celery-worker
       ports:
         - protocol: TCP
           port: 12000

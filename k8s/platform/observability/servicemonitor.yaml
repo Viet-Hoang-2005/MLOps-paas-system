@@ -3,7 +3,7 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: model-server-monitor
+  name: mlops-paas-model-server-monitor
   namespace: monitoring
   labels:
     release: monitoring
@@ -37,7 +37,7 @@ spec:
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: control-plane-monitor
+  name: mlops-paas-control-plane-monitor
   namespace: monitoring
   labels:
     release: monitoring
@@ -71,7 +71,7 @@ spec:
       - mlops-paas-data
   selector:
     matchLabels:
-      app: mlops-paas-redis-ha
+      app: redis-ha
       app.kubernetes.io/component: metrics
       redis_setup_type: replication
       role: replication
@@ -93,7 +93,7 @@ spec:
       - mlops-paas-data
   selector:
     matchLabels:
-      app: mlops-paas-redis-ha-sentinel
+      app: redis-ha-sentinel
       app.kubernetes.io/component: metrics
       redis_setup_type: sentinel
       role: sentinel

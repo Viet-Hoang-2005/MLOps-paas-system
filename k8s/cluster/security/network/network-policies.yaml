@@ -2,7 +2,7 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: np-postgres
+  name: np-postgresql
   namespace: mlops-paas-data
   labels:
     app.kubernetes.io/name: postgresql
@@ -13,7 +13,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      cnpg.io/cluster: mlops-paas-postgres
+      cnpg.io/cluster: postgresql
   policyTypes:
     - Ingress
   ingress:
@@ -21,7 +21,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: mlops-paas-postgres
+              cnpg.io/cluster: postgresql
     # 1.2. CloudNativePG Operator quản lý cluster
     - from:
         - namespaceSelector:
@@ -49,7 +49,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: np-redis
+  name: np-redis-ha
   namespace: mlops-paas-data
   labels:
     app.kubernetes.io/name: redis
@@ -60,7 +60,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: mlops-paas-redis-ha
+      app: redis-ha
   policyTypes:
     - Ingress
   ingress:
@@ -143,7 +143,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: np-control-plane
+  name: np-mlops-paas-control-plane
   namespace: mlops-paas-core
   labels:
     app.kubernetes.io/name: mlops-paas-control-plane
@@ -194,7 +194,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: np-web
+  name: np-mlops-paas-web
   namespace: mlops-paas-core
   labels:
     app.kubernetes.io/name: mlops-paas-web
@@ -237,7 +237,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: np-model-server
+  name: np-mlops-paas-model-server
   namespace: mlops-paas-core
   labels:
     app.kubernetes.io/name: mlops-paas-model-server
@@ -285,7 +285,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: np-consumer-deny-ingress
+  name: np-mlops-paas-consumer
   namespace: mlops-paas-core
   labels:
     app.kubernetes.io/name: mlops-paas-consumer

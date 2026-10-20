@@ -40,7 +40,7 @@ def validate(context: ValidationContext) -> list[str]:
     config = sentinel.get("redisSentinelConfig") or {}
     if sentinel.get("clusterSize") != 3 or config.get("quorum") != "2":
         errors.append("RedisSentinel must run three Pods with quorum two")
-    if config.get("redisReplicationName") != "mlops-paas-redis-ha" or config.get("masterGroupName") != "mlops-paas-redis":
+    if config.get("redisReplicationName") != "redis-ha" or config.get("masterGroupName") != "redis-master":
         errors.append("RedisSentinel must monitor the declared RedisReplication master set")
     node_terms = ((((sentinel.get("affinity") or {}).get("nodeAffinity") or {}).get("requiredDuringSchedulingIgnoredDuringExecution") or {}).get("nodeSelectorTerms") or [])
     if not node_terms or not any(

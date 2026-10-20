@@ -34,7 +34,7 @@ spec:
         - /metadata/annotations/force-sync
     - group: postgresql.cnpg.io
       kind: Cluster
-      name: mlops-paas-postgres
+      name: postgresql
       namespace: mlops-paas-data
       jsonPointers:
         - /spec/bootstrap/initdb/encoding
