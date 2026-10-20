@@ -32,11 +32,9 @@ LEGACY_K8S_PATHS = (
 PRODUCTION_NAMESPACES = {
     "argo",
     "argo-events",
-    "cloudflare",
     "cnpg-system",
     "external-secrets",
     "gpu-operator",
-    "harbor",
     "headlamp",
     "karpenter",
     "keda",
@@ -44,19 +42,15 @@ PRODUCTION_NAMESPACES = {
     "kyverno",
     "monitoring",
     "mlops-logging",
-    "mlops-cluster-config",
-    "mlops-control-plane",
-    "mlops-consumer",
-    "mlops-execution",
-    "mlops-model-runtimes",
-    "mlops-model-server",
-    "mlops-postgres",
-    "mlops-redpanda",
-    "mlops-redis",
+    "mlops-paas-system",
+    "mlops-paas-routing",
+    "mlops-paas-core",
+    "mlops-paas-data",
+    "mlops-paas-harbor",
+    "mlops-paas-execution",
+    "mlops-paas-training",
+    "mlops-paas-serving",
     "redis-operator",
-    "mlops-routing",
-    "mlops-web",
-    "user-jobs",
 }
 WORKLOAD_APPLICATIONS = {
     "mlops-prod-workload-control-plane": ("control-plane", "mlops-paas-control-plane"),
@@ -72,24 +66,24 @@ LEGACY_SHARED_SECRET_TARGETS = {
 }
 EXTERNAL_SECRET_OWNERS = {
     "k8s/apps/overlays/production/control-plane": {
-        ("mlops-control-plane", "control-plane-api-secret"),
-        ("mlops-control-plane", "celery-worker-secret"),
+        ("mlops-paas-core", "control-plane-api-secret"),
+        ("mlops-paas-core", "celery-worker-secret"),
     },
-    "k8s/apps/overlays/production/consumer": {("mlops-consumer", "consumer-secret")},
+    "k8s/apps/overlays/production/consumer": {("mlops-paas-core", "consumer-secret")},
     "k8s/apps/overlays/production/model-server": {
-        ("mlops-model-server", "model-server-secret")
+        ("mlops-paas-core", "model-server-secret")
     },
-    "k8s/platform/postgres": {("mlops-postgres", "postgres-bootstrap-secret")},
-    "k8s/platform/redis": {("mlops-redis", "redis-ha-secret")},
-    "k8s/platform/cloudflare": {("cloudflare", "tunnel-token")},
+    "k8s/platform/postgres": {("mlops-paas-data", "postgres-bootstrap-secret")},
+    "k8s/platform/redis": {("mlops-paas-data", "redis-ha-secret")},
+    "k8s/platform/cloudflare": {("mlops-paas-routing", "tunnel-token")},
     "k8s/argo": {
-        ("mlops-execution", "argo-build-callback-secret"),
-        ("mlops-execution", "harbor-registry-dockerconfig"),
-        ("mlops-execution", "argo-delete-callback-secret"),
-        ("mlops-execution", "argo-evidently-secret"),
+        ("mlops-paas-execution", "argo-build-callback-secret"),
+        ("mlops-paas-execution", "harbor-registry-dockerconfig"),
+        ("mlops-paas-execution", "argo-delete-callback-secret"),
+        ("mlops-paas-execution", "argo-evidently-secret"),
         ("argo-events", "argo-events-webhook-server"),
-        ("user-jobs", "harbor-registry-pull-secret"),
-        ("mlops-model-runtimes", "harbor-registry-pull-secret"),
+        ("mlops-paas-training", "harbor-registry-pull-secret"),
+        ("mlops-paas-serving", "harbor-registry-pull-secret"),
     },
 }
 

@@ -54,7 +54,7 @@ def test_argo_training_backend_records_runtime_selectors():
     assert job.external_job_id == runtime_name
     assert job.tracking["runtime"] == {
         "backend": "argo",
-        "namespace": "user-jobs",
+        "namespace": "mlops-paas-training",
         "pytorch_job_name": runtime_name,
         "workflow_selector": expected_selector,
         "pod_selector": expected_selector,

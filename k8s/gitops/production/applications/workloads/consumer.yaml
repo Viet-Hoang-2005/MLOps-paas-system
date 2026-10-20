@@ -23,7 +23,7 @@ spec:
     path: k8s/apps/overlays/production/consumer
   destination:
     server: https://kubernetes.default.svc
-    namespace: mlops-consumer
+    namespace: mlops-paas-core
   # ESO remoteRef defaults are declared in the manifests instead of ignored here:
   # RespectIgnoreDifferences copies live values of ignored paths into the target,
   # and for a .spec.data[] path that replaces the whole array, dropping new keys.

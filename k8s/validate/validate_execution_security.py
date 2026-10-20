@@ -86,8 +86,8 @@ def validate(context: ValidationContext) -> list[str]:
             ).get("resource")
         ) or {}
         workflow_spec = workflow.get("spec") or {}
-        if resource_namespace(workflow) != "mlops-execution":
-            errors.append("Sensor triggers must create Workflows in mlops-execution")
+        if resource_namespace(workflow) != "mlops-paas-execution":
+            errors.append("Sensor triggers must create Workflows in mlops-paas-execution")
         if not workflow_spec.get("workflowTemplateRef"):
             errors.append(
                 "every Sensor trigger must reference a Git-managed WorkflowTemplate"
@@ -118,7 +118,7 @@ def validate(context: ValidationContext) -> list[str]:
                 {
                     "namespaceSelector": {
                         "matchLabels": {
-                            "kubernetes.io/metadata.name": "mlops-control-plane"
+                            "kubernetes.io/metadata.name": "mlops-paas-core"
                         }
                     },
                     "podSelector": {"matchLabels": {"app": "mlops-paas-celery-worker"}},
@@ -128,7 +128,7 @@ def validate(context: ValidationContext) -> list[str]:
         }
     ]:
         errors.append(
-            "EventSource NetworkPolicy must allow only the mlops-control-plane worker on TCP 12000"
+            "EventSource NetworkPolicy must allow only the mlops-paas-core worker on TCP 12000"
         )
     targets = {
         (
@@ -187,13 +187,13 @@ def validate(context: ValidationContext) -> list[str]:
         for resource in execution
         if resource.get("kind") == "WorkflowTemplate"
     }
-    if workflow_namespaces != {"mlops-execution"}:
-        errors.append("all Git-managed WorkflowTemplates must run in mlops-execution")
+    if workflow_namespaces != {"mlops-paas-execution"}:
+        errors.append("all Git-managed WorkflowTemplates must run in mlops-paas-execution")
     workflow_namespaces = ((yaml.safe_load(values) or {}).get("controller") or {}).get(
         "workflowNamespaces"
     )
-    if workflow_namespaces != ["mlops-execution", "argo"]:
-        errors.append("Argo Workflows must watch only mlops-execution and argo")
+    if workflow_namespaces != ["mlops-paas-execution", "argo"]:
+        errors.append("Argo Workflows must watch only mlops-paas-execution and argo")
     errors.extend(validate_runtime_health_processes(control_plane))
     return errors
 

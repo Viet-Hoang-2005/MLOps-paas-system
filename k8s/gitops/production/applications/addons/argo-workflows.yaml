@@ -35,7 +35,7 @@ spec:
             create: false
         controller:
           workflowNamespaces:
-            - mlops-execution
+            - mlops-paas-execution
             - argo
           workflowRestrictions:
             templateReferencing: Secure

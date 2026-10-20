@@ -23,7 +23,7 @@ spec:
     path: k8s/platform/postgres
   destination:
     server: https://kubernetes.default.svc
-    namespace: mlops-postgres
+    namespace: mlops-paas-data
   # ESO remoteRef defaults are declared in the manifests instead of ignored here:
   # RespectIgnoreDifferences copies live values of ignored paths into the target,
   # and for a .spec.data[] path that replaces the whole array, dropping new keys.
@@ -35,7 +35,7 @@ spec:
     - group: postgresql.cnpg.io
       kind: Cluster
       name: mlops-paas-postgres
-      namespace: mlops-postgres
+      namespace: mlops-paas-data
       jsonPointers:
         - /spec/bootstrap/initdb/encoding
         - /spec/bootstrap/initdb/localeCType

@@ -14,7 +14,7 @@ spec:
       rules:
         # Cảnh báo khi Control Plane pod không còn chạy
         - alert: ControlPlanePodsUnavailable
-          expr: kube_deployment_status_replicas_available{namespace="mlops-control-plane", deployment="mlops-paas-control-plane"} < 1
+          expr: kube_deployment_status_replicas_available{namespace="mlops-paas-core", deployment="mlops-paas-control-plane"} < 1
           for: 1m
           labels:
             severity: critical
@@ -25,7 +25,7 @@ spec:
 
         # Cảnh báo khi Celery Worker pod không còn chạy (ảnh hưởng pipeline training, build, drift)
         - alert: CeleryWorkersUnavailable
-          expr: kube_deployment_status_replicas_available{namespace="mlops-control-plane", deployment="mlops-paas-celery-worker"} < 1
+          expr: kube_deployment_status_replicas_available{namespace="mlops-paas-core", deployment="mlops-paas-celery-worker"} < 1
           for: 2m
           labels:
             severity: critical
@@ -36,7 +36,7 @@ spec:
 
         # Cảnh báo khi Consumer pod không còn chạy
         - alert: ConsumerPodsUnavailable
-          expr: kube_deployment_status_replicas_available{namespace="mlops-consumer", deployment="mlops-paas-consumer"} < 1
+          expr: kube_deployment_status_replicas_available{namespace="mlops-paas-core", deployment="mlops-paas-consumer"} < 1
           for: 1m
           labels:
             severity: critical
@@ -47,7 +47,7 @@ spec:
 
         # Cảnh báo khi Frontend Web pod không còn chạy
         - alert: WebPodsUnavailable
-          expr: kube_deployment_status_replicas_available{namespace="mlops-web", deployment="mlops-paas-web"} < 1
+          expr: kube_deployment_status_replicas_available{namespace="mlops-paas-core", deployment="mlops-paas-web"} < 1
           for: 1m
           labels:
             severity: critical
@@ -193,7 +193,7 @@ spec:
     - name: paas.redis-ha
       rules:
         - alert: RedisHAReplicasUnavailable
-          expr: kube_statefulset_status_replicas_ready{namespace="mlops-redis",statefulset="mlops-paas-redis-ha"} < 2 or kube_statefulset_status_replicas_ready{namespace="mlops-redis",statefulset="mlops-paas-redis-ha-sentinel"} < 3
+          expr: kube_statefulset_status_replicas_ready{namespace="mlops-paas-data",statefulset="mlops-paas-redis-ha"} < 2 or kube_statefulset_status_replicas_ready{namespace="mlops-paas-data",statefulset="mlops-paas-redis-ha-sentinel"} < 3
           for: 3m
           labels:
             severity: critical
@@ -202,7 +202,7 @@ spec:
             summary: "Redis HA has unavailable Redis or Sentinel replicas"
             description: "Check the two Redis and three Sentinel Pods and their node placement."
         - alert: RedisReplicaLinkDown
-          expr: redis_master_link_up{namespace="mlops-redis"} == 0
+          expr: redis_master_link_up{namespace="mlops-paas-data"} == 0
           for: 2m
           labels:
             severity: critical
@@ -211,7 +211,7 @@ spec:
             summary: "Redis replica lost its master link"
             description: "Inspect Sentinel election and Redis replication before accepting more writes."
         - alert: RedisHAMemoryHigh
-          expr: redis_memory_used_bytes{namespace="mlops-redis"} / clamp_min(redis_memory_max_bytes{namespace="mlops-redis"}, 1) > 0.85
+          expr: redis_memory_used_bytes{namespace="mlops-paas-data"} / clamp_min(redis_memory_max_bytes{namespace="mlops-paas-data"}, 1) > 0.85
           for: 5m
           labels:
             severity: warning
@@ -220,7 +220,7 @@ spec:
             summary: "Redis memory usage exceeds 85% of maxmemory"
             description: "Investigate queue depth and key retention before Redis rejects writes."
         - alert: RedisHAPVCAlmostFull
-          expr: kubelet_volume_stats_used_bytes{namespace="mlops-redis"} / clamp_min(kubelet_volume_stats_capacity_bytes{namespace="mlops-redis"}, 1) > 0.8
+          expr: kubelet_volume_stats_used_bytes{namespace="mlops-paas-data"} / clamp_min(kubelet_volume_stats_capacity_bytes{namespace="mlops-paas-data"}, 1) > 0.8
           for: 10m
           labels:
             severity: warning

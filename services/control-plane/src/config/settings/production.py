@@ -20,6 +20,9 @@ if POD_IP and POD_IP not in ALLOWED_HOSTS:
 
 ALLOWED_HOSTS = [
     *ALLOWED_HOSTS,
+    "mlops-paas-control-plane.mlops-paas-core.svc.cluster.local",
+    "mlops-paas-control-plane.mlops-paas-core.svc",
+    "mlops-paas-control-plane.mlops-paas-core",
     "mlops-paas-control-plane.mlops-control-plane.svc.cluster.local",
     "mlops-paas-control-plane.mlops-control-plane.svc",
     "mlops-paas-control-plane.mlops-control-plane",

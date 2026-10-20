@@ -22,8 +22,8 @@ spec:
           - mlops-paas-model-serving
   namespaceSelector:
     matchNames:
-      - mlops-model-server
-      - mlops-model-runtimes
+      - mlops-paas-core
+      - mlops-paas-serving
   targetLabels:
     - app.kubernetes.io/name
     - app.kubernetes.io/component
@@ -48,7 +48,7 @@ metadata:
 spec:
   namespaceSelector:
     matchNames:
-      - mlops-control-plane
+      - mlops-paas-core
   selector:
     matchLabels:
       app.kubernetes.io/name: mlops-paas-control-plane
@@ -68,7 +68,7 @@ metadata:
 spec:
   namespaceSelector:
     matchNames:
-      - mlops-redis
+      - mlops-paas-data
   selector:
     matchLabels:
       app: mlops-paas-redis-ha
@@ -90,7 +90,7 @@ metadata:
 spec:
   namespaceSelector:
     matchNames:
-      - mlops-redis
+      - mlops-paas-data
   selector:
     matchLabels:
       app: mlops-paas-redis-ha-sentinel
@@ -98,7 +98,6 @@ spec:
       redis_setup_type: sentinel
       role: sentinel
   endpoints:
-    - port: redis-exporter
+    - port: sentinel-exp
       interval: 30s
       scrapeTimeout: 10s
-

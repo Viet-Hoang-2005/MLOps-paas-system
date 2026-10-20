@@ -12,13 +12,7 @@ spec:
   sourceRepos:
     - https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
   destinations:
-    - namespace: mlops-control-plane
-      server: https://kubernetes.default.svc
-    - namespace: mlops-consumer
-      server: https://kubernetes.default.svc
-    - namespace: mlops-model-server
-      server: https://kubernetes.default.svc
-    - namespace: mlops-web
+    - namespace: mlops-paas-core
       server: https://kubernetes.default.svc
   namespaceResourceWhitelist:
     - group: ""

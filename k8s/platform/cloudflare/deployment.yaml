@@ -4,7 +4,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cloudflared
-  namespace: cloudflare
+  namespace: mlops-paas-routing
   annotations:
     description: "Cloudflare Tunnel to securely expose the K3s Traefik Ingress to the public internet"
   labels:

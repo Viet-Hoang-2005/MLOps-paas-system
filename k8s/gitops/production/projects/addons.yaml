@@ -31,13 +31,13 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: mlops-logging
       server: https://kubernetes.default.svc
-    - namespace: mlops-execution
+    - namespace: mlops-paas-execution
       server: https://kubernetes.default.svc
-    - namespace: mlops-model-runtimes
+    - namespace: mlops-paas-serving
       server: https://kubernetes.default.svc
-    - namespace: user-jobs
+    - namespace: mlops-paas-training
       server: https://kubernetes.default.svc
-    - namespace: mlops-control-plane
+    - namespace: mlops-paas-core
       server: https://kubernetes.default.svc
     - namespace: kubeflow
       server: https://kubernetes.default.svc

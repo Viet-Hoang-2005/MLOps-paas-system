@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: mlops-paas-training-cancel-template
-  namespace: mlops-execution
+  namespace: mlops-paas-execution
 spec:
   serviceAccountName: argo-workflow-training-sa
   entrypoint: cancel-training
@@ -26,7 +26,7 @@ spec:
           - delete
           - pytorchjob.kubeflow.org
           - "{{workflow.parameters.job_name}}"
-          - "--namespace=user-jobs"
+          - "--namespace=mlops-paas-training"
           - "--ignore-not-found=true"
           - "--wait=true"
           - "--timeout=120s"

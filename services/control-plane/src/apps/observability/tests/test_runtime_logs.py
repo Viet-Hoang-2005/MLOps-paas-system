@@ -24,7 +24,7 @@ def response(values):
             "data": {
                 "resultType": "streams",
                 "result": [
-                    {"stream": {"namespace": "mlops-execution", "container": "main"}, "values": values},
+                    {"stream": {"namespace": "mlops-paas-execution", "container": "main"}, "values": values},
                 ],
             },
         }
@@ -105,7 +105,7 @@ def test_runtime_log_query_includes_control_plane_namespace(resource, monkeypatc
     for kind in ("build", "deployment", "drift", "training"):
         runtime_log_page(SimpleNamespace(query_params={}), resource, kind, Mock())
         query = get.call_args.kwargs["params"]["query"]
-        assert "mlops-control-plane" in query
+        assert "mlops-paas-core" in query
 
 
 def test_append_deployment_log_bypasses_redis_in_production(settings, monkeypatch):

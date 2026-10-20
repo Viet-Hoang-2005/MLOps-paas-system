@@ -1,6 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: mlops-postgres
+namespace: mlops-paas-data
 
 resources:
   - cluster.yaml

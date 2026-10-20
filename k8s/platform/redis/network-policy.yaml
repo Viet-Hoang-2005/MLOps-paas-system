@@ -10,10 +10,7 @@ spec:
         - podSelector: {}
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: mlops-control-plane
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: mlops-model-server
+              kubernetes.io/metadata.name: mlops-paas-core
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: redis-operator

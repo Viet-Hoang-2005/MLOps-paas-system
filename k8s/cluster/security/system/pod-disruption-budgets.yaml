@@ -7,7 +7,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: mlops-paas-control-plane-pdb
-  namespace: mlops-control-plane
+  namespace: mlops-paas-core
   labels:
     app.kubernetes.io/name: mlops-paas-control-plane
     app.kubernetes.io/part-of: mlops-paas
@@ -26,7 +26,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: mlops-paas-celery-worker-pdb
-  namespace: mlops-control-plane
+  namespace: mlops-paas-core
   labels:
     app.kubernetes.io/name: mlops-paas-celery-worker
     app.kubernetes.io/part-of: mlops-paas
@@ -45,7 +45,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: mlops-paas-model-server-pdb
-  namespace: mlops-model-server
+  namespace: mlops-paas-core
   labels:
     app.kubernetes.io/name: mlops-paas-model-server
     app.kubernetes.io/part-of: mlops-paas
@@ -65,7 +65,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: mlops-paas-web-pdb
-  namespace: mlops-web
+  namespace: mlops-paas-core
   labels:
     app.kubernetes.io/name: mlops-paas-web
     app.kubernetes.io/part-of: mlops-paas
@@ -84,7 +84,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: cloudflared-pdb
-  namespace: cloudflare
+  namespace: mlops-paas-routing
   labels:
     app.kubernetes.io/name: cloudflared
     app.kubernetes.io/part-of: mlops-paas
@@ -95,4 +95,6 @@ spec:
   maxUnavailable: 1
   selector:
     matchLabels:
+      app.kubernetes.io/name: cloudflared
+
       app.kubernetes.io/name: cloudflared

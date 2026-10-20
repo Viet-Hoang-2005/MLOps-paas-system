@@ -23,4 +23,4 @@ spec:
     path: k8s/apps/overlays/production/web
   destination:
     server: https://kubernetes.default.svc
-    namespace: mlops-web
+    namespace: mlops-paas-core

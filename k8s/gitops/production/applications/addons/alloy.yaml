@@ -27,7 +27,7 @@ spec:
           nodeSelector: {workload-type: worker}
         rbac:
           create: true
-          namespaces: [mlops-execution, mlops-model-runtimes, user-jobs, mlops-control-plane]
+          namespaces: [mlops-paas-execution, mlops-paas-serving, mlops-paas-training, mlops-paas-core]
           rules:
             - apiGroups: [""]
               resources: [pods]
@@ -44,7 +44,7 @@ spec:
             content: |
               discovery.kubernetes "tasks" {
                 role = "pod"
-                namespaces { names = ["mlops-execution", "mlops-model-runtimes", "user-jobs"] }
+                namespaces { names = ["mlops-paas-execution", "mlops-paas-serving", "mlops-paas-training"] }
               }
               discovery.relabel "tasks" {
                 targets = discovery.kubernetes.tasks.targets
@@ -117,7 +117,7 @@ spec:
               }
               discovery.kubernetes "control_plane" {
                 role = "pod"
-                namespaces { names = ["mlops-control-plane"] }
+                namespaces { names = ["mlops-paas-core"] }
               }
               discovery.relabel "control_plane" {
                 targets = discovery.kubernetes.control_plane.targets
@@ -167,11 +167,11 @@ spec:
                 }
                 stage.labels { values = {audience = "", task_kind = ""} }
                 stage.match {
-                  selector = "{namespace=\"mlops-control-plane\", audience!=\"tenant\"}"
+                  selector = "{namespace=\"mlops-paas-core\", audience!=\"tenant\"}"
                   action   = "drop"
                 }
                 stage.match {
-                  selector = "{namespace=\"mlops-control-plane\", task_kind!~\"build|deployment|drift|training\"}"
+                  selector = "{namespace=\"mlops-paas-core\", task_kind!~\"build|deployment|drift|training\"}"
                   action   = "drop"
                 }
                 stage.label_drop { values = ["audience"] }

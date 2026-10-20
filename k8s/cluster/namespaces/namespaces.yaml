@@ -1,77 +1,52 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: mlops-cluster-config
+  name: mlops-paas-system
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: mlops-control-plane
+  name: mlops-paas-routing
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: mlops-consumer
+  name: mlops-paas-core
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: mlops-model-server
+  name: mlops-paas-data
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: mlops-web
+  name: mlops-paas-harbor
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: mlops-postgres
+  name: mlops-paas-execution
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: mlops-redis
+  name: mlops-paas-training
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops-paas-serving
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops-logging
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: redis-operator
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: mlops-redpanda
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: mlops-execution
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: mlops-model-runtimes
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: mlops-routing
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: cloudflare
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: harbor
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: user-jobs
 ---
 apiVersion: v1
 kind: Namespace
@@ -126,10 +101,4 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: mlops-logging
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: headlamp
-

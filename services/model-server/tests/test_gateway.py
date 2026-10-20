@@ -165,7 +165,7 @@ def test_resolve_worker_url_local_and_kubernetes(monkeypatch):
     monkeypatch.setenv("KUBERNETES_SERVICE_HOST", "yes")
     assert (
         index.resolve_worker_url({"flavor": "tensorflow", "deployment_status": "succeeded", "endpoint_container_name": "worker"}, "/predict")
-        == "http://worker-svc.mlops-model-runtimes.svc.cluster.local:5002/predict"
+        == "http://worker-svc.mlops-paas-serving.svc.cluster.local:5002/predict"
     )
     with pytest.raises(HTTPException) as exc:
         index.resolve_worker_url({"flavor": "sklearn"}, "/predict")

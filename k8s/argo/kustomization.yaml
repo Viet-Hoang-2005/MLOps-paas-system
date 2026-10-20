@@ -22,7 +22,7 @@ resources:
 
 configMapGenerator:
   - name: argo-job-operations
-    namespace: mlops-execution
+    namespace: mlops-paas-execution
     files:
       - scripts/job_ops.py
 generatorOptions:

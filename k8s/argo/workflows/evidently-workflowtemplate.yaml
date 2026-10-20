@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: mlops-paas-evidently-template
-  namespace: mlops-execution
+  namespace: mlops-paas-execution
 spec:
   serviceAccountName: argo-workflow-basic-sa
   entrypoint: run-evidently

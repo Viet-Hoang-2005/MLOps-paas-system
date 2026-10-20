@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: mlops-paas-training-pipeline-template
-  namespace: mlops-execution
+  namespace: mlops-paas-execution
 spec:
   serviceAccountName: argo-workflow-training-sa
   entrypoint: training-pipeline
@@ -119,7 +119,7 @@ spec:
           kind: PyTorchJob
           metadata:
             name: {{=toJson(inputs.parameters.job_name)}}
-            namespace: user-jobs
+            namespace: mlops-paas-training
             labels:
               app.kubernetes.io/name: mlops-paas-training-runner
               app.kubernetes.io/instance: {{=toJson(inputs.parameters.job_name)}}
@@ -218,7 +218,7 @@ spec:
           kind: PyTorchJob
           metadata:
             name: {{=toJson(inputs.parameters.job_name)}}
-            namespace: user-jobs
+            namespace: mlops-paas-training
             labels:
               app.kubernetes.io/name: mlops-paas-training-runner
               app.kubernetes.io/instance: {{=toJson(inputs.parameters.job_name)}}

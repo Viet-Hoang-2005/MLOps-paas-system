@@ -23,4 +23,4 @@ spec:
     path: k8s/platform/routing
   destination:
     server: https://kubernetes.default.svc
-    namespace: mlops-routing
+    namespace: mlops-paas-routing

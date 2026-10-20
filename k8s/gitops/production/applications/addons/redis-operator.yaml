@@ -27,7 +27,7 @@ spec:
         redisOperator:
           imageTag: v0.26.0
           initContainerImageTag: v0.26.0
-          watchNamespace: mlops-redis
+          watchNamespace: mlops-paas-data
           webhook: false
         featureGates: null
         nodeSelector:

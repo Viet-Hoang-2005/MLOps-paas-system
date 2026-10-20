@@ -12,17 +12,11 @@ spec:
   sourceRepos:
     - https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
   destinations:
-    - namespace: mlops-postgres
+    - namespace: mlops-paas-data
       server: https://kubernetes.default.svc
-    - namespace: mlops-redis
+    - namespace: mlops-paas-routing
       server: https://kubernetes.default.svc
-    - namespace: mlops-redpanda
-      server: https://kubernetes.default.svc
-    - namespace: mlops-routing
-      server: https://kubernetes.default.svc
-    - namespace: cloudflare
-      server: https://kubernetes.default.svc
-    - namespace: harbor
+    - namespace: mlops-paas-harbor
       server: https://kubernetes.default.svc
     - namespace: monitoring
       server: https://kubernetes.default.svc

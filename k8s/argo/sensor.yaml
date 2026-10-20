@@ -246,7 +246,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: build-model-job-
-                namespace: mlops-execution
+                namespace: mlops-paas-execution
               spec:
                 workflowTemplateRef:
                   name: mlops-paas-model-packager-template
@@ -354,7 +354,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: cancel-build-operation-
-                namespace: mlops-execution
+                namespace: mlops-paas-execution
               spec:
                 workflowTemplateRef:
                   name: mlops-paas-job-submit-template
@@ -383,7 +383,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: deploy-model-job-
-                namespace: mlops-execution
+                namespace: mlops-paas-execution
               spec:
                 workflowTemplateRef:
                   name: mlops-paas-model-server-deploy-template
@@ -468,7 +468,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: drift-operation-
-                namespace: mlops-execution
+                namespace: mlops-paas-execution
               spec:
                 workflowTemplateRef:
                   name: mlops-paas-job-submit-template
@@ -497,7 +497,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: delete-model-job-
-                namespace: mlops-execution
+                namespace: mlops-paas-execution
               spec:
                 workflowTemplateRef:
                   name: mlops-paas-model-server-delete-template
@@ -538,7 +538,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: training-operation-
-                namespace: mlops-execution
+                namespace: mlops-paas-execution
               spec:
                 workflowTemplateRef:
                   name: mlops-paas-job-submit-template
@@ -567,7 +567,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: cancel-train-job-
-                namespace: mlops-execution
+                namespace: mlops-paas-execution
               spec:
                 workflowTemplateRef:
                   name: mlops-paas-training-cancel-template
@@ -614,7 +614,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: reconcile-operation-
-                namespace: mlops-execution
+                namespace: mlops-paas-execution
               spec:
                 workflowTemplateRef:
                   name: mlops-paas-job-reconcile-template

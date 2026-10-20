@@ -125,7 +125,7 @@ def test_deployment_backend_does_not_follow_build_backend(monkeypatch):
 
 
 @pytest.mark.django_db
-@override_settings(MODEL_RUNTIME_NAMESPACE="mlops-model-runtimes")
+@override_settings(MODEL_RUNTIME_NAMESPACE="mlops-paas-serving")
 def test_argo_deployment_persists_the_dedicated_runtime_namespace():
     user = get_user_model().objects.create_user("runtime-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="runtime project")
@@ -146,16 +146,16 @@ def test_argo_deployment_persists_the_dedicated_runtime_namespace():
 
     endpoint = backend.deploy(deployment)
 
-    assert endpoint.runtime_namespace == "mlops-model-runtimes"
+    assert endpoint.runtime_namespace == "mlops-paas-serving"
     assert (
-        endpoint.internal_url == f"http://deploy-{deployment.public_id}-svc.mlops-model-runtimes.svc.cluster.local:5001"
+        endpoint.internal_url == f"http://deploy-{deployment.public_id}-svc.mlops-paas-serving.svc.cluster.local:5001"
     )
     assert dispatched[0][1]["container_name"] == f"deploy-{deployment.public_id}"
     assert dispatched[0][1]["target_port"] == "5001"
 
 
 @pytest.mark.django_db
-@override_settings(MODEL_RUNTIME_NAMESPACE="mlops-model-runtimes")
+@override_settings(MODEL_RUNTIME_NAMESPACE="mlops-paas-serving")
 def test_argo_deployment_uses_port_5002_for_deep_learning_flavor():
     user = get_user_model().objects.create_user("dl-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="dl project")
@@ -176,9 +176,9 @@ def test_argo_deployment_uses_port_5002_for_deep_learning_flavor():
 
     endpoint = backend.deploy(deployment)
 
-    assert endpoint.runtime_namespace == "mlops-model-runtimes"
+    assert endpoint.runtime_namespace == "mlops-paas-serving"
     assert (
-        endpoint.internal_url == f"http://deploy-{deployment.public_id}-svc.mlops-model-runtimes.svc.cluster.local:5002"
+        endpoint.internal_url == f"http://deploy-{deployment.public_id}-svc.mlops-paas-serving.svc.cluster.local:5002"
     )
     assert dispatched[0][1]["model_type"] == "dl"
     assert dispatched[0][1]["target_port"] == "5002"

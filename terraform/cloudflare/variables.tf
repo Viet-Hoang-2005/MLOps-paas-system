@@ -60,7 +60,7 @@ variable "tunnel_services" {
   }))
   default = {
     "@" = {
-      service     = "http://mlops-paas-web.mlops-web.svc.cluster.local:80"
+      service     = "http://mlops-paas-web.mlops-paas-core.svc.cluster.local:80"
       description = "MLOps PaaS Web Dashboard"
     }
     "argocd" = {

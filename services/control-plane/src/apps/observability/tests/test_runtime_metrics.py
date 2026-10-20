@@ -73,7 +73,7 @@ def container_for(deployment):
 
 
 def test_production_metrics_join_owned_kubernetes_pods(deployment, settings):
-    settings.MODEL_RUNTIME_NAMESPACE = "mlops-model-runtimes"
+    settings.MODEL_RUNTIME_NAMESPACE = "mlops-paas-serving"
     deployment.backend = "argo"
     deployment.save(update_fields=["backend"])
     client = Mock(enabled=True, query_range=Mock(return_value=[]))
@@ -82,7 +82,7 @@ def test_production_metrics_join_owned_kubernetes_pods(deployment, settings):
     assert result["status"] == "no_data"
     queries = [call.args[0] for call in client.query_range.call_args_list]
     for query in queries[:2]:
-        assert 'namespace="mlops-model-runtimes"' in query
+        assert 'namespace="mlops-paas-serving"' in query
         assert 'container="model-server"' in query
         assert "* on (namespace,pod) group_left()" in query
         assert "max by (namespace,pod) (kube_pod_labels{" in query

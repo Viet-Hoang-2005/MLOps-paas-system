@@ -1,6 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: harbor
+namespace: mlops-paas-harbor
 
 resources:
   - ingress.yaml
@@ -10,7 +10,7 @@ helmCharts:
     repo: https://helm.goharbor.io
     version: 1.15.0
     releaseName: harbor
-    namespace: harbor
+    namespace: mlops-paas-harbor
     valuesFile: values.yaml
 
 patches:

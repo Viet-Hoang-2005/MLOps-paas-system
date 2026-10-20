@@ -288,7 +288,7 @@ if EXECUTION_WATCH_ENABLED:
     }
 MODEL_SERVER_PUBLIC_URL = str(env("MODEL_SERVER_PUBLIC_URL", "http://localhost:5002")).rstrip("/")
 MODEL_SERVER_INTERNAL_URL = str(env("MODEL_SERVER_INTERNAL_URL", "http://traefik:5000")).rstrip("/")
-MODEL_RUNTIME_NAMESPACE = str(env("MODEL_RUNTIME_NAMESPACE", "mlops-model-runtimes")).strip()
+MODEL_RUNTIME_NAMESPACE = str(env("MODEL_RUNTIME_NAMESPACE", "mlops-paas-serving")).strip()
 DOCKER_NETWORK_NAME = env("DOCKER_NETWORK_NAME", "mlops_paas_network")
 EXECUTION_BACKEND = str(env("EXECUTION_BACKEND", "docker")).strip().lower()
 if EXECUTION_BACKEND not in {"docker", "argo"}:

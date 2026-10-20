@@ -242,7 +242,7 @@
     api_version: postgresql.cnpg.io/v1
     kind: Cluster
     name: mlops-paas-postgres
-    namespace: mlops-postgres
+    namespace: mlops-paas-data
     kubeconfig: "{{ k3s_remote_kubeconfig }}"
   register: verified_cnpg_cluster
   when: verify_scope == 'platform'
@@ -261,7 +261,7 @@
     api_version: apps/v1
     kind: StatefulSet
     name: "{{ item }}"
-    namespace: mlops-redis
+    namespace: mlops-paas-data
     kubeconfig: "{{ k3s_remote_kubeconfig }}"
   loop:
     - mlops-paas-redis-ha
@@ -283,7 +283,7 @@
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Pod
-    namespace: mlops-redis
+    namespace: mlops-paas-data
     label_selectors:
       - "app={{ item.app }}"
       - "role={{ item.role }}"
@@ -319,7 +319,7 @@
       kind: Workflow
       metadata:
         generateName: ansible-build-dry-run-
-        namespace: mlops-execution
+        namespace: mlops-paas-execution
       spec:
         workflowTemplateRef:
           name: mlops-paas-model-packager-template
@@ -338,7 +338,7 @@
             - {name: source_download_url, value: "https://example.invalid/source"}
             - {name: output_upload_url, value: "https://example.invalid/output"}
             - name: control_plane_webhook_url
-              value: "http://mlops-paas-control-plane.mlops-control-plane.svc.cluster.local/api/v1/builds/callback"
+              value: "http://mlops-paas-control-plane.mlops-paas-core.svc.cluster.local/api/v1/builds/callback"
 
 - name: Verify EBS dynamic provisioning and attachment
   when: verify_scope == 'platform'

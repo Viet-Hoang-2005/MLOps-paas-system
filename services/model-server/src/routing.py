@@ -27,7 +27,7 @@ def resolve_worker_url(model_record: dict[str, Any], endpoint_path: str) -> str:
         service_name = f"{container_name}-svc" if not container_name.endswith("-svc") else container_name
         namespace = os.environ.get(
             "MODEL_RUNTIME_NAMESPACE",
-            "mlops-model-runtimes",
+            "mlops-paas-serving",
         ).strip()
         host = f"{service_name}.{namespace}.svc.cluster.local"
     else:

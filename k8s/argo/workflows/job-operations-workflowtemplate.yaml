@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: mlops-paas-job-tombstone-template
-  namespace: mlops-execution
+  namespace: mlops-paas-execution
 spec:
   serviceAccountName: argo-workflow-basic-sa
   entrypoint: stopped
@@ -20,7 +20,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: mlops-paas-job-submit-template
-  namespace: mlops-execution
+  namespace: mlops-paas-execution
 spec:
   serviceAccountName: argo-job-operations-sa
   entrypoint: submit
@@ -54,7 +54,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: mlops-paas-job-reconcile-template
-  namespace: mlops-execution
+  namespace: mlops-paas-execution
 spec:
   serviceAccountName: argo-job-operations-sa
   entrypoint: reconcile

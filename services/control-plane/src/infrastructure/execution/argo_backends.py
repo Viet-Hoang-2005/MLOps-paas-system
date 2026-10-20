@@ -143,7 +143,7 @@ class ArgoTrainingBackend(_ArgoBackend):
             **job.tracking,
             "runtime": {
                 "backend": "argo",
-                "namespace": "user-jobs",
+                "namespace": "mlops-paas-training",
                 "pytorch_job_name": runtime_name,
                 "workflow_selector": f"mlops.io/training-job-id={job.public_id}",
                 "pod_selector": f"mlops.io/training-job-id={job.public_id}",

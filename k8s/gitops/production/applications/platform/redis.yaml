@@ -23,4 +23,4 @@ spec:
     path: k8s/platform/redis
   destination:
     server: https://kubernetes.default.svc
-    namespace: mlops-redis
+    namespace: mlops-paas-data

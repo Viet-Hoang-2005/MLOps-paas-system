@@ -23,4 +23,4 @@ spec:
     path: k8s/cluster/storage
   destination:
     server: https://kubernetes.default.svc
-    namespace: mlops-cluster-config
+    namespace: mlops-paas-system
