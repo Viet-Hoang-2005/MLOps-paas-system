@@ -3,11 +3,16 @@ kind: Service
 metadata:
   name: mlops-paas-model-server
   labels:
-    app: mlops-paas-model-server
-    component: model-gateway
+    app.kubernetes.io/name: mlops-paas-model-server
+    app.kubernetes.io/instance: mlops-paas-model-server
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/tier: gateway
+    mlops.io/domain: serving
+    app.kubernetes.io/managed-by: kustomize
 spec:
   selector:
-    app: mlops-paas-model-server
+    app.kubernetes.io/name: mlops-paas-model-server
   ports:
     - name: http
       port: 5000

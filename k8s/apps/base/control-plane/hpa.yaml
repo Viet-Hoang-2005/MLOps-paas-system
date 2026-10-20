@@ -2,6 +2,14 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: mlops-paas-control-plane-hpa
+  labels:
+    app.kubernetes.io/name: mlops-paas-control-plane
+    app.kubernetes.io/instance: mlops-paas-control-plane
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/tier: app
+    mlops.io/domain: control-plane
+    app.kubernetes.io/managed-by: kustomize
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

@@ -8,16 +8,28 @@ metadata:
   annotations:
     description: "Cloudflare Tunnel to securely expose the K3s Traefik Ingress to the public internet"
   labels:
-    app: cloudflared
+    app.kubernetes.io/name: cloudflared
+    app.kubernetes.io/instance: cloudflared
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: tunnel
+    app.kubernetes.io/tier: gateway
+    mlops.io/domain: networking
+    app.kubernetes.io/managed-by: kustomize
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: cloudflared
+      app.kubernetes.io/name: cloudflared
   template:
     metadata:
       labels:
-        app: cloudflared
+        app.kubernetes.io/name: cloudflared
+        app.kubernetes.io/instance: cloudflared
+        app.kubernetes.io/part-of: mlops-paas
+        app.kubernetes.io/component: tunnel
+        app.kubernetes.io/tier: gateway
+        mlops.io/domain: networking
+        app.kubernetes.io/managed-by: kustomize
     spec:
       nodeSelector:
         workload-type: worker
@@ -28,7 +40,7 @@ spec:
               podAffinityTerm:
                 labelSelector:
                   matchExpressions:
-                    - key: app
+                    - key: app.kubernetes.io/name
                       operator: In
                       values:
                         - cloudflared

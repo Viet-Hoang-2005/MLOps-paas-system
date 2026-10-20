@@ -7,17 +7,29 @@ metadata:
   annotations:
     description: "Redpanda StatefulSet for high-performance Kafka-compatible message broker"
   labels:
-    app: redpanda
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/instance: redpanda
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: message-broker
+    app.kubernetes.io/tier: data
+    mlops.io/domain: messaging
+    app.kubernetes.io/managed-by: kustomize
 spec:
   serviceName: redpanda-service
   replicas: 1
   selector:
     matchLabels:
-      app: redpanda
+      app.kubernetes.io/name: redpanda
   template:
     metadata:
       labels:
-        app: redpanda
+        app.kubernetes.io/name: redpanda
+        app.kubernetes.io/instance: redpanda
+        app.kubernetes.io/part-of: mlops-paas
+        app.kubernetes.io/component: message-broker
+        app.kubernetes.io/tier: data
+        mlops.io/domain: messaging
+        app.kubernetes.io/managed-by: kustomize
     spec:
       nodeSelector:
         workload-type: worker
@@ -77,6 +89,14 @@ apiVersion: v1
 kind: Service
 metadata:
   name: redpanda-service
+  labels:
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/instance: redpanda
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: message-broker
+    app.kubernetes.io/tier: data
+    mlops.io/domain: messaging
+    app.kubernetes.io/managed-by: kustomize
 spec:
   ports:
   - port: 9092
@@ -90,4 +110,4 @@ spec:
     name: admin
   clusterIP: None
   selector:
-    app: redpanda
+    app.kubernetes.io/name: redpanda

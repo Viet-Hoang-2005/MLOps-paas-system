@@ -3,7 +3,13 @@ kind: ConfigMap
 metadata:
   name: mlops-paas-consumer-config
   labels:
-    app: mlops-paas-consumer
+    app.kubernetes.io/name: mlops-paas-consumer
+    app.kubernetes.io/instance: mlops-paas-consumer
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/tier: app
+    mlops.io/domain: streaming
+    app.kubernetes.io/managed-by: kustomize
 data:
   LOG_FORMAT: "console"
   LOG_SUMMARY_INTERVAL_SECONDS: "60"

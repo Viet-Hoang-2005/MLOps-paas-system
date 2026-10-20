@@ -14,6 +14,14 @@ kind: IngressRoute
 metadata:
   name: control-plane-ingressroute
   namespace: mlops-routing
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: control-plane-ingressroute
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/tier: gateway
+    mlops.io/domain: networking
+    app.kubernetes.io/managed-by: kustomize
 spec:
   entryPoints:
     - web

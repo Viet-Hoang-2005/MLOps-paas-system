@@ -4,6 +4,12 @@ kind: NetworkPolicy
 metadata:
   name: np-postgres
   namespace: mlops-postgres
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: database
+    app.kubernetes.io/tier: data
+    mlops.io/domain: storage
 spec:
   podSelector:
     matchLabels:
@@ -51,6 +57,12 @@ kind: NetworkPolicy
 metadata:
   name: np-redis
   namespace: mlops-redis
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/tier: data
+    mlops.io/domain: cache
 spec:
   podSelector:
     matchLabels:
@@ -95,10 +107,16 @@ kind: NetworkPolicy
 metadata:
   name: np-redpanda
   namespace: mlops-redpanda
+  labels:
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: message-broker
+    app.kubernetes.io/tier: data
+    mlops.io/domain: messaging
 spec:
   podSelector:
     matchLabels:
-      app: redpanda
+      app.kubernetes.io/name: redpanda
   policyTypes:
     - Ingress
   ingress:
@@ -106,7 +124,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              app: redpanda
+              app.kubernetes.io/name: redpanda
     # 3.2. Model Server (Producer), Consumer (Consumer), Argo Workflows đẩy/tiêu thụ data
     - from:
         - namespaceSelector:
@@ -139,10 +157,16 @@ kind: NetworkPolicy
 metadata:
   name: np-control-plane
   namespace: mlops-control-plane
+  labels:
+    app.kubernetes.io/name: mlops-paas-control-plane
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/tier: app
+    mlops.io/domain: control-plane
 spec:
   podSelector:
     matchLabels:
-      app: mlops-paas-control-plane
+      app.kubernetes.io/name: mlops-paas-control-plane
   policyTypes:
     - Ingress
   ingress:
@@ -184,10 +208,16 @@ kind: NetworkPolicy
 metadata:
   name: np-web
   namespace: mlops-web
+  labels:
+    app.kubernetes.io/name: mlops-paas-web
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/tier: frontend
+    mlops.io/domain: frontend
 spec:
   podSelector:
     matchLabels:
-      app: mlops-paas-web
+      app.kubernetes.io/name: mlops-paas-web
   policyTypes:
     - Ingress
   ingress:
@@ -209,7 +239,7 @@ spec:
               kubernetes.io/metadata.name: cloudflare
           podSelector:
             matchLabels:
-              app: cloudflared
+              app.kubernetes.io/name: cloudflared
       ports:
         - protocol: TCP
           port: 80
@@ -221,10 +251,16 @@ kind: NetworkPolicy
 metadata:
   name: np-model-server
   namespace: mlops-model-server
+  labels:
+    app.kubernetes.io/name: mlops-paas-model-server
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/tier: gateway
+    mlops.io/domain: serving
 spec:
   podSelector:
     matchLabels:
-      app: mlops-paas-model-server
+      app.kubernetes.io/name: mlops-paas-model-server
   policyTypes:
     - Ingress
   ingress:
@@ -263,10 +299,16 @@ kind: NetworkPolicy
 metadata:
   name: np-consumer-deny-ingress
   namespace: mlops-consumer
+  labels:
+    app.kubernetes.io/name: mlops-paas-consumer
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/tier: app
+    mlops.io/domain: streaming
 spec:
   podSelector:
     matchLabels:
-      app: mlops-paas-consumer
+      app.kubernetes.io/name: mlops-paas-consumer
   policyTypes:
     - Ingress
   # ingress: [] (để trống đồng nghĩa chặn 100% kết nối đến nó, chỉ cho phép nó gọi ra ngoài)

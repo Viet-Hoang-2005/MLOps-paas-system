@@ -82,6 +82,13 @@ spec:
             name: {{=toJson(inputs.parameters.container_name)}}
             namespace: mlops-model-runtimes
             labels:
+              app.kubernetes.io/name: mlops-paas-model-serving
+              app.kubernetes.io/instance: {{=toJson(inputs.parameters.container_name)}}
+              app.kubernetes.io/part-of: mlops-paas
+              app.kubernetes.io/component: model-endpoint
+              app.kubernetes.io/tier: app
+              mlops.io/domain: serving
+              app.kubernetes.io/managed-by: argo-workflows
               app: model-endpoint
               tenant: {{=toJson(inputs.parameters.tenant_id)}}
               project: {{=toJson(inputs.parameters.project_id)}}
@@ -95,6 +102,13 @@ spec:
             template:
               metadata:
                 labels:
+                  app.kubernetes.io/name: mlops-paas-model-serving
+                  app.kubernetes.io/instance: {{=toJson(inputs.parameters.container_name)}}
+                  app.kubernetes.io/part-of: mlops-paas
+                  app.kubernetes.io/component: model-endpoint
+                  app.kubernetes.io/tier: app
+                  mlops.io/domain: serving
+                  app.kubernetes.io/managed-by: argo-workflows
                   app: {{=toJson(inputs.parameters.container_name)}}
                   mlops.io/deployment-id: "{{workflow.parameters.deployment_id}}"
                   mlops.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
@@ -167,6 +181,13 @@ spec:
             name: {{=toJson(inputs.parameters.service_name)}}
             namespace: mlops-model-runtimes
             labels:
+              app.kubernetes.io/name: mlops-paas-model-serving
+              app.kubernetes.io/instance: {{=toJson(inputs.parameters.container_name)}}
+              app.kubernetes.io/part-of: mlops-paas
+              app.kubernetes.io/component: model-endpoint
+              app.kubernetes.io/tier: app
+              mlops.io/domain: serving
+              app.kubernetes.io/managed-by: argo-workflows
               component: model-server
               serving-engine: {{=toJson(inputs.parameters.model_type)}}
           spec:

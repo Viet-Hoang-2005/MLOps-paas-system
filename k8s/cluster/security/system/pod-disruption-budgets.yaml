@@ -8,11 +8,17 @@ kind: PodDisruptionBudget
 metadata:
   name: mlops-paas-control-plane-pdb
   namespace: mlops-control-plane
+  labels:
+    app.kubernetes.io/name: mlops-paas-control-plane
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/tier: app
+    mlops.io/domain: control-plane
 spec:
   maxUnavailable: 1
   selector:
     matchLabels:
-      app: mlops-paas-control-plane
+      app.kubernetes.io/name: mlops-paas-control-plane
 
 # 2. PDB cho Celery Worker (Xử lý tác vụ nền & MLOps Pipelines)
 ---
@@ -21,11 +27,17 @@ kind: PodDisruptionBudget
 metadata:
   name: mlops-paas-celery-worker-pdb
   namespace: mlops-control-plane
+  labels:
+    app.kubernetes.io/name: mlops-paas-celery-worker
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/tier: jobs
+    mlops.io/domain: control-plane
 spec:
   maxUnavailable: 1
   selector:
     matchLabels:
-      app: mlops-paas-celery-worker
+      app.kubernetes.io/name: mlops-paas-celery-worker
 
 # 3. PDB cho Model Server Gateway (Phục vụ suy luận thời gian thực)
 ---
@@ -34,11 +46,17 @@ kind: PodDisruptionBudget
 metadata:
   name: mlops-paas-model-server-pdb
   namespace: mlops-model-server
+  labels:
+    app.kubernetes.io/name: mlops-paas-model-server
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/tier: gateway
+    mlops.io/domain: serving
 spec:
   maxUnavailable: 1
   selector:
     matchLabels:
-      app: mlops-paas-model-server
+      app.kubernetes.io/name: mlops-paas-model-server
 
 # NHÓM 2: CÁC DỊCH VỤ ĐƠN LẺ (1 REPLICA)
 # 4. PDB cho Frontend Web Dashboard
@@ -48,11 +66,17 @@ kind: PodDisruptionBudget
 metadata:
   name: mlops-paas-web-pdb
   namespace: mlops-web
+  labels:
+    app.kubernetes.io/name: mlops-paas-web
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/tier: frontend
+    mlops.io/domain: frontend
 spec:
   maxUnavailable: 1
   selector:
     matchLabels:
-      app: mlops-paas-web
+      app.kubernetes.io/name: mlops-paas-web
 
 # 5. PDB cho Cloudflare Zero Trust Tunnel
 ---
@@ -61,8 +85,14 @@ kind: PodDisruptionBudget
 metadata:
   name: cloudflared-pdb
   namespace: cloudflare
+  labels:
+    app.kubernetes.io/name: cloudflared
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: tunnel
+    app.kubernetes.io/tier: gateway
+    mlops.io/domain: networking
 spec:
   maxUnavailable: 1
   selector:
     matchLabels:
-      app: cloudflared
+      app.kubernetes.io/name: cloudflared

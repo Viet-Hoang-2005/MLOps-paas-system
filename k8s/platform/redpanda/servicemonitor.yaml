@@ -8,13 +8,17 @@ metadata:
   namespace: monitoring
   labels:
     release: monitoring
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: message-broker
+    mlops.io/domain: messaging
 spec:
   namespaceSelector:
     matchNames:
       - mlops-redpanda
   selector:
     matchLabels:
-      app: redpanda
+      app.kubernetes.io/name: redpanda
   endpoints:
     - port: admin
       path: /metrics

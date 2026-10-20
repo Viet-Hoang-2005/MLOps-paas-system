@@ -121,8 +121,12 @@ spec:
             name: {{=toJson(inputs.parameters.job_name)}}
             namespace: user-jobs
             labels:
+              app.kubernetes.io/name: mlops-paas-training-runner
+              app.kubernetes.io/instance: {{=toJson(inputs.parameters.job_name)}}
               app.kubernetes.io/part-of: mlops-paas
               app.kubernetes.io/component: training
+              app.kubernetes.io/tier: jobs
+              mlops.io/domain: training
               app.kubernetes.io/managed-by: argo-workflows
               mlops.io/training-job-id: {{=toJson(inputs.parameters.job_id)}}
               mlops.io/project-id: {{=toJson(inputs.parameters.project_id)}}
@@ -138,8 +142,12 @@ spec:
                 template:
                   metadata:
                     labels:
+                      app.kubernetes.io/name: mlops-paas-training-runner
+                      app.kubernetes.io/instance: {{=toJson(inputs.parameters.job_name)}}
                       app.kubernetes.io/part-of: mlops-paas
                       app.kubernetes.io/component: training
+                      app.kubernetes.io/tier: jobs
+                      mlops.io/domain: training
                       app.kubernetes.io/managed-by: argo-workflows
                       mlops.io/training-job-id: {{=toJson(inputs.parameters.job_id)}}
                       mlops.io/project-id: {{=toJson(inputs.parameters.project_id)}}
@@ -212,8 +220,12 @@ spec:
             name: {{=toJson(inputs.parameters.job_name)}}
             namespace: user-jobs
             labels:
+              app.kubernetes.io/name: mlops-paas-training-runner
+              app.kubernetes.io/instance: {{=toJson(inputs.parameters.job_name)}}
               app.kubernetes.io/part-of: mlops-paas
               app.kubernetes.io/component: training
+              app.kubernetes.io/tier: jobs
+              mlops.io/domain: training
               app.kubernetes.io/managed-by: argo-workflows
               mlops.io/training-job-id: {{=toJson(inputs.parameters.job_id)}}
               mlops.io/project-id: {{=toJson(inputs.parameters.project_id)}}
@@ -229,8 +241,12 @@ spec:
                 template:
                   metadata:
                     labels:
+                      app.kubernetes.io/name: mlops-paas-training-runner
+                      app.kubernetes.io/instance: {{=toJson(inputs.parameters.job_name)}}
                       app.kubernetes.io/part-of: mlops-paas
                       app.kubernetes.io/component: training
+                      app.kubernetes.io/tier: jobs
+                      mlops.io/domain: training
                       app.kubernetes.io/managed-by: argo-workflows
                       mlops.io/training-job-id: {{=toJson(inputs.parameters.job_id)}}
                       mlops.io/project-id: {{=toJson(inputs.parameters.project_id)}}

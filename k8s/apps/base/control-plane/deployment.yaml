@@ -3,7 +3,13 @@ kind: Deployment
 metadata:
   name: mlops-paas-control-plane
   labels:
-    app: mlops-paas-control-plane
+    app.kubernetes.io/name: mlops-paas-control-plane
+    app.kubernetes.io/instance: mlops-paas-control-plane
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/tier: app
+    mlops.io/domain: control-plane
+    app.kubernetes.io/managed-by: kustomize
 spec:
   replicas: 2
   strategy:
@@ -13,11 +19,17 @@ spec:
       maxUnavailable: 1
   selector:
     matchLabels:
-      app: mlops-paas-control-plane
+      app.kubernetes.io/name: mlops-paas-control-plane
   template:
     metadata:
       labels:
-        app: mlops-paas-control-plane
+        app.kubernetes.io/name: mlops-paas-control-plane
+        app.kubernetes.io/instance: mlops-paas-control-plane
+        app.kubernetes.io/part-of: mlops-paas
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/tier: app
+        mlops.io/domain: control-plane
+        app.kubernetes.io/managed-by: kustomize
     spec:
       automountServiceAccountToken: false
       nodeSelector:
@@ -29,7 +41,7 @@ spec:
               podAffinityTerm:
                 labelSelector:
                   matchExpressions:
-                    - key: app
+                    - key: app.kubernetes.io/name
                       operator: In
                       values:
                         - mlops-paas-control-plane

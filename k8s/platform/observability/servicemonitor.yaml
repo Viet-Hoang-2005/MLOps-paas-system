@@ -7,22 +7,27 @@ metadata:
   namespace: monitoring
   labels:
     release: monitoring
+    app.kubernetes.io/name: mlops-paas-model-server
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: gateway
+    mlops.io/domain: serving
 spec:
   selector:
     matchExpressions:
       # Scrape both dynamic serving workers and the central model gateway.
-      - key: component
+      - key: app.kubernetes.io/name
         operator: In
         values:
-          - model-server
-          - model-gateway
+          - mlops-paas-model-server
+          - mlops-paas-model-serving
   namespaceSelector:
     matchNames:
       - mlops-model-server
       - mlops-model-runtimes
   targetLabels:
-    - app
-    - component
+    - app.kubernetes.io/name
+    - app.kubernetes.io/component
+    - mlops.io/domain
   endpoints:
     - port: http
       path: /metrics
@@ -36,13 +41,17 @@ metadata:
   namespace: monitoring
   labels:
     release: monitoring
+    app.kubernetes.io/name: mlops-paas-control-plane
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: backend
+    mlops.io/domain: control-plane
 spec:
   namespaceSelector:
     matchNames:
       - mlops-control-plane
   selector:
     matchLabels:
-      app: mlops-paas-control-plane
+      app.kubernetes.io/name: mlops-paas-control-plane
   endpoints:
     - port: http
       path: /health/metrics

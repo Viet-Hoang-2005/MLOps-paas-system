@@ -3,16 +3,28 @@ kind: Deployment
 metadata:
   name: mlops-paas-web
   labels:
-    app: mlops-paas-web
+    app.kubernetes.io/name: mlops-paas-web
+    app.kubernetes.io/instance: mlops-paas-web
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/tier: frontend
+    mlops.io/domain: frontend
+    app.kubernetes.io/managed-by: kustomize
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mlops-paas-web
+      app.kubernetes.io/name: mlops-paas-web
   template:
     metadata:
       labels:
-        app: mlops-paas-web
+        app.kubernetes.io/name: mlops-paas-web
+        app.kubernetes.io/instance: mlops-paas-web
+        app.kubernetes.io/part-of: mlops-paas
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/tier: frontend
+        mlops.io/domain: frontend
+        app.kubernetes.io/managed-by: kustomize
     spec:
       nodeSelector:
         workload-type: worker

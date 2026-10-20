@@ -6,7 +6,11 @@ metadata:
   name: mlops-paas-postgres-monitor
   namespace: monitoring
   labels:
-    release: monitoring # Label để Prometheus Operator nhận diện
+    release: monitoring
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: database
+    mlops.io/domain: storage
 spec:
   # Chỉ định namespace đang chạy Database
   namespaceSelector:

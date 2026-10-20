@@ -3,7 +3,13 @@ kind: TriggerAuthentication
 metadata:
   name: mlops-paas-celery-redis-auth
   labels:
-    app: mlops-paas-celery-worker
+    app.kubernetes.io/name: mlops-paas-celery-worker
+    app.kubernetes.io/instance: mlops-paas-celery-worker
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/tier: jobs
+    mlops.io/domain: control-plane
+    app.kubernetes.io/managed-by: kustomize
 spec:
   secretTargetRef:
     - parameter: password
@@ -18,7 +24,13 @@ kind: ScaledObject
 metadata:
   name: mlops-paas-celery-scaler
   labels:
-    app: mlops-paas-celery-worker
+    app.kubernetes.io/name: mlops-paas-celery-worker
+    app.kubernetes.io/instance: mlops-paas-celery-worker
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/tier: jobs
+    mlops.io/domain: control-plane
+    app.kubernetes.io/managed-by: kustomize
 spec:
   scaleTargetRef:
     name: mlops-paas-celery-worker

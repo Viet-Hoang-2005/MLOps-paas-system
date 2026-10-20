@@ -8,6 +8,12 @@ spec:
   entrypoint: build-model
   podMetadata:
     labels:
+      app.kubernetes.io/name: mlops-paas-model-packager
+      app.kubernetes.io/part-of: mlops-paas
+      app.kubernetes.io/component: packaging
+      app.kubernetes.io/tier: jobs
+      mlops.io/domain: packaging
+      app.kubernetes.io/managed-by: argo-workflows
       mlops.io/build-id: "{{workflow.parameters.build_id}}"
   workflowMetadata:
     labelsFrom:

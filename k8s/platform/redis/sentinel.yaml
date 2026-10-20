@@ -4,6 +4,14 @@ metadata:
   name: mlops-paas-redis-ha
   annotations:
     argocd.argoproj.io/sync-wave: "1"
+  labels:
+    app.kubernetes.io/name: redis-sentinel
+    app.kubernetes.io/instance: mlops-paas-redis-ha
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: sentinel
+    app.kubernetes.io/tier: data
+    mlops.io/domain: cache
+    app.kubernetes.io/managed-by: redis-operator
 spec:
   clusterSize: 3
   kubernetesConfig:

@@ -3,16 +3,28 @@ kind: Deployment
 metadata:
   name: mlops-paas-celery-worker
   labels:
-    app: mlops-paas-celery-worker
+    app.kubernetes.io/name: mlops-paas-celery-worker
+    app.kubernetes.io/instance: mlops-paas-celery-worker
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/tier: jobs
+    mlops.io/domain: control-plane
+    app.kubernetes.io/managed-by: kustomize
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: mlops-paas-celery-worker
+      app.kubernetes.io/name: mlops-paas-celery-worker
   template:
     metadata:
       labels:
-        app: mlops-paas-celery-worker
+        app.kubernetes.io/name: mlops-paas-celery-worker
+        app.kubernetes.io/instance: mlops-paas-celery-worker
+        app.kubernetes.io/part-of: mlops-paas
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/tier: jobs
+        mlops.io/domain: control-plane
+        app.kubernetes.io/managed-by: kustomize
     spec:
       automountServiceAccountToken: false
       nodeSelector:
@@ -96,18 +108,30 @@ kind: Deployment
 metadata:
   name: mlops-paas-celery-beat
   labels:
-    app: mlops-paas-celery-beat
+    app.kubernetes.io/name: mlops-paas-celery-beat
+    app.kubernetes.io/instance: mlops-paas-celery-beat
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: scheduler
+    app.kubernetes.io/tier: jobs
+    mlops.io/domain: control-plane
+    app.kubernetes.io/managed-by: kustomize
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: mlops-paas-celery-beat
+      app.kubernetes.io/name: mlops-paas-celery-beat
   template:
     metadata:
       labels:
-        app: mlops-paas-celery-beat
+        app.kubernetes.io/name: mlops-paas-celery-beat
+        app.kubernetes.io/instance: mlops-paas-celery-beat
+        app.kubernetes.io/part-of: mlops-paas
+        app.kubernetes.io/component: scheduler
+        app.kubernetes.io/tier: jobs
+        mlops.io/domain: control-plane
+        app.kubernetes.io/managed-by: kustomize
     spec:
       automountServiceAccountToken: false
       nodeSelector:
@@ -162,16 +186,28 @@ kind: Deployment
 metadata:
   name: mlops-paas-celery-health-worker
   labels:
-    app: mlops-paas-celery-health-worker
+    app.kubernetes.io/name: mlops-paas-celery-health-worker
+    app.kubernetes.io/instance: mlops-paas-celery-health-worker
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/tier: jobs
+    mlops.io/domain: control-plane
+    app.kubernetes.io/managed-by: kustomize
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mlops-paas-celery-health-worker
+      app.kubernetes.io/name: mlops-paas-celery-health-worker
   template:
     metadata:
       labels:
-        app: mlops-paas-celery-health-worker
+        app.kubernetes.io/name: mlops-paas-celery-health-worker
+        app.kubernetes.io/instance: mlops-paas-celery-health-worker
+        app.kubernetes.io/part-of: mlops-paas
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/tier: jobs
+        mlops.io/domain: control-plane
+        app.kubernetes.io/managed-by: kustomize
     spec:
       automountServiceAccountToken: false
       nodeSelector:
