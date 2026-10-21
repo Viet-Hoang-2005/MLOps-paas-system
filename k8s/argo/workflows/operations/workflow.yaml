@@ -10,6 +10,14 @@ spec:
     secondsAfterCompletion: 300
   podGC:
     strategy: OnPodCompletion
+  podMetadata:
+    labels:
+      app.kubernetes.io/name: mlops-paas-job-operations
+      app.kubernetes.io/part-of: mlops-paas
+      app.kubernetes.io/component: operations
+      app.kubernetes.io/tier: jobs
+      mlops.io/domain: operations
+      app.kubernetes.io/managed-by: argo-workflows
   templates:
     - name: stopped
       container:
@@ -29,6 +37,14 @@ spec:
     secondsAfterCompletion: 300
   podGC:
     strategy: OnPodCompletion
+  podMetadata:
+    labels:
+      app.kubernetes.io/name: mlops-paas-job-operations
+      app.kubernetes.io/part-of: mlops-paas
+      app.kubernetes.io/component: operations
+      app.kubernetes.io/tier: jobs
+      mlops.io/domain: operations
+      app.kubernetes.io/managed-by: argo-workflows
   templates:
     - name: submit
       retryStrategy:
@@ -63,6 +79,14 @@ spec:
     secondsAfterCompletion: 300
   podGC:
     strategy: OnPodCompletion
+  podMetadata:
+    labels:
+      app.kubernetes.io/name: mlops-paas-job-operations
+      app.kubernetes.io/part-of: mlops-paas
+      app.kubernetes.io/component: operations
+      app.kubernetes.io/tier: jobs
+      mlops.io/domain: operations
+      app.kubernetes.io/managed-by: argo-workflows
   templates:
     - name: reconcile
       retryStrategy:

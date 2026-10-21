@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-ingress-execution
+  namespace: mlops-paas-execution
+  labels:
+    app.kubernetes.io/name: default-deny-all-ingress-execution
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/tier: jobs
+    mlops.io/domain: execution
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+

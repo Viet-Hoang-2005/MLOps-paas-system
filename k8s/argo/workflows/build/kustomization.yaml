@@ -4,3 +4,5 @@ kind: Kustomization
 resources:
   - workflow.yaml
   - external-secrets.yaml
+  - network-policy.yaml
+

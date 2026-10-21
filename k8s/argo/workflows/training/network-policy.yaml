@@ -1,0 +1,75 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-mlops-paas-training
+  namespace: mlops-paas-training
+  labels:
+    app.kubernetes.io/name: mlops-paas-training
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/tier: jobs
+    mlops.io/domain: training
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mlops-paas-training-runner
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Chỉ cho phép các Pod PyTorch trong cùng namespace trao đổi (Distributed Training / DDP)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mlops-paas-training-runner
+      ports:
+        - protocol: TCP
+          port: 23456
+  egress:
+    # 1. DNS Resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # 2. Giao tiếp với Control Plane (MLflow tracking & Presigned S3 capability tokens)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-paas-core
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mlops-paas-control-plane
+      ports:
+        - protocol: TCP
+          port: 8000
+    # 3. Giao tiếp giữa các Pod PyTorch (Distributed Training / DDP)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mlops-paas-training-runner
+      ports:
+        - protocol: TCP
+          port: 23456
+    # 4. Tải data/code từ S3 Presigned URLs và cài dependencies từ PyPI
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.169.254/32
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+

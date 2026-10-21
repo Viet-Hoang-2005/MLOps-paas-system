@@ -11,7 +11,7 @@ metadata:
     mlops.io/domain: control-plane
     app.kubernetes.io/managed-by: kustomize
   annotations:
-    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 2

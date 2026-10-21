@@ -23,8 +23,14 @@ spec:
       kind: Deployment
     - group: autoscaling
       kind: HorizontalPodAutoscaler
+    - group: batch
+      kind: Job
+    - group: policy
+      kind: PodDisruptionBudget
     - group: keda.sh
       kind: ScaledObject
+    - group: keda.sh
+      kind: TriggerAuthentication
     - group: external-secrets.io
       kind: ExternalSecret
     - group: networking.k8s.io

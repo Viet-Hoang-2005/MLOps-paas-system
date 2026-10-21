@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - workflow.yaml
   - rbac.yaml
+  - network-policy.yaml
 
 configMapGenerator:
   - name: argo-job-operations

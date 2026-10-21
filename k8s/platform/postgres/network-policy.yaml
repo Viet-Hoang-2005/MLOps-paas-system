@@ -26,11 +26,14 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: cnpg-system
-    # Core platform workloads truy cập DB (cổng 5432)
+    # Core platform workloads và Execution analytical workloads (Evidently) truy cập DB (cổng 5432)
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: mlops-paas-core
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-paas-execution
       ports:
         - protocol: TCP
           port: 5432

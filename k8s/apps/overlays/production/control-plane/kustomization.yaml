@@ -3,10 +3,124 @@ kind: Kustomization
 namespace: mlops-paas-core
 
 resources:
-- ../../../base/control-plane
-- external-secrets.yaml
+  - ../../../base/control-plane
+  - external-secrets.yaml
 
 images:
-- name: mlops-paas-control-plane
-  newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane
-  newTag: 09998848067dd8853133854b656240dee431988d
+  - name: mlops-paas-control-plane
+    newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane
+    newTag: 09998848067dd8853133854b656240dee431988d
+
+patches:
+  - target:
+      kind: ConfigMap
+      name: mlops-paas-control-plane-config
+    patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: mlops-paas-control-plane-config
+        annotations:
+          argocd.argoproj.io/sync-wave: "-1"
+  - target:
+      kind: Job
+      name: mlops-paas-control-plane-migration
+    patch: |-
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: mlops-paas-control-plane-migration
+        annotations:
+          argocd.argoproj.io/sync-wave: "0"
+  - target:
+      kind: Deployment
+      name: mlops-paas-control-plane
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: mlops-paas-control-plane
+        annotations:
+          argocd.argoproj.io/sync-wave: "1"
+  - target:
+      kind: Deployment
+      name: mlops-paas-celery-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: mlops-paas-celery-worker
+        annotations:
+          argocd.argoproj.io/sync-wave: "1"
+  - target:
+      kind: Deployment
+      name: mlops-paas-celery-beat
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: mlops-paas-celery-beat
+        annotations:
+          argocd.argoproj.io/sync-wave: "1"
+  - target:
+      kind: Deployment
+      name: mlops-paas-celery-health-worker
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: mlops-paas-celery-health-worker
+        annotations:
+          argocd.argoproj.io/sync-wave: "1"
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: mlops-paas-control-plane-hpa
+    patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: mlops-paas-control-plane-hpa
+        annotations:
+          argocd.argoproj.io/sync-wave: "1"
+  - target:
+      kind: PodDisruptionBudget
+      name: mlops-paas-control-plane-pdb
+    patch: |-
+      apiVersion: policy/v1
+      kind: PodDisruptionBudget
+      metadata:
+        name: mlops-paas-control-plane-pdb
+        annotations:
+          argocd.argoproj.io/sync-wave: "1"
+  - target:
+      kind: PodDisruptionBudget
+      name: mlops-paas-celery-worker-pdb
+    patch: |-
+      apiVersion: policy/v1
+      kind: PodDisruptionBudget
+      metadata:
+        name: mlops-paas-celery-worker-pdb
+        annotations:
+          argocd.argoproj.io/sync-wave: "1"
+  - target:
+      group: keda.sh
+      kind: ScaledObject
+      name: mlops-paas-celery-worker-scaler
+    patch: |-
+      apiVersion: keda.sh/v1alpha1
+      kind: ScaledObject
+      metadata:
+        name: mlops-paas-celery-worker-scaler
+        annotations:
+          argocd.argoproj.io/sync-wave: "1"
+  - target:
+      group: keda.sh
+      kind: TriggerAuthentication
+      name: mlops-paas-celery-redis-auth
+    patch: |-
+      apiVersion: keda.sh/v1alpha1
+      kind: TriggerAuthentication
+      metadata:
+        name: mlops-paas-celery-redis-auth
+        annotations:
+          argocd.argoproj.io/sync-wave: "1"

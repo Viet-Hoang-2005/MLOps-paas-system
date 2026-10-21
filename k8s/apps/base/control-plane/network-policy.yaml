@@ -27,7 +27,7 @@ spec:
       ports:
         - protocol: TCP
           port: 8000
-    # Consumer và Workflows gọi Webhook đồng bộ trạng thái
+    # Consumer, Workflows và Training Jobs gọi Webhook/MLflow API
     - from:
         - podSelector:
             matchLabels:
@@ -35,6 +35,9 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: mlops-paas-execution
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-paas-training
       ports:
         - protocol: TCP
           port: 8000

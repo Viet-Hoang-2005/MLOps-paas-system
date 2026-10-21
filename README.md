@@ -9,14 +9,11 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104.x-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![MLflow](https://img.shields.io/badge/MLflow-2.14-0194E2?style=flat-square&logo=mlflow&logoColor=white)](https://mlflow.org)
 [![BentoML](https://img.shields.io/badge/BentoML-1.2-00A396?style=flat-square)](https://bentoml.com)
-[![Evidently AI](https://img.shields.io/badge/Evidently_AI-0.4.x-6D31FF?style=flat-square)](https://evidentlyai.com)
-[![Redpanda](https://img.shields.io/badge/Redpanda-Streaming-E52B20?style=flat-square)](https://redpanda.com)
-[![Kubeflow](https://img.shields.io/badge/Kubeflow-PyTorchJob-2596BE?style=flat-square&logo=kubeflow&logoColor=white)](https://kubeflow.org)
-[![Karpenter](https://img.shields.io/badge/Karpenter-Compute-0052CC?style=flat-square)](https://karpenter.sh)
-[![Argo CD](https://img.shields.io/badge/Argo_CD-GitOps-EF7B4D?style=flat-square&logo=argo&logoColor=white)](https://argoproj.github.io/cd)
+[![Evidently AI](https://img.shields.io/badge/Evidently_AI-0.4.15-6D31FF?style=flat-square)](https://evidentlyai.com)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-K3s-326CE5?style=flat-square&logo=kubernetes&logoColor=white)](https://k3s.io)
 [![Terraform](https://img.shields.io/badge/Terraform-AWS-7B42BC?style=flat-square&logo=terraform&logoColor=white)](https://www.terraform.io)
-[![Ansible](https://img.shields.io/badge/Ansible-Automation-EE0000?style=flat-square&logo=ansible&logoColor=white)](https://ansible.com)
+[![Ansible](https://img.shields.io/badge/Ansible-Boostrap-EE0000?style=flat-square&logo=ansible&logoColor=white)](https://ansible.com)
+[![Argo CD](https://img.shields.io/badge/Argo_CD-GitOps-EF7B4D?style=flat-square&logo=argo&logoColor=white)](https://argoproj.github.io/cd)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](LICENSE)
 
 **Khoa Mạng Máy Tính và Truyền Thông Dữ Liệu · Trường Đại học Công nghệ Thông tin (UIT) · ĐHQG-HCM**

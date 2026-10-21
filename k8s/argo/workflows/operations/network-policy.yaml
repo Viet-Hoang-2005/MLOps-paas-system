@@ -1,0 +1,61 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-mlops-paas-job-operations
+  namespace: mlops-paas-execution
+  labels:
+    app.kubernetes.io/name: mlops-paas-job-operations
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/tier: jobs
+    mlops.io/domain: operations
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mlops-paas-job-operations
+  policyTypes:
+    - Egress
+  egress:
+    # 1. DNS Resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # 2. Kubernetes API Server nội bộ (để submit/reconcile Workflows và PyTorchJobs)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+      ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.169.254/32
+      ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 443
+    # 3. Control Plane Callback (Observation reconciliation callback)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-paas-core
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mlops-paas-control-plane
+      ports:
+        - protocol: TCP
+          port: 8000
+
