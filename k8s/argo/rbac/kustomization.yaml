@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - events-rbac.yaml
+  - workflow-executor-rbac.yaml
+  - serving-deploy-rbac.yaml
+  - serving-delete-rbac.yaml
+  - training-rbac.yaml
+  - job-operations-rbac.yaml

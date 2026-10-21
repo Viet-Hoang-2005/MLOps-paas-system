@@ -1,0 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mlops-paas-control-plane-monitor
+  labels:
+    release: monitoring
+    app.kubernetes.io/name: mlops-paas-control-plane
+    app.kubernetes.io/instance: mlops-paas-control-plane
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/tier: app
+    mlops.io/domain: control-plane
+spec:
+  namespaceSelector:
+    matchNames:
+      - mlops-paas-core
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mlops-paas-control-plane
+  endpoints:
+    - port: http
+      path: /health/metrics
+      interval: 15s
+      scrapeTimeout: 10s
+

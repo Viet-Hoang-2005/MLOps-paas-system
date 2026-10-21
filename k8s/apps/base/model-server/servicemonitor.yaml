@@ -1,0 +1,35 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mlops-paas-model-server-monitor
+  labels:
+    release: monitoring
+    app.kubernetes.io/name: mlops-paas-model-server
+    app.kubernetes.io/instance: mlops-paas-model-server
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/tier: gateway
+    mlops.io/domain: serving
+spec:
+  selector:
+    matchExpressions:
+      # Scrape both dynamic serving workers and the central model gateway.
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - mlops-paas-model-server
+          - mlops-paas-model-serving
+  namespaceSelector:
+    matchNames:
+      - mlops-paas-core
+      - mlops-paas-serving
+  targetLabels:
+    - app.kubernetes.io/name
+    - app.kubernetes.io/component
+    - mlops.io/domain
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+

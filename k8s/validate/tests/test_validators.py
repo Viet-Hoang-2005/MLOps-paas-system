@@ -265,7 +265,13 @@ class RuntimeLoggingTests(unittest.TestCase):
         addon_path = root / "k8s/gitops/production/applications/addons"
         apps = [yaml.safe_load((addon_path / name).read_text()) for name in ("alloy.yaml", "loki.yaml")]
         template = yaml.safe_load((root / "k8s/argo/workflows/deploy-workflowtemplate.yaml").read_text())
-        roles = list(yaml.safe_load_all((root / "k8s/argo/rbac.yaml").read_text()))
+        roles = [
+            doc
+            for p in sorted((root / "k8s/argo/rbac").glob("*.yaml"))
+            if p.name != "kustomization.yaml"
+            for doc in yaml.safe_load_all(p.read_text(encoding="utf-8"))
+            if doc
+        ]
         return FakeContext(applications=apps, rendered={"k8s/argo": [template, *roles]})
 
     def test_current_runtime_logging_contract(self):

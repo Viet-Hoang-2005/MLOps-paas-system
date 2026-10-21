@@ -8,3 +8,5 @@ resources:
   - replication.yaml
   - sentinel.yaml
   - network-policy.yaml
+  - servicemonitor.yaml
+

@@ -1,4 +1,3 @@
-# redpanda-servicemonitor.yaml: Cấu hình Prometheus scrape metrics nội bộ của Redpanda
 # Redpanda tự expose metrics tại port 9644 không cần exporter thêm
 ---
 apiVersion: monitoring.coreos.com/v1

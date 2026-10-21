@@ -95,7 +95,7 @@ def test_runtime_times_use_runner_not_executor(kind, runner):
 
 def test_sensor_forwards_entire_training_payload():
     root = Path(__file__).parents[2]
-    sensor = yaml.safe_load((root / "argo/sensor.yaml").read_text())
+    sensor = yaml.safe_load((root / "argo/events/sensor.yaml").read_text())
     triggers = {t["template"]["name"]: t["template"]["k8s"] for t in sensor["spec"]["triggers"]}
     for name, kind in (("train-workflow-trigger", "training"), ("drift-workflow-trigger", "drift")):
         trigger = triggers[name]
@@ -220,7 +220,7 @@ def test_operational_workflows_have_ttl_and_pod_gc():
     assert delete_doc["spec"]["ttlStrategy"]["secondsAfterCompletion"] == 300
     assert delete_doc["spec"]["podGC"]["strategy"] == "OnPodCompletion"
 
-    sensor = yaml.safe_load((root / "argo/sensor.yaml").read_text())
+    sensor = yaml.safe_load((root / "argo/events/sensor.yaml").read_text())
     op_triggers = ["cancel-build-workflow-trigger", "drift-workflow-trigger", "delete-workflow-trigger", "train-workflow-trigger", "cancel-train-workflow-trigger", "reconcile-job-trigger"]
     for t in sensor["spec"]["triggers"]:
         if t["template"]["name"] in op_triggers:
@@ -279,9 +279,9 @@ def test_build_template_labels_workflow_and_keeps_callback_secret_away_from_user
     prepare_env = {item["name"] for item in steps["prepare-package"]["container"]["env"]}
     assert "CONTROL_PLANE_WEBHOOK_SECRET" not in prepare_env
     assert "CONTROL_PLANE_WEBHOOK_SECRET" in {item["name"] for item in steps["notify-success"]["container"]["env"]}
-    sensor = yaml.safe_load((root / "sensor.yaml").read_text(encoding="utf-8"))
+    sensor = yaml.safe_load((root / "events/sensor.yaml").read_text(encoding="utf-8"))
     assert "cancel-build-dep" in {dep["name"] for dep in sensor["spec"]["dependencies"]}
-    source = yaml.safe_load((root / "eventsource.yaml").read_text(encoding="utf-8"))
+    source = yaml.safe_load((root / "events/eventsource.yaml").read_text(encoding="utf-8"))
     assert "cancel-build" in source["spec"]["webhook"]
 
 

@@ -117,11 +117,11 @@ k8s/
 │   ├── cloudflare/                     # Cloudflare Tunnel Daemon kết nối ra ngoài an toàn
 │   └── routing/                        # Traefik IngressRoute, Middleware định tuyến tên miền
 ├── argo/                               # Hạ tầng điều phối tác vụ MLOps (Argo Events & Workflows)
-│   ├── event-bus.yaml                  # NATS EventBus cho Argo Events
-│   ├── event-source.yaml               # Webhook tiếp nhận tín hiệu từ Control Plane / GitHub
-│   ├── sensor.yaml                     # Bộ lọc sự kiện và kích hoạt Workflow tương ứng
-│   ├── external-secrets.yaml           # Secret kết nối và token xác thực webhook
-│   └── workflow-templates/             # Mẫu template pipeline: build, deploy, delete, drift, training
+│   ├── config/                         # Biến môi trường & ExternalSecrets cho Execution
+│   ├── rbac/                           # Phân quyền ServiceAccounts & Roles tập trung
+│   ├── events/                         # Argo Events: EventBus, EventSource, Service, Sensor, NetworkPolicy
+│   ├── workflows/                      # Mẫu template pipeline: build, deploy, delete, drift, training
+│   └── scripts/                        # Python scripts điều khiển tác vụ chạy trong workflow
 ├── apps/                               # Mã nguồn Kubernetes của các Microservices ứng dụng
 │   ├── base/                           # Manifest cơ sở (environment-agnostic, dùng chung)
 │   │   ├── control-plane/              # Deployment Django API, Celery Worker, Beat

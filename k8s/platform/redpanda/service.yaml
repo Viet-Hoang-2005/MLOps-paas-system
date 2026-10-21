@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda
+  labels:
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/instance: redpanda
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: message-broker
+    app.kubernetes.io/tier: data
+    mlops.io/domain: messaging
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  ports:
+  - port: 9092
+    targetPort: 9092
+    name: kafka
+  - port: 19092
+    targetPort: 19092
+    name: kafka-ext
+  - port: 9644
+    targetPort: 9644
+    name: admin
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: redpanda
