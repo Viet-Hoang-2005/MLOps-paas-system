@@ -231,16 +231,16 @@ jobs:
           
           # 2. Update Argo Workflow Templates (packager and evidently)
           if [ "${{ needs.detect-changes.outputs.packager }}" == "true" ]; then
-            yq e -i '(.spec.templates[] | select(.name == "prepare-package" or .name == "notify-success") | .container.image) = "'$REG'/mlops-paas-model-packager:'$SHA'"' k8s/argo/workflows/build-workflowtemplate.yaml
+            yq e -i '(.spec.templates[] | select(.name == "prepare-package" or .name == "notify-success") | .container.image) = "'$REG'/mlops-paas-model-packager:'$SHA'"' k8s/argo/workflows/build/workflow.yaml
           fi
 
           if [ "${{ needs.detect-changes.outputs.evidently }}" == "true" ]; then
-            yq e -i '(.spec.templates[] | select(.name == "run-evidently") | .container.image) = "'$REG'/mlops-paas-evidently:'$SHA'"' k8s/argo/workflows/evidently-workflowtemplate.yaml
+            yq e -i '(.spec.templates[] | select(.name == "run-evidently") | .container.image) = "'$REG'/mlops-paas-evidently:'$SHA'"' k8s/argo/workflows/evidently/workflow.yaml
           fi
 
           if [ "${{ needs.detect-changes.outputs.training_runner }}" == "true" ]; then
-            yq e -i '(.spec.templates[] | select(.name == "cpu-pytorch-job") | .resource.manifest) |= sub("image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:[^\\n]+", "image: '$REG'/mlops-paas-training-runner:'$SHA'")' k8s/argo/workflows/training-workflowtemplate.yaml
-            yq e -i '(.spec.templates[] | select(.name == "gpu-pytorch-job") | .resource.manifest) |= sub("image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:[^\\n]+", "image: '$REG'/mlops-paas-training-runner:'$SHA'")' k8s/argo/workflows/training-workflowtemplate.yaml
+            yq e -i '(.spec.templates[] | select(.name == "cpu-pytorch-job") | .resource.manifest) |= sub("image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:[^\\n]+", "image: '$REG'/mlops-paas-training-runner:'$SHA'")' k8s/argo/workflows/training/workflow.yaml
+            yq e -i '(.spec.templates[] | select(.name == "gpu-pytorch-job") | .resource.manifest) |= sub("image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:[^\\n]+", "image: '$REG'/mlops-paas-training-runner:'$SHA'")' k8s/argo/workflows/training/workflow.yaml
           fi
 
       - name: Generate Summary Table

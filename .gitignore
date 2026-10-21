@@ -27,8 +27,6 @@ venv/
 .venv-secrets/
 .venv-refactor/
 *.egg-info/
-dist/
-build/
 
 # Django static files
 services/control-plane/staticfiles/

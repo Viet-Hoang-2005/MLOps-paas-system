@@ -34,4 +34,3 @@ subjects:
   - kind: ServiceAccount
     name: argo-sensor-sa
     namespace: argo-events
-

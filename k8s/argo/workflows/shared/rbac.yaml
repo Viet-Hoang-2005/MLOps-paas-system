@@ -4,24 +4,6 @@ metadata:
   name: argo-workflow-basic-sa
   namespace: mlops-paas-execution
 ---
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: argo-workflow-deploy-sa
-  namespace: mlops-paas-execution
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: argo-workflow-delete-sa
-  namespace: mlops-paas-execution
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: argo-workflow-training-sa
-  namespace: mlops-paas-execution
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -54,4 +36,3 @@ subjects:
   - kind: ServiceAccount
     name: argo-workflow-training-sa
     namespace: mlops-paas-execution
-

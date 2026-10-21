@@ -159,6 +159,7 @@ spec:
                           - 'import json,os,sys,urllib.request; r=urllib.request.Request("http://127.0.0.1:"+os.environ["MODEL_HEALTH_PORT"]+"/health",data=b"{}" if os.environ["MODEL_HEALTH_TYPE"]=="dl" else None,headers={"Content-Type":"application/json"}); p=json.load(urllib.request.urlopen(r,timeout=3)); sys.exit(0 if p.get("model_loaded") is True and p.get("status")=="healthy" and p.get("project_id")==os.environ["PROJECT_ID"] and p.get("model_version_id")==os.environ["MODEL_VERSION_ID"] else 1)'
                       periodSeconds: 10
                       timeoutSeconds: 5
+                      failureThreshold: 150
                 volumes:
                   - {name: dynamic-libs, emptyDir: {}}
                   - {name: pip-cache, emptyDir: {}}
@@ -245,3 +246,101 @@ spec:
         resources:
           requests: {cpu: 25m, memory: 32Mi}
           limits: {cpu: 100m, memory: 64Mi}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: mlops-paas-model-server-delete-template
+  namespace: mlops-paas-execution
+spec:
+  serviceAccountName: argo-workflow-delete-sa
+  entrypoint: delete-model-project
+  onExit: notify-delete-exit
+  ttlStrategy:
+    secondsAfterCompletion: 300
+  podGC:
+    strategy: OnPodCompletion
+  arguments:
+    parameters:
+      - name: project_id
+      - name: container_names
+      - name: control_plane_webhook_url
+  templates:
+    - name: delete-model-project
+      inputs:
+        parameters:
+          - name: project_id
+          - name: container_names
+      steps:
+        - - name: delete-runtime
+            template: delete-runtime
+            arguments:
+              parameters:
+                - {name: container_name, value: "{{item}}"}
+            withParam: "{{inputs.parameters.container_names}}"
+
+    - name: delete-runtime
+      inputs:
+        parameters:
+          - name: container_name
+      steps:
+        - - name: deployment
+            template: delete-deployment
+            arguments:
+              parameters:
+                - {name: container_name, value: "{{inputs.parameters.container_name}}"}
+          - name: service
+            template: delete-service
+            arguments:
+              parameters:
+                - {name: service_name, value: "{{inputs.parameters.container_name}}-svc"}
+
+    - name: delete-deployment
+      inputs:
+        parameters:
+          - name: container_name
+      resource:
+        action: delete
+        flags: ["--ignore-not-found"]
+        manifest: |
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: {{=toJson(inputs.parameters.container_name)}}
+            namespace: mlops-paas-serving
+
+    - name: delete-service
+      inputs:
+        parameters:
+          # Built by the caller: quoted literals inside {{=...}} are escaped when the
+          # template is serialized, so the expression would be left unevaluated.
+          - name: service_name
+      resource:
+        action: delete
+        flags: ["--ignore-not-found"]
+        manifest: |
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: {{=toJson(inputs.parameters.service_name)}}
+            namespace: mlops-paas-serving
+
+    - name: notify-delete-exit
+      nodeSelector: {workload-type: worker}
+      container:
+        image: curlimages/curl:8.8.0
+        args:
+          - -sS
+          - -X
+          - POST
+          - "{{workflow.parameters.control_plane_webhook_url}}"
+          - -H
+          - "Content-Type: application/json"
+          - -H
+          - "X-Control-Plane-Secret: $(CONTROL_PLANE_WEBHOOK_SECRET)"
+          - --data
+          - '{"status":"{{workflow.status}}","error_message":"Model cleanup workflow {{workflow.name}} finished with {{workflow.status}}"}'
+        env:
+          - name: CONTROL_PLANE_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef: {name: argo-delete-callback-secret, key: CONTROL_PLANE_WEBHOOK_SECRET}

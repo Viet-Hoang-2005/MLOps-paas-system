@@ -264,10 +264,14 @@ class RuntimeLoggingTests(unittest.TestCase):
         root = repository_root()
         addon_path = root / "k8s/gitops/production/applications/addons"
         apps = [yaml.safe_load((addon_path / name).read_text()) for name in ("alloy.yaml", "loki.yaml")]
-        template = yaml.safe_load((root / "k8s/argo/workflows/deploy-workflowtemplate.yaml").read_text())
+        template = next(
+            d
+            for d in yaml.safe_load_all((root / "k8s/argo/workflows/deploy/workflow.yaml").read_text())
+            if d and d["metadata"]["name"] == "mlops-paas-model-server-deploy-template"
+        )
         roles = [
             doc
-            for p in sorted((root / "k8s/argo/rbac").glob("*.yaml"))
+            for p in sorted((root / "k8s/argo").glob("**/rbac.yaml"))
             if p.name != "kustomization.yaml"
             for doc in yaml.safe_load_all(p.read_text(encoding="utf-8"))
             if doc

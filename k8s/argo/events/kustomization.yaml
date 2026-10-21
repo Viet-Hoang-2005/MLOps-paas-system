@@ -7,4 +7,5 @@ resources:
   - service.yaml
   - sensor.yaml
   - network-policy.yaml
-
+  - external-secrets.yaml
+  - rbac.yaml

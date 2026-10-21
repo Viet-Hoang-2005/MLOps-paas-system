@@ -7,7 +7,7 @@ import pytest
 import yaml
 
 
-spec = importlib.util.spec_from_file_location("job_ops", Path(__file__).parents[2] / "argo/scripts/job_ops.py")
+spec = importlib.util.spec_from_file_location("job_ops", Path(__file__).parents[2] / "argo/workflows/operations/scripts/job_ops.py")
 ops = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ops)
 ID = "00000000-0000-0000-0000-000000000001"
@@ -103,7 +103,7 @@ def test_sensor_forwards_entire_training_payload():
         assert resource["spec"]["workflowTemplateRef"]["name"] == "mlops-paas-job-submit-template"
         assert resource["spec"]["arguments"]["parameters"][0]["value"] == kind
         assert trigger["parameters"][0]["src"]["dataTemplate"] == "{{ .Input.body | toJson }}"
-    training = yaml.safe_load((root / "argo/workflows/training-workflowtemplate.yaml").read_text())
+    training = next(d for d in yaml.safe_load_all((root / "argo/workflows/training/workflow.yaml").read_text()) if d and d["metadata"]["name"] == "mlops-paas-training-pipeline-template")
     for template in training["spec"]["templates"]:
         if "resource" in template:
             manifest = template["resource"]["manifest"]
@@ -186,7 +186,7 @@ def test_reconcile_stop_raises_on_persistent_patch_409(payload):
 
 def test_pytorch_jobs_have_owner_reference_and_active_deadline():
     root = Path(__file__).parents[2]
-    training = yaml.safe_load((root / "argo/workflows/training-workflowtemplate.yaml").read_text())
+    training = next(d for d in yaml.safe_load_all((root / "argo/workflows/training/workflow.yaml").read_text()) if d and d["metadata"]["name"] == "mlops-paas-training-pipeline-template")
     pytorch_templates = [t for t in training["spec"]["templates"] if t.get("name") in {"cpu-pytorch-job", "gpu-pytorch-job"}]
     assert len(pytorch_templates) == 2
     for t in pytorch_templates:
@@ -199,7 +199,7 @@ def test_pytorch_jobs_have_owner_reference_and_active_deadline():
 
 def test_operational_workflows_have_ttl_and_pod_gc():
     root = Path(__file__).parents[2]
-    job_ops_docs = list(yaml.safe_load_all((root / "argo/workflows/job-operations-workflowtemplate.yaml").read_text()))
+    job_ops_docs = list(yaml.safe_load_all((root / "argo/workflows/operations/workflow.yaml").read_text()))
     expected_image = "python:3.10-slim@sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2"
     for doc in job_ops_docs:
         assert doc["spec"]["ttlStrategy"]["secondsAfterCompletion"] == 300
@@ -212,11 +212,11 @@ def test_operational_workflows_have_ttl_and_pod_gc():
             submit_tpl = next(t for t in doc["spec"]["templates"] if t["name"] == "submit")
             assert submit_tpl["retryStrategy"]["limit"] == "3"
 
-    cancel_doc = yaml.safe_load((root / "argo/workflows/training-cancel-workflowtemplate.yaml").read_text())
+    cancel_doc = next(d for d in yaml.safe_load_all((root / "argo/workflows/training/workflow.yaml").read_text()) if d and d["metadata"]["name"] == "mlops-paas-training-cancel-template")
     assert cancel_doc["spec"]["ttlStrategy"]["secondsAfterCompletion"] == 300
     assert cancel_doc["spec"]["podGC"]["strategy"] == "OnPodCompletion"
 
-    delete_doc = yaml.safe_load((root / "argo/workflows/delete-workflowtemplate.yaml").read_text())
+    delete_doc = next(d for d in yaml.safe_load_all((root / "argo/workflows/deploy/workflow.yaml").read_text()) if d and d["metadata"]["name"] == "mlops-paas-model-server-delete-template")
     assert delete_doc["spec"]["ttlStrategy"]["secondsAfterCompletion"] == 300
     assert delete_doc["spec"]["podGC"]["strategy"] == "OnPodCompletion"
 
@@ -272,7 +272,7 @@ def test_cancel_build_refuses_foreign_workflow_and_bad_identity():
 
 def test_build_template_labels_workflow_and_keeps_callback_secret_away_from_user_code():
     root = Path(__file__).parents[3] / "k8s/argo"
-    template = yaml.safe_load((root / "workflows/build-workflowtemplate.yaml").read_text(encoding="utf-8"))
+    template = yaml.safe_load((root / "workflows/build/workflow.yaml").read_text(encoding="utf-8"))
     labels = template["spec"]["workflowMetadata"]["labelsFrom"]
     assert set(labels) == {"mlops.io/build-id", "mlops.io/project-id", "mlops.io/tenant-id"}
     steps = {item["name"]: item for item in template["spec"]["templates"]}
@@ -288,7 +288,7 @@ def test_build_template_labels_workflow_and_keeps_callback_secret_away_from_user
 def test_push_credential_is_only_mounted_where_no_user_code_runs():
     """build-image runs the user's pip install as root; whatever it mounts, that code can read."""
     root = Path(__file__).parents[3] / "k8s/argo"
-    template = yaml.safe_load((root / "workflows/build-workflowtemplate.yaml").read_text(encoding="utf-8"))
+    template = yaml.safe_load((root / "workflows/build/workflow.yaml").read_text(encoding="utf-8"))
     spec = template["spec"]
     templates = {item["name"]: item for item in spec["templates"]}
     secret_of = {volume["name"]: volume["secret"]["secretName"] for volume in spec["volumes"]}
