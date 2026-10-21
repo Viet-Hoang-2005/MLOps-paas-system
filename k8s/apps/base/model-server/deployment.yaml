@@ -26,13 +26,33 @@ spec:
         mlops.io/domain: serving
         app.kubernetes.io/managed-by: kustomize
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       volumes:
         - name: prometheus-multiprocess
           emptyDir: {}
       nodeSelector:
         workload-type: worker
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: mlops-paas-model-server
       containers:
         - name: model-server
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           image: mlops-paas-model-server
           imagePullPolicy: IfNotPresent
           ports:

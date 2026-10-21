@@ -29,6 +29,14 @@ spec:
         mlops.io/domain: streaming
         app.kubernetes.io/managed-by: kustomize
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       nodeSelector:
         workload-type: worker
       affinity:
@@ -45,11 +53,24 @@ spec:
                 topologyKey: "kubernetes.io/hostname"
       initContainers:
         - name: init-kafka-topic
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           image: docker.redpanda.com/redpandadata/redpanda:v23.3.21
           command: ["/bin/sh", "-c"]
           args: ["rpk topic create mlops_paas_production_data mlops_paas_production_data.dlq --brokers redpanda.mlops-paas-data.svc.cluster.local:9092 || true"]
+          env:
+            - name: HOME
+              value: /tmp
       containers:
         - name: consumer
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           image: mlops-paas-consumer
           imagePullPolicy: Always
           command: ["python", "-m", "src.main"]

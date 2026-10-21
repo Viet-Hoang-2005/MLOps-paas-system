@@ -27,41 +27,36 @@ spec:
         app.kubernetes.io/managed-by: kustomize
     spec:
       automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       nodeSelector:
         workload-type: worker
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                    - key: app.kubernetes.io/name
-                      operator: In
-                      values:
-                        - mlops-paas-control-plane
-                topologyKey: "kubernetes.io/hostname"
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: mlops-paas-control-plane
       volumes:
         - name: staticfiles
           emptyDir: {}
       initContainers:
-        - name: db-migrate
+        - name: collect-static
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           image: mlops-paas-control-plane
           imagePullPolicy: IfNotPresent
-          command: ["sh", "-c"]
-          args:
-            - "python manage.py migrate && python manage.py collectstatic --noinput"
+          command: ["python", "manage.py", "collectstatic", "--noinput"]
           env:
-            - name: DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: mlops-paas-control-plane-secret
-                  key: DB_USER
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mlops-paas-control-plane-secret
-                  key: DB_PASSWORD
             - name: DJANGO_SECRET_KEY
               valueFrom:
                 secretKeyRef:
@@ -87,16 +82,6 @@ spec:
                 secretKeyRef:
                   name: mlops-paas-control-plane-secret
                   key: ARGO_EVENTS_WEBHOOK_TOKEN
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mlops-paas-control-plane-secret
-                  key: REDIS_PASSWORD
-            - name: REDIS_SENTINEL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mlops-paas-control-plane-secret
-                  key: REDIS_SENTINEL_PASSWORD
           envFrom:
             - configMapRef:
                 name: mlops-paas-control-plane-config
@@ -105,6 +90,11 @@ spec:
               mountPath: /app/staticfiles
       containers:
         - name: control-plane
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           image: mlops-paas-control-plane
           imagePullPolicy: IfNotPresent
           command: ["sh", "-c"]

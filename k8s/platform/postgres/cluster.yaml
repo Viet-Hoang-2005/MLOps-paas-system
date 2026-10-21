@@ -52,7 +52,7 @@ spec:
     nodeSelector:
       workload-type: worker
     enablePodAntiAffinity: true
-    podAntiAffinityType: preferred
+    podAntiAffinityType: required
     topologyKey: kubernetes.io/hostname
 
   # Tuning PostgreSQL parameters

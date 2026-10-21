@@ -27,10 +27,29 @@ spec:
         app.kubernetes.io/managed-by: kustomize
     spec:
       automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       nodeSelector:
         workload-type: worker
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: mlops-paas-celery-worker
       containers:
         - name: worker
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           image: mlops-paas-control-plane
           imagePullPolicy: IfNotPresent
           command: ["celery"]
@@ -134,10 +153,22 @@ spec:
         app.kubernetes.io/managed-by: kustomize
     spec:
       automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       nodeSelector:
         workload-type: worker
       containers:
         - name: celery-beat
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           image: mlops-paas-control-plane
           imagePullPolicy: IfNotPresent
           command: ["celery"]
@@ -210,10 +241,22 @@ spec:
         app.kubernetes.io/managed-by: kustomize
     spec:
       automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       nodeSelector:
         workload-type: worker
       containers:
         - name: celery-health-worker
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           image: mlops-paas-control-plane
           imagePullPolicy: IfNotPresent
           command: ["celery"]
@@ -256,60 +299,3 @@ spec:
             limits:
               cpu: 300m
               memory: 512Mi
-
----
-apiVersion: keda.sh/v1alpha1
-kind: TriggerAuthentication
-metadata:
-  name: mlops-paas-celery-redis-auth
-  labels:
-    app.kubernetes.io/name: mlops-paas-celery-worker
-    app.kubernetes.io/instance: mlops-paas-celery-worker
-    app.kubernetes.io/part-of: mlops-paas
-    app.kubernetes.io/component: worker
-    app.kubernetes.io/tier: jobs
-    mlops.io/domain: control-plane
-    app.kubernetes.io/managed-by: kustomize
-spec:
-  secretTargetRef:
-    - parameter: password
-      name: mlops-paas-celery-worker-secret
-      key: REDIS_PASSWORD
-    - parameter: sentinelPassword
-      name: mlops-paas-celery-worker-secret
-      key: REDIS_SENTINEL_PASSWORD
----
-apiVersion: keda.sh/v1alpha1
-kind: ScaledObject
-metadata:
-  name: mlops-paas-celery-worker-scaler
-  labels:
-    app.kubernetes.io/name: mlops-paas-celery-worker
-    app.kubernetes.io/instance: mlops-paas-celery-worker
-    app.kubernetes.io/part-of: mlops-paas
-    app.kubernetes.io/component: worker
-    app.kubernetes.io/tier: jobs
-    mlops.io/domain: control-plane
-    app.kubernetes.io/managed-by: kustomize
-spec:
-  scaleTargetRef:
-    name: mlops-paas-celery-worker
-  minReplicaCount: 2
-  maxReplicaCount: 5
-  pollingInterval: 15
-  cooldownPeriod: 180
-  triggers:
-    - type: redis-sentinel
-      metadata:
-        sentinelAddresses: redis-ha-sentinel-0.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-1.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-2.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
-        sentinelMaster: redis-master
-        listName: celery
-        listLength: "10"
-        databaseIndex: "3"
-      authenticationRef:
-        name: mlops-paas-celery-redis-auth
-    - type: cpu
-      metricType: Utilization
-      metadata:
-        value: "80"
-

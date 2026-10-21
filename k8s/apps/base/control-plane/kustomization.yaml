@@ -3,10 +3,12 @@ kind: Kustomization
 
 resources:
   - deployment.yaml
-  - celery.yaml
+  - celery-deployment.yaml
+  - celery-scaledobject.yaml
   - service.yaml
   - hpa.yaml
   - configmap.yaml
   - network-policy.yaml
   - servicemonitor.yaml
   - pdb.yaml
+  - migration-job.yaml
