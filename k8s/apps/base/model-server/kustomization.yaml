@@ -8,3 +8,4 @@ resources:
   - configmap.yaml
   - network-policy.yaml
   - servicemonitor.yaml
+  - pdb.yaml

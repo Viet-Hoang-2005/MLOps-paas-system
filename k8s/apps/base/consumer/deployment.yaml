@@ -1,5 +1,3 @@
-# consumer-deployment.yaml: Triển khai Kafka Consumer để tiêu thụ dữ liệu từ Redpanda và phát hiện Data Drift với Evidently
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:

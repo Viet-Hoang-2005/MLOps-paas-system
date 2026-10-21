@@ -1,5 +1,3 @@
-# consumer-scaledobject.yaml: Tự động scale Pod Consumer dựa trên độ trễ (lag) của Redpanda Topic
----
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
