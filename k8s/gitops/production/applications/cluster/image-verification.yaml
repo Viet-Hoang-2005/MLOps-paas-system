@@ -15,13 +15,13 @@ spec:
     - name: Owner
       value: Platform Engineering
     - name: Source
-      value: k8s/cluster/security/image
+      value: k8s/cluster/image
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#image-verification
   source:
     repoURL: https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
     targetRevision: main
-    path: k8s/cluster/security/image
+    path: k8s/cluster/image
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno

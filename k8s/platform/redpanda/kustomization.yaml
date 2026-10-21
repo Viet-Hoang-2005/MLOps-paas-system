@@ -5,3 +5,6 @@ namespace: mlops-paas-data
 resources:
   - statefulset.yaml
   - servicemonitor.yaml
+  - network-policy.yaml
+  - network-policy.yaml
+

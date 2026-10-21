@@ -27,6 +27,8 @@ spec:
       kind: ScaledObject
     - group: external-secrets.io
       kind: ExternalSecret
+    - group: networking.k8s.io
+      kind: NetworkPolicy
   orphanedResources:
     warn: true
     ignore:

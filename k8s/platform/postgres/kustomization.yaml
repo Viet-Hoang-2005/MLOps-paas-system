@@ -6,3 +6,6 @@ resources:
   - cluster.yaml
   - pod-monitor.yaml
   - external-secrets.yaml
+  - network-policy.yaml
+  - network-policy.yaml
+

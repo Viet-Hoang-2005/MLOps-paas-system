@@ -1,0 +1,41 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-mlops-paas-web
+  labels:
+    app.kubernetes.io/name: mlops-paas-web
+    app.kubernetes.io/instance: mlops-paas-web
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/tier: frontend
+    mlops.io/domain: frontend
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mlops-paas-web
+  policyTypes:
+    - Ingress
+  ingress:
+    # Traefik Ingress (từ kube-system)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 80
+    # Cloudflare Tunnel (từ namespace mlops-paas-routing)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-paas-routing
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cloudflared
+      ports:
+        - protocol: TCP
+          port: 80
+

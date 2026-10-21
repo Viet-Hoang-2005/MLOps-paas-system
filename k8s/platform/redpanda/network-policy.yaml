@@ -1,0 +1,45 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-redpanda
+  labels:
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/instance: redpanda
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: message-broker
+    app.kubernetes.io/tier: data
+    mlops.io/domain: messaging
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redpanda
+  policyTypes:
+    - Ingress
+  ingress:
+    # Nội bộ Redpanda
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redpanda
+    # Core apps & Execution engine đẩy/tiêu thụ data
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-paas-core
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-paas-execution
+      ports:
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 19092
+    # Prometheus cào metrics admin (cổng 9644)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9644
+

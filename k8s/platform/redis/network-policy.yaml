@@ -2,12 +2,34 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: np-redis-ha
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: redis-ha
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/tier: data
+    mlops.io/domain: cache
 spec:
-  podSelector: {}
-  policyTypes: [Ingress]
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - redis-ha
+          - redis-ha-sentinel
+  policyTypes:
+    - Ingress
   ingress:
+    # Nội bộ Redis & Sentinel giao tiếp với nhau
     - from:
         - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 26379
+    # Core platform workloads truy cập Redis & Sentinel
+    - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: mlops-paas-core
@@ -19,6 +41,7 @@ spec:
           port: 6379
         - protocol: TCP
           port: 26379
+    # Prometheus cào metrics exporter (cổng 9121)
     - from:
         - namespaceSelector:
             matchLabels:

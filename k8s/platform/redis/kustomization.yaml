@@ -4,7 +4,7 @@ namespace: mlops-paas-data
 
 resources:
   - external-secrets.yaml
-  - redis-config.yaml
+  - configmap.yaml
   - replication.yaml
   - sentinel.yaml
   - network-policy.yaml

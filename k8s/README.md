@@ -95,7 +95,6 @@ k8s/
 │   ├── secret-store/                   # ClusterSecretStore liên kết AWS Secrets Manager
 │   ├── security/                       # Bảo mật cụm phân tách theo miền nghiệp vụ
 │   │   ├── image/                      # Kiểm tra chữ ký ảnh container (Kyverno)
-│   │   ├── network/                    # Zero-Trust NetworkPolicy
 │   │   └── system/                     # PodDisruptionBudgets bảo vệ tính sẵn sàng
 │   └── karpenter/                      # EC2NodeClass & NodePools mở rộng tài nguyên tính toán
 ├── gitops/                             # Định nghĩa cấu trúc phân tầng Argo CD (App-of-Apps)

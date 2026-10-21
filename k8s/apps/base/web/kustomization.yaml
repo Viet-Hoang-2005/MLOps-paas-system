@@ -4,3 +4,6 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - service.yaml
+  - network-policy.yaml
+  - network-policy.yaml
+

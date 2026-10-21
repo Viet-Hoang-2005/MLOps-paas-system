@@ -5,3 +5,6 @@ resources:
   - deployment.yaml
   - scaledobject.yaml
   - configmap.yaml
+  - network-policy.yaml
+  - network-policy.yaml
+

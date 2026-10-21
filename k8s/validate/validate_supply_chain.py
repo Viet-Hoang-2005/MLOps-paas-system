@@ -43,13 +43,13 @@ def validate_policy(context: ValidationContext) -> tuple[list[str], dict]:
     verification_app = context.application("mlops-prod-cluster-image-verification")
     if (
         ((verification_app.get("spec") or {}).get("source") or {}).get("path")
-    ) != "k8s/cluster/security/image":
+    ) != "k8s/cluster/image":
         errors.append("image-verification must use the Git-backed policy source")
     if (
         ((verification_app.get("spec") or {}).get("destination") or {}).get("namespace")
     ) != "kyverno":
         errors.append("image-verification must reconcile in kyverno")
-    resources = context.render("k8s/cluster/security/image")
+    resources = context.render("k8s/cluster/image")
     credentials = find_resource(
         resources, "ExternalSecret", "kyverno-harbor-registry-auth-sync"
     )

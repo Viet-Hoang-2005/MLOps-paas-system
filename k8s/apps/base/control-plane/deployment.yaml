@@ -12,11 +12,6 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
 spec:
   replicas: 2
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 0
-      maxUnavailable: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: mlops-paas-control-plane

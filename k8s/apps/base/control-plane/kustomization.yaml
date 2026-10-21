@@ -8,3 +8,6 @@ resources:
   - configmap.yaml
   - celery-deployment.yaml
   - celery-scaledobject.yaml
+  - network-policy.yaml
+  - network-policy.yaml
+
