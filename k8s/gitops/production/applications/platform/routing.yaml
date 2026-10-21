@@ -6,6 +6,8 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "20"
   labels:
+    app.kubernetes.io/name: routing
+    app.kubernetes.io/managed-by: argocd
     mlops-paas.io/plane: platform
     mlops-paas.io/component: routing
 spec:

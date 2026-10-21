@@ -6,6 +6,8 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "15"
   labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/managed-by: argocd
     mlops-paas.io/plane: workload
     mlops-paas.io/component: web
 spec:

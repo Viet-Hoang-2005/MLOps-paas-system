@@ -6,5 +6,4 @@ resources:
   - scaledobject.yaml
   - configmap.yaml
   - network-policy.yaml
-  - network-policy.yaml
 

@@ -9,5 +9,4 @@ resources:
   - celery-deployment.yaml
   - celery-scaledobject.yaml
   - network-policy.yaml
-  - network-policy.yaml
 

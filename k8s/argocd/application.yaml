@@ -4,7 +4,9 @@ metadata:
   name: mlops-paas-system
   namespace: argocd
   labels:
+    app.kubernetes.io/name: mlops-paas-system
     app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/managed-by: argocd
     mlops-paas.io/environment: production
     mlops-paas.io/plane: gitops
   annotations:

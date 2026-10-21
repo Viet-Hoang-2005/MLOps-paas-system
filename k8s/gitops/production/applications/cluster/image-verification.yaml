@@ -7,6 +7,8 @@ metadata:
     argocd.argoproj.io/sync-wave: "-29"
     argocd.argoproj.io/compare-options: ServerSideDiff=true
   labels:
+    app.kubernetes.io/name: image-verification
+    app.kubernetes.io/managed-by: argocd
     mlops-paas.io/plane: cluster
     mlops-paas.io/component: image-verification
 spec:

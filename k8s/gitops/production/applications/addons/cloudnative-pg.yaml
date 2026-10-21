@@ -6,6 +6,8 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-40"
   labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/managed-by: argocd
     mlops-paas.io/plane: addon
     mlops-paas.io/component: cloudnative-pg
 spec:

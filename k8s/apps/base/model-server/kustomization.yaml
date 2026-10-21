@@ -7,5 +7,4 @@ resources:
   - hpa.yaml
   - configmap.yaml
   - network-policy.yaml
-  - network-policy.yaml
 

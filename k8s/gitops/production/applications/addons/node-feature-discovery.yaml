@@ -6,8 +6,8 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-24"
   labels:
-    app.kubernetes.io/part-of: mlops-paas
-    mlops-paas.io/environment: production
+    app.kubernetes.io/name: node-feature-discovery
+    app.kubernetes.io/managed-by: argocd
     mlops-paas.io/plane: addon
     mlops-paas.io/component: node-feature-discovery
 spec:
@@ -43,14 +43,3 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: gpu-operator
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-      allowEmpty: false
-    syncOptions:
-      - ApplyOutOfSyncOnly=true
-      - ServerSideApply=true
-      - RespectIgnoreDifferences=true
-      - PruneLast=true
-      - FailOnSharedResource=true

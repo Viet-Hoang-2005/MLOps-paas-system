@@ -6,6 +6,8 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "5"
   labels:
+    app.kubernetes.io/name: monitoring-config
+    app.kubernetes.io/managed-by: argocd
     mlops-paas.io/plane: platform
     mlops-paas.io/component: monitoring-config
 spec:

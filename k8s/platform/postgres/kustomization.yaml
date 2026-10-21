@@ -7,5 +7,4 @@ resources:
   - pod-monitor.yaml
   - external-secrets.yaml
   - network-policy.yaml
-  - network-policy.yaml
 
