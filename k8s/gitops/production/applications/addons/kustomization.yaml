@@ -9,6 +9,7 @@ resources:
   - keda.yaml
   - argo-workflows.yaml
   - argo-events.yaml
+  - argocd.yaml
   - monitoring.yaml
   - loki.yaml
   - alloy.yaml
@@ -19,4 +20,3 @@ resources:
   - node-feature-discovery.yaml
   - gpu-operator.yaml
   - headlamp.yaml
-

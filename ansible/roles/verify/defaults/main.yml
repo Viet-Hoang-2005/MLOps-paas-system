@@ -1,0 +1,9 @@
+---
+# Default variables for the verify role
+verify_scope: all
+verify_wait_timeout: 300
+verify_retry_count: 60
+verify_retry_delay: 5
+verify_storage_smoke_enabled: true
+verify_alb_enabled: true
+

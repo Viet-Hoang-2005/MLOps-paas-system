@@ -23,6 +23,7 @@ enable_karpenter: true
 # Add-ons install upstream cluster capabilities; cluster Applications configure
 # their instances. Ansible only waits for the GitOps contract.
 core_addon_application_names:
+  - mlops-prod-addon-argocd
   - mlops-prod-addon-aws-ebs-csi
   - mlops-prod-addon-external-secrets
   - mlops-prod-addon-cloudnative-pg
@@ -41,6 +42,7 @@ core_cluster_application_names:
   - mlops-prod-cluster-secret-store
   - mlops-prod-cluster-image-verification
 core_addon_workloads:
+  - {namespace: argocd, release: argocd}
   - {namespace: kube-system, release: aws-ebs-csi-driver}
   - {namespace: external-secrets, release: external-secrets}
   - {namespace: cnpg-system, release: cloudnative-pg}

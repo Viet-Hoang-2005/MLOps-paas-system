@@ -126,7 +126,13 @@ ansible/
     ├── helm/                   # Cài đặt Helm binary trên Master node
     ├── platform_core/          # Cài đặt Argo CD và deploy root GitOps Application
     ├── platform_training/      # Cấu hình mở rộng phục vụ Training (Karpenter token, Kubeflow)
-    └── verify/                 # Kiểm tra tính toàn vẹn của cụm, CRD và trạng thái các app Argo CD
+    └── verify/                 # Kiểm tra toàn diện cụm K3s theo 3 phạm vi (verify_scope)
+        ├── defaults/main.yml   # Các biến timeout, retries và cờ kích hoạt mặc định
+        └── tasks/
+            ├── main.yml        # Dispatcher điều phối include 3 scope chính
+            ├── bootstrap.yml   # [Scope 1: Bootstrap] Node Ready, Runtime K3s, CoreDNS & ALB Target Health
+            ├── platform.yml    # [Scope 2: Platform] GitOps (35 Apps), EBS Storage, CSDL HA, Secrets, Logging, Workloads
+            └── training.yml    # [Scope 3: Training] Kubeflow Training, GPU Operator, Karpenter Autoscaling & Smoke
 ```
 
 ---
@@ -185,15 +191,52 @@ kubectl kustomize --enable-helm ../k8s >/dev/null
 Để đảm bảo việc triển khai an toàn và dễ cô lập lỗi, playbook được phân chia theo các `--tags`:
 
 ```bash
-# Bước 1: Khởi tạo cụm K3s (Cấu hình OS, Master, Worker và kiểm tra tính lũy thừa - Idempotency)
-ansible-playbook site.yml --tags bootstrap
+# Bước 1: Khởi tạo cụm K3s (Cấu hình OS, Master, Worker)
 ansible-playbook site.yml --tags bootstrap
 
 # Bước 2: Dựng nền tảng GitOps cốt lõi (Helm + Argo CD + Root Application)
 ansible-playbook site.yml --tags platform-core
 
-# Bước 3: Nghiệm thu và kiểm tra sức khỏe của cụm K3s và các ứng dụng Core
+# Bước 3: Dựng nền tảng Training
+ansible-playbook site.yml --tags platform-training
+
+# Bước 4: Nghiệm thu sức khỏe toàn diện cụm
 ansible-playbook site.yml --tags verify
+```
+
+#### Kiểm tra chọn lọc theo phân tầng (Selective Verification Tags)
+Role `verify` được tổ chức thành 10 module độc lập, cho phép kiểm tra nhanh từng phần của hệ thống mà không cần chạy lại toàn bộ:
+
+```bash
+# Kiểm tra Node và Runtime K3s (Layer 0):
+ansible-playbook site.yml --tags verify-nodes
+
+# Kiểm tra Mạng, Ingress và AWS ALB Target Group (Layer 1):
+ansible-playbook site.yml --tags verify-network
+
+# Kiểm tra trạng thái GitOps và 35 Child Applications (Layer 2):
+ansible-playbook site.yml --tags verify-gitops
+
+# Kiểm tra và chạy Smoke Test tạo/gắn ổ đĩa AWS EBS gp3 (Layer 3):
+ansible-playbook site.yml --tags verify-storage
+
+# Kiểm tra CSDL Postgres HA, Redis HA và Redpanda Kafka (Layer 4):
+ansible-playbook site.yml --tags verify-data
+
+# Kiểm tra Bảo mật, External Secrets và Network Policies (Layer 5):
+ansible-playbook site.yml --tags verify-security
+
+# Kiểm tra Thu thập Log (Loki, Alloy) và Giám sát (Prometheus) (Layer 6):
+ansible-playbook site.yml --tags verify-logging
+
+# Kiểm tra sức khỏe Microservices nghiệp vụ (Control Plane, Celery, Web) (Layer 7):
+ansible-playbook site.yml --tags verify-workloads
+
+# Kiểm tra Pipeline MLOps & Argo Events Engine (Layer 8):
+ansible-playbook site.yml --tags verify-execution
+
+# Kiểm tra Hạ tầng Huấn luyện & Karpenter GPU Smoke Test (Layer 9):
+ansible-playbook site.yml --tags verify-training
 ```
 
 Khi muốn kích hoạt thêm các thành phần phục vụ **Huấn luyện mô hình (Training Platform: Karpenter, Kubeflow, GPU Operator)**:

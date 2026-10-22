@@ -27,6 +27,8 @@ spec:
     - ghcr.io/ot-container-kit/charts
     - https://kubernetes-sigs.github.io/headlamp
   destinations:
+    - namespace: argocd
+      server: https://kubernetes.default.svc
     - namespace: headlamp
       server: https://kubernetes.default.svc
     - namespace: mlops-logging

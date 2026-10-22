@@ -53,6 +53,16 @@
     - role: platform_core
       when: deploy_core_platform | bool
 
+- name: Verify the reconciled core platform
+  hosts: master
+  become: true
+  gather_facts: false
+  tags: [platform-core, verify]
+  roles:
+    - role: verify
+      verify_scope: platform
+      when: deploy_core_platform | bool
+
 - name: Wait for optional training operators and GitOps-managed capacity
   hosts: master
   become: true
@@ -71,13 +81,3 @@
     - role: verify
       verify_scope: training
       when: deploy_training_platform | bool
-
-- name: Verify the reconciled platform
-  hosts: master
-  become: true
-  gather_facts: false
-  tags: [verify]
-  roles:
-    - role: verify
-      verify_scope: platform
-      when: deploy_core_platform | bool

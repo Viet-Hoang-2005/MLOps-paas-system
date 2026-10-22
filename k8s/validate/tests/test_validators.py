@@ -93,7 +93,7 @@ class ValidatorNegativeTests(unittest.TestCase):
 
     def test_application_contract_rejects_missing_child_applications(self):
         self.assertTrue(
-            any("exactly 34" in error for error in validate_lifecycle(FakeContext()))
+            any("exactly 35" in error for error in validate_lifecycle(FakeContext()))
         )
 
     def test_application_contract_rejects_default_destination(self):

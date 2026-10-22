@@ -27,7 +27,7 @@ Trong kiến trúc tổng thể, `k8s/` đóng vai trò là **Nguồn chân lý 
      │                │                 │                  │                │
      ▼                ▼                 ▼                  ▼                ▼
 [1. Cluster]    [2. Addons]       [3. Platform]      [4. Execution]   [5. Workloads]
-- Namespaces    - EBS CSI         - Postgres HA      - EventBus       - Control Plane
+- Namespaces    - Argo CD (Self)  - Postgres HA      - EventBus       - Control Plane
 - StorageClass  - ExternalSecrets - Redis HA         - EventSource    - Celery Workers
 - Karpenter     - KEDA / Loki     - Observability    - Pipelines      - Model Server
 - Keyless Cosign- Kubeflow / Alloy- Harbor / Traefik - NetworkPolicies- Web Frontend
@@ -43,7 +43,7 @@ Hệ thống được chia thành 5 mặt phẳng độc lập tương ứng v�
 |---|---|---|---|
 | **GitOps Control Plane** | `k8s/gitops/production` | `default` | Ứng dụng gốc `mlops-paas-system` quản lý AppProject và 35 Child Application. |
 | **Cluster Plane** | `k8s/cluster` | `mlops-cluster` | Cấu hình nền tảng cấp cụm: Namespace, StorageClass (`ebs-gp3`), `ClusterSecretStore`, chính sách Kyverno Cosign, cấu hình Karpenter Capacity (NodePools, EC2NodeClasses). |
-| **Add-ons Plane** | Charts upstream & `k8s/addons/` | `mlops-addons` | Các Controller/CRD cơ sở: AWS EBS CSI, External Secrets Operator (ESO), CloudNative-PG, Redis Operator, KEDA, Prometheus Stack, Loki, Alloy, Kyverno, Kubeflow Training, Headlamp Dashboard. |
+| **Add-ons Plane** | Charts upstream & `k8s/addons/` | `mlops-addons` | Các Controller/CRD cơ sở: Self-Managed Argo CD, AWS EBS CSI, External Secrets Operator (ESO), CloudNative-PG, Redis Operator, KEDA, Prometheus Stack, Loki, Alloy, Kyverno, Kubeflow Training, Headlamp Dashboard. |
 | **Platform Plane** | `k8s/platform` | `mlops-platform` | Các dịch vụ dữ liệu & chia sẻ dùng chung: CSDL PostgreSQL HA (CloudNative-PG), Redis HA + Sentinel, Redpanda Kafka, Harbor Registry, Traefik Routing & Cloudflare Tunnel. |
 | **Execution Plane** | `k8s/argo` | `mlops-execution` | Động cơ pipeline MLOps: Argo Events (EventBus, EventSource, Sensor), NetworkPolicies cô lập execution, và các mẫu Argo WorkflowTemplates (Build, Deploy, Delete, Drift, Training, Operations). |
 | **Workloads Plane** | `k8s/apps/overlays/production` | `mlops-workloads` | Các microservices nghiệp vụ của tenant và hệ thống: Control Plane API, Celery Worker / Beat / Health-Worker, Model Server Gateway, Redpanda Consumer, Web Frontend. |
@@ -67,7 +67,7 @@ flowchart TD
     W_20["Wave 20: Routing & Public Ingress"]
 
     W_M50 -->|Namespaces, StorageClass, SecretStore| W_M40
-    W_M40 -->|EBS CSI, CNPG, Redis Operator, Kyverno, ESO| W_M10
+    W_M40 -->|Argo CD, EBS CSI, CNPG, Redis Operator, Kyverno, ESO| W_M10
     W_M10 -->|PostgreSQL HA, Redis HA, Redpanda| W_M1
     W_M1  -->|Đồng bộ Secret từ AWS & nạp ConfigMap| W_0
     W_0   -->|Chạy Migration Job, PDB, Services, NetworkPolicies| W_1
@@ -78,7 +78,7 @@ flowchart TD
 ```
 
 - **Wave -50:** `mlops-prod-cluster-namespaces`, `mlops-prod-cluster-storage` (tạo toàn bộ namespace và StorageClass trước).
-- **Wave -40:** Cài đặt các operator hạ tầng (`redis-operator`, `cloudnative-pg`, `external-secrets`, `aws-ebs-csi`).
+- **Wave -40:** Cài đặt các operator hạ tầng và Self-Managed Argo CD (`mlops-prod-addon-argocd`, `redis-operator`, `cloudnative-pg`, `external-secrets`, `aws-ebs-csi`).
 - **Wave -10:** Khởi tạo các cụm lưu trữ dữ liệu nền tảng (`mlops-prod-platform-postgres`, `mlops-prod-platform-redis`, `mlops-prod-platform-redpanda`).
 - **Wave -1:** Đồng bộ các `ExternalSecret` tương ứng tại từng workload từ AWS Secrets Manager và nạp các `ConfigMap`.
 - **Wave 0:** Khởi tạo tài nguyên cơ sở ứng dụng, Services, PodDisruptionBudgets, NetworkPolicies và thực thi **Database Migration Job** (`mlops-paas-control-plane-migration` với `argocd.argoproj.io/hook: Sync`).
@@ -89,6 +89,12 @@ flowchart TD
 > [!NOTE]
 > **Nguyên tắc "Pure Kubernetes Base via Kustomize Patches":**
 > Toàn bộ các manifest trong `k8s/apps/base/` được giữ sạch 100%, không chứa các annotation đặc thù của Argo CD (`argocd.argoproj.io/sync-wave`). Toàn bộ luồng điều phối Sync Wave 3 bước (`ExternalSecret: -1` -> `Migration Job: 0` -> `Workloads: 1`) được inject thông qua cơ chế `patches` tại `k8s/apps/overlays/production/control-plane/kustomization.yaml`.
+
+> [!TIP]
+> **Mô hình Self-Managed Argo CD (GitOps Tự Quản lý):**
+> Hệ thống áp dụng nguyên tắc phân tách ranh giới rõ ràng:
+> - **Day-0 (Bootstrap):** Ansible giữ vai trò mồi nổ ban đầu: cài đặt K3s, cài đặt Helm chart `argocd` và áp dụng Root Application `mlops-paas-system`.
+> - **Day-1+ (GitOps Lifecycle):** Child Application `mlops-prod-addon-argocd` (Wave -40) chính thức tiếp quản quyền sở hữu Helm release `argocd`. Mọi tinh chỉnh cấu hình `values` và nâng cấp phiên bản diễn ra hoàn toàn qua Git Pull Request với cơ chế `ServerSideApply=true`. Trong trường hợp sự cố khẩn cấp (Disaster Recovery), Ansible Playbook sẵn sàng chạy lại để cứu hộ.
 
 ---
 

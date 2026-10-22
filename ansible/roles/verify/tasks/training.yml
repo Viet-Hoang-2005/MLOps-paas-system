@@ -1,4 +1,5 @@
 ---
+# Phase 3: Training Platform, GPU Operator & Karpenter Capacity Verification
 - name: Verify Argo CD owns the training addons and capacity application
   kubernetes.core.k8s_info:
     api_version: argoproj.io/v1alpha1
@@ -12,6 +13,7 @@
     verified_training_application.resources[0].status.sync.status | default('') != 'Synced' or
     verified_training_application.resources[0].status.health.status | default('') != 'Healthy'
   loop: "{{ training_addon_application_names + training_cluster_application_names }}"
+  tags: [verify, verify-training]
 
 - name: Verify the PyTorchJob CRD is Established
   kubernetes.core.k8s_info:
@@ -24,6 +26,7 @@
     wait_condition:
       type: Established
       status: "True"
+  tags: [verify, verify-training]
 
 - name: Verify the training controllers are Ready
   kubernetes.core.k8s_info:
@@ -37,6 +40,7 @@
   loop:
     - {name: training-operator, namespace: kubeflow}
     - {name: karpenter, namespace: karpenter}
+  tags: [verify, verify-training]
 
 - name: Verify Karpenter NodeClasses and NodePools
   kubernetes.core.k8s_info:
@@ -54,6 +58,7 @@
     - {api_version: karpenter.sh/v1, kind: NodePool, name: mlops-paas-training-cpu}
     - {api_version: karpenter.k8s.aws/v1, kind: EC2NodeClass, name: training-gpu}
     - {api_version: karpenter.sh/v1, kind: NodePool, name: mlops-paas-training-gpu}
+  tags: [verify, verify-training]
 
 - name: Verify NVIDIA GPU Operator control plane
   kubernetes.core.k8s_info:
@@ -64,8 +69,10 @@
     kubeconfig: "{{ k3s_remote_kubeconfig }}"
     wait: true
     wait_timeout: 300
+  tags: [verify, verify-training]
 
 - name: Run isolated CPU and GPU PyTorchJob smoke tests
+  tags: [verify, verify-training]
   block:
     - name: Create the isolated training smoke namespace
       kubernetes.core.k8s:
@@ -221,6 +228,7 @@
   until: remaining_cpu_training_nodes.resources | length == 0
   retries: "{{ (training_smoke_node_cleanup_timeout_seconds | int / 10) | round(0, 'ceil') | int }}"
   delay: 10
+  tags: [verify, verify-training]
 
 - name: Wait for GPU training nodes to consolidate after smoke cleanup
   kubernetes.core.k8s_info:
@@ -234,3 +242,5 @@
   retries: "{{ (training_smoke_node_cleanup_timeout_seconds | int / 10) | round(0, 'ceil') | int }}"
   delay: 10
   when: training_gpu_smoke_enabled | bool
+  tags: [verify, verify-training]
+
