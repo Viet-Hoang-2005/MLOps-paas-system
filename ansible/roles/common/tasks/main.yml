@@ -104,3 +104,32 @@
   loop:
     - chrony
     - iscsid
+
+- name: Install systemd unit to clean stale Redis Sentinel emptyDir configs on boot
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/clean-sentinel-emptydir.service
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Clean stale Redis Sentinel emptyDir configs on boot
+      Before=k3s.service k3s-agent.service
+      DefaultDependencies=no
+      After=local-fs.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/sh -c 'rm -f /var/lib/kubelet/pods/*/volumes/kubernetes.io~empty-dir/config/sentinel.conf /var/lib/rancher/k3s/agent/kubelet/pods/*/volumes/kubernetes.io~empty-dir/config/sentinel.conf 2>/dev/null || true'
+      RemainAfterExit=true
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable clean-sentinel-emptydir service
+  become: true
+  ansible.builtin.systemd_service:
+    name: clean-sentinel-emptydir
+    enabled: true
+    daemon_reload: true
