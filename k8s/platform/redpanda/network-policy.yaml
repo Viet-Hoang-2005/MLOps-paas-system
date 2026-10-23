@@ -21,7 +21,7 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: redpanda
-    # Core apps & Execution engine đẩy/tiêu thụ data
+    # Core apps, Execution engine đẩy/tiêu thụ data & KEDA Autoscaler giám sát consumer lag
     - from:
         - namespaceSelector:
             matchLabels:
@@ -29,6 +29,9 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: mlops-paas-execution
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keda
       ports:
         - protocol: TCP
           port: 9092
