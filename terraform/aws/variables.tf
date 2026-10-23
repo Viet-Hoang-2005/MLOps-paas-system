@@ -168,7 +168,7 @@ variable "enable_billing_alerts" {
 variable "billing_credit_limit" {
   description = "Total AWS Credit limit or budget amount in USD to track"
   type        = number
-  default     = 200
+  default     = 30
 }
 
 variable "billing_alert_emails" {

@@ -89,7 +89,7 @@ flowchart TB
 
         subgraph MANAGED_SERVICES["AWS Managed Services"]
             S3_ARTIFACTS[("S3: mlops-paas-artifacts")]
-            S3_LOGS[("S3: mlops-paas-runtime-logs")]
+            S3_LOGS[("S3: mlops-paas-logs")]
             SECRETS["AWS Secrets Manager"]
             IAM["IAM Roles & Instance Profiles / OIDC GitHub"]
             DNS["Amazon Route 53 + ACM SSL Certificates"]

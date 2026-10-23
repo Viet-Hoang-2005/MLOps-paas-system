@@ -11,7 +11,7 @@ The Terraform composition (`terraform/aws/`) provisions IaaS cloud resources acr
    - Worker Node Security Group: Inbound all traffic from Master and fellow Workers, NodePort from ALB.
 3. **`storage`:** AWS S3 buckets:
    - `artifacts_bucket` (`mlops-paas-artifacts`): S3 bucket for model weights, snapshots, datasets, and reports. Versioning enabled, public access blocked, CORS configured.
-   - `runtime_logs` (`mlops-paas-runtime-logs`): Dedicated bucket for production Loki task logs. Uses `force_destroy = true` for clean teardown during terraform destroy.
+   - `runtime_logs` (`mlops-paas-logs`): Dedicated bucket for production Loki task logs. Uses `force_destroy = true` for clean teardown during terraform destroy.
 4. **`secrets`:** AWS Secrets Manager containers with `recovery_window_in_days = 0` (secret metadata only, not values in state).
 5. **`iam`:** Instance profiles, worker roles, Karpenter node roles, and GitHub Actions OIDC federation.
 6. **`compute`:** Ubuntu 22.04 LTS EC2 instances for K3s Master (public IP/bastion) and static Workers (private IPs).

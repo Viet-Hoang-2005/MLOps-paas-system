@@ -1,0 +1,15 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-ping-expose
+  namespace: kube-system
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/ping`)
+      kind: Rule
+      services:
+        - name: ping@internal
+          kind: TraefikService
+

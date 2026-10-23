@@ -196,19 +196,55 @@ def select_groups(cli_groups: str | None) -> list[int]:
         raise SecretPreparationError("No group selection received.") from exc
 
 
+def normalize_env_value(key: str, value: str) -> str:
+    """Dynamically normalize env values whether quoted with ""/'' or unquoted,
+    and whether newlines are literal \n, \r\n, or real line breaks."""
+    if not isinstance(value, str):
+        return value
+
+    val = value.strip()
+
+    # Dynamic filter 1: Strip enclosing double or single quotes if present
+    if len(val) >= 2 and (
+        (val.startswith('"') and val.endswith('"'))
+        or (val.startswith("'") and val.endswith("'"))
+    ):
+        val = val[1:-1]
+
+    # Dynamic filter 2: Normalize literal escaped newlines (\r\n, \r, \n) into real line breaks
+    if "\\n" in val or "\\r" in val:
+        val = val.replace("\\r\\n", "\n").replace("\\r", "\n").replace("\\n", "\n")
+
+    # Dynamic filter 3: Normalize real CRLF to standard LF
+    val = val.replace("\r\n", "\n").replace("\r", "\n")
+
+    return val
+
+
 def parse_env_content(content: str) -> dict[str, str]:
     parsed = dotenv_values(stream=io.StringIO(content))
-    return {key: value for key, value in parsed.items() if value is not None}
+    return {
+        key: normalize_env_value(key, value)
+        for key, value in parsed.items()
+        if value is not None
+    }
+
+
+def format_unquoted_env_value(value: str) -> str:
+    """Format an env value without enclosing quotes, serializing any newlines as literal \n."""
+    val = value.strip() if isinstance(value, str) else str(value)
+    if len(val) >= 2 and (
+        (val.startswith('"') and val.endswith('"'))
+        or (val.startswith("'") and val.endswith("'"))
+    ):
+        val = val[1:-1]
+    normalized = val.replace("\r\n", "\n").replace("\r", "\n")
+    return normalized.replace("\n", "\\n")
 
 
 def quoted_dotenv(value: str) -> str:
-    escaped = (
-        value.replace("\\", "\\\\")
-        .replace('"', '\\"')
-        .replace("\r", "\\r")
-        .replace("\n", "\\n")
-    )
-    return f'"{escaped}"'
+    """Retained for backward compatibility; formats without enclosing quotes."""
+    return format_unquoted_env_value(value)
 
 
 def update_env_content(
@@ -231,7 +267,7 @@ def update_env_content(
             output.append(line)
         elif last_index[key] == index:
             output.append(
-                f"{key}={quoted_dotenv(replacements[key])}{newline}"
+                f"{key}={format_unquoted_env_value(replacements[key])}{newline}"
                 if key in replacements
                 else line
             )
@@ -241,7 +277,7 @@ def update_env_content(
         if output and not output[-1].endswith(("\r", "\n")):
             output.append(newline)
         for key in missing:
-            output.append(f"{key}={quoted_dotenv(replacements[key])}{newline}")
+            output.append(f"{key}={format_unquoted_env_value(replacements[key])}{newline}")
     return "".join(output)
 
 
@@ -265,10 +301,12 @@ def generate_jwt_key_pair() -> tuple[str, str]:
 
 def validate_jwt_key_pair(private_pem: str, public_pem: str) -> None:
     try:
+        norm_private = normalize_env_value("JWT_PRIVATE_KEY", private_pem)
+        norm_public = normalize_env_value("JWT_PUBLIC_KEY", public_pem)
         private = serialization.load_pem_private_key(
-            private_pem.encode(), password=None
+            norm_private.encode(), password=None
         )
-        public = serialization.load_pem_public_key(public_pem.encode())
+        public = serialization.load_pem_public_key(norm_public.encode())
         if private.public_key().public_numbers() != public.public_numbers():
             raise ValueError("mismatched key pair")
     except (TypeError, ValueError, AttributeError) as exc:
@@ -555,7 +593,7 @@ def publish(
         client.put_secret_value(
             SecretId=target, SecretString=json.dumps(merged[target], ensure_ascii=False)
         )
-        print(f"Published {target}: {', '.join(keys)}")
+        print(f"=> Published {target}: {', '.join(keys)}")
     return 0
 
 

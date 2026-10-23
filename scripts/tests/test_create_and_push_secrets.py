@@ -53,8 +53,10 @@ def test_prepare_env_content_redis_auto_generates():
     assert len(values["REDIS_PASSWORD"]) >= 32
     assert len(values["REDIS_SENTINEL_PASSWORD"]) >= 32
     assert values["REDIS_PASSWORD"] != values["REDIS_SENTINEL_PASSWORD"]
-    assert 'REDIS_PASSWORD="' in updated
-    assert 'REDIS_SENTINEL_PASSWORD="' in updated
+    assert "REDIS_PASSWORD=" in updated
+    assert 'REDIS_PASSWORD="' not in updated
+    assert "REDIS_SENTINEL_PASSWORD=" in updated
+    assert 'REDIS_SENTINEL_PASSWORD="' not in updated
     assert "# Redis config" in updated
 
 
@@ -86,7 +88,8 @@ def test_prepare_env_content_db_auto_generates_and_defaults():
 
     assert values["DB_USER"] == "postgres"
     assert len(values["DB_PASSWORD"]) >= 32
-    assert 'DB_USER="postgres"' in updated
+    assert "DB_USER=postgres" in updated
+    assert 'DB_USER="' not in updated
 
 
 def test_prepare_env_content_control_plane_auto_generates():
@@ -165,5 +168,21 @@ def test_interactive_external_prompt(monkeypatch):
     monkeypatch.setattr("getpass.getpass", lambda prompt: "secret-tunnel-token-12345")
     updated, values = prepare_env_content("", [4], rotate=[], interactive=True)
     assert values["TUNNEL_TOKEN"] == "secret-tunnel-token-12345"
-    assert 'TUNNEL_TOKEN="secret-tunnel-token-12345"' in updated
+    assert "TUNNEL_TOKEN=secret-tunnel-token-12345" in updated
+    assert 'TUNNEL_TOKEN="' not in updated
 
+
+
+def test_dynamic_filter_quoted_and_unquoted_newlines():
+    """Ensure parse_env_content dynamically filters quotes and normalizes \n newlines."""
+    raw = (
+        'PLAIN_UNQUOTED=my-secret-value\n'
+        'PLAIN_QUOTED="my-quoted-value"\n'
+        'NEWLINE_UNQUOTED=header\\nbody\\nfooter\n'
+        'NEWLINE_QUOTED="header\\nbody\\nfooter"\n'
+    )
+    parsed = parse_env_content(raw)
+    assert parsed["PLAIN_UNQUOTED"] == "my-secret-value"
+    assert parsed["PLAIN_QUOTED"] == "my-quoted-value"
+    assert parsed["NEWLINE_UNQUOTED"] == "header\nbody\nfooter"
+    assert parsed["NEWLINE_QUOTED"] == "header\nbody\nfooter"

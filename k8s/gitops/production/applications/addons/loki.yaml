@@ -45,9 +45,9 @@ spec:
           storage:
             type: s3
             bucketNames:
-              chunks: mlops-paas-runtime-logs
-              ruler: mlops-paas-runtime-logs
-              admin: mlops-paas-runtime-logs
+              chunks: mlops-paas-logs
+              ruler: mlops-paas-logs
+              admin: mlops-paas-logs
             s3:
               region: ap-southeast-1
           limits_config:

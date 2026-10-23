@@ -63,7 +63,7 @@ Hệ thống được thiết kế theo dạng **module hóa (Modular Architectu
 
 5. **Storage (`modules/storage/`):**
    - **S3 Bucket `mlops-paas-artifacts`**: Lưu trữ models, dữ liệu huấn luyện, build artifacts và báo cáo drift của Evidently (bật Versioning, cấu hình CORS cho Presigned Upload).
-   - **S3 Bucket `mlops-paas-runtime-logs`**: Lưu trữ log hệ thống và log container tập trung của Loki trong 7 ngày (kèm quy tắc vòng đời tự hủy sau 10 ngày).
+   - **S3 Bucket `mlops-paas-logs`**: Lưu trữ log hệ thống và log container tập trung của Loki trong 7 ngày (kèm quy tắc vòng đời tự hủy sau 10 ngày).
    - Cả 2 bucket đều được cấu hình `force_destroy = true` để hỗ trợ teardown hạ tầng sạch sẽ.
 
 6. **Load Balancer (`modules/alb/`):**

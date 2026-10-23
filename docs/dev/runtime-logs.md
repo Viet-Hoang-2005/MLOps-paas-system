@@ -2,7 +2,7 @@
 
 ## Ownership and access
 
-Terraform creates the private `mlops-paas-runtime-logs` bucket and a
+Terraform creates the private `mlops-paas-logs` bucket and a
 bucket-scoped policy for static workers. It does not grant this policy to
 Karpenter training nodes or GitHub Actions. Argo CD installs Loki and Alloy in
 `mlops-logging`. Loki retains logs for seven days; an S3 safety-net lifecycle

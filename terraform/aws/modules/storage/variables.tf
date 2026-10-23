@@ -7,7 +7,7 @@ variable "enable_runtime_logs" {
 variable "runtime_logs_bucket_name" {
   description = "Dedicated private Loki object-storage bucket."
   type        = string
-  default     = "mlops-paas-runtime-logs"
+  default     = "mlops-paas-logs"
 }
 
 variable "enable_harbor_images" {

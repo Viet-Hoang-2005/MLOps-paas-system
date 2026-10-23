@@ -68,7 +68,7 @@ resource "aws_ce_anomaly_monitor" "service_monitor" {
 resource "aws_ce_anomaly_subscription" "email_subscription" {
   count            = var.enable_anomaly_detection ? 1 : 0
   name             = "mlops-paas-anomaly-alert"
-  frequency        = "IMMEDIATE"
+  frequency        = "DAILY"
   monitor_arn_list = [aws_ce_anomaly_monitor.service_monitor[0].arn]
 
   subscriber {

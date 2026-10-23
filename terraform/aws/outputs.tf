@@ -1,13 +1,3 @@
-output "runtime_logs_bucket_name" {
-  description = "Private S3 object storage for seven-day Loki runtime log retention"
-  value       = var.enable_artifact_storage ? module.storage[0].runtime_logs_bucket_name : null
-}
-
-output "harbor_images_bucket_name" {
-  description = "Private S3 object storage for Harbor container images"
-  value       = var.enable_artifact_storage ? module.storage[0].harbor_images_bucket_name : null
-}
-
 output "master_public_ip" {
   description = "Public IP for SSH access to Master Node"
   value       = local.enable_k3s_compute_stack ? module.compute[0].master_public_ip : null
@@ -51,6 +41,16 @@ output "api_url" {
 output "s3_bucket_name" {
   description = "Model Storage Bucket"
   value       = var.enable_artifact_storage ? module.storage[0].bucket_id : null
+}
+
+output "runtime_logs_bucket_name" {
+  description = "Private S3 object storage for seven-day Loki runtime log retention"
+  value       = var.enable_artifact_storage ? module.storage[0].runtime_logs_bucket_name : null
+}
+
+output "harbor_images_bucket_name" {
+  description = "Private S3 object storage for Harbor container images"
+  value       = var.enable_artifact_storage ? module.storage[0].harbor_images_bucket_name : null
 }
 
 output "github_actions_role_arn" {

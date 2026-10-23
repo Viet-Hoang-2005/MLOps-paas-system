@@ -11,7 +11,7 @@
 | **Redis Connection** | `REDIS_CONNECTION_MODE=direct` (`redis://:$REDIS_PASSWORD@redis:6379/1`, password required) | `REDIS_CONNECTION_MODE=sentinel` (`REDIS_SENTINEL_HOSTS`, `REDIS_SENTINEL_MASTER_NAME`) |
 | **Log Storage** | `LOG_STORAGE_BACKEND=redis` (Redis streams: `*_logs:*`) | `LOG_STORAGE_BACKEND=loki` (Grafana Loki with task-bound cursors) |
 | **Message Broker** | Single Redpanda container (`redpanda:9092`) | Redpanda Operator HA cluster (`mlops_paas_production_data`) |
-| **Storage S3** | AWS S3 (`s3-only.tfvars`) or local S3-compatible | AWS S3 (`mlops-paas-artifacts` & `mlops-paas-runtime-logs`) |
+| **Storage S3** | AWS S3 (`s3-only.tfvars`) or local S3-compatible | AWS S3 (`mlops-paas-artifacts` & `mlops-paas-logs`) |
 | **Secrets Delivery** | Local `.env` file | AWS Secrets Manager synchronized by External Secrets Operator (ESO) |
 | **Public Routing** | Direct ports (`8000`, `5001`, `5002`, `5004`, `5173`) | AWS ALB + Traefik Ingress Controller + Cloudflare Tunnel |
 

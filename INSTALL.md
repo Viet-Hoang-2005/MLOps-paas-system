@@ -167,7 +167,7 @@ Lệnh này sẽ tự động khởi tạo:
 - 1 EC2 Master Node (`t3.medium`) có Public IP làm Bastion SSH.
 - 2 EC2 Worker Nodes (`t3.large`) nằm trong mạng Private Subnet.
 - AWS Application Load Balancer (ALB) gắn chứng chỉ ACM SSL.
-- S3 Buckets (`mlops-paas-artifacts` và `mlops-paas-runtime-logs`).
+- S3 Buckets (`mlops-paas-artifacts` và `mlops-paas-logs`).
 - 4 AWS Secrets Manager containers rỗng.
 - IAM Instance Profiles và Karpenter SQS interruption queue.
 
