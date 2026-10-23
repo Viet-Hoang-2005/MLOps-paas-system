@@ -25,7 +25,7 @@ def execute_drift_run(self, run_id):
 
     with transaction.atomic():
         run = (
-            DriftRun.objects.select_for_update()
+            DriftRun.objects.select_for_update(of=("self",))
             .select_related(
                 "monitor",
                 "monitor__version",
