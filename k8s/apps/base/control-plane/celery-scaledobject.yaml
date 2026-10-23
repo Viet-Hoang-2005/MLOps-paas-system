@@ -41,7 +41,8 @@ spec:
   triggers:
     - type: redis-sentinel
       metadata:
-        sentinelAddresses: redis-ha-sentinel-0.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-1.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-2.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
+        hosts: redis-ha-sentinel-0.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-1.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-2.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
+        addresses: redis-ha-sentinel-0.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-1.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-2.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
         sentinelMaster: redis-master
         listName: celery
         listLength: "10"
