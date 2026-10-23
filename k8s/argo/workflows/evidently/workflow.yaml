@@ -43,7 +43,7 @@ spec:
           - name: summary_json_upload_url
           - name: control_plane_webhook_url
       container:
-        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-evidently:09998848067dd8853133854b656240dee431988d
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-evidently:81965f1f52b90f1578765eaf99e15aba96f68a8a
         imagePullPolicy: Always
         envFrom:
           - secretRef:
