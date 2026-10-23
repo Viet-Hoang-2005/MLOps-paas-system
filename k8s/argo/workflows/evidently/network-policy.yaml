@@ -29,7 +29,25 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # 2. PostgreSQL Read-Only replica (mlops-paas-data:5432)
+    # 2. Kubernetes API Server nội bộ (cho argoexec wait / emissary executor báo cáo kết quả)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+      ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.169.254/32
+      ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 443
+    # 3. PostgreSQL Read-Only replica (mlops-paas-data:5432)
     - to:
         - namespaceSelector:
             matchLabels:
