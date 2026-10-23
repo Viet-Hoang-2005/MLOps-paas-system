@@ -82,6 +82,16 @@ spec:
                 secretKeyRef:
                   name: mlops-paas-control-plane-secret
                   key: ARGO_EVENTS_WEBHOOK_TOKEN
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-paas-control-plane-secret
+                  key: REDIS_PASSWORD
+            - name: REDIS_SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-paas-control-plane-secret
+                  key: REDIS_SENTINEL_PASSWORD
           envFrom:
             - configMapRef:
                 name: mlops-paas-control-plane-config
