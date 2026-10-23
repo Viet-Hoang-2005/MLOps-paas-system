@@ -17,7 +17,7 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # 1. Chỉ duy nhất model-server gateway được phép gọi vào model endpoints
+    # 1. model-server gateway, celery-health-worker (runtime health probe) và control-plane
     - from:
         - namespaceSelector:
             matchLabels:
@@ -25,6 +25,18 @@ spec:
           podSelector:
             matchLabels:
               app.kubernetes.io/name: mlops-paas-model-server
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-paas-core
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mlops-paas-celery-health-worker
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-paas-core
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mlops-paas-control-plane
       ports:
         - protocol: TCP
           port: 5001
