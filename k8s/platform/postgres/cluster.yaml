@@ -16,7 +16,7 @@ metadata:
     app.kubernetes.io/component: database
     app.kubernetes.io/tier: data
     mlops.io/domain: storage
-    app.kubernetes.io/managed-by: cloudnative-pg
+    app.kubernetes.io/managed-by: kustomize
 spec:
   inheritedMetadata:
     labels:

@@ -27,4 +27,4 @@ patches:
       kind: Deployment
       name: training-operator
       namespace: kubeflow
-    path: training-operator-node-selector.yaml
+    path: deployment-patch.yaml

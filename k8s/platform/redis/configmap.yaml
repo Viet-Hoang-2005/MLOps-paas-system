@@ -4,6 +4,14 @@ metadata:
   name: redis-ha-config
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: redis-ha
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/tier: data
+    mlops.io/domain: cache
+    app.kubernetes.io/managed-by: kustomize
 data:
   redis-additional.conf: |
     appendonly yes
