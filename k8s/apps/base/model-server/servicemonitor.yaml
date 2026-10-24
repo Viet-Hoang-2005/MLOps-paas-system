@@ -3,13 +3,14 @@ kind: ServiceMonitor
 metadata:
   name: mlops-paas-model-server-monitor
   labels:
-    release: monitoring
     app.kubernetes.io/name: mlops-paas-model-server
     app.kubernetes.io/instance: mlops-paas-model-server
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: gateway
-    app.kubernetes.io/tier: gateway
-    mlops.io/domain: serving
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: serving
+    release: monitoring
 spec:
   selector:
     matchExpressions:
@@ -26,7 +27,7 @@ spec:
   targetLabels:
     - app.kubernetes.io/name
     - app.kubernetes.io/component
-    - mlops.io/domain
+    - mlops-paas.io/domain
   endpoints:
     - port: http
       path: /metrics

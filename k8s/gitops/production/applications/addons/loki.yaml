@@ -7,9 +7,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
   labels:
     app.kubernetes.io/name: loki
+    app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: loki
     mlops-paas.io/plane: addon
-    mlops-paas.io/component: loki
 spec:
   project: mlops-addons
   info:

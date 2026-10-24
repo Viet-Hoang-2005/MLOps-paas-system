@@ -3,8 +3,12 @@ kind: NodePool
 metadata:
   name: mlops-paas-training-cpu
   labels:
+    app.kubernetes.io/name: karpenter-nodepool
+    app.kubernetes.io/instance: mlops-paas-training-cpu
     app.kubernetes.io/part-of: mlops-paas
-    mlops-paas.io/environment: production
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: cluster
 spec:
   limits:
     nodes: 1
@@ -43,8 +47,12 @@ kind: NodePool
 metadata:
   name: mlops-paas-training-gpu
   labels:
+    app.kubernetes.io/name: karpenter-nodepool
+    app.kubernetes.io/instance: mlops-paas-training-gpu
     app.kubernetes.io/part-of: mlops-paas
-    mlops-paas.io/environment: production
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: cluster
 spec:
   limits:
     nodes: 1

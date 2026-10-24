@@ -7,9 +7,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "15"
   labels:
     app.kubernetes.io/name: control-plane
+    app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: control-plane
     mlops-paas.io/plane: workload
-    mlops-paas.io/component: control-plane
 spec:
   project: mlops-workloads
   info:

@@ -49,9 +49,9 @@ def identity(payload, kind):
     if not re.fullmatch(UUID, payload["project_id"]) or not re.fullmatch("T-" + UUID, payload["tenant_id"]):
         raise ValueError("Invalid ownership identity.")
     labels = {
-        "mlops.io/tenant-id": payload["tenant_id"],
-        "mlops.io/project-id": payload["project_id"],
-        f"mlops.io/{'training-job' if kind == 'training' else 'drift-run'}-id": resource_id,
+        "mlops-paas.io/tenant-id": payload["tenant_id"],
+        "mlops-paas.io/project-id": payload["project_id"],
+        f"mlops-paas.io/{'training-job' if kind == 'training' else 'drift-run'}-id": resource_id,
     }
     return f"{kind}-{resource_id}", labels
 
@@ -110,9 +110,9 @@ def cancel_build(api, payload):
     if not re.fullmatch(UUID, build_id) or not re.fullmatch(UUID, payload.get("project_id", "")) or not re.fullmatch("T-" + UUID, payload.get("tenant_id", "")):
         raise ValueError("Invalid build identity.")
     labels = {
-        "mlops.io/tenant-id": payload["tenant_id"],
-        "mlops.io/project-id": payload["project_id"],
-        "mlops.io/build-id": build_id,
+        "mlops-paas.io/tenant-id": payload["tenant_id"],
+        "mlops-paas.io/project-id": payload["project_id"],
+        "mlops-paas.io/build-id": build_id,
     }
     selector = urllib.parse.urlencode({"labelSelector": ",".join(f"{key}={value}" for key, value in labels.items())})
     for workflow in (api.request("GET", f"{workflow_path()}?{selector}") or {}).get("items", []):

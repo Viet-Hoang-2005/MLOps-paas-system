@@ -6,8 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/name: default-deny-all-ingress-execution
     app.kubernetes.io/part-of: mlops-paas
-    app.kubernetes.io/tier: jobs
-    mlops.io/domain: execution
+    mlops-paas.io/domain: execution
     app.kubernetes.io/managed-by: kustomize
 spec:
   podSelector: {}

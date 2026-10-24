@@ -10,7 +10,7 @@ spec:
   activeDeadlineSeconds: 1800
   podMetadata:
     labels:
-      mlops.io/deployment-id: "{{workflow.parameters.deployment_id}}"
+      mlops-paas.io/deployment-id: "{{workflow.parameters.deployment_id}}"
   arguments:
     parameters:
       - name: deployment_id
@@ -86,8 +86,7 @@ spec:
               app.kubernetes.io/instance: {{=toJson(inputs.parameters.container_name)}}
               app.kubernetes.io/part-of: mlops-paas
               app.kubernetes.io/component: model-endpoint
-              app.kubernetes.io/tier: app
-              mlops.io/domain: serving
+              mlops-paas.io/domain: serving
               app.kubernetes.io/managed-by: argo-workflows
               app: model-endpoint
               tenant: {{=toJson(inputs.parameters.tenant_id)}}
@@ -106,14 +105,13 @@ spec:
                   app.kubernetes.io/instance: {{=toJson(inputs.parameters.container_name)}}
                   app.kubernetes.io/part-of: mlops-paas
                   app.kubernetes.io/component: model-endpoint
-                  app.kubernetes.io/tier: app
-                  mlops.io/domain: serving
+                  mlops-paas.io/domain: serving
                   app.kubernetes.io/managed-by: argo-workflows
                   app: {{=toJson(inputs.parameters.container_name)}}
-                  mlops.io/deployment-id: "{{workflow.parameters.deployment_id}}"
-                  mlops.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
-                  mlops.io/project-id: {{=toJson(inputs.parameters.project_id)}}
-                  mlops.io/model-version-id: {{=toJson(inputs.parameters.model_version_id)}}
+                  mlops-paas.io/deployment-id: "{{workflow.parameters.deployment_id}}"
+                  mlops-paas.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
+                  mlops-paas.io/project-id: {{=toJson(inputs.parameters.project_id)}}
+                  mlops-paas.io/model-version-id: {{=toJson(inputs.parameters.model_version_id)}}
               spec:
                 automountServiceAccountToken: false
                 nodeSelector:
@@ -186,8 +184,7 @@ spec:
               app.kubernetes.io/instance: {{=toJson(inputs.parameters.container_name)}}
               app.kubernetes.io/part-of: mlops-paas
               app.kubernetes.io/component: model-endpoint
-              app.kubernetes.io/tier: app
-              mlops.io/domain: serving
+              mlops-paas.io/domain: serving
               app.kubernetes.io/managed-by: argo-workflows
               component: model-server
               serving-engine: {{=toJson(inputs.parameters.model_type)}}

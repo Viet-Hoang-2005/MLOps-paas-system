@@ -7,9 +7,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "-40"
   labels:
     app.kubernetes.io/name: monitoring
+    app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: monitoring
     mlops-paas.io/plane: addon
-    mlops-paas.io/component: monitoring
 spec:
   project: mlops-addons
   info:
@@ -96,7 +97,7 @@ spec:
             enabled: false
         kube-state-metrics:
           metricLabelsAllowlist:
-            - pods=[mlops.io/deployment-id,mlops.io/tenant-id,mlops.io/project-id,mlops.io/model-version-id]
+            - pods=[mlops-paas.io/deployment-id,mlops-paas.io/tenant-id,mlops-paas.io/project-id,mlops-paas.io/model-version-id]
           nodeSelector:
             workload-type: worker
   destination:

@@ -6,11 +6,14 @@ metadata:
   name: redpanda-monitor
   namespace: monitoring
   labels:
-    release: monitoring
     app.kubernetes.io/name: redpanda
+    app.kubernetes.io/instance: redpanda
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: message-broker
-    mlops.io/domain: messaging
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
+    mlops-paas.io/domain: messaging
+    release: monitoring
 spec:
   namespaceSelector:
     matchNames:

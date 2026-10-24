@@ -7,8 +7,9 @@ metadata:
     app.kubernetes.io/instance: mlops-paas-web
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: frontend
-    app.kubernetes.io/tier: frontend
-    mlops.io/domain: frontend
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: frontend
 spec:
   podSelector:
     matchLabels:

@@ -7,9 +7,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "-25"
   labels:
     app.kubernetes.io/name: karpenter-crds
+    app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: karpenter-crds
     mlops-paas.io/plane: addon
-    mlops-paas.io/component: karpenter-crds
 spec:
   project: mlops-addons
   info:

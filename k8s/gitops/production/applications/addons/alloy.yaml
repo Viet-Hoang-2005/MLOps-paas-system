@@ -7,9 +7,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
   labels:
     app.kubernetes.io/name: alloy
+    app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: alloy
     mlops-paas.io/plane: addon
-    mlops-paas.io/component: alloy
 spec:
   project: mlops-addons
   info:

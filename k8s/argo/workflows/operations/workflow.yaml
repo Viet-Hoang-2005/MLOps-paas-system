@@ -15,8 +15,7 @@ spec:
       app.kubernetes.io/name: mlops-paas-job-operations
       app.kubernetes.io/part-of: mlops-paas
       app.kubernetes.io/component: operations
-      app.kubernetes.io/tier: jobs
-      mlops.io/domain: operations
+      mlops-paas.io/domain: operations
       app.kubernetes.io/managed-by: argo-workflows
   templates:
     - name: stopped
@@ -42,8 +41,7 @@ spec:
       app.kubernetes.io/name: mlops-paas-job-operations
       app.kubernetes.io/part-of: mlops-paas
       app.kubernetes.io/component: operations
-      app.kubernetes.io/tier: jobs
-      mlops.io/domain: operations
+      mlops-paas.io/domain: operations
       app.kubernetes.io/managed-by: argo-workflows
   templates:
     - name: submit
@@ -84,8 +82,7 @@ spec:
       app.kubernetes.io/name: mlops-paas-job-operations
       app.kubernetes.io/part-of: mlops-paas
       app.kubernetes.io/component: operations
-      app.kubernetes.io/tier: jobs
-      mlops.io/domain: operations
+      mlops-paas.io/domain: operations
       app.kubernetes.io/managed-by: argo-workflows
   templates:
     - name: reconcile

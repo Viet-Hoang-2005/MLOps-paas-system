@@ -7,8 +7,9 @@ metadata:
     app.kubernetes.io/instance: mlops-paas-control-plane
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: backend
-    app.kubernetes.io/tier: app
-    mlops.io/domain: control-plane
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: control-plane
 spec:
   podSelector:
     matchLabels:
@@ -59,8 +60,9 @@ metadata:
     app.kubernetes.io/instance: mlops-paas-celery-worker
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: worker
-    app.kubernetes.io/tier: jobs
-    mlops.io/domain: control-plane
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: control-plane
 spec:
   podSelector:
     matchLabels:

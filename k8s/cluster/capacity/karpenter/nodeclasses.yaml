@@ -3,8 +3,24 @@ kind: EC2NodeClass
 metadata:
   name: training-cpu
   labels:
+    app.kubernetes.io/name: karpenter-nodeclass
+    app.kubernetes.io/instance: training-cpu
     app.kubernetes.io/part-of: mlops-paas
-    mlops-paas.io/environment: production
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: cluster
+  labels:
+    app.kubernetes.io/name: karpenter-nodeclass
+    app.kubernetes.io/instance: training-cpu
+    app.kubernetes.io/name: karpenter-nodeclass
+    app.kubernetes.io/instance: training-gpu
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: cluster
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: cluster
 spec:
   amiFamily: Custom
   amiSelectorTerms:
@@ -78,8 +94,15 @@ kind: EC2NodeClass
 metadata:
   name: training-gpu
   labels:
+    app.kubernetes.io/name: karpenter-nodeclass
+    app.kubernetes.io/instance: training-gpu
     app.kubernetes.io/part-of: mlops-paas
-    mlops-paas.io/environment: production
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: cluster
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: cluster
 spec:
   amiFamily: Custom
   amiSelectorTerms:

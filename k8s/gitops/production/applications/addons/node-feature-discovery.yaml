@@ -7,9 +7,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "-24"
   labels:
     app.kubernetes.io/name: node-feature-discovery
+    app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: node-feature-discovery
     mlops-paas.io/plane: addon
-    mlops-paas.io/component: node-feature-discovery
 spec:
   project: mlops-addons
   info:

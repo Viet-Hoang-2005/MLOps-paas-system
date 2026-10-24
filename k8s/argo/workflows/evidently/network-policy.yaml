@@ -6,8 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/name: mlops-paas-evidently
     app.kubernetes.io/part-of: mlops-paas
-    app.kubernetes.io/tier: jobs
-    mlops.io/domain: monitoring
+    mlops-paas.io/domain: monitoring
     app.kubernetes.io/managed-by: kustomize
 spec:
   podSelector:

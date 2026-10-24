@@ -7,9 +7,9 @@ metadata:
     app.kubernetes.io/instance: mlops-paas-celery-worker
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: worker
-    app.kubernetes.io/tier: jobs
-    mlops.io/domain: control-plane
     app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: control-plane
 spec:
   replicas: 2
   selector:
@@ -22,9 +22,9 @@ spec:
         app.kubernetes.io/instance: mlops-paas-celery-worker
         app.kubernetes.io/part-of: mlops-paas
         app.kubernetes.io/component: worker
-        app.kubernetes.io/tier: jobs
-        mlops.io/domain: control-plane
         app.kubernetes.io/managed-by: kustomize
+        mlops-paas.io/plane: workload
+        mlops-paas.io/domain: control-plane
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -131,9 +131,9 @@ metadata:
     app.kubernetes.io/instance: mlops-paas-celery-beat
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: scheduler
-    app.kubernetes.io/tier: jobs
-    mlops.io/domain: control-plane
     app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: control-plane
 spec:
   replicas: 1
   strategy:
@@ -148,9 +148,9 @@ spec:
         app.kubernetes.io/instance: mlops-paas-celery-beat
         app.kubernetes.io/part-of: mlops-paas
         app.kubernetes.io/component: scheduler
-        app.kubernetes.io/tier: jobs
-        mlops.io/domain: control-plane
         app.kubernetes.io/managed-by: kustomize
+        mlops-paas.io/plane: workload
+        mlops-paas.io/domain: control-plane
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -221,9 +221,9 @@ metadata:
     app.kubernetes.io/instance: mlops-paas-celery-health-worker
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: worker
-    app.kubernetes.io/tier: jobs
-    mlops.io/domain: control-plane
     app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: control-plane
 spec:
   replicas: 1
   selector:
@@ -236,9 +236,9 @@ spec:
         app.kubernetes.io/instance: mlops-paas-celery-health-worker
         app.kubernetes.io/part-of: mlops-paas
         app.kubernetes.io/component: worker
-        app.kubernetes.io/tier: jobs
-        mlops.io/domain: control-plane
         app.kubernetes.io/managed-by: kustomize
+        mlops-paas.io/plane: workload
+        mlops-paas.io/domain: control-plane
     spec:
       automountServiceAccountToken: false
       securityContext:

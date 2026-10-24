@@ -9,7 +9,7 @@ spec:
   onExit: report-status
   podMetadata:
     labels:
-      mlops.io/training-job-id: "{{workflow.parameters.job_id}}"
+      mlops-paas.io/training-job-id: "{{workflow.parameters.job_id}}"
   arguments:
     parameters:
       - name: job_id
@@ -125,12 +125,11 @@ spec:
               app.kubernetes.io/instance: {{=toJson(inputs.parameters.job_name)}}
               app.kubernetes.io/part-of: mlops-paas
               app.kubernetes.io/component: training
-              app.kubernetes.io/tier: jobs
-              mlops.io/domain: training
+              mlops-paas.io/domain: training
               app.kubernetes.io/managed-by: argo-workflows
-              mlops.io/training-job-id: {{=toJson(inputs.parameters.job_id)}}
-              mlops.io/project-id: {{=toJson(inputs.parameters.project_id)}}
-              mlops.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
+              mlops-paas.io/training-job-id: {{=toJson(inputs.parameters.job_id)}}
+              mlops-paas.io/project-id: {{=toJson(inputs.parameters.project_id)}}
+              mlops-paas.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
           spec:
             runPolicy:
               cleanPodPolicy: Running
@@ -146,12 +145,11 @@ spec:
                       app.kubernetes.io/instance: {{=toJson(inputs.parameters.job_name)}}
                       app.kubernetes.io/part-of: mlops-paas
                       app.kubernetes.io/component: training
-                      app.kubernetes.io/tier: jobs
-                      mlops.io/domain: training
+                      mlops-paas.io/domain: training
                       app.kubernetes.io/managed-by: argo-workflows
-                      mlops.io/training-job-id: {{=toJson(inputs.parameters.job_id)}}
-                      mlops.io/project-id: {{=toJson(inputs.parameters.project_id)}}
-                      mlops.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
+                      mlops-paas.io/training-job-id: {{=toJson(inputs.parameters.job_id)}}
+                      mlops-paas.io/project-id: {{=toJson(inputs.parameters.project_id)}}
+                      mlops-paas.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
                   spec:
                     automountServiceAccountToken: false
                     nodeSelector:
@@ -224,12 +222,11 @@ spec:
               app.kubernetes.io/instance: {{=toJson(inputs.parameters.job_name)}}
               app.kubernetes.io/part-of: mlops-paas
               app.kubernetes.io/component: training
-              app.kubernetes.io/tier: jobs
-              mlops.io/domain: training
+              mlops-paas.io/domain: training
               app.kubernetes.io/managed-by: argo-workflows
-              mlops.io/training-job-id: {{=toJson(inputs.parameters.job_id)}}
-              mlops.io/project-id: {{=toJson(inputs.parameters.project_id)}}
-              mlops.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
+              mlops-paas.io/training-job-id: {{=toJson(inputs.parameters.job_id)}}
+              mlops-paas.io/project-id: {{=toJson(inputs.parameters.project_id)}}
+              mlops-paas.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
           spec:
             runPolicy:
               cleanPodPolicy: Running
@@ -245,12 +242,11 @@ spec:
                       app.kubernetes.io/instance: {{=toJson(inputs.parameters.job_name)}}
                       app.kubernetes.io/part-of: mlops-paas
                       app.kubernetes.io/component: training
-                      app.kubernetes.io/tier: jobs
-                      mlops.io/domain: training
+                      mlops-paas.io/domain: training
                       app.kubernetes.io/managed-by: argo-workflows
-                      mlops.io/training-job-id: {{=toJson(inputs.parameters.job_id)}}
-                      mlops.io/project-id: {{=toJson(inputs.parameters.project_id)}}
-                      mlops.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
+                      mlops-paas.io/training-job-id: {{=toJson(inputs.parameters.job_id)}}
+                      mlops-paas.io/project-id: {{=toJson(inputs.parameters.project_id)}}
+                      mlops-paas.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
                   spec:
                     automountServiceAccountToken: false
                     nodeSelector:

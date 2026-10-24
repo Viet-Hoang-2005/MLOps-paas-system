@@ -11,15 +11,14 @@ spec:
       app.kubernetes.io/name: mlops-paas-model-packager
       app.kubernetes.io/part-of: mlops-paas
       app.kubernetes.io/component: packaging
-      app.kubernetes.io/tier: jobs
-      mlops.io/domain: packaging
+      mlops-paas.io/domain: packaging
       app.kubernetes.io/managed-by: argo-workflows
-      mlops.io/build-id: "{{workflow.parameters.build_id}}"
+      mlops-paas.io/build-id: "{{workflow.parameters.build_id}}"
   workflowMetadata:
     labelsFrom:
-      mlops.io/build-id: {expression: workflow.parameters.build_id}
-      mlops.io/project-id: {expression: workflow.parameters.project_id}
-      mlops.io/tenant-id: {expression: workflow.parameters.tenant_id}
+      mlops-paas.io/build-id: {expression: workflow.parameters.build_id}
+      mlops-paas.io/project-id: {expression: workflow.parameters.project_id}
+      mlops-paas.io/tenant-id: {expression: workflow.parameters.tenant_id}
   onExit: notify-build-exit
   arguments:
     parameters:

@@ -6,8 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/name: mlops-paas-training
     app.kubernetes.io/part-of: mlops-paas
-    app.kubernetes.io/tier: jobs
-    mlops.io/domain: training
+    mlops-paas.io/domain: training
     app.kubernetes.io/managed-by: kustomize
 spec:
   podSelector:

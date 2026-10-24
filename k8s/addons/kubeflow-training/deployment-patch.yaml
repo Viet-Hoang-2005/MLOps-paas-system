@@ -3,6 +3,13 @@ kind: Deployment
 metadata:
   name: training-operator
   namespace: kubeflow
+  labels:
+    app.kubernetes.io/name: kubeflow-training-operator
+    app.kubernetes.io/instance: kubeflow-training-operator
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: training-operator
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: addon
 spec:
   template:
     spec:

@@ -7,6 +7,13 @@ metadata:
     policies.kyverno.io/category: Software Supply Chain Security
     policies.kyverno.io/severity: high
     pod-policies.kyverno.io/autogen-controllers: none
+  labels:
+    app.kubernetes.io/name: verify-platform-images
+    app.kubernetes.io/instance: verify-platform-images
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: security
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: cluster
 spec:
   background: false
   failurePolicy: Fail

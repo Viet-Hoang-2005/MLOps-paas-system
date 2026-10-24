@@ -133,8 +133,8 @@ def validate_lifecycle(context: ValidationContext) -> list[str]:
             errors.append(f"{name} must have app.kubernetes.io/part-of=mlops-paas")
         if labels.get("mlops-paas.io/environment") != "production":
             errors.append(f"{name} must have mlops-paas.io/environment=production")
-        if not labels.get("mlops-paas.io/component"):
-            errors.append(f"{name} must declare mlops-paas.io/component")
+        if not labels.get("app.kubernetes.io/component"):
+            errors.append(f"{name} must declare app.kubernetes.io/component")
         if spec.get("revisionHistoryLimit") != 10:
             errors.append(f"{name} must use revisionHistoryLimit=10")
         policy = spec.get("syncPolicy") or {}

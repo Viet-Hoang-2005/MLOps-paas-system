@@ -50,7 +50,7 @@ def test_argo_training_backend_records_runtime_selectors():
 
     job.refresh_from_db()
     runtime_name = f"training-{job.public_id}"
-    expected_selector = f"mlops.io/training-job-id={job.public_id}"
+    expected_selector = f"mlops-paas.io/training-job-id={job.public_id}"
     assert job.external_job_id == runtime_name
     assert job.tracking["runtime"] == {
         "backend": "argo",

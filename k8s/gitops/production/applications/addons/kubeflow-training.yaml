@@ -7,9 +7,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "-24"
   labels:
     app.kubernetes.io/name: kubeflow-training
+    app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: kubeflow-training
     mlops-paas.io/plane: addon
-    mlops-paas.io/component: kubeflow-training
 spec:
   project: mlops-addons
   info:

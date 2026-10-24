@@ -7,9 +7,9 @@ metadata:
     app.kubernetes.io/instance: mlops-paas-model-server
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: gateway
-    app.kubernetes.io/tier: gateway
-    mlops.io/domain: serving
     app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: serving
 spec:
   selector:
     app.kubernetes.io/name: mlops-paas-model-server

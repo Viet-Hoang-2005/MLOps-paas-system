@@ -7,8 +7,9 @@ metadata:
     app.kubernetes.io/instance: redpanda
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: message-broker
-    app.kubernetes.io/tier: data
-    mlops.io/domain: messaging
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
+    mlops-paas.io/domain: messaging
 spec:
   podSelector:
     matchLabels:

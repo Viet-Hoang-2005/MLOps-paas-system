@@ -15,9 +15,6 @@ patches:
       kind: Application
     patch: |-
       - op: add
-        path: /metadata/labels/app.kubernetes.io~1part-of
-        value: mlops-paas
-      - op: add
         path: /metadata/labels/mlops-paas.io~1environment
         value: production
       - op: add
@@ -42,4 +39,3 @@ patches:
               duration: 5s
               factor: 2
               maxDuration: 3m
-

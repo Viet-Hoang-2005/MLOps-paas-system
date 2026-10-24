@@ -145,8 +145,8 @@ class ArgoTrainingBackend(_ArgoBackend):
                 "backend": "argo",
                 "namespace": "mlops-paas-training",
                 "pytorch_job_name": runtime_name,
-                "workflow_selector": f"mlops.io/training-job-id={job.public_id}",
-                "pod_selector": f"mlops.io/training-job-id={job.public_id}",
+                "workflow_selector": f"mlops-paas.io/training-job-id={job.public_id}",
+                "pod_selector": f"mlops-paas.io/training-job-id={job.public_id}",
             },
         }
         self.persist_dispatch(job, external_job_id=job.external_job_id, tracking=job.tracking)

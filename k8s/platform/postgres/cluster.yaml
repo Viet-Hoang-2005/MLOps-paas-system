@@ -14,9 +14,9 @@ metadata:
     app.kubernetes.io/instance: postgresql
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: database
-    app.kubernetes.io/tier: data
-    mlops.io/domain: storage
     app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
+    mlops-paas.io/domain: storage
 spec:
   inheritedMetadata:
     labels:
@@ -24,8 +24,9 @@ spec:
       app.kubernetes.io/instance: postgresql
       app.kubernetes.io/part-of: mlops-paas
       app.kubernetes.io/component: database
-      app.kubernetes.io/tier: data
-      mlops.io/domain: storage
+      app.kubernetes.io/managed-by: kustomize
+      mlops-paas.io/plane: platform
+      mlops-paas.io/domain: storage
   # Chạy 2 instances để đảm bảo tính sẵn sàng cao (High Availability)
   # Node 1: Primary (RW), Node 2: Standby (RO)
   instances: 2

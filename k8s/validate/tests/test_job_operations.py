@@ -238,7 +238,7 @@ def build_payload():
 
 
 def build_workflow(phase="Running", name="build-model-job-abc"):
-    labels = {"mlops.io/tenant-id": TENANT, "mlops.io/project-id": PROJECT, "mlops.io/build-id": BUILD_ID}
+    labels = {"mlops-paas.io/tenant-id": TENANT, "mlops-paas.io/project-id": PROJECT, "mlops-paas.io/build-id": BUILD_ID}
     return {"metadata": {"name": name, "labels": labels}, "status": {"phase": phase}}
 
 
@@ -251,7 +251,7 @@ def test_cancel_build_terminates_only_running_owned_workflows():
     ops.cancel_build(api, build_payload())
     listing = api.request.call_args_list[0]
     assert listing.args[0] == "GET"
-    for label in (f"mlops.io/build-id={BUILD_ID}", f"mlops.io/project-id={PROJECT}"):
+    for label in (f"mlops-paas.io/build-id={BUILD_ID}", f"mlops-paas.io/project-id={PROJECT}"):
         assert urllib.parse.quote(label, safe="") in listing.args[1]
     patches = [call for call in api.request.call_args_list if call.args[0] == "PATCH"]
     assert [call.args[1] for call in patches] == [ops.workflow_path("build-model-job-abc")]
@@ -260,7 +260,7 @@ def test_cancel_build_terminates_only_running_owned_workflows():
 
 def test_cancel_build_refuses_foreign_workflow_and_bad_identity():
     foreign = build_workflow()
-    foreign["metadata"]["labels"]["mlops.io/project-id"] = "00000000-0000-0000-0000-0000000000ff"
+    foreign["metadata"]["labels"]["mlops-paas.io/project-id"] = "00000000-0000-0000-0000-0000000000ff"
     api = Mock()
     api.request.return_value = {"items": [foreign]}
     with pytest.raises(ValueError, match="ownership"):
@@ -274,7 +274,7 @@ def test_build_template_labels_workflow_and_keeps_callback_secret_away_from_user
     root = Path(__file__).parents[3] / "k8s/argo"
     template = yaml.safe_load((root / "workflows/build/workflow.yaml").read_text(encoding="utf-8"))
     labels = template["spec"]["workflowMetadata"]["labelsFrom"]
-    assert set(labels) == {"mlops.io/build-id", "mlops.io/project-id", "mlops.io/tenant-id"}
+    assert set(labels) == {"mlops-paas.io/build-id", "mlops-paas.io/project-id", "mlops-paas.io/tenant-id"}
     steps = {item["name"]: item for item in template["spec"]["templates"]}
     prepare_env = {item["name"] for item in steps["prepare-package"]["container"]["env"]}
     assert "CONTROL_PLANE_WEBHOOK_SECRET" not in prepare_env
