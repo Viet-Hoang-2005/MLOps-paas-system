@@ -251,7 +251,7 @@ python -m ruff check services/
 cd web && pnpm lint && pnpm build
 
 # 3. Kiểm thử tự động khai báo Kubernetes & GitOps (14 tiêu chí)
-pytest k8s/validate/tests/ -v
+pytest k8s/verify/validate/ -v
 
 # 4. Chạy kiểm thử đơn vị cho dịch vụ Backend (Ví dụ: Control Plane)
 cd services/control-plane && python -m pytest

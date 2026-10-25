@@ -45,6 +45,6 @@ Never embed passwords, tokens, private keys, real environment values, or SSH cre
 ## Validation
 
 Run the smallest affected domain test suites:
-- Kubernetes & GitOps manifests: `pytest k8s/validate/tests/`
+- Kubernetes & GitOps manifests: `pytest k8s/verify/validate/`
 - Service-specific tests: `python -m pytest` within the target service directory (e.g. `services/control-plane`, `services/consumer`, `services/model-server`).
 - Run `git diff --check` to verify code formatting and prevent whitespace anomalies.

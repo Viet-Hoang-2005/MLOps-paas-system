@@ -31,7 +31,7 @@ Never embed passwords, tokens, private keys, real environment values, or SSH cre
 
 Execute offline validation suites to verify manifests and contracts before pushing to Git:
 ```bash
-pytest k8s/validate/tests/ -v
+pytest k8s/verify/validate/ -v
 ```
 To test rendering of specific overlays:
 ```bash

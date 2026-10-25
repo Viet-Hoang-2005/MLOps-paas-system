@@ -484,7 +484,7 @@ jobs:
           python-version: "3.12"
       - name: Install Kubernetes validation dependencies
         if: matrix.target.id == 'kubernetes'
-        run: pip install -r k8s/validate/requirements.txt
+        run: pip install -r k8s/verify/requirements.txt
       - name: Setup Kustomize
         if: matrix.target.id == 'kubernetes'
         uses: imranismail/setup-kustomize@v2
@@ -521,8 +521,8 @@ jobs:
             echo "Validating $target with Kubeconform..."
             kubeconform -ignore-missing-schemas -summary "$output"
           done
-          python -m unittest discover -s k8s/validate/tests -p 'test_*.py'
-          python -m k8s.validate.run_all
+          pytest k8s/verify/validate/ -v
+
       - name: Setup Python for Ansible validation
         if: matrix.target.id == 'ansible'
         uses: actions/setup-python@v5

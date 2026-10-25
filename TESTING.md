@@ -174,15 +174,22 @@ python -m pytest
 
 ## 4. Kiểm Thử Tự Động Khai Báo Kubernetes & GitOps (K8s Offline Validation)
 
-Thư mục `k8s/validate/tests/` chứa bộ kiểm thử tự động phân tích tĩnh (Static Manifest & Policy Validation) được viết bằng Python/Pytest để kiểm tra toàn bộ 5 mặt phẳng GitOps trước khi đồng bộ lên cụm K3s.
+Thư mục `k8s/verify/` chứa bộ công cụ kiểm thử tự động toàn diện được viết bằng Python/Pytest, chia làm 2 tầng rõ rệt: Tầng Offline (`k8s/verify/validate/`) kiểm tra tĩnh cú pháp, nhãn, bảo mật và Kustomize builds; Tầng Online (`k8s/verify/test/`) kết nối trực tiếp đến cụm K3s qua thư viện `kubernetes` để nghiệm thu sức khỏe cụm thực tế.
 
 Thực thi từ thư mục gốc của repository:
 ```bash
 # Trên Windows PowerShell:
-$env:PYTHONPATH="."; pytest k8s/validate/tests/ -v
+# 1. Kiểm tra Tầng validate/ (Tĩnh, Offline):
+pytest k8s/verify/validate/ -v
 
-# Trên Linux / macOS / WSL:
-PYTHONPATH="." pytest k8s/validate/tests/ -v
+# 2. Kiểm tra Tầng test/ (Cụm K3s hoạt động, Online):
+pytest k8s/verify/test/ -v
+
+# 3. Chạy toàn bộ bộ test:
+pytest k8s/verify/ -v
+
+
+
 ```
 
 Bộ test tự động xác nhận 14 tiêu chí kỹ thuật:

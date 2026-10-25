@@ -214,19 +214,27 @@ k8s/
 │   │   └── web/                        # Deployment ReactJS frontend dashboard
 │   └── overlays/                       # Cấu hình ghi đè theo môi trường (Environment Overlays)
 │       └── production/                 # Overlay cụ thể cho Production (Kustomize Patches inject Sync Waves, Images, Secrets)
-└── validate/                           # Bộ kiểm thử tự động xác thực tính toàn vẹn và an toàn Manifest
-    ├── tests/                          # 36 bài test tự động với pytest (Job operations, Runtime health, Validators)
-    ├── common.py                       # Thư viện dùng chung phân tích cú pháp Kustomize và AST manifest
-    ├── run_all.py                      # CLI entrypoint thực thi toàn bộ 9 nhóm kiểm thử GitOps độc lập
-    ├── validate_application_contract.py # Kiểm tra hợp đồng ranh giới Application và Sync Waves
-    ├── validate_cluster_capacity.py    # Kiểm tra cấu hình Karpenter NodePool và taint GPU
-    ├── validate_execution_security.py  # Kiểm tra bảo mật webhook Argo Events, token secret và RBAC
-    ├── validate_helm_sources.py        # Kiểm tra tính toàn vẹn nguồn Helm Chart của Addons
-    ├── validate_redis_ha.py            # Kiểm tra cấu hình Sentinel quorum, topology spread và secret
-    ├── validate_resource_ownership.py  # Kiểm tra tính đơn nhất và quyền sở hữu danh tính tài nguyên
-    ├── validate_runtime_logging.py     # Kiểm tra quyền thu thập log an toàn của Alloy/Loki
-    ├── validate_secrets.py             # Kiểm tra quy ước ExternalSecret (Sync Wave -1, SecretStoreRef)
-    └── validate_supply_chain.py        # Kiểm tra Kyverno Cosign verification và quyền Kaniko
+└── verify/                             # Bộ kiểm thử và nghiệm thu tự động toàn diện (Offline & Online)
+    ├── validate/                       # Tầng kiểm tra tĩnh (Offline): syntax, kustomize, cluster, addons, platform, workloads, gitops
+    │   ├── validate_syntax_encoding.py
+    │   ├── validate_kustomize_build.py
+    │   ├── validate_cluster.py
+    │   ├── validate_addons.py
+    │   ├── validate_platform.py
+    │   ├── validate_workloads.py
+    │   ├── validate_execution.py
+    │   └── validate_gitops.py
+    ├── test/                           # Tầng kiểm thử cụm sống (Online via Python kubernetes client)
+    │   ├── test_cluster_nodes.py
+    │   ├── test_cluster_core.py
+    │   ├── test_addons_health.py
+    │   ├── test_platform_health.py
+    │   ├── test_workloads_health.py
+    │   └── test_gitops_sync.py
+    ├── pytest.ini                      # Cấu hình markers: validate (offline) & cluster (online)
+    ├── requirements.txt                # Khai báo: pytest, pytest-cov, pyyaml, kubernetes
+    ├── utils.py                        # Thư viện dùng chung phân tích cú pháp Kustomize/Helm
+    └── conftest.py                     # Fixtures session: repo_root, k8s_dir, all_k8s_yaml_files
 ```
 
 ---
@@ -237,20 +245,17 @@ k8s/
 Trước khi commit hoặc tạo PR thay đổi cấu hình Kubernetes, bắt buộc phải chạy bộ kiểm tra tĩnh:
 
 ```bash
-# 1. Chạy toàn bộ 36 bài kiểm tra tự động độc lập (Offline Validators test suite):
-python -m pytest k8s/validate/tests/ -v
+# 1. Chạy tầng kiểm tra tĩnh (Offline, không cần kết nối cụm):
+pytest k8s/verify/validate/ -v
 
-# 2. Chạy các validator GitOps độc lập (Core Checks):
-python -m k8s.validate.validate_application_contract
-python -m k8s.validate.validate_execution_security
-python -m k8s.validate.validate_secrets
-python -m k8s.validate.validate_supply_chain
-python -m k8s.validate.validate_cluster_capacity
-python -m k8s.validate.validate_redis_ha
-python -m k8s.validate.validate_runtime_logging
+# 2. Chạy tầng kiểm thử nghiệm thu cụm K3s sống (tự động skip an toàn nếu offline):
+pytest k8s/verify/test/ -v
 
-# 3. Chạy toàn bộ 9 nhóm kiểm thử trên môi trường CI (Yêu cầu có sẵn Helm & Kubeconform):
-python -m k8s.validate.run_all
+# 3. Chạy toàn bộ bộ kiểm thử:
+pytest k8s/verify/ -v
+
+
+
 
 # 4. Kiểm tra kết xuất cú pháp Kustomize cho các tầng:
 kubectl kustomize k8s/apps/overlays/production/control-plane >/dev/null

@@ -1,0 +1,6 @@
+# Runtime dependencies for the K8s verification suite (offline validation & online cluster testing).
+PyYAML==6.0.2
+pytest>=8.0.0
+pytest-cov>=5.0.0
+kubernetes>=30.0.0
+

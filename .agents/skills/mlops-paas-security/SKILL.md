@@ -34,7 +34,7 @@ Never include passwords, tokens, private keys, real `.env` values, SSH credentia
   ```bash
   pytest services/control-plane/src/apps/auth/tests/
   pytest services/control-plane/src/apps/access/tests/
-  pytest k8s/validate/tests/test_execution_security.py
+  pytest k8s/verify/validate/validate_execution.py
   ```
 - Run leak scan and verify no unmasked credentials or private keys appear in git diff:
   ```bash

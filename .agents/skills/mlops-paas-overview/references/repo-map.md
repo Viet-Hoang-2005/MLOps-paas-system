@@ -33,7 +33,7 @@
 ## Source Precedence Rules
 
 1. Executable source code and live PostgreSQL database migrations.
-2. Automated test suites asserting current contracts (`pytest`, `k8s/validate/tests/`).
+2. Automated test suites asserting current contracts (`pytest`, `k8s/verify/validate/`).
 3. Kubernetes manifests, Terraform modules, Ansible roles, Docker Compose, and CI/CD pipelines.
 4. Focused service documentation (`services/*/README.md`, `terraform/aws/README.md`, `terraform/cloudflare/README.md`, `ansible/README.md`, `k8s/README.md`, `ARCHITECTURE.md`).
 5. Supporting notes and example environment files (`.env.example`).

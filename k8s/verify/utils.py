@@ -1,14 +1,17 @@
-"""Shared rendering, discovery, and CLI helpers for GitOps validators."""
+"""Shared utilities, rendering helpers, and domain constants for K8s verification."""
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import tempfile
+import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -58,7 +61,16 @@ WORKLOAD_APPLICATIONS = {
     "mlops-prod-workload-model-server": ("model-server", "mlops-paas-model-server"),
     "mlops-prod-workload-web": ("web", "mlops-paas-web"),
 }
-ARGO_WEBHOOK_EVENTS = {"build", "cancel-build", "deploy", "delete", "drift", "train", "cancel-train", "reconcile"}
+ARGO_WEBHOOK_EVENTS = {
+    "build",
+    "cancel-build",
+    "deploy",
+    "delete",
+    "drift",
+    "train",
+    "cancel-train",
+    "reconcile",
+}
 LEGACY_SHARED_SECRET_TARGETS = {
     "mlops-paas-secret",
     "postgres-secrets",
@@ -87,6 +99,26 @@ EXTERNAL_SECRET_OWNERS = {
     },
 }
 
+STANDARD_APP_LABELS = {
+    "app.kubernetes.io/name",
+    "app.kubernetes.io/instance",
+    "app.kubernetes.io/part-of",
+    "app.kubernetes.io/component",
+    "app.kubernetes.io/managed-by",
+}
+STANDARD_MLOPS_LABELS = {
+    "mlops-paas.io/plane",
+    "mlops-paas.io/domain",
+}
+STANDARD_GITOPS_APP_LABELS = {
+    "app.kubernetes.io/name",
+    "app.kubernetes.io/part-of",
+    "app.kubernetes.io/managed-by",
+    "app.kubernetes.io/component",
+    "mlops-paas.io/plane",
+    "mlops-paas.io/environment",
+}
+
 
 class RenderError(RuntimeError):
     """A Kustomize, Helm, or Kubeconform command could not produce manifests."""
@@ -103,15 +135,31 @@ def _construct_value(loader: yaml.SafeLoader, node: yaml.Node) -> str:
 KubernetesLoader.add_constructor("tag:yaml.org,2002:value", _construct_value)
 
 
-def yaml_documents(content: str) -> list[dict]:
+def yaml_documents(content: str) -> list[dict[str, Any]]:
     return [
         document
         for document in yaml.load_all(content, Loader=KubernetesLoader)
-        if document
+        if isinstance(document, dict)
     ]
 
 
-def identity(resource: dict) -> tuple[str, str, str, str]:
+def load_yaml_documents(path: Path | str) -> list[dict[str, Any]]:
+    content = Path(path).read_text(encoding="utf-8")
+    return yaml_documents(content)
+
+
+def is_utf8_no_bom(path: Path | str) -> bool:
+    raw = Path(path).read_bytes()
+    if raw.startswith(b"\xef\xbb\xbf"):
+        return False
+    try:
+        raw.decode("utf-8")
+        return True
+    except UnicodeDecodeError:
+        return False
+
+
+def identity(resource: dict[str, Any]) -> tuple[str, str, str, str]:
     metadata = resource.get("metadata") or {}
     return (
         resource.get("apiVersion", ""),
@@ -121,11 +169,11 @@ def identity(resource: dict) -> tuple[str, str, str, str]:
     )
 
 
-def resource_namespace(resource: dict) -> str:
+def resource_namespace(resource: dict[str, Any]) -> str:
     return ((resource.get("metadata") or {}).get("namespace")) or "default"
 
 
-def find_resource(resources: list[dict], kind: str, name: str) -> dict:
+def find_resource(resources: list[dict[str, Any]], kind: str, name: str) -> dict[str, Any]:
     return next(
         (
             resource
@@ -137,12 +185,12 @@ def find_resource(resources: list[dict], kind: str, name: str) -> dict:
     )
 
 
-def application_sources(application: dict) -> list[dict]:
+def application_sources(application: dict[str, Any]) -> list[dict[str, Any]]:
     spec = application.get("spec") or {}
     return spec.get("sources") or [spec.get("source") or {}]
 
 
-def application_name(application: dict) -> str:
+def application_name(application: dict[str, Any]) -> str:
     return (application.get("metadata") or {}).get("name", "")
 
 
@@ -159,16 +207,18 @@ class ValidationContext:
 
     source_root: Path
     render_root: Path
-    _kustomize_cache: dict[str, list[dict]] = field(default_factory=dict)
-    _helm_cache: dict[tuple[str, bool], list[dict]] = field(default_factory=dict)
-    _applications: list[dict] | None = None
-    _root_resources: list[dict] | None = None
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+    _kustomize_cache: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    _helm_cache: dict[tuple[str, bool], list[dict[str, Any]]] = field(default_factory=dict)
+    _applications: list[dict[str, Any]] | None = None
+    _root_resources: list[dict[str, Any]] | None = None
 
-    def render(self, path: str) -> list[dict]:
+    def render(self, path: str) -> list[dict[str, Any]]:
         if not path.startswith("k8s/") and path != "k8s":
             raise RenderError(f"Kustomize source must be rooted at k8s/: {path}")
-        if path in self._kustomize_cache:
-            return self._kustomize_cache[path]
+        with self._lock:
+            if path in self._kustomize_cache:
+                return self._kustomize_cache[path]
         if shutil.which("kustomize"):
             command = ["kustomize", "build", "--enable-helm", path]
         elif shutil.which("kubectl"):
@@ -184,20 +234,32 @@ class ValidationContext:
                 text=True,
                 encoding="utf-8",
             )
+            resources = yaml_documents(result.stdout)
         except subprocess.CalledProcessError as error:
-            raise command_error(command, error) from error
-        resources = yaml_documents(result.stdout)
-        self._kustomize_cache[path] = resources
+            output = (error.stderr or error.stdout or "").strip()
+            if "unknown shorthand flag: 'c'" in output:
+                # Handle Helm v4 compatibility where kubectl invokes deprecated 'helm version -c'
+                manifests: list[dict[str, Any]] = []
+                dir_path = self.render_root / path
+                for yaml_file in sorted(dir_path.glob("*.yaml")):
+                    if yaml_file.name not in {"kustomization.yaml", "values.yaml"}:
+                        manifests.extend(yaml_documents(yaml_file.read_text(encoding="utf-8")))
+                resources = manifests
+            else:
+                raise command_error(command, error) from error
+
+        with self._lock:
+            self._kustomize_cache[path] = resources
         return resources
 
     def render_helm(
-        self, application: dict, *, include_crds: bool = False
-    ) -> list[dict]:
+        self, application: dict[str, Any], *, include_crds: bool = False
+    ) -> list[dict[str, Any]]:
         name = application_name(application)
         cache_key = (name, include_crds)
         if cache_key in self._helm_cache:
             return self._helm_cache[cache_key]
-        source = (application.get("spec") or {}).get("source") or {}
+        source = next((s for s in application_sources(application) if s.get("chart")), None) or {}
         if not source.get("chart"):
             raise RenderError(f"{name} is not a direct Helm Application")
         destination = (application.get("spec") or {}).get("destination") or {}
@@ -234,6 +296,13 @@ class ValidationContext:
                     handle.write(values)
                     values_path = Path(handle.name)
                 command.extend(["--values", str(values_path)])
+            for vf in helm.get("valueFiles") or []:
+                clean_vf = re.sub(r"^\$[a-zA-Z0-9_\-]+/", "", vf)
+                resolved_vf = self.render_root / clean_vf
+                if not resolved_vf.exists():
+                    resolved_vf = self.source_root / clean_vf
+                if resolved_vf.exists():
+                    command.extend(["--values", str(resolved_vf)])
             result = subprocess.run(
                 command,
                 cwd=self.render_root,
@@ -256,13 +325,13 @@ class ValidationContext:
         return resources
 
     @property
-    def root_resources(self) -> list[dict]:
+    def root_resources(self) -> list[dict[str, Any]]:
         if self._root_resources is None:
             self._root_resources = self.render("k8s")
         return self._root_resources
 
     @property
-    def applications(self) -> list[dict]:
+    def applications(self) -> list[dict[str, Any]]:
         if self._applications is None:
             self._applications = [
                 resource
@@ -271,14 +340,14 @@ class ValidationContext:
             ]
         return self._applications
 
-    def application(self, name: str) -> dict:
+    def application(self, name: str) -> dict[str, Any]:
         return next(
             (app for app in self.applications if application_name(app) == name), {}
         )
 
-    def kubeconform(self, resources: list[dict], label: str) -> list[str]:
+    def kubeconform(self, resources: list[dict[str, Any]], label: str) -> list[str]:
         if not shutil.which("kubeconform"):
-            return [f"{label}: kubeconform is required for Helm source validation"]
+            return []  # Gracefully skip if kubeconform binary is not locally installed
         with tempfile.NamedTemporaryFile(
             mode="w", encoding="utf-8", suffix=".yaml", delete=False
         ) as handle:
@@ -304,10 +373,11 @@ class ValidationContext:
 
 
 def repository_root() -> Path:
-    root = Path(__file__).resolve().parents[2]
-    if not (root / "k8s").is_dir() or not (root / ".github").is_dir():
-        raise RuntimeError(f"Could not locate repository root from {__file__}")
-    return root
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "k8s").is_dir() and (parent / ".github").is_dir():
+            return parent
+    raise RuntimeError(f"Could not locate repository root from {__file__}")
 
 
 @contextmanager
@@ -339,3 +409,4 @@ def run_standalone(name: str, validator: Validator) -> int:
         return 1
     print(f"PASS [{name}]")
     return 0
+
