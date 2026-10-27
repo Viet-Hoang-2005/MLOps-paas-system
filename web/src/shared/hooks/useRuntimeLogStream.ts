@@ -54,7 +54,7 @@ export function useRuntimeLogStream({
     );
 
     if (!sourceKind || !sourceId || !enabled) return;
-    const activeSource = { kind: sourceKind, id: sourceId } as RuntimeLogSource;
+    const activeSource = { kind: sourceKind, id: sourceId };
 
     const poll = async () => {
       try {

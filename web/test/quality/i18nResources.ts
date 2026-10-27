@@ -109,7 +109,7 @@ export function parseResource(
   return {
     resource:
       parsed && typeof parsed === "object"
-        ? (parsed as Record<string, unknown>)
+        ? (parsed)
         : null,
     errors,
   };

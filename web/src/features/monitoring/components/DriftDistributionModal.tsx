@@ -49,15 +49,9 @@ export function DriftDistributionModal({
 
   const getCatCategories = () => {
     if (isNumerical) return [];
-    const curX = (column.current?.small_distribution?.x ?? []) as (
-      | string
-      | number
-    )[];
+    const curX = (column.current?.small_distribution?.x ?? []);
     const curY = column.current?.small_distribution?.y ?? [];
-    const refX = (column.reference?.small_distribution?.x ?? []) as (
-      | string
-      | number
-    )[];
+    const refX = (column.reference?.small_distribution?.x ?? []);
     const refY = column.reference?.small_distribution?.y ?? [];
 
     const allCats = Array.from(new Set([...curX, ...refX].map(String)));

@@ -71,6 +71,17 @@ ARGO_WEBHOOK_EVENTS = {
     "cancel-train",
     "reconcile",
 }
+ARGO_WORKFLOW_TEMPLATES = {
+    "build": "mlops-paas-model-packager-template",
+    "deploy": "mlops-paas-model-server-deploy-template",
+    "deploy-delete": "mlops-paas-model-server-delete-template",
+    "evidently": "mlops-paas-evidently-template",
+    "training": "mlops-paas-training-pipeline-template",
+    "training-cancel": "mlops-paas-training-cancel-template",
+    "operations-submit": "mlops-paas-job-submit-template",
+    "operations-reconcile": "mlops-paas-job-reconcile-template",
+    "operations-tombstone": "mlops-paas-job-tombstone-template",
+}
 LEGACY_SHARED_SECRET_TARGETS = {
     "mlops-paas-secret",
     "postgres-secrets",

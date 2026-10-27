@@ -189,7 +189,7 @@ export function AttributesEvolutionPage({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-stretch">
         {hasMetrics ? (
           <MetricsCard
-            metrics={metrics as Record<string, unknown>}
+            metrics={metrics}
             summarySources={attributes?.summary_sources?.metrics}
             filename={getArtifactFilename("metrics")}
             projectId={projectId}
@@ -209,7 +209,7 @@ export function AttributesEvolutionPage({
 
         {hasParams ? (
           <HyperparametersCard
-            params={params as Record<string, unknown>}
+            params={params}
             summarySources={attributes?.summary_sources?.params}
             filename={getArtifactFilename("params")}
             projectId={projectId}

@@ -43,7 +43,7 @@ export default function NotificationsPage() {
       is_read: activeTab === "unread" ? false : undefined,
       type:
         activeTab !== "all" && activeTab !== "unread"
-          ? (activeTab as NotificationType)
+          ? (activeTab)
           : undefined,
       search: searchQuery.trim() || undefined,
       page,

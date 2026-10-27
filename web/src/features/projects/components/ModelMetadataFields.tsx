@@ -46,7 +46,7 @@ export function ModelMetadataFields({
         title={t("uploadFlow.metadata.accessMode")}
         value={form.access_mode}
         onChange={(value) =>
-          setField("access_mode", value as ProjectMetadataForm["access_mode"])
+          setField("access_mode", value)
         }
         options={[
           {

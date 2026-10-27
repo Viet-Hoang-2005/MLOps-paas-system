@@ -50,16 +50,23 @@ export default defineConfig([
     rules: {
       '@typescript-eslint/await-thenable': 'error',
       '@typescript-eslint/no-base-to-string': 'off',
+      '@typescript-eslint/no-floating-promises': ['error', { ignoreVoid: true }],
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        {
+          checksVoidReturn: { attributes: false },
+          checksConditionals: true,
+        },
+      ],
+      '@typescript-eslint/prefer-promise-reject-errors': 'error',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'error',
       '@typescript-eslint/no-floating-promises': 'off',
-      '@typescript-eslint/no-misused-promises': 'off',
-      '@typescript-eslint/no-redundant-type-constituents': 'off',
-      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      '@typescript-eslint/no-redundant-type-constituents': 'warn',
+      '@typescript-eslint/require-await': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
-      '@typescript-eslint/prefer-promise-reject-errors': 'off',
-      '@typescript-eslint/require-await': 'off',
       'no-restricted-imports': ['error', { patterns: architectureImportRestrictions }],
       'boundaries/dependencies': ['error', {
         default: 'disallow',

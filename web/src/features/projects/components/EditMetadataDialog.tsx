@@ -84,7 +84,7 @@ function EditMetadataDialogContent({
         <Picker
           title={t("workflow.accessMode")}
           value={accessMode}
-          onChange={(val) => setAccessMode(val as "private" | "public")}
+          onChange={(val) => setAccessMode(val)}
           options={[
             {
               value: "private",

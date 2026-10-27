@@ -88,3 +88,13 @@ def k8s_custom_api(cluster_connection: client.ApiClient) -> client.CustomObjects
 def k8s_storage_api(cluster_connection: client.ApiClient) -> client.StorageV1Api:
     return client.StorageV1Api(cluster_connection)
 
+
+@pytest.fixture(scope="session")
+def k8s_rbac_api(cluster_connection: client.ApiClient) -> client.RbacAuthorizationV1Api:
+    return client.RbacAuthorizationV1Api(cluster_connection)
+
+
+@pytest.fixture(scope="session")
+def k8s_networking_api(cluster_connection: client.ApiClient) -> client.NetworkingV1Api:
+    return client.NetworkingV1Api(cluster_connection)
+

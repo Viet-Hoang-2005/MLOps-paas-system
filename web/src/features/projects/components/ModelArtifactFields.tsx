@@ -216,14 +216,14 @@ export function ModelArtifactFields({
             setField("flavor", value);
             if (form.source_artifact) {
               const newMax =
-                MAX_SOURCE_ARTIFACT_BYTES[value as ModelFlavor][
+                MAX_SOURCE_ARTIFACT_BYTES[value][
                   form.artifact_format
                 ];
               if (form.source_artifact.size > newMax) {
                 setField("source_artifact", null);
                 toast.warning(
                   t("uploadFlow.build.artifactRemovedExceedsLimit", {
-                    max: MAX_SOURCE_ARTIFACT_LABELS[value as ModelFlavor][
+                    max: MAX_SOURCE_ARTIFACT_LABELS[value][
                       form.artifact_format
                     ],
                   }),
@@ -246,7 +246,7 @@ export function ModelArtifactFields({
           <Switch
             value={form.artifact_format}
             disabled={readOnly}
-            onChange={(value) => selectFormat(value as ModelArtifactFormat)}
+            onChange={(value) => selectFormat(value)}
             options={[
               { value: "raw", title: t("uploadFlow.build.raw") },
               { value: "mlflow_zip", title: t("uploadFlow.build.package") },

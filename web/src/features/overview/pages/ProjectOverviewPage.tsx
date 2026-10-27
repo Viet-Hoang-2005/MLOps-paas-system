@@ -252,7 +252,7 @@ export default function ProjectOverviewPage() {
       {tab === "deployment" && (
         <DeploymentOverviewPage
           model={model}
-          modelId={modelId!}
+          modelId={modelId}
           hasRunning={hasRunning}
           healthUnavailable={project.isError}
         />
@@ -260,7 +260,7 @@ export default function ProjectOverviewPage() {
 
       {tab === "attributes" && (
         <AttributesOverviewPage
-          modelId={modelId!}
+          modelId={modelId}
           effectiveVersionId={effectiveVersionId}
           isPreview={isPreview}
           attributes={attributes.data}
@@ -272,7 +272,7 @@ export default function ProjectOverviewPage() {
 
       {tab === "code" && (
         <CodeOverviewPage
-          modelId={modelId!}
+          modelId={modelId}
           effectiveVersionId={effectiveVersionId}
           isPreview={isPreview}
           sourceCodeName={model.source_code?.name}
@@ -304,7 +304,7 @@ export default function ProjectOverviewPage() {
 
       {tab === "data" && (
         <DataOverviewPage
-          modelId={modelId!}
+          modelId={modelId}
           effectiveVersionId={effectiveVersionId}
           isPreview={isPreview}
           referenceDataName={model.reference_data?.name}

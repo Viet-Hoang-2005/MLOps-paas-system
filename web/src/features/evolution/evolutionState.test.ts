@@ -112,7 +112,7 @@ describe("Evolution State & Lifecycle Utilities", () => {
     for (const override of invalidOverrides) {
       expect(
         registeredVersionBuild([
-          { ...build, ...override } as unknown as Build,
+          { ...build, ...override },
         ], v1),
       ).toBeUndefined();
     }

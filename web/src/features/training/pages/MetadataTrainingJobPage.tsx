@@ -78,7 +78,7 @@ export default function MetadataTrainingJobPage() {
             onChange={(value) =>
               flow.setMetadataField(
                 "access_mode",
-                value as "public" | "private",
+                value,
               )
             }
             options={[

@@ -37,7 +37,7 @@ export default function SourceTrainingJobPage() {
           <Picker
             value={flow.sourceForm.model_flavor}
             onChange={(value) =>
-              flow.setSourceField("model_flavor", value as ModelFlavor)
+              flow.setSourceField("model_flavor", value)
             }
             options={[
               {
