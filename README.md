@@ -154,7 +154,6 @@ mlops-paas-system/
 ├── README.md                          # Tài liệu giới thiệu tổng quan dự án
 ├── docker-compose.yml                 # Môi trường Local Development hoàn chỉnh
 ├── .env.example                       # File mẫu khai báo các biến môi trường
-├── Makefile                           # Các lệnh tắt thao tác nhanh
 │
 ├── services/                          # Toàn bộ mã nguồn các dịch vụ Backend Python
 │   ├── control-plane/                 # Django: AI PaaS Control Plane API (10 Domain Apps)
@@ -165,7 +164,6 @@ mlops-paas-system/
 │   ├── model-packager/                # Worker đóng gói model artifact thành ảnh container
 │   ├── training-runner/               # Worker thực thi huấn luyện trong sandbox cô lập
 │   ├── evidently/                     # Worker phân tích độ lệch dữ liệu (Data & Model Drift)
-│   └── mlflow/                        # Container cấu hình MLflow Tracking Server
 │
 ├── terraform/                         # Mã nguồn Terraform IaC
 │   ├── aws/                           # Hạ tầng AWS: VPC, EC2, S3, ALB, IAM, Secrets Manager, Karpenter
@@ -179,9 +177,9 @@ mlops-paas-system/
 ├── k8s/                               # Khai báo Kubernetes GitOps (Argo CD SSOT)
 │   ├── kustomization.yaml             # Root Kustomization quản lý production GitOps control tree
 │   ├── gitops/production/             # Argo CD Application-of-Applications (5 Sync Waves)
-│   ├── cluster/                       # Khai báo Namespace, StorageClass, SecretStore, Capacity
-│   ├── addons/                        # Addons hạ tầng: CloudNativePG, Redis HA, Redpanda, ESO, Traefik, Loki...
-│   ├── argo/                          # Argo Events EventSource/Sensors, Workflow Templates
+│   ├── cluster/                       # Namespace, StorageClass, SecretStore, Capacity
+│   ├── addons/                        # Custom addons hạ tầng: Kubeflow Operator Training
+│   ├── argo/                          # Argo Events EventSource/Sensors, Argo Workflow Templates
 │   └── apps/                          # Manifests cơ sở và overlays triển khai microservices
 │
 ├── web/                               # Mã nguồn React Frontend Dashboard (Vite / TypeScript)
@@ -199,11 +197,8 @@ mlops-paas-system/
 
 Hệ thống hỗ trợ 2 chế độ triển khai chính:
 
-### 6.1. Chạy Cục bộ (Local Development với Docker Compose)
+### 6.1. Chạy local (Docker Compose)
 
-Workflow Web mới: **Project/Preview → Build → Register → Deploy/Running**. Training completed là nguồn Build, không tự đăng ký version. Overview chỉ hiển thị snapshot Running; drift monitor có reference riêng bất biến. Local dùng Docker SDK cho CPU/RAM và counter gateway ngắn hạn cho RPS; Web giữ tối đa 5 phút trong phiên mở trang, không lưu lịch sử metric.
-
-Đợt refactor này cần database ứng dụng sạch, không có backfill hoặc route compatibility. Xem [kế hoạch và trạng thái](docs/dev/web-workflow-refactor.md) và [runbook khởi chạy/kiểm thử local](docs/dev/web-workflow-local.md) trước khi chạy lại Compose. Không tự xóa volume hoặc dữ liệu cũ.
 ```bash
 # 1. Chuẩn bị file môi trường
 cp .env.example .env
@@ -214,10 +209,14 @@ docker compose up --build -d
 # 3. Khởi chạy giao diện Frontend Dashboard (Terminal riêng)
 cd web && pnpm install && pnpm dev
 ```
-Truy cập Dashboard tại `http://localhost:5173` và Control Plane API tại `http://localhost:8000/api/`.
+
+Truy cập Dashboard tại `http://localhost:5173` 
+Control Plane API tại `http://localhost:8000/api/`
 
 ### 6.2. Triển khai Sản xuất (Production K3s trên AWS)
+
 Quy trình sản xuất được tự động hóa qua 3 bước:
+
 1. **Terraform (AWS & Cloudflare):** Tạo hạ tầng đám mây và mạng biên:
    ```bash
    # 1. Triển khai AWS (VPC, EC2, ALB, S3, Secrets Manager)
@@ -226,13 +225,15 @@ Quy trình sản xuất được tự động hóa qua 3 bước:
    # 2. Triển khai Cloudflare (DNS CNAMEs, Zero Trust Tunnel, Zone Security)
    cd ../cloudflare && terraform init && terraform apply
    ```
+
 2. **Đồng bộ Bí mật:** Nạp secret lên AWS Secrets Manager qua script:
    ```bash
    python scripts/create_and_push_secrets_to_aws.py --groups 0 --yes
    ```
+
 3. **Ansible & Argo CD:** Khởi tạo cụm K3s và bàn giao quyền kiểm soát cho GitOps:
    ```bash
-   cd ansible && ansible-playbook -i inventory/terraform.py site.yml --tags bootstrap,platform-core
+   cd ansible && ansible-playbook site.yml
    ```
 
 > 📖 **Xem hướng dẫn chi tiết từng bước:** Đọc tài liệu [**`INSTALL.md`**](INSTALL.md) để nắm rõ yêu cầu hệ thống, cấu hình biến môi trường, thiết lập SSL/TLS, chế độ S3-only, và quy trình dọn dẹp hạ tầng an toàn.

@@ -93,22 +93,22 @@
 \resumeSubHeadingListStart
 
 \resumeProjectHeading
-{\textbf{MLOps PaaS System} $|$ \href{https://github.com/Viet-Hoang-2005/mlops-paas-system}{GitHub} $|$ \emph{React, TypeScript, Django, FastAPI, PostgreSQL, Redis, Celery, Redpanda, Docker, AWS, Kubernetes, Argo CD}}
+{\textbf{MLOps PaaS System} $|$ \href{https://github.com/Viet-Hoang-2005/mlops-paas-system}{GitHub} $|$ \emph{React, Django, FastAPI, PostgreSQL, Redis, Celery, Docker, AWS, Kubernetes, Argo CD}}
 {3/2026 -- Present}
 \resumeItemListStart
-\resumeItem{Architected a multi-tenant MLOps platform featuring a React 19/TypeScript SPA and Django REST modular monolith (10 apps) with asymmetric RS256 JWT/JWKS authentication for project and model lifecycle.}
-\resumeItem{Built responsive dashboard interfaces using TanStack Query for server state/caching, Zod-validated multi-step forms (React Hook Form), S3 presigned direct uploads, and a real-time ANSI log streaming viewer.}
-\resumeItem{Developed a high-performance FastAPI inference gateway with dynamic routing, Celery/Redis async workers via \texttt{transaction.on\_commit} hooks, and Redpanda streaming for live telemetry and Evidently drift detection.}
-\resumeItem{Containerized services with multi-stage Docker builds and automated continuous GitOps deployment to Kubernetes via GitHub Actions and Argo CD.}
+\resumeItem{Architected a multi-tenant MLOps platform to manage end-to-end ML/DL model lifecycles, featuring an interactive React 19 dashboard UI and a modular monolith Django orchestration control plane.}
+\resumeItem{Structured the frontend via Feature-Driven Architecture with permission-aware React Router, TanStack Query caching, Zod-validated multi-step forms, direct S3 presigned uploads, and real-time log polling.}
+\resumeItem{Combined the Django monolith with scalable FastAPI Serving, Consumer, and Evidently Drift microservices; used PostgreSQL as the single source of truth and S3 for artifacts, secured by RS256 JWTs, with Celery and Redis tasks using transaction commit hooks and signed webhooks.}
+\resumeItem{Containerized services with multi-stage Docker builds, deployed workloads to Kubernetes on AWS infrastructure, and established automated CI/CD and continuous GitOps promotion workflows via GitHub Actions and Argo CD.}
 \resumeItemListEnd
 
 \resumeProjectHeading
-{\textbf{SageLMS} $|$ \href{https://github.com/daithang59/sagelms}{GitHub} $|$ \emph{React, TypeScript, Spring Boot, FastAPI, LangChain, PostgreSQL, Redis, Docker, GCP, Kubernetes, GitHub Actions, FluxCD}}
+{\textbf{SageLMS} $|$ \href{https://github.com/daithang59/sagelms}{GitHub} $|$ \emph{TypeScript, Java, Python, React, Spring Boot, FastAPI, LangChain, Gemini, PostgreSQL, Redis}}
 {4/2026 -- 6/2026}
 \resumeItemListStart
-\resumeItem{Connected React/TypeScript interfaces to Spring Boot APIs and PostgreSQL for course creation, lesson management, and enrollment, secured with JWT authentication via Spring Cloud Gateway.}
-\resumeItem{Built React assessment workflows with countdown timers, localStorage draft autosave, and automatic submission; connected test results to question reviews and instructor gradebooks.}
-\resumeItem{Integrated an AI tutor powered by FastAPI, LangChain, and Gemini with course context, real-time React chat UI, and automated CI/CD deployment to GKE using Docker, GitHub Actions, and FluxCD.}
+\resumeItem{Engineered an AI-powered Learning Management System built on a polyglot microservices architecture, serving students, instructors, and admins with end-to-end course authoring, progress tracking, and interactive assessments.}
+\resumeItem{Built an interactive React 18 SPA featuring role-based protected routing, an assessment runner with countdown timers and local draft recovery, multimedia lesson viewers, and a responsive AI Tutor conversational chat interface.}
+\resumeItem{Developed distributed backend services orchestrated via Spring Cloud Gateway for centralized JWT/RBAC routing, domain-isolated Spring Boot microservices with PostgreSQL and Redis, and an intelligent RAG-driven AI Tutor service using FastAPI, LangChain, and Gemini.}
 \resumeItemListEnd
 
 \resumeSubHeadingListEnd
@@ -140,11 +140,11 @@
 \section{Technical Skills}
 \begin{itemize}[leftmargin=0.15in, label={}]
   \small{\item{
-    \textbf{Languages:} JavaScript/TypeScript, Java, Python, SQL, Bash \\
+    \textbf{Languages:} JavaScript/TypeScript, Python, Java, SQL, Bash \\
     \textbf{Frontend:} ReactJS, Tailwind CSS, Radix UI, Ant Design \\
-    \textbf{Backend \& APIs:} RESTful APIs, Django, FastAPI, Spring Boot, Celery \\
+    \textbf{Backend:} RESTful APIs, Django, FastAPI, Spring Boot, Celery \\
     \textbf{Databases \& Storage:} PostgreSQL, MongoDB, Redis, Redpanda/Kafka, S3/MinIO \\
-    \textbf{Cloud \& DevOps:} Linux, AWS, GCP, Docker, Terraform, Ansible, Kubernetes, Helm, Git/GitHub, Argo CD\\
+    \textbf{Cloud \& DevOps:} Linux, AWS, Docker, Terraform, Ansible, Kubernetes, Git/GitHub, Argo CD\\
   }}
 \end{itemize}
 
