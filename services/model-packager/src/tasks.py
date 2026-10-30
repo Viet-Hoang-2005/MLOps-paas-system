@@ -571,7 +571,7 @@ def setup_logger(build_id: str):
     configure("model-packager")
     writer = None
     if os.environ.get("LOG_STORAGE_BACKEND", "").strip().lower() != "loki":
-        redis_url = os.environ.get("REDIS_URL", "redis://redis:6379/1")
+        redis_url = os.environ.get("REDIS_URL", "redis://redis-cache:6379/0")
         if redis_url and build_id:
             try:
                 writer = RedisLogHandler(redis_url, build_id).write

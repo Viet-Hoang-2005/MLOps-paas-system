@@ -21,7 +21,7 @@ def test_sentinel_connection_discovers_master(monkeypatch):
         sentinel_kwargs={"password": "sentinel-password", "socket_timeout": 2},
         socket_timeout=2,
     )
-    sentinel.master_for.assert_called_once_with("redis-master", db=1, password="redis-password")
+    sentinel.master_for.assert_called_once_with("redis-master", db=0, password="redis-password")
 
 
 def test_sentinel_connection_rejects_missing_credentials(monkeypatch):

@@ -11,7 +11,7 @@ metadata:
     mlops-paas.io/plane: workload
     mlops-paas.io/domain: control-plane
 data:
-  LOG_FORMAT: "json"
+  LOG_FORMAT: "console"
   LOG_SUMMARY_INTERVAL_SECONDS: "60"
   PYTHONUNBUFFERED: "1"
   PYTHONPATH: "/app/src"
@@ -55,9 +55,11 @@ data:
   KAFKA_TOPIC: "mlops_paas_production_data"
   REDPANDA_BROKERS: "redpanda.mlops-paas-data.svc.cluster.local:9092"
   JWKS_URL: "http://mlops-paas-control-plane.mlops-paas-core.svc.cluster.local:8000/api/auth/.well-known/jwks.json"
-  REDIS_CONNECTION_MODE: "sentinel"
-  REDIS_SENTINEL_MASTER_NAME: "redis-master"
-  REDIS_SENTINEL_HOSTS: "redis-ha-sentinel-0.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-1.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-2.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379"
+  REDIS_CONNECTION_MODE: "direct"
+  REDIS_URL: "redis://redis-cache.mlops-paas-data.svc.cluster.local:6379/0"
+  CELERY_CONNECTION_MODE: "sentinel"
+  CELERY_SENTINEL_MASTER_NAME: "redis-queue-master"
+  CELERY_SENTINEL_HOSTS: "redis-queue-ha-sentinel-0.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-1.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-2.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379"
   CONTROL_PLANE_INTERNAL_URL: "http://mlops-paas-control-plane.mlops-paas-core.svc.cluster.local:8000"
   MODEL_RUNTIME_NAMESPACE: "mlops-paas-serving"
   MODEL_SERVER_PUBLIC_URL: "https://mlops-nids-nt114.id.vn"

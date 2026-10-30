@@ -150,7 +150,7 @@ docker run --rm \
   -e ENTRY_POINT="train.py" \
   -e CAPABILITY_TOKEN="your-short-lived-capability-token" \
   -e CONTROL_PLANE_WEBHOOK_URL="http://control-plane:8000/internal/webhooks/training-jobs/019488a0-1000-7000-8000-000000000001/" \
-  -e REDIS_URL="redis://redis:6379/1" \
+  -e REDIS_URL="redis://redis-cache:6379/0" \
   mlops-paas-training-runner:latest
 ```
 

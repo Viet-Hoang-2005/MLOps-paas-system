@@ -165,15 +165,22 @@ def _derive_redis_url(base_url: str, db: int) -> str:
     return urlunsplit((parsed.scheme, parsed.netloc, f"/{db}", parsed.query, parsed.fragment))
 
 
-REDIS_URL = _inject_redis_password(env("REDIS_URL", "redis://redis:6379/1"), REDIS_PASSWORD)
+REDIS_URL = _inject_redis_password(env("REDIS_URL", "redis://redis-cache:6379/0"), REDIS_PASSWORD)
 REDIS_CONNECTION_MODE = env("REDIS_CONNECTION_MODE", "direct")
 if REDIS_CONNECTION_MODE not in {"direct", "sentinel"}:
     raise ImproperlyConfigured("REDIS_CONNECTION_MODE must be direct or sentinel")
+
+CELERY_CONNECTION_MODE = env("CELERY_CONNECTION_MODE", REDIS_CONNECTION_MODE)
+if CELERY_CONNECTION_MODE not in {"direct", "sentinel"}:
+    raise ImproperlyConfigured("CELERY_CONNECTION_MODE must be direct or sentinel")
+
 LOKI_URL = str(env("LOKI_URL", "")).rstrip("/")
 REDPANDA_BROKERS = env("REDPANDA_BROKERS", "redpanda:9092")
+
+# 1. Redis Cache Configuration (DB 0)
 if REDIS_CONNECTION_MODE == "sentinel":
     REDIS_SENTINEL_PASSWORD = env("REDIS_SENTINEL_PASSWORD", "")
-    REDIS_SENTINEL_MASTER_NAME = env("REDIS_SENTINEL_MASTER_NAME", "")
+    REDIS_SENTINEL_MASTER_NAME = env("REDIS_SENTINEL_MASTER_NAME", "redis-cache-master")
     REDIS_SENTINELS = []
     for address in env("REDIS_SENTINEL_HOSTS", "").split(","):
         if address.strip():
@@ -186,7 +193,7 @@ if REDIS_CONNECTION_MODE == "sentinel":
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",
-            "LOCATION": f"redis://{REDIS_SENTINEL_MASTER_NAME}/1",
+            "LOCATION": f"redis://{REDIS_SENTINEL_MASTER_NAME}/0",
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.SentinelClient",
                 "SENTINELS": REDIS_SENTINELS,
@@ -195,32 +202,46 @@ if REDIS_CONNECTION_MODE == "sentinel":
             },
         }
     }
-
-    def _celery_sentinel_urls(db: int) -> str:
-        return ";".join(
-            f"sentinel://:{quote(REDIS_PASSWORD, safe='')}@{host}:{port}/{db}" for host, port in REDIS_SENTINELS
-        )
-
-    CELERY_BROKER_URL = _celery_sentinel_urls(3)
-    CELERY_RESULT_BACKEND = _celery_sentinel_urls(4)
-    CELERY_BROKER_TRANSPORT_OPTIONS = {
-        "master_name": REDIS_SENTINEL_MASTER_NAME,
-        "sentinel_kwargs": sentinel_kwargs,
-    }
-    CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
-        "master_name": REDIS_SENTINEL_MASTER_NAME,
-        "sentinel_kwargs": sentinel_kwargs,
-    }
 else:
     CACHES = {"default": {"BACKEND": "django_redis.cache.RedisCache", "LOCATION": REDIS_URL}}
-    default_broker_url = _derive_redis_url(REDIS_URL, 3)
-    default_result_backend = _derive_redis_url(REDIS_URL, 4)
+
+# 2. Celery Queue Configuration (DB 0)
+if CELERY_CONNECTION_MODE == "sentinel":
+    CELERY_SENTINEL_PASSWORD = env("CELERY_SENTINEL_PASSWORD", env("REDIS_SENTINEL_PASSWORD", ""))
+    CELERY_SENTINEL_MASTER_NAME = env("CELERY_SENTINEL_MASTER_NAME", "redis-queue-master")
+    CELERY_SENTINELS = []
+    raw_celery_hosts = env("CELERY_SENTINEL_HOSTS", env("REDIS_SENTINEL_HOSTS", ""))
+    for address in raw_celery_hosts.split(","):
+        if address.strip():
+            host, _, port = address.strip().partition(":")
+            CELERY_SENTINELS.append((host, int(port or "26379")))
+    if not all((REDIS_PASSWORD, CELERY_SENTINEL_PASSWORD, CELERY_SENTINEL_MASTER_NAME)) or len(CELERY_SENTINELS) < 3:
+        raise ImproperlyConfigured("Celery Sentinel requires three hosts, master name and both credentials")
+    celery_sentinel_kwargs = {"password": CELERY_SENTINEL_PASSWORD, "socket_timeout": 2}
+
+    def _celery_sentinel_urls(db: int = 0) -> str:
+        return ";".join(
+            f"sentinel://:{quote(REDIS_PASSWORD, safe='')}@{host}:{port}/{db}" for host, port in CELERY_SENTINELS
+        )
+
+    CELERY_BROKER_URL = _celery_sentinel_urls(0)
+    CELERY_RESULT_BACKEND = _celery_sentinel_urls(0)
+    CELERY_BROKER_TRANSPORT_OPTIONS = {
+        "master_name": CELERY_SENTINEL_MASTER_NAME,
+        "sentinel_kwargs": celery_sentinel_kwargs,
+    }
+    CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
+        "master_name": CELERY_SENTINEL_MASTER_NAME,
+        "sentinel_kwargs": celery_sentinel_kwargs,
+    }
+else:
+    default_queue_url = _inject_redis_password("redis://redis-queue:6379/0", REDIS_PASSWORD)
     CELERY_BROKER_URL = _inject_redis_password(
-        env("CELERY_BROKER_URL", default_broker_url),
+        env("CELERY_BROKER_URL", default_queue_url),
         REDIS_PASSWORD,
     )
     CELERY_RESULT_BACKEND = _inject_redis_password(
-        env("CELERY_RESULT_BACKEND", default_result_backend),
+        env("CELERY_RESULT_BACKEND", default_queue_url),
         REDIS_PASSWORD,
     )
 CELERY_TASK_TRACK_STARTED = True

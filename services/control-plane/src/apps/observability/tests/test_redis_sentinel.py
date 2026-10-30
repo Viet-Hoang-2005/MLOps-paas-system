@@ -11,13 +11,19 @@ class RedisSentinelClientTests(SimpleTestCase):
         super().tearDown()
 
     @override_settings(
-        REDIS_CONNECTION_MODE="direct", REDIS_URL="redis://local:6379/1", CELERY_BROKER_URL="redis://local:6379/3"
+        REDIS_CONNECTION_MODE="direct",
+        CELERY_CONNECTION_MODE="direct",
+        REDIS_URL="redis://local-cache:6379/0",
+        CELERY_BROKER_URL="redis://local-queue:6380/0",
     )
     @patch("common.redis_client.Redis.from_url")
-    def test_direct_mode_uses_separate_database_for_celery_queue(self, from_url):
+    def test_direct_mode_uses_separate_instances_for_cache_and_queue(self, from_url):
         redis_client.cache_clear()
+        redis_client(db=0)
+        from_url.assert_called_with("redis://local-cache:6379/0")
+
         redis_client(db=3)
-        from_url.assert_called_once_with("redis://local:6379/3")
+        from_url.assert_called_with("redis://local-queue:6380/0")
 
     def test_direct_mode_derives_authenticated_celery_urls(self):
         from config.settings.base import _derive_redis_url, _inject_redis_password
@@ -37,7 +43,7 @@ class RedisSentinelClientTests(SimpleTestCase):
     @override_settings(
         REDIS_CONNECTION_MODE="sentinel",
         REDIS_SENTINELS=[("sentinel-0", 26379), ("sentinel-1", 26379), ("sentinel-2", 26379)],
-        REDIS_SENTINEL_MASTER_NAME="redis-master",
+        REDIS_SENTINEL_MASTER_NAME="redis-cache-master",
         REDIS_PASSWORD="redis-password",
         REDIS_SENTINEL_PASSWORD="sentinel-password",
     )
@@ -52,5 +58,26 @@ class RedisSentinelClientTests(SimpleTestCase):
             socket_timeout=2,
         )
         sentinel_class.return_value.master_for.assert_called_once_with(
-            "redis-master", db=1, password="redis-password"
+            "redis-cache-master", db=0, password="redis-password"
+        )
+
+    @override_settings(
+        CELERY_CONNECTION_MODE="sentinel",
+        CELERY_SENTINELS=[("sentinel-0", 26379), ("sentinel-1", 26379), ("sentinel-2", 26379)],
+        CELERY_SENTINEL_MASTER_NAME="redis-queue-master",
+        REDIS_PASSWORD="redis-password",
+        CELERY_SENTINEL_PASSWORD="sentinel-password",
+    )
+    @patch("common.redis_client.Sentinel")
+    def test_celery_queue_sentinel_mode_discovers_queue_master(self, sentinel_class):
+        redis_client.cache_clear()
+        sentinel_class.return_value.master_for.return_value = Mock()
+        redis_client(db=3)
+        sentinel_class.assert_called_once_with(
+            [("sentinel-0", 26379), ("sentinel-1", 26379), ("sentinel-2", 26379)],
+            sentinel_kwargs={"password": "sentinel-password", "socket_timeout": 2},
+            socket_timeout=2,
+        )
+        sentinel_class.return_value.master_for.assert_called_once_with(
+            "redis-queue-master", db=0, password="redis-password"
         )

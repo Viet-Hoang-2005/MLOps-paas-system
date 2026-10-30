@@ -259,9 +259,9 @@ export DB_PORT=5432
 export DB_NAME=mlops_paas_db
 export DB_USER=postgres
 export DB_PASSWORD=postgres
-export REDIS_URL=redis://localhost:6379/1
-export CELERY_BROKER_URL=redis://localhost:6379/3
-export CELERY_RESULT_BACKEND=redis://localhost:6379/4
+export REDIS_URL=redis://localhost:6379/0
+export CELERY_BROKER_URL=redis://localhost:6380/0
+export CELERY_RESULT_BACKEND=redis://localhost:6380/0
 ```
 
 #### Bước 3: Đồng bộ cơ sở dữ liệu và khởi tạo dữ liệu

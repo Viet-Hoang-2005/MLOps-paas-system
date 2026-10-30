@@ -1,10 +1,10 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: np-redis-ha
+  name: np-redis-platform
   labels:
     app.kubernetes.io/name: redis
-    app.kubernetes.io/instance: redis-ha
+    app.kubernetes.io/instance: redis-platform
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: cache
     app.kubernetes.io/managed-by: kustomize
@@ -16,8 +16,9 @@ spec:
       - key: app
         operator: In
         values:
-          - redis-ha
-          - redis-ha-sentinel
+          - redis-queue-ha
+          - redis-queue-ha-sentinel
+          - redis-cache
   policyTypes:
     - Ingress
   ingress:
@@ -34,6 +35,9 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: mlops-paas-core
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-paas-serving
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: redis-operator

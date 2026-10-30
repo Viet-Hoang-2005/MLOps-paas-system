@@ -14,7 +14,7 @@ from ..utils import (
 
 @pytest.mark.validate
 def validate_redis_ha_topology(context: ValidationContext) -> None:
-    """Verify RedisReplication (2 nodes) and RedisSentinel (3 nodes quorum 2) HA topology."""
+    """Verify RedisQueue HA (2 nodes + 3 Sentinels quorum 2) and RedisCache (standalone 1 replica)."""
     errors: list[str] = []
     app = context.application("mlops-prod-addon-redis-operator")
     source = (app.get("spec") or {}).get("source") or {}
@@ -22,29 +22,41 @@ def validate_redis_ha_topology(context: ValidationContext) -> None:
         errors.append("Redis Operator must use pinned chart redis-operator@0.26.0")
 
     rendered = context.render("k8s/platform/redis")
-    resources = {
-        resource.get("kind"): resource
-        for resource in rendered
-        if resource.get("kind") in {"RedisReplication", "RedisSentinel"}
-    }
-    replication = (resources.get("RedisReplication") or {}).get("spec") or {}
-    sentinel = (resources.get("RedisSentinel") or {}).get("spec") or {}
-    if replication.get("clusterSize") != 2 or replication.get("nodeSelector") != {"workload-type": "worker"}:
-        errors.append("RedisReplication must run exactly two Redis Pods on static workers")
-    redis_secret = ((replication.get("kubernetesConfig") or {}).get("redisSecret") or {})
-    sentinel_secret = ((sentinel.get("kubernetesConfig") or {}).get("redisSecret") or {})
+    queue_replication = find_resource(rendered, "RedisReplication", "redis-queue-ha")
+    queue_sentinel = find_resource(rendered, "RedisSentinel", "redis-queue-ha")
+    cache_redis = find_resource(rendered, "Redis", "redis-cache")
+
+    if not queue_replication:
+        errors.append("k8s/platform/redis must render RedisReplication redis-queue-ha")
+    if not queue_sentinel:
+        errors.append("k8s/platform/redis must render RedisSentinel redis-queue-ha")
+    if not cache_redis:
+        errors.append("k8s/platform/redis must render standalone Redis redis-cache")
+
+    rep_spec = (queue_replication or {}).get("spec") or {}
+    sen_spec = (queue_sentinel or {}).get("spec") or {}
+    cache_spec = (cache_redis or {}).get("spec") or {}
+
+    if rep_spec.get("clusterSize") != 2 or rep_spec.get("nodeSelector") != {"workload-type": "worker"}:
+        errors.append("RedisReplication redis-queue-ha must run exactly two Redis Pods on static workers")
+    redis_secret = ((rep_spec.get("kubernetesConfig") or {}).get("redisSecret") or {})
+    sentinel_secret = ((sen_spec.get("kubernetesConfig") or {}).get("redisSecret") or {})
     if redis_secret != {"name": "redis-ha-secret", "key": "REDIS_PASSWORD"}:
         errors.append("RedisReplication must use the Redis password Secret key")
     if sentinel_secret != {"name": "redis-ha-secret", "key": "REDIS_SENTINEL_PASSWORD"}:
         errors.append("RedisSentinel must use its separate password Secret key")
-    if ((replication.get("pdb") or {}).get("minAvailable")) != 1:
+    if ((rep_spec.get("pdb") or {}).get("minAvailable")) != 1:
         errors.append("RedisReplication PDB must keep one Redis Pod available")
 
-    config = sentinel.get("redisSentinelConfig") or {}
-    if sentinel.get("clusterSize") != 3 or config.get("quorum") != "2":
+    config = sen_spec.get("redisSentinelConfig") or {}
+    if sen_spec.get("clusterSize") != 3 or config.get("quorum") != "2":
         errors.append("RedisSentinel must run three Pods with quorum two")
-    if config.get("redisReplicationName") != "redis-ha" or config.get("masterGroupName") != "redis-master":
-        errors.append("RedisSentinel must monitor the declared RedisReplication master set")
+    if config.get("redisReplicationName") != "redis-queue-ha" or config.get("masterGroupName") != "redis-queue-master":
+        errors.append("RedisSentinel must monitor the declared redis-queue-ha master set")
+
+    cache_secret = ((cache_spec.get("kubernetesConfig") or {}).get("redisSecret") or {})
+    if cache_secret != {"name": "redis-ha-secret", "key": "REDIS_PASSWORD"}:
+        errors.append("Standalone Redis cache must use the Redis password Secret key")
 
     assert not errors, "\n".join(errors)
 

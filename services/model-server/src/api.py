@@ -64,7 +64,7 @@ from src.database import (  # noqa: E402  # Initialize log summaries before data
 JWKS_URL = os.environ.get("JWKS_URL", "http://control-plane:8000/api/auth/.well-known/jwks.json")
 REDPANDA_BROKERS = os.environ.get("REDPANDA_BROKERS", "redpanda:9092")
 KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "mlops_paas_production_data")
-REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/1")
+REDIS_URL = os.environ.get("REDIS_URL", "redis://redis-cache:6379/0")
 REDIS_CONNECTION_MODE = os.environ.get("REDIS_CONNECTION_MODE", "direct")
 LOCAL_RUNTIME_METRICS_ENABLED = os.environ.get("LOCAL_RUNTIME_METRICS_ENABLED", "false").lower() == "true"
 # A prediction request carries one record of features; anything larger is refused before it is parsed.
@@ -92,7 +92,7 @@ def _redis_connection():
     if len(hosts) < 3 or not all((master_name, password, sentinel_password)):
         raise ValueError("Redis Sentinel requires three hosts, master name and both credentials")
     sentinel = Sentinel(hosts, sentinel_kwargs={"password": sentinel_password, "socket_timeout": 2}, socket_timeout=2)
-    return sentinel.master_for(master_name, db=1, password=password)
+    return sentinel.master_for(master_name, db=0, password=password)
 
 
 def create_redis_client():

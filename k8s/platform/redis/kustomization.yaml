@@ -7,6 +7,6 @@ resources:
   - configmap.yaml
   - replication.yaml
   - sentinel.yaml
+  - cache.yaml
   - network-policy.yaml
   - servicemonitor.yaml
-

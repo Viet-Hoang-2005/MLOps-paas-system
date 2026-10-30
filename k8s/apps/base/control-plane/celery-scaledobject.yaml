@@ -41,12 +41,12 @@ spec:
   triggers:
     - type: redis-sentinel
       metadata:
-        hosts: redis-ha-sentinel-0.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-1.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-2.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
-        addresses: redis-ha-sentinel-0.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-1.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-ha-sentinel-2.redis-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
-        sentinelMaster: redis-master
+        hosts: redis-queue-ha-sentinel-0.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-1.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-2.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
+        addresses: redis-queue-ha-sentinel-0.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-1.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-2.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
+        sentinelMaster: redis-queue-master
         listName: celery
         listLength: "10"
-        databaseIndex: "3"
+        databaseIndex: "0"
       authenticationRef:
         name: mlops-paas-celery-redis-auth
     - type: cpu

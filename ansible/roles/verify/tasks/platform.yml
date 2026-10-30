@@ -177,7 +177,7 @@
     fail_msg: CloudNativePG does not have two ready instances.
   tags: [verify, verify-platform, verify-data]
 
-- name: Read the Redis HA StatefulSets
+- name: Read the Redis Platform StatefulSets
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: StatefulSet
@@ -185,19 +185,22 @@
     namespace: mlops-paas-data
     kubeconfig: "{{ k3s_remote_kubeconfig }}"
   loop:
-    - redis-ha
-    - redis-ha-sentinel
+    - redis-queue-ha
+    - redis-queue-ha-sentinel
+    - redis-cache
   register: verified_redis_statefulsets
   tags: [verify, verify-platform, verify-data]
 
-- name: Require two Redis and three Sentinel replicas Ready
+- name: Require two Redis Queue, three Sentinel replicas, and one Redis Cache Ready
   ansible.builtin.assert:
     that:
       - verified_redis_statefulsets.results[0].resources | length == 1
       - verified_redis_statefulsets.results[1].resources | length == 1
+      - verified_redis_statefulsets.results[2].resources | length == 1
       - verified_redis_statefulsets.results[0].resources[0].status.readyReplicas | default(0) | int == 2
       - verified_redis_statefulsets.results[1].resources[0].status.readyReplicas | default(0) | int == 3
-    fail_msg: Redis HA must have two Redis and three Sentinel replicas Ready.
+      - verified_redis_statefulsets.results[2].resources[0].status.readyReplicas | default(0) | int == 1
+    fail_msg: Redis Platform must have two Queue, three Sentinel, and one Cache replicas Ready.
   tags: [verify, verify-platform, verify-data]
 
 - name: Read Redis and Sentinel Pod placement
@@ -210,8 +213,8 @@
       - "role={{ item.role }}"
     kubeconfig: "{{ k3s_remote_kubeconfig }}"
   loop:
-    - {app: redis-ha, role: replication}
-    - {app: redis-ha-sentinel, role: sentinel}
+    - {app: redis-queue-ha, role: replication}
+    - {app: redis-queue-ha-sentinel, role: sentinel}
   register: verified_redis_pods
   tags: [verify, verify-platform, verify-data]
 

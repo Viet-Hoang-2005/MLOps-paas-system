@@ -1,10 +1,66 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: redis-ha-monitor
+  name: redis-queue-ha-monitor
   labels:
     app.kubernetes.io/name: redis
-    app.kubernetes.io/instance: redis-ha
+    app.kubernetes.io/instance: redis-queue-ha
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: queue
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
+    mlops-paas.io/domain: queue
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - mlops-paas-data
+  selector:
+    matchLabels:
+      app: redis-queue-ha
+      app.kubernetes.io/component: metrics
+      redis_setup_type: replication
+      role: replication
+  endpoints:
+    - port: redis-exporter
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-queue-sentinel-monitor
+  labels:
+    app.kubernetes.io/name: redis-sentinel
+    app.kubernetes.io/instance: redis-queue-ha
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: sentinel
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
+    mlops-paas.io/domain: queue
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - mlops-paas-data
+  selector:
+    matchLabels:
+      app: redis-queue-ha-sentinel
+      app.kubernetes.io/component: metrics
+      redis_setup_type: sentinel
+      role: sentinel
+  endpoints:
+    - port: sentinel-exp
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-cache-monitor
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: redis-cache
     app.kubernetes.io/part-of: mlops-paas
     app.kubernetes.io/component: cache
     app.kubernetes.io/managed-by: kustomize
@@ -17,40 +73,10 @@ spec:
       - mlops-paas-data
   selector:
     matchLabels:
-      app: redis-ha
+      app: redis-cache
       app.kubernetes.io/component: metrics
-      redis_setup_type: replication
-      role: replication
+      redis_setup_type: standalone
   endpoints:
     - port: redis-exporter
       interval: 30s
       scrapeTimeout: 10s
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: redis-sentinel-monitor
-  labels:
-    app.kubernetes.io/name: redis-sentinel
-    app.kubernetes.io/instance: redis-ha
-    app.kubernetes.io/part-of: mlops-paas
-    app.kubernetes.io/component: sentinel
-    app.kubernetes.io/managed-by: kustomize
-    mlops-paas.io/plane: platform
-    mlops-paas.io/domain: cache
-    release: monitoring
-spec:
-  namespaceSelector:
-    matchNames:
-      - mlops-paas-data
-  selector:
-    matchLabels:
-      app: redis-ha-sentinel
-      app.kubernetes.io/component: metrics
-      redis_setup_type: sentinel
-      role: sentinel
-  endpoints:
-    - port: sentinel-exp
-      interval: 30s
-      scrapeTimeout: 10s
-

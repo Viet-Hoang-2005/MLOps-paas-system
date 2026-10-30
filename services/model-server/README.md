@@ -171,7 +171,7 @@ export DB_HOST_RO=localhost
 export DB_PORT=5432
 export DB_NAME=mlops_paas_db
 export DB_SCHEMA=control_plane
-export REDIS_URL=redis://localhost:6379/1
+export REDIS_URL=redis://localhost:6379/0
 export REDIS_CONNECTION_MODE=direct
 export REDPANDA_BROKERS=localhost:19092
 export KAFKA_TOPIC=mlops_paas_production_data
@@ -192,7 +192,7 @@ uvicorn src.main:app --host 0.0.0.0 --port 5002 --reload
 | `JWKS_URL` | `http://control-plane:8000/api/auth/.well-known/jwks.json` | URL endpoint lấy public key JWKS để xác thực chữ ký JWT RS256. |
 | `REDPANDA_BROKERS` | `redpanda:9092` | Danh sách địa chỉ broker của Redpanda / Kafka. |
 | `KAFKA_TOPIC` | `mlops_paas_production_data` | Topic tiếp nhận các sự kiện suy luận thành công. |
-| `REDIS_URL` | `redis://redis:6379/1` | Địa chỉ kết nối Redis đơn lẻ (cho môi trường local). |
+| `REDIS_URL` | `redis://redis-cache:6379/0` | Địa chỉ kết nối Redis đơn lẻ (cho môi trường local). |
 | `REDIS_CONNECTION_MODE` | `direct` | Chế độ kết nối Redis (`direct` hoặc `sentinel`). |
 | `REDIS_SENTINEL_HOSTS` | `""` | Danh sách các node Sentinel (dùng cho production K3s HA). |
 | `REDIS_SENTINEL_MASTER_NAME`| `""` | Tên cụm master trong Redis Sentinel. |

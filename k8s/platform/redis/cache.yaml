@@ -1,0 +1,56 @@
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: Redis
+metadata:
+  name: redis-cache
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: redis-cache
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
+    mlops-paas.io/domain: cache
+spec:
+  kubernetesConfig:
+    image: quay.io/opstree/redis:v7.4.8
+    imagePullPolicy: IfNotPresent
+    redisSecret:
+      name: redis-ha-secret
+      key: REDIS_PASSWORD
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+  redisConfig:
+    maxMemoryPercentOfLimit: 75
+    additionalRedisConfig: redis-cache-config
+  storage:
+    keepAfterDelete: true
+    volumeClaimTemplate:
+      spec:
+        storageClassName: ebs-gp3
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 2Gi
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
+  nodeSelector:
+    workload-type: worker
+  redisExporter:
+    enabled: true
+    image: quay.io/opstree/redis-exporter:v1.44.0
+    resources:
+      requests:
+        cpu: 15m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+

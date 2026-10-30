@@ -152,7 +152,7 @@ docker run --rm \
   -e DOWNLOAD_URL="https://your-s3-presigned-get-url" \
   -e WEBHOOK_URL="http://control-plane:8000/internal/webhooks/builds/019488a0-0000-7000-8000-000000000001/" \
   -e CONTROL_PLANE_WEBHOOK_SECRET="local-webhook-secret" \
-  -e REDIS_URL="redis://redis:6379/1" \
+  -e REDIS_URL="redis://redis-cache:6379/0" \
   -v /var/run/docker.sock:/var/run/docker.sock \
   mlops-paas-model-packager:latest
 ```

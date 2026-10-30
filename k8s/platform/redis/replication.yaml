@@ -1,17 +1,17 @@
 apiVersion: redis.redis.opstreelabs.in/v1beta2
 kind: RedisReplication
 metadata:
-  name: redis-ha
+  name: redis-queue-ha
   annotations:
     argocd.argoproj.io/sync-wave: "0"
   labels:
     app.kubernetes.io/name: redis
-    app.kubernetes.io/instance: redis-ha
+    app.kubernetes.io/instance: redis-queue-ha
     app.kubernetes.io/part-of: mlops-paas
-    app.kubernetes.io/component: cache
+    app.kubernetes.io/component: queue
     app.kubernetes.io/managed-by: kustomize
     mlops-paas.io/plane: platform
-    mlops-paas.io/domain: cache
+    mlops-paas.io/domain: queue
 spec:
   clusterSize: 2
   kubernetesConfig:
@@ -29,7 +29,7 @@ spec:
         memory: 512Mi
   redisConfig:
     maxMemoryPercentOfLimit: 50
-    additionalRedisConfig: redis-ha-config
+    additionalRedisConfig: redis-queue-config
   storage:
     keepAfterDelete: true
     volumeClaimTemplate:
@@ -49,7 +49,7 @@ spec:
       requiredDuringSchedulingIgnoredDuringExecution:
         - labelSelector:
             matchLabels:
-              app: redis-ha
+              app: redis-queue-ha
               role: replication
           topologyKey: kubernetes.io/hostname
   pdb:
