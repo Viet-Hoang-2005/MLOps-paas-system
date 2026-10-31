@@ -1,0 +1,56 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mlops-paas-model-server-rules
+  labels:
+    app.kubernetes.io/name: mlops-paas-model-server
+    app.kubernetes.io/instance: mlops-paas-model-server
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: serving
+    release: monitoring
+spec:
+  groups:
+    - name: paas.serving
+      rules:
+        # Cảnh báo khi p95 latency của đường predict qua gateway vượt ngưỡng 500ms
+        - alert: HighServiceLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(paas_prediction_latency_seconds_bucket[5m])) by (le)
+            ) > 0.5
+          for: 3m
+          labels:
+            severity: warning
+            team: mlops
+          annotations:
+            summary: "Model gateway p95 latency > 500ms"
+            description: "Current p95 latency is {{ $value | humanizeDuration }}."
+
+        # Cảnh báo khi tỷ lệ lỗi predict qua gateway vượt 1%
+        - alert: HighHTTPErrorRate
+          expr: |
+            sum(rate(paas_predictions_total{status=~"error.*"}[5m])) /
+            clamp_min(sum(rate(paas_predictions_total[5m])), 0.001) > 0.01
+          for: 2m
+          labels:
+            severity: critical
+            team: mlops
+          annotations:
+            summary: "Model gateway error rate > 1%"
+            description: "Current error rate is {{ $value | humanizePercentage }}."
+
+        # Cảnh báo khi lượng lỗi suy luận tăng cao theo từng Model & Version
+        - alert: HighInferenceErrors
+          expr: |
+            sum(rate(paas_predictions_total{status=~"error.*"}[5m])) by (project_id, model_version_id) > 5
+          for: 2m
+          labels:
+            severity: warning
+            team: mlops
+          annotations:
+            summary: "High Model Inference Errors"
+            description: "Model project {{ $labels.project_id }} (version {{ $labels.model_version_id }}) is generating {{ $value }} errors/sec."
+

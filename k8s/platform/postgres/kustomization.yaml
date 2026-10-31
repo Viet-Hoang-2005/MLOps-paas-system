@@ -5,6 +5,6 @@ namespace: mlops-paas-data
 resources:
   - cluster.yaml
   - pod-monitor.yaml
+  - prometheus-rule.yaml
   - external-secrets.yaml
   - network-policy.yaml
-

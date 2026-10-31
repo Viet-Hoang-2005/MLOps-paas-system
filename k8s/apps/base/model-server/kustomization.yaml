@@ -8,4 +8,5 @@ resources:
   - configmap.yaml
   - network-policy.yaml
   - servicemonitor.yaml
+  - prometheus-rule.yaml
   - pdb.yaml

@@ -6,7 +6,6 @@ import pytest
 
 from ..utils import (
     STANDARD_APP_LABELS,
-    STANDARD_MLOPS_LABELS,
     ValidationContext,
     find_resource,
 )
@@ -106,9 +105,13 @@ def validate_platform_standard_labels(context: ValidationContext) -> None:
             if missing_app:
                 name = (resource.get("metadata") or {}).get("name")
                 errors.append(f"{path} resource {name} missing app labels: {missing_app}")
-            missing_mlops = STANDARD_MLOPS_LABELS - set(labels.keys())
-            if missing_mlops:
+            if labels.get("mlops-paas.io/plane") != "platform":
                 name = (resource.get("metadata") or {}).get("name")
-                errors.append(f"{path} resource {name} missing mlops labels: {missing_mlops}")
+                errors.append(f"{path} resource {name} mlops-paas.io/plane must be 'platform'")
+            if "mlops-paas.io/domain" in labels:
+                name = (resource.get("metadata") or {}).get("name")
+                errors.append(
+                    f"{path} resource {name} must not have 'mlops-paas.io/domain' label (reserved for workloads)"
+                )
     assert not errors, "\n".join(errors)
 

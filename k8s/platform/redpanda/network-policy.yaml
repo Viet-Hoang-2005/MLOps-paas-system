@@ -9,7 +9,6 @@ metadata:
     app.kubernetes.io/component: message-broker
     app.kubernetes.io/managed-by: kustomize
     mlops-paas.io/plane: platform
-    mlops-paas.io/domain: messaging
 spec:
   podSelector:
     matchLabels:

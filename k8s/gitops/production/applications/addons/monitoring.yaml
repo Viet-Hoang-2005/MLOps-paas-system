@@ -50,6 +50,9 @@ spec:
             podMonitorSelectorNilUsesHelmValues: false
             serviceMonitorSelectorNilUsesHelmValues: false
             ruleSelectorNilUsesHelmValues: false
+            ruleNamespaceSelector: {}
+            podMonitorNamespaceSelector: {}
+            serviceMonitorNamespaceSelector: {}
         grafana:
           resources:
             requests:

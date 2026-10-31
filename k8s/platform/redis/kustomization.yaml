@@ -10,3 +10,4 @@ resources:
   - cache.yaml
   - network-policy.yaml
   - servicemonitor.yaml
+  - prometheus-rule.yaml

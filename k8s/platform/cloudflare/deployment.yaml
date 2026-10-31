@@ -14,7 +14,6 @@ metadata:
     app.kubernetes.io/component: tunnel
     app.kubernetes.io/managed-by: kustomize
     mlops-paas.io/plane: platform
-    mlops-paas.io/domain: networking
 spec:
   replicas: 1
   selector:
@@ -29,7 +28,6 @@ spec:
         app.kubernetes.io/component: tunnel
         app.kubernetes.io/managed-by: kustomize
         mlops-paas.io/plane: platform
-        mlops-paas.io/domain: networking
     spec:
       nodeSelector:
         workload-type: worker

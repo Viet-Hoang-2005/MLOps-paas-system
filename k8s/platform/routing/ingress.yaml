@@ -3,6 +3,13 @@ kind: Middleware
 metadata:
   name: model-gateway-rewrite
   namespace: mlops-paas-routing
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: model-gateway-rewrite
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
 spec:
   replacePathRegex:
     regex: "^/[^/]+/models/[^/]+/([^/]+)/(predict|health)$"
@@ -21,7 +28,6 @@ metadata:
     app.kubernetes.io/component: ingress
     app.kubernetes.io/managed-by: kustomize
     mlops-paas.io/plane: platform
-    mlops-paas.io/domain: networking
 spec:
   entryPoints:
     - web
@@ -32,6 +38,24 @@ spec:
         - name: mlops-paas-control-plane
           namespace: mlops-paas-core
           port: 8000
+---
+# Cấu hình IngressRoute cho Model Server Gateway (Inference & Health)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: model-server-ingressroute
+  namespace: mlops-paas-routing
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: model-server-ingressroute
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
+spec:
+  entryPoints:
+    - web
+  routes:
     - match: Host(`mlops-nids-nt114.id.vn`) && PathRegexp(`^/[A-Za-z0-9-]+/models/[0-9A-Fa-f-]{36}/[0-9A-Fa-f-]{36}/(predict|health)$`)
       kind: Rule
       middlewares:
@@ -41,11 +65,19 @@ spec:
           namespace: mlops-paas-core
           port: 5000
 ---
+# Endpoint kiểm tra sức khỏe nội bộ của Traefik
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: traefik-ping-expose
   namespace: mlops-paas-routing
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-ping-expose
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
 spec:
   entryPoints:
     - web

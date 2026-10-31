@@ -6,4 +6,4 @@ resources:
   - scaledobject.yaml
   - configmap.yaml
   - network-policy.yaml
-
+  - prometheus-rule.yaml

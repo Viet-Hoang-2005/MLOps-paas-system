@@ -1,0 +1,39 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mlops-paas-postgres-rules
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/instance: postgresql
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
+    release: monitoring
+spec:
+  groups:
+    - name: paas.database
+      rules:
+        # Cảnh báo khi PostgreSQL Pod down
+        - alert: PostgresDown
+          expr: cnpg_pg_up == 0
+          for: 1m
+          labels:
+            severity: critical
+            team: infrastructure
+          annotations:
+            summary: "PostgreSQL is not responding!"
+            description: "A CloudNativePG instance is down. Check the database cluster immediately!"
+
+        # Cảnh báo khi số connections gần đạt max_connections
+        - alert: PostgresHighConnections
+          expr: |
+            sum(cnpg_pg_stat_database_numbackends) by (datname) > 80
+          for: 5m
+          labels:
+            severity: warning
+            team: infrastructure
+          annotations:
+            summary: "PostgreSQL high connections"
+            description: "Database {{ $labels.datname }} has {{ $value }} active connections."
+

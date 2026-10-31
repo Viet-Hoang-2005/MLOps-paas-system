@@ -1,0 +1,28 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mlops-paas-web-rules
+  labels:
+    app.kubernetes.io/name: mlops-paas-web
+    app.kubernetes.io/instance: mlops-paas-web
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: frontend
+    release: monitoring
+spec:
+  groups:
+    - name: paas.web
+      rules:
+        # Cảnh báo khi Frontend Web pod không còn chạy
+        - alert: WebPodsUnavailable
+          expr: kube_deployment_status_replicas_available{namespace="mlops-paas-core", deployment="mlops-paas-web"} < 1
+          for: 1m
+          labels:
+            severity: critical
+            team: mlops
+          annotations:
+            summary: "Frontend Web Pods unavailable"
+            description: "The mlops-paas-web deployment has 0 available replicas!"
+
