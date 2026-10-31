@@ -326,6 +326,13 @@ spec:
       nodeSelector: {workload-type: worker}
       container:
         image: curlimages/curl:8.8.0
+        resources:
+          requests:
+            cpu: 20m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
         args:
           - -sS
           - -X

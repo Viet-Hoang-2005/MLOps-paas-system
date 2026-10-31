@@ -37,6 +37,13 @@ persistence:
 registry:
   relativeurls: true
   nodeSelector: { workload-type: worker }
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 trivy:
   enabled: false
@@ -46,15 +53,79 @@ notary:
 
 portal:
   nodeSelector: { workload-type: worker }
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
 core:
   nodeSelector: { workload-type: worker }
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 384Mi
+
 jobservice:
   nodeSelector: { workload-type: worker }
+  resources:
+    requests:
+      cpu: 30m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
 database:
   nodeSelector: { workload-type: worker }
+  internal:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 512Mi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
 redis:
   nodeSelector: { workload-type: worker }
+  internal:
+    resources:
+      requests:
+        cpu: 30m
+        memory: 64Mi
+      limits:
+        cpu: 150m
+        memory: 128Mi
+  resources:
+    requests:
+      cpu: 30m
+      memory: 64Mi
+    limits:
+      cpu: 150m
+      memory: 128Mi
+
 exporter:
   nodeSelector: { workload-type: worker }
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
 metrics:
   nodeSelector: { workload-type: worker }

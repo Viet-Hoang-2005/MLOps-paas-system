@@ -64,6 +64,13 @@ spec:
           env:
             - name: HOME
               value: /tmp
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
       containers:
         - name: consumer
           securityContext:

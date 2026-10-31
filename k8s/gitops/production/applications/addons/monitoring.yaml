@@ -81,6 +81,13 @@ spec:
           alertmanagerSpec:
             nodeSelector:
               workload-type: worker
+            resources:
+              requests:
+                cpu: 25m
+                memory: 64Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
             storage:
               volumeClaimTemplate:
                 spec:
@@ -91,6 +98,13 @@ spec:
         prometheusOperator:
           nodeSelector:
             workload-type: worker
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
           admissionWebhooks:
             enabled: false
           tls:
@@ -100,6 +114,13 @@ spec:
             - pods=[mlops-paas.io/deployment-id,mlops-paas.io/tenant-id,mlops-paas.io/project-id,mlops-paas.io/model-version-id]
           nodeSelector:
             workload-type: worker
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

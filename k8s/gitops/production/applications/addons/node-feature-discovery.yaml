@@ -30,6 +30,13 @@ spec:
         master:
           nodeSelector:
             workload-type: worker
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
         worker:
           nodeSelector:
             workload-type: training
@@ -38,9 +45,23 @@ spec:
               operator: Equal
               value: "true"
               effect: NoSchedule
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
         gc:
           nodeSelector:
             workload-type: worker
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: gpu-operator

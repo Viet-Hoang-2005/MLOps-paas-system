@@ -292,6 +292,13 @@ spec:
     - name: report-status
       container:
         image: curlimages/curl:latest
+        resources:
+          requests:
+            cpu: 20m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
         args:
           - -sS
           - -X
@@ -329,6 +336,13 @@ spec:
     - name: cancel-training
       container:
         image: bitnami/kubectl:1.30
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
         command: [kubectl]
         args:
           - delete
@@ -341,6 +355,13 @@ spec:
     - name: report-cancellation
       container:
         image: curlimages/curl:8.7.1
+        resources:
+          requests:
+            cpu: 20m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
         command: [curl]
         args:
           - --fail-with-body

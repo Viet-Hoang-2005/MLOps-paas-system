@@ -98,6 +98,13 @@ spec:
           volumeMounts:
             - name: staticfiles
               mountPath: /app/staticfiles
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
       containers:
         - name: control-plane
           securityContext:

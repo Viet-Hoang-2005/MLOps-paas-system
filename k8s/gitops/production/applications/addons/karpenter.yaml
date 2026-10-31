@@ -30,6 +30,13 @@ spec:
         replicas: 1
         nodeSelector:
           workload-type: worker
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
         settings:
           clusterName: mlops-paas-cluster
           clusterEndpoint: https://k3s-api.internal.mlops-nids-nt114.id.vn:6443
