@@ -56,35 +56,40 @@ Hệ thống được chia thành 5 mặt phẳng độc lập tương ứng v�
 
 ```mermaid
 flowchart TD
-    W_M50["Wave -50: Cluster Foundation"]
+    W_M50["Wave -50: Cluster Foundation (Namespaces)"]
     W_M40["Wave -40: Core Operators & Drivers"]
-    W_M10["Wave -10: Data Stores & Backends"]
-    W_M1["Wave -1: ExternalSecrets & ConfigMaps"]
-    W_0["Wave 0: Supporting Controllers & DB Migration Job"]
-    W_1["Wave 1: Dependent Core Workloads"]
-    W_10["Wave 10: Execution Pipelines (Argo)"]
-    W_15["Wave 15: Workload Applications Boundary"]
-    W_20["Wave 20: Routing & Public Ingress"]
+    W_M30["Wave -30: StorageClass & SecretStore"]
+    W_M28["Wave -28: Cloudflare Zero Trust Tunnel"]
+    W_M25["Wave -25..-23: Karpenter & GPU Operator"]
+    W_M15["Wave -15..-14: Logging (Loki & Alloy)"]
+    W_M10["Wave -10: Data Stores (Postgres, Redis, Redpanda)"]
+    W_0["Wave 0: Harbor Registry & Observability"]
+    W_10["Wave 10: Execution Pipelines (Argo Events & Workflows)"]
+    W_12["Wave 12: Core Backend (Control Plane & DB Migration)"]
+    W_15["Wave 15: Edge Workloads (Consumer, Model Server, Web)"]
+    W_20["Wave 20: Traefik Public Routing"]
 
-    W_M50 -->|Namespaces, StorageClass, SecretStore| W_M40
-    W_M40 -->|Argo CD, EBS CSI, CNPG, Redis Operator, Kyverno, ESO| W_M10
-    W_M10 -->|PostgreSQL HA, Redis HA, Redpanda| W_M1
-    W_M1  -->|Đồng bộ Secret từ AWS & nạp ConfigMap| W_0
-    W_0   -->|Chạy Migration Job, PDB, Services, NetworkPolicies| W_1
-    W_1   -->|Deploy Control Plane, Celery Workers, HPA, ScaledObject| W_10
-    W_10  -->|KEDA, Loki, Monitoring, Argo Workflows & Events| W_15
-    W_15  -->|Khởi chạy Consumer, Model Server, Web Frontend| W_20
-    W_20  -->|Mở IngressRoute, Cloudflare Tunnel ra Internet| Ready["Toàn bộ Hệ thống Hoạt động"]
+    W_M50 --> W_M40 --> W_M30 --> W_M28 --> W_M25 --> W_M15 --> W_M10 --> W_0 --> W_10 --> W_12 --> W_15 --> W_20 --> Ready["Toàn bộ Hệ thống Hoạt động"]
 ```
 
-- **Wave -50:** `mlops-prod-cluster-namespaces`, `mlops-prod-cluster-storage` (tạo toàn bộ namespace và StorageClass trước).
-- **Wave -40:** Cài đặt các operator hạ tầng và Self-Managed Argo CD (`mlops-prod-addon-argocd`, `redis-operator`, `cloudnative-pg`, `external-secrets`, `aws-ebs-csi`).
+- **Wave -50:** `mlops-prod-cluster-namespaces` (tạo toàn bộ 18 namespace nền tảng).
+- **Wave -40:** Cài đặt các operator hạ tầng và Self-Managed Argo CD (`mlops-prod-addon-argocd`, `redis-operator`, `cloudnative-pg`, `external-secrets`, `aws-ebs-csi`, `kyverno`, `monitoring`, `argo-workflows`, `argo-events`).
+- **Wave -30:** `mlops-prod-cluster-storage` (StorageClass `ebs-gp3`) và `mlops-prod-cluster-secret-store` (ClusterSecretStore AWS SM).
+- **Wave -29:** `mlops-prod-cluster-image-verification` (Kyverno ClusterPolicy kiểm tra ảnh ký điện tử).
+- **Wave -28:** `mlops-prod-platform-cloudflare` (Cloudflare Zero Trust Tunnel kết nối sớm để mở remote dashboard quản trị Argo CD / Grafana).
+- **Wave -25 đến -23:** Chuỗi triển khai Karpenter CRDs (`-25`) -> Controller & NFD (`-24`) -> NodePools & GPU Operator (`-23`).
+- **Wave -15 đến -14:** Hệ thống logging tập trung (`loki: -15`, `alloy: -14`) sẵn sàng hứng log ngay từ khi các CSDL khởi chạy.
 - **Wave -10:** Khởi tạo các cụm lưu trữ dữ liệu nền tảng (`mlops-prod-platform-postgres`, `mlops-prod-platform-redis`, `mlops-prod-platform-redpanda`).
-- **Wave -1:** Đồng bộ các `ExternalSecret` tương ứng tại từng workload từ AWS Secrets Manager và nạp các `ConfigMap`.
-- **Wave 0:** Khởi tạo tài nguyên cơ sở ứng dụng, Services, PodDisruptionBudgets, NetworkPolicies và thực thi **Database Migration Job** (`mlops-paas-control-plane-migration` với `argocd.argoproj.io/hook: Sync`).
-- **Wave 1:** Triển khai các Pod nghiệp vụ phụ thuộc vào schema Database đã sẵn sàng (`control-plane`, `celery-worker`, `celery-beat`, `celery-health-worker`, `hpa`, `celery-worker-scaler`).
-- **Wave 10 - 15:** Kích hoạt pipeline MLOps (`execution-argo`), `consumer`, `model-server`, `web`.
-- **Wave 20:** Kích hoạt routing ngoài (`routing`, `cloudflare`), mở cổng an toàn cho người dùng truy cập.
+- **Wave 0:** `mlops-prod-platform-harbor` (Private Container Registry) & `mlops-prod-platform-observability` (PrometheusRule cấp cụm).
+- **Wave 10:** Kích hoạt pipeline MLOps Execution Engine (`mlops-prod-execution-argo`: EventBus, Sensor, Workflows).
+- **Wave 12:** Khởi chạy Core Backend (`mlops-prod-workload-control-plane`), thực thi Job Database Migration hoàn tất schema CSDL PostgreSQL.
+- **Wave 15:** Khởi chạy an toàn các Workload phụ thuộc (`consumer`, `model-server`, `web`) mà không lo lỗi race condition thiếu bảng dữ liệu.
+- **Wave 20:** Kích hoạt routing ngoài (`mlops-prod-platform-routing`), mở cổng Traefik Ingress an toàn ra Internet.
+
+> [!NOTE]
+> **Điều phối 2 cấp độ Sync Wave (Application-level & Resource-level):**
+> 1. **Application-level Wave:** Điều phối thứ tự triển khai giữa 35 ứng dụng trong mô hình App-of-apps từ `-50` đến `20`.
+> 2. **Resource-level Wave:** Bên trong mỗi Microservice, luồng đồng bộ 3 bước (`ExternalSecret: -1` -> `Migration Job / ConfigMap: 0` -> `Pod Deployments / Autoscalers: 1`) được điều phối chính xác để đảm bảo secret và cấu hình luôn có sẵn trước khi Pod khởi động.
 
 > [!NOTE]
 > **Nguyên tắc "Pure Kubernetes Base via Kustomize Patches":**

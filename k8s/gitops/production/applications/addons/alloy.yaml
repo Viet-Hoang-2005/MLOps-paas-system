@@ -4,7 +4,7 @@ metadata:
   name: mlops-prod-addon-alloy
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "-14"
   labels:
     app.kubernetes.io/name: alloy
     app.kubernetes.io/part-of: mlops-paas
