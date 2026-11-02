@@ -2,7 +2,7 @@
 
 from common.env import env
 
-from .base import *  # noqa: F403
+from .base import *
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", required=True)
 DEBUG = False

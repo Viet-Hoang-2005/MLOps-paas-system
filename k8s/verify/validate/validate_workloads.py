@@ -22,13 +22,13 @@ def validate_workload_layout_and_images(context: ValidationContext) -> None:
     for app_name, (service, logical_image) in WORKLOAD_APPLICATIONS.items():
         application = context.application(app_name)
         source = ((application.get("spec") or {}).get("source") or {}).get("path")
-        expected = f"k8s/apps/overlays/production/{service}"
+        expected = f"k8s/workloads/overlays/production/{service}"
         if source != expected:
             errors.append(
                 f"{app_name} source must be {expected}, found {source or 'missing'}"
             )
         images: list[str] = []
-        for resource in context.render(f"k8s/apps/base/{service}"):
+        for resource in context.render(f"k8s/workloads/base/{service}"):
             pod_spec = ((resource.get("spec") or {}).get("template") or {}).get(
                 "spec"
             ) or {}
@@ -53,7 +53,7 @@ def validate_workload_layout_and_images(context: ValidationContext) -> None:
 @pytest.mark.validate
 def validate_celery_process_isolation(repo_root: Path) -> None:
     """Verify that Celery worker, beat, and health-worker remain strictly isolated Deployments."""
-    path = repo_root / "k8s/apps/base/control-plane/celery-deployment.yaml"
+    path = repo_root / "k8s/workloads/base/control-plane/celery-deployment.yaml"
     resources = list(yaml.safe_load_all(path.read_text(encoding="utf-8")))
 
     # Assert exactly 3 deployments
@@ -76,10 +76,10 @@ def validate_celery_process_isolation(repo_root: Path) -> None:
 def validate_workload_standard_labels(context: ValidationContext) -> None:
     """Verify standard labels across workload bases and overlays."""
     paths = [
-        "k8s/apps/base/control-plane",
-        "k8s/apps/base/consumer",
-        "k8s/apps/base/model-server",
-        "k8s/apps/base/web",
+        "k8s/workloads/base/control-plane",
+        "k8s/workloads/base/consumer",
+        "k8s/workloads/base/model-server",
+        "k8s/workloads/base/web",
     ]
     errors: list[str] = []
     for path in paths:

@@ -25,7 +25,7 @@ KEYLESS_SIGNER_ISSUER = "https://token.actions.githubusercontent.com"
 LEGACY_K8S_PATHS = (
     "k8s/.kube",
     "k8s/harbor",
-    "k8s/workloads",
+    "k8s/apps",
     "k8s/execution",
     "k8s/deferred",
     "k8s/infra",
@@ -88,12 +88,12 @@ LEGACY_SHARED_SECRET_TARGETS = {
     "harbor-registry-secret",
 }
 EXTERNAL_SECRET_OWNERS = {
-    "k8s/apps/overlays/production/control-plane": {
+    "k8s/workloads/overlays/production/control-plane": {
         ("mlops-paas-core", "mlops-paas-control-plane-secret"),
         ("mlops-paas-core", "mlops-paas-celery-worker-secret"),
     },
-    "k8s/apps/overlays/production/consumer": {("mlops-paas-core", "mlops-paas-consumer-secret")},
-    "k8s/apps/overlays/production/model-server": {
+    "k8s/workloads/overlays/production/consumer": {("mlops-paas-core", "mlops-paas-consumer-secret")},
+    "k8s/workloads/overlays/production/model-server": {
         ("mlops-paas-core", "mlops-paas-model-server-secret")
     },
     "k8s/platform/postgres": {("mlops-paas-data", "postgresql-bootstrap-secret")},

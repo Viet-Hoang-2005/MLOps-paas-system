@@ -46,7 +46,7 @@ Hệ thống được chia thành 5 mặt phẳng độc lập tương ứng v�
 | **Add-ons Plane** | Charts upstream & `k8s/addons/` | `mlops-addons` | Các Controller/CRD cơ sở: Self-Managed Argo CD, AWS EBS CSI, External Secrets Operator (ESO), CloudNative-PG, Redis Operator, KEDA, Prometheus Stack, Loki, Alloy, Kyverno, Kubeflow Training, Headlamp Dashboard. |
 | **Platform Plane** | `k8s/platform` | `mlops-platform` | Các dịch vụ dữ liệu & chia sẻ dùng chung: CSDL PostgreSQL HA (CloudNative-PG), Redis HA + Sentinel, Redpanda Kafka, Harbor Registry, Traefik Routing & Cloudflare Tunnel. |
 | **Execution Plane** | `k8s/argo` | `mlops-execution` | Động cơ pipeline MLOps: Argo Events (EventBus, EventSource, Sensor), NetworkPolicies cô lập execution, và các mẫu Argo WorkflowTemplates (Build, Deploy, Delete, Drift, Training, Operations). |
-| **Workloads Plane** | `k8s/apps/overlays/production` | `mlops-workloads` | Các microservices nghiệp vụ của tenant và hệ thống: Control Plane API, Celery Worker / Beat / Health-Worker, Model Server Gateway, Redpanda Consumer, Web Frontend. |
+| **Workloads Plane** | `k8s/workloads/overlays/production` | `mlops-workloads` | Các microservices nghiệp vụ của tenant và hệ thống: Control Plane API, Celery Worker / Beat / Health-Worker, Model Server Gateway, Redpanda Consumer, Web Frontend. |
 
 ---
 
@@ -93,7 +93,7 @@ flowchart TD
 
 > [!NOTE]
 > **Nguyên tắc "Pure Kubernetes Base via Kustomize Patches":**
-> Toàn bộ các manifest trong `k8s/apps/base/` được giữ sạch 100%, không chứa các annotation đặc thù của Argo CD (`argocd.argoproj.io/sync-wave`). Toàn bộ luồng điều phối Sync Wave 3 bước (`ExternalSecret: -1` -> `Migration Job: 0` -> `Workloads: 1`) được inject thông qua cơ chế `patches` tại `k8s/apps/overlays/production/control-plane/kustomization.yaml`.
+> Toàn bộ các manifest trong `k8s/workloads/base/` được giữ sạch 100%, không chứa các annotation đặc thù của Argo CD (`argocd.argoproj.io/sync-wave`). Toàn bộ luồng điều phối Sync Wave 3 bước (`ExternalSecret: -1` -> `Migration Job: 0` -> `Workloads: 1`) được inject thông qua cơ chế `patches` tại `k8s/workloads/overlays/production/control-plane/kustomization.yaml`.
 
 > [!TIP]
 > **Mô hình Self-Managed Argo CD (GitOps Tự Quản lý):**
@@ -211,7 +211,7 @@ k8s/
 │       ├── deploy/                     # WorkflowTemplate triển khai model endpoint, RBAC, NetworkPolicy cho serving
 │       ├── training/                   # WorkflowTemplate huấn luyện PyTorchJob, ExternalSecret, NetworkPolicy cho training
 │       └── evidently/                  # WorkflowTemplate kiểm tra data/model drift, ExternalSecret, NetworkPolicy
-├── apps/                               # Mã nguồn Kubernetes của các Microservices ứng dụng (Workloads Plane)
+├── workloads/                               # Mã nguồn Kubernetes của các Microservices ứng dụng (Workloads Plane)
 │   ├── base/                           # Manifest cơ sở thuần túy (pure K8s, environment-agnostic)
 │   │   ├── control-plane/              # Deployment Django API, Celery Workers, Migration Job, Service, HPA, PDB
 │   │   ├── consumer/                   # Deployment Redpanda consumer tiếp nhận sự kiện suy luận
@@ -263,7 +263,7 @@ pytest k8s/verify/ -v
 
 
 # 4. Kiểm tra kết xuất cú pháp Kustomize cho các tầng:
-kubectl kustomize k8s/apps/overlays/production/control-plane >/dev/null
+kubectl kustomize k8s/workloads/overlays/production/control-plane >/dev/null
 kubectl kustomize k8s/argo >/dev/null
 ```
 
@@ -300,7 +300,7 @@ kubectl patch application <application-name> -n argocd --type merge -p '{"operat
 ### 3.3. Quy trình Triển khai / Nâng cấp (Deployment Workflow)
 
 1. **Cập nhật mã nguồn hoặc Image Tag:**
-   - Khi CI/CD xây dựng image mới, GitHub Actions sẽ cập nhật `newTag` trong file [k8s/apps/overlays/production/\<service\>/kustomization.yaml](file:///d:/AI%20Models/mlops-paas-system/k8s/apps/overlays/production/).
+   - Khi CI/CD xây dựng image mới, GitHub Actions sẽ cập nhật `newTag` trong file [k8s/workloads/overlays/production/\<service\>/kustomization.yaml](file:///d:/AI%20Models/mlops-paas-system/k8s/workloads/overlays/production/).
 2. **Tạo Pull Request và Merge vào `main`:**
    - Mọi thay đổi cấu hình hạ tầng đều bắt buộc thông qua PR và vượt qua toàn bộ test CI.
 3. **Argo CD tự động đối soát:**

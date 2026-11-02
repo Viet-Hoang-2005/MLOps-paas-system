@@ -17,13 +17,13 @@ spec:
     - name: Owner
       value: Application Engineering
     - name: Source
-      value: k8s/apps/overlays/production/control-plane
+      value: k8s/workloads/overlays/production/control-plane
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#workloads
   source:
     repoURL: https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
     targetRevision: main
-    path: k8s/apps/overlays/production/control-plane
+    path: k8s/workloads/overlays/production/control-plane
   destination:
     server: https://kubernetes.default.svc
     namespace: mlops-paas-core

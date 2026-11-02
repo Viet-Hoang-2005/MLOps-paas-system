@@ -21,10 +21,10 @@ def validate_root_kustomize_build(context: ValidationContext) -> None:
 def validate_production_workload_overlays(context: ValidationContext) -> None:
     """Verify that every workload production overlay builds successfully."""
     overlays = [
-        "k8s/apps/overlays/production/control-plane",
-        "k8s/apps/overlays/production/consumer",
-        "k8s/apps/overlays/production/model-server",
-        "k8s/apps/overlays/production/web",
+        "k8s/workloads/overlays/production/control-plane",
+        "k8s/workloads/overlays/production/consumer",
+        "k8s/workloads/overlays/production/model-server",
+        "k8s/workloads/overlays/production/web",
     ]
     for overlay_path in overlays:
         resources = context.render(overlay_path)

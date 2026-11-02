@@ -33,7 +33,7 @@ Never embed passwords, tokens, private keys, real environment values, or SSH cre
 ## Validation
 
 - **Local:** Validate Compose syntax with `docker compose config`.
-- **Production:** Validate Kustomize rendering with `kubectl kustomize k8s/apps/overlays/production`.
+- **Production:** Validate Kustomize rendering with `kubectl kustomize k8s/workloads/overlays/production`.
 - Verify health endpoints after container or pod restarts:
   ```bash
   curl http://localhost:8000/health/ready # Control Plane

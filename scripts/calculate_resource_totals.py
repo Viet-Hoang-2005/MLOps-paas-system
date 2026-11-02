@@ -2,7 +2,7 @@
 
 workloads = [
     # (Category, Name, Replicas, CPU Req (m), Mem Req (Mi), CPU Lim (m), Mem Lim (Mi), Notes)
-    # 1. CORE WORKLOADS (apps/base/)
+    # 1. CORE WORKLOADS (workloads/base/)
     ("Workloads", "control-plane-api", 2, 100, 256, 1000, 1024, "Django REST API"),
     ("Workloads", "celery-worker", 2, 100, 256, 1000, 1024, "Celery task workers"),
     ("Workloads", "celery-beat", 1, 50, 128, 250, 256, "Celery beat scheduler"),

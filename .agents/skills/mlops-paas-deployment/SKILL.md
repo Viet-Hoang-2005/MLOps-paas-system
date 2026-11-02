@@ -11,7 +11,7 @@ Never embed passwords, tokens, private keys, real environment values, or SSH cre
 
 ## Workflow
 
-1. Inspect root Kustomization (`k8s/kustomization.yaml`), child Applications (`k8s/gitops/production/applications/`), base manifests (`k8s/apps/base/`), and overlays (`k8s/apps/overlays/production/`).
+1. Inspect root Kustomization (`k8s/kustomization.yaml`), child Applications (`k8s/gitops/production/applications/`), base manifests (`k8s/workloads/base/`), and overlays (`k8s/workloads/overlays/production/`).
 2. Read [gitops-and-kustomize.md](references/gitops-and-kustomize.md) for sync waves, and [platform-services.md](references/platform-services.md) for operators.
 3. Determine resource ownership: GitOps (Argo CD), Ansible bootstrap, Terraform IaaS, or runtime workflow.
 4. Render manifests locally (`kubectl kustomize`) before committing or applying to the cluster.
@@ -35,6 +35,6 @@ pytest k8s/verify/validate/ -v
 ```
 To test rendering of specific overlays:
 ```bash
-kubectl kustomize k8s/apps/overlays/production
+kubectl kustomize k8s/workloads/overlays/production
 kubectl kustomize k8s/gitops/production/applications
 ```
