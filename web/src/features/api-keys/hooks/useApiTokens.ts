@@ -10,7 +10,7 @@ import type {
   CreatedAPIKeyResponse,
 } from "@/features/api-keys/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";

@@ -85,12 +85,12 @@ export function Loading({
         {(text || shouldShowPercent) && (
           <div className="flex items-center justify-between gap-4">
             {text && (
-              <span className="text-style-caption-strong text-color-foreground">
+              <span className="text-style-body-strong text-color-foreground">
                 {text}
               </span>
             )}
             {shouldShowPercent && (
-              <span className="text-style-caption text-color-muted-foreground tabular-nums">
+              <span className="text-style-body text-color-muted-foreground tabular-nums">
                 {percentText}
               </span>
             )}

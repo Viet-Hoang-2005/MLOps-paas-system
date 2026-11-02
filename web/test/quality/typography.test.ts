@@ -134,7 +134,7 @@ describe("Frontend Design Tokens - Typography", () => {
       if (!match) return;
       const value = match[2].trim();
       if (
-        file.endsWith("globals.css") &&
+        file.endsWith("index.css") &&
         /^var\(--(?:font-family|typography)-/.test(value)
       ) {
         return;

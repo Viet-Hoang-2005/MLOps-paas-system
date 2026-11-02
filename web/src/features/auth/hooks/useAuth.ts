@@ -14,7 +14,7 @@ import {
 import { broadcastLogout, initAuthBroadcast } from "@/features/auth/authSync";
 import type { AuthResponse, LoginCredentials } from "@/features/auth/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";

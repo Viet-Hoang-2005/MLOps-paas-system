@@ -47,7 +47,7 @@ import { getApiErrorMessage } from "@/shared/api/errors";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { LineSteps } from "@/shared/components/LineSteps";
 import { PageHeader } from "@/shared/components/PageHeader";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 
 const trainingPath = "/dashboard/training";
 const createPath = `${trainingPath}/new`;

@@ -11,7 +11,7 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { DataViewer } from "@/shared/components/DataViewer";
 import { Loading } from "@/shared/components/Loading";
 import { Placeholder } from "@/shared/components/Placeholder";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import {
   Download,
   GitBranch,

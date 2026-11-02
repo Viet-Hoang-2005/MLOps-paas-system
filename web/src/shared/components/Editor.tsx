@@ -17,7 +17,7 @@ import {
   buildSourceTree,
   type CreatingFileState,
 } from "@/shared/types/sourceTreeModel";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import {
   FilePlus,
   FolderOpen,

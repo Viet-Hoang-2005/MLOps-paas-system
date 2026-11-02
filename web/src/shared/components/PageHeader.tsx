@@ -1,8 +1,5 @@
-import { ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
+import { Back } from "./Back";
 import { PageTabs } from "./PageTabs";
-import { Button } from "./Button";
 import React from "react";
 
 export interface PageHeaderProps {
@@ -29,17 +26,7 @@ export function PageHeader({
   children,
   actions,
 }: PageHeaderProps) {
-  const navigate = useNavigate();
-  const { t } = useTranslation("common");
   const hasBack = back || (showBack ?? false) || Boolean(backLink);
-
-  const handleBack = () => {
-    if (onBack) {
-      onBack();
-    } else {
-      navigate(-1);
-    }
-  };
 
   return (
     <header
@@ -47,15 +34,10 @@ export function PageHeader({
     >
       <div className={`flex items-center gap-2 ${tabs ? "mb-2" : ""}`}>
         {hasBack && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={handleBack}
-            className="h-8 w-8 text-color-muted-foreground hover:text-color-foreground"
-            aria-label={t("actions.back")}
-            title={t("actions.back")}
-            icon={<ArrowLeft className="h-5 w-5" />}
+          <Back
+            onBack={onBack}
+            to={backLink?.to}
+            aria-label={backLink?.label}
           />
         )}
         <h1 className="text-style-page-title text-color-foreground">{title}</h1>

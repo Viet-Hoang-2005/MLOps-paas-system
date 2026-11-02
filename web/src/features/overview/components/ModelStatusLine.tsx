@@ -8,7 +8,7 @@ import {
   type ProgressLineStep,
 } from "@/shared/components/ProgressLine";
 import { Title } from "@/shared/components/Title";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { Activity, Bot, Check, Copy, Package, GitBranch } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";

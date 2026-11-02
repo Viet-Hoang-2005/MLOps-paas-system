@@ -31,7 +31,7 @@ import { PageHeader } from "@/shared/components/PageHeader";
 import { Select, type SelectOption } from "@/shared/components/Select";
 import { TerminalViewer } from "@/shared/components/TerminalViewer";
 import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
@@ -431,8 +431,7 @@ function BuildDeploymentContent() {
         )}
 
         <TerminalViewer
-          className="flex flex-1 flex-col min-h-72"
-          bodyClassName="flex-1 min-h-72 h-full"
+          bodyClassName="h-96 max-h-[45vh] min-h-72"
           badge={statusBadge}
           logs={logs.logs}
           actionButtons={[buildActionButton]}
@@ -539,7 +538,6 @@ function BuildDeploymentContent() {
           </Button>
         )}
       </div>
-      <div className="h-0.5 shrink-0" aria-hidden="true" />
     </div>
   );
 }

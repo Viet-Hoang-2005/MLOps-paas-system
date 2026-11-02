@@ -141,10 +141,9 @@ function RunDeploymentContent({
         />
       </div>
 
-      <div className="flex flex-1 flex-col space-y-4">
+      <div className="space-y-4">
         <TerminalViewer
-          className="flex flex-1 flex-col min-h-80"
-          bodyClassName="flex-1 min-h-64 h-full"
+          bodyClassName="h-96 max-h-[45vh] min-h-72"
           logs={logs.logs}
           badge={
             <Badge variant={attemptStatus.tone}>{t(attemptStatus.label)}</Badge>

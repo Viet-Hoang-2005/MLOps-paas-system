@@ -1,4 +1,4 @@
-import { setGlobalToastCallback } from "@/shared/types/toastStore";
+import { setGlobalToastCallback } from "@/shared/lib/toastStore";
 import * as ToastPrimitive from "@radix-ui/react-toast";
 import { AlertCircle, CheckCircle2, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";

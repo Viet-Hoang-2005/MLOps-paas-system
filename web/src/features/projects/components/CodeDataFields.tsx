@@ -1,6 +1,6 @@
 import { Title } from "@/shared/components/Title";
 import { FileDropzone } from "@/shared/components/FileDropzone";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { useTranslation } from "react-i18next";
 import type { CodeDataForm, ModelProject } from "@/features/projects/types";
 

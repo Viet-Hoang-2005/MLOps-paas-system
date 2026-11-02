@@ -11,7 +11,7 @@ import { PageHeader } from "@/shared/components/PageHeader";
 import { Table } from "@/shared/components/Table";
 import { TextArea } from "@/shared/components/TextArea";
 import { Title } from "@/shared/components/Title";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Copy } from "lucide-react";
 import { useMemo } from "react";

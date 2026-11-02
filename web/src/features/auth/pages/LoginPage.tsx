@@ -7,7 +7,7 @@ import { useForm } from "@/features/auth/hooks/useForm";
 import { startGitHubOAuth } from "@/features/auth/lib/oauth";
 import { Button } from "@/shared/components/Button";
 import { Input, InputPassword } from "@/shared/components/Input";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { useGoogleLogin } from "@react-oauth/google";
 import { LockKeyhole, Mail } from "lucide-react";
 import { useTranslation } from "react-i18next";

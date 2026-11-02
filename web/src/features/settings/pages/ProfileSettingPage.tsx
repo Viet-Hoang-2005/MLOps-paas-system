@@ -1,5 +1,5 @@
-import { AvatarCropModal } from "@/features/settings/components/AvatarCropModal";
-import { AvatarModal } from "@/features/settings/components/AvatarModal";
+import { CropDialog } from "@/shared/components/CropDialog";
+import { AvatarDialog } from "@/shared/components/AvatarDialog";
 import { useProfileSettings } from "@/features/settings/hooks/useProfileSettings";
 import type { UserProfile } from "@/features/settings/types";
 import BaseDialog from "@/shared/components/BaseDialog";
@@ -10,7 +10,7 @@ import { Input, InputPassword } from "@/shared/components/Input";
 import { OTPInput } from "@/shared/components/OTPInput";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { formatDateTime } from "@/shared/i18n/formatters";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import {
   BriefcaseBusiness,
   Building2,
@@ -348,7 +348,7 @@ export default function ProfileSettingPage() {
                   )
                 }
               />
-                
+
               <div className="grid gap-4 md:grid-cols-2">
                 <Input
                   id="profile-full-name"
@@ -628,7 +628,7 @@ export default function ProfileSettingPage() {
         onConfirm={handleDeleteAccount}
       />
 
-      <AvatarModal
+      <AvatarDialog
         open={avatarModal === "options"}
         avatarPreview={avatarPreview}
         avatarHistory={avatarHistory}
@@ -640,7 +640,7 @@ export default function ProfileSettingPage() {
         onSelectAvatar={selectAvatar}
       />
 
-      <AvatarCropModal
+      <CropDialog
         imageSrc={cropImage}
         loading={avatarSaving}
         onClose={closeCropModal}

@@ -14,7 +14,7 @@ import { FileDropzone } from "@/shared/components/FileDropzone";
 import { Loading } from "@/shared/components/Loading";
 import { Placeholder } from "@/shared/components/Placeholder";
 import { Title } from "@/shared/components/Title";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Code, Download, Lock, Upload } from "lucide-react";
 import { useState } from "react";

@@ -5,7 +5,7 @@ import { Table } from "@/shared/components/Table";
 import { TextArea } from "@/shared/components/TextArea";
 import { Title } from "@/shared/components/Title";
 import { formatDateTime } from "@/shared/i18n/formatters";
-import { buttonVariants } from "@/shared/types/buttonVariants";
+import { Button } from "@/shared/components/Button";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   Activity,
@@ -174,12 +174,11 @@ export function InformationEvolutionPage({
           description={t("workspace.buildAndRegisterDesc")}
           action={
             version.source_job_id ? (
-              <Link
-                to={`/dashboard/training/jobs/${version.source_job_id}/overview`}
-                className={buttonVariants({ variant: "secondary", size: "sm" })}
-              >
-                {t("workspace.trainingJob")}
-              </Link>
+              <Button asChild variant="secondary" size="sm">
+                <Link to={`/dashboard/training/jobs/${version.source_job_id}/overview`}>
+                  {t("workspace.trainingJob")}
+                </Link>
+              </Button>
             ) : null
           }
         />

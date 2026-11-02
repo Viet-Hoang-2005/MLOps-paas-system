@@ -14,7 +14,7 @@ import { Callout } from "@/shared/components/Callout";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { Loading } from "@/shared/components/Loading";
 import { PageHeader } from "@/shared/components/PageHeader";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";

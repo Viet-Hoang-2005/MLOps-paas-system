@@ -32,6 +32,11 @@
     border-color: var(--border);
   }
 
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
+  }
+
   html {
     min-width: 320px;
     background: var(--background);

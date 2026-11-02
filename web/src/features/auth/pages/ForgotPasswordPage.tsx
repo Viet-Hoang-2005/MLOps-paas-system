@@ -7,14 +7,15 @@ import { AuthCard } from "@/features/auth/components/AuthCard";
 import { useCountdown } from "@/features/auth/hooks/useCountdown";
 import { useForm } from "@/features/auth/hooks/useForm";
 import { getApiErrorMessage } from "@/shared/api/errors";
+import { Back } from "@/shared/components/Back";
 import { Button } from "@/shared/components/Button";
 import { Input, InputPassword } from "@/shared/components/Input";
 import { OTPInput } from "@/shared/components/OTPInput";
-import { toast } from "@/shared/types/toastStore";
-import { ArrowLeft, LockKeyhole, Mail } from "lucide-react";
+import { toast } from "@/shared/lib/toastStore";
+import { LockKeyhole, Mail } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 type ForgotPasswordStep = "email" | "otp" | "reset";
 
@@ -70,14 +71,11 @@ function ForgotPasswordOTPStep({
 
   return (
     <div className="max-w-sm w-full mx-auto text-center">
-      <button
-        type="button"
-        onClick={onBack}
-        className="mb-8 flex items-center gap-2 text-style-body text-color-muted-foreground hover:text-color-foreground font-medium transition-colors cursor-pointer"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>{t("otp.back")}</span>
-      </button>
+      <Back
+        onBack={onBack}
+        title={t("otp.back")}
+        className="mb-8"
+      />
 
       <div className="mx-auto mb-4 rounded-surface flex items-center justify-center">
         <Mail className="h-8 w-8 text-color-foreground" />
@@ -164,14 +162,11 @@ function ForgotPasswordResetStep({
 
   return (
     <div className="max-w-sm w-full mx-auto">
-      <button
-        type="button"
-        onClick={onBack}
-        className="mb-8 flex items-center gap-2 text-style-body text-color-muted-foreground hover:text-color-foreground font-medium transition-colors cursor-pointer"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>{t("recovery.startOver")}</span>
-      </button>
+      <Back
+        onBack={onBack}
+        title={t("recovery.startOver")}
+        className="mb-8"
+      />
 
       <div className="mb-4 rounded-surface flex items-center justify-center mx-auto">
         <LockKeyhole className="h-8 w-8 text-color-foreground" />
@@ -253,13 +248,11 @@ export default function ForgotPasswordPage() {
       {step === "email" && (
         <div className="max-w-sm w-full mx-auto">
           {/* Back to Login */}
-          <Link
+          <Back
             to="/login"
-            className="mb-8 flex items-center gap-2 text-style-body text-color-muted-foreground hover:text-color-foreground font-medium transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>{t("recovery.backToSignIn")}</span>
-          </Link>
+            title={t("recovery.backToSignIn")}
+            className="mb-8"
+          />
 
           {/* Icon */}
           <div className="mb-4 rounded-surface flex items-center justify-center mx-auto">

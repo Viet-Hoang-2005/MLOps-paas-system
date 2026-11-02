@@ -302,7 +302,6 @@ function CreateDriftMonitorContent({
           </Button>
         </div>
 
-        <div className="h-0.5 shrink-0" aria-hidden="true" />
       </form>
       <ConfirmDialog
         open={blocker.state === "blocked"}

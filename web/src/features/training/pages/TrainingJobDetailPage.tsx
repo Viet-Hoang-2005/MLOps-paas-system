@@ -47,7 +47,7 @@ import { Button } from "@/shared/components/Button";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageTabs } from "@/shared/components/PageTabs";
 import { computeElapsed, formatDuration } from "@/shared/lib/formatDuration";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 
 const ACTIVE_STATUSES: TrainingJobStatus[] = [
   "pending",

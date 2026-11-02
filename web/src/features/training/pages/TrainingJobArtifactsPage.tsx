@@ -14,7 +14,7 @@ import { Button } from "@/shared/components/Button";
 import { Callout } from "@/shared/components/Callout";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { CodeViewer } from "@/shared/components/CodeViewer";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,

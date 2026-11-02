@@ -1,20 +1,25 @@
 import {
   forwardRef,
   useId,
+  useState,
   type InputHTMLAttributes,
   type ReactNode,
 } from "react";
 import { cn } from "@/shared/lib/cn";
+import { Eye, EyeOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Button } from "@/shared/components/Button";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   helperText?: string;
   icon?: ReactNode;
+  rightElement?: ReactNode;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, error, helperText, icon, className, id, ...props },
+  { label, error, helperText, icon, rightElement, className, id, ...props },
   ref,
 ) {
   const generatedId = useId();
@@ -48,17 +53,22 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
             `h-14 w-full px-4 rounded-control
             border border-input bg-surface
             text-style-body text-color-foreground outline-none transition-colors
-            placeholder:text-color-foreground-subtle hover:border-input-hover
-            focus:border-ring focus:ring-2 focus:ring-ring/20
+            placeholder:text-color-foreground-subtle hover:border-input-hover focus:border-input-hover
             disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-disabled disabled:text-color-foreground-disabled
             disabled:hover:border-border`,
             icon && "pl-11",
+            rightElement && "pr-12",
             error &&
               "border-danger hover:border-danger focus:border-danger focus:ring-danger/15",
             className,
           )}
           {...props}
         />
+        {rightElement && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+            {rightElement}
+          </div>
+        )}
       </div>
       {(error || helperText) && (
         <span
@@ -77,7 +87,44 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
 });
 
 export const InputPassword = forwardRef<HTMLInputElement, InputProps>(
-  function InputPassword(props, ref) {
-    return <Input ref={ref} {...props} type="password" />;
+  function InputPassword({ className, ...props }, ref) {
+    const [showPassword, setShowPassword] = useState(false);
+    const { t } = useTranslation("common");
+
+    const togglePasswordVisibility = () => {
+      setShowPassword((prev) => !prev);
+    };
+
+    const actionLabel = showPassword
+      ? t("accessibility.hidePassword")
+      : t("accessibility.showPassword");
+
+    const toggleButton = (
+      <Button
+        size="icon"
+        variant="secondary"
+        border={false}
+        onClick={togglePasswordVisibility}
+        aria-label={actionLabel}
+        title={actionLabel}
+        icon={
+          showPassword ? (
+            <EyeOff className="h-5 w-5" />
+          ) : (
+            <Eye className="h-5 w-5" />
+          )
+        }
+      />
+    );
+
+    return (
+      <Input
+        ref={ref}
+        type={showPassword ? "text" : "password"}
+        rightElement={toggleButton}
+        className={className}
+        {...props}
+      />
+    );
   },
 );

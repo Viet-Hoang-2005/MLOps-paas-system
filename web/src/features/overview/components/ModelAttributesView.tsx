@@ -1,6 +1,6 @@
 import type { ModelAttributesResponse } from "@/shared/api/catalogApi";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import {
   removePreviewAsset,

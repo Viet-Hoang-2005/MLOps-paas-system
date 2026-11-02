@@ -1,5 +1,5 @@
 import { cn } from "@/shared/lib/cn";
-import { switchVariants } from "@/shared/types/switchVariants";
+import { switchVariants } from "@/shared/lib/switchVariants";
 import { type VariantProps } from "class-variance-authority";
 
 export interface SegmentedControlOption<T extends string | number> {

@@ -54,7 +54,7 @@ const getCroppedAvatarFile = async (imageSrc: string, cropPixels: Area) => {
   });
 };
 
-interface AvatarCropModalProps {
+interface CropDialogProps {
   imageSrc: string;
   loading?: boolean;
   onClose: () => void;
@@ -62,13 +62,13 @@ interface AvatarCropModalProps {
   onError?: () => void;
 }
 
-export function AvatarCropModal({
+export function CropDialog({
   imageSrc,
   loading = false,
   onClose,
   onConfirm,
   onError,
-}: AvatarCropModalProps) {
+}: CropDialogProps) {
   const { t } = useTranslation("settings");
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);

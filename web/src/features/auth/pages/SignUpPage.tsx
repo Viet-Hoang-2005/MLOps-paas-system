@@ -10,16 +10,16 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useCountdown } from "@/features/auth/hooks/useCountdown";
 import { useForm } from "@/features/auth/hooks/useForm";
 import { startGitHubOAuth } from "@/features/auth/lib/oauth";
-import { AvatarCropModal } from "@/features/settings/components/AvatarCropModal";
-import { AvatarModal } from "@/features/settings/components/AvatarModal";
+import { AvatarDialog } from "@/shared/components/AvatarDialog";
+import { CropDialog } from "@/shared/components/CropDialog";
 import { getApiErrorMessage } from "@/shared/api/errors";
+import { Back } from "@/shared/components/Back";
 import { Button } from "@/shared/components/Button";
 import { Input, InputPassword } from "@/shared/components/Input";
 import { OTPInput } from "@/shared/components/OTPInput";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { useGoogleLogin } from "@react-oauth/google";
 import {
-  ArrowLeft,
   Camera,
   Lock,
   LockKeyhole,
@@ -81,14 +81,10 @@ function SignUpOTPStep({ email, onVerified, onBack }: SignUpOTPStepProps) {
 
   return (
     <div className="flex flex-col max-w-sm w-full mx-auto text-center gap-8">
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex items-center gap-2 text-style-body text-color-muted-foreground hover:text-color-foreground font-medium transition-colors cursor-pointer"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>{t("otp.back")}</span>
-      </button>
+      <Back
+        onBack={onBack}
+        title={t("otp.back")}
+      />
 
       <div className="flex flex-col items-center justify-center gap-3">
         <Mail className="h-8 w-8 text-color-foreground" />
@@ -243,14 +239,11 @@ function SignUpProfileStep({
 
   return (
     <div className="max-w-sm w-full mx-auto">
-      <button
-        type="button"
-        onClick={onBack}
-        className="mb-4 flex items-center gap-2 text-style-body text-color-muted-foreground hover:text-color-foreground font-medium transition-colors cursor-pointer"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>{t("profile.back")}</span>
-      </button>
+      <Back
+        onBack={onBack}
+        title={t("profile.back")}
+        className="mb-4"
+      />
 
       <h2 className="mb-1 text-style-page-title font-bold text-color-foreground">
         {t("profile.title")}
@@ -350,7 +343,7 @@ function SignUpProfileStep({
         </Button>
       </form>
 
-      <AvatarModal
+      <AvatarDialog
         open={avatarModal === "options"}
         avatarPreview={avatarPreview}
         onClose={() => setAvatarModal("closed")}
@@ -358,7 +351,7 @@ function SignUpProfileStep({
         onChange={openAvatarPicker}
       />
 
-      <AvatarCropModal
+      <CropDialog
         imageSrc={cropImage}
         onClose={closeCropModal}
         onConfirm={confirmAvatarCrop}

@@ -4,7 +4,7 @@ import { ImageUp, Trash2, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
-interface AvatarModalProps {
+interface AvatarDialogProps {
   open: boolean;
   avatarPreview: string;
   avatarHistory?: AvatarRecord[];
@@ -16,7 +16,7 @@ interface AvatarModalProps {
   onSelectAvatar?: (avatarId: string) => void;
 }
 
-export function AvatarModal({
+export function AvatarDialog({
   open,
   avatarPreview,
   avatarHistory = [],
@@ -26,7 +26,7 @@ export function AvatarModal({
   onRemove,
   onChange,
   onSelectAvatar,
-}: AvatarModalProps) {
+}: AvatarDialogProps) {
   const { t } = useTranslation("settings");
   if (!open) return null;
   if (typeof document === "undefined") return null;

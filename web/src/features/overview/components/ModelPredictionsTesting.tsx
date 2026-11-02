@@ -23,7 +23,7 @@ import { FileDropzone } from "@/shared/components/FileDropzone";
 import { Title } from "@/shared/components/Title";
 import { TerminalViewer } from "@/shared/components/TerminalViewer";
 import { formatNumber } from "@/shared/i18n/formatters";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 
 const TARGET_COLUMN_NAMES = new Set([
   "label",

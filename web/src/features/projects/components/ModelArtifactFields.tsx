@@ -9,7 +9,7 @@ import { Picker } from "@/shared/components/Picker";
 import { Title } from "@/shared/components/Title";
 import { Switch } from "@/shared/components/Switch";
 import { TextArea } from "@/shared/components/TextArea";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 
 interface ModelArtifactFieldsProps {
   form: BuildInputForm;

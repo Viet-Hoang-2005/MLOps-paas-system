@@ -15,7 +15,7 @@ import {
 } from "@/features/monitoring/api/driftApi";
 import { driftQueryKeys } from "@/features/monitoring/queryKeys";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 

@@ -29,7 +29,7 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Table } from "@/shared/components/Table";
 import { formatDuration } from "@/shared/lib/formatDuration";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 
 const ACTIVE_STATUSES: TrainingJobStatus[] = [
   "pending",

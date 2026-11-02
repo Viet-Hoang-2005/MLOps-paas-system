@@ -7,7 +7,7 @@ import { Button } from "@/shared/components/Button";
 import { Callout } from "@/shared/components/Callout";
 import { FileDropzone } from "@/shared/components/FileDropzone";
 import { cn } from "@/shared/lib/cn";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Code2, FileSpreadsheet, Upload } from "lucide-react";
 import { useState } from "react";

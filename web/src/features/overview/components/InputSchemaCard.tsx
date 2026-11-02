@@ -1,7 +1,7 @@
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { Title } from "@/shared/components/Title";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import {
   Check,
   Code2,

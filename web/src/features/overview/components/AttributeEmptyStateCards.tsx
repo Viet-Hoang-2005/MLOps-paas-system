@@ -5,7 +5,7 @@ import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { FileDropzone } from "@/shared/components/FileDropzone";
 import { Title } from "@/shared/components/Title";
-import { toast } from "@/shared/types/toastStore";
+import { toast } from "@/shared/lib/toastStore";
 import { useMutation } from "@tanstack/react-query";
 import { GitBranch, Lock, Upload } from "lucide-react";
 import { useState, type ReactNode } from "react";
