@@ -13,7 +13,7 @@ export interface RegistryModelInsightItem {
 
 export interface RegistryModelInsightsSummary {
   schema_version?: string;
-  kind?: "feature_importance" | "coefficients" | string;
+  kind?: "feature_importance" | "coefficients" | (string & {});
   source?: string;
   feature_count?: number;
   items?: RegistryModelInsightItem[];

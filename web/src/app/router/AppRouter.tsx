@@ -11,18 +11,8 @@ import { RouteFallback } from "./RouteFallback";
 const AuthLayout = lazy(() => import("@/features/auth/pages/AuthLayout"));
 const LoginPage = lazy(() => import("@/features/auth/pages/LoginPage"));
 const SignUpPage = lazy(() => import("@/features/auth/pages/SignUpPage"));
-const SignUpOTPPage = lazy(() => import("@/features/auth/pages/SignUpOTPPage"));
-const CompleteProfilePage = lazy(
-  () => import("@/features/auth/pages/CompleteProfilePage"),
-);
 const ForgotPasswordPage = lazy(
   () => import("@/features/auth/pages/ForgotPasswordPage"),
-);
-const ForgotPasswordOTPPage = lazy(
-  () => import("@/features/auth/pages/ForgotPasswordOTPPage"),
-);
-const ForgotPasswordResetPage = lazy(
-  () => import("@/features/auth/pages/ForgotPasswordResetPage"),
 );
 const GitHubCallbackPage = lazy(
   () => import("@/features/auth/pages/GitHubCallbackPage"),
@@ -119,20 +109,7 @@ const router = createBrowserRouter(
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignUpPage />} />
-        <Route path="/signup/verify-otp" element={<SignUpOTPPage />} />
-        <Route
-          path="/signup/complete-profile"
-          element={<CompleteProfilePage />}
-        />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route
-          path="/forgot-password/verify-otp"
-          element={<ForgotPasswordOTPPage />}
-        />
-        <Route
-          path="/forgot-password/reset"
-          element={<ForgotPasswordResetPage />}
-        />
         <Route path="/oauth/github/callback" element={<GitHubCallbackPage />} />
       </Route>
       <Route path="/" element={<Navigate to="/dashboard/projects" replace />} />

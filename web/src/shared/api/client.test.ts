@@ -13,15 +13,15 @@ describe("apiClient Interceptors & Token Handling", () => {
     vi.spyOn(authSession, "getAccessToken").mockReturnValue("valid-token-123");
 
     let capturedConfig: InternalAxiosRequestConfig | undefined;
-    apiClient.defaults.adapter = async (config) => {
+    apiClient.defaults.adapter = (config) => {
       capturedConfig = config;
-      return {
+      return Promise.resolve({
         data: { success: true },
         status: 200,
         statusText: "OK",
         headers: {},
         config,
-      } as AxiosResponse;
+      } as AxiosResponse);
     };
 
     const response = await apiClient.get("/test/endpoint");
@@ -34,15 +34,15 @@ describe("apiClient Interceptors & Token Handling", () => {
     vi.spyOn(authSession, "getAccessToken").mockReturnValue(null);
 
     let capturedConfig: InternalAxiosRequestConfig | undefined;
-    apiClient.defaults.adapter = async (config) => {
+    apiClient.defaults.adapter = (config) => {
       capturedConfig = config;
-      return {
+      return Promise.resolve({
         data: { success: true },
         status: 200,
         statusText: "OK",
         headers: {},
         config,
-      } as AxiosResponse;
+      } as AxiosResponse);
     };
 
     await apiClient.get("/public/endpoint");
@@ -53,15 +53,15 @@ describe("apiClient Interceptors & Token Handling", () => {
     vi.spyOn(authSession, "getAccessToken").mockReturnValue("test-token");
 
     let capturedHeaders: Record<string, unknown> | undefined;
-    apiClient.defaults.adapter = async (config) => {
+    apiClient.defaults.adapter = (config) => {
       capturedHeaders = config.headers ? { ...config.headers } : undefined;
-      return {
+      return Promise.resolve({
         data: { uploaded: true },
         status: 200,
         statusText: "OK",
         headers: {},
         config,
-      } as AxiosResponse;
+      } as AxiosResponse);
     };
 
     const formData = new FormData();
@@ -72,14 +72,14 @@ describe("apiClient Interceptors & Token Handling", () => {
   });
 
   it("should pass through non-401 errors without attempting refresh", async () => {
-    apiClient.defaults.adapter = async (config) => {
-      throw new axios.AxiosError("Bad Request", "ERR_BAD_REQUEST", config, {}, {
+    apiClient.defaults.adapter = (config) => {
+      return Promise.reject(new axios.AxiosError("Bad Request", "ERR_BAD_REQUEST", config, {}, {
         status: 400,
         statusText: "Bad Request",
         data: { detail: "Invalid input" },
         headers: {},
         config,
-      });
+      }));
     };
 
     await expect(apiClient.get("/invalid")).rejects.toThrow();

@@ -1,11 +1,11 @@
-import { isValidElement, type ElementType, type ReactNode } from "react";
+import { isValidElement, type ComponentType, type ReactNode } from "react";
 import { cn } from "@/shared/lib/cn";
 
 export interface TitleProps {
   title: ReactNode;
   subtitle?: string;
   description?: string;
-  icon?: ElementType | ReactNode;
+  icon?: ComponentType<{ className?: string }> | ReactNode;
   className?: string;
   badge?: ReactNode;
   action?: ReactNode;
@@ -24,8 +24,8 @@ export function Title({
   let iconNode: ReactNode = null;
   if (isValidElement(icon)) {
     iconNode = icon;
-  } else if (icon) {
-    const Icon = icon as ElementType;
+  } else if (typeof icon === "function") {
+    const Icon = icon;
     iconNode = <Icon className="w-5 h-5 text-color-muted-foreground" />;
   }
 

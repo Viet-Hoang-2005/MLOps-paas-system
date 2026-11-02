@@ -163,11 +163,12 @@ function RunDeploymentContent({
               disabled: !run.canDeploy || run.deploy.isPending,
               onClick: () =>
                 run.deploy.mutate(undefined, {
-                  onSuccess: (deployment) =>
-                    navigate(
+                  onSuccess: (deployment) => {
+                    void navigate(
                       runDeploymentPath(projectId, buildId, deployment.id),
                       { replace: true },
-                    ),
+                    );
+                  },
                 }),
             },
           ]}

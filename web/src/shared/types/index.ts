@@ -27,7 +27,7 @@ export type RuntimeStatus =
   | "cancelled"
   | "unhealthy"
   | "stopped"
-  | string;
+  | (string & {});
 
 export interface RuntimeLogBatch {
   logs: string[];

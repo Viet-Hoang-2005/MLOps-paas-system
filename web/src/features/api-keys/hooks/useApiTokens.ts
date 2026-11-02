@@ -73,11 +73,11 @@ export function useApiTokens(): UseApiKeysReturn {
   });
 
   const handleDeleteAPIKey = async (apiKey: APIKeyRecord) => {
-    deleteAPIKeyMutation.mutate(apiKey.id);
+    await deleteAPIKeyMutation.mutateAsync(apiKey.id);
   };
 
   const handleRegenerateAPIKey = async (apiKey: APIKeyRecord) => {
-    regenerateAPIKeyMutation.mutate(apiKey.id);
+    await regenerateAPIKeyMutation.mutateAsync(apiKey.id);
   };
 
   const handleCopyCreatedKey = async () => {

@@ -177,7 +177,7 @@ export function useProfileSettings() {
     setEditingProfile(editing);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     updateProfileMutation.mutate({
       full_name: formValues.fullName,
       description: formValues.description,

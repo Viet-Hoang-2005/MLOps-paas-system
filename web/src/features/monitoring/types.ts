@@ -61,7 +61,7 @@ export interface DriftDistribution {
 
 export interface DriftColumnReport {
   column_name: string;
-  column_type: "num" | "cat" | string;
+  column_type: "num" | "cat" | (string & {});
   stattest_name: string;
   stattest_threshold: number;
   drift_score: number;

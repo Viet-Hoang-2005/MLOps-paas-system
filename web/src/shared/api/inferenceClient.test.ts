@@ -19,15 +19,15 @@ describe("inferenceClient - Public/Private, Token Injection & Single Refresh", (
     vi.spyOn(authSession, "getAccessToken").mockReturnValue(null);
 
     let capturedConfig: InternalAxiosRequestConfig | undefined;
-    inferenceClient.defaults.adapter = async (config) => {
+    inferenceClient.defaults.adapter = (config) => {
       capturedConfig = config;
-      return {
+      return Promise.resolve({
         data: { prediction: [1] },
         status: 200,
         statusText: "OK",
         headers: {},
         config,
-      } as AxiosResponse;
+      } as AxiosResponse);
     };
 
     await inferenceClient.post("http://gateway/predict", { data: [[1]] });
@@ -39,15 +39,15 @@ describe("inferenceClient - Public/Private, Token Injection & Single Refresh", (
     vi.spyOn(authSession, "getAccessToken").mockReturnValue("access-token-1");
 
     let capturedConfig: InternalAxiosRequestConfig | undefined;
-    inferenceClient.defaults.adapter = async (config) => {
+    inferenceClient.defaults.adapter = (config) => {
       capturedConfig = config;
-      return {
+      return Promise.resolve({
         data: { prediction: [1] },
         status: 200,
         statusText: "OK",
         headers: {},
         config,
-      } as AxiosResponse;
+      } as AxiosResponse);
     };
 
     await inferenceClient.post("http://gateway/predict", { data: [[1]] });
@@ -60,13 +60,13 @@ describe("inferenceClient - Public/Private, Token Injection & Single Refresh", (
     vi.spyOn(authSession, "getAccessToken").mockImplementation(() => currentToken);
     const refreshSpy = vi
       .spyOn(clientModule, "refreshAccessToken")
-      .mockImplementation(async () => {
+      .mockImplementation(() => {
         currentToken = "refreshed-token";
-        return currentToken;
+        return Promise.resolve(currentToken);
       });
 
     const authHeaders: (string | undefined)[] = [];
-    inferenceClient.defaults.adapter = async (config) => {
+    inferenceClient.defaults.adapter = (config) => {
       callCount++;
       authHeaders.push(
         config.headers.Authorization
@@ -74,21 +74,21 @@ describe("inferenceClient - Public/Private, Token Injection & Single Refresh", (
           : undefined,
       );
       if (callCount === 1) {
-        throw new axios.AxiosError("Expired", "ERR_BAD_RESPONSE", config, {}, {
+        return Promise.reject(new axios.AxiosError("Expired", "ERR_BAD_RESPONSE", config, {}, {
           status: 401,
           statusText: "Unauthorized",
           data: { detail: "Unauthorized: Token has expired" },
           headers: {},
           config,
-        });
+        }));
       }
-      return {
+      return Promise.resolve({
         data: { prediction: [42] },
         status: 200,
         statusText: "OK",
         headers: {},
         config,
-      } as AxiosResponse;
+      } as AxiosResponse);
     };
 
     const res = await inferenceClient.post("http://gateway/predict", { data: [[1]] });
@@ -104,14 +104,14 @@ describe("inferenceClient - Public/Private, Token Injection & Single Refresh", (
     const refreshSpy = vi.spyOn(clientModule, "refreshAccessToken");
 
     for (const code of [403, 500, 504]) {
-      inferenceClient.defaults.adapter = async (config) => {
-        throw new axios.AxiosError("Error", "ERR_BAD_RESPONSE", config, {}, {
+      inferenceClient.defaults.adapter = (config) => {
+        return Promise.reject(new axios.AxiosError("Error", "ERR_BAD_RESPONSE", config, {}, {
           status: code,
           statusText: "Error",
           data: { detail: "Unauthorized: Invalid token" },
           headers: {},
           config,
-        });
+        }));
       };
 
       await expect(

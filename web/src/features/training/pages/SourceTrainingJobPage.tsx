@@ -7,7 +7,6 @@ import {
   type EditorHandle,
 } from "@/shared/components/Editor";
 import { useCreateTrainingJob } from "@/features/training/trainingFlowContext";
-import type { ModelFlavor } from "@/features/projects/types";
 import { Button } from "@/shared/components/Button";
 import { FileDropzone } from "@/shared/components/FileDropzone";
 import { Picker } from "@/shared/components/Picker";

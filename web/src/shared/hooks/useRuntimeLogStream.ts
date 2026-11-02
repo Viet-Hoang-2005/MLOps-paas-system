@@ -91,7 +91,9 @@ export function useRuntimeLogStream({
           if (!batch.hasMore && Date.now() - terminalSince >= 15000) return;
         } else terminalSince = undefined;
         if (batch.hasMore) {
-          timer = setTimeout(poll, 100);
+          timer = setTimeout(() => {
+            void poll();
+          }, 100);
           return;
         }
       } catch {
@@ -105,7 +107,11 @@ export function useRuntimeLogStream({
         // Keep the cursor and retry without losing collected output.
       }
 
-      if (!cancelled) timer = setTimeout(poll, pollIntervalMs);
+      if (!cancelled) {
+        timer = setTimeout(() => {
+          void poll();
+        }, pollIntervalMs);
+      }
     };
 
     void poll();
