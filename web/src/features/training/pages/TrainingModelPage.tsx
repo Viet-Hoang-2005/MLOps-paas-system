@@ -1,5 +1,6 @@
 import { RouteFallback } from "@/app/router/RouteFallback";
-import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
+import { routes } from "@/app/router/paths";
+import { Placeholder } from "@/shared/components/Placeholder";
 import { formatDateTime, formatNumber } from "@/shared/i18n/formatters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -361,10 +362,22 @@ export default function TrainingModelPage() {
     return (
       <section className="flex w-full flex-1 flex-col space-y-6">
         <PageHeader title={t("title")} />
-        <NoProjectPlaceholder
+        <Placeholder
           title={tCommon("navigation.modelTraining")}
           description={tProjects("workflow.noProjectTraining")}
           icon={<BrainCircuit className="h-6 w-6" />}
+          additional={
+            tCommon("modelSelector.empty")
+          }
+          action={
+            <Button
+              size="md"
+              icon={<Plus className="h-4 w-4" />}
+              onClick={() => navigate(routes.newProject)}
+            >
+              {tProjects("workflow.newProject")}
+            </Button>
+          }
         />
       </section>
     );

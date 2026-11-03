@@ -7,6 +7,7 @@ import { ModelArtifactFields } from "@/features/projects/components/ModelArtifac
 import { ModelMetadataFields } from "@/features/projects/components/ModelMetadataFields";
 import { previewKeys, usePreview } from "@/features/projects/hooks/usePreview";
 import { catalogQueryKeys } from "@/features/projects/queryKeys";
+import { notificationQueryKeys } from "@/features/notifications/queryKeys";
 import type { ModelBuildFormValues } from "@/features/projects/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Button } from "@/shared/components/Button";
@@ -256,6 +257,9 @@ export default function NewModelProjectPage() {
       await queryClient.invalidateQueries({
         queryKey: catalogQueryKeys.projects(),
       });
+      await queryClient.invalidateQueries({
+        queryKey: notificationQueryKeys.all,
+      });
       if (modelId) {
         await queryClient.invalidateQueries({
           queryKey: previewKeys.detail(modelId),
@@ -368,7 +372,6 @@ export default function NewModelProjectPage() {
         onConfirm={() => blocker.state === "blocked" && blocker.proceed()}
         onCancel={() => blocker.state === "blocked" && blocker.reset()}
       />
-      <div className="h-0.5 shrink-0" aria-hidden="true" />
     </div>
   );
 }

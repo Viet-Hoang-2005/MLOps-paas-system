@@ -2,11 +2,11 @@ import { Button } from "@/shared/components/Button";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Search } from "@/shared/components/Search";
 import { Select, type SelectOption } from "@/shared/components/Select";
-import { cn } from "@/shared/lib/cn";
 import {
   Activity,
   AlertTriangle,
   Bell,
+  Bot,
   Box,
   CheckCheck,
   ChevronLeft,
@@ -14,78 +14,71 @@ import {
   Cpu,
   Inbox,
   Loader2,
-  RefreshCw,
   Rocket,
+  Funnel,
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NotificationItemComponent } from "@/features/notifications/components/NotificationItem";
 import {
   useDeleteNotification,
-  useMarkAllNotificationsRead,
   useMarkNotificationRead,
   useNotifications,
   useUnreadNotificationCount,
 } from "@/features/notifications/hooks/useNotifications";
 import type { NotificationType } from "@/features/notifications/types";
 
-type FilterTab = "all" | "unread" | NotificationType;
+type ReadStatus = "all" | "unread" | "read";
+type TypeFilter = "all" | NotificationType;
 
 export default function NotificationsPage() {
   const { t } = useTranslation("notifications");
-  const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [readStatus, setReadStatus] = useState<ReadStatus>("all");
+  const [selectedType, setSelectedType] = useState<TypeFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 20;
-
+  
   const filterParams = useMemo(() => {
     return {
-      is_read: activeTab === "unread" ? false : undefined,
-      type:
-        activeTab !== "all" && activeTab !== "unread"
-          ? (activeTab)
-          : undefined,
+      is_read:
+        readStatus === "unread"
+          ? false
+          : readStatus === "read"
+            ? true
+            : undefined,
+      type: selectedType !== "all" ? selectedType : undefined,
       search: searchQuery.trim() || undefined,
       page,
       page_size: pageSize,
     };
-  }, [activeTab, searchQuery, page]);
+
+  }, [readStatus, selectedType, searchQuery, page]);
 
   const {
     data: listData,
     isLoading,
-    isFetching,
-    refetch,
   } = useNotifications(filterParams);
 
   const { data: countData } = useUnreadNotificationCount();
   const unreadCount = countData?.unread_count ?? 0;
-
   const { mutate: markRead } = useMarkNotificationRead();
-  const { mutate: markAllRead, isPending: isMarkingAll } = useMarkAllNotificationsRead();
   const { mutate: deleteItem } = useDeleteNotification();
-
   const notifications = listData?.results ?? [];
   const totalCount = listData?.count ?? 0;
   const totalPages = Math.ceil(totalCount / pageSize);
-
-  const handleTabChange = (tab: FilterTab) => {
-    setActiveTab(tab);
-    setPage(1);
-  };
-
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
     setPage(1);
   };
 
-  const filterOptions = useMemo<SelectOption[]>(() => [
+  const readStatusOptions = useMemo<SelectOption[]>(() => [
     {
       value: "all",
       label: (
         <span className="flex items-center gap-2">
           <Inbox className="h-4 w-4 text-color-foreground-muted" />
-          <span>{t("filters.all")}</span>
+          <span>{t("readStatus.all")}</span>
         </span>
       ),
     },
@@ -94,7 +87,7 @@ export default function NotificationsPage() {
       label: (
         <span className="flex items-center gap-2">
           <Bell className="h-4 w-4 text-color-foreground-muted" />
-          <span>{t("filters.unread")}</span>
+          <span>{t("readStatus.unread")}</span>
         </span>
       ),
       badge: unreadCount > 0 ? (
@@ -102,6 +95,36 @@ export default function NotificationsPage() {
           {unreadCount}
         </span>
       ) : undefined,
+    },
+    {
+      value: "read",
+      label: (
+        <span className="flex items-center gap-2">
+          <CheckCheck className="h-4 w-4 text-color-foreground-muted" />
+          <span>{t("readStatus.read")}</span>
+        </span>
+      ),
+    },
+  ], [t, unreadCount]);
+
+  const typeOptions = useMemo<SelectOption[]>(() => [
+    {
+      value: "all",
+      label: (
+        <span className="flex items-center gap-2">
+          <Funnel className="h-4 w-4 text-color-foreground-muted" />
+          <span>{t("filters.all")}</span>
+        </span>
+      ),
+    },
+    {
+      value: "project",
+      label: (
+        <span className="flex items-center gap-2">
+          <Bot className="h-4 w-4 text-color-foreground-muted" />
+          <span>{t("filters.project")}</span>
+        </span>
+      ),
     },
     {
       value: "training",
@@ -148,31 +171,15 @@ export default function NotificationsPage() {
         </span>
       ),
     },
-  ], [t, unreadCount]);
+  ], [t]);
 
   return (
     <section className="flex flex-1 flex-col gap-6">
       <PageHeader
         title={t("title")}
-        actions={
-          unreadCount > 0 ? (
-            <Button
-              variant="primary"
-              size="sm"
-              className="gap-1.5"
-              disabled={isMarkingAll}
-              onClick={() => markAllRead()}
-            >
-              <CheckCheck className="h-4 w-4" />
-              <span>{t("actions.markAllAsRead")}</span>
-            </Button>
-          ) : undefined
-        }
       />
 
-      {/* Search, Refresh and Type Filter Bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4">
-        {/* Left: Search component + Refresh button */}
         <div className="flex flex-1 items-center gap-2">
           <div className="w-full sm:w-72">
             <Search
@@ -185,30 +192,36 @@ export default function NotificationsPage() {
               }}
             />
           </div>
-
-          <Button
-            variant="secondary"
-            size="md"
-            className="shrink-0 gap-1.5"
-            disabled={isFetching}
-            onClick={() => refetch()}
-            title={t("actions.refresh")}
-          >
-            <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
-            <span>{t("actions.refresh")}</span>
-          </Button>
         </div>
 
-        {/* Right: Select component to filter notification types */}
-        <div className="w-full sm:w-60 shrink-0">
+        <div className="w-full sm:w-40 shrink-0">
           <Select
             className="h-10 text-style-body"
-            value={activeTab}
-            onChange={(val) => handleTabChange(val as FilterTab)}
-            options={filterOptions}
-            placeholder={t("filters.all")}
+            value={readStatus}
+            onChange={(val) => {
+              setReadStatus(val as ReadStatus);
+              setPage(1);
+            }}
+            options={readStatusOptions}
+            placeholder={t("readStatus.all")}
           />
         </div>
+
+        <div className="w-full sm:w-45 shrink-0">
+          <Select
+            className="h-10 text-style-body"
+            value={selectedType}
+            onChange={(val) => {
+
+              setSelectedType(val as TypeFilter);
+
+              setPage(1);
+
+            }}
+            options={typeOptions}
+            placeholder={t("filters.all")}
+          />
+          </div>
       </div>
 
       {/* Notifications List */}
@@ -224,7 +237,7 @@ export default function NotificationsPage() {
               <Bell className="h-6 w-6" />
             </div>
             <h3 className="text-style-body-strong font-semibold text-color-foreground">
-              {searchQuery || activeTab !== "all"
+              {searchQuery || readStatus !== "all" || selectedType !== "all"
                 ? t("status.emptyFiltered")
                 : t("status.emptyTitle")}
             </h3>
@@ -232,6 +245,7 @@ export default function NotificationsPage() {
               {t("status.emptyDescription")}
             </p>
           </div>
+
         ) : (
           <div className="flex flex-col gap-2.5">
             {notifications.map((item) => (
@@ -265,6 +279,7 @@ export default function NotificationsPage() {
               <span className="text-style-caption px-2 font-medium">
                 {page} / {totalPages}
               </span>
+              
               <Button
                 variant="secondary"
                 size="sm"
@@ -282,3 +297,4 @@ export default function NotificationsPage() {
     </section>
   );
 }
+

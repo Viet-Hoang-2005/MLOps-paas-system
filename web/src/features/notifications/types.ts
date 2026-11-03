@@ -4,7 +4,8 @@ export type NotificationType =
   | "deployment"
   | "drift"
   | "alert"
-  | "system";
+  | "system"
+  | "project";
 
 export type NotificationLevel = "info" | "success" | "warning" | "error";
 

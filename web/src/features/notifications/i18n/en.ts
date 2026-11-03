@@ -5,14 +5,20 @@ export const notificationsEn = {
   actions: {
     markAllAsRead: "Mark all as read",
     markAsRead: "Mark as read",
+    alreadyRead: "Already read",
     delete: "Delete notification",
     viewAll: "View all notifications",
     viewDetails: "View details",
     refresh: "Refresh",
   },
-  filters: {
-    all: "All",
+  readStatus: {
+    all: "All status",
     unread: "Unread",
+    read: "Read",
+  },
+  filters: {
+    all: "All types",
+    project: "Model",
     training: "Training",
     build: "Packaging",
     deployment: "Deployment",
@@ -26,6 +32,7 @@ export const notificationsEn = {
     drift: "Data Drift",
     alert: "Alert",
     system: "System",
+    project: "Model",
   },
   levels: {
     info: "Info",

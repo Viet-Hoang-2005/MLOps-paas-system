@@ -17,10 +17,8 @@ export const NotificationDropdown: React.FC = () => {
   const { t } = useTranslation("notifications");
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-
   const { data: countData } = useUnreadNotificationCount();
   const unreadCount = countData?.unread_count ?? 0;
-
   const { data: listData, isLoading } = useNotifications({
     page_size: 5,
   });
@@ -28,7 +26,6 @@ export const NotificationDropdown: React.FC = () => {
   const { mutate: markRead } = useMarkNotificationRead();
   const { mutate: markAllRead, isPending: isMarkingAll } = useMarkAllNotificationsRead();
   const { mutate: deleteItem } = useDeleteNotification();
-
   const notifications = listData?.results ?? [];
 
   return (
@@ -45,24 +42,23 @@ export const NotificationDropdown: React.FC = () => {
           {unreadCount > 0 && (
             <span
               // typography-ignore: notification count micro-badge
-              className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-color-danger-foreground shadow-xs animate-in zoom-in-50 duration-200"
+              className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-color-danger-foreground shadow-xs animate-in zoom-in-50 duration-200"
             >
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
         </Button>
       </DropdownMenu.Trigger>
-
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           align="end"
           sideOffset={8}
-          className="z-50 w-80 sm:w-96 rounded-overlay border border-border bg-surface p-0 shadow-lg outline-hidden animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2"
+          className="z-50 w-100 sm:w-110 rounded-surface border border-border bg-surface p-0 shadow-lg outline-hidden animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div className="flex items-center gap-2">
-              <span className="text-style-body-strong font-semibold text-color-foreground">
+              <span className="text-style-overline uppercase text-color-muted-foreground">
                 {t("title")}
               </span>
               {unreadCount > 0 && (
@@ -71,23 +67,20 @@ export const NotificationDropdown: React.FC = () => {
                 </span>
               )}
             </div>
-
-            {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 gap-1 text-color-primary hover:text-color-primary"
-                disabled={isMarkingAll}
-                onClick={() => markAllRead()}
-              >
-                <CheckCheck className="h-3.5 w-3.5" />
-                <span>{t("actions.markAllAsRead")}</span>
-              </Button>
-            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              border={false}
+              disabled={unreadCount === 0 || isMarkingAll}
+              onClick={() => markAllRead()}
+            >
+              <CheckCheck className="h-3.5 w-3.5" />
+              <span>{t("actions.markAllAsRead")}</span>
+            </Button>
           </div>
 
           {/* List Content */}
-          <div className="max-h-[380px] overflow-y-auto p-2 flex flex-col gap-1.5 divide-y-0">
+          <div className="max-h-95 overflow-y-auto p-2 flex flex-col gap-1.5 divide-y-0">
             {isLoading ? (
               <div className="flex items-center justify-center py-8 text-color-foreground-muted gap-2 text-style-body">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -138,3 +131,4 @@ export const NotificationDropdown: React.FC = () => {
     </DropdownMenu.Root>
   );
 };
+

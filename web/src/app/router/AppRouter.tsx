@@ -113,6 +113,7 @@ const router = createBrowserRouter(
         <Route path="/oauth/github/callback" element={<GitHubCallbackPage />} />
       </Route>
       <Route path="/" element={<Navigate to="/dashboard/projects" replace />} />
+      <Route path="/projects" element={<Navigate to="/dashboard/projects" replace />} />
       <Route
         path="/dashboard"
         element={
@@ -128,6 +129,10 @@ const router = createBrowserRouter(
           <Route path="edit" element={<NewModelProjectPage />} />
           <Route path="overview" element={<ProjectOverviewPage />} />
           <Route path="deployment" element={<DeploymentPage />} />
+          <Route
+            path="deployments"
+            element={<Navigate to="deployment" replace />}
+          />
           <Route path="monitoring" element={<DriftMonitoringPage />} />
           <Route
             path="monitoring/:monitorId"
@@ -142,6 +147,10 @@ const router = createBrowserRouter(
         </Route>
         <Route path="overview" element={<ProjectOverviewPage />} />
         <Route path="deployment" element={<DeploymentPage />} />
+        <Route
+          path="deployments"
+          element={<Navigate to="deployment" replace />}
+        />
         <Route path="monitoring" element={<DriftMonitoringPage />} />
         <Route path="training" element={<TrainingModelPage />} />
         <Route path="evolution" element={<EvolutionPage />} />

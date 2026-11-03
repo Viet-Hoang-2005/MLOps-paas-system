@@ -174,19 +174,21 @@ export function CodeEvolutionPage({
   }
 
   return (
-    <section className="rounded-surface border border-border bg-surface p-6 space-y-6">
-      <Title
-        icon={<Code className="h-5 w-5 text-color-primary" />}
-        title={t("workspace.addSourceCode")}
-        description={t("workspace.uploadSourceHint")}
-        badge={
-          <Badge variant="neutral">
-            {t("workspace.supplementalNotice", "One-time upload")}
-          </Badge>
-        }
-      />
+    <section className="flex flex-col flex-1 min-h-0 h-full w-full rounded-surface border border-border bg-surface p-6 space-y-6">
+      <div className="shrink-0">
+        <Title
+          icon={<Code className="h-5 w-5 text-color-primary" />}
+          title={t("workspace.addSourceCode")}
+          description={t("workspace.uploadSourceHint")}
+          badge={
+            <Badge variant="neutral">
+              {t("workspace.supplementalNotice", "One-time upload")}
+            </Badge>
+          }
+        />
+      </div>
 
-      <div className="space-y-4 max-w-2xl">
+      <div className="flex flex-col flex-1 min-h-0 w-full space-y-4">
         <FileDropzone
           accept=".py"
           title={t(
@@ -203,10 +205,11 @@ export function CodeEvolutionPage({
           )}
           onChange={handleFileChange}
           hasFile={Boolean(stagedFile)}
+          className="w-full flex-1 min-h-48"
         />
 
         {stagedFile && (
-          <div className="flex items-center justify-between rounded-surface border border-border bg-muted/30 p-4">
+          <div className="shrink-0 flex items-center justify-between rounded-surface border border-border bg-muted/30 p-4">
             <div className="min-w-0 pr-4">
               <p className="truncate font-mono text-style-body-sm font-semibold text-color-foreground">
                 {stagedFile.name}
@@ -241,4 +244,3 @@ export function CodeEvolutionPage({
 }
 
 export { CodeEvolutionPage as EvolutionCodeTab };
-

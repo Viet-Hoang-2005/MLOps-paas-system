@@ -155,3 +155,37 @@ def test_alertmanager_webhook_creates_notification():
     assert item["type"] == "alert"
     assert item["level"] == "warning"
     assert "High Model Inference Errors" in item["title"]
+
+
+@pytest.mark.django_db
+def test_project_lifecycle_notifications():
+    from apps.notifications.hooks import (
+        notify_project_created,
+        notify_project_metadata_updated,
+        notify_project_preview_updated,
+        notify_project_deleted,
+    )
+
+    user = get_user_model().objects.create_user("project_owner@example.com", "pass123")
+    project = ModelProject.objects.create(
+        owner=user,
+        name="Test Fraud Model",
+        description="Fraud detection model project",
+    )
+
+    notify_project_created(project)
+    notify_project_metadata_updated(project)
+    notify_project_preview_updated(project)
+    notify_project_deleted(project)
+
+    client = APIClient()
+    client.force_authenticate(user)
+    list_resp = client.get("/api/notifications/?type=project")
+    assert list_resp.status_code == 200
+    assert list_resp.data["count"] == 4
+
+    titles = [item["title"] for item in list_resp.data["results"]]
+    assert any("Model Project Created" in t for t in titles)
+    assert any("Project Metadata Updated" in t for t in titles)
+    assert any("Model Preview Updated" in t for t in titles)
+    assert any("Model Project Deleted" in t for t in titles)

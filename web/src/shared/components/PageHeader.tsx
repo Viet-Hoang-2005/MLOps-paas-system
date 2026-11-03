@@ -32,7 +32,7 @@ export function PageHeader({
     <header
       className={`flex min-h-10 flex-col gap-4 border-b border-border md:flex-row md:items-end md:justify-between ${!tabs ? "pb-2" : ""}`}
     >
-      <div className={`flex items-center gap-2 ${tabs ? "mb-2" : ""}`}>
+      <div className={`flex items-center gap-1 ${tabs ? "mb-2" : ""}`}>
         {hasBack && (
           <Back
             onBack={onBack}

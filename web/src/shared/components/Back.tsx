@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import React, { isValidElement, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/shared/components/Button";
 
 export interface BackProps {
   title?: ReactNode;
@@ -46,15 +47,15 @@ export function Back({
 
   if (variant === "icon" || (variant === "auto" && !title)) {
     return (
-      <button
-        type="button"
+      <Button
+        size="icon"
+        variant="secondary"
+        icon={<ArrowLeft className="h-5 w-5" />}
+        border={false}
         onClick={handleClick}
-        className={`h-8 w-8 inline-flex items-center justify-center rounded-control text-color-muted-foreground hover:text-color-foreground hover:bg-muted transition-colors cursor-pointer ${className}`}
         aria-label={ariaLabel}
         title={tooltip}
-      >
-        <ArrowLeft className="h-5 w-5" />
-      </button>
+      />
     );
   }
 
@@ -85,7 +86,7 @@ export function Back({
     >
       <ArrowLeft className="h-4 w-4" />
       {title !== undefined && title !== null && (
-        <span className={titleClassName}>{title}</span>
+      <span className={titleClassName}>{title}</span>
       )}
     </button>
   );

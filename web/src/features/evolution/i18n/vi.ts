@@ -64,6 +64,7 @@ export const evolutionVi = {
     staleData: "Không thể làm mới. Đang hiển thị dữ liệu đã tải trước đó.",
     empty:
       "Chưa có phiên bản đăng ký. Hãy tạo image và đăng ký mô hình để bắt đầu quản lý phiên bản.",
+    buildAndRegister: "Tạo image và đăng ký",
     notFound: "Phiên bản này không thuộc dự án đã chọn hoặc không còn tồn tại.",
     invalidTab: "Mục này không tồn tại.",
     backToDetails: "Mở Chi tiết",

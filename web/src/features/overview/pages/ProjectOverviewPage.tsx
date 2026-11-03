@@ -1,3 +1,4 @@
+import { routes } from "@/app/router/paths";
 import { RouteFallback } from "@/app/router/RouteFallback";
 import { useTheme } from "@/app/theme/useTheme";
 import {
@@ -12,10 +13,12 @@ import { DataOverviewPage } from "@/features/overview/pages/DataOverviewPage";
 import { DeploymentOverviewPage } from "@/features/overview/pages/DeploymentOverviewPage";
 import { InformationOverviewPage } from "@/features/overview/pages/InformationOverviewPage";
 import { EditMetadataDialog } from "@/features/projects/components/EditMetadataDialog";
-import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
+import { Placeholder } from "@/shared/components/Placeholder";
 import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { usePreview } from "@/features/projects/hooks/usePreview";
 import { catalogQueryKeys } from "@/features/projects/queryKeys";
+import { notificationQueryKeys } from "@/features/notifications/queryKeys";
+import { toast } from "@/shared/lib/toastStore";
 import {
   deleteModelProject,
   updateModelProject,
@@ -34,6 +37,7 @@ import {
   Home,
   Info,
   PenLine,
+  Plus,
   Settings2,
   SlidersHorizontal,
   Trash2,
@@ -50,6 +54,8 @@ import {
 export default function ProjectOverviewPage() {
   const { modelId } = useParams();
   const { t } = useTranslation("overview");
+  const { t: tCommon } = useTranslation("common");
+  const { t: tProjects } = useTranslation("projects");
   const { selectedModel, loading: isModelLoading } = useModelSelection();
   const { resolvedTheme } = useTheme();
   const navigate = useNavigate();
@@ -108,6 +114,8 @@ export default function ProjectOverviewPage() {
       setEditMetadataOpen(false);
       await project.refetch();
       await client.invalidateQueries({ queryKey: catalogQueryKeys.projects() });
+      await client.invalidateQueries({ queryKey: notificationQueryKeys.all });
+      toast.success(tProjects("messages.updateSuccess"));
     },
   });
 
@@ -115,6 +123,8 @@ export default function ProjectOverviewPage() {
     mutationFn: () => deleteModelProject(modelId!),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: catalogQueryKeys.projects() });
+      await client.invalidateQueries({ queryKey: notificationQueryKeys.all });
+      toast.success(tProjects("messages.deleteStarted"));
       navigate("/dashboard/projects");
     },
   });
@@ -132,10 +142,22 @@ export default function ProjectOverviewPage() {
     return (
       <div className="flex w-full flex-1 flex-col space-y-6">
         <PageHeader title={t("pageTitle")} />
-        <NoProjectPlaceholder
+        <Placeholder
           title={t("pageTitle")}
           description={t("workflow.noProjectOverview")}
           icon={<Home className="h-6 w-6" />}
+          additional={
+            tCommon("modelSelector.empty")
+          }
+          action={
+            <Button
+              size="md"
+              icon={<Plus className="h-4 w-4" />}
+              onClick={() => navigate(routes.newProject)}
+            >
+              {tProjects("workflow.newProject")}
+            </Button>
+          }
         />
       </div>
     );

@@ -5,16 +5,22 @@ export const notificationsVi = {
   actions: {
     markAllAsRead: "Đánh dấu tất cả đã đọc",
     markAsRead: "Đánh dấu đã đọc",
+    alreadyRead: "Đã đọc",
     delete: "Xóa thông báo",
     viewAll: "Xem tất cả thông báo",
     viewDetails: "Xem chi tiết",
     refresh: "Làm mới",
   },
-  filters: {
+  readStatus: {
     all: "Tất cả",
     unread: "Chưa đọc",
+    read: "Đã đọc",
+  },
+  filters: {
+    all: "Tất cả",
+    project: "Mô hình",
     training: "Huấn luyện",
-    build: "Đóng gói Image",
+    build: "Đóng gói",
     deployment: "Triển khai",
     drift: "Data Drift",
     alert: "Cảnh báo",
@@ -26,6 +32,7 @@ export const notificationsVi = {
     drift: "Data Drift",
     alert: "Cảnh báo",
     system: "Hệ thống",
+    project: "Mô hình",
   },
   levels: {
     info: "Thông tin",

@@ -21,7 +21,8 @@ import {
   useDeployments,
 } from "@/features/deployments/hooks/useDeploymentFlow";
 import { useProjectOverview } from "@/features/overview/hooks/useProjectOverview";
-import { NoProjectPlaceholder } from "@/features/projects/components/NoProjectPlaceholder";
+import { routes } from "@/app/router/paths";
+import { Placeholder } from "@/shared/components/Placeholder";
 import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import type { Build } from "@/features/projects/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
@@ -41,6 +42,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 export default function DeploymentPage() {
   const { modelId } = useParams();
   const { t, i18n } = useTranslation("projects");
+  const { t: tCommon } = useTranslation("common");
   const { selectedModel, loading: isModelLoading } = useModelSelection();
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -246,10 +248,22 @@ export default function DeploymentPage() {
     return (
       <div className="flex w-full flex-1 flex-col space-y-6">
         <PageHeader title={t("workflow.deploymentModel")} />
-        <NoProjectPlaceholder
+        <Placeholder
           title={t("workflow.deploymentModel")}
           description={t("workflow.noProjectDeployment")}
           icon={<Box className="h-6 w-6" />}
+          additional={
+            tCommon("modelSelector.empty")
+          }
+          action={
+            <Button
+              size="md"
+              icon={<Plus className="h-4 w-4" />}
+              onClick={() => navigate(routes.newProject)}
+            >
+              {t("workflow.newProject")}
+            </Button>
+          }
         />
       </div>
     );

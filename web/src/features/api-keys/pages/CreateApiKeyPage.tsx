@@ -209,7 +209,7 @@ export default function ApiKeyPage() {
               description={t("apiKey.pythonDescription")}
             />
             <div className="relative overflow-hidden rounded-surface border border-terminal-border bg-terminal">
-              <pre className="custom-scrollbar overflow-x-auto p-4 font-mono text-style-code-sm text-color-terminal-foreground">
+              <pre className="custom-scrollbar overflow-x-auto p-4 font-mono text-style-code text-color-terminal-foreground">
                 <span className="text-color-syntax-keyword">import</span>{" "}
                 <span className="text-color-syntax-type">requests</span>
                 {"\n\n"}
@@ -314,7 +314,6 @@ export default function ApiKeyPage() {
             {keyId ? t("apiKey.save") : t("apiKey.createTitle")}
           </Button>
         </div>
-        <div className="h-0.5 shrink-0" aria-hidden="true" />
       </div>
 
       {createdApiKey && (

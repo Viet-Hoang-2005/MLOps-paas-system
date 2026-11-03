@@ -49,6 +49,8 @@ class ModelProjectListCreateEndpoint(generics.ListCreateAPIView):
         serializer = ProjectCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         project = create_project_preview(actor=request.user, data=serializer.validated_data)
+        from apps.notifications.hooks import notify_project_created
+        notify_project_created(project)
         return Response(ModelProjectSerializer(project).data, status=status.HTTP_201_CREATED)
 
 
@@ -74,11 +76,15 @@ class ModelProjectDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
             project=project,
             validated_data=serializer.validated_data,
         )
+        from apps.notifications.hooks import notify_project_metadata_updated
+        notify_project_metadata_updated(project)
         return Response(ModelProjectSerializer(project).data)
 
     def destroy(self, request, *args, **kwargs):
         project = self.get_object()
         project = request_project_deletion(project)
+        from apps.notifications.hooks import notify_project_deleted
+        notify_project_deleted(project)
         return Response(ModelProjectSerializer(project).data, status=status.HTTP_202_ACCEPTED)
 
 
@@ -87,6 +93,8 @@ class TrainingProjectCreateEndpoint(APIView):
         serializer = ProjectMetadataWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         project = save_project_metadata(actor=request.user, validated_data=serializer.validated_data)
+        from apps.notifications.hooks import notify_project_created
+        notify_project_created(project)
         return Response(ModelProjectSerializer(project).data, status=status.HTTP_201_CREATED)
 
 
@@ -122,6 +130,8 @@ class ProjectPreviewEndpoint(APIView):
         serializer = PreviewWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         preview = save_preview(project=project, data=serializer.validated_data)
+        from apps.notifications.hooks import notify_project_preview_updated
+        notify_project_preview_updated(project)
         return Response(ModelPreviewSerializer(preview).data)
 
 

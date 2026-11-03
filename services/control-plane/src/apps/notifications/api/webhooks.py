@@ -55,7 +55,7 @@ class AlertWebhookEndpoint(APIView):
                     project = None
 
                 if project and project.owner:
-                    link = f"/dashboard/projects/{project.public_id}/monitoring"
+                    link = f"/dashboard/projects/{project.public_id}/overview"
                     create_notification(
                         user=project.owner,
                         type=Notification.Type.ALERT,

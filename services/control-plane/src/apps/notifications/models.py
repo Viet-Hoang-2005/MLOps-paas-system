@@ -12,6 +12,7 @@ class Notification(models.Model):
         DRIFT = "drift", "Data Drift"
         ALERT = "alert", "Model Alert"
         SYSTEM = "system", "System"
+        PROJECT = "project", "Model Project"
 
     class Level(models.TextChoices):
         INFO = "info", "Information"
