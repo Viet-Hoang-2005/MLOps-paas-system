@@ -47,6 +47,9 @@ def create_job(*, project, validated_data):
     The job row is created afterwards in a short transaction that checks the project again;
     until then only unreferenced objects exist, and they are removed if anything fails.
     """
+    if settings.TRAINING_BACKEND == "docker" and validated_data.get("accelerator_type") == "gpu":
+        from apps.training.services.local_gpu import require_device
+        require_device(validated_data.get("local_gpu_id", ""))
     with transaction.atomic():
         project = _require_active_project(project)
     source_zip = validated_data.pop("source_zip", None)
@@ -134,6 +137,7 @@ RETRY_FIELDS = (
     "accelerator_type",
     "accelerator_count",
     "accelerator_model",
+    "local_gpu_id",
     "baseline_version_id",
     "dataset_snapshot_id",
 )
@@ -164,6 +168,11 @@ def retry_job(job, *, storage=None):
             **{field: getattr(job, field) for field in RETRY_FIELDS},
         )
         sources = {"code_snapshot_uri": job.code_snapshot_uri, "data_snapshot_uri": job.data_snapshot_uri}
+    from apps.training.services.resources import validate_resources
+    validate_resources({}, retry)
+    if settings.TRAINING_BACKEND == "docker" and retry.accelerator_type == "gpu":
+        from apps.training.services.local_gpu import require_device
+        require_device(retry.local_gpu_id)
     storage = storage or S3Storage()
     uris = expected_training_uris(retry, storage.bucket)
     retry.output_uri, retry.mlflow_artifact_uri = uris["output"], uris["mlflow"]
@@ -178,18 +187,30 @@ def retry_job(job, *, storage=None):
             record_training_event(
                 job=retry, event_type="created", message="Training retry created from immutable inputs."
             )
-            return submit_job(retry)
+            return submit_job(retry, verify_gpu=False)
     except Exception:
         _discard_unused_inputs(storage, project, retry)
         raise
 
 
-@transaction.atomic
-def submit_job(job):
+def submit_job(job, *, verify_gpu=True):
     from apps.training.services.resources import validate_resources
     validate_resources({}, job)
+    if verify_gpu and settings.TRAINING_BACKEND == "docker" and job.accelerator_type == "gpu":
+        from apps.training.services.local_gpu import require_device
+        require_device(job.local_gpu_id)
+    verified_gpu_id = job.local_gpu_id if job.accelerator_type == "gpu" and settings.TRAINING_BACKEND == "docker" else ""
+    return _submit_job_atomic(job, verified_gpu_id=verified_gpu_id)
+
+
+@transaction.atomic
+def _submit_job_atomic(job, *, verified_gpu_id):
     project = type(job.project).objects.select_for_update().get(pk=job.project_id)
     job = TrainingJob.objects.select_for_update().get(pk=job.pk)
+    from apps.training.services.resources import validate_resources
+    validate_resources({}, job)
+    if settings.TRAINING_BACKEND == "docker" and job.accelerator_type == "gpu" and job.local_gpu_id != verified_gpu_id:
+        raise Conflict("The selected GPU changed; retry the request.")
     if project.deletion_state != "active":
         raise Conflict("This project is being deleted.")
     if job.deletion_requested_at:

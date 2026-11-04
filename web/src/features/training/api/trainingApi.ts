@@ -30,6 +30,7 @@ const trainingJobFormData = (payload: TrainingJobFormValues) => {
   formData.append("accelerator_type", payload.accelerator_type);
   formData.append("accelerator_count", String(payload.accelerator_count));
   formData.append("accelerator_model", payload.accelerator_model);
+  formData.append("local_gpu_id", payload.local_gpu_id);
   if (payload.source_zip) formData.append("source_zip", payload.source_zip);
   if (payload.training_data)
     formData.append("training_data", payload.training_data);
@@ -114,10 +115,11 @@ export const deleteTrainingOutputs = async (
   ).data;
 
 export const getTrainingRuntimeCapabilities =
-  async (): Promise<TrainingRuntimeCapabilities> =>
+  async (refresh = false): Promise<TrainingRuntimeCapabilities> =>
     (
       await apiClient.get<TrainingRuntimeCapabilities>(
         controlPlaneURL("/training-jobs/runtime-capabilities/"),
+        { params: refresh ? { refresh: "1" } : undefined },
       )
     ).data;
 

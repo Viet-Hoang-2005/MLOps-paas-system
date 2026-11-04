@@ -62,6 +62,7 @@ class TrainingJob(ExecutionWatch):
     accelerator_type = models.CharField(max_length=20, choices=ACCELERATORS, default="none")
     accelerator_count = models.PositiveIntegerField(default=0)
     accelerator_model = models.CharField(max_length=16, blank=True, default="")
+    local_gpu_id = models.CharField(max_length=80, blank=True, default="")
     tracking = models.JSONField(default=dict, blank=True)
     error_message = models.TextField(blank=True)
     started_at = models.DateTimeField(null=True, blank=True)

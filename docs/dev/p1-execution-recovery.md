@@ -34,7 +34,15 @@ CPU/memory profiles are 1/2048, 2/4096 and 4/8192 (cores/MiB), validated on
 create/update/submit. Runtime options are 900, 1800, 3600, 7200, 21600, 43200 seconds
 and come from `GET /api/training-jobs/runtime-capabilities/`. GPU requires
 `TRAINING_GPU_ENABLED`, count 1 and `1` in `TRAINING_GPU_COUNTS`; `none` requires 0
-and an empty model. Docker uses an empty model and a generic host GPU DeviceRequest.
+and an empty model and device ID. Docker GPU jobs use an empty model and persist
+the selected NVIDIA UUID in `local_gpu_id`; creation, submission and dispatch
+verify that Docker can access that exact GPU. Jobs created before device selection
+must be recreated to run on a GPU. No alternative GPU is selected automatically.
+Local capabilities run a bounded, networkless `nvidia-smi` probe using the existing
+training-runner image, cache the result for 30 seconds and accept `?refresh=1` to
+recheck. `TRAINING_GPU_ENABLED=false` disables detection and GPU selection. CPU
+remains available if detection fails. Free VRAM is a snapshot and does not guarantee
+that a model or framework fits or is compatible with the installed CUDA stack.
 Argo requires `accelerator_model` of `t4` or `a10g`; the Sensor accepts only one GPU
 and the workflow restricts instance types to the selected model. Retry preserves the
 model. Existing Argo GPU jobs without a model must be recreated. Docker sets CPU

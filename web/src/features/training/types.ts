@@ -63,6 +63,7 @@ export interface TrainingJob {
   accelerator_type: TrainingAcceleratorType;
   accelerator_count: number;
   accelerator_model: TrainingAcceleratorModel;
+  local_gpu_id: string;
   source_zip: string;
   requirements_file: string;
   training_data: string;
@@ -121,6 +122,7 @@ export interface TrainingJobFormValues {
   accelerator_type: TrainingAcceleratorType;
   accelerator_count: number;
   accelerator_model: TrainingAcceleratorModel;
+  local_gpu_id: string;
   source_zip: File | null;
   training_data: File | null;
   project_id?: ResourceId;
@@ -131,7 +133,13 @@ export interface TrainingRuntimeCapabilities {
   enabled: boolean;
   backend: "docker" | "argo";
   cpu_profiles: Array<{ id: string; vcpu: number; memory_mb: number }>;
-  accelerators: Array<{ type: TrainingAcceleratorType; model?: TrainingAcceleratorModel; counts: number[] }>;
+  accelerators: Array<{ type: TrainingAcceleratorType; model?: TrainingAcceleratorModel; device_id?: string; counts: number[] }>;
+  local_gpu?: {
+    status: "available" | "unavailable" | "checking" | "disabled" | "error";
+    reason: string;
+    checked_at?: string;
+    devices: Array<{ id: string; name: string; memory_total_mib: number | null; memory_free_mib: number | null }>;
+  };
 }
 
 export interface TrainingJobDownloadURLResponse {

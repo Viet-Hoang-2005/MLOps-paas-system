@@ -37,6 +37,7 @@ export interface TrainingExecutionForm {
   accelerator_type: TrainingAcceleratorType;
   accelerator_count: number;
   accelerator_model: TrainingAcceleratorModel;
+  local_gpu_id: string;
 }
 
 export interface CreateTrainingJobContext {
@@ -48,6 +49,8 @@ export interface CreateTrainingJobContext {
   executionForm: TrainingExecutionForm;
   job: TrainingJob | null;
   capabilities: TrainingRuntimeCapabilities | null;
+  gpuChecking: boolean;
+  refreshGpuCapabilities(): Promise<void>;
   metadataDirty: boolean;
   sourceDirty: boolean;
   transitionState: TrainingTransitionState;

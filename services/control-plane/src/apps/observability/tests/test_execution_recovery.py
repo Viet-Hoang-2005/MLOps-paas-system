@@ -362,6 +362,7 @@ def test_gpu_unavailable_fails_without_cpu_retry(job, monkeypatch, settings):
     settings.TRAINING_GPU_ENABLED = True
     settings.TRAINING_GPU_COUNTS = [1]
     job.accelerator_type, job.accelerator_count = "gpu", 1
+    job.local_gpu_id = "GPU-01234567-89ab-cdef-0123-456789abcdef"
     job.save()
     backend = backend_mock(monkeypatch)
     backend.poll.return_value = {"status": "not_found"}

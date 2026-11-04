@@ -81,6 +81,7 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "accelerator_type",
             "accelerator_count",
             "accelerator_model",
+            "local_gpu_id",
             "tracking",
             "error_message",
             "started_at",

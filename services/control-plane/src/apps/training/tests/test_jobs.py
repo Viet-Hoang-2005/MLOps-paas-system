@@ -48,7 +48,7 @@ def test_training_job_paths_are_project_scoped(monkeypatch):
 
 
 @pytest.mark.django_db
-def test_runtime_capabilities_only_expose_configured_accelerators(settings):
+def test_runtime_capabilities_only_expose_configured_accelerators(settings, monkeypatch):
     user = get_user_model().objects.create_user("capabilities@example.com", "password123")
     client = APIClient()
     client.force_authenticate(user)
@@ -64,8 +64,10 @@ def test_runtime_capabilities_only_expose_configured_accelerators(settings):
     assert cpu_only.data["accelerators"] == [{"type": "none", "counts": [0]}]
 
     settings.TRAINING_GPU_ENABLED = True
+    monkeypatch.setattr("apps.training.services.local_gpu.inventory", lambda **kwargs: {
+        "status": "available", "reason": "", "devices": [{"id": "GPU-01234567-89ab-cdef-0123-456789abcdef"}]})
     with_gpu = client.get("/api/training-jobs/runtime-capabilities/")
-    assert with_gpu.data["accelerators"][-1] == {"type": "gpu", "model": "", "counts": [1]}
+    assert with_gpu.data["accelerators"][-1] == {"type": "gpu", "model": "", "counts": [1], "device_id": "GPU-01234567-89ab-cdef-0123-456789abcdef"}
 
 
 @pytest.mark.django_db

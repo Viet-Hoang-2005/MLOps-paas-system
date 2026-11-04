@@ -13,14 +13,18 @@ from apps.training.services.resources import validate_resources
     ("docker", [{"type": "gpu", "model": "", "counts": [1]}]),
     ("argo", [{"type": "gpu", "model": "t4", "counts": [1]}, {"type": "gpu", "model": "a10g", "counts": [1]}]),
 ])
-def test_capabilities_never_advertise_more_than_one_gpu(settings, backend, expected):
+def test_capabilities_never_advertise_more_than_one_gpu(settings, monkeypatch, backend, expected):
     settings.TRAINING_BACKEND = backend
     settings.TRAINING_GPU_ENABLED = True
     settings.TRAINING_GPU_COUNTS = (1, 2, 4)
+    monkeypatch.setattr("apps.training.services.local_gpu.inventory", lambda **kwargs: {
+        "status": "available", "reason": "", "devices": [{"id": "GPU-01234567-89ab-cdef-0123-456789abcdef"}]})
     client = APIClient()
     client.force_authenticate(get_user_model().objects.create_user("gpu-capability@example.com"))
     result = client.get("/api/training-jobs/runtime-capabilities/")
     assert result.status_code == 200
+    if backend == "docker":
+        expected[0]["device_id"] = "GPU-01234567-89ab-cdef-0123-456789abcdef"
     assert result.data["accelerators"] == [{"type": "none", "counts": [0]}, *expected]
 
 
@@ -42,7 +46,8 @@ def test_resource_validation(settings, backend, kind, count, model, valid):
     settings.TRAINING_BACKEND = backend
     settings.TRAINING_GPU_ENABLED = True
     settings.TRAINING_GPU_COUNTS = (1, 2)
-    values = {"accelerator_type": kind, "accelerator_count": count, "accelerator_model": model}
+    values = {"accelerator_type": kind, "accelerator_count": count, "accelerator_model": model,
+              "local_gpu_id": "GPU-01234567-89ab-cdef-0123-456789abcdef" if backend == "docker" and kind == "gpu" else ""}
     if valid:
         assert validate_resources(values) == values
     else:

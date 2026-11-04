@@ -69,6 +69,7 @@ const emptyExecution: TrainingExecutionForm = {
   accelerator_type: "none",
   accelerator_count: 0,
   accelerator_model: "",
+  local_gpu_id: "",
 };
 
 const metadataFingerprint = (form: TrainingMetadataForm) =>
@@ -100,6 +101,7 @@ export default function CreateTrainingJobPage() {
   const [job, setJob] = useState<TrainingJob | null>(null);
   const [capabilities, setCapabilities] =
     useState<TrainingRuntimeCapabilities | null>(null);
+  const [gpuChecking, setGpuChecking] = useState(false);
   const [transitionState, setTransitionState] =
     useState<TrainingTransitionState>("idle");
   const [metadataBaseline, setMetadataBaseline] = useState(
@@ -142,6 +144,16 @@ export default function CreateTrainingJobPage() {
   );
 
   const effectTranslation = useEffectEvent((key: string) => t(key));
+  const refreshGpuCapabilities = useCallback(async () => {
+    setGpuChecking(true);
+    try {
+      setCapabilities(await getTrainingRuntimeCapabilities(true));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("createFlow.execution.gpuRefreshFailed")));
+    } finally {
+      setGpuChecking(false);
+    }
+  }, [t]);
   useEffect(() => {
     void Promise.all([listModelProjects(), getTrainingRuntimeCapabilities()])
       .then(([projectResponse, runtime]) => {
@@ -385,6 +397,7 @@ export default function CreateTrainingJobPage() {
         accelerator_type: executionForm.accelerator_type,
         accelerator_count: executionForm.accelerator_count,
         accelerator_model: executionForm.accelerator_model,
+        local_gpu_id: executionForm.local_gpu_id,
         source_zip: null,
         training_data: null,
       });
@@ -487,6 +500,8 @@ export default function CreateTrainingJobPage() {
     executionForm,
     job,
     capabilities,
+    gpuChecking,
+    refreshGpuCapabilities,
     metadataDirty,
     sourceDirty,
     transitionState,

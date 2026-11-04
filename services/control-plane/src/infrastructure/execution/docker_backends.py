@@ -96,6 +96,9 @@ class DockerTrainingBackend:
 
     def run(self, job):
         project = job.project
+        if job.accelerator_type == "gpu":
+            from apps.training.services.local_gpu import require_device
+            require_device(job.local_gpu_id, client=self.docker.client)
         validate_training_uri(job, self.storage.bucket, "code", job.code_snapshot_uri)
         validate_training_uri(job, self.storage.bucket, "data", job.data_snapshot_uri)
         validate_training_uri(job, self.storage.bucket, "output", job.output_uri)
@@ -139,7 +142,7 @@ class DockerTrainingBackend:
             nano_cpus=job.vcpu * 1_000_000_000,
             mem_limit=f"{job.memory_mb}m",
             memswap_limit=f"{job.memory_mb}m",
-            device_requests=[docker.types.DeviceRequest(count=job.accelerator_count, capabilities=[["gpu"]])] if job.accelerator_type == "gpu" else [],
+            device_requests=[docker.types.DeviceRequest(device_ids=[job.local_gpu_id], capabilities=[["gpu"]])] if job.accelerator_type == "gpu" else [],
         )
         return {"dispatched": True, "container_id": container.id}
 

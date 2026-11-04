@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useCreateTrainingJob } from "@/features/training/trainingFlowContext";
-import type { TrainingAcceleratorModel, TrainingAcceleratorType } from "@/features/training/types";
+import type { TrainingAcceleratorType } from "@/features/training/types";
 import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
 import { Button } from "@/shared/components/Button";
 import { Slider } from "@/shared/components/Slider";
@@ -58,6 +58,10 @@ export default function ExecutionTrainingJobPage() {
   const accelerators = flow.capabilities?.accelerators ?? [
     { type: "none" as const, counts: [0] },
   ];
+  const localGpu = flow.capabilities?.local_gpu;
+  const missingSelectedGpu = flow.capabilities?.backend === "docker" &&
+    flow.executionForm.accelerator_type === "gpu" &&
+    !localGpu?.devices.some((device) => device.id === flow.executionForm.local_gpu_id);
   const stream = useRuntimeLogStream({
     source: flow.job?.id ? { kind: "training", id: flow.job.id } : null,
     enabled: Boolean(flow.job),
@@ -133,32 +137,58 @@ export default function ExecutionTrainingJobPage() {
             {t("createFlow.execution.accelerator")}
           </p>
           <Picker
-            value={`${flow.executionForm.accelerator_type}-${flow.executionForm.accelerator_model || "generic"}-${flow.executionForm.accelerator_count}`}
+            value={`${flow.executionForm.accelerator_type}|${flow.executionForm.local_gpu_id || flow.executionForm.accelerator_model || "generic"}|${flow.executionForm.accelerator_count}`}
             onChange={(val) => {
-              const [type, model, count] = val.split("-");
+              const [type, selection, count] = val.split("|");
               flow.setExecutionField(
                 "accelerator_type",
                 type as TrainingAcceleratorType,
               );
               flow.setExecutionField("accelerator_count", Number(count));
-              flow.setExecutionField("accelerator_model", (model === "generic" ? "" : model) as TrainingAcceleratorModel);
+              flow.setExecutionField("accelerator_model", selection === "t4" || selection === "a10g" ? selection : "");
+              flow.setExecutionField("local_gpu_id", selection.startsWith("GPU-") ? selection : "");
             }}
             className="gap-3 sm:grid-cols-2 lg:grid-cols-3"
             options={accelerators.flatMap((accelerator) =>
               accelerator.counts.map((count) => ({
-                value: `${accelerator.type}-${accelerator.model || "generic"}-${count}`,
+                value: `${accelerator.type}|${accelerator.device_id || accelerator.model || "generic"}|${count}`,
                 title:
                   accelerator.type === "none"
                     ? t("createFlow.execution.cpuOnly")
+                    : accelerator.device_id
+                      ? localGpu?.devices.find((device) => device.id === accelerator.device_id)?.name ?? t("createFlow.execution.gpuGeneric")
                     : accelerator.model === "t4"
                       ? t("createFlow.execution.gpuT4")
                       : accelerator.model === "a10g"
                         ? t("createFlow.execution.gpuA10g")
                         : t("createFlow.execution.gpuGeneric"),
-                description: flow.capabilities?.backend ?? "-",
+                description: accelerator.device_id ? (() => {
+                  const device = localGpu?.devices.find((item) => item.id === accelerator.device_id);
+                  const total = device?.memory_total_mib;
+                  const free = device?.memory_free_mib;
+                  return t("createFlow.execution.gpuMemory", {
+                    total: total == null ? t("createFlow.execution.gpuUnknown") : `${total} MiB`,
+                    free: free == null ? t("createFlow.execution.gpuUnknown") : `${free} MiB`,
+                  });
+                })() : flow.capabilities?.backend ?? "-",
               })),
             )}
           />
+          {localGpu && (
+            <div className="space-y-2" role="status">
+              <p className="text-style-body text-color-muted-foreground">
+                {t(`createFlow.execution.gpuStatus.${localGpu.status}`)}
+              </p>
+              {localGpu.status === "available" && <p className="text-style-body text-color-muted-foreground">{t("createFlow.execution.gpuMemoryNote")}</p>}
+              {localGpu.reason && <p className="text-style-body text-color-muted-foreground">
+                {t(`createFlow.execution.gpuReason.${localGpu.reason}`)}
+              </p>}
+              {missingSelectedGpu && <p className="text-style-body text-color-danger">{t("createFlow.execution.gpuSelectionMissing")}</p>}
+              <Button variant="secondary" loading={flow.gpuChecking} onClick={() => void flow.refreshGpuCapabilities()}>
+                {t("createFlow.execution.gpuCheckAgain")}
+              </Button>
+            </div>
+          )}
         </div>
 
         <div>
@@ -197,7 +227,7 @@ export default function ExecutionTrainingJobPage() {
               <TerminalActionButton
                 icon={<Play className="h-3 w-3" />}
                 loading={flow.transitionState === "starting-training"}
-                disabled={flow.transitionState !== "idle"}
+                disabled={flow.transitionState !== "idle" || flow.gpuChecking || missingSelectedGpu}
                 onClick={() => void flow.startTraining()}
               >
                 {flow.job
