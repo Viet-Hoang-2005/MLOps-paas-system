@@ -33,9 +33,13 @@ The public APIs retain lifecycle enums and add `observation_status` (`ok`,
 CPU/memory profiles are 1/2048, 2/4096 and 4/8192 (cores/MiB), validated on
 create/update/submit. Runtime options are 900, 1800, 3600, 7200, 21600, 43200 seconds
 and come from `GET /api/training-jobs/runtime-capabilities/`. GPU requires
-`TRAINING_GPU_ENABLED` and a count in `TRAINING_GPU_COUNTS`; `none` requires 0.
-Docker sets CPU quota, memory plus swap limit and GPU DeviceRequest. An unavailable
-GPU fails explicitly; no CPU substitution occurs.
+`TRAINING_GPU_ENABLED`, count 1 and `1` in `TRAINING_GPU_COUNTS`; `none` requires 0
+and an empty model. Docker uses an empty model and a generic host GPU DeviceRequest.
+Argo requires `accelerator_model` of `t4` or `a10g`; the Sensor accepts only one GPU
+and the workflow restricts instance types to the selected model. Retry preserves the
+model. Existing Argo GPU jobs without a model must be recreated. Docker sets CPU
+quota, memory plus swap limit and GPU DeviceRequest. An unavailable GPU fails
+explicitly; no CPU substitution occurs.
 
 `EXECUTION_DISPATCH_TIMEOUT_SECONDS` defaults to 1800. Runner runtime begins when
 its container process starts, including Python initialization, input download,

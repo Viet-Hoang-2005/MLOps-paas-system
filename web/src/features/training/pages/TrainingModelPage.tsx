@@ -16,10 +16,8 @@ import {
   listTrainingJobs,
   retryTrainingJob,
 } from "@/features/training/api/trainingApi";
-import {
-  TrainingJobStatusFilter,
-  type TrainingStatusFilter,
-} from "@/features/training/components/TrainingJobListSections";
+import type { TrainingStatusFilter } from "@/features/training/components/TrainingJobListSections";
+import { Select, type SelectOption } from "@/shared/components/Select";
 import { trainingQueryKeys } from "@/features/training/queryKeys";
 import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
@@ -117,6 +115,16 @@ export default function TrainingModelPage() {
         : [],
     [allTrainingJobs, selectedModel],
   );
+  const statusOptions = useMemo<SelectOption[]>(
+    () => [
+      { value: "all", label: t("statusFilter.all") },
+      { value: "pending", label: t("statusFilter.pending") },
+      { value: "success", label: t("statusFilter.success") },
+      { value: "failed", label: t("statusFilter.failed") },
+    ],
+    [t],
+  );
+
   const trainingJobs = useMemo(
     () =>
       selectedModelTrainingJobs.filter((job) => {
@@ -276,7 +284,7 @@ export default function TrainingModelPage() {
           });
           const gpu =
             job.accelerator_type === "gpu" && job.accelerator_count > 0
-              ? ` · GPU ×${job.accelerator_count}`
+              ? ` · ${job.accelerator_model === "t4" ? "NVIDIA T4" : job.accelerator_model === "a10g" ? "NVIDIA A10G" : "GPU"} ×${job.accelerator_count}`
               : "";
           return `${job.vcpu} vCPU · ${memoryGb} GB${gpu}`;
         },
@@ -496,10 +504,15 @@ export default function TrainingModelPage() {
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <TrainingJobStatusFilter
-          value={statusFilter}
-          onChange={setStatusFilter}
-        />
+        <div className="w-full sm:w-60">
+          <Select
+            className="h-10 text-style-body"
+            value={statusFilter}
+            onChange={(val) => setStatusFilter(val as TrainingStatusFilter)}
+            options={statusOptions}
+            placeholder={t("statusFilter.placeholder")}
+          />
+        </div>
         <Button
           size="md"
           icon={<Plus className="h-4 w-4" />}

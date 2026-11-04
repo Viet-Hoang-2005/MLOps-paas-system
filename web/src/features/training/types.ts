@@ -11,6 +11,7 @@ export type TrainingJobStatus =
   | "failed"
   | "cancelled";
 export type TrainingAcceleratorType = "none" | "gpu";
+export type TrainingAcceleratorModel = "" | "t4" | "a10g";
 export type TrainingModelStatus = "none" | "trained" | "built" | "deployed";
 
 export interface TrainingBuild {
@@ -61,6 +62,7 @@ export interface TrainingJob {
   max_runtime_seconds: number;
   accelerator_type: TrainingAcceleratorType;
   accelerator_count: number;
+  accelerator_model: TrainingAcceleratorModel;
   source_zip: string;
   requirements_file: string;
   training_data: string;
@@ -118,6 +120,7 @@ export interface TrainingJobFormValues {
   max_runtime_seconds: number;
   accelerator_type: TrainingAcceleratorType;
   accelerator_count: number;
+  accelerator_model: TrainingAcceleratorModel;
   source_zip: File | null;
   training_data: File | null;
   project_id?: ResourceId;
@@ -128,7 +131,7 @@ export interface TrainingRuntimeCapabilities {
   enabled: boolean;
   backend: "docker" | "argo";
   cpu_profiles: Array<{ id: string; vcpu: number; memory_mb: number }>;
-  accelerators: Array<{ type: TrainingAcceleratorType; counts: number[] }>;
+  accelerators: Array<{ type: TrainingAcceleratorType; model?: TrainingAcceleratorModel; counts: number[] }>;
 }
 
 export interface TrainingJobDownloadURLResponse {

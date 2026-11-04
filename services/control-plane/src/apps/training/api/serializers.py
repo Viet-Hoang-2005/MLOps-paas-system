@@ -80,6 +80,7 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "max_runtime_seconds",
             "accelerator_type",
             "accelerator_count",
+            "accelerator_model",
             "tracking",
             "error_message",
             "started_at",

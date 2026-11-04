@@ -1,30 +1,38 @@
 import { useTranslation } from "react-i18next";
-import { Switch } from "@/shared/components/Switch";
+import { useMemo } from "react";
+import { Select, type SelectOption } from "@/shared/components/Select";
 
 export type TrainingStatusFilter = "pending" | "success" | "failed" | "all";
 
 export function TrainingJobStatusFilter({
   value,
   onChange,
+  className = "w-full sm:w-60",
 }: {
   value: TrainingStatusFilter;
   onChange: (value: TrainingStatusFilter) => void;
+  className?: string;
 }) {
   const { t } = useTranslation("training");
-  const options = [
-    { title: t("statusFilter.all"), value: "all" as const },
-    { title: t("statusFilter.pending"), value: "pending" as const },
-    { title: t("statusFilter.success"), value: "success" as const },
-    { title: t("statusFilter.failed"), value: "failed" as const },
-  ];
+  const options = useMemo<SelectOption[]>(
+    () => [
+      { value: "all", label: t("statusFilter.all") },
+      { value: "pending", label: t("statusFilter.pending") },
+      { value: "success", label: t("statusFilter.success") },
+      { value: "failed", label: t("statusFilter.failed") },
+    ],
+    [t],
+  );
 
   return (
-    <Switch
-      value={value}
-      onChange={onChange}
-      options={options}
-      size="md"
-      ariaLabel={t("statusFilter.label")}
-    />
+    <div className={className}>
+      <Select
+        className="h-10 text-style-body"
+        value={value}
+        onChange={(val) => onChange(val as TrainingStatusFilter)}
+        options={options}
+        placeholder={t("statusFilter.placeholder")}
+      />
+    </div>
   );
 }

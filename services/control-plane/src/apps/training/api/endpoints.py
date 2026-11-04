@@ -19,7 +19,7 @@ from apps.training.services.jobs import (
     submit_job,
 )
 from apps.training.services.logs import training_logs
-from apps.training.services.resources import CPU_PROFILES, RUNTIME_OPTIONS
+from apps.training.services.resources import CPU_PROFILES, GPU_MODELS, RUNTIME_OPTIONS
 from apps.training.services.outputs import (
     get_job_reference_preview,
     get_model_output_summary,
@@ -188,8 +188,11 @@ class TrainingRuntimeCapabilitiesEndpoint(APIView):
                 }
             )
         accelerators = [{"type": "none", "counts": [0]}]
-        if settings.TRAINING_GPU_ENABLED:
-            accelerators.append({"type": "gpu", "counts": list(settings.TRAINING_GPU_COUNTS or (1,))})
+        if settings.TRAINING_GPU_ENABLED and 1 in settings.TRAINING_GPU_COUNTS:
+            if settings.TRAINING_BACKEND == "argo":
+                accelerators.extend({"type": "gpu", "model": model, "counts": [1]} for model in GPU_MODELS)
+            else:
+                accelerators.append({"type": "gpu", "model": "", "counts": [1]})
         return Response(
             {
                 "enabled": True,

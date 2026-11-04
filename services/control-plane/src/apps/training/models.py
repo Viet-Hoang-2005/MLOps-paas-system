@@ -61,6 +61,7 @@ class TrainingJob(ExecutionWatch):
     max_runtime_seconds = models.PositiveIntegerField(default=3600)
     accelerator_type = models.CharField(max_length=20, choices=ACCELERATORS, default="none")
     accelerator_count = models.PositiveIntegerField(default=0)
+    accelerator_model = models.CharField(max_length=16, blank=True, default="")
     tracking = models.JSONField(default=dict, blank=True)
     error_message = models.TextField(blank=True)
     started_at = models.DateTimeField(null=True, blank=True)

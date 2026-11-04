@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useCreateTrainingJob } from "@/features/training/trainingFlowContext";
-import type { TrainingAcceleratorType } from "@/features/training/types";
+import type { TrainingAcceleratorModel, TrainingAcceleratorType } from "@/features/training/types";
 import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
 import { Button } from "@/shared/components/Button";
 import { Slider } from "@/shared/components/Slider";
@@ -133,23 +133,28 @@ export default function ExecutionTrainingJobPage() {
             {t("createFlow.execution.accelerator")}
           </p>
           <Picker
-            value={`${flow.executionForm.accelerator_type}-${flow.executionForm.accelerator_count}`}
+            value={`${flow.executionForm.accelerator_type}-${flow.executionForm.accelerator_model || "generic"}-${flow.executionForm.accelerator_count}`}
             onChange={(val) => {
-              const [type, count] = val.split("-");
+              const [type, model, count] = val.split("-");
               flow.setExecutionField(
                 "accelerator_type",
                 type as TrainingAcceleratorType,
               );
               flow.setExecutionField("accelerator_count", Number(count));
+              flow.setExecutionField("accelerator_model", (model === "generic" ? "" : model) as TrainingAcceleratorModel);
             }}
             className="gap-3 sm:grid-cols-2 lg:grid-cols-3"
             options={accelerators.flatMap((accelerator) =>
               accelerator.counts.map((count) => ({
-                value: `${accelerator.type}-${count}`,
+                value: `${accelerator.type}-${accelerator.model || "generic"}-${count}`,
                 title:
                   accelerator.type === "none"
                     ? t("createFlow.execution.cpuOnly")
-                    : `GPU x${count}`,
+                    : accelerator.model === "t4"
+                      ? t("createFlow.execution.gpuT4")
+                      : accelerator.model === "a10g"
+                        ? t("createFlow.execution.gpuA10g")
+                        : t("createFlow.execution.gpuGeneric"),
                 description: flow.capabilities?.backend ?? "-",
               })),
             )}

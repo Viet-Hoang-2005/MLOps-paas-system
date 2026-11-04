@@ -55,7 +55,7 @@ export function VersionLineage({
           const isSelected = version.id === selectedId;
 
           const borderClasses = isSelected
-            ? "border-foreground"
+            ? "border-primary"
             : isRunning
               ? "border-success-border"
               : "border-info-border";

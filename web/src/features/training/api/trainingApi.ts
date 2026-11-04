@@ -29,6 +29,7 @@ const trainingJobFormData = (payload: TrainingJobFormValues) => {
   formData.append("max_runtime_seconds", String(payload.max_runtime_seconds));
   formData.append("accelerator_type", payload.accelerator_type);
   formData.append("accelerator_count", String(payload.accelerator_count));
+  formData.append("accelerator_model", payload.accelerator_model);
   if (payload.source_zip) formData.append("source_zip", payload.source_zip);
   if (payload.training_data)
     formData.append("training_data", payload.training_data);

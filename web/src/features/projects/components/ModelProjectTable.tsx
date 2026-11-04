@@ -141,9 +141,6 @@ export function ModelProjectTable({
           return (
             <Badge variant={variant}>
               {t(`workflow.${statusKey}`)}
-              {row.original.preview_changed
-                ? ` · ${t("workflow.previewChanged")}`
-                : ""}
             </Badge>
           );
         },

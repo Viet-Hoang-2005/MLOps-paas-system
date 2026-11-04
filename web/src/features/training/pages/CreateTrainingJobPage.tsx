@@ -68,6 +68,7 @@ const emptyExecution: TrainingExecutionForm = {
   max_runtime_seconds: 3600,
   accelerator_type: "none",
   accelerator_count: 0,
+  accelerator_model: "",
 };
 
 const metadataFingerprint = (form: TrainingMetadataForm) =>
@@ -383,6 +384,7 @@ export default function CreateTrainingJobPage() {
         max_runtime_seconds: executionForm.max_runtime_seconds,
         accelerator_type: executionForm.accelerator_type,
         accelerator_count: executionForm.accelerator_count,
+        accelerator_model: executionForm.accelerator_model,
         source_zip: null,
         training_data: null,
       });

@@ -76,7 +76,9 @@ spec:
           operator: In
           values:
             - g4dn.xlarge
+            - g4dn.2xlarge
             - g5.xlarge
+            - g5.2xlarge
       nodeClassRef:
         group: karpenter.k8s.aws
         kind: EC2NodeClass

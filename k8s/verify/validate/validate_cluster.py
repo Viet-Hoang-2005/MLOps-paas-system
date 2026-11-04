@@ -132,7 +132,7 @@ def validate_karpenter_capacity(context: ValidationContext) -> None:
                 gpu_pool,
                 "mlops-paas-training-gpu",
                 "training-gpu",
-                {"g4dn.xlarge", "g5.xlarge"},
+                {"g4dn.xlarge", "g4dn.2xlarge", "g5.xlarge", "g5.2xlarge"},
                 gpu=True,
             )
         )

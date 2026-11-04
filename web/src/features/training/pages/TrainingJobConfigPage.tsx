@@ -47,7 +47,11 @@ export default function TrainingJobConfigPage() {
               value={
                 job.accelerator_type === "none"
                   ? t("statuses.none", { ns: "common" })
-                  : job.accelerator_type.toUpperCase()
+                  : job.accelerator_model === "t4"
+                    ? t("createFlow.execution.gpuT4")
+                    : job.accelerator_model === "a10g"
+                      ? t("createFlow.execution.gpuA10g")
+                      : job.accelerator_type.toUpperCase()
               }
             />
             {job.accelerator_type !== "none" && (

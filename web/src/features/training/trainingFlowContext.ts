@@ -7,6 +7,7 @@ import type {
 } from "@/features/projects/types";
 import type {
   TrainingAcceleratorType,
+  TrainingAcceleratorModel,
   TrainingJob,
   TrainingRuntimeCapabilities,
 } from "@/features/training/types";
@@ -35,6 +36,7 @@ export interface TrainingExecutionForm {
   max_runtime_seconds: number;
   accelerator_type: TrainingAcceleratorType;
   accelerator_count: number;
+  accelerator_model: TrainingAcceleratorModel;
 }
 
 export interface CreateTrainingJobContext {

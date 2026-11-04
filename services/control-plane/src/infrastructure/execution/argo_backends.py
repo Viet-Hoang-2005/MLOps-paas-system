@@ -164,6 +164,7 @@ class ArgoTrainingBackend(_ArgoBackend):
                 "input_download_capability": issue_capability(job, "input_download", preserve_existing=True),
                 "accelerator_type": job.accelerator_type,
                 "accelerator_count": job.accelerator_count,
+                "accelerator_model": job.accelerator_model,
                 "s3_source_uri": self.storage.presigned_get(
                     job.code_snapshot_uri, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS
                 ),

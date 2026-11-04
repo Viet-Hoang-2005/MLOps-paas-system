@@ -170,6 +170,9 @@ spec:
           - path: body.accelerator_type
             type: string
             value: ['^(none|gpu)$']
+          - path: body.accelerator_model
+            type: string
+            value: ['^(|t4|a10g)$']
           - path: body.control_plane_webhook_url
             type: string
             value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/training-jobs/[0-9a-f-]{36}/$']
@@ -189,13 +192,15 @@ spec:
               - name: memory
                 path: body.memory
           - expr: >-
-              (accelerator_type == "none" && accelerator_count == 0) ||
-              (accelerator_type == "gpu" && accelerator_count > 0)
+              (accelerator_type == "none" && accelerator_count == 0 && accelerator_model == "") ||
+              (accelerator_type == "gpu" && accelerator_count == 1 && (accelerator_model == "t4" || accelerator_model == "a10g"))
             fields:
               - name: accelerator_type
                 path: body.accelerator_type
               - name: accelerator_count
                 path: body.accelerator_count
+              - name: accelerator_model
+                path: body.accelerator_model
     - name: cancel-train-dep
       eventSourceName: webhook-eventsource
       eventName: cancel-train

@@ -1,5 +1,7 @@
 # Cross-Service Contracts
 
+Training dispatch carries `accelerator_type`, `accelerator_count`, and `accelerator_model` from Control Plane to Argo. Only `(none, 0, empty)`, `(gpu, 1, t4)`, and `(gpu, 1, a10g)` are valid for Argo; the Sensor validates these before the workflow chooses model-bound instance types. Docker GPU jobs use the host's generic GPU and empty model.
+
 ## 1. Environment ID Invariants
 
 | Runtime / Worker | Required Identity Variables |

@@ -10,9 +10,9 @@ describe("inferenceClient - Public/Private, Token Injection & Single Refresh", (
     authSession.clearAuthSession();
   });
 
-  it("should enforce withCredentials: false and 30s timeout defaults", () => {
+  it("should enforce withCredentials: false and 75s timeout defaults", () => {
     expect(inferenceClient.defaults.withCredentials).toBe(false);
-    expect(inferenceClient.defaults.timeout).toBe(30_000);
+    expect(inferenceClient.defaults.timeout).toBe(75_000);
   });
 
   it("should omit Authorization header for public requests when no token is stored", async () => {

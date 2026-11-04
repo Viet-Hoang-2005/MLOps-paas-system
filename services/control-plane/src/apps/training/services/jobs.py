@@ -133,6 +133,7 @@ RETRY_FIELDS = (
     "max_runtime_seconds",
     "accelerator_type",
     "accelerator_count",
+    "accelerator_model",
     "baseline_version_id",
     "dataset_snapshot_id",
 )

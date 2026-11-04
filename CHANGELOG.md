@@ -6,6 +6,8 @@ Tài liệu này ghi nhận các thay đổi mã nguồn có ảnh hưởng đ�
 
 ### Changed
 
+- Training production chọn NVIDIA T4 hoặc A10G ×1; giữ GPU local tổng quát ×1. Lưu model trong job/retry, ràng buộc instance tương ứng trong Argo và mở rộng NodePool GPU với các instance `2xlarge`.
+
 - Tái cấu trúc schema first-party của Control Plane cho hướng Continuous Training; toàn bộ bảng thuộc schema `control_plane`.
 - Tạo app nghiệp vụ `continuous_training` tại package `apps/ct`, giữ Django app label `ct` và tên bảng `ct_*`.
 - Tạo `production_predictionrecord` làm nguồn dữ liệu production thống nhất cho API production-data, Evidently và automatic drift.

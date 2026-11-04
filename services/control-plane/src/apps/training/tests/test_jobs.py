@@ -65,7 +65,7 @@ def test_runtime_capabilities_only_expose_configured_accelerators(settings):
 
     settings.TRAINING_GPU_ENABLED = True
     with_gpu = client.get("/api/training-jobs/runtime-capabilities/")
-    assert with_gpu.data["accelerators"][-1] == {"type": "gpu", "counts": [1, 2]}
+    assert with_gpu.data["accelerators"][-1] == {"type": "gpu", "model": "", "counts": [1]}
 
 
 @pytest.mark.django_db

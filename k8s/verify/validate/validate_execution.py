@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+
 import pytest
 import yaml
 
@@ -268,6 +269,25 @@ def validate_workflow_training_task(context: ValidationContext) -> None:
     assert gpu_step, "Training pipeline must include 'run-gpu-pytorch-job' step"
     assert "!= 'gpu'" in cpu_step.get("when", "")
     assert "== 'gpu'" in gpu_step.get("when", "")
+    gpu_arguments = {p["name"]: p.get("value") for p in gpu_step["arguments"]["parameters"]}
+    assert gpu_arguments["accelerator_model"] == "{{inputs.parameters.accelerator_model}}"
+    gpu_manifest = templates["gpu-pytorch-job"]["resource"]["manifest"]
+    assert all(value in gpu_manifest for value in ("g4dn.xlarge", "g4dn.2xlarge", "g5.xlarge", "g5.2xlarge"))
+    assert "invalid-gpu-model" in gpu_manifest
+    gpu_job = _safe_parse_embedded_manifest(gpu_manifest)
+    gpu_pod = gpu_job["spec"]["pytorchReplicaSpecs"]["Master"]["template"]["spec"]
+    assert gpu_pod["affinity"]["nodeAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"]["nodeSelectorTerms"][0]["matchExpressions"][0]["key"] == "node.kubernetes.io/instance-type"
+    resources = gpu_pod["containers"][0]["resources"]
+    assert resources["requests"]["nvidia.com/gpu"] == "placeholder"
+    assert resources["limits"]["nvidia.com/gpu"] == "placeholder"
+
+    sensor = find_resource(execution, "Sensor", "model-sensor")
+    dependency = next(d for d in sensor["spec"]["dependencies"] if d["name"] == "train-dep")
+    expressions = dependency["filters"]["exprs"]
+    gpu_filter = next(item for item in expressions if "accelerator_count" in item["expr"])
+    assert 'accelerator_count == 1' in gpu_filter["expr"]
+    assert 'accelerator_model == "t4"' in gpu_filter["expr"]
+    assert 'accelerator_model == "a10g"' in gpu_filter["expr"]
 
     # Verify PyTorchJob CRD manifest
     cpu_job_tmpl = templates.get("cpu-pytorch-job")

@@ -26,6 +26,7 @@ spec:
           - {name: memory}
           - {name: accelerator_type}
           - {name: accelerator_count}
+          - {name: accelerator_model}
           - {name: s3_source_uri}
           - {name: s3_training_data_uri}
           - {name: output_upload_url}
@@ -76,6 +77,7 @@ spec:
                 - {name: vcpu, value: "{{inputs.parameters.vcpu}}"}
                 - {name: memory, value: "{{inputs.parameters.memory}}"}
                 - {name: accelerator_count, value: "{{inputs.parameters.accelerator_count}}"}
+                - {name: accelerator_model, value: "{{inputs.parameters.accelerator_model}}"}
                 - {name: s3_source_uri, value: "{{inputs.parameters.s3_source_uri}}"}
                 - {name: s3_training_data_uri, value: "{{inputs.parameters.s3_training_data_uri}}"}
                 - {name: output_upload_url, value: "{{inputs.parameters.output_upload_url}}"}
@@ -194,6 +196,7 @@ spec:
           - {name: vcpu}
           - {name: memory}
           - {name: accelerator_count}
+          - {name: accelerator_model}
           - {name: s3_source_uri}
           - {name: s3_training_data_uri}
           - {name: output_upload_url}
@@ -251,6 +254,16 @@ spec:
                     automountServiceAccountToken: false
                     nodeSelector:
                       mlops-paas/nodepool: training-gpu
+                    affinity:
+                      nodeAffinity:
+                        requiredDuringSchedulingIgnoredDuringExecution:
+                          nodeSelectorTerms:
+                            - matchExpressions:
+                                - key: node.kubernetes.io/instance-type
+                                  operator: In
+                                  values:
+                                    - "{{=inputs.parameters.accelerator_model == 't4' ? 'g4dn.xlarge' : inputs.parameters.accelerator_model == 'a10g' ? 'g5.xlarge' : 'invalid-gpu-model'}}"
+                                    - "{{=inputs.parameters.accelerator_model == 't4' ? 'g4dn.2xlarge' : inputs.parameters.accelerator_model == 'a10g' ? 'g5.2xlarge' : 'invalid-gpu-model'}}"
                     tolerations:
                       - key: nvidia.com/gpu
                         operator: Equal
