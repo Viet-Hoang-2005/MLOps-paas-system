@@ -9,6 +9,7 @@ import {
 } from "@/shared/api/authSession";
 import axios, { type InternalAxiosRequestConfig } from "axios";
 import { apiBaseURL } from "./config";
+import { isInvalidRefreshSession } from "./authErrors";
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 type TokenRefreshResponse = {
@@ -124,7 +125,9 @@ apiClient.interceptors.response.use(
       originalRequest.headers.Authorization = `Bearer ${newAccess}`;
       return apiClient(originalRequest);
     } catch (refreshError: unknown) {
-      clearAuthAndRedirect();
+      if (isInvalidRefreshSession(refreshError)) {
+        clearAuthAndRedirect();
+      }
       return Promise.reject(
         refreshError instanceof Error
           ? refreshError

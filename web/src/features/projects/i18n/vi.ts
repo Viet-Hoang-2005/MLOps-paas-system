@@ -2,6 +2,7 @@ export const projectsVi = {
   workflow: {
     compareVersions: "So sánh bản chụp bất biến",
     trainingLineage: "Tác vụ huấn luyện nguồn",
+    notFoundTitle: "404 Không tìm thấy",
     notFound: "Trang hoặc Dự án mô hình này không tồn tại.",
     pending: "Đang chờ",
     queued: "Đã vào hàng đợi",

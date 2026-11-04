@@ -2,6 +2,7 @@ export const catalogEn = {
   workflow: {
     compareVersions: "Compare immutable snapshots",
     trainingLineage: "Source training job",
+    notFoundTitle: "404 Not found",
     notFound: "This page or model project does not exist.",
     pending: "Pending",
     queued: "Queued",

@@ -172,6 +172,22 @@ export default function ProjectOverviewPage() {
 
   if (!model) return <p>{t("workflow.loading")}</p>;
 
+  const deletionState = model.deletion_state;
+  const lifecycleStatus = model.lifecycle_status ?? "preview";
+  const statusKey =
+    deletionState && deletionState !== "active"
+      ? deletionState
+      : lifecycleStatus;
+
+  const statusVariant =
+    deletionState === "delete_failed"
+      ? "danger"
+      : deletionState === "deleting"
+        ? "warning"
+        : lifecycleStatus === "running"
+          ? "success"
+          : "neutral";
+
   return (
     <div className="flex w-full flex-1 flex-col space-y-6">
       <PageHeader title={t("pageTitle")} />
@@ -182,19 +198,9 @@ export default function ProjectOverviewPage() {
               <h1 className="text-style-page-title text-color-foreground">
                 {model.name}
               </h1>
-              <Badge
-                variant={
-                  model.lifecycle_status === "running" ? "success" : "neutral"
-                }
-              >
-                {t(`workflow.${model.lifecycle_status}`)}
-                {model.preview_changed
-                  ? ` · ${t("workflow.previewChanged")}`
-                  : ""}
+              <Badge variant={statusVariant}>
+                {t(`workflow.${statusKey}`)}
               </Badge>
-              {!hasRunning && model.lifecycle_status === "registered" && (
-                <Badge variant="neutral">{t("workflow.preview")}</Badge>
-              )}
             </div>
             <p className="text-color-muted-foreground">
               {model.description || t("noDescription")}

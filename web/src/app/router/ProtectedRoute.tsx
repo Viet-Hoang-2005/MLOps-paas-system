@@ -5,11 +5,17 @@ import {
 } from "@/features/auth/authStore";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
+import { isInvalidRefreshSession } from "@/shared/api/authErrors";
+import { Button } from "@/shared/components/Button";
+import { Placeholder } from "@/shared/components/Placeholder";
+import { RouteFallback } from "./RouteFallback";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { t } = useTranslation("auth");
   const [status, setStatus] = useState<
-    "checking" | "authenticated" | "unauthenticated"
+    "checking" | "authenticated" | "unauthenticated" | "unavailable"
   >(() => (isAuthenticated() ? "authenticated" : "checking"));
 
   useEffect(() => {
@@ -25,10 +31,14 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
           setStatus("authenticated");
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (isMounted) {
-          clearAuthStore();
-          setStatus("unauthenticated");
+          if (isInvalidRefreshSession(error)) {
+            clearAuthStore();
+            setStatus("unauthenticated");
+          } else {
+            setStatus("unavailable");
+          }
         }
       });
 
@@ -38,7 +48,24 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   }, [status]);
 
   if (status === "checking") {
-    return null;
+    return <RouteFallback />;
+  }
+
+  if (status === "unavailable") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background p-4 md:p-6">
+        <Placeholder
+          role="alert"
+          title={t("session.unavailableTitle")}
+          description={t("session.unavailableDescription")}
+          action={
+            <Button onClick={() => setStatus("checking")}>
+              {t("common:actions.retry")}
+            </Button>
+          }
+        />
+      </main>
+    );
   }
 
   if (status === "unauthenticated") {
