@@ -10,6 +10,7 @@ The Model Server (`services/model-server/`) is the centralized, trusted inferenc
 2. **Multi-Modal Authentication:**
    - Evaluates model project access mode (`public`, `protected`, `private`).
    - Verifies Bearer JWTs (`RS256`) against Control Plane's JWKS endpoint (`/api/auth/.well-known/jwks.json`), caching public keys in Redis.
+   - Accepts only `token_type=access`, issuer `django-control-plane`, audience `mlops-paas`; requires `exp`, `iat`, `jti`, `user_id`, `tenant_id`, `token_type`, `iss`, `aud`. Refresh or other token types return 401 irrespective of blacklist state. Access JWTs remain stateless and valid until expiry; this does not add immediate logout revocation.
    - Validates machine-to-machine Project API Keys (`X-API-Key`) hashed with SHA-256 against Redis cache or PostgreSQL.
 3. **Dynamic Multi-Environment Routing:**
    - *Docker Compose:* Resolves internal container URLs (e.g. `http://machine-learning-serving:5001/predict`).

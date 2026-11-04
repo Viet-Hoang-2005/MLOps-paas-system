@@ -115,10 +115,7 @@ def authenticate_github(code, redirect_uri, http=None):
         raise AuthenticationFailed("GitHub did not return an access token.")
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     profile = client.request("GET", "https://api.github.com/user", headers=headers).json()
-    email = profile.get("email")
-    if not email:
-        emails = client.request("GET", "https://api.github.com/user/emails", headers=headers).json()
-        email = next((item["email"] for item in emails if item.get("primary") and item.get("verified")), None)
+    email = _github_verified_primary_email(client, headers)
     if not email:
         raise AuthenticationFailed("GitHub account has no verified primary email.")
     user, created = _oauth_user(email, profile.get("name") or profile.get("login", ""), "github")
@@ -127,6 +124,28 @@ def authenticate_github(code, redirect_uri, http=None):
         if avatar_url:
             _save_oauth_avatar(user, "github", avatar_url, http=client)
     return user, created
+
+
+def _github_verified_primary_email(client, headers):
+    # Never use the public profile email for account linking: it has no verified flag.
+    # Build each page URL ourselves so an untrusted Link header cannot redirect credentials.
+    for page in range(1, 11):
+        response = client.request(
+            "GET", "https://api.github.com/user/emails", headers=headers,
+            params={"per_page": 100, "page": page},
+        )
+        emails = response.json()
+        if not isinstance(emails, list):
+            break
+        for item in emails:
+            if not isinstance(item, dict):
+                continue
+            email = item.get("email")
+            if item.get("primary") is True and item.get("verified") is True and isinstance(email, str) and email.strip():
+                return email.strip()
+        if "next" not in getattr(response, "links", {}):
+            break
+    raise AuthenticationFailed("GitHub account has no verified primary email.")
 
 
 def _oauth_user(email, full_name, provider, avatar_url="", http=None):

@@ -74,6 +74,8 @@ class GitHubOAuthClient:
             return FakeResponse(payload={"access_token": "github-token"})
         if url == "https://api.github.com/user":
             return FakeResponse(payload={"email": "github-owner@example.com", "name": "GitHub Owner"})
+        if url == "https://api.github.com/user/emails":
+            return FakeResponse(payload=[{"email": "github-owner@example.com", "primary": True, "verified": True}])
         if url == "https://api.github.com/graphql":
             return FakeResponse(
                 payload={"data": {"viewer": {"avatarUrl": "https://avatars.githubusercontent.com/u/12345?size=512"}}}

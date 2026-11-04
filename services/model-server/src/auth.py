@@ -182,7 +182,13 @@ async def authorize_model_access(
             public_key,
             algorithms=["RS256"],
             audience="mlops-paas",
+            issuer="django-control-plane",
+            options={"require": ["exp", "iat", "jti", "user_id", "tenant_id", "token_type", "iss", "aud"]},
         )
+        # Refresh tokens share the issuer, signing key and tenant with access
+        # tokens. They must never authorize inference, even before revocation.
+        if payload.get("token_type") != "access":
+            raise HTTPException(status_code=401, detail="Unauthorized: Expected an access token")
         if payload.get("tenant_id") != model_tenant_id:
             raise HTTPException(
                 status_code=403,

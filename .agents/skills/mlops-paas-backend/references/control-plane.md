@@ -17,6 +17,11 @@ The Django Control Plane is a domain-oriented modular monolith (`services/contro
 
 ## Browser Authentication Contract
 
+- GitHub OAuth account creation/linking must use a verified primary email from the authenticated `/user/emails` API, never the profile email; follow pagination through a bounded set of requests to the fixed GitHub endpoint and fail closed if verification is unavailable.
+
+- Refresh validates the signed token's current user and tenant before issuing access or rotating refresh. Reject inactive, soft-deleted, missing users and invalid identity claims with `TokenError` (the endpoint returns `token_not_valid`); lock the account within the issuance transaction and never create orphaned outstanding tokens.
+- Refresh rotation must atomically claim the old token by a unique blacklist insert; reject an already claimed token even if it passed the earlier validation. Commit that claim and the new outstanding token in the same transaction. Test concurrent refresh and concurrent revocation against disposable PostgreSQL.
+
 - Browser sign-in endpoints return the short-lived RS256 access token in JSON and set the rotating refresh token only in a host-only `HttpOnly` cookie. Never return refresh tokens in JSON or persist either token in browser storage.
 - Refresh and logout read the refresh cookie and require the exact configured Web `Origin` plus `X-Requested-With: XMLHttpRequest`; cookie-setting password, OAuth, and registration-completion endpoints enforce the same request checks.
 - Logout blacklists a valid refresh token before clearing its cookie. Treat persistence failures as server errors so the Web can distinguish local logout from server-side revocation.

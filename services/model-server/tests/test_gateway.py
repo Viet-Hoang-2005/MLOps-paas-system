@@ -129,9 +129,9 @@ async def test_access_jwt_success_missing_and_tenant_mismatch(monkeypatch):
     assert exc.value.status_code == 401
     monkeypatch.setattr(index.jwt, "get_unverified_header", lambda token: {"kid": "k"})
     monkeypatch.setattr(index, "get_public_key", AsyncMock(return_value="public"))
-    monkeypatch.setattr(index.jwt, "decode", lambda *a, **k: {"tenant_id": "t"})
+    monkeypatch.setattr(index.jwt, "decode", lambda *a, **k: {"tenant_id": "t", "token_type": "access"})
     assert (await index.verify_model_access(version, None, "Bearer token"))["auth_type"] == "jwt"
-    monkeypatch.setattr(index.jwt, "decode", lambda *a, **k: {"tenant_id": "other"})
+    monkeypatch.setattr(index.jwt, "decode", lambda *a, **k: {"tenant_id": "other", "token_type": "access"})
     with pytest.raises(HTTPException) as exc:
         await index.verify_model_access(version, None, "Bearer token")
     assert exc.value.status_code == 403

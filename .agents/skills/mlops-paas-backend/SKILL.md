@@ -22,12 +22,14 @@ Never embed passwords, tokens, private keys, real environment values, or SSH cre
 
 ## Architectural Boundaries
 
+- Refresh issuance must verify that the token's user exists, is active and owns its tenant before rotation; retain the account row lock through issuance. Atomically claim the old token in the blacklist and reject a duplicate claim. Never rotate an orphaned refresh token with `user=None`.
+
 - **Strict Layering:** API endpoints must never directly invoke external infrastructure clients (Docker, Boto3, Argo, Harbor, Redis).
 - **Transactional Dispatch:** Celery tasks must be dispatched inside `transaction.on_commit` hooks, ensuring the database transaction has committed before the background task runs.
 - **Service Segregation:**
   - `control-plane`: 10 domain apps (`auth`, `access`, `catalog`, `registry`, `training`, `deployment`, `drift`, `ct`, `production`, `observability`).
   - `consumer`: Redpanda Kafka ingestion, micro-batching into PostgreSQL, and Transactional Outbox for drift signals.
-  - `model-server`: Trusted inference gateway, RS256 JWT / JWKS auth, project API keys, dynamic worker routing, and asynchronous Kafka telemetry emission.
+  - `model-server`: Trusted inference gateway, RS256 JWT / JWKS auth (only `token_type=access`, issuer `django-control-plane`, audience `mlops-paas`, with required identity and lifetime claims), project API keys, dynamic worker routing, and asynchronous Kafka telemetry emission.
   - `machine-learning-serving`: Stateless FastAPI worker for Scikit-Learn/XGBoost, Model Signature column ordering, and confidence calculation via `predict_proba`.
   - `deep-learning-serving`: Stateless BentoML worker for PyTorch/TensorFlow, MLflow PyFunc loading, and tensor normalization.
   - `model-packager`: Formats models to MLflow PyFunc, generates Dockerfiles, and builds images via Docker SDK (local) or Kaniko (production).

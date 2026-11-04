@@ -6,7 +6,7 @@ type InferenceRequest = InternalAxiosRequestConfig & { _retry?: boolean };
 
 export const inferenceClient = axios.create({
   withCredentials: false,
-  timeout: 30_000,
+  timeout: 75_000,
   headers: { "Content-Type": "application/json" },
 });
 
