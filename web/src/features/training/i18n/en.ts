@@ -309,9 +309,12 @@ export const trainingEn = {
     metricsPage: {
       starting: "Runtime metrics are starting",
       startingDescription:
-        "Metrics will appear automatically after the training runner emits its first sample.",
+        "Waiting for resource measurements from the runtime.",
       empty: "No runtime metrics available",
-      emptyDescription: "This training job did not emit any runtime metrics.",
+      emptyDescription: "Resource measurements are available while the job is running.",
+      unavailableDescription: "Resource measurements are temporarily unavailable.",
+      wholeGpu: "Whole GPU; may include other processes",
+      vram: "GPU memory",
       title: "Runtime metrics",
       sampled: "Sampled at {{time}}",
       pending: "Waiting for metrics...",
@@ -319,7 +322,7 @@ export const trainingEn = {
       memoryUsed: "{{memory}} used",
       waitingRunner: "Waiting for runner metrics",
       gpuUnavailable: "Not available",
-      noGpu: "No GPU detected by the training runner",
+      noGpu: "GPU memory data unavailable",
       cpuLimit: "{{count}} vCPU limit",
       cpuUsage: "Container CPU usage",
       cpu: "CPU",

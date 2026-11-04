@@ -148,18 +148,9 @@ export const getTrainingJobLogs = async (
 export const getTrainingJobMetrics = async (
   jobId: string,
 ): Promise<TrainingJobMetricsResponse> => {
-  const job = await getTrainingJob(jobId);
-  return {
-    job_id: job.id,
-    training_job_id: job.id,
-    status: job.status,
-    metrics_available: false,
-    latest: null,
-    history: [],
-    log_stream_name: "",
-    message: "Runtime metrics are not available for this backend.",
-    updated_at: job.updated_at,
-  };
+  return (await apiClient.get<TrainingJobMetricsResponse>(
+    controlPlaneURL(`/training-jobs/${jobId}/runtime-metrics/`),
+  )).data;
 };
 
 export const getTrainingJobEvents = async (
@@ -244,12 +235,12 @@ export const getJobReferencePreview = async (
     )
   ).data;
 
-export const getTrainingJobMetricsHistory = async (
+export const getTrainingJobExperimentMetrics = async (
   jobId: string,
-): Promise<import("@/features/training/types").TrainingJobMetricsHistoryResponse> =>
+): Promise<import("@/features/training/types").TrainingJobExperimentMetricsResponse> =>
   (
-    await apiClient.get<import("@/features/training/types").TrainingJobMetricsHistoryResponse>(
-      controlPlaneURL(`/training-jobs/${jobId}/metrics-history/`),
+    await apiClient.get<import("@/features/training/types").TrainingJobExperimentMetricsResponse>(
+      controlPlaneURL(`/training-jobs/${jobId}/experiment-metrics/`),
     )
   ).data;
 

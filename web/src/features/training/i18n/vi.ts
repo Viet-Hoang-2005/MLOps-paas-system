@@ -307,9 +307,12 @@ export const trainingVi = {
     metricsPage: {
       starting: "Đang khởi tạo metric runtime",
       startingDescription:
-        "Metric sẽ xuất hiện sau khi runner huấn luyện phát mẫu đầu tiên.",
+        "Đang chờ số liệu tài nguyên từ môi trường chạy.",
       empty: "Không có metric runtime",
-      emptyDescription: "Tác vụ này không phát metric runtime.",
+      emptyDescription: "Số liệu tài nguyên chỉ hiển thị khi tác vụ đang chạy.",
+      unavailableDescription: "Tạm thời không thể đọc số liệu tài nguyên.",
+      wholeGpu: "Toàn bộ GPU; có thể bao gồm tiến trình khác",
+      vram: "Bộ nhớ GPU",
       title: "Metric runtime",
       sampled: "Lấy mẫu lúc {{time}}",
       pending: "Đang chờ metric…",
@@ -317,7 +320,7 @@ export const trainingVi = {
       memoryUsed: "Đã dùng {{memory}}",
       waitingRunner: "Đang chờ metric runner",
       gpuUnavailable: "Không khả dụng",
-      noGpu: "Runner huấn luyện không phát hiện GPU",
+      noGpu: "Không có dữ liệu bộ nhớ GPU",
       cpuLimit: "Giới hạn {{count}} vCPU",
       cpuUsage: "Mức sử dụng CPU container",
       cpu: "CPU",

@@ -199,7 +199,7 @@ class MLflowCompatibilityTests(APITestCase):
         self.assertEqual(response.data["error_code"], "RESOURCE_DOES_NOT_EXIST")
         self.assertFalse(TrainingJobMetric.objects.filter(name="hacked").exists())
 
-    def test_mlflow_metrics_history_query(self):
+    def test_mlflow_experiment_metrics_query(self):
         self.client.post(
             "/api/2.0/mlflow/runs/log-metric",
             data={"run_id": str(self.job.public_id), "key": "val_loss", "value": 0.42, "step": 1},
@@ -209,7 +209,7 @@ class MLflowCompatibilityTests(APITestCase):
 
         # Web query endpoint (authenticated as project owner)
         self.client.force_authenticate(user=self.user)
-        history_resp = self.client.get(f"/api/training-jobs/{self.job.public_id}/metrics-history/")
+        history_resp = self.client.get(f"/api/training-jobs/{self.job.public_id}/experiment-metrics/")
         self.assertEqual(history_resp.status_code, status.HTTP_200_OK)
         data = history_resp.data
         self.assertEqual(len(data["series"]), 1)

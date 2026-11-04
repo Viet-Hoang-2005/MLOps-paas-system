@@ -16,6 +16,7 @@ export interface TrainingJobDetailContextValue {
   activeStatuses: TrainingJobStatus[];
   metrics?: TrainingJobMetricsResponse;
   loadingMetrics: boolean;
+  metricsError?: boolean;
   eventsResponse?: TrainingJobEventsResponse;
   refreshingSection: "header" | "logs" | "metrics" | null;
   refreshLogs: () => Promise<void>;

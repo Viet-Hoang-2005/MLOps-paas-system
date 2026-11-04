@@ -3,9 +3,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.training.selectors import job_for_user, jobs_for_user
+from apps.training.services.runtime_metrics import runtime_metrics
 
 
-class TrainingJobMetricsHistoryEndpoint(APIView):
+class TrainingJobRuntimeMetricsEndpoint(APIView):
+    def get(self, request, job_id):
+        return Response(runtime_metrics(job_for_user(request.user, job_id)))
+
+
+class TrainingJobExperimentMetricsEndpoint(APIView):
     def get(self, request, job_id):
         job = job_for_user(request.user, job_id)
         metrics = job.step_metrics.order_by("name", "step").values("name", "value", "step", "timestamp")

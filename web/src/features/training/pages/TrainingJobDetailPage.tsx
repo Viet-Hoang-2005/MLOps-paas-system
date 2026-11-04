@@ -120,15 +120,15 @@ export default function TrainingJobDetailPage() {
   const {
     data: metrics,
     isLoading: loadingMetrics,
+    isError: metricsError,
     refetch: refetchMetrics,
   } = useQuery({
     queryKey: trainingQueryKeys.metrics(parsedJobId),
     queryFn: () => getTrainingJobMetrics(parsedJobId),
-    enabled: Boolean(job) && activeSection === "metrics",
-    refetchInterval:
-      job && activeSection === "metrics" && ACTIVE_STATUSES.includes(job.status)
-        ? AUTO_SYNC_INTERVAL_MS
-        : false,
+    enabled: job?.status === "running" && activeSection === "metrics",
+    refetchInterval: job?.status === "running" && activeSection === "metrics"
+      ? (job.backend === "docker" ? 15000 : 30000)
+      : false,
   });
 
   const { data: eventsResponse, refetch: refetchEvents } = useQuery({
@@ -336,6 +336,7 @@ export default function TrainingJobDetailPage() {
     activeStatuses: ACTIVE_STATUSES,
     metrics,
     loadingMetrics,
+    metricsError,
     eventsResponse,
     refreshingSection,
     refreshLogs,

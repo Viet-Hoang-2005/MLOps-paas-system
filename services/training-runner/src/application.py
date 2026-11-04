@@ -712,7 +712,6 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
 
     log(f"Running training entry point: {entry_point}")
     stop_metrics = threading.Event()
-    start_metric_emitter(stop_metrics)
     stdout_lines: list[str] = []
     stderr_lines: list[str] = []
 

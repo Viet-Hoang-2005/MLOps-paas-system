@@ -49,6 +49,18 @@ model. Existing Argo GPU jobs without a model must be recreated. Docker sets CPU
 quota, memory plus swap limit and GPU DeviceRequest. An unavailable GPU fails
 explicitly; no CPU substitution occurs.
 
+`GET /api/training-jobs/{job_id}/experiment-metrics/` returns the job's recorded
+experiment metrics and parameters. `GET /api/training-jobs/{job_id}/runtime-metrics/` returns an authorized, transient
+snapshot only while a job is running. CPU and RAM are percentages of the job's
+limits, with RAM based on working set. Local Docker stats require the exact runtime
+ID and tenant/project/job labels; GPU usage is a bounded, networkless probe of the
+selected UUID. Production uses cAdvisor and DCGM through Prometheus, scoped to a
+uniquely mapped training pod and GPU. GPU utilization and VRAM represent the whole
+device, including other processes. Local snapshots are cached for 15 seconds and
+production snapshots for 30 seconds; no application history is stored. Missing,
+stale, ambiguous or unsupported data is unavailable, never reported as zero.
+Prometheus GPU memory total includes used, free and reserved framebuffer MiB.
+
 `EXECUTION_DISPATCH_TIMEOUT_SECONDS` defaults to 1800. Runner runtime begins when
 its container process starts, including Python initialization, input download,
 pip, training and output upload. The supervisor signals the entire child process

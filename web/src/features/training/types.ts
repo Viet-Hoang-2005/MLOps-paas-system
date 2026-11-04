@@ -166,7 +166,6 @@ export interface TrainingMetricPoint {
   memory_used_mb: number | null;
   memory_limit_mb: number | null;
   memory_percent: number | null;
-  gpu_available: boolean;
   gpu_percent: number | null;
   gpu_memory_used_mb: number | null;
   gpu_memory_total_mb: number | null;
@@ -175,14 +174,10 @@ export interface TrainingMetricPoint {
 
 export interface TrainingJobMetricsResponse {
   job_id: ResourceId;
-  training_job_id: ResourceId;
-  status: TrainingJobStatus;
-  metrics_available: boolean;
+  status: "waiting" | "available" | "unavailable";
+  backend: string;
+  poll_interval_seconds: number;
   latest: TrainingMetricPoint | null;
-  history: TrainingMetricPoint[];
-  log_stream_name: string;
-  message: string;
-  updated_at: string;
 }
 
 export interface TrainingJobEvent {
@@ -261,7 +256,7 @@ export interface MetricHistorySeries {
   points: MetricHistoryPoint[];
 }
 
-export interface TrainingJobMetricsHistoryResponse {
+export interface TrainingJobExperimentMetricsResponse {
   job_id: ResourceId;
   name: string;
   status: TrainingJobStatus;

@@ -22,6 +22,7 @@ CACHE_KEY = "training:local-gpu:inventory:v1"
 LOCK_KEY = "training:local-gpu:probe-lock:v1"
 GPU_UUID = re.compile(r"^GPU-[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")
 QUERY = ["--query-gpu=uuid,name,memory.total,memory.free", "--format=csv,noheader,nounits"]
+METRICS_QUERY = ["--query-gpu=uuid,utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"]
 PROBE_PREFIX = "mlops-local-gpu-probe-"
 
 
@@ -61,7 +62,7 @@ def _reap_stale(client):
                 container.remove(force=True)
 
 
-def _probe(device_id=None, client=None):
+def _probe(device_id=None, client=None, *, metrics=False):
     """Run the same NVIDIA DeviceRequest path as a training container; never pull images."""
     container = None
     name = f"{PROBE_PREFIX}{uuid.uuid4().hex}"
@@ -72,7 +73,7 @@ def _probe(device_id=None, client=None):
         request = (docker.types.DeviceRequest(device_ids=[device_id], capabilities=[["gpu"]])
                    if device_id else docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]]))
         container = client.containers.create(
-            IMAGE, name=name, entrypoint="nvidia-smi", command=QUERY, device_requests=[request],
+            IMAGE, name=name, entrypoint="nvidia-smi", command=METRICS_QUERY if metrics else QUERY, device_requests=[request],
             network_disabled=True, user="10001:10001", mem_limit="256m", nano_cpus=250_000_000,
             pids_limit=64, cap_drop=["ALL"], security_opt=["no-new-privileges:true"],
             labels={"mlops_paas.gpu_probe": "true", "mlops_paas.gpu_probe_expires": str(int(time.time()) + 120)},
@@ -83,7 +84,16 @@ def _probe(device_id=None, client=None):
         if result.get("StatusCode") != 0:
             return _result("unavailable", "nvidia_unavailable")
         output = container.logs(stdout=True, stderr=False).decode("utf-8", errors="replace")
-        devices = _parse(output)
+        if metrics:
+            rows = list(csv.reader(io.StringIO(output)))
+            devices = []
+            if len(rows) == 1 and len(rows[0]) == 4:
+                identifier, utilization, used, total = (value.strip() for value in rows[0])
+                if GPU_UUID.fullmatch(identifier):
+                    devices = [{"id": identifier, "gpu_percent": _number(utilization),
+                                "gpu_memory_used_mb": _number(used), "gpu_memory_total_mb": _number(total)}]
+        else:
+            devices = _parse(output)
         if not devices:
             return _result("unavailable", "nvidia_unavailable")
         if device_id and (len(devices) != 1 or devices[0]["id"] != device_id):
@@ -156,3 +166,17 @@ def require_device(device_id, *, client=None):
     if result["status"] != "available":
         raise ValidationError({"local_gpu_id": "The selected NVIDIA GPU is unavailable or cannot be isolated."})
     return result["devices"][0]
+
+
+def device_metrics(device_id):
+    """Read whole-device usage without trusting the training container."""
+    if not GPU_UUID.fullmatch(device_id or ""):
+        return None
+    try:
+        with _probe_lock() as acquired:
+            if not acquired:
+                return None
+            result = _probe(device_id, metrics=True)
+        return result["devices"][0] if result["status"] == "available" else None
+    except Exception:
+        return None

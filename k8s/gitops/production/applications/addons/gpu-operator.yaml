@@ -58,6 +58,13 @@ spec:
               value: nvidia
             - name: CONTAINERD_SET_AS_DEFAULT
               value: "true"
+        dcgmExporter:
+          serviceMonitor:
+            enabled: true
+            interval: 30s
+            honorLabels: true
+            interval: 30s
+            honorLabels: true
   destination:
     server: https://kubernetes.default.svc
     namespace: gpu-operator

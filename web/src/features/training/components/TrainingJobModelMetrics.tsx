@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Activity, Sliders, TrendingUp } from "lucide-react";
 
-import { getTrainingJobMetricsHistory } from "@/features/training/api/trainingApi";
+import { getTrainingJobExperimentMetrics } from "@/features/training/api/trainingApi";
 import { Chart } from "@/shared/components/Chart";
 import { formatNumber } from "@/shared/i18n/formatters";
 
@@ -19,8 +19,8 @@ export function TrainingJobModelMetrics({
   const isRunning = jobStatus === "running";
 
   const { data, isLoading } = useQuery({
-    queryKey: ["training-job-metrics-history", jobId],
-    queryFn: () => getTrainingJobMetricsHistory(jobId),
+    queryKey: ["training-job-experiment-metrics", jobId],
+    queryFn: () => getTrainingJobExperimentMetrics(jobId),
     refetchInterval: isRunning ? 3000 : false,
   });
 

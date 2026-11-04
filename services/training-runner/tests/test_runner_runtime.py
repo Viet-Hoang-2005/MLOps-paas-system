@@ -78,7 +78,8 @@ def test_run_training_streams_output_and_sets_environment(monkeypatch, runner_wo
     monkeypatch.setenv("S3_OUTPUT_UPLOAD_CAPABILITY", "must-not-leak")
     monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://control-plane:8000/api/2.0/mlflow")
     monkeypatch.setenv("MLFLOW_TRACKING_TOKEN", "test-tracking-token")
-    monkeypatch.setattr(runner, "start_metric_emitter", lambda event: Mock())
+    emitter = Mock()
+    monkeypatch.setattr(runner, "start_metric_emitter", emitter)
     monkeypatch.setattr(runner, "log_to_redis", Mock())
 
     def popen(*args, **kwargs):
@@ -87,6 +88,7 @@ def test_run_training_streams_output_and_sets_environment(monkeypatch, runner_wo
 
     monkeypatch.setattr(runner.subprocess, "Popen", popen)
     result = runner.run_training("train.py", "v2")
+    emitter.assert_not_called()
     assert result.returncode == 3
     assert result.stdout == "out one\nout two\n"
     assert result.stderr == "warning\n"

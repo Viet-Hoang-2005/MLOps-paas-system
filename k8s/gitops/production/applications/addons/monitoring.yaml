@@ -114,7 +114,7 @@ spec:
             enabled: false
         kube-state-metrics:
           metricLabelsAllowlist:
-            - pods=[mlops-paas.io/deployment-id,mlops-paas.io/tenant-id,mlops-paas.io/project-id,mlops-paas.io/model-version-id]
+            - pods=[mlops-paas.io/deployment-id,mlops-paas.io/tenant-id,mlops-paas.io/project-id,mlops-paas.io/model-version-id,mlops-paas.io/training-job-id]
           nodeSelector:
             workload-type: worker
           resources:

@@ -13,18 +13,19 @@ export default function TrainingJobMetricsPage() {
     `${formatNumber(Math.round(value), i18n.language)}%`;
   const formatMegabytes = (megabytes: number) =>
     megabytes >= 1024
-      ? `${formatNumber(megabytes / 1024, i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} GB`
-      : `${formatNumber(Math.round(megabytes), i18n.language)} MB`;
+      ? `${formatNumber(megabytes / 1024, i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} GiB`
+      : `${formatNumber(Math.round(megabytes), i18n.language)} MiB`;
   const {
     job,
     activeStatuses,
     metrics,
     loadingMetrics,
+    metricsError,
     refreshingSection,
     refreshMetrics,
   } = useTrainingJobDetailContext();
 
-  const latest = metrics?.latest;
+  const latest = job.status === "running" && !metricsError ? metrics?.latest : null;
   const highCpu = latest?.cpu_percent != null && latest.cpu_percent > 85;
   const highRam = latest?.memory_percent != null && latest.memory_percent > 85;
   const memoryValue =
@@ -44,14 +45,13 @@ export default function TrainingJobMetricsPage() {
         ? t("detail.metricsPage.memoryUsed", {
             memory: formatMegabytes(latest.memory_used_mb),
           })
-        : metrics?.message || t("detail.metricsPage.waitingRunner");
+        : t("detail.metricsPage.waitingRunner");
   const gpuValue =
-    latest?.gpu_available && latest.gpu_percent != null
+    latest?.gpu_percent != null
       ? formatMetricPercent(latest.gpu_percent)
       : t("detail.metricsPage.gpuUnavailable");
   const gpuDetail =
-    latest?.gpu_available &&
-    latest.gpu_memory_used_mb != null &&
+    latest?.gpu_memory_used_mb != null &&
     latest.gpu_memory_total_mb != null
       ? `${formatMegabytes(latest.gpu_memory_used_mb)} / ${formatMegabytes(
           latest.gpu_memory_total_mb,
@@ -99,8 +99,8 @@ export default function TrainingJobMetricsPage() {
           </div>
         </div>
 
-        {metrics?.metrics_available ? (
-          <div className="grid gap-4 sm:grid-cols-3">
+        {latest ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCell
               icon={<Cpu className="h-3.5 w-3.5" />}
               label={t("detail.metricsPage.cpu")}
@@ -133,15 +133,26 @@ export default function TrainingJobMetricsPage() {
               icon={<Rocket className="h-3.5 w-3.5" />}
               label={t("detail.metricsPage.gpu")}
               value={gpuValue}
-              detail={gpuDetail}
-              muted={!latest?.gpu_available}
+              detail={t("detail.metricsPage.wholeGpu")}
+              muted={latest?.gpu_percent == null}
               progress={latest?.gpu_percent}
+              progressColor="bg-chart-3"
+            />
+            <MetricCell
+              icon={<HardDrive className="h-3.5 w-3.5" />}
+              label={t("detail.metricsPage.vram")}
+              value={latest.gpu_memory_percent == null ? t("detail.metricsPage.gpuUnavailable") : formatMetricPercent(latest.gpu_memory_percent)}
+              detail={gpuDetail}
+              muted={latest.gpu_memory_percent == null}
+              progress={latest.gpu_memory_percent}
               progressColor="bg-chart-3"
             />
           </div>
         ) : (
           <div className="py-6 text-center text-style-caption text-color-muted-foreground">
-            {activeStatuses.includes(job.status)
+            {job.status === "running" && (metricsError || metrics?.status === "unavailable")
+              ? t("detail.metricsPage.unavailableDescription")
+              : activeStatuses.includes(job.status)
               ? t("detail.metricsPage.startingDescription")
               : t("detail.metricsPage.emptyDescription")}
           </div>

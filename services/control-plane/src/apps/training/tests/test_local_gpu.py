@@ -52,6 +52,22 @@ def test_probe_reads_multiple_gpus_and_unknown_free_memory():
     assert devices[1]["memory_total_mib"] == 24576
 
 
+def test_metrics_probe_selects_exact_uuid_and_cleans_up():
+    client, container = docker_client(f"{GPU}, 42, 1024, 4096\n")
+    result = local_gpu._probe(GPU, client=client, metrics=True)
+    assert result["devices"] == [{"id": GPU, "gpu_percent": 42, "gpu_memory_used_mb": 1024, "gpu_memory_total_mb": 4096}]
+    options = client.containers.create.call_args.kwargs
+    assert options["device_requests"][0]["DeviceIDs"] == [GPU]
+    assert options["command"] == local_gpu.METRICS_QUERY and options["network_disabled"]
+    client.images.pull.assert_not_called()
+    container.remove.assert_called_once_with(force=True)
+
+
+def test_metrics_probe_rejects_another_device():
+    client, _ = docker_client(f"{OTHER}, 42, 1024, 4096\n")
+    assert local_gpu._probe(GPU, client=client, metrics=True)["reason"] == "device_selection_unsupported"
+
+
 @pytest.mark.parametrize("error,status,reason", [
     (docker.errors.ImageNotFound("missing"), "unavailable", "image_missing"),
     (docker.errors.APIError("no gpu"), "unavailable", "nvidia_unavailable"),
