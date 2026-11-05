@@ -169,7 +169,11 @@ def retry_job(job, *, storage=None):
         )
         sources = {"code_snapshot_uri": job.code_snapshot_uri, "data_snapshot_uri": job.data_snapshot_uri}
     from apps.training.services.resources import validate_resources
-    validate_resources({}, retry)
+    local_capacity = None
+    if retry.backend == "docker":
+        from apps.training.services.local_resources import require_capacity
+        local_capacity = require_capacity(force=True)
+    validate_resources({}, retry, local_capacity=local_capacity)
     if settings.TRAINING_BACKEND == "docker" and retry.accelerator_type == "gpu":
         from apps.training.services.local_gpu import require_device
         require_device(retry.local_gpu_id)
@@ -190,34 +194,37 @@ def retry_job(job, *, storage=None):
             record_training_event(
                 job=retry, event_type="created", message="Training retry created from immutable inputs."
             )
-            return submit_job(retry, verify_gpu=False)
+            return submit_job(retry, verify_gpu=False, local_capacity=local_capacity)
     except Exception:
         _discard_unused_inputs(storage, project, retry)
         raise
 
 
-def submit_job(job, *, verify_gpu=True):
+def submit_job(job, *, verify_gpu=True, local_capacity=None):
     from apps.training.services.resources import validate_resources
-    validate_resources({}, job)
+    if job.backend == "docker" and local_capacity is None:
+        from apps.training.services.local_resources import require_capacity
+        local_capacity = require_capacity(force=True)
+    validate_resources({}, job, local_capacity=local_capacity)
     if verify_gpu and settings.TRAINING_BACKEND == "docker" and job.accelerator_type == "gpu":
         from apps.training.services.local_gpu import require_device
         require_device(job.local_gpu_id)
     verified_gpu_id = job.local_gpu_id if job.accelerator_type == "gpu" and settings.TRAINING_BACKEND == "docker" else ""
     try:
-        return _submit_job_atomic(job, verified_gpu_id=verified_gpu_id)
+        return _submit_job_atomic(job, verified_gpu_id=verified_gpu_id, local_capacity=local_capacity)
     except DatabaseError as exc:
         raise ServiceUnavailable("Training quota is temporarily unavailable.") from exc
 
 
 @transaction.atomic
-def _submit_job_atomic(job, *, verified_gpu_id):
+def _submit_job_atomic(job, *, verified_gpu_id, local_capacity=None):
     if job.backend == "argo":
         from apps.training.services.quota import lock_owner
         lock_owner(job.project.owner_id)
     project = type(job.project).objects.select_for_update().get(pk=job.project_id)
     job = TrainingJob.objects.select_for_update().get(pk=job.pk)
     from apps.training.services.resources import validate_resources
-    validate_resources({}, job)
+    validate_resources({}, job, local_capacity=local_capacity)
     if settings.TRAINING_BACKEND == "docker" and job.accelerator_type == "gpu" and job.local_gpu_id != verified_gpu_id:
         raise Conflict("The selected GPU changed; retry the request.")
     if project.deletion_state != "active":
@@ -229,6 +236,9 @@ def _submit_job_atomic(job, *, verified_gpu_id):
     if job.backend == "argo":
         from apps.training.services.quota import reserve
         reserve(job)
+    elif job.backend == "docker":
+        from apps.training.services.local_resources import reserve
+        reserve(job, local_capacity)
     job.status = "queued"
     job.save(update_fields=["status", "dispatch_deadline_at", "updated_at"])
     transaction.on_commit(lambda: _enqueue(job))

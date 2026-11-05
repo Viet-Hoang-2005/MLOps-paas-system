@@ -188,3 +188,25 @@ expired leases, observation errors, deadlines and cleanup pending. Investigate
 increasing counts and verify recovery after dependency restoration. Rollback may
 disable the watchdog only after accounting for running work and pending cleanup;
 keep the additive schema and retained runtime identities.
+
+## Docker training capacity
+
+Local training profiles come from the Docker daemon's CPU and memory capacity. The
+Large profile uses at most 75% of CPUs (capped at 8) and leaves at least 25% or
+1536 MiB of RAM for the platform. Smaller profiles are derived from Large, and
+identical choices are removed. Docker must support CPU and memory limits.
+
+Local jobs reserve their limits in PostgreSQL across tenants before dispatch. The
+watchdog must be enabled: the reservation remains active through cancellation,
+errors and cleanup until the Docker runtime is confirmed stopped. Admission also
+requires Redis for the shared dispatch lock. A short-lived, network-isolated runner
+container reads Docker's current available memory before starting each job; it uses
+the locally available runner image and never pulls an image. Docker or memory probe
+failures defer dispatch until the existing dispatch deadline.
+
+Apply the additive training migration before enabling the new code. Stop or reconcile
+active training containers created before the migration: unreserved active training
+containers block new local dispatch and admission. Increasing or decreasing Docker
+Desktop resources changes future profile choices; existing running limits are not
+rewritten. Docker limits and a current free-memory check reduce, but cannot eliminate,
+the risk of other processes exhausting memory after dispatch.

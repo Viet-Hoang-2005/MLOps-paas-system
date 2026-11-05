@@ -25,6 +25,7 @@ Never embed passwords, tokens, private keys, real environment values, or SSH cre
 - Refresh issuance must verify that the token's user exists, is active and owns its tenant before rotation; retain the account row lock through issuance. Atomically claim the old token in the blacklist and reject a duplicate claim. Never rotate an orphaned refresh token with `user=None`.
 
 - **Strict Layering:** API endpoints must never directly invoke external infrastructure clients (Docker, Boto3, Argo, Harbor, Redis).
+- **Local training capacity:** Derive local profiles from Docker capacity, serialize durable per-daemon reservations, verify available memory before dispatch, and release reservations only after confirmed runtime cleanup.
 - **Transactional Dispatch:** Celery tasks must be dispatched inside `transaction.on_commit` hooks, ensuring the database transaction has committed before the background task runs.
 - **Service Segregation:**
   - `control-plane`: 10 domain apps (`auth`, `access`, `catalog`, `registry`, `training`, `deployment`, `drift`, `ct`, `production`, `observability`).

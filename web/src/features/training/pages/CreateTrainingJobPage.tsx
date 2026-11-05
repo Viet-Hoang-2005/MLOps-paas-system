@@ -66,8 +66,8 @@ const emptySource: TrainingSourceForm = {
   requirements_text: "",
 };
 const emptyExecution: TrainingExecutionForm = {
-  vcpu: 2,
-  memory_mb: 4096,
+  vcpu: 0,
+  memory_mb: 0,
   max_runtime_seconds: 3600,
   accelerator_type: "none",
   accelerator_count: 0,

@@ -46,9 +46,10 @@ export default function ExecutionTrainingJobPage() {
     flow.job &&
     ["pending", "queued", "uploading", "running"].includes(flow.job.status);
   const profiles = flow.capabilities?.cpu_profiles ?? [];
+  const selectedProfile = profiles.find((profile) => profile.vcpu === flow.executionForm.vcpu && profile.memory_mb === flow.executionForm.memory_mb);
   const quotaResource = flow.executionForm.accelerator_type === "gpu"
     ? (flow.capabilities?.backend === "docker" ? "gpu_local" : flow.executionForm.accelerator_model)
-    : ({ 1: "cpu_small", 2: "cpu_medium", 4: "cpu_large" } as Record<number, string>)[flow.executionForm.vcpu];
+    : (selectedProfile ? `cpu_${selectedProfile.id}` : undefined);
   const quota = usage?.resources.find((item) => item.resource === quotaResource);
   const supportedRuntimeOptions = (
     flow.capabilities?.runtime_options_seconds ?? []
@@ -70,6 +71,7 @@ export default function ExecutionTrainingJobPage() {
     { type: "none" as const, counts: [0] },
   ];
   const localGpu = flow.capabilities?.local_gpu;
+  const localResources = flow.capabilities?.local_resources;
   const missingSelectedGpu = flow.capabilities?.backend === "docker" &&
     flow.executionForm.accelerator_type === "gpu" &&
     !localGpu?.devices.some((device) => device.id === flow.executionForm.local_gpu_id);
@@ -108,6 +110,10 @@ export default function ExecutionTrainingJobPage() {
           title={t("createFlow.execution.unavailableTitle")}
           description={t("createFlow.execution.unavailableDescription")}
         />
+        {localResources && <div className="mt-3 space-y-2" role="status">
+          <p>{t(`createFlow.execution.localResourceReason.${localResources.reason}`, { defaultValue: t("createFlow.execution.localResourceUnavailable") })}</p>
+          <Button variant="secondary" loading={flow.gpuChecking} onClick={() => void flow.refreshGpuCapabilities()}>{t("createFlow.execution.localResourceCheckAgain")}</Button>
+        </div>}
         <footer className="grid gap-3 pb-6">
           <Button
             variant="secondary"
@@ -139,9 +145,15 @@ export default function ExecutionTrainingJobPage() {
           options={profiles.map((profile) => ({
             value: `${profile.vcpu}-${profile.memory_mb}`,
             title: <span className="capitalize">{profile.id}</span>,
-            description: `${profile.vcpu} vCPU / ${profile.memory_mb} MB`,
+            description: `${profile.vcpu} vCPU / ${profile.memory_mb} MiB`,
           }))}
         />
+        {localResources?.status === "available" && <div className="space-y-2 text-style-body text-color-muted-foreground" role="status">
+          <p>{t("createFlow.execution.localResourceCapacity", { cpu: localResources.total_vcpu, memory: localResources.total_memory_mb, budgetCpu: localResources.budget_vcpu, budgetMemory: localResources.budget_memory_mb })}</p>
+          <p>{t("createFlow.execution.localResourceRemaining", { cpu: localResources.available_vcpu, memory: localResources.available_memory_mb })}</p>
+          {!selectedProfile && <p className="text-color-danger">{t("createFlow.execution.localResourceSelectionMissing")}</p>}
+          <Button variant="secondary" loading={flow.gpuChecking} onClick={() => void flow.refreshGpuCapabilities()}>{t("createFlow.execution.localResourceCheckAgain")}</Button>
+        </div>}
 
         <div className="space-y-3">
           <p className="text-style-body-strong text-color-foreground">
@@ -244,7 +256,7 @@ export default function ExecutionTrainingJobPage() {
               <TerminalActionButton
                 icon={<Play className="h-3 w-3" />}
                 loading={flow.transitionState === "starting-training"}
-                disabled={flow.transitionState !== "idle" || flow.gpuChecking || missingSelectedGpu}
+                disabled={flow.transitionState !== "idle" || flow.gpuChecking || missingSelectedGpu || !selectedProfile}
                 onClick={() => void flow.startTraining()}
               >
                 {flow.job

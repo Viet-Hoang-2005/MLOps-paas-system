@@ -134,6 +134,19 @@ export interface TrainingRuntimeCapabilities {
   enabled: boolean;
   backend: "docker" | "argo";
   cpu_profiles: Array<{ id: string; vcpu: number; memory_mb: number }>;
+  local_resources?: {
+    status: "available" | "unavailable" | "checking" | "error";
+    reason: string;
+    checked_at?: string;
+    total_vcpu?: number;
+    total_memory_mb?: number;
+    budget_vcpu?: number;
+    budget_memory_mb?: number;
+    reserved_vcpu?: number;
+    reserved_memory_mb?: number;
+    available_vcpu?: number;
+    available_memory_mb?: number;
+  };
   accelerators: Array<{ type: TrainingAcceleratorType; model?: TrainingAcceleratorModel; device_id?: string; counts: number[] }>;
   local_gpu?: {
     status: "available" | "unavailable" | "checking" | "disabled" | "error";

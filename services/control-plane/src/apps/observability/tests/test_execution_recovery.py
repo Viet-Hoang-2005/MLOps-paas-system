@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -29,6 +30,7 @@ def job(db, settings):
 def backend_mock(monkeypatch):
     backend = Mock(setting_name="")
     monkeypatch.setattr(executions, "backend_for", lambda row, kind: backend)
+    monkeypatch.setattr("apps.training.services.local_resources.dispatch_guard", lambda *args: nullcontext())
     return backend
 
 

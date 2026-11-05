@@ -20,7 +20,7 @@ describe("training GPU selection", () => {
         accelerator_type: "none", accelerator_count: 0, accelerator_model: "", local_gpu_id: "" },
       setExecutionField: vi.fn(), goToStep: vi.fn(), startTraining: vi.fn(),
       refreshJob: vi.fn(), cancelTraining: vi.fn(), finishTraining: vi.fn(),
-      capabilities: { enabled: true, backend: "argo", cpu_profiles: [], runtime_options_seconds: [],
+      capabilities: { enabled: true, backend: "argo", cpu_profiles: [{ id: "medium", vcpu: 2, memory_mb: 4096 }], runtime_options_seconds: [],
         accelerators: [{ type: "none", counts: [0] }, { type: "gpu", model: "t4", counts: [1] },
           { type: "gpu", model: "a10g", counts: [1] }] },
     };
@@ -72,5 +72,20 @@ describe("training GPU selection", () => {
     renderWithProviders(<ExecutionTrainingJobPage />);
     expect(screen.getByRole("button", { name: /CPU only/ })).toBeInTheDocument();
     expect(screen.getByText(/NVIDIA driver and container toolkit/)).toBeInTheDocument();
+  });
+
+  it.each(["en", "vi"] as const)("shows the Docker budget and requests profile reselection in %s", async (language) => {
+    flow.current.refreshGpuCapabilities = vi.fn();
+    flow.current.capabilities = { enabled: true, backend: "docker",
+      cpu_profiles: [{ id: "large", vcpu: 3, memory_mb: 2560 }], runtime_options_seconds: [],
+      accelerators: [{ type: "none", counts: [0] }],
+      local_resources: { status: "available", reason: "", total_vcpu: 4, total_memory_mb: 4096,
+        budget_vcpu: 3, budget_memory_mb: 2560, available_vcpu: 2, available_memory_mb: 1280 } };
+    renderWithProviders(<ExecutionTrainingJobPage />, { language });
+    expect(screen.getByText(/4 vCPU \/ 4096 MiB/)).toBeInTheDocument();
+    expect(screen.getByText(/2 vCPU \/ 1280 MiB/)).toBeInTheDocument();
+    expect(screen.getByText(language === "en" ? /selected profile is no longer available/i : /cấu hình đã chọn không còn/i)).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: language === "en" ? "Check resources again" : "Kiểm tra lại tài nguyên" }));
+    expect(flow.current.refreshGpuCapabilities).toHaveBeenCalledOnce();
   });
 });

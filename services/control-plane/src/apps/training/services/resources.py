@@ -11,16 +11,28 @@ def runtime_options():
     return sorted({value for value in RUNTIME_OPTIONS if value <= maximum} | {maximum})
 
 
-def validate_resources(values, instance=None):
+def validate_resources(values, instance=None, *, local_capacity=None):
     def value(name, default):
         return values.get(name, getattr(instance, name, default))
 
     errors = {}
-    if (value("vcpu", 2), value("memory_mb", 4096)) not in CPU_PROFILES:
+    submitted = instance is not None and instance.status != "pending"
+    if submitted:
+        for field in ("vcpu", "memory_mb"):
+            if field in values and values[field] != getattr(instance, field):
+                errors[field] = "Submitted training resources are immutable."
+    choices = CPU_PROFILES
+    if settings.TRAINING_BACKEND == "docker" and not submitted:
+        from apps.training.services.local_resources import require_capacity
+        local_capacity = local_capacity or require_capacity()
+        choices = [(item["vcpu"], item["memory_mb"]) for item in local_capacity["cpu_profiles"]]
+        if instance is None and "vcpu" not in values and "memory_mb" not in values:
+            default = next((item for item in local_capacity["cpu_profiles"] if item["id"] == "medium"), local_capacity["cpu_profiles"][0])
+            values["vcpu"], values["memory_mb"] = default["vcpu"], default["memory_mb"]
+    if not (submitted and settings.TRAINING_BACKEND == "docker") and (value("vcpu", 2), value("memory_mb", 4096)) not in choices:
         errors["vcpu"] = "Select a supported CPU/memory profile."
         errors["memory_mb"] = "Select a supported CPU/memory profile."
     runtime = value("max_runtime_seconds", 3600)
-    submitted = instance is not None and instance.status != "pending"
     invalid_submitted = submitted and (runtime <= 0 or (instance.backend == "argo" and runtime > 86400))
     if invalid_submitted or ((not submitted or "max_runtime_seconds" in values) and runtime not in runtime_options()):
         errors["max_runtime_seconds"] = "Select a supported maximum runtime."

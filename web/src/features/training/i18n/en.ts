@@ -416,6 +416,13 @@ export const trainingEn = {
       },
     },
     execution: {
+      localResourceUnavailable: "Unable to check Docker resources. Please try again.",
+      localResourceCheckAgain: "Check resources again",
+      localResourceReason: { insufficient_capacity: "Docker does not have enough memory for safe training.", docker_unavailable: "Docker is unavailable or does not support CPU and memory limits.", cache_unavailable: "Resource discovery is temporarily unavailable.", checking: "Checking Docker resources." },
+      localResourceCapacity: "Docker: {{cpu}} vCPU / {{memory}} MiB. Training budget: {{budgetCpu}} vCPU / {{budgetMemory}} MiB.",
+      localResourceRemaining: "Available for training: {{cpu}} vCPU / {{memory}} MiB.",
+      localResourceExceeded: "Insufficient local training capacity. {{cpu}} vCPU / {{memory}} MiB remain; select another profile or retry later.",
+      localResourceSelectionMissing: "The selected profile is no longer available. Select another profile.",
       quotaRemaining: "Weekly quota remaining: {{duration}}",
       quotaCrossWeek: "This job may cross the weekly reset; quota is reserved in both weeks when necessary.",
       title: "Execution resources",

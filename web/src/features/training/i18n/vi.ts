@@ -422,6 +422,13 @@ export const trainingVi = {
       },
     },
     execution: {
+      localResourceUnavailable: "Không thể kiểm tra tài nguyên Docker. Vui lòng thử lại.",
+      localResourceCheckAgain: "Kiểm tra lại tài nguyên",
+      localResourceReason: { insufficient_capacity: "Docker không đủ RAM an toàn để chạy training.", docker_unavailable: "Không thể kết nối Docker hoặc Docker chưa hỗ trợ giới hạn CPU/RAM.", cache_unavailable: "Không thể kiểm tra tài nguyên lúc này.", checking: "Đang kiểm tra tài nguyên Docker." },
+      localResourceCapacity: "Docker: {{cpu}} vCPU / {{memory}} MiB. Ngân sách training: {{budgetCpu}} vCPU / {{budgetMemory}} MiB.",
+      localResourceRemaining: "Có thể cấp thêm: {{cpu}} vCPU / {{memory}} MiB.",
+      localResourceExceeded: "Không đủ tài nguyên training local. Còn {{cpu}} vCPU / {{memory}} MiB; hãy chọn cấu hình khác hoặc thử lại sau.",
+      localResourceSelectionMissing: "Cấu hình đã chọn không còn khả dụng. Hãy chọn lại cấu hình.",
       quotaRemaining: "Hạn mức tuần còn lại: {{duration}}",
       quotaCrossWeek: "Tác vụ có thể qua mốc cấp lại; hệ thống sẽ giữ chỗ quota ở cả hai tuần khi cần.",
       title: "Tài nguyên thực thi",

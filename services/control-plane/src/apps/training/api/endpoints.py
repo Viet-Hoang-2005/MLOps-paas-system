@@ -199,7 +199,14 @@ class TrainingRuntimeCapabilitiesEndpoint(APIView):
             )
         accelerators = [{"type": "none", "counts": [0]}]
         local_gpu = None
+        local_resources = None
+        cpu_profiles = [{"id": name, "vcpu": cpu, "memory_mb": memory}
+                        for name, (cpu, memory) in zip(("small", "medium", "large"), CPU_PROFILES, strict=True)]
         if settings.TRAINING_BACKEND == "docker":
+            from apps.training.services.local_resources import capacity, public_capacity
+            snapshot = capacity(force=request.query_params.get("refresh") == "1")
+            local_resources = public_capacity(snapshot)
+            cpu_profiles = snapshot["cpu_profiles"]
             from apps.training.services.local_gpu import inventory
             local_gpu = (inventory(force=request.query_params.get("refresh") == "1")
                          if settings.TRAINING_GPU_ENABLED and 1 in settings.TRAINING_GPU_COUNTS
@@ -212,15 +219,13 @@ class TrainingRuntimeCapabilitiesEndpoint(APIView):
                                     for device in local_gpu["devices"])
         return Response(
             {
-                "enabled": True,
+                "enabled": bool(cpu_profiles),
                 "runtime_options_seconds": runtime_options(),
                 "dispatch_timeout_seconds": settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS,
                 "backend": settings.TRAINING_BACKEND,
-                "cpu_profiles": [
-                    {"id": name, "vcpu": cpu, "memory_mb": memory}
-                    for name, (cpu, memory) in zip(("small", "medium", "large"), CPU_PROFILES, strict=True)
-                ],
+                "cpu_profiles": cpu_profiles,
                 "accelerators": accelerators,
                 **({"local_gpu": local_gpu} if local_gpu is not None else {}),
+                **({"local_resources": local_resources} if local_resources is not None else {}),
             }
         )

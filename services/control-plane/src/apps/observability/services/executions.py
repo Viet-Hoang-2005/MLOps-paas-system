@@ -192,16 +192,24 @@ def reconcile(kind, public_id, token=None):
                 validate_resources({}, row)
                 from apps.training.services.quota import require_reservation
                 require_reservation(row)
-            backend.run(row)
+            if kind == "training" and row.backend == "docker":
+                from apps.training.services.local_resources import dispatch_guard
+                with dispatch_guard(row, backend.docker.client):
+                    backend.run(row)
+            else:
+                backend.run(row)
             return apply_observation(kind, public_id, token, {"status": "dispatched"})
         return apply_observation(kind, public_id, token, result)
     except Exception as exc:
         from rest_framework.exceptions import ValidationError
+        from common.api.exceptions import ServiceUnavailable
         import docker.errors
         if kind == "training" and row.accelerator_type == "gpu" and isinstance(exc, docker.errors.APIError) and any(word in str(exc).lower() for word in ("gpu", "device driver", "nvidia")):
             return apply_observation(kind, public_id, token, {"status": "failed", "error": "Requested GPU is unavailable on this Docker host."})
         if isinstance(exc, ValidationError):
             return apply_observation(kind, public_id, token, {"status": "failed", "error": str(exc.detail)})
+        if isinstance(exc, ServiceUnavailable):
+            return apply_observation(kind, public_id, token, {"status": "error", "error": str(exc.detail)})
         return apply_observation(kind, public_id, token, {"status": "error", "error": type(exc).__name__})
 
 
@@ -323,6 +331,9 @@ def apply_observation(kind, public_id, token, observation):
             return current.status
         inactive = project.deletion_state != "active" or bool(getattr(current, "deletion_requested_at", None))
         if observed == "stopped":
+            if kind == "training" and current.backend == "docker":
+                from apps.training.services.local_resources import release
+                release(current)
             if not quota_settled:
                 current.observation_status = "cleanup_pending"
                 _release(current, "Training runtime timing is unavailable; quota reconciliation is pending.")

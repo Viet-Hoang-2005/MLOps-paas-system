@@ -4,6 +4,8 @@ The Django Control Plane is a domain-oriented modular monolith (`services/contro
 
 ## App Ownership
 
+Local training advertises Docker-derived CPU and memory profiles. Admission uses durable shared CPU/RAM reservations, Redis dispatch locking and a bounded available-memory probe; retain reservations until confirmed cleanup. Production CPU profiles and weekly quotas remain separate.
+
 Training resource capabilities expose at most one GPU. Argo jobs require `accelerator_model` `t4` or `a10g`; Docker jobs use a generic GPU and an empty model. CPU jobs use no model. Persist the model and retain it on retry; old Argo GPU jobs without a model cannot be submitted or retried.
 
 1. **`auth`:** CustomUser, user profile avatars, RS256 JWT issuance, JWKS endpoint (`/api/auth/.well-known/jwks.json`), OAuth2 (Google/GitHub), 2FA/TOTP.

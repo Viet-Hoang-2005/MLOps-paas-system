@@ -13,4 +13,13 @@ describe("training quota errors", () => {
     expect(message).toContain("0s");
     expect(message).toMatch(language === "vi" ? /Không đủ quota/ : /Insufficient/);
   });
+
+  it.each(["en", "vi"] as const)("shows remaining local capacity in %s", (language) => {
+    const i18n = createTestI18n(language);
+    const error = { isAxiosError: true, response: { data: { error: { code: "local_training_capacity_exceeded", detail: {
+      available_vcpu: "1", available_memory_mb: "1280",
+    } } } } };
+    const message = getTrainingStartError(error, i18n.getFixedT(language, "training"), language);
+    expect(message).toContain("1 vCPU / 1280 MiB");
+  });
 });

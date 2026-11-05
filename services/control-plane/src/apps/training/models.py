@@ -97,6 +97,20 @@ class TrainingJob(ExecutionWatch):
             self.capabilities.filter(purpose="tracking").delete()
 
 
+class LocalTrainingPool(models.Model):
+    daemon_id = models.CharField(max_length=128, unique=True)
+
+
+class LocalTrainingReservation(models.Model):
+    pool = models.ForeignKey(LocalTrainingPool, on_delete=models.PROTECT, related_name="reservations")
+    job_id = models.UUIDField(unique=True)
+    vcpu = models.PositiveIntegerField()
+    memory_mb = models.PositiveIntegerField()
+    active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    stopped_at = models.DateTimeField(null=True, blank=True)
+
+
 class TrainingQuotaReservation(models.Model):
     """Durable usage survives deletion of the job and its project."""
 

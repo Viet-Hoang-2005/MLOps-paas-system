@@ -7,6 +7,12 @@ import { getApiErrorMessage } from "@/shared/api/errors";
 export function getTrainingStartError(error: unknown, t: TFunction<"training">, language: string): string {
   const body = axios.isAxiosError(error) ? error.response?.data as { error?: { code?: string; detail?: Record<string, string> } } : undefined;
   if (body?.error?.code === "training_concurrency_exceeded") return t("quotaConcurrencyError");
+  if (body?.error?.code === "local_training_capacity_exceeded" && body.error.detail) {
+    return t("createFlow.execution.localResourceExceeded", {
+      cpu: body.error.detail.available_vcpu,
+      memory: body.error.detail.available_memory_mb,
+    });
+  }
   if (body?.error?.code === "training_quota_exceeded" && body.error.detail) {
     const detail = body.error.detail;
     return t("quotaExceededError", {
