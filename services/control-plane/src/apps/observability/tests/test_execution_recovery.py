@@ -19,7 +19,8 @@ from infrastructure.execution.job_containers import labels_for, start, observe
 
 @pytest.fixture
 def job(db, settings):
-    settings.EXECUTION_WATCH_ENABLED = True
+    settings.TRAINING_EXECUTION_WATCH_ENABLED = True
+    settings.DRIFT_EXECUTION_WATCH_ENABLED = True
     owner = get_user_model().objects.create_user("p1-test@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="P1")
     return TrainingJob.objects.create(project=project, name="recovery", model_flavor="sklearn", backend="docker", status="queued")

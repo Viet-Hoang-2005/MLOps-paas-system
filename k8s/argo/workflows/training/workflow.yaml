@@ -37,6 +37,7 @@ spec:
           - {name: reporter_capability}
           - {name: requirements_text, value: ""}
           - {name: max_runtime_seconds}
+          - {name: dispatch_timeout_seconds, value: "1800"}
           - {name: input_download_url}
           - {name: input_download_capability}
           - {name: mlflow_tracking_uri, value: ""}
@@ -61,6 +62,7 @@ spec:
                 - {name: model_version, value: "{{inputs.parameters.model_version}}"}
                 - {name: requirements_text, value: "{{inputs.parameters.requirements_text}}"}
                 - {name: max_runtime_seconds, value: "{{inputs.parameters.max_runtime_seconds}}"}
+                - {name: dispatch_timeout_seconds, value: "{{inputs.parameters.dispatch_timeout_seconds}}"}
                 - {name: input_download_url, value: "{{inputs.parameters.input_download_url}}"}
                 - {name: input_download_capability, value: "{{inputs.parameters.input_download_capability}}"}
                 - {name: mlflow_tracking_uri, value: "{{inputs.parameters.mlflow_tracking_uri}}"}
@@ -86,6 +88,7 @@ spec:
                 - {name: model_version, value: "{{inputs.parameters.model_version}}"}
                 - {name: requirements_text, value: "{{inputs.parameters.requirements_text}}"}
                 - {name: max_runtime_seconds, value: "{{inputs.parameters.max_runtime_seconds}}"}
+                - {name: dispatch_timeout_seconds, value: "{{inputs.parameters.dispatch_timeout_seconds}}"}
                 - {name: input_download_url, value: "{{inputs.parameters.input_download_url}}"}
                 - {name: input_download_capability, value: "{{inputs.parameters.input_download_capability}}"}
                 - {name: mlflow_tracking_uri, value: "{{inputs.parameters.mlflow_tracking_uri}}"}
@@ -107,6 +110,7 @@ spec:
           - {name: model_version}
           - {name: requirements_text}
           - {name: max_runtime_seconds}
+          - {name: dispatch_timeout_seconds}
           - {name: input_download_url}
           - {name: input_download_capability}
           - {name: mlflow_tracking_uri, value: ""}
@@ -135,7 +139,7 @@ spec:
           spec:
             runPolicy:
               cleanPodPolicy: Running
-              activeDeadlineSeconds: {{=asInt(inputs.parameters.max_runtime_seconds)}}
+              activeDeadlineSeconds: {{=asInt(inputs.parameters.max_runtime_seconds) + asInt(inputs.parameters.dispatch_timeout_seconds) + 60}}
             pytorchReplicaSpecs:
               Master:
                 replicas: 1
@@ -205,6 +209,7 @@ spec:
           - {name: model_version}
           - {name: requirements_text}
           - {name: max_runtime_seconds}
+          - {name: dispatch_timeout_seconds}
           - {name: input_download_url}
           - {name: input_download_capability}
           - {name: mlflow_tracking_uri, value: ""}
@@ -233,7 +238,7 @@ spec:
           spec:
             runPolicy:
               cleanPodPolicy: Running
-              activeDeadlineSeconds: {{=asInt(inputs.parameters.max_runtime_seconds)}}
+              activeDeadlineSeconds: {{=asInt(inputs.parameters.max_runtime_seconds) + asInt(inputs.parameters.dispatch_timeout_seconds) + 60}}
             pytorchReplicaSpecs:
               Master:
                 replicas: 1

@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db.models import Prefetch
+from django.db import DatabaseError
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -19,7 +20,7 @@ from apps.training.services.jobs import (
     submit_job,
 )
 from apps.training.services.logs import training_logs
-from apps.training.services.resources import CPU_PROFILES, GPU_MODELS, RUNTIME_OPTIONS
+from apps.training.services.resources import CPU_PROFILES, GPU_MODELS, runtime_options
 from apps.training.services.outputs import (
     get_job_reference_preview,
     get_model_output_summary,
@@ -175,6 +176,15 @@ class TrainingJobOutputsEndpoint(APIView):
         return Response(TrainingJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
 
 
+class TrainingUsageEndpoint(APIView):
+    def get(self, request):
+        from apps.training.services.quota import usage
+        try:
+            return Response(usage(request.user))
+        except DatabaseError as exc:
+            raise ServiceUnavailable("Training quota is temporarily unavailable.") from exc
+
+
 class TrainingRuntimeCapabilitiesEndpoint(APIView):
     def get(self, request):
         if not settings.TRAINING_ENABLED:
@@ -203,7 +213,8 @@ class TrainingRuntimeCapabilitiesEndpoint(APIView):
         return Response(
             {
                 "enabled": True,
-                "runtime_options_seconds": RUNTIME_OPTIONS,
+                "runtime_options_seconds": runtime_options(),
+                "dispatch_timeout_seconds": settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS,
                 "backend": settings.TRAINING_BACKEND,
                 "cpu_profiles": [
                     {"id": name, "vcpu": cpu, "memory_mb": memory}

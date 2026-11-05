@@ -19,6 +19,8 @@ import {
 import type { TrainingStatusFilter } from "@/features/training/components/TrainingJobListSections";
 import { Select, type SelectOption } from "@/shared/components/Select";
 import { trainingQueryKeys } from "@/features/training/queryKeys";
+import { getTrainingStartError } from "@/features/training/api/quotaErrors";
+import { formatQuotaDuration } from "@/features/training/api/quotaFormatting";
 import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
@@ -98,7 +100,7 @@ export default function TrainingModelPage() {
         : false;
     },
   });
-  const { data: usage, isLoading: isUsageLoading } = useQuery({
+  const { data: usage, isLoading: isUsageLoading, isError: isUsageError } = useQuery({
     queryKey: trainingQueryKeys.usage(),
     queryFn: getTrainingUsage,
     refetchInterval: 15000,
@@ -211,6 +213,7 @@ export default function TrainingModelPage() {
     onSuccess: (newJob) => {
       setJobToRetry(null);
       toast.success(t("createFlow.messages.trainingStarted"));
+      void queryClient.invalidateQueries({ queryKey: trainingQueryKeys.usage() });
       void queryClient.invalidateQueries({
         queryKey: trainingQueryKeys.jobs(),
       });
@@ -218,7 +221,7 @@ export default function TrainingModelPage() {
     },
     onError: (error) => {
       toast.error(
-        getApiErrorMessage(error, t("createFlow.messages.trainingStartFailed")),
+        getTrainingStartError(error, t, i18n.language),
       );
     },
   });
@@ -406,49 +409,20 @@ export default function TrainingModelPage() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-surface border border-border bg-surface p-5 shadow-sm md:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <p className="text-style-overline uppercase text-color-muted-foreground">
-                {t("quota")}
-              </p>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-style-page-title font-semibold text-color-foreground">
-                  {isUsageLoading
-                    ? "..."
-                    : formatDuration(usage?.monthly_runtime_seconds)}
-                </span>
-                <span className="text-style-body-strong text-color-muted-foreground">
-                  {t("used", {
-                    duration: formatDuration(
-                      usage?.monthly_quota_seconds || 43200,
-                    ),
-                  })}
-                </span>
+          <p className="text-style-overline uppercase text-color-muted-foreground">{t("quota")}</p>
+          {isUsageLoading && <p>...</p>}
+          {isUsageError && <p className="text-style-caption text-color-danger">{t("quotaUnavailable")}</p>}
+          {usage && <p className="text-style-caption text-color-muted-foreground">{t("quotaReset", { time: formatDateTime(usage.reset_at, i18n.language) })}</p>}
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {usage?.resources.map((item) => (
+              <div key={item.resource} className="rounded-surface border border-border p-3">
+                <p className="text-style-caption-strong">{t(`quotaProfiles.${item.resource}`)}</p>
+                <p className="text-style-body-strong">{item.remaining_seconds == null ? t("quotaUnlimited") : formatQuotaDuration(item.remaining_seconds)}</p>
+                {item.limit_seconds != null && <p className="text-style-caption text-color-muted-foreground">
+                  {formatQuotaDuration(item.used_seconds)} / {formatQuotaDuration(item.limit_seconds)} · {t("quotaReserved", { duration: formatQuotaDuration(item.reserved_seconds) })}
+                </p>}
               </div>
-            </div>
-            <div className="text-right">
-              <p className="text-style-overline uppercase text-color-muted-foreground">
-                {t("remaining")}
-              </p>
-              <p className="mt-1 text-style-heading font-semibold text-color-success">
-                {isUsageLoading
-                  ? "..."
-                  : formatDuration(usage?.remaining_seconds)}
-              </p>
-            </div>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full bg-success transition-all duration-500 ease-out"
-              style={{
-                width: `${Math.min(
-                  100,
-                  ((usage?.monthly_runtime_seconds || 0) /
-                    (usage?.monthly_quota_seconds || 1)) *
-                    100,
-                )}%`,
-              }}
-            />
+            ))}
           </div>
         </div>
 

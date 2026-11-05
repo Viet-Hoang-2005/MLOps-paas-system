@@ -1,4 +1,5 @@
 import { Cpu, FileCode2, FileText } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useCallback,
   useEffect,
@@ -16,6 +17,8 @@ import {
 } from "react-router-dom";
 
 import type { ModelProject } from "@/features/projects/types";
+import { trainingQueryKeys } from "@/features/training/queryKeys";
+import { getTrainingStartError } from "@/features/training/api/quotaErrors";
 import {
   cancelTrainingJob,
   createTrainingJob,
@@ -86,7 +89,8 @@ const sourceFingerprint = (form: TrainingSourceForm) =>
   });
 
 export default function CreateTrainingJobPage() {
-  const { t } = useTranslation("training");
+  const queryClient = useQueryClient();
+  const { t, i18n } = useTranslation("training");
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -167,6 +171,8 @@ export default function CreateTrainingJobPage() {
             ...current,
             vcpu: firstProfile.vcpu,
             memory_mb: firstProfile.memory_mb,
+            max_runtime_seconds: runtime.runtime_options_seconds?.includes(current.max_runtime_seconds)
+              ? current.max_runtime_seconds : (runtime.runtime_options_seconds?.[0] ?? current.max_runtime_seconds),
           }));
         }
       })
@@ -402,16 +408,17 @@ export default function CreateTrainingJobPage() {
         training_data: null,
       });
       setJob(nextJob);
+      void queryClient.invalidateQueries({ queryKey: trainingQueryKeys.usage() });
       navigate(routeFor(3, project.id, nextJob.id), { replace: true });
       toast.success(t("createFlow.messages.trainingStarted"));
     } catch (error) {
       toast.error(
-        getApiErrorMessage(error, t("createFlow.messages.trainingStartFailed")),
+        getTrainingStartError(error, t, i18n.language),
       );
     } finally {
       setTransitionState("idle");
     }
-  }, [executionForm, navigate, project, routeFor, sourceForm, t]);
+  }, [executionForm, i18n.language, navigate, project, queryClient, routeFor, sourceForm, t]);
 
   const refreshJob = useCallback(async () => {
     if (!job) return;
@@ -425,7 +432,8 @@ export default function CreateTrainingJobPage() {
     )
       return;
     setJob(await cancelTrainingJob(job.id));
-  }, [job]);
+    void queryClient.invalidateQueries({ queryKey: trainingQueryKeys.usage() });
+  }, [job, queryClient]);
 
   const finishTraining = () => {
     if (!job) {

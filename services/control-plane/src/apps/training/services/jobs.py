@@ -2,7 +2,7 @@ from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.conf import settings
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -15,7 +15,7 @@ from apps.training.tasks import (
     execute_training_job,
     purge_training_job_outputs,
 )
-from common.api.exceptions import Conflict
+from common.api.exceptions import Conflict, ServiceUnavailable
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import training_job_prefix
 
@@ -181,6 +181,9 @@ def retry_job(job, *, storage=None):
             copied = storage.copy(sources[field], storage.parse_uri(uris[kind])[1])
             setattr(retry, field, copied.uri)
         with transaction.atomic():
+            if retry.backend == "argo":
+                from apps.training.services.quota import lock_owner
+                lock_owner(project.owner_id)
             project = type(project).objects.select_for_update(of=("self",)).select_related("owner").get(pk=project.pk)
             _check_retryable(project, TrainingJob.objects.select_for_update().get(pk=job.pk))
             retry.save()
@@ -200,11 +203,17 @@ def submit_job(job, *, verify_gpu=True):
         from apps.training.services.local_gpu import require_device
         require_device(job.local_gpu_id)
     verified_gpu_id = job.local_gpu_id if job.accelerator_type == "gpu" and settings.TRAINING_BACKEND == "docker" else ""
-    return _submit_job_atomic(job, verified_gpu_id=verified_gpu_id)
+    try:
+        return _submit_job_atomic(job, verified_gpu_id=verified_gpu_id)
+    except DatabaseError as exc:
+        raise ServiceUnavailable("Training quota is temporarily unavailable.") from exc
 
 
 @transaction.atomic
 def _submit_job_atomic(job, *, verified_gpu_id):
+    if job.backend == "argo":
+        from apps.training.services.quota import lock_owner
+        lock_owner(job.project.owner_id)
     project = type(job.project).objects.select_for_update().get(pk=job.project_id)
     job = TrainingJob.objects.select_for_update().get(pk=job.pk)
     from apps.training.services.resources import validate_resources
@@ -217,8 +226,11 @@ def _submit_job_atomic(job, *, verified_gpu_id):
         raise Conflict("This training job is being deleted.")
     if job.status != "pending":
         raise Conflict("Only pending jobs can be submitted.")
+    if job.backend == "argo":
+        from apps.training.services.quota import reserve
+        reserve(job)
     job.status = "queued"
-    job.save(update_fields=["status", "updated_at"])
+    job.save(update_fields=["status", "dispatch_deadline_at", "updated_at"])
     transaction.on_commit(lambda: _enqueue(job))
     return job
 
@@ -269,7 +281,7 @@ def request_job_deletion(job):
             task = delete_training_job
             event_type = "deletion_requested"
             message = "Training deletion requested."
-        if settings.EXECUTION_WATCH_ENABLED:
+        if settings.TRAINING_EXECUTION_WATCH_ENABLED:
             job.execution_stop_requested = True
             job.observation_status = "cleanup_pending"
             job.next_execution_check_at = timezone.now()

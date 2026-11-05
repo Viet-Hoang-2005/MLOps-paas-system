@@ -40,10 +40,10 @@ def capability_for_token(*, job, purpose, token):
 
 def _ttl_seconds(job):
     requested = int(job.max_runtime_seconds) + settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS + settings.TRAINING_CAPABILITY_GRACE_SECONDS
-    return min(
-        max(requested, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS),
-        min(46800, settings.TRAINING_CAPABILITY_MAX_TTL_SECONDS),
-    )
+    configured_cap = settings.TRAINING_CAPABILITY_MAX_TTL_SECONDS
+    if configured_cap and configured_cap < requested:
+        raise ValueError("TRAINING_CAPABILITY_MAX_TTL_SECONDS is shorter than the required training lifetime.")
+    return max(requested, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS)
 
 
 def _token_hash(token):

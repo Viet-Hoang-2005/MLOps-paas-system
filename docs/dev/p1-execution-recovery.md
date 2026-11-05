@@ -4,7 +4,8 @@
 
 PostgreSQL is authoritative for TrainingJob and DriftRun dispatch, observation and
 cleanup. Redis carries tasks/logs and may be cleared without losing committed jobs.
-`EXECUTION_WATCH_ENABLED=true` enables a 15-second Beat scan, batches of 100 per
+`TRAINING_EXECUTION_WATCH_ENABLED` and `DRIFT_EXECUTION_WATCH_ENABLED` independently
+enable a 15-second Beat scan, batches of 100 per
 resource kind, `select_for_update(skip_locked=True)` and 60-second leases. Only one
 Beat instance should run. Observations are applied only while their lease is valid.
 Docker/HTTP/S3 operations occur outside observation transactions.
@@ -31,8 +32,8 @@ The public APIs retain lifecycle enums and add `observation_status` (`ok`,
 ## Training Configuration
 
 CPU/memory profiles are 1/2048, 2/4096 and 4/8192 (cores/MiB), validated on
-create/update/submit. Runtime options are 900, 1800, 3600, 7200, 21600, 43200 seconds
-and come from `GET /api/training-jobs/runtime-capabilities/`. GPU requires
+create/update/submit. Runtime options include up to 86400 seconds and are bounded
+by `TRAINING_MAX_RUNTIME_SECONDS`; they come from `GET /api/training-jobs/runtime-capabilities/`. GPU requires
 `TRAINING_GPU_ENABLED`, count 1 and `1` in `TRAINING_GPU_COUNTS`; `none` requires 0
 and an empty model and device ID. Docker GPU jobs use an empty model and persist
 the selected NVIDIA UUID in `local_gpu_id`; creation, submission and dispatch
@@ -69,11 +70,20 @@ The external observer also stops a runtime that exceeds its deadline. After a
 queue outage, actual runtime start/finish timestamps distinguish node wait from
 execution time, including completion before the deadline observed later.
 
-Capability TTL is dispatch wait + runtime + 900 seconds grace, capped at 46800
-seconds (13 hours). Presigned URLs default to 900 seconds. The runner obtains
+Capability TTL is dispatch wait + runtime + 900 seconds grace; a configured explicit
+cap below that requirement causes an error. Presigned URLs default to 900 seconds. The runner obtains
 fresh input URLs at startup, then an output PUT URL just before upload, with
 `Content-Type: application/gzip`. Dispatch retry does not revoke tokens already
 given to an accepted workload. Drift runtime defaults to 3600 seconds.
+
+Production training uses a durable per-account weekly quota and at most one active
+reservation across projects; CPU-only charges its CPU profile and GPU jobs charge
+the selected GPU. UTC weeks start Monday. Reservations remain until trusted cleanup
+confirms a stop and must not be discarded when jobs or projects are deleted. If
+runtime timing cannot be verified, reconciliation remains pending. The usage API is
+`GET /api/training-jobs/usage/`. Local training has no weekly limits.
+`TRAINING_EXECUTION_WATCH_ENABLED` enables training reconciliation independently of
+the shared drift watcher.
 
 ## Stack Checks
 
@@ -167,9 +177,9 @@ them manually also deletes create-if-absent history.
 Roll out: additive migrations, runner/adapters and Argo templates, backend/Beat,
 then FE. Inventory all active jobs before enabling the watchdog. Existing unlabeled
 Docker runtimes require an ownership audit rather than automatic label adoption.
-Production `EXECUTION_WATCH_ENABLED` stays false until the staging handlers/images
-are compatible and cluster smoke has passed. While it is false, Argo training and
-drift are not status-polled; their terminal status arrives only through callbacks.
+Production enables the training watcher and keeps `DRIFT_EXECUTION_WATCH_ENABLED`
+false until the drift handlers/images are compatible and cluster smoke has passed.
+When the drift watcher is disabled, Argo drift terminal status arrives through callbacks.
 Use the normal image promotion workflow; do not change pinned production digests
 to a local image. No production deployment is performed by this P1 change.
 

@@ -19,7 +19,7 @@ grace deadline; it does not rewrite old rows. New local attempts use the new
 contract; in-flight old attempts are not adopted. Finish or cancel them using the
 old code before updating, or use a clean local application DB.
 
-Compose enables `LOCAL_EXECUTION_WATCH_ENABLED=true` only on its existing Beat.
+Compose enables `LOCAL_DEPLOYMENT_WATCH_ENABLED=true` on its existing Beat by default.
 Every five seconds Beat enqueues a DB-only scan into `celery`. The scan claims
 due Docker executions and dispatches short check tasks. Each delivery expires
 after ten seconds and has a single-use, thirty-second DB lease. A checker has a

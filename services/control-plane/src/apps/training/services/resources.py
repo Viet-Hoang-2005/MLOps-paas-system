@@ -2,8 +2,13 @@ from django.conf import settings
 from rest_framework.exceptions import ValidationError
 
 CPU_PROFILES = [(1, 2048), (2, 4096), (4, 8192)]
-RUNTIME_OPTIONS = [900, 1800, 3600, 7200, 21600, 43200]
+RUNTIME_OPTIONS = [900, 1800, 3600, 7200, 21600, 43200, 86400]
 GPU_MODELS = ("t4", "a10g")
+
+
+def runtime_options():
+    maximum = settings.TRAINING_MAX_RUNTIME_SECONDS
+    return sorted({value for value in RUNTIME_OPTIONS if value <= maximum} | {maximum})
 
 
 def validate_resources(values, instance=None):
@@ -14,7 +19,10 @@ def validate_resources(values, instance=None):
     if (value("vcpu", 2), value("memory_mb", 4096)) not in CPU_PROFILES:
         errors["vcpu"] = "Select a supported CPU/memory profile."
         errors["memory_mb"] = "Select a supported CPU/memory profile."
-    if value("max_runtime_seconds", 3600) not in RUNTIME_OPTIONS:
+    runtime = value("max_runtime_seconds", 3600)
+    submitted = instance is not None and instance.status != "pending"
+    invalid_submitted = submitted and (runtime <= 0 or (instance.backend == "argo" and runtime > 86400))
+    if invalid_submitted or ((not submitted or "max_runtime_seconds" in values) and runtime not in runtime_options()):
         errors["max_runtime_seconds"] = "Select a supported maximum runtime."
     kind, count = value("accelerator_type", "none"), value("accelerator_count", 0)
     model = value("accelerator_model", "")

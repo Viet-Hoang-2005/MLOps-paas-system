@@ -14,6 +14,7 @@ from .endpoints import (
     TrainingJobRetryEndpoint,
     TrainingJobSubmitEndpoint,
     TrainingRuntimeCapabilitiesEndpoint,
+    TrainingUsageEndpoint,
 )
 from .metrics_endpoints import (
     TrainingJobExperimentMetricsEndpoint,
@@ -24,6 +25,7 @@ from .metrics_endpoints import (
 urlpatterns = [
     path("", TrainingJobListCreateEndpoint.as_view(), name="training-job-list"),
     path("compare/", TrainingJobsCompareEndpoint.as_view(), name="training-jobs-compare"),
+    path("usage/", TrainingUsageEndpoint.as_view(), name="training-usage"),
     path("<uuid:job_id>/", TrainingJobDetailEndpoint.as_view(), name="training-job-detail"),
     path("<uuid:job_id>/experiment-metrics/", TrainingJobExperimentMetricsEndpoint.as_view(), name="training-job-experiment-metrics"),
     path("<uuid:job_id>/runtime-metrics/", TrainingJobRuntimeMetricsEndpoint.as_view(), name="training-job-runtime-metrics"),

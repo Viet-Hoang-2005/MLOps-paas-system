@@ -18,7 +18,7 @@ TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled", "skipped"
 )
 def execute_drift_run(self, run_id):
     from django.conf import settings
-    if settings.EXECUTION_WATCH_ENABLED:
+    if settings.DRIFT_EXECUTION_WATCH_ENABLED:
         from apps.observability.services.executions import reconcile
         return reconcile("drift", run_id)
     from .models import DriftRun
@@ -92,7 +92,7 @@ def execute_drift_run(self, run_id):
 @shared_task(bind=True, max_retries=120, soft_time_limit=50, time_limit=55)
 def poll_drift_run_status(self, run_id):
     from django.conf import settings
-    if settings.EXECUTION_WATCH_ENABLED:
+    if settings.DRIFT_EXECUTION_WATCH_ENABLED:
         from apps.observability.services.executions import reconcile
         return reconcile("drift", run_id)
     from .models import DriftRun

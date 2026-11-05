@@ -149,6 +149,7 @@ def test_retry_copies_gpu_model(settings, monkeypatch):
     from apps.training.services.jobs import retry_job
 
     settings.TRAINING_BACKEND = "argo"
+    settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     settings.TRAINING_GPU_ENABLED = True
     settings.TRAINING_GPU_COUNTS = (1,)
     user = get_user_model().objects.create_user("gpu-retry@example.com")

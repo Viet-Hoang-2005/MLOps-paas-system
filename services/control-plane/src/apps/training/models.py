@@ -1,5 +1,7 @@
 import uuid
 
+from django.conf import settings
+
 from django.db import models
 from django.utils import timezone
 from common.execution_watch import ExecutionWatch
@@ -93,6 +95,38 @@ class TrainingJob(ExecutionWatch):
         self.status = status
         if self.pk:
             self.capabilities.filter(purpose="tracking").delete()
+
+
+class TrainingQuotaReservation(models.Model):
+    """Durable usage survives deletion of the job and its project."""
+
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="training_quota_reservations")
+    job_id = models.UUIDField(unique=True)
+    resource = models.CharField(max_length=16)
+    submitted_at = models.DateTimeField()
+    dispatch_deadline_at = models.DateTimeField()
+    max_runtime_seconds = models.PositiveIntegerField()
+    started_at = models.DateTimeField(null=True, blank=True)
+    runtime_finished_at = models.DateTimeField(null=True, blank=True)
+    stopped_at = models.DateTimeField(null=True, blank=True)
+    active = models.BooleanField(default=True, db_index=True)
+
+    def __str__(self):
+        return f"{self.job_id}:{self.resource}"
+
+
+class TrainingQuotaWeek(models.Model):
+    reservation = models.ForeignKey(TrainingQuotaReservation, on_delete=models.CASCADE, related_name="weeks")
+    week_start = models.DateTimeField()
+    reserved_seconds = models.PositiveIntegerField(default=0)
+    used_seconds = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["reservation", "week_start"], name="training_quota_job_week_unique")]
+        indexes = [models.Index(fields=["week_start"], name="training_quota_week_idx")]
+
+    def __str__(self):
+        return f"{self.reservation_id}:{self.week_start}"
 
 
 class TrainingJobCapability(models.Model):

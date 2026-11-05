@@ -43,6 +43,7 @@ import type {
 } from "@/features/training/trainingJobDetailContext";
 import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
+import { getTrainingStartError } from "@/features/training/api/quotaErrors";
 import { Button } from "@/shared/components/Button";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageTabs } from "@/shared/components/PageTabs";
@@ -228,6 +229,7 @@ export default function TrainingJobDetailPage() {
     onSuccess: async (newJob) => {
       setRetryJobOpen(false);
       toast.success(t("createFlow.messages.trainingStarted"));
+      await queryClient.invalidateQueries({ queryKey: trainingQueryKeys.usage() });
       await queryClient.invalidateQueries({
         queryKey: trainingQueryKeys.jobs(),
       });
@@ -235,7 +237,7 @@ export default function TrainingJobDetailPage() {
     },
     onError: (error) =>
       toast.error(
-        getApiErrorMessage(error, t("createFlow.messages.trainingStartFailed")),
+        getTrainingStartError(error, t, i18n.language),
       ),
   });
 

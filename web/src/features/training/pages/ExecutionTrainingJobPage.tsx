@@ -15,6 +15,11 @@ import {
   TerminalViewer,
 } from "@/shared/components/TerminalViewer";
 import { Picker } from "@/shared/components/Picker";
+import { useQuery } from "@tanstack/react-query";
+import { getTrainingUsage } from "@/features/training/api/trainingApi";
+import { trainingQueryKeys } from "@/features/training/queryKeys";
+import { formatDuration } from "@/shared/lib/formatDuration";
+import { formatQuotaDuration } from "@/features/training/api/quotaFormatting";
 
 const runtimeOptions = [
   { label: "15m", value: 900 },
@@ -23,6 +28,7 @@ const runtimeOptions = [
   { label: "2h", value: 7200 },
   { label: "6h", value: 21600 },
   { label: "12h", value: 43200 },
+  { label: "24h", value: 86400 },
 ];
 
 const TRAINING_TERMINAL_STATUSES = [
@@ -34,18 +40,23 @@ const TRAINING_TERMINAL_STATUSES = [
 export default function ExecutionTrainingJobPage() {
   const { t } = useTranslation("training");
   const flow = useCreateTrainingJob();
+  const { data: usage, dataUpdatedAt: usageUpdatedAt, isError: usageError } = useQuery({ queryKey: trainingQueryKeys.usage(), queryFn: getTrainingUsage, refetchInterval: 15000 });
   const handledTerminalState = useRef("");
   const active =
     flow.job &&
     ["pending", "queued", "uploading", "running"].includes(flow.job.status);
   const profiles = flow.capabilities?.cpu_profiles ?? [];
+  const quotaResource = flow.executionForm.accelerator_type === "gpu"
+    ? (flow.capabilities?.backend === "docker" ? "gpu_local" : flow.executionForm.accelerator_model)
+    : ({ 1: "cpu_small", 2: "cpu_medium", 4: "cpu_large" } as Record<number, string>)[flow.executionForm.vcpu];
+  const quota = usage?.resources.find((item) => item.resource === quotaResource);
   const supportedRuntimeOptions = (
     flow.capabilities?.runtime_options_seconds ?? []
   ).map((value) => ({
     value,
     label:
       runtimeOptions.find((option) => option.value === value)?.label ??
-      `${Math.round(value / 60)}m`,
+      formatDuration(value),
   }));
   const observeExecution = Boolean(
     flow.job &&
@@ -202,6 +213,12 @@ export default function ExecutionTrainingJobPage() {
               flow.setExecutionField("max_runtime_seconds", value)
             }
           />
+          {usage && quota && <p className="mt-2 text-style-caption text-color-muted-foreground">
+            {t("createFlow.execution.quotaRemaining", { duration: quota.remaining_seconds == null ? t("quotaUnlimited") : formatQuotaDuration(quota.remaining_seconds) })}
+          </p>}
+          {usageError && <p className="mt-2 text-style-caption text-color-danger">{t("quotaUnavailable")}</p>}
+          {usage?.backend === "argo" && usageUpdatedAt + (flow.executionForm.max_runtime_seconds + (flow.capabilities?.dispatch_timeout_seconds ?? 0)) * 1000 > Date.parse(usage.reset_at) &&
+            <p className="mt-2 text-style-caption text-color-muted-foreground">{t("createFlow.execution.quotaCrossWeek")}</p>}
         </div>
 
         <ExecutionObservation state={flow.job} />

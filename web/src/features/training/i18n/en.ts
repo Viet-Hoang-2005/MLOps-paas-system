@@ -10,7 +10,14 @@ export const trainingEn = {
   description:
     "Train new model artifacts or retrain the model selected in the header.",
   newJob: "New Training Job",
-  quota: "Monthly Training Quota",
+  quota: "Weekly Training Quota",
+  quotaUnlimited: "Unlimited",
+  quotaUnavailable: "Weekly quota is temporarily unavailable.",
+  quotaReset: "Resets {{time}}",
+  quotaReserved: "Reserved: {{duration}}",
+  quotaConcurrencyError: "Another training job is still running or being cleaned up.",
+  quotaExceededError: "Insufficient {{resource}} quota: {{required}} needed, {{remaining}} available. Resets {{reset}}.",
+  quotaProfiles: { cpu_small: "CPU Small", cpu_medium: "CPU Medium", cpu_large: "CPU Large", gpu_local: "Local GPU", t4: "NVIDIA T4", a10g: "NVIDIA A10G" },
   used: "/ {{duration}} used",
   remaining: "Remaining",
   totalJobs: "Total Jobs",
@@ -409,6 +416,8 @@ export const trainingEn = {
       },
     },
     execution: {
+      quotaRemaining: "Weekly quota remaining: {{duration}}",
+      quotaCrossWeek: "This job may cross the weekly reset; quota is reserved in both weeks when necessary.",
       title: "Execution resources",
       description:
         "Choose a runtime capability exposed by the Control Plane, then run training.",

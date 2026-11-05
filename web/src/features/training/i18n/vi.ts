@@ -10,7 +10,14 @@ export const trainingVi = {
   description:
     "Huấn luyện artifact mới hoặc huấn luyện lại mô hình đang chọn trên Header.",
   newJob: "Tác vụ huấn luyện mới",
-  quota: "Hạn mức huấn luyện hàng tháng",
+  quota: "Hạn mức huấn luyện hàng tuần",
+  quotaUnlimited: "Không giới hạn",
+  quotaUnavailable: "Tạm thời không thể tải hạn mức tuần.",
+  quotaReset: "Cấp lại {{time}}",
+  quotaReserved: "Đã giữ chỗ: {{duration}}",
+  quotaConcurrencyError: "Một tác vụ huấn luyện khác vẫn đang chạy hoặc đang được dọn dẹp.",
+  quotaExceededError: "Không đủ quota {{resource}}: cần {{required}}, còn {{remaining}}. Cấp lại {{reset}}.",
+  quotaProfiles: { cpu_small: "CPU Small", cpu_medium: "CPU Medium", cpu_large: "CPU Large", gpu_local: "GPU local", t4: "NVIDIA T4", a10g: "NVIDIA A10G" },
   used: "/ đã sử dụng {{duration}}",
   remaining: "Còn lại",
   totalJobs: "Tổng tác vụ",
@@ -415,6 +422,8 @@ export const trainingVi = {
       },
     },
     execution: {
+      quotaRemaining: "Hạn mức tuần còn lại: {{duration}}",
+      quotaCrossWeek: "Tác vụ có thể qua mốc cấp lại; hệ thống sẽ giữ chỗ quota ở cả hai tuần khi cần.",
       title: "Tài nguyên thực thi",
       description:
         "Chọn khả năng runtime mà Control Plane cung cấp rồi chạy huấn luyện.",

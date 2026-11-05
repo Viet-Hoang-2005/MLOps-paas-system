@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "test/renderWithProviders";
 import ExecutionTrainingJobPage from "./ExecutionTrainingJobPage";
+import * as trainingApi from "@/features/training/api/trainingApi";
 
 const { flow } = vi.hoisted((): { flow: { current: Record<string, unknown> } } => ({ flow: { current: {} } }));
 vi.mock("@/features/training/trainingFlowContext", () => ({ useCreateTrainingJob: () => flow.current }));
@@ -12,6 +13,7 @@ vi.mock("@/shared/hooks/useRuntimeLogStream", () => ({
 
 describe("training GPU selection", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     flow.current = {
       project: null, job: null, transitionState: "idle",
       executionForm: { vcpu: 2, memory_mb: 4096, max_runtime_seconds: 3600,
@@ -22,6 +24,15 @@ describe("training GPU selection", () => {
         accelerators: [{ type: "none", counts: [0] }, { type: "gpu", model: "t4", counts: [1] },
           { type: "gpu", model: "a10g", counts: [1] }] },
     };
+  });
+
+  it.each(["en", "vi"] as const)("shows the selected CPU weekly quota in %s", async (language) => {
+    vi.spyOn(trainingApi, "getTrainingUsage").mockResolvedValue({ backend: "argo", week_start: "2026-11-02T00:00:00Z",
+      reset_at: "2030-11-11T00:00:00Z", active_jobs_count: 0, max_active_jobs: 1,
+      resources: [{ resource: "cpu_medium", limit_seconds: 172800, used_seconds: 3600,
+        reserved_seconds: 0, remaining_seconds: 169200 }] });
+    renderWithProviders(<ExecutionTrainingJobPage />, { language });
+    expect(await screen.findByText(language === "en" ? /Weekly quota remaining:/ : /Hạn mức tuần còn lại:/)).toBeInTheDocument();
   });
 
   it.each(["en", "vi"] as const)("selects T4 and A10G on production in %s", async (language) => {

@@ -16,7 +16,7 @@ Before changing a port or service name, search Compose, `.env.example`, Control 
 Use `docker compose config`, `docker ps -a`, service health checks, and scoped `docker logs`. Do not delete volumes or images unless explicitly authorized.
 
 P1 training/drift use PostgreSQL leases and Beat recovery with
-`EXECUTION_WATCH_ENABLED=true` in Compose. Separate Control Plane readiness from
+`TRAINING_EXECUTION_WATCH_ENABLED=true, DRIFT_EXECUTION_WATCH_ENABLED=true` in Compose. Separate Control Plane readiness from
 Traefik ping, gateway `http://localhost:5001/health/ready` and Kafka/consumer ingestion checks. Port 5002 routes inference and does not expose gateway readiness. Inference
 uses a cookie-free Bearer client. Training applies CPU/RAM/optional GPU and a runner
 wall-clock deadline. See `docs/dev/p1-execution-recovery.md` for additive migrations,

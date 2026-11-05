@@ -60,31 +60,7 @@ export const listTrainingJobs = async (): Promise<TrainingJobListResponse> => {
 };
 
 export const getTrainingUsage = async (): Promise<TrainingUsageResponse> => {
-  const { training_jobs: jobs } = await listTrainingJobs();
-  const monthlyRuntime = jobs.reduce(
-    (total, job) => total + job.runtime_seconds,
-    0,
-  );
-  const trainingBackend = ["argo", "kubeflow"].includes(jobs[0]?.backend ?? "")
-    ? "kubeflow"
-    : "local";
-  return {
-    training_backend: trainingBackend,
-    monthly_quota_seconds: 0,
-    monthly_runtime_seconds: monthlyRuntime,
-    remaining_seconds: 0,
-    active_jobs_count: jobs.filter((job) =>
-      ["pending", "queued", "uploading", "running", "cancelling"].includes(
-        job.status,
-      ),
-    ).length,
-    running_jobs_count: jobs.filter((job) => job.status === "running").length,
-    completed_jobs_count: jobs.filter((job) => job.status === "completed")
-      .length,
-    failed_jobs_count: jobs.filter((job) => job.status === "failed").length,
-    current_month_start: "",
-    current_month_end: "",
-  };
+  return (await apiClient.get<TrainingUsageResponse>(controlPlaneURL("/training-jobs/usage/"))).data;
 };
 
 export const getTrainingJob = async (jobId: string): Promise<TrainingJob> =>

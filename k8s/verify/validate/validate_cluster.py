@@ -79,7 +79,7 @@ def check_pool(
     }:
         errors.append(f"NodePool {name} must reference EC2NodeClass {nodeclass}")
     if (
-        template_spec.get("expireAfter") != "24h"
+        template_spec.get("expireAfter") != "Never"
         or (spec.get("disruption") or {}).get("consolidateAfter") != "5m"
     ):
         errors.append(
@@ -123,7 +123,7 @@ def validate_karpenter_capacity(context: ValidationContext) -> None:
                 cpu_pool,
                 "mlops-paas-training-cpu",
                 "training-cpu",
-                {"c6i.2xlarge", "c6i.4xlarge"},
+                {"c6i.xlarge", "c6i.2xlarge", "c6i.4xlarge"},
                 gpu=False,
             )
         )

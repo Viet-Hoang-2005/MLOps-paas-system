@@ -182,6 +182,9 @@ spec:
               - {name: callback, path: body.control_plane_webhook_url}
               - {name: job_name, path: body.job_name}
               - {name: job_id, path: body.job_id}
+          - expr: max_runtime_seconds > 0 && max_runtime_seconds <= 86400
+            fields:
+              - {name: max_runtime_seconds, path: body.max_runtime_seconds}
           - expr: >-
               (vcpu == 1 && memory == 2048) ||
               (vcpu == 2 && memory == 4096) ||

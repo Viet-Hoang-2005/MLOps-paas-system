@@ -45,7 +45,7 @@ protocols and never infer lifecycle state from tenant output. See
 ## Durable Training And Drift
 
 PostgreSQL owns dispatch, observation leases and cleanup intent for TrainingJob/DriftRun.
-With EXECUTION_WATCH_ENABLED, Beat scans every 15 seconds; batch size is 100 and
+With TRAINING_EXECUTION_WATCH_ENABLED or DRIFT_EXECUTION_WATCH_ENABLED, Beat scans every 15 seconds; batch size is 100 and
 leases last 60 seconds. Runtime I/O stays outside transactions. Temporary backend
 errors retain lifecycle state and set observation_status=retrying (or cleanup_pending).
 Deterministic UUID runtime names and tenant/project/resource labels fence adoption

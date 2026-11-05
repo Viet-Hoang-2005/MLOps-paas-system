@@ -192,7 +192,7 @@ class ArgoTrainingBackend(_ArgoBackend):
             cancellation_capability = issue_capability(
                 job,
                 "cancel_reporter",
-                ttl_seconds=min(600, settings.TRAINING_CAPABILITY_MAX_TTL_SECONDS),
+                ttl_seconds=min(600, settings.TRAINING_CAPABILITY_MAX_TTL_SECONDS or 600),
             )
             response = self.client.trigger(
                 settings.ARGO_CANCEL_TRAINING_WEBHOOK_URL,

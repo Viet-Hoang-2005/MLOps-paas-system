@@ -97,11 +97,15 @@ def claim(kind, public_id=None):
 def scan():
     from apps.observability.tasks import reconcile_job_execution
 
-    if not settings.EXECUTION_WATCH_ENABLED:
+    if not (settings.DRIFT_EXECUTION_WATCH_ENABLED or settings.TRAINING_EXECUTION_WATCH_ENABLED):
         return 0
     count = 0
     lease_seconds = getattr(settings, "EXECUTION_CHECK_LEASE_SECONDS", 300)
     for kind in ("training", "drift"):
+        if kind == "training" and not settings.TRAINING_EXECUTION_WATCH_ENABLED:
+            continue
+        if kind == "drift" and not settings.DRIFT_EXECUTION_WATCH_ENABLED:
+            continue
         for public_id, token in claim(kind):
             try:
                 reconcile_job_execution.apply_async(args=[kind, public_id, token], expires=min(60, lease_seconds))
@@ -186,6 +190,8 @@ def reconcile(kind, public_id, token=None):
             if kind == "training":
                 from apps.training.services.resources import validate_resources
                 validate_resources({}, row)
+                from apps.training.services.quota import require_reservation
+                require_reservation(row)
             backend.run(row)
             return apply_observation(kind, public_id, token, {"status": "dispatched"})
         return apply_observation(kind, public_id, token, result)
@@ -291,11 +297,19 @@ def apply_observation(kind, public_id, token, observation):
             observation = {**observation, "status": observed, "error": "Runtime output verification failed."}
     project = project_for(row, kind)
     with transaction.atomic():
+        if kind == "training" and row.backend == "argo":
+            from apps.training.services.quota import lock_owner
+            lock_owner(project.owner_id)
         project = type(project).objects.select_for_update().get(pk=project.pk)
         current = model_for(kind).objects.select_for_update().get(pk=row.pk)
         if not _valid(current, token):
             return "ignored"
         finished = _store_runtime_metadata(current, kind, observation)
+        quota_settled = True
+        if kind == "training" and current.backend == "argo":
+            from apps.training.services.quota import update_observation
+            quota_settled = update_observation(current, started_at=current.runtime_started_at, finished_at=finished,
+                                               stopped=observed == "stopped")
         now = timezone.now()
         dispatch_expired = bool(current.dispatch_deadline_at and (current.runtime_started_at or now) > current.dispatch_deadline_at)
         runtime_expired = bool(current.execution_deadline_at and now >= current.execution_deadline_at)
@@ -309,6 +323,10 @@ def apply_observation(kind, public_id, token, observation):
             return current.status
         inactive = project.deletion_state != "active" or bool(getattr(current, "deletion_requested_at", None))
         if observed == "stopped":
+            if not quota_settled:
+                current.observation_status = "cleanup_pending"
+                _release(current, "Training runtime timing is unavailable; quota reconciliation is pending.")
+                return current.status
             if current.status not in TERMINAL:
                 _finish(current, kind, "cancelled")
             current.observation_status = "ok"

@@ -95,6 +95,8 @@ def test_argo_cancel_uses_job_bound_callback_capability(settings):
         f"/internal/webhooks/training-jobs/{job.public_id}/cancellation/"
     )
     assert payload["cancel_reporter_capability"]
+    from apps.training.services.capabilities import capability_for_token
+    assert capability_for_token(job=job, purpose="cancel_reporter", token=payload["cancel_reporter_capability"])
 
 
 @pytest.mark.django_db
@@ -104,7 +106,7 @@ def test_argo_training_is_not_status_polled_without_the_watcher(settings, monkey
     from infrastructure.execution.argo_backends import ArgoDriftBackend
     from infrastructure.execution.docker_backends import DockerTrainingBackend
 
-    settings.EXECUTION_WATCH_ENABLED = False
+    settings.TRAINING_EXECUTION_WATCH_ENABLED = False
     backend = ArgoTrainingBackend(client=FakeArgoClient(), storage=FakeStorage())
     assert not polls_runtime_status(backend)
     assert not polls_runtime_status(ArgoDriftBackend(client=FakeArgoClient(), storage=FakeStorage()))

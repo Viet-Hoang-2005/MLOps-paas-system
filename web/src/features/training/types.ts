@@ -130,6 +130,7 @@ export interface TrainingJobFormValues {
 
 export interface TrainingRuntimeCapabilities {
   runtime_options_seconds?: number[];
+  dispatch_timeout_seconds?: number;
   enabled: boolean;
   backend: "docker" | "argo";
   cpu_profiles: Array<{ id: string; vcpu: number; memory_mb: number }>;
@@ -194,16 +195,13 @@ export interface TrainingJobEventsResponse {
 }
 
 export interface TrainingUsageResponse {
-  training_backend: "kubeflow" | "local";
-  monthly_quota_seconds: number;
-  monthly_runtime_seconds: number;
-  remaining_seconds: number;
-  active_jobs_count: number;
-  running_jobs_count: number;
-  completed_jobs_count: number;
-  failed_jobs_count: number;
-  current_month_start: string;
-  current_month_end: string;
+  backend: "argo" | "docker";
+  week_start: string;
+  reset_at: string;
+  active_jobs_count: number | null;
+  max_active_jobs: number | null;
+  resources: { resource: string; limit_seconds: number | null; used_seconds: number;
+    reserved_seconds: number; remaining_seconds: number | null }[];
 }
 
 export interface TrainingOutputSummaryAsset {
