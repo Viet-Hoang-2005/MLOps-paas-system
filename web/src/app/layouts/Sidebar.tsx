@@ -110,7 +110,7 @@ export default function Sidebar({
 
   const modelItems = sectionItems.map((item) => ({
     ...item,
-    to: selectedModel
+    to: item.section === "training" ? "/dashboard/training" : selectedModel
       ? `/dashboard/projects/${selectedModel.id}/${item.section}`
       : `/dashboard/${item.section}`,
   }));

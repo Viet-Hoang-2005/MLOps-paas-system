@@ -1,17 +1,19 @@
-from infrastructure.storage.paths import training_job_prefix, training_mlflow_artifacts_prefix
+from infrastructure.storage.paths import training_job_prefix, tenant_training_job_prefix
+
+
+def training_prefix_for(job):
+    owner = job.owner if job.owner_id else job.project.owner
+    if job.storage_layout == "tenant":
+        return tenant_training_job_prefix(owner.tenant_id, job.public_id)
+    project_id = job.storage_project_id or (job.project.public_id if job.project_id else None)
+    if not project_id:
+        raise ValueError("Project-scoped training storage has no original project identity.")
+    return training_job_prefix(owner.tenant_id, project_id, job.public_id)
 
 
 def expected_training_uris(job, bucket):
-    prefix = training_job_prefix(
-        job.project.owner.tenant_id,
-        job.project.public_id,
-        job.public_id,
-    )
-    mlflow_prefix = training_mlflow_artifacts_prefix(
-        job.project.owner.tenant_id,
-        job.project.public_id,
-        job.public_id,
-    )
+    prefix = training_prefix_for(job)
+    mlflow_prefix = f"{prefix}/mlflow/artifacts/"
     return {
         "code": f"s3://{bucket}/{prefix}/input/code/source.zip",
         "data": f"s3://{bucket}/{prefix}/input/data/data.zip",

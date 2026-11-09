@@ -296,6 +296,7 @@ export default function TrainingJobArtifactsPage() {
   };
 
   const proceedToBuild = () => {
+    if (!job.project_id) return;
     const build = job.registration_build;
     navigate(
       buildDeploymentPath({

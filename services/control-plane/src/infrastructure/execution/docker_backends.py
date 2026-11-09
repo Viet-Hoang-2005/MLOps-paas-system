@@ -121,7 +121,7 @@ class DockerTrainingBackend:
             "ENTRY_POINT": job.entry_point,
             "MODEL_VERSION": "",
             "TRAINING_JOB_ID": str(job.public_id),
-            "TENANT_ID": project.owner.tenant_id,
+            "TENANT_ID": job.owner.tenant_id,
             "REQUIREMENTS_TEXT": base64.b64encode(job.requirements_text.encode()).decode()
             if job.requirements_text
             else "",
@@ -130,6 +130,20 @@ class DockerTrainingBackend:
             "MLFLOW_TRACKING_TOKEN": issue_capability(job, "tracking", preserve_existing=True),
         }
         from .job_containers import start
+
+        options = {}
+        if job.input_contract == "workspace":
+            from . import workspace_docker
+            if not workspace_docker.prepare(self.docker.client, job, environment, settings.DOCKER_NETWORK_NAME):
+                return {"dispatched": True, "preparing": True}
+            environment.update(INPUT_CONTRACT="workspace", PREPARED_INPUT_DIR="/prepared/input",
+                RUNTIME_CONFIG_URL=f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/training-jobs/{job.public_id}/runtime-config/",
+                RUNTIME_CONFIG_CAPABILITY=issue_capability(job, "runtime_config", preserve_existing=True))
+            # Input tokens belong exclusively to the helper.
+            for key in ("S3_SOURCE_URI", "S3_TRAINING_DATA_URI", "S3_INPUT_DOWNLOAD_URL", "S3_INPUT_DOWNLOAD_CAPABILITY"):
+                environment.pop(key, None)
+            options = {"volumes": {workspace_docker.names(job)[1]: {"bind": "/prepared", "mode": "ro"}},
+                       "cap_drop": ["ALL"], "security_opt": ["no-new-privileges:true"]}
 
         container = start(
             self.docker,
@@ -143,18 +157,26 @@ class DockerTrainingBackend:
             mem_limit=f"{job.memory_mb}m",
             memswap_limit=f"{job.memory_mb}m",
             device_requests=[docker.types.DeviceRequest(device_ids=[job.local_gpu_id], capabilities=[["gpu"]])] if job.accelerator_type == "gpu" else [],
+            **options,
         )
         return {"dispatched": True, "container_id": container.id}
 
     def poll(self, job):
         from .job_containers import observe
-
-        return observe(self.docker.client, job, "training")
+        result = observe(self.docker.client, job, "training")
+        if job.input_contract == "workspace" and result["status"] == "not_found" and not job.external_job_id:
+            from . import workspace_docker
+            return workspace_docker.observe(self.docker.client, job)
+        return result
 
     def cleanup(self, job):
         from .job_containers import remove
 
-        return remove(self.docker.client, job, "training")
+        result = remove(self.docker.client, job, "training")
+        if job.input_contract == "workspace":
+            from . import workspace_docker
+            workspace_docker.cleanup(self.docker.client, job)
+        return result
 
     def cancel(self, job):
         return {"dispatched": False, **self.cleanup(job)}

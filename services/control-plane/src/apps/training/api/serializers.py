@@ -35,9 +35,28 @@ class TrainingJobBuildRequestSerializer(serializers.Serializer):
     output_revision = serializers.IntegerField(min_value=1)
 
 
+class NewTrainingProjectSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField(max_length=160, trim_whitespace=True)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    access_mode = serializers.ChoiceField(choices=ModelProject.ACCESS_MODES, default="private")
+
+
+class TrainingJobProjectRequestSerializer(serializers.Serializer):
+    project_id = serializers.UUIDField(required=False)
+    new_project = NewTrainingProjectSerializer(required=False)
+    output_revision = serializers.IntegerField(min_value=1)
+
+    def validate(self, attrs):
+        if ("project_id" in attrs) == ("new_project" in attrs):
+            raise serializers.ValidationError("Choose an existing project or provide a new project.")
+        return attrs
+
+
 class TrainingJobSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="public_id", read_only=True)
-    project_id = serializers.UUIDField(source="project.public_id", read_only=True)
+    project_id = serializers.UUIDField(source="project.public_id", read_only=True, allow_null=True)
+    workspace_id = serializers.UUIDField(source="workspace.public_id", read_only=True, allow_null=True)
     project = serializers.SlugRelatedField(
         slug_field="public_id", queryset=ModelProject.objects.none(), write_only=True
     )
@@ -55,6 +74,10 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "id",
             "project",
             "project_id",
+            "workspace_id",
+            "input_contract",
+            "workspace_revision",
+            "run_key",
             "name",
             "model_flavor",
             "entry_point",
@@ -99,6 +122,7 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = (
+            "input_contract", "workspace_revision", "run_key",
             "observation_status", "observation_error", "execution_deadline_at", "runtime_started_at",
             "backend",
             "code_snapshot_uri",
@@ -166,7 +190,7 @@ class TrainingJobSerializer(serializers.ModelSerializer):
         if not ready_builds:
             return "trained"
 
-        active_id = instance.project.active_deployment_id
+        active_id = instance.project.active_deployment_id if instance.project_id else None
         for build in ready_builds:
             if any(deployment.pk == active_id for deployment in build.version.deployments.all()):
                 return "deployed"

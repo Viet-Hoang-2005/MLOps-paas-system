@@ -2,6 +2,7 @@
 
 from django.shortcuts import get_object_or_404
 from rest_framework import status
+from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -78,6 +79,10 @@ class WorkspaceDetailEndpoint(APIView):
         workspace = service.update_workspace(_workspace(request.user, workspace_id), revision=request.data.get("revision"), changes=changes)
         return Response(_serialize(workspace, detail=True))
 
+    def delete(self, request, workspace_id):
+        service.delete_workspace(_workspace(request.user, workspace_id), revision=request.data.get("revision"))
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class WorkspaceEntriesEndpoint(APIView):
     def post(self, request, workspace_id):
@@ -123,3 +128,36 @@ class WorkspaceSecretEndpoint(APIView):
         workspace = _workspace(request.user, workspace_id)
         revision = service.delete_secret(workspace, revision=request.data.get("revision"), name=name)
         return Response({"revision": revision})
+
+
+class WorkspaceRunSerializer(serializers.Serializer):
+    revision = serializers.IntegerField(min_value=1)
+    run_key = serializers.UUIDField()
+    name = serializers.CharField(max_length=160)
+    model_flavor = serializers.ChoiceField(choices=["sklearn", "xgboost", "pytorch", "tensorflow"])
+    vcpu = serializers.IntegerField(min_value=1)
+    memory_mb = serializers.IntegerField(min_value=512)
+    max_runtime_seconds = serializers.IntegerField(min_value=1)
+    accelerator_type = serializers.ChoiceField(choices=["none", "gpu"], default="none")
+    accelerator_count = serializers.IntegerField(min_value=0, max_value=1, default=0)
+    accelerator_model = serializers.ChoiceField(choices=["", "t4", "a10g"], default="")
+    local_gpu_id = serializers.CharField(max_length=80, allow_blank=True, default="")
+
+
+class WorkspaceRunsEndpoint(APIView):
+    def get(self, request, workspace_id):
+        from apps.training.api.serializers import TrainingJobSerializer
+        workspace = _workspace(request.user, workspace_id)
+        return Response(TrainingJobSerializer(workspace.jobs.order_by("-created_at"), many=True).data)
+
+    def post(self, request, workspace_id):
+        from apps.training.api.endpoints import require_training_enabled
+        from apps.training.api.serializers import TrainingJobSerializer
+        from apps.training.services.workspace_runs import run_workspace
+        require_training_enabled()
+        workspace = _workspace(request.user, workspace_id)
+        serializer = WorkspaceRunSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = dict(serializer.validated_data)
+        job = run_workspace(workspace, revision=values.pop("revision"), run_key=values.pop("run_key"), values=values)
+        return Response(TrainingJobSerializer(job).data, status=status.HTTP_201_CREATED)

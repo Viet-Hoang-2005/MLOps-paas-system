@@ -7,7 +7,7 @@ import {
   Pencil,
   Play,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -48,6 +48,8 @@ interface DirectoryTreeProps {
   selectedPath: string | null;
   onSelect: (path: string) => void;
   onEditFile?: (path: string) => void;
+  onMove?: (path: string, folder: string) => void;
+  onDropFiles?: (event: DragEvent, folder: string) => void;
   unsavedContents: Record<string, string>;
   currentEntryPoint?: string;
   expandedFolders: Set<string>;
@@ -63,6 +65,8 @@ export function DirectoryTree({
   selectedPath,
   onSelect,
   onEditFile,
+  onMove,
+  onDropFiles,
   unsavedContents,
   currentEntryPoint,
   expandedFolders,
@@ -85,6 +89,14 @@ export function DirectoryTree({
             <li key={node.path}>
               <button
                 type="button"
+                draggable={Boolean(onMove)}
+                onDragStart={onMove ? (event) => { event.stopPropagation(); event.dataTransfer.setData("application/x-training-path", node.path); } : undefined}
+                onDragOver={onMove || onDropFiles ? (event) => event.preventDefault() : undefined}
+                onDrop={onMove || onDropFiles ? (event) => {
+                  event.preventDefault(); event.stopPropagation();
+                  const path = event.dataTransfer.getData("application/x-training-path");
+                  if (path) onMove?.(path, node.path); else onDropFiles?.(event, node.path);
+                } : undefined}
                 onClick={(event) => {
                   event.stopPropagation();
                   onSelect(node.path);
@@ -116,6 +128,8 @@ export function DirectoryTree({
                   selectedPath={selectedPath}
                   onSelect={onSelect}
                   onEditFile={onEditFile}
+                  onMove={onMove}
+                  onDropFiles={onDropFiles}
                   unsavedContents={unsavedContents}
                   currentEntryPoint={currentEntryPoint}
                   expandedFolders={expandedFolders}
@@ -133,6 +147,8 @@ export function DirectoryTree({
           <li key={node.path} className="flex items-center">
             <button
               type="button"
+              draggable={Boolean(onMove) && node.path !== "requirements.txt"}
+              onDragStart={onMove ? (event) => { event.stopPropagation(); event.dataTransfer.setData("application/x-training-path", node.path); } : undefined}
               onClick={() => onSelect(node.path)}
               onDoubleClick={onEditFile ? () => onEditFile(node.path) : undefined}
               className={`flex min-w-0 flex-1 items-center gap-1.5 truncate rounded-compact px-2 py-1.5 text-left text-style-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) ${

@@ -259,7 +259,7 @@ def test_docker_dispatch_uses_exact_verified_uuid(settings, monkeypatch):
 
     user = get_user_model().objects.create_user("gpu-dispatch-test@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
-    job = TrainingJob(project=project, name="gpu", model_flavor="pytorch", accelerator_type="gpu",
+    job = TrainingJob(project=project, owner=project.owner, name="gpu", model_flavor="pytorch", accelerator_type="gpu",
                       accelerator_count=1, local_gpu_id=GPU)
     uris = expected_training_uris(job, "test-bucket")
     job.code_snapshot_uri, job.data_snapshot_uri, job.output_uri = uris["code"], uris["data"], uris["output"]

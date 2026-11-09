@@ -38,3 +38,7 @@ To test rendering of specific overlays:
 kubectl kustomize k8s/workloads/overlays/production
 kubectl kustomize k8s/gitops/production/applications
 ```
+
+## Training input contract
+
+Training supports account-owned projectless jobs. Read [argo-execution.md](references/argo-execution.md) before changing Sensor identity validation or init/main volume mounts. Render offline; a render command does not authorize applying resources.

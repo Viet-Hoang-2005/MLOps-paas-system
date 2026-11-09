@@ -17,6 +17,7 @@ from apps.training.api.webhooks import (
     TrainingJobWebhookEndpoint,
     TrainingOutputUploadURLEndpoint,
     TrainingInputDownloadURLEndpoint,
+    TrainingRuntimeConfigEndpoint,
 )
 
 urlpatterns = [
@@ -57,6 +58,7 @@ urlpatterns = [
     ),
     path("internal/training-jobs/<uuid:job_id>/output-upload-url/", TrainingOutputUploadURLEndpoint.as_view()),
     path("internal/training-jobs/<uuid:job_id>/input-download-urls/", TrainingInputDownloadURLEndpoint.as_view()),
+    path("internal/training-jobs/<uuid:job_id>/runtime-config/", TrainingRuntimeConfigEndpoint.as_view()),
     path("api/notifications/", include("apps.notifications.api.urls")),
     path("internal/webhooks/drift-runs/<uuid:run_id>/", DriftRunWebhookEndpoint.as_view()),
     path("internal/webhooks/automatic-drift/", AutomaticDriftWebhookEndpoint.as_view()),

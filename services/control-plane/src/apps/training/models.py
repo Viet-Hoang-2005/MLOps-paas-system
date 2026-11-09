@@ -1,6 +1,7 @@
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 
 from django.db import models
 from django.utils import timezone
@@ -82,7 +83,18 @@ class TrainingJob(ExecutionWatch):
     ACCELERATORS = (("none", "None"), ("gpu", "GPU"))
 
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    project = models.ForeignKey("catalog.ModelProject", on_delete=models.CASCADE, related_name="training_jobs")
+    project = models.ForeignKey("catalog.ModelProject", on_delete=models.SET_NULL, related_name="training_jobs", null=True, blank=True)
+    storage_project_id = models.UUIDField(null=True, blank=True, editable=False)
+    storage_layout = models.CharField(max_length=16, choices=(("project", "Project"), ("tenant", "Tenant")), default="project")
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="training_jobs")
+    workspace = models.ForeignKey(
+        TrainingWorkspace, on_delete=models.SET_NULL, related_name="jobs", null=True, blank=True
+    )
+    input_contract = models.CharField(max_length=16, default="legacy", choices=(("legacy", "Legacy"), ("workspace", "Workspace")))
+    workspace_revision = models.PositiveIntegerField(null=True, blank=True)
+    run_key = models.UUIDField(null=True, blank=True, unique=True, editable=False)
+    environment_snapshot = models.JSONField(default=dict, blank=True)
+    secret_snapshot = models.JSONField(default=dict, blank=True, editable=False)
     retry_of = models.ForeignKey("self", on_delete=models.SET_NULL, related_name="retries", null=True, blank=True)
     trigger_kind = models.CharField(
         max_length=32,
@@ -100,6 +112,7 @@ class TrainingJob(ExecutionWatch):
     model_flavor = models.CharField(max_length=40, choices=MODEL_FLAVORS)
     entry_point = models.CharField(max_length=512, default="train.py")
     requirements_text = models.TextField(blank=True)
+    build_requirements_text = models.TextField(null=True, blank=True)
     code_snapshot_uri = models.CharField(max_length=1024)
     data_snapshot_uri = models.CharField(max_length=1024)
     output_uri = models.CharField(max_length=1024)
@@ -135,10 +148,27 @@ class TrainingJob(ExecutionWatch):
     def __str__(self):
         return f"{self.name} ({self.public_id})"
 
+    def save(self, *args, **kwargs):
+        # Legacy creation paths still supply only project. Keep ownership
+        # explicit on the job so it can eventually outlive that relationship.
+        if not self.owner_id and self.project_id:
+            self.owner_id = self.project.owner_id
+        if self.storage_layout == "project" and not self.storage_project_id and self.project_id:
+            self.storage_project_id = self.project.public_id
+        if self.project_id and self.owner_id != self.project.owner_id:
+            raise ValidationError("Training job and project must have the same owner.")
+        if self.workspace_id and self.owner_id != self.workspace.owner_id:
+            raise ValidationError("Training job and workspace must have the same owner.")
+        super().save(*args, **kwargs)
+
     def mark_started(self):
         if not self.started_at:
             self.started_at = timezone.now()
         self.status = "running"
+
+    @property
+    def runtime_project_id(self):
+        return str(self.storage_project_id or (self.project.public_id if self.storage_layout == "project" and self.project_id else ""))
 
     def mark_finished(self, status):
         self.completed_at = timezone.now()
@@ -202,6 +232,7 @@ class TrainingJobCapability(models.Model):
         ("trusted_reporter", "Trusted reporter"),
         ("cancel_reporter", "Cancellation reporter"),
         ("tracking", "Tracking reporter"),
+        ("runtime_config", "Runtime configuration"),
     )
 
     job = models.ForeignKey(TrainingJob, on_delete=models.CASCADE, related_name="capabilities")
@@ -277,6 +308,8 @@ class TrainingOutput(models.Model):
         ("source_code", "Source Code"),
         ("reference_data", "Reference Data"),
         ("file", "File"),
+        ("label_mapping", "Label mapping"),
+        ("input_schema", "Input schema"),
     )
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     job = models.ForeignKey(TrainingJob, on_delete=models.CASCADE, related_name="outputs")
@@ -301,4 +334,16 @@ class TrainingOutput(models.Model):
 
     def __str__(self):
         return f"{self.job.public_id}/{self.relative_path}"
+
+
+class TrainingStorageCopy(models.Model):
+    job = models.ForeignKey(TrainingJob, on_delete=models.CASCADE, related_name="storage_copies")
+    source_uri = models.CharField(max_length=1024)
+    destination_uri = models.CharField(max_length=1024)
+    source_etag = models.CharField(max_length=160)
+    checksum = models.CharField(max_length=64)
+    verified_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["job", "source_uri"], name="training_storage_copy_unique")]
 

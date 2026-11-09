@@ -98,7 +98,7 @@ function BuildDeploymentContent() {
     });
 
     const completedJobs = (jobs.data?.training_jobs ?? []).filter(
-      (job) => job.status === "completed" && job.output_available,
+      (job) => job.status === "completed" && job.output_available && Boolean(job.project_id) && (projects.data?.models ?? []).some((project) => project.id === job.project_id && project.is_active),
     );
     completedJobs.forEach((job) => {
       const project = projects.data?.models.find(

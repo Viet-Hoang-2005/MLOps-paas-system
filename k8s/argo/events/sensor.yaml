@@ -155,12 +155,18 @@ spec:
       eventName: train
       filters:
         data:
+          - path: body.input_contract
+            type: string
+            value: ['^(legacy|workspace)$']
+          - path: body.runtime_config_url
+            type: string
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/training-jobs/[0-9a-f-]{36}/runtime-config/$']
           - path: body.job_id
             type: string
             value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
           - path: body.project_id
             type: string
-            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+            value: ['^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$']
           - path: body.tenant_id
             type: string
             value: ['^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
@@ -177,11 +183,12 @@ spec:
             type: string
             value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/training-jobs/[0-9a-f-]{36}/$']
         exprs:
-          - expr: callback =~ job_id && job_name =~ job_id
+          - expr: callback =~ job_id && job_name =~ job_id && runtime_config =~ job_id
             fields:
               - {name: callback, path: body.control_plane_webhook_url}
               - {name: job_name, path: body.job_name}
               - {name: job_id, path: body.job_id}
+              - {name: runtime_config, path: body.runtime_config_url}
           - expr: max_runtime_seconds > 0 && max_runtime_seconds <= 86400
             fields:
               - {name: max_runtime_seconds, path: body.max_runtime_seconds}
@@ -237,7 +244,7 @@ spec:
             value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
           - path: body.project_id
             type: string
-            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+            value: ['^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$']
           - path: body.tenant_id
             type: string
             value: ['^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']

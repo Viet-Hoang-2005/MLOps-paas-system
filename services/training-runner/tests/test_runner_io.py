@@ -189,3 +189,23 @@ def test_create_model_archive_requires_model_and_packages_metadata(runner_worksp
     runner.create_model_archive(archive_path)
     with tarfile.open(archive_path) as archive:
         assert set(archive.getnames()) == {"model.pkl", "_mlops/summary.json"}
+
+
+def test_create_model_archive_rejects_symlinks(runner_workspace, tmp_path):
+    model_dir = runner_workspace["MODEL_DIR"]
+    (model_dir / "model.pkl").write_bytes(b"model")
+    external = tmp_path / "external"
+    external.write_bytes(b"private")
+    try:
+        (model_dir / "link").symlink_to(external)
+    except OSError:
+        pytest.skip("Creating symbolic links is not permitted")
+    with pytest.raises(RuntimeError, match="link or unsupported"):
+        runner.create_model_archive(tmp_path / "model.tar.gz")
+
+
+def test_create_model_archive_limits_total_size(runner_workspace, tmp_path, monkeypatch):
+    (runner_workspace["MODEL_DIR"] / "model.pkl").write_bytes(b"model")
+    monkeypatch.setattr(runner.execution, "MAX_MODEL_BYTES", 4)
+    with pytest.raises(RuntimeError, match="file count or size"):
+        runner.create_model_archive(tmp_path / "model.tar.gz")

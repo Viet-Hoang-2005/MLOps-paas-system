@@ -40,12 +40,19 @@ def model_for(kind):
 
 
 def resource_for(kind, public_id):
-    related = ("project__owner",) if kind == "training" else ("monitor__version__project__owner", "monitor__reference_asset")
+    related = ("project__owner", "owner") if kind == "training" else ("monitor__version__project__owner", "monitor__reference_asset")
     return model_for(kind).objects.select_related(*related).filter(public_id=public_id).first()
 
 
 def project_for(row, kind):
     return row.project if kind == "training" else row.monitor.version.project
+
+
+def ownership_for(row, kind):
+    if kind == "training":
+        return str(row.owner.tenant_id), row.runtime_project_id
+    project = project_for(row, kind)
+    return str(project.owner.tenant_id), str(project.public_id)
 
 
 def backend_for(row, kind):
@@ -134,9 +141,9 @@ def _release(row, error=""):
 
 
 def signed_observation_token(kind, row, token):
-    project = project_for(row, kind)
+    tenant, project_id = ownership_for(row, kind)
     return signing.dumps({"kind": kind, "id": str(row.public_id), "lease": str(token),
-        "tenant": str(project.owner.tenant_id), "project": str(project.public_id)}, salt="execution-observation")
+        "tenant": tenant, "project": project_id}, salt="execution-observation")
 
 
 def reconcile(kind, public_id, token=None):
@@ -156,7 +163,7 @@ def reconcile(kind, public_id, token=None):
     now = timezone.now()
     project = project_for(row, kind)
     stopping = (row.execution_stop_requested or row.status == "cancelling" or row.status in TERMINAL
-        or project.deletion_state != "active" or bool(getattr(row, "deletion_requested_at", None)))
+        or (project and project.deletion_state != "active") or bool(getattr(row, "deletion_requested_at", None)))
     if stopping:
         with transaction.atomic():
             current = model_for(kind).objects.select_for_update().get(pk=row.pk)
@@ -307,8 +314,9 @@ def apply_observation(kind, public_id, token, observation):
     with transaction.atomic():
         if kind == "training" and row.backend == "argo":
             from apps.training.services.quota import lock_owner
-            lock_owner(project.owner_id)
-        project = type(project).objects.select_for_update().get(pk=project.pk)
+            lock_owner(row.owner_id)
+        if project:
+            project = type(project).objects.select_for_update().get(pk=project.pk)
         current = model_for(kind).objects.select_for_update().get(pk=row.pk)
         if not _valid(current, token):
             return "ignored"
@@ -329,7 +337,7 @@ def apply_observation(kind, public_id, token, observation):
         if observed == "error":
             _release(current, observation.get("error", "Observation unavailable."))
             return current.status
-        inactive = project.deletion_state != "active" or bool(getattr(current, "deletion_requested_at", None))
+        inactive = (project and project.deletion_state != "active") or bool(getattr(current, "deletion_requested_at", None))
         if observed == "stopped":
             if kind == "training" and current.backend == "docker":
                 from apps.training.services.local_resources import release

@@ -46,7 +46,7 @@ def identity(payload, kind):
     resource_id = payload.get("resource_id", payload.get("job_id", ""))
     if kind not in {"training", "drift"} or not re.fullmatch(UUID, resource_id):
         raise ValueError("Invalid execution identity.")
-    if not re.fullmatch(UUID, payload["project_id"]) or not re.fullmatch("T-" + UUID, payload["tenant_id"]):
+    if not (re.fullmatch(UUID, payload["project_id"]) or (kind == "training" and payload["project_id"] == "")) or not re.fullmatch("T-" + UUID, payload["tenant_id"]):
         raise ValueError("Invalid ownership identity.")
     labels = {
         "mlops-paas.io/tenant-id": payload["tenant_id"],

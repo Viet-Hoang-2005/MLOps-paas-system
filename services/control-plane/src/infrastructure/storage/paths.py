@@ -50,6 +50,10 @@ def training_job_prefix(tenant_id, project_id, job_id):
     return f"{project_prefix(tenant_id, project_id)}/training/jobs/{_clean(job_id)}"
 
 
+def tenant_training_job_prefix(tenant_id, job_id):
+    return f"users/{_clean(tenant_id)}/training/jobs/{_clean(job_id)}"
+
+
 def training_input_key(tenant_id, project_id, job_id, kind, relative_path):
     if kind not in {"code", "data"}:
         raise ValueError("Training input kind must be code or data")

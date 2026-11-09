@@ -13,6 +13,12 @@ from ..auth import (
 )
 
 
+def _job_experiment(job):
+    from .runs import _mlflow_artifact_uri
+    return {"experiment_id": str(job.storage_project_id or job.public_id), "name": job.name,
+            "artifact_location": _mlflow_artifact_uri(job), "lifecycle_stage": "active"}
+
+
 def _project_mlflow_artifact_uri(project):
     key = f"{project_prefix(project.owner.tenant_id, project.public_id)}/training/jobs"
     return f"mlflow-artifacts:/{key}"
@@ -26,6 +32,9 @@ class MLflowExperimentsGetByNameView(APIView):
         job, project, user, tenant_id, api_key, err_resp = _require_auth(request)
         if err_resp:
             return err_resp
+
+        if job and not job.storage_project_id:
+            return Response({"experiment": _job_experiment(job)})
 
         exp_name = request.query_params.get("experiment_name") or request.data.get("experiment_name") or ""
         target_project = project
@@ -122,6 +131,8 @@ class MLflowExperimentsGetView(APIView):
             return err_resp
 
         exp_id = request.query_params.get("experiment_id") or ""
+        if job and (not exp_id or exp_id == str(job.storage_project_id or job.public_id)) and not job.storage_project_id:
+            return Response({"experiment": _job_experiment(job)})
         target_project = None
         try:
             proj_uuid = uuid.UUID(str(exp_id))

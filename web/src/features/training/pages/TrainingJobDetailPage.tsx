@@ -385,6 +385,11 @@ export default function TrainingJobDetailPage() {
           <div className="flex shrink-0 flex-col items-end gap-3 sm:flex-row sm:items-center">
             {ACTIVE_STATUSES.includes(job.status) && <LiveStatusBadge />}
             <div className="flex flex-wrap items-center justify-end gap-2">
+              {!job.project_id && job.status === "completed" && job.output_available && !job.deletion_pending && (
+                <Button variant="secondary" onClick={() => navigate(`/dashboard/training/jobs/${job.id}/project`)}>
+                  {t("studio.assignProject")}
+                </Button>
+              )}
               <Button
                 size="icon"
                 variant="secondary"

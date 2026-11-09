@@ -8,7 +8,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.observability.services.lifecycle import record_training_event
 from apps.training.models import TrainingJob
-from apps.training.services.storage_scope import expected_training_uris, validate_training_uri
+from apps.training.services.storage_scope import expected_training_uris, training_prefix_for, validate_training_uri
 from apps.training.tasks import (
     cancel_training_job,
     delete_training_job,
@@ -29,7 +29,7 @@ def _discard_unused_inputs(storage, project, job):
     broker); the inputs then belong to a real job and must stay.
     """
     if not TrainingJob.objects.filter(public_id=job.public_id).exists():
-        storage.delete_prefix(training_job_prefix(project.owner.tenant_id, project.public_id, job.public_id))
+        storage.delete_prefix(training_prefix_for(job) + "/")
 
 
 def _require_active_project(project):
@@ -144,7 +144,7 @@ RETRY_FIELDS = (
 
 
 def _check_retryable(project, job):
-    if project.deletion_state != "active" or job.deletion_requested_at:
+    if (project and project.deletion_state != "active") or job.deletion_requested_at:
         raise Conflict("This project or job is being deleted.")
     if job.status not in {"failed", "cancelled"}:
         raise Conflict("Only failed or cancelled jobs can be retried.")
@@ -157,17 +157,31 @@ def retry_job(job, *, storage=None):
     transaction that checks the original job and project again.
     """
     with transaction.atomic():
-        project = type(job.project).objects.select_for_update(of=("self",)).select_related("owner").get(pk=job.project_id)
+        from apps.catalog.models import ModelProject
+        project = ModelProject.objects.select_for_update(of=("self",)).select_related("owner").get(pk=job.project_id) if job.project_id else None
         job = TrainingJob.objects.select_for_update().get(pk=job.pk)
         _check_retryable(project, job)
         retry = TrainingJob(
             project=project,
+            owner=job.owner,
+            workspace=job.workspace,
+            input_contract=job.input_contract,
+            storage_layout=job.storage_layout if project else "tenant",
+            workspace_revision=job.workspace_revision,
+            environment_snapshot=job.environment_snapshot,
             retry_of=job,
             trigger_kind="retry",
             backend=settings.TRAINING_BACKEND,
             **{field: getattr(job, field) for field in RETRY_FIELDS},
         )
         sources = {"code_snapshot_uri": job.code_snapshot_uri, "data_snapshot_uri": job.data_snapshot_uri}
+        if job.secret_snapshot:
+            if not job.workspace_id:
+                raise Conflict("The workspace secrets are no longer available; create a new run.")
+            secrets = list(job.workspace.secrets.filter(name__in=job.secret_snapshot))
+            if {secret.name for secret in secrets} != set(job.secret_snapshot):
+                raise Conflict("A required secret was deleted; create a new run.")
+            retry.secret_snapshot = {secret.name: bytes(secret.ciphertext).decode("ascii") for secret in secrets}
     from apps.training.services.resources import validate_resources
     local_capacity = None
     if retry.backend == "docker":
@@ -185,10 +199,24 @@ def retry_job(job, *, storage=None):
             copied = storage.copy(sources[field], storage.parse_uri(uris[kind])[1])
             setattr(retry, field, copied.uri)
         with transaction.atomic():
+            # Workspace mutations/deletion share this lock. Recheck after the
+            # potentially slow storage copy so a deleted secret cannot be
+            # reissued from the earlier validation snapshot.
+            if job.secret_snapshot:
+                from apps.training.models import TrainingWorkspace
+                workspace = TrainingWorkspace.objects.select_for_update().filter(
+                    pk=job.workspace_id, owner_id=job.owner_id,
+                ).first()
+                if workspace is None:
+                    raise Conflict("The workspace secrets are no longer available; create a new run.")
+                secrets = list(workspace.secrets.filter(name__in=job.secret_snapshot))
+                if {secret.name for secret in secrets} != set(job.secret_snapshot):
+                    raise Conflict("A required secret was deleted; create a new run.")
+                retry.secret_snapshot = {secret.name: bytes(secret.ciphertext).decode("ascii") for secret in secrets}
             if retry.backend == "argo":
                 from apps.training.services.quota import lock_owner
-                lock_owner(project.owner_id)
-            project = type(project).objects.select_for_update(of=("self",)).select_related("owner").get(pk=project.pk)
+                lock_owner(job.owner_id)
+            project = type(project).objects.select_for_update(of=("self",)).select_related("owner").get(pk=project.pk) if project else None
             _check_retryable(project, TrainingJob.objects.select_for_update().get(pk=job.pk))
             retry.save()
             record_training_event(
@@ -220,14 +248,15 @@ def submit_job(job, *, verify_gpu=True, local_capacity=None):
 def _submit_job_atomic(job, *, verified_gpu_id, local_capacity=None):
     if job.backend == "argo":
         from apps.training.services.quota import lock_owner
-        lock_owner(job.project.owner_id)
-    project = type(job.project).objects.select_for_update().get(pk=job.project_id)
+        lock_owner(job.owner_id)
+    from apps.catalog.models import ModelProject
+    project = ModelProject.objects.select_for_update().filter(pk=job.project_id).first() if job.project_id else None
     job = TrainingJob.objects.select_for_update().get(pk=job.pk)
     from apps.training.services.resources import validate_resources
     validate_resources({}, job, local_capacity=local_capacity)
     if settings.TRAINING_BACKEND == "docker" and job.accelerator_type == "gpu" and job.local_gpu_id != verified_gpu_id:
         raise Conflict("The selected GPU changed; retry the request.")
-    if project.deletion_state != "active":
+    if project and project.deletion_state != "active":
         raise Conflict("This project is being deleted.")
     if job.deletion_requested_at:
         raise Conflict("This training job is being deleted.")

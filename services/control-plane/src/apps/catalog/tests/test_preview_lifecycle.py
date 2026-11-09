@@ -505,7 +505,9 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
     assert overview.data["reference_data"]["name"] == "reference.csv"
 
 
-def test_training_retry_preserves_frozen_inputs_not_updated_workspace(project, monkeypatch):
+def test_training_retry_preserves_frozen_inputs_not_updated_workspace(project, monkeypatch, settings):
+    settings.TRAINING_BACKEND = "argo"
+    settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     from apps.catalog.models import WorkspaceAsset
     from apps.training.models import TrainingJob
     from apps.training.services.jobs import retry_job

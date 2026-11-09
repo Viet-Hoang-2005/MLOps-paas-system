@@ -47,7 +47,8 @@ export interface TrainingJob {
   execution_deadline_at?: string | null;
   runtime_started_at?: string | null;
   id: ResourceId;
-  project_id: ResourceId;
+  project_id: ResourceId | null;
+  workspace_id?: ResourceId | null;
   output_revision: number;
   name: string;
   model_flavor: ModelFlavor;
@@ -232,11 +233,14 @@ export interface TrainingOutputSummaryAsset {
 
 export interface TrainingJobModelOutputSummary {
   job_id: ResourceId;
-  project_id: ResourceId;
+  project_id: ResourceId | null;
   output_revision: number;
   model_flavor: ModelFlavor;
   entry_point: string;
   requirements_text: string;
+  build_requirements_text?: string | null;
+  label_mapping?: TrainingOutputSummaryAsset | null;
+  input_schema?: TrainingOutputSummaryAsset | null;
   model_artifact: TrainingOutputSummaryAsset | null;
   source_code: TrainingOutputSummaryAsset | null;
   reference_data: TrainingOutputSummaryAsset | null;

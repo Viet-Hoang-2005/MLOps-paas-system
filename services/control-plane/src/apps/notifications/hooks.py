@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 def notify_training_result(job):
     """Safely notify project owner of a training job terminal state."""
     try:
-        owner = getattr(getattr(job, "project", None), "owner", None)
+        owner = job.owner
         if not owner:
             return
         level = (
@@ -18,19 +18,19 @@ def notify_training_result(job):
             if job.status == "failed"
             else Notification.Level.WARNING
         )
-        title = f"Training Job: {job.job_name} ({job.status})"
-        message = f"Training workflow for project '{job.project.name}' completed with status '{job.status}'."
+        title = f"Training Job: {job.name} ({job.status})"
+        message = f"Training '{job.name}' completed with status '{job.status}'."
         create_notification(
             user=owner,
             type=Notification.Type.TRAINING,
             level=level,
             title=title,
             message=message,
-            link=f"/dashboard/projects/{job.project.public_id}/training",
+            link=f"/dashboard/training/jobs/{job.public_id}/overview",
             metadata={
                 "job_id": str(job.public_id),
                 "status": job.status,
-                "project_id": str(job.project.public_id),
+                "project_id": str(job.project.public_id) if job.project_id else None,
             },
         )
     except Exception as exc:

@@ -13,7 +13,7 @@ def input_download_urls(job_id, token):
     with transaction.atomic():
         job = TrainingJob.objects.select_for_update().get(public_id=job_id)
         capability = capability_for_token(job=job, purpose="input_download", token=token)
-        if not capability or capability.consumed_at or job.status not in {"queued", "running"} or job.execution_stop_requested or job.deletion_requested_at or job.project.deletion_state != "active":
+        if not capability or capability.consumed_at or job.status not in {"queued", "running"} or job.execution_stop_requested or job.deletion_requested_at or (job.project_id and job.project.deletion_state != "active"):
             raise PermissionDenied("Invalid input download capability.")
         capability.consumed_at = timezone.now()
         capability.save(update_fields=["consumed_at"])

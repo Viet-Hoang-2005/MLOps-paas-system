@@ -1,15 +1,13 @@
-import { RouteFallback } from "@/app/router/RouteFallback";
-import { routes } from "@/app/router/paths";
-import { Placeholder } from "@/shared/components/Placeholder";
 import { formatDateTime, formatNumber } from "@/shared/i18n/formatters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { BrainCircuit, Eye, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Eye, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
-import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
+import { listModelProjects } from "@/shared/api/catalogApi";
+import { listWorkspaces } from "@/features/training/api/workspacesApi";
 import {
   deleteTrainingJob,
   getTrainingUsage,
@@ -68,11 +66,11 @@ const displayStatus = (job: TrainingJob) => {
 export default function TrainingModelPage() {
   const { modelId } = useParams();
   const { t, i18n } = useTranslation("training");
-  const { t: tCommon } = useTranslation("common");
-  const { t: tProjects } = useTranslation("projects");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { selectedModel, loading: isModelLoading } = useModelSelection();
+  const [projectFilter, setProjectFilter] = useState(modelId ?? "all");
+  const { data: projects } = useQuery({ queryKey: ["training", "projects"], queryFn: listModelProjects });
+  const { data: workspaces } = useQuery({ queryKey: ["training", "workspaces"], queryFn: listWorkspaces });
   const [statusFilter, setStatusFilter] = useState<TrainingStatusFilter>("all");
   const [jobToDelete, setJobToDelete] = useState<TrainingJob | null>(null);
   const [jobToRetry, setJobToRetry] = useState<TrainingJob | null>(null);
@@ -112,10 +110,8 @@ export default function TrainingModelPage() {
   );
   const selectedModelTrainingJobs = useMemo(
     () =>
-      selectedModel
-        ? allTrainingJobs.filter((job) => job.project_id === selectedModel.id)
-        : [],
-    [allTrainingJobs, selectedModel],
+      projectFilter === "all" ? allTrainingJobs : allTrainingJobs.filter((job) => projectFilter === "unassigned" ? !job.project_id : job.project_id === projectFilter),
+    [allTrainingJobs, projectFilter],
   );
   const statusOptions = useMemo<SelectOption[]>(
     () => [
@@ -228,6 +224,11 @@ export default function TrainingModelPage() {
 
   const columns = useMemo<ColumnDef<TrainingJob>[]>(
     () => [
+      {
+        accessorKey: "project_id",
+        header: t("studio.project"),
+        cell: ({ row }) => projects?.models.find((project) => project.id === row.original.project_id)?.name ?? t("studio.unassigned"),
+      },
       {
         accessorKey: "started_at",
         header: t("table.trainingAt"),
@@ -365,47 +366,16 @@ export default function TrainingModelPage() {
         },
       },
     ],
-    [navigate, retryMutation.isPending, t, i18n.language],
+    [navigate, retryMutation.isPending, t, i18n.language, projects],
   );
-
-  if (!selectedModel) {
-    if (isModelLoading) return <RouteFallback />;
-    return (
-      <section className="flex w-full flex-1 flex-col space-y-6">
-        <PageHeader title={t("title")} />
-        <Placeholder
-          title={tCommon("navigation.modelTraining")}
-          description={tProjects("workflow.noProjectTraining")}
-          icon={<BrainCircuit className="h-6 w-6" />}
-          additional={
-            tCommon("modelSelector.empty")
-          }
-          action={
-            <Button
-              size="md"
-              icon={<Plus className="h-4 w-4" />}
-              onClick={() => navigate(routes.newProject)}
-            >
-              {tProjects("workflow.newProject")}
-            </Button>
-          }
-        />
-      </section>
-    );
-  }
-
-  if (!modelId) {
-    return (
-      <Navigate
-        to={`/dashboard/projects/${selectedModel.id}/training`}
-        replace
-      />
-    );
-  }
 
   return (
     <section className="flex w-full flex-1 flex-col space-y-6">
       <PageHeader title={t("title")} />
+      <div className="flex flex-wrap gap-3">
+        <label className="space-y-2 text-style-body-strong"><span>{t("studio.project")}</span><select className="block h-11 rounded-control border border-input bg-surface px-3 text-style-body" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">{t("studio.allProjects")}</option><option value="unassigned">{t("studio.unassigned")}</option>{projects?.models.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+        <label className="space-y-2 text-style-body-strong"><span>{t("studio.drafts")}</span><select className="block h-11 rounded-control border border-input bg-surface px-3 text-style-body" value="" onChange={(event) => { if (event.target.value) navigate(`/dashboard/training/workspaces/${event.target.value}`); }}><option value="">{t("studio.openDraft")}</option>{workspaces?.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select></label>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-surface border border-border bg-surface p-5 shadow-sm md:col-span-2">
@@ -490,7 +460,7 @@ export default function TrainingModelPage() {
         <Button
           size="md"
           icon={<Plus className="h-4 w-4" />}
-          onClick={() => navigate("/dashboard/training/new/metadata")}
+          onClick={() => navigate(`/dashboard/training/new${modelId ? `?project=${modelId}` : ""}`)}
         >
           {t("newJob")}
         </Button>

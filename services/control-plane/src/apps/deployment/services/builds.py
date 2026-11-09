@@ -88,6 +88,8 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
     """Create or reuse the image build backed by immutable training outputs."""
 
     storage = storage or S3Storage()
+    if not job.project_id:
+        raise Conflict("Assign this training job to a project before building a model.")
     expected_revision = validate_output_revision(output_revision, required=False)
 
     # 1. Validate and snapshot under the lock.
@@ -95,7 +97,7 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
         project = type(job.project).objects.select_for_update().get(pk=job.project_id)
         if project.deletion_state != "active":
             raise Conflict("This project is being deleted.")
-        job = type(job).objects.select_for_update().select_related("project", "project__owner").get(pk=job.pk)
+        job = type(job).objects.select_for_update(of=("self",)).select_related("project", "project__owner").get(pk=job.pk)
         _check_training_job(job, expected_revision)
         existing = _existing_training_build(job)
         if existing:
@@ -114,7 +116,7 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
                 metadata={"source_job_id": str(job.public_id)},
             )
         ]
-        for supp in job.outputs.filter(kind__in=("source_code", "reference_data")):
+        for supp in job.outputs.filter(kind__in=("source_code", "reference_data", "label_mapping", "input_schema")):
             if supp.s3_uri:
                 sources.append(
                     _Source(
@@ -124,7 +126,7 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
                         checksum=supp.checksum,
                         size_bytes=supp.size_bytes,
                         content_type=supp.content_type,
-                        metadata={"entry_point": job.entry_point} if supp.kind == "source_code" else supp.metadata,
+                        metadata={"entry_point": Path(supp.relative_path).name} if supp.kind == "source_code" else supp.metadata,
                     )
                 )
         summary_sources = [
@@ -134,7 +136,7 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
         ]
         revision = job.output_revision
         tenant_id, project_public_id = job.project.owner.tenant_id, job.project.public_id
-        flavor, requirements = job.model_flavor, job.requirements_text
+        flavor, requirements = job.model_flavor, job.build_requirements_text if job.build_requirements_text is not None else job.requirements_text
     build_public_id = uuid.uuid4()
 
     # 2. Copy with no lock held.
@@ -156,7 +158,7 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
             project = type(job.project).objects.select_for_update().get(pk=job.project_id)
             if project.deletion_state != "active":
                 raise Conflict("This project is being deleted.")
-            job = type(job).objects.select_for_update().select_related("project", "project__owner").get(pk=job.pk)
+            job = type(job).objects.select_for_update(of=("self",)).select_related("project", "project__owner").get(pk=job.pk)
             _check_training_job(job, expected_revision)
             if job.output_revision != revision:
                 raise Conflict("Training output changed while the build was being prepared. Try again.")

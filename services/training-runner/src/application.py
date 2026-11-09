@@ -2,6 +2,8 @@ import base64
 import json
 import logging
 import os
+import re
+from functools import lru_cache
 import shutil
 import subprocess
 import sys
@@ -30,6 +32,21 @@ SOURCE_DIR = WORKSPACE / "source"
 INPUT_TRAIN_DIR = WORKSPACE / "input" / "train"
 MODEL_DIR = WORKSPACE / "model"
 OUTPUT_DIR = WORKSPACE / "output"
+WORK_DIR = WORKSPACE / "work"
+RUNTIME_ENV = {}
+SECRET_VALUES = []
+
+
+@lru_cache(maxsize=1)
+def _secret_pattern(values):
+    fragments = {fragment for value in values for fragment in [value, *value.splitlines()] if fragment}
+    return re.compile("|".join(re.escape(value) for value in sorted(fragments, key=len, reverse=True))) if fragments else None
+
+
+def redact_training_output(text):
+    """Scrub both streamed and captured output before logs or artifacts use it."""
+    pattern = _secret_pattern(tuple(SECRET_VALUES))
+    return pattern.sub(lambda match: "[REDACTED]", text) if pattern else text
 MLOPS_DIR_NAME = "_mlops"
 RUNNER_VERSION = "mlops-metadata-bundle-v1"
 MODEL_FILE_EXTENSIONS = {".pkl", ".joblib", ".xgb"}
@@ -422,6 +439,11 @@ def write_mlops_bundle(
     stdout_text: str,
     stderr_text: str,
 ) -> None:
+    stdout_text = redact_training_output(stdout_text)
+    stderr_text = redact_training_output(stderr_text)
+    # Validate before writing metadata or handing paths to MLflow, not only
+    # when packaging the final archive.
+    execution.validate_model_tree(MODEL_DIR)
     warnings: list[dict] = []
     mlops_dir = MODEL_DIR / MLOPS_DIR_NAME
     mlops_dir.mkdir(parents=True, exist_ok=True)
@@ -709,6 +731,12 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
             "MODEL_VERSION": model_version,
         }
     )
+    env.update(RUNTIME_ENV)
+    workspace_contract = os.environ.get("INPUT_CONTRACT") == "workspace"
+    if workspace_contract:
+        env.update(MLOPS_WORK_DIR=str(WORK_DIR), HOME=str(WORK_DIR / "home"),
+                   TMPDIR=str(WORK_DIR / "tmp"), PYTHONDONTWRITEBYTECODE="1",
+                   PYTHONPATH=str(SOURCE_DIR) + os.pathsep + env.get("PYTHONPATH", ""))
 
     log(f"Running training entry point: {entry_point}")
     stop_metrics = threading.Event()
@@ -720,6 +748,7 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
             return
         for line in iter(stream.readline, ""):
             # Keep parser/bundle input verbatim; sanitize only the display copy.
+            line = redact_training_output(line)
             lines.append(line)
             message = line.rstrip("\n")
             if protocol and is_metric_protocol_line(message):
@@ -730,7 +759,7 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
     try:
         process = subprocess.Popen(
             [sys.executable, str(entry_point_path)],
-            cwd=str(SOURCE_DIR),
+            cwd=str(WORK_DIR if workspace_contract else SOURCE_DIR),
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -757,8 +786,8 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
     return subprocess.CompletedProcess(
         args=[sys.executable, str(entry_point_path)],
         returncode=process.returncode,
-        stdout="".join(stdout_lines),
-        stderr="".join(stderr_lines),
+        stdout=redact_training_output("".join(stdout_lines)),
+        stderr=redact_training_output("".join(stderr_lines)),
     )
 
 
@@ -767,6 +796,8 @@ def create_model_archive(archive_path: Path) -> None:
 
 
 def _run() -> None:
+    if os.environ.get("INPUT_CONTRACT") == "workspace":
+        return _run_workspace()
     source_uri = require_env("S3_SOURCE_URI")
     training_data_uri = require_env("S3_TRAINING_DATA_URI")
     input_endpoint = os.environ.get("S3_INPUT_DOWNLOAD_URL", "")
@@ -851,6 +882,40 @@ def _run() -> None:
         model_archive_path,
         request_output_upload_url(output_upload_endpoint, output_upload_capability),
     )
+
+
+def _run_workspace():
+    global SOURCE_DIR, INPUT_TRAIN_DIR, RUNTIME_ENV, SECRET_VALUES
+    input_root = Path(require_env("PREPARED_INPUT_DIR"))
+    # This verifies the actual mount, not file permissions that the user can undo.
+    if not hasattr(os, "statvfs") or not os.statvfs(input_root).f_flag & os.ST_RDONLY:
+        raise RuntimeError("Workspace Input must be mounted read-only.")
+    SOURCE_DIR = INPUT_TRAIN_DIR = input_root
+    for directory in (MODEL_DIR, OUTPUT_DIR, WORK_DIR, WORK_DIR / "home", WORK_DIR / "tmp"):
+        directory.mkdir(parents=True, exist_ok=True)
+    entry = require_env("ENTRY_POINT")
+    entry_path = (input_root / entry).resolve()
+    if not entry_path.is_relative_to(input_root.resolve()) or not entry_path.is_file() or entry_path.suffix.lower() != ".py":
+        raise RuntimeError("Invalid workspace entry point.")
+    # Dependency build code never receives the user's secret/environment snapshot.
+    os.environ["HOME"] = str(WORK_DIR / "home")
+    os.environ["TMPDIR"] = str(WORK_DIR / "tmp")
+    install_requirements(input_root / "requirements.txt")
+    response = requests.post(require_env("RUNTIME_CONFIG_URL"),
+        headers={"Authorization": "Bearer " + require_env("RUNTIME_CONFIG_CAPABILITY")}, timeout=30)
+    response.raise_for_status()
+    configuration = response.json()
+    RUNTIME_ENV = configuration["environment"]
+    SECRET_VALUES = sorted([RUNTIME_ENV[name] for name in configuration["secret_names"] if RUNTIME_ENV.get(name)], key=len, reverse=True)
+    result = run_training(entry, "")
+    write_mlops_bundle(entry_point=entry, model_version="", training_job_id=require_env("TRAINING_JOB_ID"),
+        status="succeeded" if result.returncode == 0 else "failed",
+        stdout_text=redact_training_output(result.stdout or ""), stderr_text=redact_training_output(result.stderr or ""))
+    if result.returncode:
+        raise RuntimeError(f"Training entry point failed with exit code {result.returncode}")
+    archive = OUTPUT_DIR / "model.tar.gz"
+    create_model_archive(archive)
+    upload_presigned_url(archive, request_output_upload_url(require_env("S3_OUTPUT_UPLOAD_URL"), require_env("S3_OUTPUT_UPLOAD_CAPABILITY")))
 
 
 def main() -> None:

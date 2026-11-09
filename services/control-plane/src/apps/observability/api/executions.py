@@ -5,7 +5,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.observability.services.executions import apply_observation, project_for, resource_for
+from apps.observability.services.executions import apply_observation, ownership_for, resource_for
 
 
 class ObservationSerializer(serializers.Serializer):
@@ -31,8 +31,8 @@ class ExecutionObservationEndpoint(APIView):
         row = resource_for(kind, public_id)
         if not row:
             raise PermissionDenied("Observation resource no longer exists.")
-        project = project_for(row, kind)
-        if claims.get("project") != str(project.public_id) or claims.get("tenant") != str(project.owner.tenant_id):
+        tenant, project_id = ownership_for(row, kind)
+        if claims.get("project") != project_id or claims.get("tenant") != tenant:
             raise PermissionDenied("Observation capability ownership mismatch.")
         serializer = ObservationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

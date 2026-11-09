@@ -116,7 +116,10 @@ def _check_unmanaged(daemon_id):
                 continue
             labels = (container.attrs.get("Config") or {}).get("Labels") or {}
             job_id = labels.get("mlops_training_id")
-            if job_id not in known or container.name != f"training-{job_id}":
+            managed_name = container.name == f"training-{job_id}" or (
+                labels.get("mlops_role") == "input" and container.name == f"training-input-{job_id}"
+            )
+            if job_id not in known or not managed_name:
                 raise ServiceUnavailable("An existing training container has no capacity reservation. Stop or reconcile it first.")
     except ServiceUnavailable:
         raise

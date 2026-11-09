@@ -270,8 +270,9 @@ def test_create_job_failure_leaves_no_row_and_cleans_the_prefix(project, job_sto
     assert len(job_storage.deleted) == 1
 
 
-def test_retry_job_copies_inputs_outside_any_transaction(project, job_storage, monkeypatch):
-    monkeypatch.setattr(job_service, "submit_job", lambda job: job)
+def test_retry_job_copies_inputs_outside_any_transaction(project, job_storage, monkeypatch, settings):
+    settings.TRAINING_BACKEND = "argo"
+    monkeypatch.setattr(job_service, "submit_job", lambda job, **kwargs: job)
     code = job_storage.put("input/code.zip", b"code")
     failed = TrainingJob.objects.create(
         project=project,

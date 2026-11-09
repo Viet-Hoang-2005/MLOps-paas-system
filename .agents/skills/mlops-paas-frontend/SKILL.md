@@ -33,3 +33,7 @@ Manually smoke-test:
 - Light and dark theme transitions.
 - Form validation, dirty form exit confirmation, and error recovery states.
 - Responsive breakpoints (mobile, tablet, desktop).
+
+## Training studio
+
+Training is account-scoped and works without a Model Project. Follow [routing-and-state.md](references/routing-and-state.md) for durable workspace/run selection, readonly snapshots, dirty-buffer saving and post-run Project assignment; do not restore the old Metadata/Source/Execution wizard.

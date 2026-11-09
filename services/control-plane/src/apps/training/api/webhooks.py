@@ -40,7 +40,7 @@ class TrainingJobWebhookEndpoint(APIView):
         key = request.headers.get("Idempotency-Key") or str(request.data.get("idempotency_key", ""))
         output_error = ""
         candidate = TrainingJob.objects.select_related("project__owner").filter(public_id=job_id).first()
-        if candidate and candidate.status not in {"cancelling", "completed", "failed", "cancelled"} and not candidate.deletion_requested_at and candidate.project.deletion_state == "active":
+        if candidate and candidate.status not in {"cancelling", "completed", "failed", "cancelled"} and not candidate.deletion_requested_at and (not candidate.project_id or candidate.project.deletion_state == "active"):
             capability = capability_for_token(job=candidate, purpose="trusted_reporter", token=_bearer_token(request))
             if capability and not capability.consumed_at and _terminal_status(request.data.get("workflow_status")) == "completed":
                 try:
@@ -84,7 +84,7 @@ class TrainingJobWebhookEndpoint(APIView):
                 job.status in {"cancelling", "completed", "failed", "cancelled"}
                 or job.execution_stop_requested
                 or job.deletion_requested_at
-                or job.project.deletion_state != "active"
+                or (job.project_id and job.project.deletion_state != "active")
             ):
                 capability.consumed_at = timezone.now()
                 capability.save(update_fields=["consumed_at"])
@@ -211,19 +211,30 @@ class TrainingInputDownloadURLEndpoint(APIView):
         return Response(input_download_urls(job_id, _bearer_token(request)))
 
 
+class TrainingRuntimeConfigEndpoint(APIView):
+    authentication_classes = ()
+    permission_classes = ()
+
+    def post(self, request, job_id):
+        from apps.training.services.workspace_runs import runtime_configuration
+        response = Response(runtime_configuration(job_id, _bearer_token(request)))
+        response["Cache-Control"] = "no-store"
+        return response
+
+
 class TrainingOutputUploadURLEndpoint(APIView):
     authentication_classes = ()
     permission_classes = ()
 
     def post(self, request, job_id):
         with transaction.atomic():
-            job = TrainingJob.objects.select_for_update().select_related("project__owner").get(public_id=job_id)
+            job = TrainingJob.objects.select_for_update(of=("self",)).select_related("project__owner").get(public_id=job_id)
             capability = capability_for_token(
                 job=job,
                 purpose="output_upload",
                 token=_bearer_token(request),
             )
-            if not capability or capability.consumed_at or job.status not in {"queued", "running", "uploading"} or job.execution_stop_requested or job.deletion_requested_at or job.project.deletion_state != "active":
+            if not capability or capability.consumed_at or job.status not in {"queued", "running", "uploading"} or job.execution_stop_requested or job.deletion_requested_at or (job.project_id and job.project.deletion_state != "active"):
                 return Response({"detail": "Invalid training output capability."}, status=status.HTTP_403_FORBIDDEN)
             storage = S3Storage()
             validate_training_uri(job, storage.bucket, "output", job.output_uri)

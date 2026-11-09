@@ -9,7 +9,7 @@ from apps.deployment.models import Build
 from apps.deployment.services.builds import request_training_build
 from apps.observability.services.lifecycle import events_for_aggregate
 from apps.training.selectors import job_for_user, jobs_for_user
-from apps.training.api.serializers import TrainingJobBuildRequestSerializer
+from apps.training.api.serializers import TrainingJobBuildRequestSerializer, TrainingJobProjectRequestSerializer
 from apps.training.services.jobs import (
     cancel_job,
     create_job,
@@ -26,7 +26,7 @@ from apps.training.services.outputs import (
     get_model_output_summary,
     mutate_training_output,
 )
-from common.api.exceptions import ServiceUnavailable
+from common.api.exceptions import Conflict, ServiceUnavailable
 from infrastructure.runtime_logs import runtime_log_page
 
 from .serializers import TrainingBuildSerializer, TrainingJobEventSerializer, TrainingJobSerializer
@@ -90,6 +90,17 @@ class TrainingJobSubmitEndpoint(APIView):
         return Response(TrainingJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
 
 
+class TrainingJobProjectEndpoint(APIView):
+    def post(self, request, job_id):
+        from apps.training.services.project_assignment import assign_project
+
+        job = job_for_user(request.user, job_id)
+        serializer = TrainingJobProjectRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        job = assign_project(job=job, actor=request.user, data=serializer.validated_data)
+        return Response(TrainingJobSerializer(job).data)
+
+
 class TrainingJobCancelEndpoint(APIView):
     def post(self, request, job_id):
         job = cancel_job(job_for_user(request.user, job_id))
@@ -133,9 +144,23 @@ class TrainingJobDownloadEndpoint(APIView):
         return Response({"download_url": output_download_url(job)})
 
 
+class TrainingJobInputEndpoint(APIView):
+    def get(self, request, job_id):
+        from apps.training.services.snapshots import input_snapshot
+        return Response(input_snapshot(job_for_user(request.user, job_id), path=request.query_params.get("path"), download=request.query_params.get("download") == "1"))
+
+
+class TrainingOutputDownloadEndpoint(APIView):
+    def get(self, request, job_id, output_id):
+        from apps.training.services.snapshots import output_download
+        return Response(output_download(job_for_user(request.user, job_id), output_id))
+
+
 class TrainingJobBuildEndpoint(APIView):
     def post(self, request, job_id):
         job = job_for_user(request.user, job_id)
+        if not job.project_id:
+            raise Conflict("Assign this training job to a project before building a model.")
         request_serializer = TrainingJobBuildRequestSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
         build, created = request_training_build(
@@ -158,8 +183,12 @@ class TrainingJobModelOutputEndpoint(APIView):
             "output_revision": request.data.get("output_revision"),
             "source_code_file": request.FILES.get("source_code_file"),
             "reference_data_file": request.FILES.get("reference_data_file"),
+            "label_mapping_file": request.FILES.get("label_mapping_file"),
+            "input_schema_file": request.FILES.get("input_schema_file"),
             "remove_assets": request.data.get("remove_assets"),
         }
+        if "build_requirements_text" in request.data:
+            data["build_requirements_text"] = request.data["build_requirements_text"]
         summary = mutate_training_output(job=job, user=request.user, data=data)
         return Response(summary, status=status.HTTP_200_OK)
 

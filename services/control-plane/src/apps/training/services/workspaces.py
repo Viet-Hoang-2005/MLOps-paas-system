@@ -1,9 +1,12 @@
 """Account-owned training drafts. Object keys never depend on editable paths."""
 
 import json
+import hashlib
 import re
 import uuid
+from io import BytesIO
 from pathlib import PurePosixPath
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from cryptography.fernet import Fernet
 from django.conf import settings
@@ -18,8 +21,10 @@ from infrastructure.storage import S3Storage
 EXTENSIONS = {"script": ".py", "data": ".csv", "config": ".json", "document": ".md", "requirements": ".txt"}
 MAX_TEXT = 5 * 1024 * 1024
 MAX_DATA = 100 * 1024 * 1024
+MAX_WORKSPACE_SNAPSHOT = 256 * 1024 * 1024
+MAX_WORKSPACE_ENTRIES = 10_000
 ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
-RESERVED_ENV = {"PATH", "PYTHONPATH", "PYTHONHOME", "HOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "TMPDIR"}
+RESERVED_ENV = {"PATH", "PYTHONPATH", "PYTHONHOME", "HOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "TMPDIR", "MODEL_VERSION", "INPUT_CONTRACT", "PREPARED_INPUT_DIR", "RUNTIME_CONFIG_URL", "RUNTIME_CONFIG_CAPABILITY"}
 RESERVED_PREFIXES = ("MLOPS_", "SM_", "AWS_", "S3_", "REDIS_", "DJANGO_", "MLFLOW_", "TRAINING_")
 
 
@@ -76,6 +81,8 @@ def _lock(workspace, revision):
     valid = valid_type and int(revision) == row.revision
     if not valid:
         raise Conflict("Workspace changed. Reload before saving.")
+    if row.jobs.filter(status__in=["queued", "uploading", "running", "cancelling"]).exists():
+        raise Conflict("The workspace is locked while training is active.")
     return row
 
 
@@ -88,6 +95,57 @@ def _parent_exists(workspace, path):
     parent = str(PurePosixPath(path).parent)
     if parent != "." and not workspace.entries.filter(relative_path=parent, kind="folder").exists():
         raise ValidationError({"path": "Parent folder does not exist."})
+
+
+def snapshot_input(workspace, *, revision, storage=None):
+    """Build a revision-checked Input archive without holding a DB lock during I/O.
+
+    This prepares the immutable input contract; dispatch must separately verify
+    the revision again before committing a run.
+    """
+    with transaction.atomic():
+        locked = _lock(workspace, revision)
+        entries = list(locked.entries.order_by("relative_path"))
+        if len(entries) > MAX_WORKSPACE_ENTRIES:
+            raise ValidationError({"file": "Workspace contains too many entries."})
+        entry_point = locked.entry_point
+        snapshot_revision = locked.revision
+        tenant_id = locked.owner.tenant_id
+        workspace_id = locked.public_id
+        if not entry_point or not any(e.relative_path == entry_point and e.kind == "script" for e in entries):
+            raise ValidationError({"entry_point": "Select a Python entry point before running training."})
+
+    storage = storage or S3Storage()
+    prefix = f"users/{tenant_id}/training/workspaces/{workspace_id}/objects/"
+    total = 0
+    bundle = BytesIO()
+    with ZipFile(bundle, "w", ZIP_DEFLATED) as archive:
+        for entry in entries:
+            path = safe_path(entry.relative_path)
+            if entry.kind == "folder":
+                archive.writestr(path + "/", b"")
+                continue
+            bucket, key = storage.parse_uri(entry.s3_uri)
+            if bucket != storage.bucket or not key.startswith(prefix):
+                raise ValidationError({"file": "Workspace file is outside its storage scope."})
+            max_size = MAX_DATA if entry.kind == "data" else MAX_TEXT
+            if entry.size_bytes > max_size or total + entry.size_bytes > MAX_WORKSPACE_SNAPSHOT:
+                raise ValidationError({"file": "Workspace exceeds the allowed snapshot size."})
+            try:
+                payload = storage.read(entry.s3_uri, max_bytes=max_size)
+            except Exception as exc:
+                if not TrainingWorkspace.objects.filter(pk=workspace.pk, revision=snapshot_revision).exists():
+                    raise Conflict("Workspace changed. Reload before running training.") from exc
+                raise
+            if len(payload) != entry.size_bytes or hashlib.sha256(payload).hexdigest() != entry.checksum:
+                raise ValidationError({"file": "Workspace file failed integrity verification."})
+            validate_file(path, entry.kind, payload)
+            total += len(payload)
+            archive.writestr(path, payload)
+
+    if not TrainingWorkspace.objects.filter(pk=workspace.pk, revision=snapshot_revision).exists():
+        raise Conflict("Workspace changed. Reload before running training.")
+    return {"archive": bundle.getvalue(), "revision": snapshot_revision, "entry_point": entry_point}
 
 
 def serialize_entries(entries):
@@ -131,6 +189,15 @@ def update_workspace(workspace, *, revision, changes):
             locked.environment = environment
         _bump(locked)
         return locked
+
+
+def delete_workspace(workspace, *, revision, storage=None):
+    storage = storage or S3Storage()
+    prefix = f"users/{workspace.owner.tenant_id}/training/workspaces/{workspace.public_id}/"
+    with transaction.atomic():
+        locked = _lock(workspace, revision)
+        locked.delete()  # Job snapshots and owner survive via SET_NULL.
+        transaction.on_commit(lambda: storage.delete_prefix(prefix), robust=True)
 
 
 def create_entry(workspace, *, revision, path, kind, payload=None, storage=None):
@@ -287,6 +354,8 @@ def set_secret(workspace, *, revision, name, value):
         locked = _lock(workspace, revision)
         if name in locked.environment:
             raise Conflict("This name is already used by an environment variable.")
+        if not locked.secrets.filter(name=name).exists() and locked.secrets.count() >= 100:
+            raise ValidationError({"name": "At most 100 secrets are supported per workspace."})
         secret, _ = TrainingWorkspaceSecret.objects.update_or_create(workspace=locked, name=name,
             defaults={"ciphertext": encrypted})
         _bump(locked)

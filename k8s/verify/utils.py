@@ -402,7 +402,8 @@ def prepared_context(repo_root: Path | None = None) -> Iterator[ValidationContex
         )
     with tempfile.TemporaryDirectory(prefix="mlops-gitops-") as temporary_directory:
         render_root = Path(temporary_directory)
-        shutil.copytree(source_root / "k8s", render_root / "k8s")
+        shutil.copytree(source_root / "k8s", render_root / "k8s",
+                        ignore=shutil.ignore_patterns(".pytest_cache", "__pycache__", ".ruff_cache"))
         yield ValidationContext(source_root=source_root, render_root=render_root)
 
 

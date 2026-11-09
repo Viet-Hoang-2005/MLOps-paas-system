@@ -6,13 +6,13 @@ The Django Control Plane is a domain-oriented modular monolith (`services/contro
 
 Local training advertises Docker-derived CPU and memory profiles. Admission uses durable shared CPU/RAM reservations, Redis dispatch locking and a bounded available-memory probe; retain reservations until confirmed cleanup. Production CPU profiles and weekly quotas remain separate.
 
-Training resource capabilities expose at most one GPU. Argo jobs require `accelerator_model` `t4` or `a10g`; Docker jobs use a generic GPU and an empty model. CPU jobs use no model. Persist the model and retain it on retry; old Argo GPU jobs without a model cannot be submitted or retried.
+Training resource capabilities expose at most one GPU. Argo jobs require `accelerator_model` `t4` or `a10g`; Docker jobs require a currently verified NVIDIA device UUID in local_gpu_id and an empty accelerator_model; dispatch must request that exact device without fallback. CPU jobs use no model. Persist the model and retain it on retry; old Argo GPU jobs without a model cannot be submitted or retried.
 
 1. **`auth`:** CustomUser, user profile avatars, RS256 JWT issuance, JWKS endpoint (`/api/auth/.well-known/jwks.json`), OAuth2 (Google/GitHub), 2FA/TOTP.
 2. **`access`:** Project-scoped API keys (`ApiKey`) hashed with SHA-256 for machine-to-machine authentication.
-3. **`catalog`:** Project metadata, one revision-checked `ModelPreview` per project, mutable training workspace, Running snapshot access, async retryable hard deletion.
+3. **`catalog`:** Project metadata, one revision-checked `ModelPreview` per project, legacy project workspace assets, Running snapshot access, async retryable hard deletion.
 4. **`registry`:** Immutable registered versions (`ModelVersion`), artifacts, metrics, insights, dynamic aliases (`champion`/`challenger`).
-5. **`training`:** Training jobs (`TrainingJob`), short-lived Capability Tokens, Presigned S3 URLs, resource quotas, graceful cancellation.
+5. **`training`:** Account-owned drafts (`TrainingWorkspace`) and jobs (`TrainingJob`) with optional Project links, short-lived Capability Tokens, Presigned S3 URLs, resource quotas, graceful cancellation.
 6. **`deployment`:** Immutable Build input snapshots, explicit asynchronous idempotent registration, serving deployment/readiness. Project.active_deployment is the Running source of truth; runtime uses deployment UUID, not Build UUID.
 7. **`drift`:** Drift monitors (`DriftMonitor`), scheduled and event-driven drift runs (`DriftRun`), report access, threshold configuration.
 8. **`ct` (Continuous Training):** Retraining policies, automated retraining triggers (`RetrainingTrigger`), pipeline orchestration upon drift signals.
@@ -49,7 +49,7 @@ HTTP Request
 - Avoid circular imports by placing task imports at dispatch boundaries or moving shared queries to selectors.
 - Use `select_for_update()` when transitioning terminal states to prevent race conditions.
 - Late callbacks must never revive cancelled or deleting resources (return HTTP 200 no-op).
-- Lock project before Preview/Build/job when coordinating deletion or snapshots; dispatch after commit. Normal new project requires artifact, training-created project does not. No legacy upload/backfill compatibility in the clean local workflow.
+- Lock project before Preview/Build/job when coordinating deletion or snapshots; dispatch after commit. Normal new project requires artifact; training assignment may create a Project without Preview. Training ownership migrations and legacy storage preservation are additive; do not reset data.
 - Keep raw/package artifact, requirements, source/reference and Advanced assets immutable across Build → Register; training retry uses original snapshots, not current workspace. Only registered versions deploy, and failed deployments retain old Running.
 - Build history Re-build creates a new attempt from current Preview or original training output. DELETE persists a cleanup tombstone, blocks registration, and removes only unregistered build-scoped images/objects before hard deletion; dispatched Argo builds wait for a trusted terminal reporter. See `docs/dev/build-history-actions.md`.
 
@@ -59,3 +59,7 @@ Local runtime metrics are read-only Docker SDK snapshots of the project's explic
 
 - **Local Development:** Transient real-time logs stream into Redis lists (`training_logs:{job_id}`, `build_logs:{build_id}`, `drift_logs:{run_id}`). Web frontend polls using cursor tokens.
 - **Production Kubernetes:** Task logs are collected by Alloy into Grafana Loki (7-day retention). Control Plane acts as an authorized proxy: generates signed task-bound cursors to prevent cross-tenant LogQL injection.
+
+## Training workspace changes
+
+Use [training-workspaces.md](training-workspaces.md) when changing projectless jobs, assignment or deletion. Workspace admission/mutation share a workspace lock; operations involving Project/job coordinate Project before job. Nullable joined Project rows cannot be locked by PostgreSQL select_for_update without narrowing the lock with of=("self",). Test these paths on PostgreSQL as well as isolated fixtures.

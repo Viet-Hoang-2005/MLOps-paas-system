@@ -66,7 +66,7 @@ def authenticate_mlflow_request(request):
                 token_hash=token_hash,
                 expires_at__gt=timezone.now(),
             )
-            .select_related("job__project__owner")
+            .select_related("job__project", "job__owner")
             .first()
         )
         if cap:
@@ -76,7 +76,7 @@ def authenticate_mlflow_request(request):
                 TrainingJobCapability.objects.filter(job=job, purpose="tracking").delete()
                 return None, None, None, None, None
             project = job.project
-            user = project.owner
+            user = job.owner
             return job, project, user, user.tenant_id, None
 
     # 2. User API Key (External Data Scientist)
@@ -115,6 +115,8 @@ def _require_auth(request):
 def _is_project_allowed_for_api_key(api_key: UserAPIKey | None, project: ModelProject) -> bool:
     if api_key is None or not api_key.allowed_projects.exists():
         return True
+    if project is None:
+        return False
     return api_key.allowed_projects.filter(id=project.id).exists()
 
 
@@ -151,8 +153,8 @@ def _resolve_target_job(job_from_auth, run_id_str, tenant_id, api_key=None, for_
 
         # 1. Tenant boundary check
         job = (
-            TrainingJob.objects.filter(public_id=run_uuid, project__owner__tenant_id=tenant_id)
-            .select_related("project__owner")
+            TrainingJob.objects.filter(public_id=run_uuid, owner__tenant_id=tenant_id)
+            .select_related("project", "owner")
             .first()
         )
         if not job:

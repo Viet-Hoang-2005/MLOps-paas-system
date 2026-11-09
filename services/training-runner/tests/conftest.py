@@ -20,12 +20,15 @@ def runner_workspace(tmp_path, monkeypatch):
         "INPUT_TRAIN_DIR": workspace / "input" / "train",
         "MODEL_DIR": workspace / "model",
         "OUTPUT_DIR": workspace / "output",
+        "WORK_DIR": workspace / "work",
     }
     for name, path in paths.items():
         monkeypatch.setattr(runner, name, path)
     for name in ("SOURCE_DIR", "INPUT_TRAIN_DIR", "MODEL_DIR", "OUTPUT_DIR"):
         paths[name].mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(runner, "log_to_mlflow", lambda **kwargs: None)
+    monkeypatch.setattr(runner, "RUNTIME_ENV", {})
+    monkeypatch.setattr(runner, "SECRET_VALUES", [])
     return paths
 
 
@@ -52,6 +55,10 @@ def clean_runtime_env(monkeypatch):
         "MLFLOW_EXPERIMENT_NAME",
         "MLFLOW_ARTIFACT_ROOT",
         "AWS_BUCKET_NAME",
+        "INPUT_CONTRACT",
+        "PREPARED_INPUT_DIR",
+        "RUNTIME_CONFIG_URL",
+        "RUNTIME_CONFIG_CAPABILITY",
     )
     for name in names:
         monkeypatch.delenv(name, raising=False)

@@ -18,7 +18,7 @@ def test_concurrent_claims_have_one_owner_per_job(settings):
         pytest.skip("Lease concurrency requires disposable PostgreSQL.")
     owner = get_user_model().objects.create_user("leases@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="lease-concurrency")
-    TrainingJob.objects.bulk_create([TrainingJob(project=project, name=f"job-{index}", model_flavor="sklearn", backend="docker", status="queued") for index in range(24)])
+    TrainingJob.objects.bulk_create([TrainingJob(project=project, owner=project.owner, name=f"job-{index}", model_flavor="sklearn", backend="docker", status="queued") for index in range(24)])
     gate = Barrier(3)
 
     def claimant():

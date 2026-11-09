@@ -18,7 +18,7 @@ from common.validation.artifacts import (
 )
 from common.validation.revisions import validate_output_revision
 from infrastructure.storage import S3Storage
-from infrastructure.storage.paths import training_output_prefix
+from infrastructure.storage.paths import tenant_training_job_prefix, training_output_prefix
 
 
 def verify_training_output(job, storage=None):
@@ -96,15 +96,18 @@ def get_model_output_summary(job: TrainingJob, storage=None) -> dict[str, Any]:
         and not job.outputs_purged_at
         and getattr(job.project, "deletion_state", "active") == "active"
     )
-    can_build = can_edit and (model_artifact is not None)
+    can_build = can_edit and bool(job.project_id) and (model_artifact is not None)
 
     return {
         "job_id": str(job.public_id),
-        "project_id": str(job.project.public_id),
+        "project_id": str(job.project.public_id) if job.project_id else None,
         "output_revision": job.output_revision,
         "model_flavor": job.model_flavor,
         "entry_point": job.entry_point or "train.py",
         "requirements_text": job.requirements_text or "",
+        "build_requirements_text": job.build_requirements_text,
+        "label_mapping": serialize_output_asset(job.outputs.filter(kind="label_mapping").first(), storage) if job.outputs.filter(kind="label_mapping").exists() else None,
+        "input_schema": serialize_output_asset(job.outputs.filter(kind="input_schema").first(), storage) if job.outputs.filter(kind="input_schema").exists() else None,
         "model_artifact": serialize_output_asset(model_artifact, storage) if model_artifact else None,
         "source_code": serialize_output_asset(source_code, storage) if source_code else None,
         "reference_data": serialize_output_asset(reference_data, storage) if reference_data else None,
@@ -124,10 +127,17 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
 
     try:
         with transaction.atomic():
-            project = type(job.project).objects.select_for_update().get(pk=job.project_id)
-            if getattr(project, "deletion_state", "active") != "active":
-                raise Conflict("This project is being deleted.")
+            project = None
+            if job.project_id:
+                from apps.catalog.models import ModelProject
+                project = ModelProject.objects.select_for_update().get(pk=job.project_id)
+                if project.deletion_state != "active":
+                    raise Conflict("This project is being deleted.")
             job = TrainingJob.objects.select_for_update().get(pk=job.pk)
+            if job.owner_id != user.pk:
+                raise Conflict("This training job is unavailable.")
+            if job.project_id != (project.pk if project else None):
+                raise Conflict("The job's project changed. Reload before saving.")
             if job.status != "completed":
                 raise Conflict("Cannot edit output of a job that is not completed.")
             if job.outputs_purged_at:
@@ -163,10 +173,12 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
                         old_uris_to_delete.append(old_ref.s3_uri)
                     old_ref.delete()
 
-            tenant_id = project.owner.tenant_id
-            project_id = project.public_id
-            job_id = job.public_id
-            out_prefix = training_output_prefix(tenant_id, project_id, job_id)
+            if job.storage_layout == "tenant":
+                out_prefix = f"{tenant_training_job_prefix(job.owner.tenant_id, job.public_id)}/output/"
+            elif job.storage_project_id:
+                out_prefix = training_output_prefix(job.owner.tenant_id, job.storage_project_id, job.public_id)
+            else:
+                raise Conflict("Training storage identity is unavailable.")
 
             # Source code mutation
             if source_code_file:
@@ -224,8 +236,39 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
                     },
                 )
 
+            for kind in ("label_mapping", "input_schema"):
+                upload = data.get(kind + "_file")
+                if not upload and kind not in remove_assets_set:
+                    continue
+                old = job.outputs.filter(kind=kind).first()
+                if upload:
+                    if upload.size > 1024 * 1024:
+                        raise ValidationError({kind: "JSON file exceeds 1 MiB."})
+                    raw = upload.read(1024 * 1024 + 1)
+                    try:
+                        parsed = json.loads(raw.decode("utf-8"))
+                    except (ValueError, UnicodeError):
+                        raise ValidationError({kind: "Upload valid JSON."}) from None
+                    if not isinstance(parsed, dict if kind == "input_schema" else (dict, list)):
+                        raise ValidationError({kind: "Unsupported JSON structure."})
+                    name = kind + ".json"
+                    stored = storage.put(f"{out_prefix}supplemental/{kind}/{uuid.uuid4().hex}/{name}", raw, "application/json")
+                    new_uploaded_uris.append(stored.uri)
+                    if old:
+                        old_uris_to_delete.append(old.s3_uri)
+                        old.delete()
+                    TrainingOutput.objects.create(job=job, kind=kind, relative_path=name, s3_uri=stored.uri,
+                        checksum=stored.checksum, size_bytes=stored.size_bytes, content_type="application/json")
+                elif old:
+                    old_uris_to_delete.append(old.s3_uri)
+                    old.delete()
+            if "build_requirements_text" in data:
+                requirements = data["build_requirements_text"]
+                if not isinstance(requirements, str) or len(requirements.encode()) > 64 * 1024:
+                    raise ValidationError({"build_requirements_text": "Requirements must be text up to 64 KiB."})
+                job.build_requirements_text = requirements
             job.output_revision += 1
-            job.save(update_fields=["output_revision", "updated_at"])
+            job.save(update_fields=["output_revision", "build_requirements_text", "updated_at"])
 
             record_training_event(
                 job=job,

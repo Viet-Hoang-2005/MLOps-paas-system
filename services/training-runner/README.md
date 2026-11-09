@@ -1,5 +1,19 @@
 # Training Runner — Thực Thi Huấn Luyện Mô Hình Học Máy (Training Execution Engine)
 
+## Hợp đồng workspace mới
+
+Job có `INPUT_CONTRACT=workspace` chạy độc lập với Model Project. Helper Docker
+hoặc init container Kubernetes chuẩn bị Input trước; runner mount Input chỉ đọc
+và kiểm tra cờ mount thực tế trước khi chạy Python. `SM_CHANNEL_TRAIN` là gốc
+Input hợp nhất, `MLOPS_WORK_DIR` là thư mục tạm ghi được và working directory.
+Lưu model bằng API của framework vào `SM_MODEL_DIR`; metrics/metadata được hỗ
+trợ ghi vào `SM_OUTPUT_DIR`. Không cài hoặc yêu cầu SDK `mlops`.
+
+Chỉ đóng gói và công bố model khi tiến trình thành công, model hợp lệ và upload
+được xác minh. Environment/Secrets được cấp riêng bằng capability của job;
+requirements được cài trước khi cấp Secret. Các mô tả source/data tách riêng
+bên dưới áp dụng cho hợp đồng legacy. Xem [hướng dẫn và rollout](../../docs/dev/training-model-output.md).
+
 Thư mục `services/training-runner/` chứa mã nguồn của **Training Runner Service**, một Worker Container độc lập chuyên biệt hóa cho việc thực thi các tác vụ huấn luyện mô hình học máy (Machine Learning & Deep Learning Training Jobs). Dịch vụ chạy trong môi trường cô lập (Sandbox) để thực thi mã nguồn tùy biến của người dùng một cách an toàn, thu thập siêu dữ liệu huấn luyện, stream logs thời gian thực và đóng gói kết quả đầu ra.
 
 ---

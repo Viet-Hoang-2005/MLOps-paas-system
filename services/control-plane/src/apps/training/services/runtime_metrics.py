@@ -105,8 +105,9 @@ def _prometheus_snapshot(job, client=None):
         return None
     ns = "mlops-paas-training"
     scope = {"namespace": ns, "label_mlops_paas_io_training_job_id": str(job.public_id),
-             "label_mlops_paas_io_project_id": str(job.project.public_id),
-             "label_mlops_paas_io_tenant_id": str(job.project.owner.tenant_id)}
+             "label_mlops_paas_io_tenant_id": str(job.owner.tenant_id)}
+    if job.runtime_project_id:
+        scope["label_mlops_paas_io_project_id"] = job.runtime_project_id
     selector = ",".join(f"{k}={json.dumps(v)}" for k, v in scope.items())
     pods = client.query(f"max by (namespace,pod) (kube_pod_labels{{{selector}}})")
     if len(pods) != 1:
