@@ -1,4 +1,14 @@
 export const trainingVi = {
+  workspace: { fileDialog: {
+    create: "Tệp mới", edit: "Chỉnh sửa tệp", description: "Chọn loại và tên tệp.",
+    type: "Loại tệp", name: "Tên tệp", script: "Script (.py)", data: "Dữ liệu (.csv)",
+    config: "Cấu hình (.json)", document: "Tài liệu (.md)", requirements: "Thư viện (requirements.txt)",
+    upload: "Chọn tệp", required: "Bắt buộc tải lên CSV", optional: "Có thể tải lên tệp",
+    removeUpload: "Bỏ tệp đã chọn", invalidName: "Nhập tên hợp lệ với phần mở rộng tương ứng.",
+    csvRequired: "Hãy tải lên tệp CSV.", requirementsExists: "Xóa requirements.txt hiện tại trước khi tạo tệp mới.",
+    requirementsEdit: "Sửa nội dung trong editor. Xóa tệp trước khi tải lên bản thay thế.",
+    cancel: "Hủy", save: "Lưu", createAction: "Tạo",
+  } },
   workflow: {
     snapshotHint:
       "Đầu vào được đóng băng khi tạo tác vụ; chỉnh sửa workspace không làm thay đổi chúng.",

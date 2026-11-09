@@ -4,6 +4,7 @@ import {
   Database,
   FileCode2,
   Folder as FolderIcon,
+  Pencil,
   Play,
 } from "lucide-react";
 import { useState } from "react";
@@ -46,6 +47,7 @@ interface DirectoryTreeProps {
   level?: number;
   selectedPath: string | null;
   onSelect: (path: string) => void;
+  onEditFile?: (path: string) => void;
   unsavedContents: Record<string, string>;
   currentEntryPoint?: string;
   expandedFolders: Set<string>;
@@ -60,6 +62,7 @@ export function DirectoryTree({
   level = 0,
   selectedPath,
   onSelect,
+  onEditFile,
   unsavedContents,
   currentEntryPoint,
   expandedFolders,
@@ -68,6 +71,7 @@ export function DirectoryTree({
   onFinishCreating,
   currentParentPath = "",
 }: DirectoryTreeProps) {
+  const { t } = useTranslation("projects");
   return (
     <ul className="space-y-0.5">
       {nodes.map((node) => {
@@ -111,6 +115,7 @@ export function DirectoryTree({
                   level={level + 1}
                   selectedPath={selectedPath}
                   onSelect={onSelect}
+                  onEditFile={onEditFile}
                   unsavedContents={unsavedContents}
                   currentEntryPoint={currentEntryPoint}
                   expandedFolders={expandedFolders}
@@ -125,11 +130,12 @@ export function DirectoryTree({
         }
 
         return (
-          <li key={node.path}>
+          <li key={node.path} className="flex items-center">
             <button
               type="button"
               onClick={() => onSelect(node.path)}
-              className={`flex w-full items-center gap-1.5 truncate rounded-compact px-2 py-1.5 text-left text-style-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) ${
+              onDoubleClick={onEditFile ? () => onEditFile(node.path) : undefined}
+              className={`flex min-w-0 flex-1 items-center gap-1.5 truncate rounded-compact px-2 py-1.5 text-left text-style-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) ${
                 isSelected
                   ? "bg-(--color-primary-subtle) font-medium text-(--color-primary)"
                   : "text-(--color-muted-foreground) hover:bg-(--color-muted)"
@@ -150,6 +156,17 @@ export function DirectoryTree({
                 <Play className="h-3 w-3 shrink-0 text-(--color-primary)" />
               ) : null}
             </button>
+            {isSelected && onEditFile && (
+              <button
+                type="button"
+                onClick={() => onEditFile(node.path)}
+                aria-label={t("sourceEditor.editFile", { path: node.path })}
+                title={t("sourceEditor.editFile", { path: node.path })}
+                className="shrink-0 rounded-compact p-1.5 text-color-muted-foreground hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
           </li>
         );
       })}

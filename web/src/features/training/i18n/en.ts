@@ -1,4 +1,14 @@
 export const trainingEn = {
+  workspace: { fileDialog: {
+    create: "New file", edit: "Edit file", description: "Choose the file type and name.",
+    type: "File type", name: "File name", script: "Script (.py)", data: "Data (.csv)",
+    config: "Config (.json)", document: "Document (.md)", requirements: "Requirements (requirements.txt)",
+    upload: "Choose a file", required: "CSV upload is required", optional: "Upload is optional",
+    removeUpload: "Remove selected upload", invalidName: "Enter a valid name with the selected extension.",
+    csvRequired: "Upload a CSV file.", requirementsExists: "Delete the existing requirements.txt before creating another.",
+    requirementsEdit: "Edit contents in the editor. Delete this file before uploading a replacement.",
+    cancel: "Cancel", save: "Save", createAction: "Create",
+  } },
   workflow: {
     snapshotHint:
       "These inputs were frozen when the job was created; workspace edits do not change them.",

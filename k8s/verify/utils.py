@@ -91,6 +91,7 @@ EXTERNAL_SECRET_OWNERS = {
     "k8s/workloads/overlays/production/control-plane": {
         ("mlops-paas-core", "mlops-paas-control-plane-secret"),
         ("mlops-paas-core", "mlops-paas-celery-worker-secret"),
+        ("mlops-paas-core", "mlops-training-secret-key"),
     },
     "k8s/workloads/overlays/production/consumer": {("mlops-paas-core", "mlops-paas-consumer-secret")},
     "k8s/workloads/overlays/production/model-server": {

@@ -38,6 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /install /usr/local
 COPY --chown=app:app . .
+COPY mlops.py /usr/local/lib/python3.10/site-packages/mlops.py
 
 USER app
 

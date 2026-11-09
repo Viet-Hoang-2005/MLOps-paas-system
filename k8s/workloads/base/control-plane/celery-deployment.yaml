@@ -55,6 +55,12 @@ spec:
           command: ["celery"]
           args: ["-A", "config", "worker", "-Q", "celery", "--concurrency=2"]
           env:
+            - name: TRAINING_SECRET_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-training-secret-key
+                  key: TRAINING_SECRET_ENCRYPTION_KEY
+                  optional: true
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
