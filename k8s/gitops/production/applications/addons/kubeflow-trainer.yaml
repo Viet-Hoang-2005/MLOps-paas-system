@@ -1,0 +1,104 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-addon-kubeflow-trainer
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '-24'
+  labels:
+    app.kubernetes.io/name: kubeflow-trainer
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: kubeflow-trainer
+    mlops-paas.io/plane: addon
+spec:
+  project: mlops-addons
+  info:
+  - name: Owner
+    value: Platform Engineering
+  - name: Source
+    value: ghcr.io/kubeflow/charts/kubeflow-trainer@2.3.0
+  - name: Runbook
+    value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/docs/dev/trainer-v2.md
+  source:
+    repoURL: ghcr.io/kubeflow/charts
+    chart: kubeflow-trainer
+    targetRevision: 2.3.0
+    helm:
+      releaseName: kubeflow-trainer
+      values: |
+        crds:
+          enabled: true
+        commonLabels:
+          app.kubernetes.io/part-of: mlops-paas
+          mlops-paas.io/plane: addon
+        manager:
+          nodeSelector:
+            workload-type: worker
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+        jobset:
+          install: true
+          image:
+            repository: registry.k8s.io/jobset/jobset
+            tag: v0.12.0
+            pullPolicy: IfNotPresent
+          controller:
+            nodeSelector:
+              workload-type: worker
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+        runtimes:
+          defaultEnabled: false
+        dataCache:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubeflow-system
+  syncPolicy:
+    syncOptions:
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+  ignoreDifferences:
+  - group: admissionregistration.k8s.io
+    kind: MutatingWebhookConfiguration
+    name: defaulter.trainer.kubeflow.org
+    jqPathExpressions:
+    - .webhooks[]?.clientConfig.caBundle
+  - group: admissionregistration.k8s.io
+    kind: ValidatingWebhookConfiguration
+    name: validator.trainer.kubeflow.org
+    jqPathExpressions:
+    - .webhooks[]?.clientConfig.caBundle
+  - group: admissionregistration.k8s.io
+    kind: MutatingWebhookConfiguration
+    name: jobset-mutating-webhook-configuration
+    jqPathExpressions:
+    - .webhooks[]?.clientConfig.caBundle
+  - group: admissionregistration.k8s.io
+    kind: ValidatingWebhookConfiguration
+    name: jobset-validating-webhook-configuration
+    jqPathExpressions:
+    - .webhooks[]?.clientConfig.caBundle
+  - group: ''
+    kind: Secret
+    name: kubeflow-trainer-webhook-cert
+    namespace: kubeflow-system
+    jsonPointers:
+    - /data
+  - group: ''
+    kind: Secret
+    name: jobset-webhook-server-cert
+    namespace: kubeflow-system
+    jsonPointers:
+    - /data

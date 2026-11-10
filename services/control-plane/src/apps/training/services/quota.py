@@ -90,7 +90,7 @@ def require_reservation(job):
         raise ServiceUnavailable("Training quota reservation is unavailable.")
 
 
-def update_observation(job, *, started_at=None, finished_at=None, stopped=False):
+def update_observation(job, *, started_at=None, finished_at=None, stopped=False, never_started=False):
     """Caller holds owner and job locks; only a confirmed stop releases reservation."""
     reservation = TrainingQuotaReservation.objects.select_for_update().filter(job_id=job.public_id, active=True).first()
     if not reservation:
@@ -109,7 +109,7 @@ def update_observation(job, *, started_at=None, finished_at=None, stopped=False)
         reservation.save(update_fields=["runtime_finished_at"])
     if not stopped:
         return True
-    if not reservation.started_at and job.external_job_id:
+    if not reservation.started_at and job.external_job_id and not never_started:
         return False  # Runtime creation was attempted but no trustworthy start is available.
     end = reservation.runtime_finished_at or finished_at or timezone.now()
     overlaps = _window_overlaps(reservation.started_at, reservation.started_at,

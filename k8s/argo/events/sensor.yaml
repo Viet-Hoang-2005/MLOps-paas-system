@@ -216,21 +216,35 @@ spec:
       eventName: cancel-train
       filters:
         data:
-          - path: body.job_id
-            type: string
-            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
-          - path: body.job_name
-            type: string
-            value: ['^training-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
-          - path: body.control_plane_callback_url
-            type: string
-            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/training-jobs/[0-9a-f-]{36}/cancellation/$']
+        - path: body.job_id
+          type: string
+          value:
+          - ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        - path: body.job_name
+          type: string
+          value:
+          - ^training-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        - path: body.control_plane_callback_url
+          type: string
+          value:
+          - ^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/training-jobs/[0-9a-f-]{36}/cancellation/$
+        - path: body.project_id
+          type: string
+          value:
+          - ^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$
+        - path: body.tenant_id
+          type: string
+          value:
+          - ^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
         exprs:
-          - expr: callback =~ job_id && job_name =~ job_id
-            fields:
-              - {name: callback, path: body.control_plane_callback_url}
-              - {name: job_name, path: body.job_name}
-              - {name: job_id, path: body.job_id}
+        - expr: callback =~ job_id && job_name =~ job_id
+          fields:
+          - name: callback
+            path: body.control_plane_callback_url
+          - name: job_name
+            path: body.job_name
+          - name: job_id
+            path: body.job_id
     - name: reconcile-dep
       eventSourceName: webhook-eventsource
       eventName: reconcile
@@ -581,7 +595,7 @@ spec:
 
     - template:
         name: cancel-train-workflow-trigger
-        conditions: "cancel-train-dep"
+        conditions: cancel-train-dep
         k8s:
           operation: create
           source:
@@ -600,31 +614,43 @@ spec:
                   strategy: OnPodCompletion
                 arguments:
                   parameters:
-                    - name: job_id
-                      value: ""
-                    - name: job_name
-                      value: ""
-                    - name: control_plane_callback_url
-                      value: ""
-                    - name: cancel_reporter_capability
-                      value: ""
+                  - name: job_id
+                    value: ''
+                  - name: job_name
+                    value: ''
+                  - name: control_plane_callback_url
+                    value: ''
+                  - name: cancel_reporter_capability
+                    value: ''
+                  - name: project_id
+                    value: ''
+                  - name: tenant_id
+                    value: ''
           parameters:
-            - src: { dependencyName: cancel-train-dep, dataKey: body.job_id }
-              dest: spec.arguments.parameters.0.value
-            - src: { dependencyName: cancel-train-dep, dataKey: body.job_name }
-              dest: spec.arguments.parameters.1.value
-            - src:
-                {
-                  dependencyName: cancel-train-dep,
-                  dataKey: body.control_plane_callback_url,
-                }
-              dest: spec.arguments.parameters.2.value
-            - src:
-                {
-                  dependencyName: cancel-train-dep,
-                  dataKey: body.cancel_reporter_capability,
-                }
-              dest: spec.arguments.parameters.3.value
+          - src:
+              dependencyName: cancel-train-dep
+              dataKey: body.job_id
+            dest: spec.arguments.parameters.0.value
+          - src:
+              dependencyName: cancel-train-dep
+              dataKey: body.job_name
+            dest: spec.arguments.parameters.1.value
+          - src:
+              dependencyName: cancel-train-dep
+              dataKey: body.control_plane_callback_url
+            dest: spec.arguments.parameters.2.value
+          - src:
+              dependencyName: cancel-train-dep
+              dataKey: body.cancel_reporter_capability
+            dest: spec.arguments.parameters.3.value
+          - src:
+              dependencyName: cancel-train-dep
+              dataKey: body.project_id
+            dest: spec.arguments.parameters.4.value
+          - src:
+              dependencyName: cancel-train-dep
+              dataKey: body.tenant_id
+            dest: spec.arguments.parameters.5.value
 
     - template:
         name: reconcile-job-trigger

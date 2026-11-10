@@ -198,7 +198,7 @@ flowchart TB
     subgraph PLANE_EXECUTION["Plane 4: Execution Plane (Sync Wave: -20 -> -11)"]
         ARGO_WORKFLOWS["Argo Workflows Controller"]
         ARGO_EVENTS["Argo Events (EventSource & Sensors)"]
-        KUBEFLOW["Kubeflow Training Operator (PyTorchJob)"]
+        KUBEFLOW["Kubeflow Trainer v2 (TrainJob)"]
         KARPENTER["Karpenter (GPU Node Autoscaler)"]
         KEDA["KEDA (Event-driven Autoscaler)"]
     end
@@ -326,7 +326,7 @@ sequenceDiagram
     CP->>S3: Snapshot mã nguồn & dataset thành file ZIP bất biến
     CP->>CP: Lưu Job (PENDING) & sinh Capability Token
     CP->>Celery: Enqueue sau khi DB commit (on_commit)
-    Celery->>Runner: Khởi chạy Pod PyTorchJob / Container
+    Celery->>Runner: Khởi chạy Pod TrainJob / Container
     Runner->>S3: Tải source.zip & data qua Presigned GET URLs
     Runner->>Runner: Cài đặt requirements.txt & thực thi train.py
     Runner->>CP: In ra stdout METRIC_JSON -> Stream vào Redis/Loki

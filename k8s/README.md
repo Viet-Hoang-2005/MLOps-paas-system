@@ -41,9 +41,9 @@ Hệ thống được chia thành 5 mặt phẳng độc lập tương ứng v�
 
 | Mặt phẳng (Plane) | Đường dẫn mã nguồn | Argo CD AppProject | Trách nhiệm chính |
 |---|---|---|---|
-| **GitOps Control Plane** | `k8s/gitops/production` | `default` | Ứng dụng gốc `mlops-paas-system` quản lý AppProject và 35 Child Application. |
+| **GitOps Control Plane** | `k8s/gitops/production` | `default` | Ứng dụng gốc `mlops-paas-system` quản lý AppProject và 36 Child Application. |
 | **Cluster Plane** | `k8s/cluster` | `mlops-cluster` | Cấu hình nền tảng cấp cụm: Namespace, StorageClass (`ebs-gp3`), `ClusterSecretStore`, chính sách Kyverno Cosign, cấu hình Karpenter Capacity (NodePools, EC2NodeClasses). |
-| **Add-ons Plane** | Charts upstream & `k8s/addons/` | `mlops-addons` | Các Controller/CRD cơ sở: Self-Managed Argo CD, AWS EBS CSI, External Secrets Operator (ESO), CloudNative-PG, Redis Operator, KEDA, Prometheus Stack, Loki, Alloy, Kyverno, Kubeflow Training, Headlamp Dashboard. |
+| **Add-ons Plane** | Helm charts upstream | `mlops-addons` | Các Controller/CRD cơ sở: Self-Managed Argo CD, AWS EBS CSI, External Secrets Operator (ESO), CloudNative-PG, Redis Operator, KEDA, Prometheus Stack, Loki, Alloy, Kyverno, Kubeflow Trainer v2, Headlamp Dashboard. |
 | **Platform Plane** | `k8s/platform` | `mlops-platform` | Các dịch vụ dữ liệu & chia sẻ dùng chung: CSDL PostgreSQL HA (CloudNative-PG), Redis HA + Sentinel, Redpanda Kafka, Harbor Registry, Traefik Routing & Cloudflare Tunnel. |
 | **Execution Plane** | `k8s/argo` | `mlops-execution` | Động cơ pipeline MLOps: Argo Events (EventBus, EventSource, Sensor), NetworkPolicies cô lập execution, và các mẫu Argo WorkflowTemplates (Build, Deploy, Delete, Drift, Training, Operations). |
 | **Workloads Plane** | `k8s/workloads/overlays/production` | `mlops-workloads` | Các microservices nghiệp vụ của tenant và hệ thống: Control Plane API, Celery Worker / Beat / Health-Worker, Model Server Gateway, Redpanda Consumer, Web Frontend. |
@@ -88,7 +88,7 @@ flowchart TD
 
 > [!NOTE]
 > **Điều phối 2 cấp độ Sync Wave (Application-level & Resource-level):**
-> 1. **Application-level Wave:** Điều phối thứ tự triển khai giữa 35 ứng dụng trong mô hình App-of-apps từ `-50` đến `20`.
+> 1. **Application-level Wave:** Điều phối thứ tự triển khai giữa 36 ứng dụng trong mô hình App-of-apps từ `-50` đến `20`.
 > 2. **Resource-level Wave:** Bên trong mỗi Microservice, luồng đồng bộ 3 bước (`ExternalSecret: -1` -> `Migration Job / ConfigMap: 0` -> `Pod Deployments / Autoscalers: 1`) được điều phối chính xác để đảm bảo secret và cấu hình luôn có sẵn trước khi Pod khởi động.
 
 > [!NOTE]
@@ -171,8 +171,6 @@ Hệ thống triển khai mô hình phòng thủ theo chiều sâu (**Defense-in
 k8s/
 ├── kustomization.yaml                  # Kustomize entrypoint gốc của toàn bộ kho mã nguồn
 ├── README.md                           # Tài liệu kiến trúc và hướng dẫn vận hành GitOps K8s
-├── addons/                             # Remote overlays cho các Addons bên thứ ba
-│   └── kubeflow-training/              # Kustomize overlay triển khai Kubeflow Training Operator
 ├── argocd/                             # Định nghĩa ứng dụng gốc Argo CD
 │   ├── application.yaml                # Manifest Root Application (mlops-paas-system)
 │   └── values.yaml                     # Helm values tùy chỉnh cho Argo CD server
@@ -187,7 +185,7 @@ k8s/
 │       ├── kustomization.yaml          # Tổng hợp projects, repositories và applications
 │       ├── projects/                   # 5 AppProject kiểm soát quyền hạn (cluster, addons, platform, execution, workloads)
 │       ├── repositories/               # Cấu hình Git repository nguồn có xác thực
-│       └── applications/               # Định nghĩa 35 Argo CD Child Application
+│       └── applications/               # Định nghĩa 36 Argo CD Child Application
 │           ├── cluster/                # Ứng dụng cấu hình nền tảng cụm
 │           ├── addons/                 # Ứng dụng cài đặt các Helm Chart bên thứ ba
 │           ├── platform/               # Ứng dụng dịch vụ nền tảng (Postgres, Redis, Redpanda, Harbor, Logging)
@@ -209,7 +207,7 @@ k8s/
 │       ├── operations/                 # Python script job_ops.py, WorkflowTemplates submit/reconcile, NetworkPolicy
 │       ├── build/                      # WorkflowTemplate đóng gói mô hình Kaniko, ExternalSecret, NetworkPolicy
 │       ├── deploy/                     # WorkflowTemplate triển khai model endpoint, RBAC, NetworkPolicy cho serving
-│       ├── training/                   # WorkflowTemplate huấn luyện PyTorchJob, ExternalSecret, NetworkPolicy cho training
+│       ├── training/                   # WorkflowTemplate huấn luyện TrainJob, ExternalSecret, NetworkPolicy cho training
 │       └── evidently/                  # WorkflowTemplate kiểm tra data/model drift, ExternalSecret, NetworkPolicy
 ├── workloads/                               # Mã nguồn Kubernetes của các Microservices ứng dụng (Workloads Plane)
 │   ├── base/                           # Manifest cơ sở thuần túy (pure K8s, environment-agnostic)

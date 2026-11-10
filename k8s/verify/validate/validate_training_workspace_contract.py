@@ -10,23 +10,23 @@ ROOT = Path(__file__).resolve().parents[3]
 
 @pytest.mark.validate
 def validate_training_input_is_a_real_readonly_mount():
-    workflow = next(item for item in yaml.safe_load_all((ROOT / "k8s/argo/workflows/training/workflow.yaml").read_text(encoding="utf-8")) if item["metadata"]["name"] == "mlops-paas-training-pipeline-template")
-    templates = {template["name"]: template for template in workflow["spec"]["templates"]}
-    for name in ("cpu-pytorch-job", "gpu-pytorch-job"):
-        raw = templates[name]["resource"]["manifest"]
-        job = yaml.safe_load(re.sub(r"\{\{.*?\}\}", "placeholder", raw))
-        pod = job["spec"]["pytorchReplicaSpecs"]["Master"]["template"]["spec"]
-        assert pod["automountServiceAccountToken"] is False
-        assert pod["securityContext"]["runAsNonRoot"] is True
-        runner = pod["containers"][0]
-        init = pod["initContainers"][0]
-        assert init["command"] == ["python", "-m", "src.prepare"]
-        assert runner["volumeMounts"] == [{"name": "training-input", "mountPath": "/prepared", "readOnly": True}]
-        assert init["volumeMounts"] == [{"name": "training-input", "mountPath": "/prepared"}]
-        assert all("hostPath" not in volume for volume in pod["volumes"])
-        assert runner["securityContext"]["capabilities"]["drop"] == ["ALL"]
-        assert "RUNTIME_CONFIG_CAPABILITY" not in {item["name"] for item in init["env"]}
-        assert {item["name"] for item in runner["env"]} >= {"INPUT_CONTRACT", "PREPARED_INPUT_DIR", "RUNTIME_CONFIG_URL", "RUNTIME_CONFIG_CAPABILITY"}
+    from ..trainer import runtime_pod, trainjob, patch_pod
+    pod = runtime_pod()
+    assert pod["automountServiceAccountToken"] is False
+    assert pod["securityContext"]["runAsNonRoot"] is True
+    runner, init = pod["containers"][0], pod["initContainers"][0]
+    assert runner["name"] == "node" and init["command"] == ["python", "-m", "src.prepare"]
+    assert runner["image"] == init["image"]
+    mounts = {m["name"]: m for m in runner["volumeMounts"]}
+    assert mounts["training-input"]["readOnly"] is True
+    assert init["volumeMounts"] == [{"name": "training-input", "mountPath": "/prepared"}]
+    assert all("hostPath" not in volume for volume in pod["volumes"])
+    assert runner["securityContext"]["capabilities"]["drop"] == ["ALL"]
+    for name in ("cpu-train-job", "gpu-train-job"):
+        job = trainjob(name)
+        init_vars = {e["name"] for e in patch_pod(job)["spec"]["initContainers"][0]["env"]}
+        assert "RUNTIME_CONFIG_CAPABILITY" not in init_vars
+        assert {e["name"] for e in job["spec"]["trainer"]["env"]} >= {"INPUT_CONTRACT", "RUNTIME_CONFIG_URL", "RUNTIME_CONFIG_CAPABILITY"}
 
 
 @pytest.mark.validate

@@ -61,7 +61,7 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: kubeflow
+  name: kubeflow-system
 ---
 apiVersion: v1
 kind: Namespace

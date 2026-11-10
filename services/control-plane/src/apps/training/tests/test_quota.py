@@ -110,6 +110,21 @@ def test_unconfirmed_runtime_timing_keeps_reservation(job):
     assert TrainingQuotaReservation.objects.get(job_id=job.public_id).active
 
 
+def test_confirmed_tombstone_releases_never_started_job_without_charging(job):
+    reserve_locked(job)
+    job.external_job_id = f"training-{job.public_id}"
+    with transaction.atomic():
+        lock_owner(job.owner_id)
+        update_observation(job, never_started=True)
+    assert TrainingQuotaReservation.objects.get(job_id=job.public_id).active
+    with transaction.atomic():
+        lock_owner(job.owner_id)
+        assert update_observation(job, stopped=True, never_started=True)
+    reservation = TrainingQuotaReservation.objects.get(job_id=job.public_id)
+    assert not reservation.active
+    assert all(row.used_seconds == row.reserved_seconds == 0 for row in reservation.weeks.all())
+
+
 def test_utc_reset_and_local_unlimited(job, settings):
     assert week_start(datetime(2026, 11, 9, 1, tzinfo=dt_timezone.utc)) == datetime(2026, 11, 9, tzinfo=dt_timezone.utc)
     settings.TRAINING_BACKEND = "docker"

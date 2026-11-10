@@ -54,7 +54,7 @@ def test_argo_training_backend_records_runtime_selectors():
     assert job.tracking["runtime"] == {
         "backend": "argo",
         "namespace": "mlops-paas-training",
-        "pytorch_job_name": runtime_name,
+        "train_job_name": runtime_name,
         "workflow_selector": expected_selector,
         "pod_selector": expected_selector,
     }
@@ -88,6 +88,8 @@ def test_argo_cancel_uses_job_bound_callback_capability(settings):
     assert result["dispatched"] is True
     assert payload["job_id"] == str(job.public_id)
     assert payload["job_name"] == f"training-{job.public_id}"
+    assert payload["tenant_id"] == job.owner.tenant_id
+    assert payload["project_id"] == str(project.public_id)
     assert "namespace" not in payload
     assert payload["control_plane_callback_url"].endswith(
         f"/internal/webhooks/training-jobs/{job.public_id}/cancellation/"

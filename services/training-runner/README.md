@@ -22,7 +22,7 @@ Thư mục `services/training-runner/` chứa mã nguồn của **Training Runne
 
 ### 1.1. Vai trò trong hệ thống
 
-Trong kiến trúc MLOps PaaS, Training Runner là thành phần trực tiếp thi hành các bài toán huấn luyện được giao bởi Control Plane (thông qua Docker Container ở môi trường local hoặc Kubernetes `PyTorchJob` / Argo Workflow có gắn GPU trên Production):
+Trong kiến trúc MLOps PaaS, Training Runner là thành phần trực tiếp thi hành các bài toán huấn luyện được giao bởi Control Plane (thông qua Docker Container ở môi trường local hoặc Kubernetes `TrainJob` / Argo Workflow có gắn GPU trên Production):
 
 1. **Môi trường Thực thi Cô lập Cho Tác vụ Người dùng (Untrusted Workload Sandbox):**
    - Mã nguồn huấn luyện do người dùng tải lên được hệ thống xếp vào diện "không tin cậy" (Untrusted Tenant Code). Training Runner chạy trong container cách ly, **tuyệt đối không nắm giữ AWS credentials, mật khẩu cơ sở dữ liệu hệ thống, hoặc quyền truy cập trực tiếp vào các dịch vụ cốt lõi**.
@@ -45,7 +45,7 @@ Trong kiến trúc MLOps PaaS, Training Runner là thành phần trực tiếp t
 |                               CONTROL PLANE                                 |
 |   1. Nhận yêu cầu huấn luyện từ người dùng -> Lưu TrainingJob (PENDING)     |
 |   2. Sinh Capability Token & Presigned URLs cho Job                         |
-|   3. Kích hoạt Worker qua Docker SDK (Local) hoặc PyTorchJob/Argo (K8s)     |
+|   3. Kích hoạt Worker qua Docker SDK (Local) hoặc TrainJob/Argo (K8s)     |
 +-----------------------------------------------------------------------------+
                                        │
                                        ▼

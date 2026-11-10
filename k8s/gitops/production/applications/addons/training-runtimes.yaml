@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-addon-training-runtimes
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '-22'
+  labels:
+    app.kubernetes.io/name: training-runtimes
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: training-runtimes
+    mlops-paas.io/plane: addon
+spec:
+  project: mlops-addons
+  info:
+  - name: Owner
+    value: Platform Engineering
+  - name: Source
+    value: k8s/argo/runtimes/training
+  - name: Runbook
+    value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/docs/dev/trainer-v2.md
+  source:
+    repoURL: https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
+    targetRevision: main
+    path: k8s/argo/runtimes/training
+    directory:
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubeflow-system

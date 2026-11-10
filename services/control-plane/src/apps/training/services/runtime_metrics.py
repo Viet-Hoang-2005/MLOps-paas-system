@@ -93,7 +93,7 @@ def _vector(client, expression, *, pod=None, gpu=False):
         return None
     if pod and (labels.get("namespace") != "mlops-paas-training" or labels.get("pod") != pod):
         return None
-    if gpu and (labels.get("container") != "pytorch" or not labels.get("UUID")):
+    if gpu and (labels.get("container") != "node" or not labels.get("UUID")):
         return None
     number = _finite(value[1])
     return (number, labels) if number is not None else None
@@ -115,7 +115,7 @@ def _prometheus_snapshot(job, client=None):
     pod = pods[0].get("metric", {}).get("pod")
     if not pod or pods[0].get("metric", {}).get("namespace") != ns:
         return None
-    labels = f'namespace={json.dumps(ns)},pod={json.dumps(pod)},container="pytorch"'
+    labels = f'namespace={json.dumps(ns)},pod={json.dumps(pod)},container="node"'
     cgroup = f'{labels},job="kubelet",metrics_path="/metrics/cadvisor"'
     # Rate requires two scrapes; the freshness guard rejects stale cAdvisor/DCGM samples.
     cpu_base = f'container_cpu_usage_seconds_total{{{cgroup}}}'

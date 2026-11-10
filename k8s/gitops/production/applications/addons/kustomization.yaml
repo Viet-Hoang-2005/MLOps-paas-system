@@ -16,7 +16,8 @@ resources:
   - kyverno.yaml
   - karpenter-crds.yaml
   - karpenter.yaml
-  - kubeflow-training.yaml
+  - kubeflow-trainer.yaml
+  - training-runtimes.yaml
   - node-feature-discovery.yaml
   - gpu-operator.yaml
   - headlamp.yaml

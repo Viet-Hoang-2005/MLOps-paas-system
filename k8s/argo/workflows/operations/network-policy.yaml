@@ -28,7 +28,7 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # 2. Kubernetes API Server nội bộ (để submit/reconcile Workflows và PyTorchJobs)
+    # 2. Kubernetes API Server nội bộ (để submit/reconcile Workflows và TrainJobs)
     - to:
         - namespaceSelector:
             matchLabels:

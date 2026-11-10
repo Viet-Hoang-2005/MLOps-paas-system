@@ -12,6 +12,7 @@ class ObservationSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=["running", "completed", "failed", "not_found", "stopped", "error"])
     started_at = serializers.DateTimeField(required=False, allow_null=True)
     finished_at = serializers.DateTimeField(required=False, allow_null=True)
+    never_started = serializers.BooleanField(required=False, default=False)
     error = serializers.CharField(max_length=1000, required=False, allow_blank=True)
 
 

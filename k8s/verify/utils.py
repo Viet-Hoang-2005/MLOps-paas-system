@@ -41,7 +41,7 @@ PRODUCTION_NAMESPACES = {
     "headlamp",
     "karpenter",
     "keda",
-    "kubeflow",
+    "kubeflow-system",
     "kyverno",
     "monitoring",
     "mlops-logging",
@@ -231,6 +231,15 @@ class ValidationContext:
         with self._lock:
             if path in self._kustomize_cache:
                 return self._kustomize_cache[path]
+        directory = self.render_root / path
+        if not any((directory / name).exists() for name in ("kustomization.yaml", "kustomization.yml", "Kustomization")):
+            resources = [resource for file in sorted(directory.glob("*.yaml"))
+                         for resource in yaml_documents(file.read_text(encoding="utf-8"))]
+            if not resources:
+                raise RenderError(f"Git directory source contains no manifests: {path}")
+            with self._lock:
+                self._kustomize_cache[path] = resources
+            return resources
         if shutil.which("kustomize"):
             command = ["kustomize", "build", "--enable-helm", path]
         elif shutil.which("kubectl"):

@@ -144,7 +144,7 @@ class ArgoTrainingBackend(_ArgoBackend):
             "runtime": {
                 "backend": "argo",
                 "namespace": "mlops-paas-training",
-                "pytorch_job_name": runtime_name,
+                "train_job_name": runtime_name,
                 "workflow_selector": f"mlops-paas.io/training-job-id={job.public_id}",
                 "pod_selector": f"mlops-paas.io/training-job-id={job.public_id}",
             },
@@ -202,6 +202,8 @@ class ArgoTrainingBackend(_ArgoBackend):
                 {
                     "job_id": str(job.public_id),
                     "job_name": job.external_job_id or f"training-{str(job.public_id).lower()}",
+                    "project_id": job.runtime_project_id,
+                    "tenant_id": job.owner.tenant_id,
                     "control_plane_callback_url": (
                         f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/"
                         f"training-jobs/{job.public_id}/cancellation/"

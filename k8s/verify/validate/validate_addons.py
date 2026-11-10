@@ -68,28 +68,17 @@ def validate_helm_addon_sources(context: ValidationContext) -> None:
 
 
 @pytest.mark.validate
-def validate_kubeflow_training_addon(repo_root: Path) -> None:
-    """Verify Kubeflow training addon patch and resources (pure static, no remote git clone)."""
-    patch_file = repo_root / "k8s/addons/kubeflow-training/deployment-patch.yaml"
-    assert patch_file.is_file(), "deployment-patch.yaml missing in k8s/addons/kubeflow-training"
-    docs = load_yaml_documents(patch_file)
-    assert docs, "deployment-patch.yaml contains no valid YAML documents"
-    deployment = docs[0]
-    labels = (deployment.get("metadata") or {}).get("labels") or {}
-    missing = STANDARD_APP_LABELS - set(labels.keys())
-    assert not missing, f"Kubeflow training-operator missing app labels: {missing}"
-    assert labels.get("mlops-paas.io/plane") == "addon", "Kubeflow plane must be 'addon'"
-
-    # Verify kustomization references deployment-patch.yaml
-    kust_file = repo_root / "k8s/addons/kubeflow-training/kustomization.yaml"
-    kust_docs = load_yaml_documents(kust_file)
-    assert kust_docs, "kustomization.yaml in kubeflow-training is empty"
-    patches = kust_docs[0].get("patches") or []
-    has_deploy_patch = any(
-        isinstance(p, dict) and p.get("path") == "deployment-patch.yaml"
-        for p in patches
-    )
-    assert has_deploy_patch, "Kubeflow kustomization must reference deployment-patch.yaml"
+def validate_kubeflow_trainer_addon(repo_root: Path) -> None:
+    application = load_yaml_documents(repo_root / "k8s/gitops/production/applications/addons/kubeflow-trainer.yaml")[0]
+    source = application["spec"]["source"]
+    assert source["repoURL"] == "ghcr.io/kubeflow/charts"
+    assert source["chart"] == "kubeflow-trainer" and source["targetRevision"] == "2.3.0"
+    values = yaml.safe_load(source["helm"]["values"])
+    assert values["crds"]["enabled"] and values["jobset"]["install"]
+    assert values["jobset"]["image"]["tag"] == "v0.12.0"
+    assert not values["runtimes"]["defaultEnabled"] and not values["dataCache"]["enabled"]
+    assert application["spec"]["destination"]["namespace"] == "kubeflow-system"
+    assert not (repo_root / "k8s/addons/kubeflow-training/kustomization.yaml").exists()
 
 
 @pytest.mark.validate

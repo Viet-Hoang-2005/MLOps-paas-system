@@ -5,14 +5,17 @@ import os
 import re
 import ssl
 import sys
+import time
 import urllib.error
-import urllib.request
 import urllib.parse
+import urllib.request
 from pathlib import Path
 
 UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 EXECUTION_NS = "mlops-paas-execution"
 TRAINING_NS = "mlops-paas-training"
+TRAINER_API = "trainer.kubeflow.org/v1alpha1"
+TRAINING_CONTAINER = "node"
 # A tombstone is only a terminated Workflow without Pods. It must outlive any
 # replay of the original submit event, otherwise the event recreates the job.
 TOMBSTONE_TTL_SECONDS = 7 * 24 * 3600
@@ -66,7 +69,7 @@ def runtime_times(pods, kind):
     started, finished = [], []
     for pod in pods:
         for container in pod.get("status", {}).get("containerStatuses", []):
-            if container.get("name") != ("pytorch" if kind == "training" else "main"):
+            if container.get("name") != (TRAINING_CONTAINER if kind == "training" else "main"):
                 continue
             state = container.get("state", {})
             timestamp = state.get("running", state.get("terminated", {})).get("startedAt")
@@ -129,33 +132,94 @@ def cancel_build(api, payload):
                     raise
 
 
+def trainjob_path(name):
+    return f"/apis/{TRAINER_API}/namespaces/{TRAINING_NS}/trainjobs/{name}"
+
+
+def training_condition(job):
+    conditions = (job or {}).get("status", {}).get("conditions", [])
+    if any(c.get("type") == "Failed" and str(c.get("status")).lower() == "true" for c in conditions):
+        return "failed"
+    if any(c.get("type") == "Complete" and str(c.get("status")).lower() == "true" for c in conditions):
+        return "completed"
+    return None
+
+
+def wait_training(api, payload, *, sleep=time.sleep):
+    name, labels = identity(payload, "training")
+    while True:
+        try:
+            job = api.request("GET", trainjob_path(name))
+        except (RuntimeError, OSError):
+            sleep(5)
+            continue
+        if not job:
+            raise RuntimeError("Training workload disappeared before completion.")
+        verify(job, labels)
+        state = training_condition(job)
+        if state == "completed":
+            return
+        if state == "failed":
+            raise RuntimeError("TrainJob failed.")
+        sleep(5)
+
+
+def _owned_list(api, path, selector, labels):
+    resources = api.request("GET", f"{path}?{selector}")["items"]
+    for resource in resources:
+        verify(resource, labels)
+    return resources
+
+
+def _delete_owned(api, path, resource):
+    uid = resource["metadata"]["uid"]
+    api.request("DELETE", path, {"preconditions": {"uid": uid}, "propagationPolicy": "Foreground"})
+
+
 def reconcile(api, payload):
     kind = payload["kind"]
     name, labels = identity(payload, kind)
     workflow = api.request("GET", workflow_path(name))
     if workflow:
         verify(workflow, labels)
-    workload_path = f"/apis/kubeflow.org/v1/namespaces/{TRAINING_NS}/pytorchjobs/{name}"
+    workload_path = trainjob_path(name)
     job = api.request("GET", workload_path) if kind == "training" else None
     if job:
         verify(job, labels)
     pod_ns = TRAINING_NS if kind == "training" else EXECUTION_NS
     selector = urllib.parse.urlencode({"labelSelector": ",".join(f"{key}={value}" for key, value in labels.items())})
     pods_path = f"/api/v1/namespaces/{pod_ns}/pods"
-    pods = api.request("GET", f"{pods_path}?{selector}")["items"]
-    for pod in pods:
-        verify(pod, labels)
+    pods = _owned_list(api, pods_path, selector, labels)
     result = runtime_times(pods, kind)
+    # Preserve trusted pod timing across foreground GC, worker restarts and repeated cancellation.
+    annotations = (workflow or {}).get("metadata", {}).get("annotations", {})
+    for key in ("started_at", "finished_at"):
+        if key not in result and annotations.get(f"mlops-paas.io/{key}"):
+            result[key] = annotations[f"mlops-paas.io/{key}"]
+    children = []
+    if kind == "training":
+        for group, resource in (("jobset.x-k8s.io/v1alpha2", "jobsets"), ("batch/v1", "jobs")):
+            path = f"/apis/{group}/namespaces/{TRAINING_NS}/{resource}"
+            children.append((path, _owned_list(api, path, selector, labels)))
+    if workflow and result:
+        api.request("PATCH", workflow_path(name), {"metadata": {"annotations": {
+            f"mlops-paas.io/{key}": value for key, value in result.items()
+        }}})
     if payload.get("stop"):
+        never_started = annotations.get("mlops-paas.io/never-started") == "true"
         if not workflow:
             # A tombstone prevents an already-delivered submit event from recreating work.
             tombstone = {"apiVersion": "argoproj.io/v1alpha1", "kind": "Workflow",
                 "metadata": {"name": name, "namespace": EXECUTION_NS, "labels": labels},
                 "spec": {"shutdown": "Terminate", "workflowTemplateRef": {"name": "mlops-paas-job-tombstone-template"},
                          "ttlStrategy": {"secondsAfterCompletion": TOMBSTONE_TTL_SECONDS}, "podGC": {"strategy": "OnPodCompletion"}}}
-            api.request("POST", workflow_path(), tombstone)
+            created = api.request("POST", workflow_path(), tombstone)
             workflow = api.request("GET", workflow_path(name))
             verify(workflow, labels)
+            # Only a newly created tombstone proves that no submit ever won this name.
+            never_started = bool(created and not job and not pods and not any(items for _, items in children))
+            if never_started:
+                api.request("PATCH", workflow_path(name), {"metadata": {"annotations": {"mlops-paas.io/never-started": "true"}}})
         for attempt in range(3):
             try:
                 api.request("PATCH", workflow_path(name), {"spec": {"shutdown": "Terminate"}})
@@ -166,26 +230,39 @@ def reconcile(api, payload):
                 workflow = api.request("GET", workflow_path(name))
                 if not workflow:
                     break
+        if result:
+            api.request("PATCH", workflow_path(name), {"metadata": {"annotations": {
+                f"mlops-paas.io/{key}": value for key, value in result.items()
+            }}})
         if job:
-            api.request("DELETE", workload_path, {"preconditions": {"uid": job["metadata"]["uid"]}})
+            _delete_owned(api, workload_path, job)
+        for path, resources in children:
+            for child in resources:
+                _delete_owned(api, f"{path}/{child['metadata']['name']}", child)
         for pod in pods:
-            api.request("DELETE", f"{pods_path}/{pod['metadata']['name']}", {"preconditions": {"uid": pod["metadata"]["uid"]}})
-        remaining = api.request("GET", f"{pods_path}?{selector}")["items"]
+            _delete_owned(api, f"{pods_path}/{pod['metadata']['name']}", pod)
+        remaining = _owned_list(api, pods_path, selector, labels)
+        remaining_children = any(_owned_list(api, path, selector, labels) for path, _ in children)
         remaining_job = api.request("GET", workload_path) if kind == "training" else None
         if remaining_job:
             verify(remaining_job, labels)
         workflow = api.request("GET", workflow_path(name))
         if workflow:
             verify(workflow, labels)
-        terminating = workflow and workflow.get("status", {}).get("phase") in {"Running", "Pending"}
-        return {**result, "status": "error", "error": "Runtime cleanup is pending."} if remaining or remaining_job or terminating else {**result, "status": "stopped"}
-    conditions = (job or {}).get("status", {}).get("conditions", [])
-    succeeded = any(c["type"] == "Succeeded" and str(c["status"]).lower() == "true" for c in conditions)
-    failed = any(c["type"] == "Failed" and str(c["status"]).lower() == "true" for c in conditions)
+        never_started = never_started and not result.get("started_at")
+        # A Workflow with no observed phase can still have an in-flight resource step.
+        # Only our never-started tombstone may be considered stopped before a terminal phase.
+        terminating = workflow and workflow.get("status", {}).get("phase") not in {"Succeeded", "Failed", "Error"} and not never_started
+        if remaining or remaining_job or remaining_children or terminating:
+            return {**result, "status": "error", "error": "Runtime cleanup is pending."}
+        return {**result, "status": "stopped", "never_started": never_started}
+    condition = training_condition(job)
     phase = (workflow or {}).get("status", {}).get("phase")
-    if succeeded or phase == "Succeeded":
+    if condition == "failed":
+        return {**result, "status": "failed", "error": "TrainJob failed."}
+    if condition == "completed" or (kind != "training" and phase == "Succeeded"):
         return {**result, "status": "completed"}
-    if failed or phase in {"Failed", "Error"}:
+    if phase in {"Failed", "Error"}:
         return {**result, "status": "failed", "error": "Argo workload failed."}
     return {**result, "status": "running" if workflow or job else "not_found"}
 
@@ -193,6 +270,16 @@ def reconcile(api, payload):
 def main():
     payload = json.loads(os.environ["EXECUTION_PAYLOAD"])
     api = Kubernetes()
+    if sys.argv[1] == "wait-training":
+        wait_training(api, payload)
+        return
+    if sys.argv[1] == "cancel-training":
+        deadline = time.monotonic() + 120
+        while time.monotonic() < deadline:
+            if reconcile(api, {**payload, "stop": True})["status"] == "stopped":
+                return
+            time.sleep(2)
+        raise RuntimeError("Runtime cleanup is pending.")
     if sys.argv[1] == "submit":
         if os.environ["EXECUTION_KIND"] == "cancel-build":
             cancel_build(api, payload)
@@ -206,7 +293,7 @@ def main():
         raise ValueError("Invalid observation callback destination.")
     try:
         observation = reconcile(api, payload)
-    except Exception:
+    except (RuntimeError, ValueError, KeyError, TypeError, OSError):
         observation = {"status": "error", "error": "Argo observation unavailable."}
     request = urllib.request.Request(payload["callback_url"], method="POST", data=json.dumps(observation).encode(),
         headers={"Authorization": f"Bearer {payload['callback_token']}", "Content-Type": "application/json"})
@@ -217,6 +304,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception:
+    except (RuntimeError, ValueError, KeyError, TypeError, OSError):
         print("Execution operation unavailable.", file=sys.stderr)
         sys.exit(1)

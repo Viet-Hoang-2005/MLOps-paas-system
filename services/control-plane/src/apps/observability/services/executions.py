@@ -325,7 +325,7 @@ def apply_observation(kind, public_id, token, observation):
         if kind == "training" and current.backend == "argo":
             from apps.training.services.quota import update_observation
             quota_settled = update_observation(current, started_at=current.runtime_started_at, finished_at=finished,
-                                               stopped=observed == "stopped")
+                                               stopped=observed == "stopped", never_started=observation.get("never_started", False))
         now = timezone.now()
         dispatch_expired = bool(current.dispatch_deadline_at and (current.runtime_started_at or now) > current.dispatch_deadline_at)
         runtime_expired = bool(current.execution_deadline_at and now >= current.execution_deadline_at)

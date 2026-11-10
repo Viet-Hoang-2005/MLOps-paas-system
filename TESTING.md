@@ -284,7 +284,7 @@ ansible-playbook -i inventory/terraform.py site.yml --tags platform-training \
 ```
 
 Quy trình xác minh:
-1. Kubeflow Training Operator khởi chạy `PyTorchJob` trong namespace tạm thời `ansible-training-smoke`.
+1. Kubeflow Trainer v2 khởi chạy `TrainJob` trong namespace tạm thời `ansible-training-smoke`.
 2. Worker tải dữ liệu qua Presigned S3 URLs, thực thi huấn luyện và ghi log `METRIC_JSON`.
 3. Gói `training_output.zip` được đẩy lên S3 và gọi webhook callback về Control Plane.
 4. Sau khi hoàn thành, namespace tạm thời tự động bị dọn dẹp sạch sẽ và Karpenter thu hồi node nhàn rỗi.
