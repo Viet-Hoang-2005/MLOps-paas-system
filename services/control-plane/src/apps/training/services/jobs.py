@@ -17,7 +17,6 @@ from apps.training.tasks import (
 )
 from common.api.exceptions import Conflict, ServiceUnavailable
 from infrastructure.storage import S3Storage
-from infrastructure.storage.paths import training_job_prefix
 
 ACTIVE_STATUSES = {"pending", "queued", "uploading", "running", "cancelling"}
 
@@ -127,7 +126,6 @@ def _snapshot_data(project, job, storage):
 
 
 RETRY_FIELDS = (
-    "name",
     "model_flavor",
     "entry_point",
     "requirements_text",

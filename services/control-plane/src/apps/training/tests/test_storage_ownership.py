@@ -10,7 +10,7 @@ from apps.training.services.storage_scope import expected_training_uris
 def test_legacy_storage_scope_survives_project_detachment():
     owner = get_user_model().objects.create_user("storage-owner@example.test", "password")
     project = ModelProject.objects.create(owner=owner, name="Project")
-    job = TrainingJob.objects.create(project=project, name="Training", model_flavor="sklearn")
+    job = TrainingJob.objects.create(project=project, model_flavor="sklearn")
     before = expected_training_uris(job, "bucket")
     job.project = None
     job.save(update_fields=["project"])
@@ -21,7 +21,7 @@ def test_legacy_storage_scope_survives_project_detachment():
 @pytest.mark.django_db
 def test_tenant_storage_scope_does_not_depend_on_project():
     owner = get_user_model().objects.create_user("independent-owner@example.test", "password")
-    job = TrainingJob.objects.create(owner=owner, name="Training", model_flavor="sklearn", storage_layout="tenant")
+    job = TrainingJob.objects.create(owner=owner, model_flavor="sklearn", storage_layout="tenant")
     urls = expected_training_uris(job, "bucket")
     assert urls["code"] == f"s3://bucket/users/{owner.tenant_id}/training/jobs/{job.public_id}/input/code/source.zip"
     assert urls["output"].endswith("/output/model.tar.gz")

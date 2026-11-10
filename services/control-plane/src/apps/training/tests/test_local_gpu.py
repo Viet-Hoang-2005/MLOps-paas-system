@@ -194,7 +194,7 @@ def test_submit_checks_selected_device_before_queuing(settings, monkeypatch):
     settings.TRAINING_GPU_COUNTS = (1,)
     user = get_user_model().objects.create_user("gpu-submit-test@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
-    job = TrainingJob.objects.create(project=project, name="gpu", model_flavor="pytorch",
+    job = TrainingJob.objects.create(project=project, model_flavor="pytorch",
         accelerator_type="gpu", accelerator_count=1, local_gpu_id=GPU)
     check = Mock(side_effect=ValidationError({"local_gpu_id": "Selected GPU is unavailable."}))
     monkeypatch.setattr(local_gpu, "require_device", check)
@@ -240,7 +240,7 @@ def test_create_persists_only_a_verified_local_gpu(settings, monkeypatch):
     project = ModelProject.objects.create(owner=user, name="gpu project")
     client = APIClient()
     client.force_authenticate(user)
-    payload = {"project": str(project.public_id), "name": "gpu", "model_flavor": "pytorch",
+    payload = {"project": str(project.public_id),  "model_flavor": "pytorch",
                "accelerator_type": "gpu", "accelerator_count": 1, "local_gpu_id": GPU}
     response = client.post("/api/training-jobs/", payload, format="json")
     assert response.status_code == 201
@@ -259,7 +259,7 @@ def test_docker_dispatch_uses_exact_verified_uuid(settings, monkeypatch):
 
     user = get_user_model().objects.create_user("gpu-dispatch-test@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
-    job = TrainingJob(project=project, owner=project.owner, name="gpu", model_flavor="pytorch", accelerator_type="gpu",
+    job = TrainingJob(project=project, owner=project.owner, model_flavor="pytorch", accelerator_type="gpu",
                       accelerator_count=1, local_gpu_id=GPU)
     uris = expected_training_uris(job, "test-bucket")
     job.code_snapshot_uri, job.data_snapshot_uri, job.output_uri = uris["code"], uris["data"], uris["output"]

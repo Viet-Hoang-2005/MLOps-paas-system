@@ -11,20 +11,20 @@ export interface WorkspaceEntry {
   download_url?: string;
 }
 export interface TrainingWorkspace {
-  id: string; name: string; revision: number; entry_point: string;
+  id: string; revision: number; entry_point: string;
   entries: WorkspaceEntry[]; environment: Record<string, string>;
   secrets: { name: string; updated_at: string }[]; secrets_available: boolean;
 }
 const url = (id?: string) => controlPlaneURL(`/training-workspaces/${id ? `${id}/` : ""}`);
 export const createWorkspace = async () => (await apiClient.post<TrainingWorkspace>(url(), {})).data;
 export const getWorkspace = async (id: string) => (await apiClient.get<TrainingWorkspace>(url(id))).data;
-export const listWorkspaces = async () => (await apiClient.get<Pick<TrainingWorkspace, "id" | "name" | "revision">[]>(url())).data;
-export const updateWorkspace = async (id: string, revision: number, changes: Partial<Pick<TrainingWorkspace, "name" | "entry_point" | "environment">>) =>
+export const listWorkspaces = async () => (await apiClient.get<Pick<TrainingWorkspace, "id" | "revision">[]>(url())).data;
+export const updateWorkspace = async (id: string, revision: number, changes: Partial<Pick<TrainingWorkspace, "entry_point" | "environment">>) =>
   (await apiClient.patch<TrainingWorkspace>(url(id), { revision, ...changes })).data;
 export const listWorkspaceRuns = async (id: string) => (await apiClient.get<TrainingJob[]>(`${url(id)}runs/`)).data;
 export const runWorkspace = async (id: string, revision: number, runKey: string, values: TrainingJobFormValues) =>
   (await apiClient.post<TrainingJob>(`${url(id)}runs/`, {
-    revision, run_key: runKey, name: values.name, model_flavor: values.model_flavor,
+    revision, run_key: runKey, model_flavor: values.model_flavor,
     vcpu: values.vcpu, memory_mb: values.memory, max_runtime_seconds: values.max_runtime_seconds,
     accelerator_type: values.accelerator_type, accelerator_count: values.accelerator_count,
     accelerator_model: values.accelerator_model, local_gpu_id: values.local_gpu_id,

@@ -1,4 +1,4 @@
-import AdaptMLLogo from "@/assets/icons/AdaptML.png";
+import MLlifeLogo from "@/assets/icons/MLlife.png";
 import { AuthCard } from "@/features/auth/components/AuthCard";
 import { Divider } from "@/features/auth/components/Divider";
 import { OAuthButton } from "@/features/auth/components/OAuthButton";
@@ -47,7 +47,7 @@ export default function LoginPage() {
   return (
     <AuthCard>
       <div className="rounded-surface flex items-center justify-center mx-auto mb-2">
-        <img src={AdaptMLLogo} alt="AdaptML" className="w-8 h-8" />
+        <img src={MLlifeLogo} alt="MLlife" className="w-8 h-8" />
       </div>
 
       <h2 className="mb-1 text-center text-style-page-title font-bold text-color-foreground">

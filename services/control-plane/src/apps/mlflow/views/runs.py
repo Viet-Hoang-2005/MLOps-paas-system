@@ -47,7 +47,6 @@ class MLflowRunsCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        run_name = request.data.get("run_name") or "training-run"
         tags = request.data.get("tags") or []
         exp_id = request.data.get("experiment_id")
 
@@ -81,7 +80,7 @@ class MLflowRunsCreateView(APIView):
                     "info": {
                         "run_id": str(target_job.public_id),
                         "run_uuid": str(target_job.public_id),
-                        "run_name": run_name or target_job.name,
+                        "run_name": str(target_job.public_id),
                         "experiment_id": str(target_job.storage_project_id or target_job.public_id),
                         "status": "RUNNING",
                         "start_time": int((target_job.started_at or timezone.now()).timestamp() * 1000),
@@ -180,7 +179,7 @@ class MLflowRunsGetView(APIView):
                     "info": {
                         "run_id": str(job.public_id),
                         "run_uuid": str(job.public_id),
-                        "run_name": job.name,
+                        "run_name": str(job.public_id),
                         "experiment_id": str(job.storage_project_id or job.public_id),
                         "status": mlflow_status,
                         "start_time": int((job.started_at or timezone.now()).timestamp() * 1000),

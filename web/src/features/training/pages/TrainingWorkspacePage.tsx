@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/components/Button";
-import { Input } from "@/shared/components/Input";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { TerminalViewer } from "@/shared/components/TerminalViewer";
@@ -12,7 +11,7 @@ import { getApiErrorMessage } from "@/shared/api/errors";
 import { toast } from "@/shared/lib/toastStore";
 import { getTrainingStartError } from "@/features/training/api/quotaErrors";
 import { cancelTrainingJob, getTrainingRuntimeCapabilities } from "@/features/training/api/trainingApi";
-import { downloadRunOutput, getRunInput, getWorkspace, listWorkspaceRuns, runWorkspace, updateWorkspace } from "@/features/training/api/workspacesApi";
+import { downloadRunOutput, getRunInput, getWorkspace, listWorkspaceRuns, runWorkspace } from "@/features/training/api/workspacesApi";
 import { WorkspaceEditor, type WorkspaceEditorHandle } from "@/features/training/components/WorkspaceEditor";
 import { WorkspaceEnvironmentDialog } from "@/features/training/components/WorkspaceEnvironmentDialog";
 import { TrainingProjectAssignment } from "@/features/training/components/TrainingProjectAssignment";
@@ -32,7 +31,7 @@ export default function TrainingWorkspacePage() {
   const [environmentOpen, setEnvironmentOpen] = useState(false);
   const [cpuId, setCpuId] = useState(""); const [gpu, setGpu] = useState("none");
   const [runtime, setRuntime] = useState<number | null>(null); const [flavor, setFlavor] = useState<TrainingJobFormValues["model_flavor"]>("sklearn");
-  const [name, setName] = useState<string | null>(null); const [reset, setReset] = useState(0);
+  const [reset, setReset] = useState(0);
   const editor = useRef<WorkspaceEditorHandle>(null); const allowNavigation = useRef(false);
   const runKey = useRef<string | null>(null);
   const workspace = workspaceQuery.data;
@@ -42,8 +41,7 @@ export default function TrainingWorkspacePage() {
   const hasActiveRun = Boolean(runsQuery.data?.some(active));
   const isDraft = selectedRun === "draft";
   const locked = busy || editorBusy || hasActiveRun || !isDraft;
-  const nameDirty = name !== null && name !== workspace?.name;
-  const unsaved = dirty || nameDirty;
+  const unsaved = dirty;
   const blocker = useBlocker(({ currentLocation, nextLocation }) => unsaved && !allowNavigation.current && `${currentLocation.pathname}${currentLocation.search}` !== `${nextLocation.pathname}${nextLocation.search}`);
   useEffect(() => {
     if (!unsaved) return;
@@ -65,11 +63,10 @@ export default function TrainingWorkspacePage() {
     if (!workspace || !cpu || !accelerator || hasActiveRun || !isDraft) return;
     setBusy(true);
     try {
-      let revision = await editor.current!.saveAll();
-      if (nameDirty && name !== null) { const next = await updateWorkspace(workspaceId, revision, { name }); queryClient.setQueryData(workspaceKey, next); revision = next.revision; }
+      const revision = await editor.current!.saveAll();
       runKey.current ??= crypto.randomUUID();
       const job = await runWorkspace(workspaceId, revision, runKey.current, {
-        name: name ?? workspace.name, model_flavor: flavor, entry_point: workspace.entry_point,
+        model_flavor: flavor, entry_point: workspace.entry_point,
         requirements_text: "", vcpu: cpu.vcpu, memory: cpu.memory_mb, max_runtime_seconds: maxRuntime,
         accelerator_type: accelerator.type, accelerator_count: accelerator.type === "gpu" ? 1 : 0,
         accelerator_model: accelerator.model ?? "", local_gpu_id: accelerator.device_id ?? "", source_zip: null, training_data: null,
@@ -96,12 +93,11 @@ export default function TrainingWorkspacePage() {
     <PageHeader title={t("studio.title")} />
     <div className="flex flex-wrap items-center gap-3 rounded-surface border border-border bg-surface p-4">
       <span className="text-style-body-strong">1. {t("studio.runStep")}</span><span className="text-color-muted-foreground">→</span><span className="text-style-body-strong">2. {t("studio.assignProject")}</span>
-      <label className="ml-auto flex items-center gap-2 text-style-body"><span>{t("studio.history")}</span><select className={formSelect} value={selectedRun} disabled={busy} onChange={(event) => selectRun(event.target.value)}><option value="draft">{t("studio.draft")}</option>{runsQuery.data?.map((job, index) => <option key={job.id} value={job.id}>{`${(runsQuery.data?.length ?? 0) - index}. ${job.name} · ${job.status}`}</option>)}</select></label>
+      <label className="ml-auto flex items-center gap-2 text-style-body"><span>{t("studio.history")}</span><select className={formSelect} value={selectedRun} disabled={busy} onChange={(event) => selectRun(event.target.value)}><option value="draft">{t("studio.draft")}</option>{runsQuery.data?.map((job, index) => <option key={job.id} value={job.id}>{`${(runsQuery.data?.length ?? 0) - index}. ${job.id} · ${job.status}`}</option>)}</select></label>
     </div>
     {params.get("step") === "project" && selectedJob?.status === "completed" && selectedJob.output_available ?
       <TrainingProjectAssignment key={selectedJob.id} job={selectedJob} suggestedProject={params.get("project") ?? undefined} onBack={() => { const next = new URLSearchParams(params); next.delete("step"); setParams(next); }} onSaved={(job) => { void queryClient.invalidateQueries({ queryKey: ["models"] }); void queryClient.invalidateQueries({ queryKey: trainingQueryKeys.jobs() }); navigate(`/dashboard/training/jobs/${job.id}/overview`); }} /> : <>
       <div className="space-y-4 rounded-surface border border-border bg-surface p-4">
-        <Input label={t("studio.name")} value={selectedJob?.name ?? name ?? workspace.name} disabled={locked} onChange={(event) => setName(event.target.value)} />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <label className="space-y-2 text-style-body-strong"><span>{t("studio.cpu")}</span><select className={formSelect} value={selectedJob ? "snapshot" : cpu?.id ?? ""} disabled={locked} onChange={(event) => setCpuId(event.target.value)}>{selectedJob ? <option value="snapshot">{t("studio.cpuProfile", { cpu: selectedJob.vcpu, memory: selectedJob.memory_mb })}</option> : caps?.cpu_profiles.map((item) => <option key={item.id} value={item.id}>{t(`studio.profiles.${item.id}`)} · {t("studio.cpuProfile", { cpu: item.vcpu, memory: item.memory_mb })}</option>)}</select></label>
           <label className="space-y-2 text-style-body-strong"><span>{t("studio.gpu")}</span><select className={formSelect} value={selectedJob ? "snapshot" : gpu} disabled={locked} onChange={(event) => setGpu(event.target.value)}>{selectedJob ? <option value="snapshot">{selectedJob.local_gpu_id || selectedJob.accelerator_model || t("studio.cpuOnly")}</option> : accelerators.map((item) => <option key={gpuKey(item)} value={gpuKey(item)}>{item.type === "none" ? t("studio.cpuOnly") : item.device_id ? caps?.local_gpu?.devices.find((device) => device.id === item.device_id)?.name ?? item.device_id : `NVIDIA ${item.model === "t4" ? "T4 16 GB" : "A10G 24 GB"} ×1`}</option>)}</select></label>
@@ -123,6 +119,6 @@ export default function TrainingWorkspacePage() {
       <div className="flex justify-between gap-3"><Button variant="secondary" onClick={() => navigate("/dashboard/training")}>{t("studio.close")}</Button><Button disabled={selectedJob?.status !== "completed" || !selectedJob.output_available} onClick={() => { const next = new URLSearchParams(params); next.set("step", "project"); setParams(next); }}>{t("studio.next")}</Button></div>
     </>}
     {environmentOpen && <WorkspaceEnvironmentDialog workspace={workspace} onRefresh={refresh} onClose={() => setEnvironmentOpen(false)} />}
-    <ConfirmDialog open={blocker.state === "blocked"} title={t("studio.unsaved")} description={t("studio.discard")} confirmText={t("studio.close")} tone="danger" onCancel={() => { if (blocker.state === "blocked") blocker.reset(); }} onConfirm={() => { setDirty(false); setName(null); setReset((current) => current + 1); if (blocker.state === "blocked") blocker.proceed(); }} />
+    <ConfirmDialog open={blocker.state === "blocked"} title={t("studio.unsaved")} description={t("studio.discard")} confirmText={t("studio.close")} tone="danger" onCancel={() => { if (blocker.state === "blocked") blocker.reset(); }} onConfirm={() => { setDirty(false); setReset((current) => current + 1); if (blocker.state === "blocked") blocker.proceed(); }} />
   </section>;
 }

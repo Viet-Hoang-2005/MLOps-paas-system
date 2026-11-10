@@ -92,7 +92,6 @@ def completed_job(project, storage):
     code = storage.put("input/code.zip", b"code")
     job = TrainingJob.objects.create(
         project=project,
-        name="trained",
         model_flavor="xgboost",
         status="completed",
         entry_point="train.py",
@@ -220,7 +219,6 @@ def job_storage(monkeypatch, storage):
 
 def job_data(**extra):
     return {
-        "name": "fresh",
         "model_flavor": "sklearn",
         "entry_point": "train.py",
         "requirements_text": "",
@@ -276,7 +274,6 @@ def test_retry_job_copies_inputs_outside_any_transaction(project, job_storage, m
     code = job_storage.put("input/code.zip", b"code")
     failed = TrainingJob.objects.create(
         project=project,
-        name="failed",
         model_flavor="sklearn",
         status="failed",
         entry_point="train.py",
@@ -381,12 +378,11 @@ def test_stalled_deletions_are_dispatched_again(project, dispatch):
     stale_project = ModelProject.objects.create(owner=other_owner, name="gone", deletion_state="deleting")
     age(ModelProject, stale_project.pk)
     job = TrainingJob.objects.create(
-        project=project, name="j", model_flavor="sklearn", status="cancelled", deletion_requested_at=timezone.now()
+        project=project, model_flavor="sklearn", status="cancelled", deletion_requested_at=timezone.now()
     )
     TrainingJob.objects.filter(pk=job.pk).update(deletion_requested_at=timezone.now() - timedelta(hours=1))
     errored = TrainingJob.objects.create(
         project=project,
-        name="e",
         model_flavor="sklearn",
         status="cancelled",
         deletion_requested_at=timezone.now() - timedelta(hours=1),

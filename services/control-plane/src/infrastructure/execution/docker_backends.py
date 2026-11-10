@@ -95,7 +95,6 @@ class DockerTrainingBackend:
         self.storage = storage or S3Storage()
 
     def run(self, job):
-        project = job.project
         if job.accelerator_type == "gpu":
             from apps.training.services.local_gpu import require_device
             require_device(job.local_gpu_id, client=self.docker.client)

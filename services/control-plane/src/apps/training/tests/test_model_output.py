@@ -14,7 +14,6 @@ def completed_training_job(db):
     project = ModelProject.objects.create(owner=user, name="Output Project")
     job = TrainingJob.objects.create(
         project=project,
-        name="output-job",
         model_flavor="xgboost",
         status="completed",
         entry_point="train.py",

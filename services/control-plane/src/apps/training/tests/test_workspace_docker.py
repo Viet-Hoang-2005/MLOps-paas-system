@@ -13,7 +13,7 @@ from infrastructure.execution import workspace_docker
 @pytest.mark.django_db
 def test_preparation_is_async_and_main_container_mounts_only_job_input_read_only():
     user = get_user_model().objects.create_user("docker-workspace@example.test", "password")
-    job = TrainingJob.objects.create(owner=user, storage_layout="tenant", input_contract="workspace", backend="docker", status="queued", name="Workspace", model_flavor="sklearn")
+    job = TrainingJob.objects.create(owner=user, storage_layout="tenant", input_contract="workspace", backend="docker", status="queued", model_flavor="sklearn")
     uris = expected_training_uris(job, "bucket")
     job.code_snapshot_uri, job.data_snapshot_uri, job.output_uri = uris["code"], uris["data"], uris["output"]
     job.save()
@@ -66,7 +66,7 @@ def test_preparation_is_async_and_main_container_mounts_only_job_input_read_only
 def test_input_cleanup_refuses_foreign_volume():
     from common.api.exceptions import Conflict
     user = get_user_model().objects.create_user("volume-owner@example.test", "password")
-    job = TrainingJob.objects.create(owner=user, name="Job", model_flavor="sklearn", storage_layout="tenant")
+    job = TrainingJob.objects.create(owner=user, model_flavor="sklearn", storage_layout="tenant")
     volume = SimpleNamespace(attrs={"Labels": {"mlops_role": "input"}}, reload=Mock(), remove=Mock())
     client = SimpleNamespace(containers=SimpleNamespace(get=Mock(side_effect=docker.errors.NotFound("missing"))),
         volumes=SimpleNamespace(get=lambda name: volume))

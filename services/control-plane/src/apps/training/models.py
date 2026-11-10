@@ -13,7 +13,6 @@ class TrainingWorkspace(models.Model):
 
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="training_workspaces")
-    name = models.CharField(max_length=160, default="Untitled training")
     entry_point = models.CharField(max_length=512, blank=True)
     environment = models.JSONField(default=dict, blank=True)
     revision = models.PositiveIntegerField(default=1)
@@ -21,7 +20,7 @@ class TrainingWorkspace(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.name} ({self.public_id})"
+        return str(self.public_id)
 
 
 class TrainingWorkspaceEntry(models.Model):
@@ -108,7 +107,6 @@ class TrainingJob(ExecutionWatch):
         "ct.DatasetSnapshot", on_delete=models.SET_NULL, related_name="training_jobs", null=True, blank=True
     )
     recipe_version = models.CharField(max_length=80, blank=True)
-    name = models.CharField(max_length=160)
     model_flavor = models.CharField(max_length=40, choices=MODEL_FLAVORS)
     entry_point = models.CharField(max_length=512, default="train.py")
     requirements_text = models.TextField(blank=True)
@@ -146,7 +144,7 @@ class TrainingJob(ExecutionWatch):
         indexes = [models.Index(fields=["project", "status"], name="training_project_status_idx")]
 
     def __str__(self):
-        return f"{self.name} ({self.public_id})"
+        return str(self.public_id)
 
     def save(self, *args, **kwargs):
         # Legacy creation paths still supply only project. Keep ownership
@@ -182,6 +180,9 @@ class TrainingJob(ExecutionWatch):
 class LocalTrainingPool(models.Model):
     daemon_id = models.CharField(max_length=128, unique=True)
 
+    def __str__(self):
+        return self.daemon_id
+
 
 class LocalTrainingReservation(models.Model):
     pool = models.ForeignKey(LocalTrainingPool, on_delete=models.PROTECT, related_name="reservations")
@@ -191,6 +192,9 @@ class LocalTrainingReservation(models.Model):
     active = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     stopped_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return str(self.job_id)
 
 
 class TrainingQuotaReservation(models.Model):
@@ -346,4 +350,7 @@ class TrainingStorageCopy(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["job", "source_uri"], name="training_storage_copy_unique")]
+
+    def __str__(self):
+        return f"{self.job_id}: {self.source_uri}"
 

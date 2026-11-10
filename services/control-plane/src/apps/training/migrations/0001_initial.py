@@ -24,7 +24,6 @@ class Migration(migrations.Migration):
                 ('public_id', models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
                 ('trigger_kind', models.CharField(choices=[('manual', 'Manual'), ('retry', 'Retry'), ('maintenance', 'Maintenance')], default='manual', max_length=32)),
                 ('recipe_version', models.CharField(blank=True, max_length=80)),
-                ('name', models.CharField(max_length=160)),
                 ('model_flavor', models.CharField(choices=[('sklearn', 'Scikit-learn'), ('xgboost', 'XGBoost'), ('pytorch', 'PyTorch'), ('tensorflow', 'TensorFlow')], max_length=40)),
                 ('entry_point', models.CharField(default='train.py', max_length=512)),
                 ('requirements_text', models.TextField(blank=True)),

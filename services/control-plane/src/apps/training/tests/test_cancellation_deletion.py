@@ -20,7 +20,6 @@ def training_job(*, email="delete-training@example.com", status="completed"):
     project = ModelProject.objects.create(owner=owner, name=f"project-{email}")
     job = TrainingJob.objects.create(
         project=project,
-        name="training",
         model_flavor="sklearn",
         code_snapshot_uri="s3://bucket/code.zip",
         data_snapshot_uri="s3://bucket/data.csv",

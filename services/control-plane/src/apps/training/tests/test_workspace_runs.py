@@ -26,7 +26,7 @@ def draft(db, settings, monkeypatch):
     TrainingWorkspaceEntry.objects.create(workspace=workspace, relative_path="train.py", kind="script",
         s3_uri=item.uri, checksum=item.checksum, size_bytes=item.size_bytes)
     monkeypatch.setattr("apps.training.services.jobs._enqueue", lambda job: None)
-    values = {"name": "Run", "model_flavor": "sklearn", "vcpu": 1, "memory_mb": 2048,
+    values = {"model_flavor": "sklearn", "vcpu": 1, "memory_mb": 2048,
               "max_runtime_seconds": 900, "accelerator_type": "none", "accelerator_count": 0}
     return workspace, storage, values
 
@@ -40,9 +40,10 @@ def test_run_without_project_is_immutable_and_idempotent(draft):
     assert job.owner_id == workspace.owner_id
     assert job.status == "queued"
     assert job.input_contract == "workspace"
+    assert str(job) == str(job.public_id)
     assert run_workspace(workspace, revision=1, run_key=key, values=values, storage=storage).pk == job.pk
     with pytest.raises(Conflict):
-        workspaces.update_workspace(workspace, revision=1, changes={"name": "Changed"})
+        workspaces.update_workspace(workspace, revision=1, changes={"environment": {"EXAMPLE": "changed"}})
     with ZipFile(BytesIO(storage.objects[job.code_snapshot_uri])) as archive:
         assert archive.namelist() == ["train.py"]
     from apps.training.models import TrainingQuotaReservation

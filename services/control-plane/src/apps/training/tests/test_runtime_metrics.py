@@ -20,7 +20,7 @@ GPU = "GPU-01234567-89ab-cdef-0123-456789abcdef"
 def job(db):
     owner = get_user_model().objects.create_user("runtime@example.com")
     project = ModelProject.objects.create(owner=owner, name="Runtime")
-    return TrainingJob.objects.create(project=project, name="Train", model_flavor="pytorch", status="running",
+    return TrainingJob.objects.create(project=project, model_flavor="pytorch", status="running",
                                       backend="docker", external_job_id="container-1", vcpu=2, memory_mb=4096)
 
 

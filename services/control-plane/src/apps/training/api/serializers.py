@@ -78,7 +78,6 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "input_contract",
             "workspace_revision",
             "run_key",
-            "name",
             "model_flavor",
             "entry_point",
             "requirements_text",

@@ -7,7 +7,6 @@ import io
 import json
 import time
 import uuid
-import zipfile
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
@@ -54,7 +53,7 @@ def verify():
         if not capabilities["enabled"]:
             raise RuntimeError("Local training capacity is unavailable.")
         profile = min(capabilities["cpu_profiles"], key=lambda item: item["memory_mb"])
-        workspace = call("post", "/api/training-workspaces/", {"name": "Disposable workspace smoke"}, expected=201)
+        workspace = call("post", "/api/training-workspaces/", {}, expected=201)
         root = f"/api/training-workspaces/{workspace['id']}/"
         revision = workspace["revision"]
         for path, kind, payload in [
@@ -85,7 +84,7 @@ print("READ_ONLY_VERIFIED")
             result = call("post", root + "entries/", data, expected=201)
             revision = result["revision"]
         result = call("patch", root, {"revision": revision, "entry_point": "train.py", "environment": {"SMOKE_MARKER": "workspace"}})
-        payload = {"revision": result["revision"], "run_key": str(uuid.uuid4()), "name": "Read-only Input smoke",
+        payload = {"revision": result["revision"], "run_key": str(uuid.uuid4()),
             "model_flavor": "sklearn", "vcpu": profile["vcpu"], "memory_mb": profile["memory_mb"],
             "max_runtime_seconds": capabilities["runtime_options_seconds"][0], "accelerator_type": "none", "accelerator_count": 0}
         job = call("post", root + "runs/", payload, expected=201)
@@ -115,13 +114,14 @@ print("READ_ONLY_VERIFIED")
         project = ModelProject.objects.get(public_id=project_id)
 
         # A legacy object exercises copy+checksum+pointer migration on real S3.
-        legacy = TrainingJob(project=project, owner=owner, name="Legacy storage smoke", model_flavor="sklearn", status="completed", backend="docker")
+        legacy = TrainingJob(project=project, owner=owner, model_flavor="sklearn", status="completed", backend="docker")
         uris = expected_training_uris(legacy, storage.bucket)
         legacy.code_snapshot_uri, legacy.data_snapshot_uri = uris["code"], uris["data"]
         legacy.output_uri, legacy.mlflow_artifact_uri = uris["output"], uris["mlflow"]
         for key, data in (("code", b"source"), ("data", b"data"), ("output", model_bytes)):
             storage.put(storage.parse_uri(uris[key])[1], data)
-        legacy.save(); jobs.append(str(legacy.public_id))
+        legacy.save()
+        jobs.append(str(legacy.public_id))
         TrainingOutput.objects.create(job=legacy, kind="model", relative_path="model.tar.gz", s3_uri=legacy.output_uri)
         call("delete", f"/api/models/{project_id}/", expected=202)
         wait_for(lambda: not ModelProject.objects.filter(public_id=project_id).exists(), "Project cleanup")

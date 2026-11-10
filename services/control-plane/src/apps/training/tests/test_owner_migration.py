@@ -15,7 +15,7 @@ def test_existing_jobs_keep_owner_during_migration():
     job_model = old_apps.get_model("training", "TrainingJob")
     user = user_model.objects.create(email="migration-owner@example.test", tenant_id="migration-tenant")
     project = project_model.objects.create(owner_id=user.pk, name="Existing")
-    job = job_model.objects.create(project_id=project.pk, name="Existing job", model_flavor="sklearn")
+    job = job_model.objects.create(project_id=project.pk, model_flavor="sklearn")
 
     try:
         executor = MigrationExecutor(connection)

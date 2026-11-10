@@ -24,7 +24,7 @@ def _serialize_entry(entry):
 
 
 def _serialize(workspace, *, detail=False):
-    result = {"id": str(workspace.public_id), "name": workspace.name, "revision": workspace.revision,
+    result = {"id": str(workspace.public_id), "revision": workspace.revision,
               "entry_point": workspace.entry_point, "created_at": workspace.created_at.isoformat(),
               "updated_at": workspace.updated_at.isoformat()}
     if detail:
@@ -61,10 +61,7 @@ class WorkspaceListEndpoint(APIView):
         return Response([_serialize(item) for item in TrainingWorkspace.objects.filter(owner=request.user).order_by("-updated_at")])
 
     def post(self, request):
-        name = request.data.get("name", "Untitled training")
-        if not isinstance(name, str) or not name.strip() or len(name) > 160:
-            raise ValidationError({"name": "Enter a name of at most 160 characters."})
-        workspace = TrainingWorkspace.objects.create(owner=request.user, name=name.strip())
+        workspace = TrainingWorkspace.objects.create(owner=request.user)
         return Response(_serialize(workspace, detail=True), status=status.HTTP_201_CREATED)
 
 
@@ -73,7 +70,7 @@ class WorkspaceDetailEndpoint(APIView):
         return Response(_serialize(_workspace(request.user, workspace_id), detail=True))
 
     def patch(self, request, workspace_id):
-        changes = {field: request.data[field] for field in ("name", "entry_point", "environment") if field in request.data}
+        changes = {field: request.data[field] for field in ("entry_point", "environment") if field in request.data}
         if not changes:
             raise ValidationError("No workspace changes were provided.")
         workspace = service.update_workspace(_workspace(request.user, workspace_id), revision=request.data.get("revision"), changes=changes)
@@ -133,7 +130,6 @@ class WorkspaceSecretEndpoint(APIView):
 class WorkspaceRunSerializer(serializers.Serializer):
     revision = serializers.IntegerField(min_value=1)
     run_key = serializers.UUIDField()
-    name = serializers.CharField(max_length=160)
     model_flavor = serializers.ChoiceField(choices=["sklearn", "xgboost", "pytorch", "tensorflow"])
     vcpu = serializers.IntegerField(min_value=1)
     memory_mb = serializers.IntegerField(min_value=512)

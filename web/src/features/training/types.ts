@@ -50,7 +50,6 @@ export interface TrainingJob {
   project_id: ResourceId | null;
   workspace_id?: ResourceId | null;
   output_revision: number;
-  name: string;
   model_flavor: ModelFlavor;
   model_version: string;
   entry_point: string;
@@ -112,7 +111,6 @@ export interface TrainingJobDeletionRequest {
 
 export interface TrainingJobFormValues {
   reference_path?: string;
-  name: string;
   model_version?: string;
   model_flavor: ModelFlavor;
   entry_point: string;
@@ -273,7 +271,6 @@ export interface MetricHistorySeries {
 
 export interface TrainingJobExperimentMetricsResponse {
   job_id: ResourceId;
-  name: string;
   status: TrainingJobStatus;
   model_flavor: ModelFlavor;
   started_at?: string | null;
@@ -286,7 +283,6 @@ export interface TrainingJobExperimentMetricsResponse {
 
 export interface TrainingRunComparison {
   job_id: ResourceId;
-  name: string;
   status: TrainingJobStatus;
   model_flavor: ModelFlavor;
   runtime_seconds: number;

@@ -15,7 +15,7 @@ from ..auth import (
 
 def _job_experiment(job):
     from .runs import _mlflow_artifact_uri
-    return {"experiment_id": str(job.storage_project_id or job.public_id), "name": job.name,
+    return {"experiment_id": str(job.storage_project_id or job.public_id), "name": str(job.public_id),
             "artifact_location": _mlflow_artifact_uri(job), "lifecycle_stage": "active"}
 
 

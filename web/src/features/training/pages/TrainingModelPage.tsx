@@ -225,6 +225,19 @@ export default function TrainingModelPage() {
   const columns = useMemo<ColumnDef<TrainingJob>[]>(
     () => [
       {
+        accessorKey: "id",
+        header: t("detail.overview.internalJobId"),
+        cell: ({ row }) => (
+          <button
+            type="button"
+            className="break-all text-left font-medium hover:text-color-primary"
+            onClick={() => navigate(`/dashboard/training/jobs/${row.original.id}/overview`)}
+          >
+            {row.original.id}
+          </button>
+        ),
+      },
+      {
         accessorKey: "project_id",
         header: t("studio.project"),
         cell: ({ row }) => projects?.models.find((project) => project.id === row.original.project_id)?.name ?? t("studio.unassigned"),
@@ -374,7 +387,7 @@ export default function TrainingModelPage() {
       <PageHeader title={t("title")} />
       <div className="flex flex-wrap gap-3">
         <label className="space-y-2 text-style-body-strong"><span>{t("studio.project")}</span><select className="block h-11 rounded-control border border-input bg-surface px-3 text-style-body" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">{t("studio.allProjects")}</option><option value="unassigned">{t("studio.unassigned")}</option>{projects?.models.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
-        <label className="space-y-2 text-style-body-strong"><span>{t("studio.drafts")}</span><select className="block h-11 rounded-control border border-input bg-surface px-3 text-style-body" value="" onChange={(event) => { if (event.target.value) navigate(`/dashboard/training/workspaces/${event.target.value}`); }}><option value="">{t("studio.openDraft")}</option>{workspaces?.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select></label>
+        <label className="space-y-2 text-style-body-strong"><span>{t("studio.drafts")}</span><select className="block h-11 rounded-control border border-input bg-surface px-3 text-style-body" value="" onChange={(event) => { if (event.target.value) navigate(`/dashboard/training/workspaces/${event.target.value}`); }}><option value="">{t("studio.openDraft")}</option>{workspaces?.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.id}</option>)}</select></label>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -498,7 +511,7 @@ export default function TrainingModelPage() {
       <ConfirmDialog
         open={Boolean(jobToDelete)}
         title={t("delete.title")}
-        description={t("delete.description", { job: jobToDelete?.name ?? "" })}
+        description={t("delete.description", { job: jobToDelete?.id ?? "" })}
         confirmText={t("delete.confirm")}
         tone="danger"
         loading={deleteMutation.isPending}
@@ -510,7 +523,7 @@ export default function TrainingModelPage() {
       <ConfirmDialog
         open={Boolean(jobToRetry)}
         title={t("retryTitle")}
-        description={t("retryDescription", { job: jobToRetry?.name ?? "" })}
+        description={t("retryDescription", { job: jobToRetry?.id ?? "" })}
         confirmText={t("retryJob")}
         tone="default"
         loading={retryMutation.isPending}

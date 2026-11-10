@@ -5,6 +5,10 @@ has its own URL and editable draft; each Run saves the draft, checks its revisio
 and creates a separate immutable input archive and Training Job. While a job is
 active, workspace changes are rejected on both the frontend and backend.
 
+Workspaces and Training Jobs are identified by their public UUID (`id` in the
+API); neither has a display-name field. Lists, run history, notifications
+and MLflow run names use the job or workspace UUID.
+
 ## Workspace runtime contract
 
 | Environment variable | Contract |

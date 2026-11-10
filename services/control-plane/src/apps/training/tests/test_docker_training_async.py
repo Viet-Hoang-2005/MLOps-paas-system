@@ -19,7 +19,6 @@ class DockerTrainingAsyncTests(TestCase):
         self.project = ModelProject.objects.create(owner=self.owner, name="async-project")
         self.job = TrainingJob.objects.create(
             project=self.project,
-            name="async-training-job",
             model_flavor="sklearn",
             status="queued",
             backend="docker",

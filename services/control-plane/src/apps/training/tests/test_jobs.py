@@ -19,7 +19,6 @@ def test_training_job_paths_are_project_scoped(monkeypatch):
         "/api/training-jobs/",
         {
             "project": str(project.public_id),
-            "name": "nightly",
             "model_flavor": "xgboost",
             "requirements_text": "xgboost==2.0.3",
             "code_snapshot_uri": "s3://other-tenant/source.zip",
@@ -29,7 +28,11 @@ def test_training_job_paths_are_project_scoped(monkeypatch):
     )
 
     assert response.status_code == 201
+    assert "name" not in response.data
     job = TrainingJob.objects.get(public_id=response.data["id"])
+    assert str(job) == response.data["id"]
+    assert "name" not in client.get(f"/api/training-jobs/{job.public_id}/").data
+    assert all("name" not in row for row in client.get("/api/training-jobs/").data["results"])
     prefix = f"users/{user.tenant_id}/models/{project.public_id}/training/jobs/{job.public_id}"
     assert job.code_snapshot_uri.endswith(f"{prefix}/input/code/source.zip")
     assert job.data_snapshot_uri.endswith(f"{prefix}/input/data/data.zip")
@@ -76,7 +79,6 @@ def test_training_creation_and_submission_are_disabled_during_platform_validatio
     project = ModelProject.objects.create(owner=user, name="NIDS")
     job = TrainingJob.objects.create(
         project=project,
-        name="queued-job",
         model_flavor="xgboost",
         code_snapshot_uri="s3://bucket/source.zip",
         data_snapshot_uri="s3://bucket/train.csv",
@@ -89,7 +91,7 @@ def test_training_creation_and_submission_are_disabled_during_platform_validatio
     capabilities = client.get("/api/training-jobs/runtime-capabilities/")
     create = client.post(
         "/api/training-jobs/",
-        {"project": str(project.public_id), "name": "blocked", "model_flavor": "xgboost"},
+        {"project": str(project.public_id),  "model_flavor": "xgboost"},
         format="json",
     )
     submit = client.post(f"/api/training-jobs/{job.public_id}/submit/")
@@ -115,7 +117,6 @@ def test_training_job_list_reports_model_lifecycle_status():
     def create_job(name, status="completed"):
         return TrainingJob.objects.create(
             project=project,
-            name=name,
             model_flavor="sklearn",
             code_snapshot_uri=f"s3://bucket/{name}/source.zip",
             data_snapshot_uri=f"s3://bucket/{name}/data.csv",
@@ -186,7 +187,6 @@ def test_submit_job_requires_pending_status(monkeypatch):
 
     pending_job = TrainingJob.objects.create(
         project=project,
-        name="pending-job",
         model_flavor="sklearn",
         code_snapshot_uri="s3://bucket/source.zip",
         data_snapshot_uri="s3://bucket/train.csv",
@@ -206,7 +206,6 @@ def test_submit_job_requires_pending_status(monkeypatch):
     # Submitting a failed job fails with 409 Conflict
     failed_job = TrainingJob.objects.create(
         project=project,
-        name="failed-job",
         model_flavor="sklearn",
         code_snapshot_uri="s3://bucket/source.zip",
         data_snapshot_uri="s3://bucket/train.csv",
@@ -220,7 +219,6 @@ def test_submit_job_requires_pending_status(monkeypatch):
     # Submitting a cancelled job fails with 409 Conflict
     cancelled_job = TrainingJob.objects.create(
         project=project,
-        name="cancelled-job",
         model_flavor="sklearn",
         code_snapshot_uri="s3://bucket/source.zip",
         data_snapshot_uri="s3://bucket/train.csv",
@@ -249,7 +247,6 @@ def test_failed_job_retry_endpoint_creates_new_attempt(monkeypatch):
 
     failed_job = TrainingJob.objects.create(
         project=project,
-        name="failed-job",
         model_flavor="sklearn",
         code_snapshot_uri=code_file.uri,
         data_snapshot_uri=data_file.uri,

@@ -213,10 +213,6 @@ export default function TrainingJobOverviewPage() {
             value={job.external_job_id || job.sagemaker_job_name || "-"}
           />
           <MetadataRow
-            label={t("detail.overview.modelName")}
-            value={job.name}
-          />
-          <MetadataRow
             label={t("detail.overview.modelVersion")}
             value={job.model_version}
           />

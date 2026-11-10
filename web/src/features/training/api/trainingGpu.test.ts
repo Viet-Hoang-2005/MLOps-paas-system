@@ -11,7 +11,7 @@ describe("training GPU payload", () => {
       .mockResolvedValueOnce({ data: { id: "job-id" } })
       .mockResolvedValueOnce({ data: { id: "job-id", accelerator_model: model } });
     const result = await createTrainingJob({
-      name: "training", model_flavor: "pytorch", entry_point: "train.py", requirements_text: "",
+      model_flavor: "pytorch", entry_point: "train.py", requirements_text: "",
       vcpu: 4, memory: 8192, max_runtime_seconds: 3600, accelerator_type: "gpu",
       accelerator_count: 1, accelerator_model: model, local_gpu_id: "", source_zip: null, training_data: null,
       project_id: "project-id",
@@ -29,7 +29,7 @@ describe("training GPU payload", () => {
       .mockResolvedValueOnce({ data: { id: "job-id" } })
       .mockResolvedValueOnce({ data: { id: "job-id" } });
     await createTrainingJob({
-      name: "training", model_flavor: "pytorch", entry_point: "train.py", requirements_text: "",
+      model_flavor: "pytorch", entry_point: "train.py", requirements_text: "",
       vcpu: 2, memory: 4096, max_runtime_seconds: 3600, accelerator_type: "gpu",
       accelerator_count: 1, accelerator_model: "", local_gpu_id: "GPU-12345678-1234-1234-1234-123456789abc",
       source_zip: null, training_data: null, project_id: "project-id",

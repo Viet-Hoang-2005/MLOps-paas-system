@@ -104,7 +104,7 @@ function BuildDeploymentContent() {
       const project = projects.data?.models.find(
         (p) => p.id === job.project_id,
       );
-      const displayName = project ? `${project.name} · ${job.name}` : job.name;
+      const displayName = project ? `${project.name} · ${job.id}` : job.id;
       list.push({
         value: `training:${job.project_id}:${job.id}`,
         label: displayName,

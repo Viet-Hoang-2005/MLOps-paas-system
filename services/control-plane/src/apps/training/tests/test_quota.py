@@ -20,7 +20,7 @@ def job(db, settings):
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     owner = get_user_model().objects.create_user("quota@example.com")
     project = ModelProject.objects.create(owner=owner, name="quota")
-    return TrainingJob.objects.create(project=project, name="job", backend="argo", model_flavor="pytorch",
+    return TrainingJob.objects.create(project=project, backend="argo", model_flavor="pytorch",
                                       vcpu=2, memory_mb=4096, max_runtime_seconds=3600)
 
 
@@ -35,7 +35,7 @@ def test_reservation_and_concurrency_across_projects(job):
     resource = next(v for v in usage(job.project.owner)["resources"] if v["resource"] == "cpu_medium")
     assert resource["reserved_seconds"] == 3600 and resource["used_seconds"] == 0
     second = TrainingJob.objects.create(project=ModelProject.objects.create(owner=job.project.owner, name="second"),
-                                        name="job2", backend="argo", model_flavor="pytorch")
+                                         backend="argo", model_flavor="pytorch")
     with pytest.raises(TrainingConcurrencyExceeded):
         reserve_locked(second)
 
@@ -130,7 +130,7 @@ def test_submit_enforces_single_active_job_over_all_projects(job):
     job.status = "pending"
     job.save(update_fields=["status"])
     second = TrainingJob.objects.create(project=ModelProject.objects.create(owner=job.project.owner, name="other project"),
-                                        name="second", backend="argo", model_flavor="pytorch")
+                                         backend="argo", model_flavor="pytorch")
     client = APIClient()
     client.force_authenticate(job.project.owner)
     assert client.post(f"/api/training-jobs/{job.public_id}/submit/").status_code == 202
@@ -164,7 +164,7 @@ def test_postgres_simultaneous_submit_only_one_succeeds(job, monkeypatch):
     from apps.training.services.jobs import submit_job
     job.status = "pending"
     job.save(update_fields=["status"])
-    second = TrainingJob.objects.create(project=job.project, name="second", backend="argo", model_flavor="pytorch")
+    second = TrainingJob.objects.create(project=job.project, backend="argo", model_flavor="pytorch")
     monkeypatch.setattr("apps.training.services.jobs._enqueue", lambda _job: None)
     barrier = Barrier(2)
     def submit(job_id):

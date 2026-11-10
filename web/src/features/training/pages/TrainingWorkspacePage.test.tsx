@@ -21,8 +21,8 @@ vi.mock("@/features/training/components/WorkspaceEditor", async () => {
     return <div data-testid="workspace-editor" data-readonly={readOnly} />;
   }) };
 });
-const workspace = { id: "workspace", name: "Demo", revision: 1, entry_point: "train.py", entries: [], environment: {}, secrets: [], secrets_available: true };
-const job = { id: "run-one", name: "Demo", project_id: null, workspace_id: "workspace", status: "running", model_flavor: "sklearn", entry_point: "train.py", requirements_text: "", vcpu: 1, memory_mb: 2048, max_runtime_seconds: 900, accelerator_type: "none", outputs: [], output_available: false, output_revision: 1 } as unknown as TrainingJob;
+const workspace = { id: "workspace", revision: 1, entry_point: "train.py", entries: [], environment: {}, secrets: [], secrets_available: true };
+const job = { id: "run-one", project_id: null, workspace_id: "workspace", status: "running", model_flavor: "sklearn", entry_point: "train.py", requirements_text: "", vcpu: 1, memory_mb: 2048, max_runtime_seconds: 900, accelerator_type: "none", outputs: [], output_available: false, output_revision: 1 } as unknown as TrainingJob;
 const caps: TrainingRuntimeCapabilities = { enabled: true, backend: "argo", runtime_options_seconds: [900, 86400], cpu_profiles: [{ id: "small", vcpu: 1, memory_mb: 2048 }], accelerators: [{ type: "none", counts: [0] }, { type: "gpu", model: "t4", counts: [1] }, { type: "gpu", model: "a10g", counts: [1] }] };
 function show(language: "en" | "vi" = "en", query = "") {
   return renderWithProviders(<Routes><Route path="/training/workspaces/:workspaceId" element={<TrainingWorkspacePage />} /></Routes>, { language, initialEntries: [`/training/workspaces/workspace${query}`] });
@@ -43,6 +43,8 @@ describe("training workspace flow", () => {
     const [id, revision, key, payload] = mocks.run.mock.calls[0];
     expect(id).toBe("workspace"); expect(revision).toBe(6); expect(key).toEqual(expect.any(String));
     expect(payload).not.toHaveProperty("project_id");
+    expect(payload).not.toHaveProperty("name");
+    expect(screen.queryByLabelText(language === "en" ? "Name" : "Tên")).not.toBeInTheDocument();
     expect(payload.source_zip).toBeNull();
     await waitFor(() => expect(screen.getByTestId("workspace-editor")).toHaveAttribute("data-readonly", "true"));
     expect(screen.getByRole("button", { name: language === "en" ? "Continue" : "Tiếp tục" })).toBeDisabled();

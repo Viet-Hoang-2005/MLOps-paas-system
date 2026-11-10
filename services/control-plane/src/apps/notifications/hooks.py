@@ -18,8 +18,8 @@ def notify_training_result(job):
             if job.status == "failed"
             else Notification.Level.WARNING
         )
-        title = f"Training Job: {job.name} ({job.status})"
-        message = f"Training '{job.name}' completed with status '{job.status}'."
+        title = f"Training Job: {job.public_id} ({job.status})"
+        message = f"Training '{job.public_id}' completed with status '{job.status}'."
         create_notification(
             user=owner,
             type=Notification.Type.TRAINING,

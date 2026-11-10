@@ -39,6 +39,20 @@ def test_workspace_and_secrets_are_scoped_and_write_only(setup_workspace):
     assert client.put(url + "secrets/API_TOKEN/", {"revision": 2, "value": "replacement"}, format="json").status_code == 404
 
 
+def test_workspace_is_identified_by_uuid_without_a_name(setup_workspace):
+    import uuid
+    client, _, _, _ = setup_workspace
+    response = client.post("/api/training-workspaces/", {}, format="json")
+    assert response.status_code == 201
+    workspace_id = response.data["id"]
+    assert str(uuid.UUID(workspace_id)) == workspace_id
+    assert "name" not in response.data
+    workspace = TrainingWorkspace.objects.get(public_id=workspace_id)
+    assert str(workspace) == workspace_id
+    assert "name" not in client.get(f"/api/training-workspaces/{workspace_id}/").data
+    assert all("name" not in row for row in client.get("/api/training-workspaces/").data)
+
+
 def test_requirements_file_is_unique_and_cannot_be_replaced(setup_workspace):
     client, workspace, _, _ = setup_workspace
     url = f"/api/training-workspaces/{workspace.public_id}/"

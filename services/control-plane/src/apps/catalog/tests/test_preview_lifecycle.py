@@ -378,7 +378,6 @@ def test_training_build_provenance_survives_source_job_deletion(project):
     ref_file = storage.put("output/reference.csv", SimpleUploadedFile("reference.csv", b"x\n1\n"), "text/csv")
     job = TrainingJob.objects.create(
         project=project,
-        name="trained",
         model_flavor="xgboost",
         status="completed",
         entry_point="train.py",
@@ -521,7 +520,6 @@ def test_training_retry_preserves_frozen_inputs_not_updated_workspace(project, m
         inputs[kind] = storage.put(f"original/{name}", SimpleUploadedFile(name, content), "application/octet-stream")
     job = TrainingJob.objects.create(
         project=project,
-        name="retry",
         status="failed",
         model_flavor="xgboost",
         code_snapshot_uri=inputs["code"].uri,

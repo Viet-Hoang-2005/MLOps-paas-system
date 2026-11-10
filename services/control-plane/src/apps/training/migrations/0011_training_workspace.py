@@ -12,7 +12,6 @@ class Migration(migrations.Migration):
         migrations.CreateModel(name="TrainingWorkspace", fields=[
             ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
             ("public_id", models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
-            ("name", models.CharField(default="Untitled training", max_length=160)),
             ("entry_point", models.CharField(blank=True, max_length=512)),
             ("environment", models.JSONField(blank=True, default=dict)),
             ("revision", models.PositiveIntegerField(default=1)),

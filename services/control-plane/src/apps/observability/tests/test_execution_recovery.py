@@ -24,7 +24,7 @@ def job(db, settings):
     settings.DRIFT_EXECUTION_WATCH_ENABLED = True
     owner = get_user_model().objects.create_user("p1-test@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="P1")
-    return TrainingJob.objects.create(project=project, name="recovery", model_flavor="sklearn", backend="docker", status="queued")
+    return TrainingJob.objects.create(project=project, model_flavor="sklearn", backend="docker", status="queued")
 
 
 def backend_mock(monkeypatch):

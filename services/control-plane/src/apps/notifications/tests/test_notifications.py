@@ -6,12 +6,7 @@ from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.notifications.models import Notification
-from apps.notifications.services import (
-    create_notification,
-    delete_notification,
-    mark_all_notifications_as_read,
-    mark_notification_as_read,
-)
+from apps.notifications.services import create_notification
 
 
 @pytest.mark.django_db

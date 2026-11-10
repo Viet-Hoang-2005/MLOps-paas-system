@@ -88,7 +88,7 @@ def _lock(workspace, revision):
 
 def _bump(workspace):
     workspace.revision += 1
-    workspace.save(update_fields=["revision", "entry_point", "name", "environment", "updated_at"])
+    workspace.save(update_fields=["revision", "entry_point", "environment", "updated_at"])
 
 
 def _parent_exists(workspace, path):
@@ -164,11 +164,6 @@ def serialize_entries(entries):
 def update_workspace(workspace, *, revision, changes):
     with transaction.atomic():
         locked = _lock(workspace, revision)
-        if "name" in changes:
-            name = changes["name"]
-            if not isinstance(name, str) or not name.strip() or len(name) > 160:
-                raise ValidationError({"name": "Enter a name of at most 160 characters."})
-            locked.name = name.strip()
         if "entry_point" in changes:
             path = changes["entry_point"]
             if not isinstance(path, str):

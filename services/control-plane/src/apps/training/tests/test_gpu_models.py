@@ -67,11 +67,11 @@ def test_serializer_persists_gpu_model_and_response(settings, model):
     client.force_authenticate(user)
     request = client.get("/").wsgi_request
     request.user = user
-    serializer = TrainingJobSerializer(data={"project": str(project.public_id), "name": "gpu",
+    serializer = TrainingJobSerializer(data={"project": str(project.public_id),
         "model_flavor": "pytorch", "accelerator_type": "gpu", "accelerator_count": 1,
         "accelerator_model": model}, context={"request": request})
     assert serializer.is_valid(), serializer.errors
-    job = TrainingJob.objects.create(project=project, name="gpu", model_flavor="pytorch",
+    job = TrainingJob.objects.create(project=project, model_flavor="pytorch",
         accelerator_type="gpu", accelerator_count=1, accelerator_model=serializer.validated_data["accelerator_model"])
     job.refresh_from_db()
     assert TrainingJobSerializer(job).data["accelerator_model"] == model
@@ -90,7 +90,7 @@ def test_create_and_read_gpu_job_over_api(settings, monkeypatch, model):
     project = ModelProject.objects.create(owner=user, name="gpu project")
     client = APIClient()
     client.force_authenticate(user)
-    payload = {"project": str(project.public_id), "name": "gpu", "model_flavor": "pytorch",
+    payload = {"project": str(project.public_id),  "model_flavor": "pytorch",
         "accelerator_type": "gpu", "accelerator_count": 1, "accelerator_model": model}
     created = client.post("/api/training-jobs/", payload, format="json")
     assert created.status_code == 201
@@ -107,7 +107,7 @@ def test_submit_rejects_legacy_production_gpu_without_model(settings):
     settings.TRAINING_GPU_COUNTS = (1,)
     user = get_user_model().objects.create_user("gpu-legacy@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
-    job = TrainingJob.objects.create(project=project, name="old", model_flavor="pytorch",
+    job = TrainingJob.objects.create(project=project, model_flavor="pytorch",
         accelerator_type="gpu", accelerator_count=1, accelerator_model="", status="pending")
     client = APIClient()
     client.force_authenticate(user)
@@ -126,7 +126,7 @@ def test_argo_dispatch_includes_selected_gpu_model(settings, monkeypatch, model)
 
     user = get_user_model().objects.create_user("gpu-dispatch@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
-    job = TrainingJob(project=project, owner=project.owner, name="gpu", model_flavor="pytorch",
+    job = TrainingJob(project=project, owner=project.owner, model_flavor="pytorch",
         accelerator_type="gpu", accelerator_count=1, accelerator_model=model)
     uris = expected_training_uris(job, "test-bucket")
     job.code_snapshot_uri, job.data_snapshot_uri, job.output_uri = uris["code"], uris["data"], uris["output"]
@@ -157,7 +157,7 @@ def test_retry_copies_gpu_model(settings, monkeypatch):
     storage = MemoryStorage()
     code = storage.put("orig/code.zip", b"code", "application/zip")
     data = storage.put("orig/data.zip", b"data", "application/zip")
-    job = TrainingJob.objects.create(project=project, name="failed", model_flavor="pytorch",
+    job = TrainingJob.objects.create(project=project, model_flavor="pytorch",
         code_snapshot_uri=code.uri, data_snapshot_uri=data.uri, output_uri="s3://bucket/out",
         status="failed", accelerator_type="gpu", accelerator_count=1, accelerator_model="t4")
     retry = retry_job(job, storage=storage)

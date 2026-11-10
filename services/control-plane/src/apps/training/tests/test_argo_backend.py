@@ -32,7 +32,6 @@ def test_argo_training_backend_records_runtime_selectors():
     project = ModelProject.objects.create(owner=user, name="NIDS")
     job = TrainingJob.objects.create(
         project=project,
-        name="nightly",
         code_snapshot_uri="s3://bucket/code.zip",
         data_snapshot_uri="s3://bucket/train.csv",
         output_uri="s3://bucket/model.tar.gz",
@@ -74,7 +73,6 @@ def test_argo_cancel_uses_job_bound_callback_capability(settings):
     project = ModelProject.objects.create(owner=user, name="Cancel NIDS")
     job = TrainingJob.objects.create(
         project=project,
-        name="cancel-nightly",
         code_snapshot_uri="s3://bucket/code.zip",
         data_snapshot_uri="s3://bucket/train.csv",
         output_uri="s3://bucket/model.tar.gz",
@@ -114,7 +112,7 @@ def test_argo_training_is_not_status_polled_without_the_watcher(settings, monkey
 
     owner = get_user_model().objects.create_user("argo-poll@example.com", "test-password")
     project = ModelProject.objects.create(owner=owner, name="argo-poll")
-    job = TrainingJob.objects.create(project=project, name="job", model_flavor="sklearn", backend="argo", status="running")
+    job = TrainingJob.objects.create(project=project, model_flavor="sklearn", backend="argo", status="running")
     monkeypatch.setattr("apps.training.tasks.training_backend", lambda _: backend)
     assert poll_training_job_status.run(str(job.public_id)) == "running"
     job.refresh_from_db()

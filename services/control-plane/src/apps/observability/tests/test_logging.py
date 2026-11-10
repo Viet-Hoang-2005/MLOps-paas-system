@@ -232,7 +232,7 @@ def test_build_dispatch_is_not_completion(project, monkeypatch, django_capture_o
 
 
 def test_training_dispatch_is_not_completion(project, monkeypatch, django_capture_on_commit_callbacks):
-    job = TrainingJob.objects.create(project=project, status="queued", backend="argo", name="logging")
+    job = TrainingJob.objects.create(project=project, status="queued", backend="argo", )
     monkeypatch.setattr(
         "apps.training.tasks.training_backend", lambda _: SimpleNamespace(run=lambda _: {"dispatched": True})
     )

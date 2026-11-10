@@ -12,7 +12,7 @@ def test_legacy_job_records_owner_and_is_scoped_to_owner():
     user = get_user_model().objects.create_user("training-owner@example.test", "test-password")
     other = get_user_model().objects.create_user("training-other@example.test", "test-password")
     project = ModelProject.objects.create(owner=user, name="Project")
-    job = TrainingJob.objects.create(project=project, name="Job", model_flavor="sklearn")
+    job = TrainingJob.objects.create(project=project, model_flavor="sklearn")
 
     assert job.owner_id == user.pk
     assert list(jobs_for_user(user)) == [job]
@@ -27,9 +27,9 @@ def test_rejects_job_owner_inconsistent_with_project_or_workspace():
     workspace = TrainingWorkspace.objects.create(owner=other)
 
     with pytest.raises(ValidationError, match="project must have the same owner"):
-        TrainingJob.objects.create(project=project, owner=other, name="Job", model_flavor="sklearn")
+        TrainingJob.objects.create(project=project, owner=other, model_flavor="sklearn")
     with pytest.raises(ValidationError, match="workspace must have the same owner"):
-        TrainingJob.objects.create(project=project, workspace=workspace, name="Job", model_flavor="sklearn")
+        TrainingJob.objects.create(project=project, workspace=workspace, model_flavor="sklearn")
 
 
 @pytest.mark.django_db
@@ -40,7 +40,7 @@ def test_unassigned_job_tracking_is_tenant_and_capability_scoped():
 
     owner = get_user_model().objects.create_user("tracking-owner@example.test", "test-password")
     other = get_user_model().objects.create_user("tracking-other@example.test", "test-password")
-    job = TrainingJob.objects.create(owner=owner, name="Job", model_flavor="sklearn", status="running", storage_layout="tenant")
+    job = TrainingJob.objects.create(owner=owner, model_flavor="sklearn", status="running", storage_layout="tenant")
     token = issue_capability(job, "tracking")
     request = SimpleNamespace(headers={"Authorization": f"Bearer {token}"}, user=None)
     authed_job, project, user, tenant, _ = authenticate_mlflow_request(request)

@@ -374,7 +374,7 @@ export default function TrainingJobDetailPage() {
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-style-page-title font-bold text-color-foreground">
-                {job.name}
+                {job.id}
               </h1>
               <p className="mt-1 text-style-caption-strong text-color-muted-foreground">
                 {t("detail.jobNumber", { id: job.id })}
@@ -494,7 +494,7 @@ export default function TrainingJobDetailPage() {
       <ConfirmDialog
         open={deleteJobOpen}
         title={t("delete.title")}
-        description={t("delete.description", { job: job.name })}
+        description={t("delete.description", { job: job.id })}
         confirmText={t("delete.confirm")}
         tone="danger"
         loading={deleteJobMutation.isPending}
@@ -514,7 +514,7 @@ export default function TrainingJobDetailPage() {
       <ConfirmDialog
         open={retryJobOpen}
         title={t("retryTitle")}
-        description={t("retryDescription", { job: job.name })}
+        description={t("retryDescription", { job: job.id })}
         confirmText={t("retryJob")}
         tone="default"
         loading={retryJobMutation.isPending}

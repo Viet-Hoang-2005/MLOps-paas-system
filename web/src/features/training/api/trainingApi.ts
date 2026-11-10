@@ -19,7 +19,6 @@ import type {
 
 const trainingJobFormData = (payload: TrainingJobFormValues) => {
   const formData = new FormData();
-  formData.append("name", payload.name);
   formData.append("model_flavor", payload.model_flavor);
   formData.append("project", payload.project_id || "");
   formData.append("entry_point", payload.entry_point || "train.py");

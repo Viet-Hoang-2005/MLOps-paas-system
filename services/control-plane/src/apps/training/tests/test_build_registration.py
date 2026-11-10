@@ -39,7 +39,6 @@ def completed_job(email="training-build@example.com"):
     project = ModelProject.objects.create(owner=owner, name="NIDS")
     job = TrainingJob.objects.create(
         project=project,
-        name="training-v1",
         model_flavor="xgboost",
         requirements_text="xgboost==2.0.3",
         code_snapshot_uri="s3://bucket/source.zip",
