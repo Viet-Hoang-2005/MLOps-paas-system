@@ -6,13 +6,17 @@ import { renderWithProviders } from "test/renderWithProviders";
 import TrainingWorkspacePage from "./TrainingWorkspacePage";
 import type { TrainingJob, TrainingRuntimeCapabilities } from "@/features/training/types";
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), update: vi.fn(), run: vi.fn(), input: vi.fn(), save: vi.fn(), caps: vi.fn() }));
+const mocks = vi.hoisted(() => ({ get: vi.fn(), update: vi.fn(), run: vi.fn(), input: vi.fn(), save: vi.fn(), caps: vi.fn(), metrics: vi.fn() }));
 vi.mock("react-router-dom", async (original) => ({ ...await original<typeof import("react-router-dom")>(), useBlocker: () => ({ state: "unblocked" }) }));
 vi.mock("@/features/training/api/jobWorkspaceApi", async (original) => ({
   ...await original<typeof import("@/features/training/api/jobWorkspaceApi")>(),
   getJobWorkspace: mocks.get, runJob: mocks.run, updateJobWorkspace: mocks.update, getRunInput: mocks.input,
 }));
-vi.mock("@/features/training/api/trainingApi", async (original) => ({ ...await original<typeof import("@/features/training/api/trainingApi")>(), getTrainingRuntimeCapabilities: mocks.caps }));
+vi.mock("@/features/training/api/trainingApi", async (original) => ({
+  ...await original<typeof import("@/features/training/api/trainingApi")>(),
+  getTrainingRuntimeCapabilities: mocks.caps,
+  getTrainingJobMetrics: mocks.metrics,
+}));
 vi.mock("@/shared/hooks/useRuntimeLogStream", () => ({ useRuntimeLogStream: () => ({ logs: [], status: null, error: "", isPolling: false, refresh: vi.fn() }) }));
 vi.mock("@/features/training/components/WorkspaceEditor", async () => {
   const { forwardRef, useImperativeHandle } = await import("react");
@@ -31,6 +35,7 @@ describe("training workspace flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.get.mockResolvedValue(workspace); mocks.update.mockResolvedValue(workspace); mocks.caps.mockResolvedValue(caps);
+    mocks.metrics.mockResolvedValue({ job_id: "workspace", status: "available", backend: "argo", poll_interval_seconds: 5, latest: null });
     mocks.save.mockResolvedValue(6); mocks.run.mockImplementation(() => { mocks.get.mockResolvedValue({ ...workspace, ...job, id: "workspace" }); return Promise.resolve({ ...job, id: "workspace" }); }); mocks.input.mockResolvedValue({ entries: [], entry_point: "train.py" });
   });
   it.each(["en", "vi"] as const)("runs without a project and saves pending editor changes first in %s", async (language) => {
@@ -73,5 +78,38 @@ describe("training workspace flow", () => {
     await waitFor(() => expect(mocks.input).toHaveBeenCalledWith("workspace"));
     expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
     expect(await screen.findByTestId("workspace-editor")).toHaveAttribute("data-readonly", "true");
+  });
+  it("renders 4 CardSummary metrics cards only when training is running", async () => {
+    mocks.metrics.mockResolvedValue({
+      job_id: "workspace",
+      status: "available",
+      backend: "argo",
+      poll_interval_seconds: 5,
+      latest: {
+        timestamp: "2026-11-11T00:00:00Z",
+        cpu_percent: 42,
+        cpu_limit_cores: 1,
+        memory_used_mb: 512,
+        memory_limit_mb: 2048,
+        memory_percent: 25,
+        gpu_percent: null,
+        gpu_memory_used_mb: null,
+        gpu_memory_total_mb: null,
+        gpu_memory_percent: null,
+      },
+    });
+    show("en");
+    expect(screen.queryByText("% CPU")).not.toBeInTheDocument();
+
+    mocks.get.mockResolvedValue({ ...workspace, ...job, id: "workspace", status: "running", started_at: "2026-11-11T00:00:00Z" });
+    show("en", "?running=1");
+    expect(await screen.findByText("% CPU")).toBeInTheDocument();
+    expect(await screen.findByText("42%")).toBeInTheDocument();
+    expect(screen.getByText("0.4 / 1 vCPU")).toBeInTheDocument();
+    expect(screen.getByText("% RAM")).toBeInTheDocument();
+    expect(screen.getByText("25%")).toBeInTheDocument();
+    expect(screen.getByText("512 MiB / 2.0 GiB")).toBeInTheDocument();
+    expect(screen.getByText("% GPU")).toBeInTheDocument();
+    expect(screen.getByText("% Runtime Elapsed")).toBeInTheDocument();
   });
 });

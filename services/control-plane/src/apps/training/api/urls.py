@@ -13,6 +13,7 @@ from .endpoints import (
     TrainingJobProjectEndpoint,
     TrainingJobInputEndpoint,
     TrainingOutputDownloadEndpoint,
+    TrainingWorkspaceDownloadEndpoint,
     TrainingJobReferencePreviewEndpoint,
     TrainingJobRetryEndpoint,
     TrainingJobCloneEndpoint,
@@ -29,6 +30,8 @@ from .metrics_endpoints import (
 from .workspaces import WorkspaceEntriesEndpoint, WorkspaceEntryEndpoint, WorkspaceSecretEndpoint
 
 urlpatterns = [
+    path("<uuid:job_id>/input/download/", TrainingWorkspaceDownloadEndpoint.as_view(), {"area": "input"}, name="training-input-download"),
+    path("<uuid:job_id>/outputs/download/", TrainingWorkspaceDownloadEndpoint.as_view(), {"area": "output"}, name="training-outputs-download"),
     path("<uuid:job_id>/entries/", WorkspaceEntriesEndpoint.as_view(), name="training-job-entries"),
     path("<uuid:job_id>/entries/<uuid:entry_id>/", WorkspaceEntryEndpoint.as_view(), name="training-job-entry"),
     path("<uuid:job_id>/secrets/<str:name>/", WorkspaceSecretEndpoint.as_view(), name="training-job-secret"),

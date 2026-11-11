@@ -1,6 +1,6 @@
 import type { DragEvent } from "react";
 import type { WorkspaceEntry } from "@/features/training/api/jobWorkspaceApi";
-import type { TrainingFileKind } from "@/features/training/components/TrainingFileDialog";
+import type { InputFileKind } from "@/features/training/components/InputFileDialog";
 import type { SourceTreeNode } from "@/shared/types/sourceTreeModel";
 
 export function workspaceTree(entries: WorkspaceEntry[]): SourceTreeNode[] {
@@ -21,7 +21,7 @@ export function workspaceTree(entries: WorkspaceEntry[]): SourceTreeNode[] {
   sort(root.children);
   return root.children;
 }
-export function kindForPath(path: string): TrainingFileKind {
+export function kindForPath(path: string): InputFileKind {
   if (path === "requirements.txt" || path.endsWith(".txt")) return "requirements";
   if (path.endsWith(".py")) return "script";
   if (path.endsWith(".csv")) return "data";

@@ -1,1187 +1,785 @@
 export const trainingVi = {
-
   studio: {
     saved: "Đã lưu tất cả thay đổi.",
     cancel: "Hủy",
-
     draftCount: "Bản nháp: {{count}}",
     clone: "Nhân bản và chỉnh sửa",
     draftCreated: "Đã tạo bản nháp training",
     savingSettings: "Đang lưu cấu hình…",
     settingsSaved: "Đã lưu cấu hình",
-
-
-    title: "Không gian huấn luyện", creating: "Đang tạo không gian huấn luyện…", loading: "Đang tải…", failed: "Thao tác thất bại. Vui lòng thử lại.",
-
-    reload: "Tải lại / thử lại", runStep: "Chạy huấn luyện", assignProject: "Gán Model Project", draft: "Bản nháp có thể sửa",
-
-    input: "Input", output: "Output", snapshot: "Snapshot của lần chạy", name: "Tên", description: "Mô tả", cpu: "CPU / RAM", gpu: "GPU", cpuOnly: "Không dùng GPU",
-
-    runtime: "Thời gian chạy tối đa", minutes: "phút", hour: "giờ", hours: "giờ", framework: "Framework", environment: "Environment & Secrets", key: "Tên biến", value: "Giá trị", secret: "Secret",
-
-    secretWarning: "Không thể đọc lại giá trị Secret đã lưu. Code huấn luyện có thể đọc và làm lộ Secret được cấp. Việc che log không ngăn được hành vi cố ý làm lộ.",
-
-    secretsUnavailable: "Secret chưa khả dụng khi máy chủ chưa cấu hình khóa mã hóa.", secretSaved: "Đã lưu giá trị", replaceValue: "Thay giá trị",
-
-    checkResources: "Kiểm tra lại tài nguyên", locked: "Input bị khóa sau khi gửi chạy. Nhân bản job để chỉnh sửa và chạy lại. Đóng trang không dừng huấn luyện.", resourcesUnavailable: "Không xác minh được tài nguyên chạy.",
-
-    contract: "Input chỉ đọc. Đọc file qua SM_CHANNEL_TRAIN, ghi dữ liệu tạm vào MLOPS_WORK_DIR, lưu model vào SM_MODEL_DIR và ghi metrics được hỗ trợ vào SM_OUTPUT_DIR.",
-
-    cpuProfile: "{{cpu}} vCPU / {{memory}} MiB", profiles: { small: "Nhỏ", medium: "Trung bình", large: "Lớn" },
-
-    vram: "VRAM trống: {{free}} / {{total}} MiB (tại lần kiểm tra gần nhất)", newFolder: "Tạo thư mục", folderPath: "Đường dẫn thư mục tương đối trong Input", destination: "Thư mục đích (để trống để chuyển về gốc Input)",
-
-    download: "Tải xuống", move: "Di chuyển", delete: "Xóa", deleteConfirm: "Xóa file hoặc thư mục cùng nội dung bên trong? Snapshot các lần chạy vẫn được giữ.", save: "Lưu", edit: "Sửa",
-
-    selectFile: "Chọn một file", entryPoint: "Chọn làm file chính", editor: "Trình soạn thảo", preview: "Xem trước", pathExists: "Đường dẫn {{path}} đã tồn tại.",
-
-    saveAsMain: "Lưu làm file chính", isMain: "File chính", markdownPreview: "Xem trước Markdown", saveAll: "Lưu tất cả", removeAll: "Xóa tất cả", removeAllTitle: "Xóa tất cả các file", removeAllConfirm: "Bạn có chắc chắn muốn xóa toàn bộ file và thư mục trong không gian làm việc này? Hành động này không thể hoàn tác.", allFilesDeleted: "Đã xóa toàn bộ file.", resetAll: "Đặt lại tất cả", resetAllTitle: "Hủy thay đổi chưa lưu", resetAllConfirm: "Hủy tất cả các thay đổi chưa lưu và khôi phục trạng thái đã lưu trên máy chủ?", resetAllSuccess: "Đã hủy tất cả các thay đổi chưa lưu.", unsupportedPreview: "Định dạng file này không hỗ trợ xem trước. Vui lòng tải file về để xem nội dung.", noFiles: "Chưa có file nào", createFirstFile: "Tạo file đầu tiên để bắt đầu viết code.", selectFileHint: "Chọn một file từ cây thư mục bên phải để xem hoặc chỉnh sửa.", noOutputDescription: "Lần chạy này không có file output nào.", deleteOutputConfirm: "Xóa toàn bộ file output của lần chạy này?", outputDeleted: "Đã xóa các file output.",
-
-    terminal: "Log huấn luyện", logPlaceholder: "Lưu file, chọn file Python chính rồi chạy huấn luyện.", stop: "Dừng", run: "Chạy", noOutput: "Chưa có output đã xác minh.",
-
-    close: "Đóng", next: "Tiếp tục", back: "Quay lại", unsaved: "Có thay đổi chưa lưu", discard: "Rời trang và bỏ các chỉnh sửa chưa lưu? File đã lưu và job đang chạy vẫn được giữ.",
-
-    project: "Model Project", newProject: "Tạo Project mới", access: "Chế độ truy cập", private: "API riêng tư", public: "API công khai", metadataReadOnly: "Metadata của Project hiện có chỉ được đọc tại đây.",
-
-    assignmentHint: "Gán lần chạy thành công và lưu artifact bổ sung để build. Model đã huấn luyện được giữ nguyên. Lưu không thay đổi Model Preview và không bắt đầu build.",
-
-    optionalArtifact: "Artifact bổ sung tùy chọn của lần chạy", source_code: "Source để build (.py)", reference_data: "Dữ liệu tham chiếu (.csv)", label_mapping: "Ánh xạ nhãn (.json)", input_schema: "Schema đầu vào (.json)",
-
-    buildRequirements: "Dependencies để build (tách khỏi snapshot huấn luyện)", allProjects: "Tất cả Project", unassigned: "Chưa gán Project", openDraft: "Mở workspace",
-
-    gpuStatus: { available: "Đã xác minh GPU NVIDIA", unavailable: "GPU không khả dụng", checking: "Đang kiểm tra GPU", disabled: "Đã tắt GPU", error: "Lỗi xác minh GPU" },
-
+    title: "Không gian huấn luyện",
+    creating: "Đang tạo không gian huấn luyện…",
+    loading: "Đang tải…",
+    failed: "Thao tác thất bại. Vui lòng thử lại.",
+    reload: "Tải lại / thử lại",
+    runStep: "Chạy huấn luyện",
+    assignProject: "Gán Model Project",
+    draft: "Bản nháp có thể sửa",
+    input: "Input",
+    output: "Output",
+    snapshot: "Snapshot của lần chạy",
+    name: "Tên",
+    description: "Mô tả",
+    cpu: "CPU / RAM",
+    gpu: "GPU",
+    cpuOnly: "Không dùng GPU",
+    runtime: "Thời gian chạy tối đa",
+    minutes: "phút",
+    hour: "giờ",
+    hours: "giờ",
+    framework: "Framework",
+    environment: "Environment & Secrets",
+    environmentTitle: "Environment",
+    secretTitle: "Secret",
+    newEnvironment: "Thêm biến",
+    newSecret: "Thêm Secret",
+    editEnvironment: "Sửa biến môi trường",
+    newEnvDialogTitle: "Thêm biến môi trường",
+    editEnvDialogTitle: "Chỉnh sửa biến môi trường",
+    newSecretDialogTitle: "Thêm Secret mới",
+    noEnvironmentTitle: "Chưa có biến môi trường",
+    noEnvironment: "Chưa có biến môi trường nào được tạo.",
+    noSecretsTitle: "Chưa có Secret",
+    noSecrets: "Chưa có Secret nào được tạo.",
+    searchEnvironment: "Tìm kiếm biến môi trường...",
+    searchSecret: "Tìm kiếm Secret...",
+    noMatchingVariables: "Không tìm thấy biến môi trường phù hợp.",
+    noMatchingSecrets: "Không tìm thấy Secret phù hợp.",
+    accessGuide: "Hướng dẫn truy cập",
+    help: "Trợ giúp",
+    helpDialogTitle: "Hướng dẫn tích hợp mã nguồn huấn luyện",
+    helpDialogDescription:
+      "Mẫu code Python chuẩn để nạp biến môi trường, secret, đọc dữ liệu input và xuất model & metrics.",
+    guideDialogTitle: "Hướng dẫn truy cập biến môi trường & đường dẫn",
+    pythonGuideTitle: "Tích hợp mã nguồn Python",
+    guideDialogDescription:
+      "Cách truy cập các biến môi trường, secret và đường dẫn lưu trữ trong mã Python huấn luyện.",
+    guideData: "Dữ liệu",
+    guideAccessMethod: "Cách truy cập",
+    guideCurrentPath: "Đường dẫn hiện tại",
+    guideEnvDesc: "Không phải file hoặc URL",
+    guideSecretDesc: "Không phải file hoặc URL",
+    guideInputData: "File Input",
+    guideInputDesc: "/prepared/input — chỉ đọc",
+    guideModelOutput: "Model xuất ra",
+    guideMetricsOutput: "Metrics và metadata",
+    guideTempWork: "File tạm, dữ liệu trung gian",
+    copyCode: "Sao chép mã Python",
+    key: "Tên biến",
+    value: "Giá trị",
+    secret: "Secret",
+    secretWarning:
+      "Không thể đọc lại giá trị Secret đã lưu. Code huấn luyện có thể đọc và làm lộ Secret được cấp. Việc che log không ngăn được hành vi cố ý làm lộ.",
+    secretsUnavailable:
+      "Secret chưa khả dụng khi máy chủ chưa cấu hình khóa mã hóa.",
+    secretSaved: "Đã lưu giá trị",
+    copied: "Đã sao chép vào bộ nhớ tạm",
+    replaceValue: "Thay giá trị",
+    checkResources: "Kiểm tra lại tài nguyên",
+    locked:
+      "Input bị khóa sau khi gửi chạy. Nhân bản job để chỉnh sửa và chạy lại. Đóng trang không dừng huấn luyện.",
+    resourcesUnavailable: "Không xác minh được tài nguyên chạy.",
+    contract:
+      "Input chỉ đọc. Đọc file qua SM_CHANNEL_TRAIN, ghi dữ liệu tạm vào MLOPS_WORK_DIR, lưu model vào SM_MODEL_DIR và ghi metrics được hỗ trợ vào SM_OUTPUT_DIR.",
+    cpuProfile: "{{cpu}} vCPU / {{memory}} MiB",
+    profiles: { small: "Nhỏ", medium: "Trung bình", large: "Lớn" },
+    vram: "VRAM trống: {{free}} / {{total}} MiB (tại lần kiểm tra gần nhất)",
+    newFolder: "Tạo thư mục",
+    folderName: "Tên thư mục",
+    invalidFolderName: "Nhập tên thư mục hợp lệ, không chứa / hoặc \\.",
+    destination: "Thư mục đích (để trống để chuyển về gốc Input)",
+    download: "Tải xuống",
+    move: "Di chuyển",
+    delete: "Xóa",
+    deleteConfirm:
+      "Xóa file hoặc thư mục cùng nội dung bên trong? Snapshot các lần chạy vẫn được giữ.",
+    save: "Lưu",
+    edit: "Sửa",
+    selectFile: "Chọn một file",
+    entryPoint: "Chọn làm file chính",
+    editor: "Trình soạn thảo",
+    preview: "Xem trước",
+    pathExists: "Đường dẫn {{path}} đã tồn tại.",
+    saveAsMain: "Lưu làm file chính",
+    isMain: "File chính",
+    markdownPreview: "Xem trước Markdown",
+    saveAll: "Lưu tất cả",
+    removeAll: "Xóa tất cả",
+    removeAllTitle: "Xóa tất cả các file",
+    removeAllConfirm:
+      "Bạn có chắc chắn muốn xóa toàn bộ file và thư mục trong không gian làm việc này? Hành động này không thể hoàn tác.",
+    allFilesDeleted: "Đã xóa toàn bộ file.",
+    resetAll: "Đặt lại tất cả",
+    resetAllTitle: "Hủy thay đổi chưa lưu",
+    resetAllConfirm:
+      "Hủy tất cả các thay đổi chưa lưu và khôi phục trạng thái đã lưu trên máy chủ?",
+    resetAllSuccess: "Đã hủy tất cả các thay đổi chưa lưu.",
+    unsupportedPreview:
+      "Định dạng file này không hỗ trợ xem trước. Vui lòng tải file về để xem nội dung.",
+    noFiles: "Chưa có file nào",
+    createFirstFile: "Tạo file đầu tiên để bắt đầu viết code.",
+    selectFileHint:
+      "Chọn một file từ cây thư mục bên phải để xem hoặc chỉnh sửa.",
+    noOutputDescription: "Lần chạy này không có file output nào.",
+    deleteOutputConfirm: "Xóa toàn bộ file output của lần chạy này?",
+    outputDeleted: "Đã xóa các file output.",
+    terminal: "Log huấn luyện",
+    logPlaceholder: "Lưu file, chọn file Python chính rồi chạy huấn luyện.",
+    stop: "Dừng",
+    run: "Chạy",
+    noOutput: "Chưa có output đã xác minh.",
+    close: "Đóng",
+    next: "Tiếp tục",
+    back: "Quay lại",
+    unsaved: "Có thay đổi chưa lưu",
+    discard:
+      "Rời trang và bỏ các chỉnh sửa chưa lưu? File đã lưu và job đang chạy vẫn được giữ.",
+    project: "Model Project",
+    newProject: "Tạo Project mới",
+    access: "Chế độ truy cập",
+    private: "API riêng tư",
+    public: "API công khai",
+    metadataReadOnly: "Metadata của Project hiện có chỉ được đọc tại đây.",
+    assignmentHint:
+      "Gán lần chạy thành công và lưu artifact bổ sung để build. Model đã huấn luyện được giữ nguyên. Lưu không thay đổi Model Preview và không bắt đầu build.",
+    optionalArtifact: "Artifact bổ sung tùy chọn của lần chạy",
+    source_code: "Source để build (.py)",
+    reference_data: "Dữ liệu tham chiếu (.csv)",
+    label_mapping: "Ánh xạ nhãn (.json)",
+    input_schema: "Schema đầu vào (.json)",
+    buildRequirements: "Dependencies để build (tách khỏi snapshot huấn luyện)",
+    allProjects: "Tất cả Project",
+    unassigned: "Chưa gán Project",
+    openDraft: "Mở workspace",
+    gpuStatus: {
+      available: "Đã xác minh GPU NVIDIA",
+      unavailable: "GPU không khả dụng",
+      checking: "Đang kiểm tra GPU",
+      disabled: "Đã tắt GPU",
+      error: "Lỗi xác minh GPU",
+    },
+    metrics: {
+      cpuUsage: "% CPU",
+      ramUsage: "% RAM",
+      gpuUsage: "% GPU",
+      runtimeProgress: "% Thời gian chạy",
+      cpuLimit: "Giới hạn {{count}} vCPU",
+      ramPercent: "Đã dùng {{percent}}%",
+      gpuVram: "{{used}} / {{total}} VRAM",
+      runtimePercent: "{{percent}}% của giới hạn",
+      waiting: "Đang chờ metric...",
+      noGpuAssigned: "Không gán GPU",
+    },
   },
-
-  workspace: { fileDialog: {
-
-    create: "Tệp mới", edit: "Chỉnh sửa tệp", description: "Chọn loại và tên tệp.",
-
-    type: "Loại tệp", name: "Tên tệp", script: "Script (.py)", data: "Dữ liệu (.csv)",
-
-    config: "Cấu hình (.json)", document: "Tài liệu (.md)", requirements: "Thư viện (requirements.txt)",
-
-    upload: "Chọn tệp", required: "Bắt buộc tải lên CSV", optional: "Có thể tải lên tệp",
-
-    removeUpload: "Bỏ tệp đã chọn", invalidName: "Nhập tên hợp lệ với phần mở rộng tương ứng.",
-
-    csvRequired: "Hãy tải lên tệp CSV.", requirementsExists: "Xóa requirements.txt hiện tại trước khi tạo tệp mới.",
-
-    requirementsEdit: "Sửa nội dung trong editor. Xóa tệp trước khi tải lên bản thay thế.",
-
-    cancel: "Hủy", save: "Lưu", createAction: "Tạo",
-
-  } },
-
+  workspace: {
+    fileDialog: {
+      create: "Tệp mới",
+      edit: "Chỉnh sửa tệp",
+      description: "Chọn loại và tên tệp.",
+      type: "Loại tệp",
+      name: "Tên tệp",
+      script: "Python script (.py)",
+      data: "Dữ liệu (.csv)",
+      config: "Cấu hình (.json)",
+      document: "Tài liệu (.md)",
+      requirements: "Thư viện (requirements.txt)",
+      upload: "Chọn tệp",
+      required: "Bắt buộc tải lên CSV",
+      optional: "Có thể tải lên tệp",
+      removeUpload: "Bỏ tệp đã chọn",
+      invalidName: "Nhập tên hợp lệ với phần mở rộng tương ứng.",
+      csvRequired: "Hãy tải lên tệp CSV.",
+      requirementsExists:
+        "Xóa requirements.txt hiện tại trước khi tạo tệp mới.",
+      requirementsEdit:
+        "Sửa nội dung trong editor. Xóa tệp trước khi tải lên bản thay thế.",
+      cancel: "Hủy",
+      save: "Lưu",
+      createAction: "Tạo",
+    },
+  },
   workflow: {
-
     snapshotHint:
-
       "Đầu vào được đóng băng khi gửi chạy tác vụ và không thể chỉnh sửa.",
-
     openBuild: "Tạo image, đăng ký và triển khai",
-
   },
-
   title: "Huấn luyện mô hình",
-
   create: "Tạo tác vụ huấn luyện",
-
   empty: "Tạo tác vụ huấn luyện để theo dõi tiến trình runtime và artifact.",
-
   description:
-
     "Huấn luyện artifact mới hoặc huấn luyện lại mô hình đang chọn trên Header.",
-
   newJob: "Tác vụ huấn luyện mới",
-
   quota: "Hạn mức huấn luyện hàng tuần",
-
   quotaUnlimited: "Không giới hạn",
-
   quotaUnavailable: "Tạm thời không thể tải hạn mức tuần.",
-
   quotaReset: "Cấp lại {{time}}",
-
   quotaReserved: "Đã giữ chỗ: {{duration}}",
-
-  quotaConcurrencyError: "Một tác vụ huấn luyện khác vẫn đang chạy hoặc đang được dọn dẹp.",
-
-  quotaExceededError: "Không đủ quota {{resource}}: cần {{required}}, còn {{remaining}}. Cấp lại {{reset}}.",
-
-  quotaProfiles: { cpu_small: "CPU Small", cpu_medium: "CPU Medium", cpu_large: "CPU Large", gpu_local: "GPU local", t4: "NVIDIA T4", a10g: "NVIDIA A10G" },
-
-  used: "/ đã sử dụng {{duration}}",
-
-  remaining: "Còn lại",
-
-  totalJobs: "Tổng tác vụ",
-
-  statusDistribution: {
-
-    label: "Phân bố trạng thái tác vụ huấn luyện",
-
-    tooltip: "{{status}}: {{percentage}}%",
-
-    empty: "Chưa có tác vụ huấn luyện.",
-
+  quotaConcurrencyError:
+    "Một tác vụ huấn luyện khác vẫn đang chạy hoặc đang được dọn dẹp.",
+  quotaExceededError:
+    "Không đủ quota {{resource}}: cần {{required}}, còn {{remaining}}. Cấp lại {{reset}}.",
+  quotaProfiles: {
+    cpu_small: "CPU Small",
+    cpu_medium: "CPU Medium",
+    cpu_large: "CPU Large",
+    gpu_local: "GPU local",
+    t4: "NVIDIA T4",
+    a10g: "NVIDIA A10G",
   },
-
+  used: "/ đã sử dụng {{duration}}",
+  remaining: "Còn lại",
+  totalJobs: "Tổng tác vụ",
+  statusDistribution: {
+    label: "Phân bố trạng thái tác vụ huấn luyện",
+    tooltip: "{{status}}: {{percentage}}%",
+    empty: "Chưa có tác vụ huấn luyện.",
+  },
   loadFailed: "Không thể tải tác vụ huấn luyện",
-
   checkApi: "Vui lòng kiểm tra API Control Plane.",
-
   retryLoad: "Thử lại",
-
-  staleData: "Không thể làm mới danh sách tác vụ. Đang hiển thị dữ liệu đã tải trước đó.",
-
+  staleData:
+    "Không thể làm mới danh sách tác vụ. Đang hiển thị dữ liệu đã tải trước đó.",
   noJobs: "Chưa có tác vụ huấn luyện",
-
   noJobsDescription:
-
     "Gửi ZIP mã nguồn và bộ dữ liệu CSV để bắt đầu tác vụ huấn luyện đầu tiên.",
-
   firstJob: "Tạo tác vụ huấn luyện đầu tiên",
-
   history: "Lịch sử huấn luyện",
-
   historyCount: "Hiển thị {{shown}} / tổng {{total}}",
-
   sort: "Sắp xếp",
-
   newest: "Mới nhất",
-
   oldest: "Cũ nhất",
-
   status: "Trạng thái",
-
   name: "Tên",
-
   refreshing: "Đang làm mới danh sách…",
-
   noView: "Không có tác vụ phù hợp",
-
   noViewDescription: "Thay đổi bộ lọc trạng thái huấn luyện.",
-
   cancelTitle: "Hủy tác vụ huấn luyện?",
-
   retryTitle: "Thử lại tác vụ huấn luyện?",
-
   cancelDescription: "Thao tác này sẽ dừng {{job}} nếu vẫn đang hoạt động.",
-
   retryDescription: "Tạo tác vụ huấn luyện mới với cấu hình giống {{job}}?",
-
   close: "Đóng",
-
   cancelJob: "Hủy tác vụ",
-
   retryJob: "Thử lại tác vụ",
-
   details: "Chi tiết tác vụ huấn luyện",
-
   overview: "Tổng quan mô hình",
-
   progress: "Tiến trình",
-
   metrics: "Metric",
-
   events: "Sự kiện",
-
   logs: "Log",
-
   artifacts: "Artifact",
-
   deployment: "Triển khai",
-
   cancel: "Hủy tác vụ",
-
   retry: "Thử lại tác vụ",
-
   register: "Đăng ký mô hình",
-
   statusFilter: {
     editing: "Đang chỉnh sửa",
-
     label: "Bộ lọc trạng thái training",
-
     placeholder: "Lọc trạng thái training",
-
     all: "Tất cả trạng thái training",
-
     pending: "Đang chờ",
-
     success: "Thành công",
-
     failed: "Thất bại",
-
   },
-
   statuses: {
-
     none: "Không có",
-
     unknown: "Chưa xác định",
-
   },
-
   table: {
-
-    trainingAt: "Thời điểm huấn luyện",
-
+    jobId: "Training job ID",
+    createAt: "Create at",
+    trainingAt: "Training at",
     flavor: "Framework",
-
     modelStatus: "Trạng thái mô hình",
-
     accelerators: "Bộ tăng tốc",
-
     runtime: "Runtime",
-
     status: "Trạng thái huấn luyện",
-
     actions: "Thao tác",
-
     view: "Xem",
-
     delete: "Xóa",
-
     deleting: "Đang xóa…",
-
     empty: "Không có tác vụ phù hợp với trạng thái này.",
-
     flavors: {
-
       sklearn: "Scikit-learn",
-
       xgboost: "XGBoost",
-
       pytorch: "PyTorch",
-
       tensorflow: "TensorFlow",
-
     },
-
     statuses: {
       editing: "Đang chỉnh sửa",
-
       pending: "Đang chờ",
-
       success: "Thành công",
-
       failed: "Thất bại",
-
       deleting: "Đang xóa…",
-
     },
-
     modelStatuses: {
-
       none: "Không có",
-
       trained: "Đã huấn luyện",
-
       built: "Đã tạo image",
-
       deployed: "Đã triển khai",
-
     },
-
   },
-
   delete: {
-
     title: "Xóa tác vụ huấn luyện?",
-
     description:
-
       "Xóa vĩnh viễn {{job}}? Nếu còn hoạt động, runtime sẽ được hủy trước khi dọn dẹp.",
-
     confirm: "Xóa tác vụ",
-
     requested: "Đã yêu cầu xóa tác vụ huấn luyện.",
-
     completed: "Đã xóa tác vụ huấn luyện.",
-
     failed: "Không thể xóa tác vụ huấn luyện.",
-
   },
-
   list: {
-
     loading: "Đang tải tác vụ huấn luyện",
-
     refresh: "Làm mới",
-
     download: "Tải xuống",
-
     cancel: "Hủy",
-
     retry: "Thử lại",
-
     view: "Xem chi tiết",
-
   },
-
   runtime: {
-
     livePolling: "Cập nhật trực tiếp",
-
     progress: "Tiến trình huấn luyện",
-
     eventEmpty:
-
       "Lịch sử sự kiện xuất hiện khi backend ghi nhận cập nhật vòng đời.",
-
     eventHistory: "Lịch sử sự kiện",
-
   },
-
   detail: {
-
     statuses: {
       editing: "Đang chỉnh sửa",
-
       pending: "Đang chờ",
-
       queued: "Đã vào hàng đợi",
-
       uploading: "Đang tải lên",
-
       running: "Đang chạy",
-
       cancelling: "Đang hủy",
-
       completed: "Đã hoàn tất",
-
       failed: "Thất bại",
-
       cancelled: "Đã hủy",
-
     },
-
     completedToast: "Tác vụ huấn luyện đã hoàn tất!",
-
     failedToast: "Tác vụ huấn luyện thất bại.",
-
     cancelledToast: "Tác vụ huấn luyện đã bị hủy.",
-
     refreshed: "Đã làm mới trạng thái tác vụ",
-
     refreshFailed: "Không thể làm mới trạng thái tác vụ",
-
     downloadFailed: "Không thể lấy URL tải xuống",
-
     copied: "Đã sao chép vào clipboard",
-
     invalidId: "ID tác vụ không hợp lệ",
-
     loading: "Đang tải workspace huấn luyện…",
-
     notFound: "Không tìm thấy tác vụ hoặc lỗi tải tác vụ",
-
     notFoundDescription:
-
       "Tác vụ huấn luyện có thể đã bị xóa hoặc bạn không có quyền truy cập.",
-
     backHistory: "Quay lại Lịch sử",
-
     backTraining: "Quay lại Huấn luyện mô hình",
-
     jobNumber: "Tác vụ huấn luyện #{{id}}",
-
     refreshStatus: "Làm mới trạng thái",
-
     refresh: "Làm mới",
-
     download: "Tải xuống",
-
     status: "Trạng thái",
-
     runtimeElapsed: "Thời gian đã chạy",
-
     live: "trực tiếp",
-
     maxRuntime: "Thời gian chạy tối đa",
-
     createdAt: "Ngày tạo",
-
     tabsLabel: "Các phần của tác vụ huấn luyện",
-
     tabs: {
-
       overview: "Tổng quan mô hình",
-
       logs: "Log",
-
       metrics: "Metric",
-
       artifacts: "Artifact",
-
       config: "Cấu hình",
-
     },
-
     milestones: {
-
       created: "Đã tạo",
-
       submitted: "Đã gửi",
-
       running: "Đang chạy",
-
       completed: "Đã hoàn tất",
-
       failed: "Thất bại",
-
       cancelled: "Đã hủy",
-
       pending: "Đang chờ",
-
       skipped: "Đã bỏ qua",
-
       unavailable: "Không có dấu thời gian",
-
       startedAfter: "Bắt đầu sau {{duration}}",
-
       finishedIn: "Hoàn tất trong {{duration}}",
-
     },
-
     buildStarted: "Đã bắt đầu tạo image mô hình.",
-
     buildFailed: "Không thể tạo image và đăng ký đầu ra huấn luyện này.",
-
     outputsDeleted: "Đã xóa đầu ra huấn luyện.",
-
     outputDeleteFailed: "Không thể xóa đầu ra huấn luyện.",
-
     deleteOutput: "Xóa đầu ra huấn luyện",
-
     deleteOutputTitle: "Xóa đầu ra huấn luyện?",
-
     deleteOutputDescription:
-
       "Gói đầu ra sẽ bị xóa vĩnh viễn. Tác vụ, sự kiện, log và phiên bản đã đăng ký vẫn được giữ.",
-
     deleteOutputConfirm: "Xóa đầu ra",
-
     registry: {
-
       title: "Tạo image và đăng ký đầu ra huấn luyện",
-
       description:
-
         "Tạo image thành công sẽ tạo phiên bản mô hình bất biến. Quản lý triển khai tại Phiên bản mô hình.",
-
       build: "Tạo image và đăng ký",
-
       building: "Đang build",
-
       retry: "Thử tạo image lại",
-
       open: "Mở danh sách phiên bản",
-
       console: "Bảng điều khiển tạo image",
-
     },
-
     overview: {
-
       failedTitle: "Huấn luyện thất bại",
-
       failedFallback: "Tác vụ huấn luyện kết thúc ngoài dự kiến.",
-
       cancelledTitle: "Huấn luyện đã bị hủy",
-
       cancelledFallback: "Tác vụ này bị hủy trước khi hoàn tất.",
-
       metadataTitle: "Siêu dữ liệu tác vụ",
-
       internalJobId: "ID tác vụ nội bộ",
-
       externalJobId: "ID tác vụ bên ngoài",
-
       modelName: "Tên mô hình",
-
       modelVersion: "Phiên bản mô hình",
-
       backend: "Backend",
-
       status: "Trạng thái",
-
       createdAt: "Ngày tạo",
-
       updatedAt: "Ngày cập nhật",
-
       startedAt: "Bắt đầu lúc",
-
       completedAt: "Hoàn tất lúc",
-
     },
-
     logsPage: {
-
       stopReason: "Lý do dừng",
-
       title: "Đầu ra huấn luyện",
-
       refresh: "Làm mới",
-
       waiting: "Log xuất hiện sau khi container huấn luyện khởi động.",
-
       empty: "Không có log cho tác vụ này.",
-
       events: "Lịch sử sự kiện",
-
     },
-
     config: {
-
       title: "Cấu hình đã gửi",
-
       compute: "Tài nguyên và runtime",
-
       backend: "Backend huấn luyện",
-
       vcpu: "vCPU",
-
       memory: "Bộ nhớ (MB)",
-
       maxRuntime: "Thời gian chạy tối đa (giây)",
-
       accelerator: "Bộ tăng tốc",
-
       acceleratorType: "Loại bộ tăng tốc",
-
       acceleratorCount: "Số bộ tăng tốc",
-
       source: "Nguồn",
-
       entryPoint: "Điểm vào",
-
     },
-
     artifactPage: {
-
       title: "Đầu ra mô hình",
-
       subtitle:
-
         "Quản lý artifact mô hình, mã nguồn bổ sung và dữ liệu tham chiếu để build.",
-
       revision: "Phiên bản #{{revision}}",
-
       readOnlyNotice:
-
         "Chỉnh sửa đầu ra bị khóa vì tác vụ chưa hoàn thành hoặc đã bị xóa.",
-
       flavor: "Framework mô hình",
-
       entryPoint: "Script chính",
-
       save: "Lưu thay đổi",
-
       saving: "Đang lưu...",
-
       saveSuccess: "Đã cập nhật đầu ra huấn luyện lên Phiên bản #{{revision}}.",
-
       saveError: "Không thể lưu thay đổi đầu ra.",
-
       conflictTitle: "Xung đột phiên bản (409)",
-
       conflictDesc:
-
         "Đầu ra huấn luyện đã được sửa đổi ở phiên làm việc khác. Vui lòng tải lại để xem phiên bản mới nhất hoặc kiểm tra trước khi lưu.",
-
       reload: "Tải lại bản mới nhất",
-
       discardUnsaved: "Hủy thay đổi & Tải lại",
-
       modelCardTitle: "Artifact mô hình đã huấn luyện",
-
       immutableBadge: "Bất biến",
-
       immutableDesc:
-
         "Được tạo trực tiếp từ quá trình huấn luyện. Bất biến và không thể chỉnh sửa.",
-
       sourceCardTitle: "Mã nguồn bổ sung",
-
       sourceCardDesc:
-
         "Script Python chính tùy chọn (.py, tối đa 5 MB). Dùng khi Build để đóng gói runtime suy luận.",
-
       sourceFile: "Tệp: {{name}}",
-
       sourceEmpty: "Chưa có mã nguồn bổ sung được đính kèm.",
-
       uploadSource: "Tải lên .py (< 5 MB)",
-
       replaceSource: "Thay thế tệp .py",
-
       removeSource: "Xóa mã nguồn",
-
       refCardTitle: "Dữ liệu tham chiếu bổ sung",
-
       refCardDesc:
-
         "Dữ liệu tham chiếu dạng bảng tùy chọn (.csv, tối đa 100 MB). Dùng cho Giám sát trôi dạt.",
-
       refFile: "Tệp: {{name}} ({{format}})",
-
       refEmpty: "Chưa có dữ liệu tham chiếu được đính kèm.",
-
       uploadRef: "Tải lên CSV (< 100 MB)",
-
       replaceRef: "Thay thế tệp dữ liệu",
-
       removeRef: "Xóa dữ liệu tham chiếu",
-
       previewRows: "Xem trước dữ liệu (hiển thị {{count}} dòng)",
-
       metricsCardTitle: "Metric, Tham số & Phân tích",
-
       noMetrics: "Không có metric hoặc tham số nào được ghi lại.",
-
       stagedUpload: "Chờ tải lên: {{name}} ({{size}})",
-
       stagedRemove: "Chờ xóa khi lưu",
-
       cancelStage: "Hủy",
-
       buildButton: "Build Deployment",
-
       unsavedConfirmTitle: "Thay đổi chưa được lưu",
-
       unsavedConfirmDesc:
-
         "Bạn có thay đổi chưa lưu trong mã nguồn hoặc dữ liệu tham chiếu. Bạn muốn tiếp tục Build với phiên bản đã lưu hiện tại, hay hủy để lưu trước?",
-
       buildAnyway: "Vẫn tiếp tục Build",
-
       cancel: "Hủy",
-
       download: "Tải xuống đầu ra (ZIP)",
-
       delete: "Xóa đầu ra",
-
       sizeErrorSource: "Tệp mã nguồn phải nhỏ hơn 5 MB.",
-
       formatErrorSource: "Chỉ hỗ trợ tệp .py cho mã nguồn.",
-
       sizeErrorRef: "Tệp dữ liệu tham chiếu phải nhỏ hơn 100 MB.",
-
       formatErrorRef: "Chỉ hỗ trợ tệp .csv cho dữ liệu tham chiếu.",
-
       notReady: "Artifact mô hình chưa sẵn sàng.",
-
       limitHint: "Mã nguồn < 5 MB (.py) · Dữ liệu tham chiếu < 100 MB (.csv).",
-
       previewEmpty: "Không có dòng nào trong bản xem trước.",
-
       unsaved: "Chưa lưu",
-
       unsavedBadge: "Thay đổi chưa lưu",
-
       relativePath: "Đường dẫn tương đối:",
-
       fileSize: "Kích thước tệp:",
-
       checksumLabel: "Checksum (SHA-256):",
-
       metricsLabel: "Metric",
-
       paramsLabel: "Tham số",
-
-      stagedRefNotice: "Tệp dữ liệu mới đã chọn ({{name}}). Lưu thay đổi để xem trước.",
-
+      stagedRefNotice:
+        "Tệp dữ liệu mới đã chọn ({{name}}). Lưu thay đổi để xem trước.",
       totalRows: "tổng số dòng",
-
       nullValue: "null",
-
     },
-
     metricsPage: {
-
       starting: "Đang khởi tạo metric runtime",
-
-      startingDescription:
-
-        "Đang chờ số liệu tài nguyên từ môi trường chạy.",
-
+      startingDescription: "Đang chờ số liệu tài nguyên từ môi trường chạy.",
       empty: "Không có metric runtime",
-
       emptyDescription: "Số liệu tài nguyên chỉ hiển thị khi tác vụ đang chạy.",
-
       unavailableDescription: "Tạm thời không thể đọc số liệu tài nguyên.",
-
       wholeGpu: "Toàn bộ GPU; có thể bao gồm tiến trình khác",
-
       vram: "Bộ nhớ GPU",
-
       title: "Metric runtime",
-
       sampled: "Lấy mẫu lúc {{time}}",
-
       pending: "Đang chờ metric…",
-
       refresh: "Làm mới",
-
       memoryUsed: "Đã dùng {{memory}}",
-
       waitingRunner: "Đang chờ metric runner",
-
       gpuUnavailable: "Không khả dụng",
-
       noGpu: "Không có dữ liệu bộ nhớ GPU",
-
       cpuLimit: "Giới hạn {{count}} vCPU",
-
       cpuUsage: "Mức sử dụng CPU container",
-
       cpu: "CPU",
-
       ram: "RAM",
-
       gpu: "GPU",
-
       noModelMetricsTitle: "Chưa có log theo dõi thử nghiệm",
-
       noModelMetricsHint:
-
         "Gọi mlflow.autolog() hoặc mlflow.log_metric() trong mã nguồn để truyền biểu đồ loss huấn luyện thời gian thực tại đây.",
-
       hyperparameters: "Siêu tham số (Hyperparameters)",
-
       trainingCurves: "Đường cong huấn luyện & Đánh giá (Lịch sử bước)",
-
       liveStreaming: "Đang phát trực tiếp",
-
       steps: "bước",
-
       step: "Bước",
-
       insufficientPoints: "Chưa đủ điểm dữ liệu",
-
     },
-
   },
-
   createFlow: {
-
     title: "Tạo tác vụ huấn luyện",
-
     steps: {
-
       metadata: "Siêu dữ liệu",
-
       source: "Nguồn",
-
       execution: "Thực thi",
-
     },
-
     actions: {
-
       back: "Quay lại",
-
       continue: "Tiếp tục",
-
       finish: "Hoàn tất",
-
     },
-
     discard: {
-
       title: "Bỏ thay đổi huấn luyện?",
-
       description:
-
         "Siêu dữ liệu, mã nguồn, dữ liệu tham chiếu và cấu hình thực thi chưa lưu sẽ bị mất.",
-
       confirm: "Bỏ thay đổi và thoát",
-
     },
-
     messages: {
-
       loadFailed: "Không thể tải workflow huấn luyện.",
-
       projectLoadFailed: "Không thể tải mô hình đã chọn.",
-
       jobLoadFailed: "Không thể tải tác vụ huấn luyện đã chọn.",
-
       nameRequired: "Tên mô hình là bắt buộc.",
-
       metadataSaveFailed: "Không thể lưu siêu dữ liệu mô hình.",
-
       metadataRequired: "Hoàn thành siêu dữ liệu mô hình trước khi tiếp tục.",
-
       sourceRequired: "Bổ sung đầu vào mã nguồn bắt buộc: {{fields}}.",
-
       sourceSaveFailed: "Không thể lưu đầu vào mã nguồn.",
-
       trainingStarted: "Tác vụ huấn luyện đã bắt đầu.",
-
       trainingStartFailed: "Không thể bắt đầu tác vụ huấn luyện.",
-
       runFirst: "Chạy huấn luyện trước khi hoàn tất.",
-
       trainingStillRunning: "Chờ đến khi huấn luyện kết thúc.",
-
       completeSource: "Hoàn thành và lưu bước Mã nguồn trước.",
-
     },
-
     metadata: {
-
       title: "Chọn dự án mô hình",
-
       description: "Tạo mô hình mới hoặc huấn luyện lại dự án hiện có.",
-
       newModel: "Tạo mô hình",
-
       existingModel: "Mô hình hiện có",
-
       modeLabel: "Chế độ mô hình huấn luyện",
-
       selectModel: "Chọn mô hình",
-
       selectPlaceholder: "Chọn mô hình hiện có",
-
       name: "Tên mô hình",
-
       namePlaceholder: "Ví dụ: Bộ phân loại xâm nhập mạng",
-
       descriptionLabel: "Mô tả",
-
       modelDescription: "Mô tả",
-
       descriptionPlaceholder: "Mô hình này học gì?",
-
       access: "Chế độ truy cập",
-
       accessMode: "Chế độ truy cập",
-
       private: "Riêng tư",
-
       public: "Công khai",
-
       privateTitle: "API riêng tư",
-
       privateDescription: "Yêu cầu JWT hoặc khóa API dự án hợp lệ.",
-
       publicTitle: "API công khai",
-
       publicDescription: "Cho phép dự đoán mà không cần xác thực.",
-
     },
-
     source: {
-
       title: "Mã nguồn và dữ liệu huấn luyện",
-
       description:
-
         "Xem workspace mới nhất rồi chọn script huấn luyện chính trong Mã nguồn.",
-
       flavor: "Framework mô hình",
-
       entryPoint: "Script huấn luyện chính",
-
       requirements: "Thư viện yêu cầu (không bắt buộc)",
-
       requirementsPlaceholder: "Mỗi dòng một thư viện Python",
-
       requirementsHelper: "Mỗi dòng một thư viện.",
-
       requirementsFile: "Tải lên requirements.txt",
-
       optional: "Không bắt buộc",
-
       sourceCode: "Mã nguồn",
-
       trainingData: "Dữ liệu huấn luyện",
-
       referenceData: "Dữ liệu tham chiếu",
-
       setReference: "Đặt làm dữ liệu tham chiếu",
-
       flavors: {
-
         sklearn: "Bộ ước lượng Pickle hoặc joblib.",
-
         xgboost: "Artifact Booster hoặc XGBModel.",
-
         pytorch: "Artifact PyTorch hoặc MLflow.",
-
         tensorflow: "Artifact Keras, SavedModel hoặc MLflow.",
-
       },
-
     },
-
     execution: {
-
-      localResourceUnavailable: "Không thể kiểm tra tài nguyên Docker. Vui lòng thử lại.",
-
+      localResourceUnavailable:
+        "Không thể kiểm tra tài nguyên Docker. Vui lòng thử lại.",
       localResourceCheckAgain: "Kiểm tra lại tài nguyên",
-
-      localResourceReason: { insufficient_capacity: "Docker không đủ RAM an toàn để chạy training.", docker_unavailable: "Không thể kết nối Docker hoặc Docker chưa hỗ trợ giới hạn CPU/RAM.", cache_unavailable: "Không thể kiểm tra tài nguyên lúc này.", checking: "Đang kiểm tra tài nguyên Docker." },
-
-      localResourceCapacity: "Docker: {{cpu}} vCPU / {{memory}} MiB. Ngân sách training: {{budgetCpu}} vCPU / {{budgetMemory}} MiB.",
-
+      localResourceReason: {
+        insufficient_capacity: "Docker không đủ RAM an toàn để chạy training.",
+        docker_unavailable:
+          "Không thể kết nối Docker hoặc Docker chưa hỗ trợ giới hạn CPU/RAM.",
+        cache_unavailable: "Không thể kiểm tra tài nguyên lúc này.",
+        checking: "Đang kiểm tra tài nguyên Docker.",
+      },
+      localResourceCapacity:
+        "Docker: {{cpu}} vCPU / {{memory}} MiB. Ngân sách training: {{budgetCpu}} vCPU / {{budgetMemory}} MiB.",
       localResourceRemaining: "Có thể cấp thêm: {{cpu}} vCPU / {{memory}} MiB.",
-
-      localResourceExceeded: "Không đủ tài nguyên training local. Còn {{cpu}} vCPU / {{memory}} MiB; hãy chọn cấu hình khác hoặc thử lại sau.",
-
-      localResourceSelectionMissing: "Cấu hình đã chọn không còn khả dụng. Hãy chọn lại cấu hình.",
-
+      localResourceExceeded:
+        "Không đủ tài nguyên training local. Còn {{cpu}} vCPU / {{memory}} MiB; hãy chọn cấu hình khác hoặc thử lại sau.",
+      localResourceSelectionMissing:
+        "Cấu hình đã chọn không còn khả dụng. Hãy chọn lại cấu hình.",
       quotaRemaining: "Hạn mức tuần còn lại: {{duration}}",
-
-      quotaCrossWeek: "Tác vụ có thể qua mốc cấp lại; hệ thống sẽ giữ chỗ quota ở cả hai tuần khi cần.",
-
+      quotaCrossWeek:
+        "Tác vụ có thể qua mốc cấp lại; hệ thống sẽ giữ chỗ quota ở cả hai tuần khi cần.",
       title: "Tài nguyên thực thi",
-
       description:
-
         "Chọn khả năng runtime mà Control Plane cung cấp rồi chạy huấn luyện.",
-
       backend: "Backend",
-
       cpuProfile: "Cấu hình CPU và bộ nhớ",
-
       accelerator: "Bộ tăng tốc",
-
       cpuOnly: "Chỉ CPU",
-
       gpuT4: "NVIDIA T4 · 16 GB ×1",
-
       gpuA10g: "NVIDIA A10G · 24 GB ×1",
-
       gpuGeneric: "GPU ×1",
-
-      gpuMemory: "VRAM: tổng {{total}} · còn trống {{free}} (lần kiểm tra gần nhất)",
-
+      gpuMemory:
+        "VRAM: tổng {{total}} · còn trống {{free}} (lần kiểm tra gần nhất)",
       gpuUnknown: "Không rõ",
-
       gpuCheckAgain: "Kiểm tra lại GPU",
-
       gpuRefreshFailed: "Không thể kiểm tra GPU. Vui lòng thử lại.",
-
-      gpuSelectionMissing: "GPU đã chọn không khả dụng. Hãy chọn GPU khác hoặc CPU.",
-
-      gpuMemoryNote: "VRAM còn trống chỉ là số liệu tại thời điểm kiểm tra, không đảm bảo đủ cho mô hình hoặc batch.",
-
+      gpuSelectionMissing:
+        "GPU đã chọn không khả dụng. Hãy chọn GPU khác hoặc CPU.",
+      gpuMemoryNote:
+        "VRAM còn trống chỉ là số liệu tại thời điểm kiểm tra, không đảm bảo đủ cho mô hình hoặc batch.",
       gpuStatus: {
-
         available: "GPU NVIDIA Docker có thể sử dụng",
-
         unavailable: "Docker chưa có GPU NVIDIA được xác minh.",
-
         checking: "Đang có một lượt kiểm tra GPU.",
-
         disabled: "Huấn luyện GPU đang bị tắt trong cấu hình local.",
-
         error: "Tạm thời chưa thể kiểm tra GPU.",
-
       },
-
       gpuReason: {
-
         nvidia_unavailable: "Kiểm tra NVIDIA driver và container toolkit.",
-
-        image_missing: "Hãy build image training runner trước khi kiểm tra GPU.",
-
+        image_missing:
+          "Hãy build image training runner trước khi kiểm tra GPU.",
         docker_unavailable: "Kiểm tra Docker đang chạy và có thể truy cập.",
-
         probe_unavailable: "Chưa thể hoàn tất kiểm tra GPU. Hãy thử lại.",
-
         probe_in_progress: "Hãy kiểm tra lại sau ít giây.",
-
         gpu_disabled: "Bật GPU training trong cấu hình local để sử dụng GPU.",
-
         device_selection_unsupported: "Docker không thể cô lập GPU đã chọn.",
-
       },
-
       gpuCount: "Số GPU",
-
       maxRuntime: "Thời gian chạy tối đa (giây)",
-
       console: "Bảng điều khiển huấn luyện",
-
       placeholder: "Chạy huấn luyện để xem log vòng đời tại đây.",
-
       train: "Huấn luyện",
-
       retrain: "Huấn luyện lại",
-
       stop: "Dừng",
-
       model: "Mô hình",
-
       compute: "Tài nguyên",
-
       running: "Đang huấn luyện",
-
       status: "Trạng thái hiện tại: {{status}}",
-
       unavailableTitle: "Huấn luyện tạm thời không khả dụng",
-
       unavailableDescription:
-
         "Nền tảng huấn luyện đang được kiểm chứng. Tạo và gửi tác vụ bị vô hiệu hóa đến khi rollout hoàn tất.",
-
     },
-
   },
-
   createJob: {
-
     steps: {
-
       sources: "Nguồn",
-
       compute: "Tài nguyên",
-
       execution: "Thực thi",
-
     },
-
     profiles: {
-
       small: "Nhỏ",
-
       medium: "Vừa",
-
       large: "Lớn",
-
       cheaper: "Tiết kiệm hơn",
-
       recommended: "Khuyến nghị",
-
       moreMemory: "Nhiều bộ nhớ hơn",
-
     },
-
     accelerator: {
-
       none: "Không dùng bộ tăng tốc",
-
       gpuOne: "GPU x1",
-
       gpuTwo: "GPU x2",
-
       gpuFour: "GPU x4",
-
       tpu: "TPU",
-
       trainium: "Trainium",
-
       cpuHelper: "Tác vụ CPU Kubeflow",
-
       gpuHelper: "Yêu cầu tài nguyên GPU Karpenter",
-
       comingSoon: "Sắp ra mắt",
-
     },
-
     started: "Tác vụ huấn luyện đã bắt đầu!",
-
     unableToStart: "Không thể bắt đầu tác vụ huấn luyện.",
-
     startFailed: "Không thể bắt đầu huấn luyện: {{message}}",
-
     cancelledTracking: "[SYSTEM] Người dùng đã hủy theo dõi huấn luyện.",
-
     backToTraining: "Quay lại Huấn luyện mô hình",
-
     title: "Tác vụ huấn luyện mới",
-
     titleFor: "Tác vụ huấn luyện mới cho {{name}}",
-
     codeData: "Mã nguồn và dữ liệu",
-
     codeDataDescription:
-
       "Xem và chỉnh sửa mã nguồn, dữ liệu tham chiếu trước khi bắt đầu huấn luyện.",
-
     sourceCode: "Mã nguồn",
-
     referenceData: "Dữ liệu tham chiếu",
-
     computeResources: "Tài nguyên tính toán",
-
     computeDescription: "Chọn cấu hình phần cứng cho tác vụ huấn luyện.",
-
     maxRuntime: "Thời gian chạy tối đa",
-
     cpu: "Tài nguyên (CPU)",
-
     acceleratorLabel: "Bộ tăng tốc (GPU)",
-
     summary: "Tóm tắt và thực thi",
-
     summaryDescription: "Kiểm tra cấu hình rồi bắt đầu huấn luyện.",
-
     mainFile: "Tệp chính",
-
     notSet: "Chưa đặt",
-
     compute: "Tài nguyên",
-
     acceleratorSummary: "Bộ tăng tốc",
-
     none: "Không có",
-
     minutes: "{{count}} phút",
-
     logTitle: "Log huấn luyện (Kubeflow)",
-
     logPlaceholder:
-
       "Bấm 'Chạy huấn luyện' để gửi tác vụ Kubeflow và thực thi mã nguồn.",
-
     run: "Chạy huấn luyện",
-
     stop: "Dừng",
-
     rerun: "Chạy lại huấn luyện",
-
     back: "Quay lại",
-
     continue: "Tiếp tục",
-
     unsavedTitle: "Thay đổi chưa lưu",
-
     leaveDescription:
-
       "Bạn có thay đổi chưa lưu trong mã nguồn, dữ liệu tham chiếu hoặc requirements. Rời trang sẽ làm mất các thay đổi này.",
-
     leaveDiscard: "Rời trang và bỏ thay đổi",
-
     stepDescription:
-
       "Bạn có thay đổi chưa lưu trong tệp. Tiếp tục mà không lưu? Các thay đổi sẽ không được dùng trong tác vụ huấn luyện.",
-
     continueAnyway: "Vẫn tiếp tục",
-
     requirementsTitle: "Requirements chưa lưu",
-
     requirementsIntro: "Bạn đã chỉnh sửa requirements.txt nhưng chưa lưu.",
-
     requirementsSavedVersion:
-
       "Tác vụ sẽ dùng phiên bản đã lưu gần nhất trên server, không dùng thay đổi chưa lưu.",
-
     requirementsSaveHint:
-
       "Quay lại và bấm Lưu trong trình soạn thảo requirements để sử dụng thay đổi mới nhất.",
-
     proceedSaved: "Tiếp tục với phiên bản đã lưu",
-
     goBackSave: "Quay lại và lưu",
-
   },
-
 } as const;

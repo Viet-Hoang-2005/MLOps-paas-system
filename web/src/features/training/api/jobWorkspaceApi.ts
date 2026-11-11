@@ -1,12 +1,13 @@
 import { apiClient } from "@/shared/api/client";
+import { isAxiosError } from "axios";
 import { controlPlaneURL } from "@/shared/api/config";
 import type { TrainingJob } from "@/features/training/types";
-import type { TrainingFileKind, TrainingFileSelection } from "@/features/training/components/TrainingFileDialog";
+import type { InputFileKind, InputFileSelection } from "@/features/training/components/InputFileDialog";
 
 export interface WorkspaceEntry {
   id: string;
   path: string;
-  kind: TrainingFileKind | "folder";
+  kind: InputFileKind | "folder";
   size_bytes: number;
   download_url?: string;
 }
@@ -23,7 +24,7 @@ export const updateJobWorkspace = async (id: string, revision: number, changes: 
 export const runJob = async (id: string, revision: number, runKey: string) =>
   (await apiClient.post<TrainingJob>(`${url(id)}submit/`, { revision, run_key: runKey })).data;
 
-export async function saveJobEntry(id: string, revision: number, selection: TrainingFileSelection | { path: string; kind: "folder"; file: null }, entryId?: string, content?: string) {
+export async function saveJobEntry(id: string, revision: number, selection: InputFileSelection | { path: string; kind: "folder"; file: null }, entryId?: string, content?: string) {
   const form = new FormData();
   form.append("revision", String(revision)); form.append("path", selection.path); form.append("kind", selection.kind);
   if (selection.file) form.append("file", selection.file);
@@ -42,8 +43,23 @@ export const getRunInput = async (id: string) =>
   (await apiClient.get<{ entries: WorkspaceEntry[]; entry_point: string }>(controlPlaneURL(`/training-jobs/${id}/input/`))).data;
 export const getRunFile = async (id: string, path: string) =>
   (await apiClient.get<{ content: string }>(controlPlaneURL(`/training-jobs/${id}/input/`), { params: { path } })).data.content;
-export const downloadRunInput = async (id: string) =>
-  (await apiClient.get<{ download_url: string }>(controlPlaneURL(`/training-jobs/${id}/input/`), { params: { download: "1" } })).data.download_url;
+export async function downloadWorkspaceSelection(id: string, area: "input" | "outputs", path?: string | null, revision?: number) {
+  const response = await apiClient.get<Blob>(`${url(id)}${area}/download/`, {
+    params: { ...(path ? { path } : {}), ...(revision !== undefined ? { revision } : {}) },
+    responseType: "blob", timeout: 120000,
+  }).catch(async (error: unknown) => {
+    if (isAxiosError(error) && error.response?.data instanceof Blob) {
+      try { error.response.data = JSON.parse(await error.response.data.text()); } catch { /* Keep the original transport error. */ }
+    }
+    throw error;
+  });
+  const filename = path?.split("/").pop() ?? (area === "input" ? "input" : "output");
+  const disposition = String(response.headers["content-disposition"] ?? "");
+  const encoded = /filename\*=utf-8''([^;]+)/i.exec(disposition)?.[1];
+  const plain = /filename="([^"]+)"/i.exec(disposition)?.[1];
+  const fallback = `${filename}${response.headers["content-type"] === "application/zip" && !filename.endsWith(".zip") ? ".zip" : ""}`;
+  return { blob: response.data, filename: encoded ? decodeURIComponent(encoded) : plain ?? fallback };
+}
 export const downloadRunOutput = async (id: string, outputId: string) =>
   (await apiClient.get<{ download_url: string }>(controlPlaneURL(`/training-jobs/${id}/outputs/${outputId}/download/`))).data.download_url;
 export const assignTrainingProject = async (id: string, outputRevision: number, project: { project_id: string } | { new_project: { id: string; name: string; description: string; access_mode: "private" | "public" } }) =>

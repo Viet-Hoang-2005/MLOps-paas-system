@@ -1,23 +1,20 @@
-import { formatDateTime, formatNumber } from "@/shared/i18n/formatters";
+import { formatDateTime } from "@/shared/i18n/formatters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Eye, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { listModelProjects } from "@/shared/api/catalogApi";
 import {
   deleteTrainingJob,
-  getTrainingUsage,
   listTrainingJobs,
   retryTrainingJob,
 } from "@/features/training/api/trainingApi";
-import type { TrainingStatusFilter } from "@/features/training/components/TrainingJobListSections";
 import { Select, type SelectOption } from "@/shared/components/Select";
 import { trainingQueryKeys } from "@/features/training/queryKeys";
 import { getTrainingStartError } from "@/features/training/api/quotaErrors";
-import { formatQuotaDuration } from "@/features/training/api/quotaFormatting";
 import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
@@ -26,7 +23,6 @@ import { Callout } from "@/shared/components/Callout";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { Table } from "@/shared/components/Table";
-import { formatDuration } from "@/shared/lib/formatDuration";
 import { toast } from "@/shared/lib/toastStore";
 
 const ACTIVE_STATUSES: TrainingJobStatus[] = [
@@ -37,41 +33,16 @@ const ACTIVE_STATUSES: TrainingJobStatus[] = [
   "cancelling",
 ];
 
-type TrainingSummaryStatus = "editing" | "pending" | "success" | "failed";
-
-const summaryStatusForJob = (job: TrainingJob): TrainingSummaryStatus => {
-  const status = displayStatus(job);
-  if (status === "editing") return "editing";
-  return status === "success" || status === "failed" ? status : "pending";
-};
-
-const elapsedForJob = (job: TrainingJob) => {
-  if (job.runtime_seconds) return job.runtime_seconds;
-  if (job.started_at && ACTIVE_STATUSES.includes(job.status)) {
-    return Math.max(
-      Math.floor((Date.now() - new Date(job.started_at).getTime()) / 1000),
-      0,
-    );
-  }
-  return 0;
-};
-
-const displayStatus = (job: TrainingJob) => {
-  if (job.deletion_pending) return "deleting";
-  if (job.status === "editing") return "editing";
-  if (job.status === "completed") return "success";
-  if (job.status === "failed" || job.status === "cancelled") return "failed";
-  return "pending";
-};
-
 export default function TrainingModelPage() {
-  const { modelId } = useParams();
   const { t, i18n } = useTranslation("training");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [projectFilter, setProjectFilter] = useState(modelId ?? "all");
-  const { data: projects } = useQuery({ queryKey: ["training", "projects"], queryFn: listModelProjects });
-  const [statusFilter, setStatusFilter] = useState<TrainingStatusFilter>("all");
+  const [projectFilter, setProjectFilter] = useState("all");
+  const { data: projects } = useQuery({
+    queryKey: ["training", "projects"],
+    queryFn: listModelProjects,
+  });
+  const [statusFilter, setStatusFilter] = useState("all");
   const [jobToDelete, setJobToDelete] = useState<TrainingJob | null>(null);
   const [jobToRetry, setJobToRetry] = useState<TrainingJob | null>(null);
   const retryKeys = useRef(new Map<string, string>());
@@ -99,64 +70,58 @@ export default function TrainingModelPage() {
         : false;
     },
   });
-  const { data: usage, isLoading: isUsageLoading, isError: isUsageError } = useQuery({
-    queryKey: trainingQueryKeys.usage(),
-    queryFn: getTrainingUsage,
-    refetchInterval: 15000,
-  });
 
   const allTrainingJobs = useMemo(
     () => data?.training_jobs ?? [],
     [data?.training_jobs],
   );
-  const selectedModelTrainingJobs = useMemo(
-    () =>
-      projectFilter === "all" ? allTrainingJobs : allTrainingJobs.filter((job) => projectFilter === "unassigned" ? !job.project_id : job.project_id === projectFilter),
-    [allTrainingJobs, projectFilter],
-  );
+
+  const projectOptions = useMemo<SelectOption[]>(() => {
+    const options: SelectOption[] = [
+      { value: "all", label: t("studio.allProjects") },
+      { value: "unassigned", label: t("studio.unassigned") },
+    ];
+    if (projects?.models) {
+      for (const project of projects.models) {
+        options.push({ value: project.id, label: project.name });
+      }
+    }
+    return options;
+  }, [projects, t]);
+
   const statusOptions = useMemo<SelectOption[]>(
     () => [
       { value: "all", label: t("statusFilter.all") },
-      { value: "editing", label: t("statusFilter.editing") },
-      { value: "pending", label: t("statusFilter.pending") },
-      { value: "success", label: t("statusFilter.success") },
-      { value: "failed", label: t("statusFilter.failed") },
+      { value: "editing", label: t("detail.statuses.editing", "Editing") },
+      { value: "running", label: t("detail.statuses.running", "Running") },
+      { value: "uploading", label: t("detail.statuses.uploading", "Uploading") },
+      { value: "cancelling", label: t("detail.statuses.cancelling", "Cancelling") },
+      { value: "completed", label: t("detail.statuses.completed", "Completed") },
+      { value: "failed", label: t("detail.statuses.failed", "Failed") },
+      { value: "cancelled", label: t("detail.statuses.cancelled", "Cancelled") },
+      { value: "pending", label: t("detail.statuses.pending", "Pending") },
+      { value: "queued", label: t("detail.statuses.queued", "Queued") },
     ],
     [t],
   );
 
   const trainingJobs = useMemo(
     () =>
-      selectedModelTrainingJobs.filter((job) => {
-        const status = displayStatus(job);
-        return (
-          statusFilter === "all" ||
-          (status === "deleting" ? "pending" : status) === statusFilter
-        );
+      allTrainingJobs.filter((job) => {
+        if (projectFilter === "unassigned") {
+          if (job.project_id) return false;
+        } else if (projectFilter !== "all") {
+          if (job.project_id !== projectFilter) return false;
+        }
+
+        if (statusFilter !== "all") {
+          if (job.status !== statusFilter) return false;
+        }
+
+        return true;
       }),
-    [selectedModelTrainingJobs, statusFilter],
+    [allTrainingJobs, projectFilter, statusFilter],
   );
-  const trainingStatusSummary = useMemo(() => {
-    const total = selectedModelTrainingJobs.length;
-    const counts: Record<TrainingSummaryStatus, number> = {
-      editing: 0,
-      pending: 0,
-      success: 0,
-      failed: 0,
-    };
-
-    selectedModelTrainingJobs.forEach((job) => {
-      counts[summaryStatusForJob(job)] += 1;
-    });
-
-    return (
-      Object.entries(counts) as Array<[TrainingSummaryStatus, number]>
-    ).map(([status, count]) => ({
-      status,
-      count,
-      percentage: total ? (count / total) * 100 : 0,
-    }));
-  }, [selectedModelTrainingJobs]);
 
   useEffect(() => {
     if (!pendingDeletionIds.current.size) return;
@@ -216,16 +181,17 @@ export default function TrainingModelPage() {
     onSuccess: (newJob, sourceJob) => {
       setJobToRetry(null);
       toast.success(t("studio.draftCreated"));
-      void queryClient.invalidateQueries({ queryKey: trainingQueryKeys.usage() });
       void queryClient.invalidateQueries({
         queryKey: trainingQueryKeys.jobs(),
       });
-      navigate(`/dashboard/training/${newJob.id}/workspace${sourceJob.project_id ? `?project=${sourceJob.project_id}` : ""}`);
+      navigate(
+        `/dashboard/training/${newJob.id}/workspace${
+          sourceJob.project_id ? `?project=${sourceJob.project_id}` : ""
+        }`,
+      );
     },
     onError: (error) => {
-      toast.error(
-        getTrainingStartError(error, t, i18n.language),
-      );
+      toast.error(getTrainingStartError(error, t, i18n.language));
     },
   });
 
@@ -233,11 +199,11 @@ export default function TrainingModelPage() {
     () => [
       {
         accessorKey: "id",
-        header: t("detail.overview.internalJobId"),
+        header: t("table.jobId", "Training job ID"),
         cell: ({ row }) => (
           <button
             type="button"
-            className="break-all text-left font-medium hover:text-color-primary"
+            className="break-all text-left font-medium hover:text-color-primary focus:outline-none"
             onClick={() => navigate(`/dashboard/training/${row.original.id}/workspace`)}
           >
             {row.original.id}
@@ -245,103 +211,63 @@ export default function TrainingModelPage() {
         ),
       },
       {
-        accessorKey: "project_id",
-        header: t("studio.project"),
-        cell: ({ row }) => projects?.models.find((project) => project.id === row.original.project_id)?.name ?? t("studio.unassigned"),
-      },
-      {
-        accessorKey: "started_at",
-        header: t("table.trainingAt"),
+        accessorKey: "created_at",
+        header: t("table.createAt", "Create at"),
         cell: ({ row }) => (
-          <button
-            type="button"
-            className="text-left font-medium hover:text-color-primary transition-colors focus:outline-none"
-            onClick={() =>
-              navigate(`/dashboard/training/${row.original.id}/workspace`)
-            }
-          >
-            {row.original.started_at
-              ? formatDateTime(row.original.started_at, i18n.language)
+          <span className="text-left font-medium">
+            {row.original.created_at
+              ? formatDateTime(row.original.created_at, i18n.language)
               : "—"}
-          </button>
+          </span>
         ),
       },
       {
-        accessorKey: "model_flavor",
-        header: t("table.flavor"),
-        cell: ({ row }) => (
-          <Badge variant="neutral">
-            {t(`table.flavors.${row.original.model_flavor}`)}
-          </Badge>
-        ),
+        accessorKey: "project_id",
+        header: t("studio.project", "Model Project"),
+        cell: ({ row }) =>
+          projects?.models.find((project) => project.id === row.original.project_id)?.name ??
+          t("studio.unassigned", "Unassigned"),
       },
       {
-        accessorKey: "model_status",
-        header: t("table.modelStatus"),
+        accessorKey: "status",
+        header: t("table.status", "Training status"),
         cell: ({ row }) => {
-          const modelStatus = row.original.model_status ?? "none";
+          const job = row.original;
+          if (job.deletion_pending) {
+            return <Badge variant="warning">{t("table.deleting", "Deleting…")}</Badge>;
+          }
+          const status = job.status;
           const variant =
-            modelStatus === "deployed"
+            status === "completed"
               ? "success"
-              : modelStatus === "built"
+              : status === "running" || status === "uploading"
                 ? "primary"
-                : modelStatus === "trained"
-                  ? "warning"
-                  : "neutral";
+                : status === "failed"
+                  ? "danger"
+                  : status === "cancelling" || status === "cancelled"
+                    ? "warning"
+                    : "neutral";
           return (
             <Badge variant={variant}>
-              {t(`table.modelStatuses.${modelStatus}`)}
+              {t(`detail.statuses.${status}`, status)}
             </Badge>
           );
         },
       },
       {
-        id: "accelerators",
-        header: t("table.accelerators"),
-        enableSorting: false,
-        cell: ({ row }) => {
-          const job = row.original;
-          if (job.vcpu == null || job.memory_mb == null) return "—";
-          const digits = job.memory_mb % 1024 === 0 ? 0 : 1;
-          const memoryGb = formatNumber(job.memory_mb / 1024, i18n.language, {
-            minimumFractionDigits: digits,
-            maximumFractionDigits: digits,
-          });
-          const gpu =
-            job.accelerator_type === "gpu" && job.accelerator_count > 0
-              ? ` · ${job.accelerator_model === "t4" ? "NVIDIA T4" : job.accelerator_model === "a10g" ? "NVIDIA A10G" : "GPU"} ×${job.accelerator_count}`
-              : "";
-          return `${job.vcpu} vCPU · ${memoryGb} GB${gpu}`;
-        },
-      },
-      {
-        id: "runtime",
-        header: t("table.runtime"),
-        accessorFn: elapsedForJob,
-        cell: ({ row }) => formatDuration(elapsedForJob(row.original)),
-      },
-      {
-        id: "status",
-        header: t("table.status"),
-        accessorFn: displayStatus,
-        cell: ({ row }) => {
-          const status = displayStatus(row.original);
-          const variant =
-            status === "success"
-              ? "success"
-              : status === "failed"
-                ? "danger"
-                : status === "deleting"
-                  ? "warning"
-                  : "neutral";
-          return (
-            <Badge variant={variant}>{t(`table.statuses.${status}`)}</Badge>
-          );
-        },
+        accessorKey: "started_at",
+        header: t("table.trainingAt", "Training at"),
+        cell: ({ row }) => (
+          <span className="text-left font-medium">
+            {row.original.started_at
+              ? formatDateTime(row.original.started_at, i18n.language)
+              : "—"}
+          </span>
+        ),
       },
       {
         id: "actions",
-        header: t("table.actions"),
+        header: t("table.actions", "Action"),
         enableSorting: false,
         cell: ({ row }) => {
           const job = row.original;
@@ -353,30 +279,28 @@ export default function TrainingModelPage() {
               <Button
                 size="icon"
                 variant="ghost"
-                aria-label={t("training:table.view")}
-                title={t("training:table.view")}
+                aria-label={t("table.view", "View")}
+                title={t("table.view", "View")}
                 icon={<Eye className="h-4 w-4" />}
                 disabled={deleting}
                 onClick={() =>
                   navigate(`/dashboard/training/${job.id}/workspace`)
                 }
               />
-              {(job.status === "failed" || job.status === "cancelled") && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label={t("training:retryJob")}
-                  title={t("training:retryJob")}
-                  icon={<RotateCcw className="h-4 w-4" />}
-                  disabled={deleting || retryMutation.isPending}
-                  onClick={() => setJobToRetry(job)}
-                />
-              )}
               <Button
                 size="icon"
                 variant="ghost"
-                aria-label={t("training:table.delete")}
-                title={t("training:table.delete")}
+                aria-label={t("retryJob", "Retry job")}
+                title={t("retryJob", "Retry job")}
+                icon={<RotateCcw className="h-4 w-4" />}
+                disabled={deleting || retryMutation.isPending}
+                onClick={() => setJobToRetry(job)}
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label={t("table.delete", "Delete")}
+                title={t("table.delete", "Delete")}
                 icon={<Trash2 className="h-4 w-4" />}
                 className="text-color-danger hover:text-color-danger-hover active:text-color-danger-active"
                 disabled={deleting}
@@ -393,103 +317,47 @@ export default function TrainingModelPage() {
   return (
     <section className="flex w-full flex-1 flex-col space-y-6">
       <PageHeader title={t("title")} />
-      <div className="flex flex-wrap gap-3">
-        <label className="space-y-2 text-style-body-strong"><span>{t("studio.project")}</span><select className="block h-11 rounded-control border border-input bg-surface px-3 text-style-body" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">{t("studio.allProjects")}</option><option value="unassigned">{t("studio.unassigned")}</option>{projects?.models.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-surface border border-border bg-surface p-5 shadow-sm md:col-span-2">
-          <p className="text-style-overline uppercase text-color-muted-foreground">{t("quota")}</p>
-          {isUsageLoading && <p>...</p>}
-          {isUsageError && <p className="text-style-caption text-color-danger">{t("quotaUnavailable")}</p>}
-          {usage && <p className="text-style-caption text-color-muted-foreground">{t("quotaReset", { time: formatDateTime(usage.reset_at, i18n.language) })}</p>}
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {usage?.resources.map((item) => (
-              <div key={item.resource} className="rounded-surface border border-border p-3">
-                <p className="text-style-caption-strong">{t(`quotaProfiles.${item.resource}`)}</p>
-                <p className="text-style-body-strong">{item.remaining_seconds == null ? t("quotaUnlimited") : formatQuotaDuration(item.remaining_seconds)}</p>
-                {item.limit_seconds != null && <p className="text-style-caption text-color-muted-foreground">
-                  {formatQuotaDuration(item.used_seconds)} / {formatQuotaDuration(item.limit_seconds)} · {t("quotaReserved", { duration: formatQuotaDuration(item.reserved_seconds) })}
-                </p>}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-surface border border-border bg-surface p-5 shadow-sm">
-          <p className="flex items-center gap-2 text-style-overline uppercase text-color-muted-foreground">
-            {t("totalJobs")}
-          </p>
-          <span className="mt-3 text-style-page-title font-semibold text-color-foreground">
-            {selectedModelTrainingJobs.filter((job) => Boolean(job.submitted_at)).length}
-          </span>
-          <p className="mt-2 text-style-caption">{t("studio.draftCount", { count: selectedModelTrainingJobs.filter((job) => job.status === "editing").length })}</p>
-          <div
-            className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-muted"
-            aria-label={t("statusDistribution.label")}
-            role="img"
-          >
-            {trainingStatusSummary.some(({ count }) => count > 0) ? (
-              trainingStatusSummary.map(({ status, percentage }) => (
-                <span
-                  key={status}
-                  tabIndex={0}
-                  title={t("statusDistribution.tooltip", {
-                    status: t(`table.statuses.${status}`),
-                    percentage: formatNumber(percentage, i18n.language, {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    }),
-                  })}
-                  aria-label={t("statusDistribution.tooltip", {
-                    status: t(`table.statuses.${status}`),
-                    percentage: formatNumber(percentage, i18n.language, {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    }),
-                  })}
-                  className={
-                    status === "success"
-                      ? "h-full bg-success outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      : status === "failed"
-                        ? "h-full bg-danger outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        : "h-full bg-primary outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  }
-                  style={{ width: `${percentage}%` }}
-                />
-              ))
-            ) : (
-              <span
-                className="h-full w-full"
-                title={t("statusDistribution.empty")}
-              />
-            )}
-          </div>
-        </div>
-      </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="w-full sm:w-60">
-          <Select
-            className="h-10 text-style-body"
-            value={statusFilter}
-            onChange={(val) => setStatusFilter(val as TrainingStatusFilter)}
-            options={statusOptions}
-            placeholder={t("statusFilter.placeholder")}
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-full sm:w-60">
+            <Select
+              className="h-10 text-style-body"
+              value={projectFilter}
+              onChange={(val) => setProjectFilter(val)}
+              options={projectOptions}
+              aria-label={t("studio.project")}
+            />
+          </div>
+          <div className="w-full sm:w-60">
+            <Select
+              className="h-10 text-style-body"
+              value={statusFilter}
+              onChange={(val) => setStatusFilter(val)}
+              options={statusOptions}
+              placeholder={t("statusFilter.placeholder")}
+              aria-label={t("statusFilter.label")}
+            />
+          </div>
         </div>
         <Button
           size="md"
           icon={<Plus className="h-4 w-4" />}
-          onClick={() => navigate(`/dashboard/training/new${modelId ? `?project=${modelId}` : ""}`)}
+          onClick={() =>
+            navigate(
+              `/dashboard/training/new${
+                projectFilter && projectFilter !== "all" && projectFilter !== "unassigned"
+                  ? `?project=${projectFilter}`
+                  : ""
+              }`,
+            )
+          }
         >
           {t("newJob")}
         </Button>
       </div>
 
       {isError && (
-        // A failed background refresh (the list polls while jobs run) keeps the last loaded
-        // jobs on screen; only a failed first load, with nothing to show, replaces the table.
         <Callout
           variant="danger"
           role="alert"

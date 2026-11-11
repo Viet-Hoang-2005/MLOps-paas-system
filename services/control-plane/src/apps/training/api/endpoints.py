@@ -187,6 +187,19 @@ class TrainingOutputDownloadEndpoint(APIView):
         return Response(output_download(job_for_user(request.user, job_id), output_id))
 
 
+class TrainingWorkspaceDownloadEndpoint(APIView):
+    def get(self, request, job_id, area):
+        from django.http import FileResponse
+        from apps.training.services.downloads import workspace_download
+        stream, filename, content_type = workspace_download(
+            job_for_user(request.user, job_id), area=area, path=request.query_params.get("path"),
+            revision=request.query_params.get("revision"),
+        )
+        response = FileResponse(stream, as_attachment=True, filename=filename, content_type=content_type)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
 class TrainingJobBuildEndpoint(APIView):
     def post(self, request, job_id):
         job = job_for_user(request.user, job_id)

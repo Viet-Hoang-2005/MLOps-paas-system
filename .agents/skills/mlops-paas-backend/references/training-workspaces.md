@@ -32,3 +32,7 @@
 ## Verification and rollout
 
 Apply additive training migrations, then update Control Plane/workers and runner image together. Kubernetes init and main containers use the same promoted image. See docs/dev/training-model-output.md for the current contract and services/control-plane/scripts/verify_training_workspace.py for the disposable Docker/S3 end-to-end check. Test ownership, revisions, retry, file rules, RO mounts, verified upload, assignment and resumable preservation before Project cleanup. Rendering manifests is offline; deployment requires its own authorization.
+
+## Workspace downloads
+
+GET /training-jobs/{job}/input/download/ and /outputs/download/ authorize the owning account before storage access and return attachments, accepting only an optional relative path. A file selection returns the exact bytes; a folder selection returns a ZIP rooted at that folder; no selection returns the entire area as a ZIP. Unsubmitted Input reads draft objects with an optional revision check; submitted Input reads the frozen ZIP, never mutable entries. Empty selections are unavailable. Keep safe-path/job-prefix/checksum validation and binary-safe streaming. Derived ZIPs use bounded temporary files, not persistent S3 objects; close streams on success/error and after the HTTP response.

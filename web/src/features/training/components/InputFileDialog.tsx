@@ -5,37 +5,42 @@ import BaseDialog from "@/shared/components/BaseDialog";
 import { Button } from "@/shared/components/Button";
 import { FileDropzone } from "@/shared/components/FileDropzone";
 import { Input } from "@/shared/components/Input";
+import { Select, type SelectOption } from "@/shared/components/Select";
 
-export type TrainingFileKind = "script" | "data" | "config" | "document" | "requirements";
-export interface TrainingFileSelection { path: string; kind: TrainingFileKind; file: File | null }
-export interface TrainingFileDialogProps {
-  existing?: { path: string; kind: TrainingFileKind };
+export type InputFileKind = "script" | "data" | "config" | "document" | "requirements";
+export interface InputFileSelection { path: string; kind: InputFileKind; file: File | null }
+export interface InputFileDialogProps {
+  existing?: { path: string; kind: InputFileKind };
   parentPath?: string;
   hasRequirements: boolean;
   saving?: boolean;
   onClose: () => void;
-  onSave: (selection: TrainingFileSelection) => void;
+  onSave: (selection: InputFileSelection) => void;
 }
 
-const extensions: Record<TrainingFileKind, string> = {
+const extensions: Record<InputFileKind, string> = {
   script: ".py", data: ".csv", config: ".json", document: ".md", requirements: ".txt",
 };
 
-export function TrainingFileDialog({ existing, parentPath = "", hasRequirements, saving = false, onClose, onSave }: TrainingFileDialogProps) {
+export function InputFileDialog({ existing, parentPath = "", hasRequirements, saving = false, onClose, onSave }: InputFileDialogProps) {
   const { t } = useTranslation("training");
-  const [kind, setKind] = useState<TrainingFileKind>(existing?.kind ?? "script");
+  const [kind, setKind] = useState<InputFileKind>(existing?.kind ?? "script");
   const [name, setName] = useState(existing?.path.split("/").pop() ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const lockedRequirements = existing?.kind === "requirements";
   const isRequirements = kind === "requirements";
-  const kinds = [
+  const kinds: SelectOption[] = [
     { value: "script", label: t("workspace.fileDialog.script") },
     { value: "data", label: t("workspace.fileDialog.data") },
     { value: "config", label: t("workspace.fileDialog.config") },
     { value: "document", label: t("workspace.fileDialog.document") },
-    { value: "requirements", label: t("workspace.fileDialog.requirements") },
-  ] as const;
+    {
+      value: "requirements",
+      label: t("workspace.fileDialog.requirements"),
+      disabled: !lockedRequirements && (hasRequirements || Boolean(existing)),
+    },
+  ];
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -59,17 +64,19 @@ export function TrainingFileDialog({ existing, parentPath = "", hasRequirements,
   };
 
   return (
-    <BaseDialog title={existing ? t("workspace.fileDialog.edit") : t("workspace.fileDialog.create")} onClose={onClose} description={t("workspace.fileDialog.description")}>
+    <BaseDialog title={existing ? t("workspace.fileDialog.edit") : t("workspace.fileDialog.create")} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
-        <label className="block space-y-2 text-style-body-strong text-color-foreground">
-          <span>{t("workspace.fileDialog.type")}</span>
-          <select aria-label={t("workspace.fileDialog.type")} value={kind} disabled={Boolean(lockedRequirements) || saving}
-            onChange={(event) => { setKind(event.target.value as TrainingFileKind); setFile(null); setError(""); }}
-            className="h-14 w-full rounded-control border border-input bg-surface px-4 text-style-body text-color-foreground">
-            {kinds.map((item) => <option key={item.value} value={item.value}
-              disabled={item.value === "requirements" && !lockedRequirements && (hasRequirements || Boolean(existing))}>{item.label}</option>)}
-          </select>
-        </label>
+        <Select
+          label={t("workspace.fileDialog.type")}
+          value={kind}
+          disabled={Boolean(lockedRequirements) || saving}
+          onChange={(val) => {
+            setKind(val as InputFileKind);
+            setFile(null);
+            setError("");
+          }}
+          options={kinds}
+        />
         <Input label={t("workspace.fileDialog.name")} value={isRequirements ? "requirements.txt" : name}
           disabled={isRequirements || saving} onChange={(event) => { setName(event.target.value); setError(""); }} error={error || undefined} />
         {!lockedRequirements && <FileDropzone accept={extensions[kind]} title={file?.name ?? t("workspace.fileDialog.upload")}
