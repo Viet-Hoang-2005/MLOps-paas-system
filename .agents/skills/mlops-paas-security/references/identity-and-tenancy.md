@@ -18,3 +18,5 @@
 - Inference paths bind tenant, project, and version consistently.
 
 Test valid, missing, revoked, expired, invalid-signature, wrong-tenant, and cross-project cases.
+
+Account avatars use a single CustomUser.avatar reference and server-generated immutable keys under users/{tenant_id}/avatar/. All writes act on the authenticated account (OAuth import only for account creation). Validate uploads as images up to 5 MiB; reject raw storage-key/URL assignment and upload+remove ambiguity. Object cleanup must validate tenant scope and skip any currently referenced key, including after concurrent replacements.

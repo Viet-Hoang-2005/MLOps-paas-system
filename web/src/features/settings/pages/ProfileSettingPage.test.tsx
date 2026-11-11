@@ -7,10 +7,8 @@ import type { UserProfile } from "@/features/settings/types";
 
 vi.mock("@/features/settings/api/profileApi", () => ({
   getProfile: vi.fn(),
-  listProfileAvatars: vi.fn(),
   updateProfile: vi.fn(),
   updateProfileAvatar: vi.fn(),
-  selectProfileAvatar: vi.fn(),
   deleteAccount: vi.fn(),
   requestPasswordChangeOTP: vi.fn(),
   verifyPasswordChangeOTP: vi.fn(),
@@ -35,7 +33,6 @@ describe("ProfileSettingPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(profileApi.getProfile).mockResolvedValue(mockProfile);
-    vi.mocked(profileApi.listProfileAvatars).mockResolvedValue({ avatars: [] });
     vi.mocked(profileApi.updateProfile).mockResolvedValue({
       message: "Profile updated successfully",
     });

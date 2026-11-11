@@ -7,8 +7,7 @@ from django.utils import timezone
 
 
 def avatar_path(instance, filename):
-    user = getattr(instance, "user", instance)
-    return f"users/{user.tenant_id}/avatar/{filename}"
+    return f"users/{instance.tenant_id}/avatar/{filename}"
 
 
 class CustomUserManager(BaseUserManager):
@@ -85,16 +84,3 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         self.is_active = False
         self.deleted_at = timezone.now()
         self.save(update_fields=["is_active", "deleted_at"])
-
-
-class UserAvatar(models.Model):
-    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="avatar_history")
-    image = models.ImageField(upload_to=avatar_path, max_length=1024)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"Avatar {self.public_id} for {self.user.email}"

@@ -22,3 +22,7 @@ bound visible output, drain exit logs after terminal status, and preserve cursor
 during outages. `unconfirmed` deployment means callback missing, not successful.
 
 `TerminalViewer` is presentation-only: title, copy action, optional header actions, placeholder, and supplied log content. Pages/hooks own polling, stream cursors, Run/Stop/Retry behavior, and lifecycle callbacks.
+
+## Profile avatar
+
+A profile has one optional avatar. Settings provides upload/crop/replace/remove, without avatar history queries or selection. Header and Settings share settingsQueryKeys.profile(); invalidate that key after successful avatar changes. Keep the previous image and the crop dialog when upload fails. The shared AvatarDialog accepts only current-image presentation/actions, never feature-owned history types.

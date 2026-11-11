@@ -83,13 +83,11 @@ export default function ProfileSettingPage() {
   const { t, i18n } = useTranslation("settings");
   const {
     profile,
-    avatarHistory,
     formValues,
     editingProfile,
     loading,
     saving,
     avatarSaving,
-    avatarHistoryLoading,
     profileChanged,
     passwordModalStep,
     newPassword,
@@ -110,7 +108,6 @@ export default function ProfileSettingPage() {
     handleCancelEdit,
     handleUpdateAvatar,
     handleRemoveAvatar,
-    handleSelectAvatar,
     openPasswordOTPModal,
     handleVerifyPasswordOTP,
     handleCompletePasswordChange,
@@ -120,9 +117,6 @@ export default function ProfileSettingPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [avatarModal, setAvatarModal] = useState<AvatarModalState>("closed");
   const [cropImage, setCropImage] = useState("");
-  const [selectingAvatarId, setSelectingAvatarId] = useState<string | null>(
-    null,
-  );
   const [copiedTenantId, setCopiedTenantId] = useState(false);
 
   const handleCopyTenantId = async () => {
@@ -184,24 +178,23 @@ export default function ProfileSettingPage() {
   };
 
   const confirmAvatarCrop = async (file: File) => {
-    await handleUpdateAvatar(file);
-    closeCropModal();
+    try {
+      await handleUpdateAvatar(file);
+      closeCropModal();
+    } catch {
+      // The mutation displays the error; keep the crop for retry.
+    }
   };
 
   const removeAvatar = async () => {
-    await handleRemoveAvatar();
-    setAvatarModal("closed");
-  };
-
-  const selectAvatar = async (avatarId: string) => {
-    setSelectingAvatarId(avatarId);
     try {
-      await handleSelectAvatar(avatarId);
+      await handleRemoveAvatar();
       setAvatarModal("closed");
-    } finally {
-      setSelectingAvatarId(null);
+    } catch {
+      // The mutation displays the error; keep the current avatar on failure.
     }
   };
+
 
   return (
     <div className="flex w-full flex-1 flex-col space-y-6">
@@ -631,13 +624,10 @@ export default function ProfileSettingPage() {
       <AvatarDialog
         open={avatarModal === "options"}
         avatarPreview={avatarPreview}
-        avatarHistory={avatarHistory}
-        historyLoading={avatarHistoryLoading}
-        selectingAvatarId={selectingAvatarId}
+        busy={avatarSaving}
         onClose={() => setAvatarModal("closed")}
         onRemove={removeAvatar}
         onChange={openAvatarPicker}
-        onSelectAvatar={selectAvatar}
       />
 
       <CropDialog

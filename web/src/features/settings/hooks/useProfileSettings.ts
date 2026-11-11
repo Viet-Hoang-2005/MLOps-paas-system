@@ -3,9 +3,7 @@ import {
   completePasswordChange,
   deleteAccount,
   getProfile,
-  listProfileAvatars,
   requestPasswordChangeOTP,
-  selectProfileAvatar,
   updateProfile,
   updateProfileAvatar,
   verifyPasswordChangeOTP,
@@ -63,10 +61,6 @@ export function useProfileSettings() {
     queryKey: settingsQueryKeys.profile(),
     queryFn: getProfile,
   });
-  const avatarHistoryQuery = useQuery({
-    queryKey: settingsQueryKeys.avatars(),
-    queryFn: listProfileAvatars,
-  });
 
   const profile = profileQuery.data ?? null;
   const profileFormValues = useMemo(
@@ -115,14 +109,7 @@ export function useProfileSettings() {
   const updateAvatarMutation = useMutation({
     mutationFn: updateProfileAvatar,
     onSuccess: async (_response, variables) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: settingsQueryKeys.profile(),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: settingsQueryKeys.avatars(),
-        }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: settingsQueryKeys.profile() });
       toast.success(
         variables.remove_avatar
           ? t("profilePage.avatarRemoved")
@@ -132,26 +119,6 @@ export function useProfileSettings() {
     onError: (error) => {
       toast.error(
         getApiErrorMessage(error, t("profilePage.avatarUpdateFailed")),
-      );
-    },
-  });
-
-  const selectAvatarMutation = useMutation({
-    mutationFn: selectProfileAvatar,
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: settingsQueryKeys.profile(),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: settingsQueryKeys.avatars(),
-        }),
-      ]);
-      toast.success(t("profilePage.avatarSelected"));
-    },
-    onError: (error) => {
-      toast.error(
-        getApiErrorMessage(error, t("profilePage.avatarSelectFailed")),
       );
     },
   });
@@ -199,10 +166,6 @@ export function useProfileSettings() {
 
   const handleRemoveAvatar = async () => {
     await updateAvatarMutation.mutateAsync({ remove_avatar: true });
-  };
-
-  const handleSelectAvatar = async (avatarId: string) => {
-    await selectAvatarMutation.mutateAsync(avatarId);
   };
 
   const openPasswordOTPModal = async () => {
@@ -285,14 +248,11 @@ export function useProfileSettings() {
 
   return {
     profile,
-    avatarHistory: avatarHistoryQuery.data?.avatars ?? [],
     formValues,
     editingProfile,
     loading: profileQuery.isLoading,
     saving: updateProfileMutation.isPending,
     avatarSaving: updateAvatarMutation.isPending,
-    avatarHistoryLoading: avatarHistoryQuery.isLoading,
-    selectingAvatar: selectAvatarMutation.isPending,
     profileChanged,
     passwordModalStep,
     otpCode,
@@ -314,7 +274,6 @@ export function useProfileSettings() {
     handleCancelEdit,
     handleUpdateAvatar,
     handleRemoveAvatar,
-    handleSelectAvatar,
     openPasswordOTPModal,
     handleVerifyPasswordOTP,
     handleCompletePasswordChange,

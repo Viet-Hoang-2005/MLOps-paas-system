@@ -5,7 +5,7 @@ from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.auth.models import UserAvatar
+from apps.auth.services.avatars import update_profile, validate_avatar
 from apps.auth.services.cookies import clear_refresh_token_cookie, verify_auth_security_headers
 from apps.auth.services.otp import (
     check_and_record_otp_cooldown,
@@ -80,6 +80,10 @@ class CompleteRegistrationEndpoint(APIView):
         except DjangoValidationError as exc:
             raise serializers.ValidationError({"password": list(exc.messages)})
 
+        avatar = request.FILES.get("avatar")
+        if avatar is not None:
+            validate_avatar(avatar)
+
         try:
             read_token(token, "registration", consume=True)
         except TypeError:
@@ -90,11 +94,8 @@ class CompleteRegistrationEndpoint(APIView):
             password=password,
             full_name=full_name,
         )
-        avatar = request.FILES.get("avatar")
-        if avatar:
-            user.avatar = avatar
-            user.save(update_fields=["avatar"])
-            UserAvatar.objects.create(user=user, image=user.avatar.name)
+        if avatar is not None:
+            user = update_profile(user, avatar=avatar)
         return create_auth_response(
             user,
             {"message": "Account created.", "is_new_user": True},

@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from rest_framework.exceptions import AuthenticationFailed, ValidationError
 
-from apps.auth.models import UserAvatar
+from apps.auth.services.avatars import update_profile
 from infrastructure.http import HttpClient
 
 logger = logging.getLogger(__name__)
@@ -226,7 +226,7 @@ def _save_oauth_avatar(user, provider, avatar_url, http=None):
             return
 
         filename = f"oauth-{provider}{extension}"
-        user.avatar.save(filename, ContentFile(bytes(content)), save=True)
-        UserAvatar.objects.create(user=user, image=user.avatar.name)
+        updated = update_profile(user, avatar=ContentFile(bytes(content), name=filename), only_if_empty=True)
+        user.avatar = updated.avatar
     except Exception:  # Avatar synchronization must never block a successful OAuth login.
         logger.warning("Unable to synchronize OAuth avatar for provider %s", provider, exc_info=True)

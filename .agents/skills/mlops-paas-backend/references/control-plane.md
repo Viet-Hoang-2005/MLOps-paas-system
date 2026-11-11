@@ -63,3 +63,9 @@ Local runtime metrics are read-only Docker SDK snapshots of the project's explic
 ## Training workspace changes
 
 Use [training-workspaces.md](training-workspaces.md) when changing projectless jobs, assignment or deletion. Draft mutation/preparation/admission share the TrainingJob lock; operations involving Project/job coordinate Project before job. Nullable joined Project rows cannot be locked by PostgreSQL select_for_update without narrowing the lock with of=("self",). Test these paths on PostgreSQL as well as isolated fixtures.
+
+## Account avatar
+
+CustomUser.avatar is the only current-avatar reference; there is no UserAvatar history model or history/select API. Keep GET/PUT /api/auth/profile/ and the avatar/remove_avatar payload. Profile, registration and first-account OAuth import use services/avatars.py: validate a real image up to 5 MiB, upload a new UUID key outside transactions, lock the account to swap the reference, and delete only the superseded object after commit. Cleanup tasks retry up to five times and must skip a currently referenced or out-of-tenant key. Never overwrite storage keys or remove an entire avatar prefix. UserSerializer exposes avatar read-only to avoid writing the same upload twice. Later OAuth sign-ins neither replace custom images nor restore removed images.
+
+Removing the historical avatar table edits identity's initial migration and requires a user-managed development database/storage reset; do not apply it as a data-preserving production migration.

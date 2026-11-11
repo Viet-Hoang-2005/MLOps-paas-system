@@ -13,7 +13,7 @@ from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from rest_framework_simplejwt.utils import datetime_from_epoch
 
-from apps.auth.models import CustomUser, UserAvatar
+from apps.auth.models import CustomUser
 
 
 class _KeyIdTokenMixin:
@@ -120,12 +120,4 @@ class UserSerializer(serializers.ModelSerializer):
             "auth_provider",
             "date_joined",
         )
-        read_only_fields = ("email", "tenant_id", "date_joined")
-
-
-class AvatarSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(source="public_id", read_only=True)
-
-    class Meta:
-        model = UserAvatar
-        fields = ("id", "image", "created_at")
+        read_only_fields = ("email", "tenant_id", "date_joined", "avatar")

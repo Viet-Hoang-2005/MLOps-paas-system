@@ -1,4 +1,3 @@
-import type { AvatarRecord } from "@/features/settings/types";
 import { Button } from "@/shared/components/Button";
 import { ImageUp, Trash2, X } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -6,26 +5,20 @@ import { useTranslation } from "react-i18next";
 
 interface AvatarDialogProps {
   open: boolean;
+  busy?: boolean;
   avatarPreview: string;
-  avatarHistory?: AvatarRecord[];
-  historyLoading?: boolean;
-  selectingAvatarId?: string | null;
   onClose: () => void;
   onRemove?: () => void;
   onChange: () => void;
-  onSelectAvatar?: (avatarId: string) => void;
 }
 
 export function AvatarDialog({
   open,
+  busy = false,
   avatarPreview,
-  avatarHistory = [],
-  historyLoading = false,
-  selectingAvatarId = null,
   onClose,
   onRemove,
   onChange,
-  onSelectAvatar,
 }: AvatarDialogProps) {
   const { t } = useTranslation("settings");
   if (!open) return null;
@@ -41,6 +34,7 @@ export function AvatarDialog({
           <button
             type="button"
             onClick={onClose}
+            disabled={busy}
             className="flex h-8 w-8 items-center justify-center rounded-surface text-color-muted-foreground hover:bg-muted hover:text-color-foreground"
             aria-label={t("avatarDialog.close")}
           >
@@ -64,7 +58,7 @@ export function AvatarDialog({
                   size="md"
                   icon={<Trash2 className="h-4 w-4" />}
                   onClick={onRemove}
-                  disabled={!onRemove}
+                  disabled={busy || !onRemove}
                 >
                   {t("removeAvatar")}
                 </Button>
@@ -74,6 +68,7 @@ export function AvatarDialog({
                   size="md"
                   icon={<ImageUp className="h-4 w-4" />}
                   onClick={onChange}
+                disabled={busy}
                 >
                   {t("changeAvatar")}
                 </Button>
@@ -96,56 +91,10 @@ export function AvatarDialog({
                 type="button"
                 icon={<ImageUp className="h-4 w-4" />}
                 onClick={onChange}
+                disabled={busy}
               >
                 {t("avatarDialog.upload")}
               </Button>
-            </div>
-          )}
-          {(historyLoading || avatarHistory.length > 0) && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-style-body-strong text-color-foreground">
-                  {t("avatarDialog.previous")}
-                </h3>
-                {historyLoading && (
-                  <span className="text-style-caption-strong text-color-muted-foreground">
-                    {t("avatarDialog.loading")}
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {avatarHistory.map((avatar) => (
-                  <button
-                    key={avatar.id}
-                    type="button"
-                    onClick={() => onSelectAvatar?.(avatar.id)}
-                    disabled={
-                      avatar.is_current || selectingAvatarId === avatar.id
-                    }
-                    className={`h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 transition ${
-                      avatar.is_current
-                        ? "border-primary"
-                        : "border-border hover:border-muted-foreground disabled:opacity-60"
-                    }`}
-                    aria-label={
-                      avatar.is_current
-                        ? t("avatarDialog.current")
-                        : t("avatarDialog.selectPrevious")
-                    }
-                    title={
-                      avatar.is_current
-                        ? t("avatarDialog.current")
-                        : t("avatarDialog.useThis")
-                    }
-                  >
-                    <img
-                      src={avatar.url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
             </div>
           )}
         </div>

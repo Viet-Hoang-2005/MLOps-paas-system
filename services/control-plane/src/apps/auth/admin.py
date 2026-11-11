@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import CustomUser, UserAvatar
+from .models import CustomUser
 
 
 @admin.register(CustomUser)
@@ -14,6 +14,3 @@ class CustomUserAdmin(UserAdmin):
         ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser")}),
     )
     add_fieldsets = ((None, {"classes": ("wide",), "fields": ("email", "password1", "password2")}),)
-
-
-admin.site.register(UserAvatar)
