@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('public_id', models.UUIDField(db_index=True, default=uuid.uuid4, editable=False, unique=True)),
                 ('tenant_id', models.CharField(blank=True, db_index=True, max_length=64)),
-                ('type', models.CharField(choices=[('training', 'Training'), ('build', 'Build & Packaging'), ('deployment', 'Deployment'), ('drift', 'Data Drift'), ('alert', 'Model Alert'), ('system', 'System')], db_index=True, default='system', max_length=32)),
+                ('type', models.CharField(choices=[('training', 'Training'), ('build', 'Build & Packaging'), ('deployment', 'Deployment'), ('drift', 'Data Drift'), ('alert', 'Model Alert'), ('system', 'System'), ('project', 'Model Project')], db_index=True, default='system', max_length=32)),
                 ('level', models.CharField(choices=[('info', 'Information'), ('success', 'Success'), ('warning', 'Warning'), ('error', 'Error')], default='info', max_length=16)),
                 ('title', models.CharField(max_length=255)),
                 ('message', models.TextField()),

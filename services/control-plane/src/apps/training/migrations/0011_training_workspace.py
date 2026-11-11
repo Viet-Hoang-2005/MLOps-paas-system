@@ -9,17 +9,7 @@ class Migration(migrations.Migration):
     dependencies = [("training", "0010_local_training_reservations"), migrations.swappable_dependency(settings.AUTH_USER_MODEL)]
 
     operations = [
-        migrations.CreateModel(name="TrainingWorkspace", fields=[
-            ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
-            ("public_id", models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
-            ("entry_point", models.CharField(blank=True, max_length=512)),
-            ("environment", models.JSONField(blank=True, default=dict)),
-            ("revision", models.PositiveIntegerField(default=1)),
-            ("created_at", models.DateTimeField(auto_now_add=True)),
-            ("updated_at", models.DateTimeField(auto_now=True)),
-            ("owner", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="training_workspaces", to=settings.AUTH_USER_MODEL)),
-        ]),
-        migrations.CreateModel(name="TrainingWorkspaceEntry", fields=[
+        migrations.CreateModel(name="TrainingJobEntry", fields=[
             ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
             ("public_id", models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
             ("relative_path", models.CharField(max_length=512)),
@@ -30,16 +20,16 @@ class Migration(migrations.Migration):
             ("content_type", models.CharField(blank=True, max_length=160)),
             ("created_at", models.DateTimeField(auto_now_add=True)),
             ("updated_at", models.DateTimeField(auto_now=True)),
-            ("workspace", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="entries", to="training.trainingworkspace")),
+            ("job", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="entries", to="training.trainingjob")),
         ]),
-        migrations.CreateModel(name="TrainingWorkspaceSecret", fields=[
+        migrations.CreateModel(name="TrainingJobSecret", fields=[
             ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
             ("name", models.CharField(max_length=128)),
             ("ciphertext", models.BinaryField()),
             ("created_at", models.DateTimeField(auto_now_add=True)),
             ("updated_at", models.DateTimeField(auto_now=True)),
-            ("workspace", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="secrets", to="training.trainingworkspace")),
+            ("job", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="secrets", to="training.trainingjob")),
         ]),
-        migrations.AddConstraint(model_name="trainingworkspaceentry", constraint=models.UniqueConstraint(fields=("workspace", "relative_path"), name="training_workspace_entry_path_unique")),
-        migrations.AddConstraint(model_name="trainingworkspacesecret", constraint=models.UniqueConstraint(fields=("workspace", "name"), name="training_workspace_secret_unique")),
+        migrations.AddConstraint(model_name="trainingjobentry", constraint=models.UniqueConstraint(fields=("job", "relative_path"), name="training_job_entry_path_unique")),
+        migrations.AddConstraint(model_name="trainingjobsecret", constraint=models.UniqueConstraint(fields=("job", "name"), name="training_job_secret_unique")),
     ]

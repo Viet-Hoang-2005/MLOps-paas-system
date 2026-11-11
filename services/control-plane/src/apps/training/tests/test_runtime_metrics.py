@@ -1,3 +1,4 @@
+from django.utils import timezone
 import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
@@ -21,7 +22,7 @@ def job(db):
     owner = get_user_model().objects.create_user("runtime@example.com")
     project = ModelProject.objects.create(owner=owner, name="Runtime")
     return TrainingJob.objects.create(project=project, model_flavor="pytorch", status="running",
-                                      backend="docker", external_job_id="container-1", vcpu=2, memory_mb=4096)
+                                      backend="docker", external_job_id="container-1", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
 
 
 @pytest.fixture(autouse=True)

@@ -1,580 +1,1176 @@
 export const trainingEn = {
+
   studio: {
-    title: "Training workspace", creating: "Creating a training workspace…", loading: "Loading…", failed: "The operation failed. Please retry.",
-    reload: "Reload / retry", runStep: "Run training", assignProject: "Assign Model Project", history: "Runs", draft: "Editable draft",
-    input: "Input", output: "Output (read-only)", snapshot: "Run snapshot", name: "Name", description: "Description", cpu: "CPU / RAM", gpu: "GPU", cpuOnly: "No GPU",
-    runtime: "Maximum runtime", minutes: "minutes", framework: "Framework", environment: "Environment & Secrets", key: "Key", value: "Value", secret: "Secret",
+    saved: "All changes saved.",
+
+
+    draftCount: "Drafts: {{count}}",
+    clone: "Clone and edit",
+
+    draftCreated: "Training draft created",
+
+    savingSettings: "Saving settings...",
+
+    settingsSaved: "Settings saved",
+
+    title: "Training workspace", creating: "Creating a training draft…", loading: "Loading…", failed: "The operation failed. Please retry.",
+
+    reload: "Reload / retry", runStep: "Run training", assignProject: "Assign Model Project", draft: "Editable draft",
+
+    input: "Input", output: "Output", snapshot: "Run snapshot", name: "Name", description: "Description", cpu: "CPU / RAM", gpu: "GPU", cpuOnly: "No GPU",
+
+    runtime: "Maximum runtime", minutes: "minutes", hour: "hour", hours: "hours", framework: "Framework", environment: "Environment & Secrets", key: "Key", value: "Value", secret: "Secret",
+
     secretWarning: "Saved secret values cannot be read back. Training code can read and disclose secrets granted to it. Log masking cannot prevent deliberate disclosure.",
+
     secretsUnavailable: "Secrets are unavailable until the server encryption key is configured.", secretSaved: "Value saved", replaceValue: "Replace value",
-    checkResources: "Check resources again", locked: "The draft is locked until the active run finishes. Closing this page does not stop training.", resourcesUnavailable: "Unable to verify runtime resources.",
+
+    checkResources: "Check resources again", locked: "Input is locked after submission. Clone this job to edit and run again. Closing this page does not stop training.", resourcesUnavailable: "Unable to verify runtime resources.",
+
     contract: "Input is read-only. Read files with SM_CHANNEL_TRAIN, write temporary data to MLOPS_WORK_DIR, save your model to SM_MODEL_DIR, and write supported metrics to SM_OUTPUT_DIR.",
+
     cpuProfile: "{{cpu}} vCPU / {{memory}} MiB", profiles: { small: "Small", medium: "Medium", large: "Large" },
+
     vram: "VRAM: {{free}} / {{total}} MiB free (at last check)", newFolder: "New folder", folderPath: "Folder path relative to Input", destination: "Destination folder (empty for Input root)",
+
     download: "Download", move: "Move", delete: "Delete", deleteConfirm: "Delete this file or folder and its contents? Run snapshots will be kept.", save: "Save", edit: "Edit",
+
     selectFile: "Select a file", entryPoint: "Set as main", editor: "Editor", preview: "Preview", pathExists: "The path {{path}} already exists.",
+
+    saveAsMain: "Save as main", isMain: "Main entry point", markdownPreview: "Markdown preview", saveAll: "Save all", removeAll: "Remove all", removeAllTitle: "Remove all files", removeAllConfirm: "Delete all files and folders in this workspace? This action cannot be undone.", allFilesDeleted: "All files removed.", resetAll: "Reset all", resetAllTitle: "Reset unsaved changes", resetAllConfirm: "Discard all unsaved changes and revert to the saved state on server?", resetAllSuccess: "All unsaved changes discarded.", unsupportedPreview: "This file format cannot be previewed. Download the file to view its contents.", noFiles: "No files in workspace", createFirstFile: "Create your first file to start coding.", selectFileHint: "Select a file from the explorer on the right to view or edit.", noOutputDescription: "This run has no output artifacts.", deleteOutputConfirm: "Delete all output artifacts for this training run?", outputDeleted: "Output artifacts deleted.",
+
     terminal: "Training logs", logPlaceholder: "Save your files, select a Python entry point, then run training.", stop: "Stop", run: "Run", noOutput: "No verified output is available yet.",
-    close: "Close", next: "Continue", back: "Back", unsaved: "Unsaved changes", discard: "Leave and discard unsaved edits? Saved files and running jobs are retained.",
+
+    close: "Close", cancel: "Cancel", next: "Continue", back: "Back", unsaved: "Unsaved changes", discard: "Leave and discard unsaved edits? Saved files and running jobs are retained.",
+
     project: "Model Project", newProject: "Create a new Project", access: "Access mode", private: "Private API", public: "Public API", metadataReadOnly: "Existing Project metadata is read-only here.",
+
     assignmentHint: "Assign this successful run and save its supplemental build artifacts. The trained model stays unchanged. Saving does not change Model Preview or start a build.",
+
     optionalArtifact: "Optional supplemental artifact for this run", source_code: "Build source (.py)", reference_data: "Reference data (.csv)", label_mapping: "Label mapping (.json)", input_schema: "Input schema (.json)",
-    buildRequirements: "Build dependencies (separate from the training snapshot)", allProjects: "All Projects", unassigned: "Unassigned", drafts: "Saved workspaces", openDraft: "Open workspace",
+
+    buildRequirements: "Build dependencies (separate from the training snapshot)", allProjects: "All Projects", unassigned: "Unassigned", openDraft: "Open workspace",
+
     gpuStatus: { available: "NVIDIA GPU verified", unavailable: "GPU unavailable", checking: "Checking GPU", disabled: "GPU disabled", error: "GPU verification failed" },
+
   },
+
   workspace: { fileDialog: {
+
     create: "New file", edit: "Edit file", description: "Choose the file type and name.",
+
     type: "File type", name: "File name", script: "Script (.py)", data: "Data (.csv)",
+
     config: "Config (.json)", document: "Document (.md)", requirements: "Requirements (requirements.txt)",
+
     upload: "Choose a file", required: "CSV upload is required", optional: "Upload is optional",
+
     removeUpload: "Remove selected upload", invalidName: "Enter a valid name with the selected extension.",
+
     csvRequired: "Upload a CSV file.", requirementsExists: "Delete the existing requirements.txt before creating another.",
+
     requirementsEdit: "Edit contents in the editor. Delete this file before uploading a replacement.",
+
     cancel: "Cancel", save: "Save", createAction: "Create",
+
   } },
+
   workflow: {
+
     snapshotHint:
-      "These inputs were frozen when the job was created; workspace edits do not change them.",
+
+      "These inputs were frozen when the job was submitted; they cannot be edited.",
+
     openBuild: "Build, register and deploy",
+
   },
+
   title: "Training Model",
+
   create: "Create training job",
+
   empty: "Create a training job to track runtime progress and artifacts.",
+
   description:
+
     "Train new model artifacts or retrain the model selected in the header.",
+
   newJob: "New Training Job",
+
   quota: "Weekly Training Quota",
+
   quotaUnlimited: "Unlimited",
+
   quotaUnavailable: "Weekly quota is temporarily unavailable.",
+
   quotaReset: "Resets {{time}}",
+
   quotaReserved: "Reserved: {{duration}}",
+
   quotaConcurrencyError: "Another training job is still running or being cleaned up.",
+
   quotaExceededError: "Insufficient {{resource}} quota: {{required}} needed, {{remaining}} available. Resets {{reset}}.",
+
   quotaProfiles: { cpu_small: "CPU Small", cpu_medium: "CPU Medium", cpu_large: "CPU Large", gpu_local: "Local GPU", t4: "NVIDIA T4", a10g: "NVIDIA A10G" },
+
   used: "/ {{duration}} used",
+
   remaining: "Remaining",
+
   totalJobs: "Total Jobs",
+
   statusDistribution: {
+
     label: "Training job status distribution",
+
     tooltip: "{{status}}: {{percentage}}%",
+
     empty: "No training jobs yet.",
+
   },
+
   loadFailed: "Unable to load training jobs",
+
   checkApi: "Please check the control plane API.",
+
   retryLoad: "Try again",
+
   staleData: "Could not refresh the job list. Showing the last loaded data.",
+
   noJobs: "No training jobs yet",
+
   noJobsDescription:
+
     "Submit a source zip and CSV dataset to start your first training job.",
+
   firstJob: "Create your first training job",
+
   history: "Training history",
+
   historyCount: "{{shown}} shown / {{total}} total",
+
   sort: "Sort",
+
   newest: "Newest",
+
   oldest: "Oldest",
+
   status: "Status",
+
   name: "Name",
+
   refreshing: "Refreshing list...",
+
   noView: "No jobs match this view",
+
   noViewDescription: "Change the training status filter.",
+
   cancelTitle: "Cancel training job?",
+
   retryTitle: "Retry training job?",
+
   cancelDescription: "This will stop {{job}} if it is still active.",
+
   retryDescription:
+
     "Create a new training job using the same configuration as {{job}}?",
+
   close: "Close",
+
   cancelJob: "Cancel job",
+
   retryJob: "Retry job",
+
   details: "Training job details",
+
   overview: "Overview",
+
   progress: "Progress",
+
   metrics: "Metrics",
+
   events: "Events",
+
   logs: "Logs",
+
   artifacts: "Artifacts",
+
   deployment: "Deployment",
+
   cancel: "Cancel job",
+
   retry: "Retry job",
+
   register: "Register model",
+
   statusFilter: {
+
+    editing: "Editing",
+
     label: "Training status filter",
+
     placeholder: "Filter by training status",
+
     all: "All training statuses",
+
     pending: "Pending",
+
     success: "Success",
+
     failed: "Failed",
+
   },
+
   statuses: {
+
     none: "None",
+
     unknown: "Unknown",
+
   },
+
   table: {
+
     trainingAt: "Training at",
+
     flavor: "Flavor",
+
     modelStatus: "Model status",
+
     accelerators: "Accelerators",
+
     runtime: "Runtime",
+
     status: "Training status",
+
     actions: "Action",
+
     view: "View",
+
     delete: "Delete",
+
     deleting: "Deleting…",
+
     empty: "No training jobs match this training status.",
+
     flavors: {
+
       sklearn: "Scikit-learn",
+
       xgboost: "XGBoost",
+
       pytorch: "PyTorch",
+
       tensorflow: "TensorFlow",
+
     },
+
     statuses: {
+      editing: "Editing",
+
       pending: "Pending",
+
       success: "Success",
+
       failed: "Failed",
+
       deleting: "Deleting…",
+
     },
+
     modelStatuses: {
+
       none: "None",
+
       trained: "Trained",
+
       built: "Built",
+
       deployed: "Deployed",
+
     },
+
   },
+
   delete: {
+
     title: "Delete training job?",
+
     description:
+
       "Delete {{job}} permanently? If it is active, its runtime will be cancelled before cleanup.",
+
     confirm: "Delete job",
+
     requested: "Training job deletion requested.",
+
     completed: "Training job deleted.",
+
     failed: "Unable to delete the training job.",
+
   },
+
   list: {
+
     loading: "Loading training jobs",
+
     refresh: "Refresh",
+
     download: "Download",
+
     cancel: "Cancel",
+
     retry: "Retry",
+
     view: "View details",
+
   },
+
   runtime: {
+
     livePolling: "Live polling",
+
     progress: "Training progress",
+
     eventEmpty:
+
       "Event history will appear as the backend records lifecycle updates.",
+
     eventHistory: "Event history",
+
   },
+
   detail: {
+
     statuses: {
+      editing: "Editing",
+
       pending: "Pending",
+
       queued: "Queued",
+
       uploading: "Uploading",
+
       running: "Running",
+
       cancelling: "Cancelling",
+
       completed: "Completed",
+
       failed: "Failed",
+
       cancelled: "Cancelled",
+
     },
+
     completedToast: "Training job completed!",
+
     failedToast: "Training job failed.",
+
     cancelledToast: "Training job cancelled.",
+
     refreshed: "Job status refreshed",
+
     refreshFailed: "Failed to refresh job status",
+
     downloadFailed: "Failed to get download URL",
+
     copied: "Copied to clipboard",
+
     invalidId: "Invalid Job ID",
+
     loading: "Loading training workspace...",
+
     notFound: "Job not found or error loading job",
+
     notFoundDescription:
+
       "The training job you are looking for might have been deleted, or you don't have access to it.",
+
     backHistory: "Back to History",
+
     backTraining: "Back to Model Training",
+
     jobNumber: "Training job #{{id}}",
+
     refreshStatus: "Refresh Status",
+
     refresh: "Refresh",
+
     download: "Download",
+
     status: "Status",
+
     runtimeElapsed: "Runtime Elapsed",
+
     live: "live",
+
     maxRuntime: "Max Runtime",
+
     createdAt: "Created At",
+
     tabsLabel: "Training job sections",
+
     tabs: {
+
       overview: "Overview",
+
       logs: "Logs",
+
       metrics: "Metrics",
+
       artifacts: "Artifacts",
+
       config: "Config",
+
     },
+
     milestones: {
+
       created: "Created",
+
       submitted: "Submitted",
+
       running: "Running",
+
       completed: "Completed",
+
       failed: "Failed",
+
       cancelled: "Cancelled",
+
       pending: "Pending",
+
       skipped: "Skipped",
+
       unavailable: "Timestamp unavailable",
+
       startedAfter: "Started after {{duration}}",
+
       finishedIn: "Finished in {{duration}}",
+
     },
+
     buildStarted: "Model image build started.",
+
     buildFailed: "Unable to build and register this training output.",
+
     outputsDeleted: "Training output deleted.",
+
     outputDeleteFailed: "Unable to delete the training output.",
+
     deleteOutput: "Delete Training Output",
+
     deleteOutputTitle: "Delete training output?",
+
     deleteOutputDescription:
+
       "The output bundle will be removed permanently. The job, events, logs, and any version already registered remain available.",
+
     deleteOutputConfirm: "Delete output",
+
     registry: {
+
       title: "Build and register this training output",
+
       description:
+
         "A successful build creates an immutable model version. Deployment is managed from Model Evolution.",
+
       build: "Build & Register",
+
       building: "Building",
+
       retry: "Retry Build",
+
       open: "Open in Registry",
+
       console: "Build Console",
+
     },
+
     overview: {
+
       failedTitle: "Training failed",
+
       failedFallback: "The training job exited unexpectedly.",
+
       cancelledTitle: "Training cancelled",
+
       cancelledFallback: "This training job was cancelled before completion.",
+
       metadataTitle: "Job metadata",
+
       internalJobId: "Internal job ID",
+
       externalJobId: "External job ID",
+
       modelName: "Model name",
+
       modelVersion: "Model version",
+
       backend: "Backend",
+
       status: "Status",
+
       createdAt: "Created at",
+
       updatedAt: "Updated at",
+
       startedAt: "Started at",
+
       completedAt: "Completed at",
+
     },
+
     logsPage: {
+
       stopReason: "Stop reason",
+
       title: "Training output",
+
       refresh: "Refresh",
+
       waiting: "Logs will appear after the training container starts.",
+
       empty: "No logs are available for this job.",
+
       events: "Event history",
+
     },
+
     config: {
+
       title: "Submitted configuration",
+
       compute: "Compute and runtime",
+
       backend: "Training backend",
+
       vcpu: "vCPU",
+
       memory: "Memory (MB)",
+
       maxRuntime: "Maximum runtime (seconds)",
+
       accelerator: "Accelerator",
+
       acceleratorType: "Accelerator type",
+
       acceleratorCount: "Accelerator count",
+
       source: "Source",
+
       entryPoint: "Entry point",
+
     },
+
     artifactPage: {
+
       title: "Model Outputs",
+
       subtitle:
+
         "Manage model artifacts, supplemental source code, and reference datasets for building.",
+
       revision: "Revision #{{revision}}",
+
       readOnlyNotice:
+
         "Output editing is locked because the job is not completed or outputs are purged.",
+
       flavor: "Model flavor",
+
       entryPoint: "Entry point",
+
       save: "Save Changes",
+
       saving: "Saving...",
+
       saveSuccess: "Training outputs updated to Revision #{{revision}}.",
+
       saveError: "Failed to save output changes.",
+
       conflictTitle: "Revision Conflict (409)",
+
       conflictDesc:
+
         "Training output was modified in another session. Please reload to see the latest revision or review before saving.",
+
       reload: "Reload Latest",
+
       discardUnsaved: "Discard & Reload",
+
       modelCardTitle: "Trained Model Artifact",
+
       immutableBadge: "Immutable",
+
       immutableDesc:
+
         "Generated directly by training execution. Immutable and cannot be altered.",
+
       sourceCardTitle: "Supplemental Source Code",
+
       sourceCardDesc:
+
         "Optional Python script (.py, max 5 MB). Used by Build to package inference runtime.",
+
       sourceFile: "File: {{name}}",
+
       sourceEmpty: "No supplemental source code attached.",
+
       uploadSource: "Upload .py (< 5 MB)",
+
       replaceSource: "Replace .py file",
+
       removeSource: "Remove source code",
+
       refCardTitle: "Supplemental Reference Dataset",
+
       refCardDesc:
+
         "Optional reference dataset (.csv, max 100 MB). Used by Drift Monitoring.",
+
       refFile: "File: {{name}} ({{format}})",
+
       refEmpty: "No reference dataset attached.",
+
       uploadRef: "Upload CSV (< 100 MB)",
+
       replaceRef: "Replace dataset file",
+
       removeRef: "Remove reference data",
+
       previewRows: "Dataset preview (showing {{count}} rows)",
+
       metricsCardTitle: "Metrics, Parameters & Insights",
+
       noMetrics: "No metrics or parameters recorded.",
+
       stagedUpload: "Staged for upload: {{name}} ({{size}})",
+
       stagedRemove: "Staged for removal",
+
       cancelStage: "Cancel",
+
       buildButton: "Build Deployment",
+
       unsavedConfirmTitle: "Unsaved Changes",
+
       unsavedConfirmDesc:
+
         "You have unsaved changes in your source code or reference data. Do you want to build using the currently saved revision, or cancel to save first?",
+
       buildAnyway: "Build Anyway",
+
       cancel: "Cancel",
+
       download: "Download Outputs (ZIP)",
+
       delete: "Delete Outputs",
+
       sizeErrorSource: "Source code file must be smaller than 5 MB.",
+
       formatErrorSource: "Only .py files are supported for source code.",
+
       sizeErrorRef: "Reference data file must be smaller than 100 MB.",
+
       formatErrorRef: "Only .csv files are supported for reference data.",
+
       notReady: "Model artifacts are not available yet.",
+
       limitHint: "Source code < 5 MB (.py) · Reference data < 100 MB (.csv).",
+
       previewEmpty: "No rows available in preview.",
+
       unsaved: "Unsaved",
+
       unsavedBadge: "Unsaved changes",
+
       relativePath: "Relative Path:",
+
       fileSize: "File Size:",
+
       checksumLabel: "Checksum (SHA-256):",
+
       metricsLabel: "Metrics",
+
       paramsLabel: "Parameters",
+
       stagedRefNotice:
+
         "New dataset file staged ({{name}}). Save changes to compute preview.",
+
       totalRows: "total rows",
+
       nullValue: "null",
+
     },
+
     metricsPage: {
+
       starting: "Runtime metrics are starting",
+
       startingDescription:
+
         "Waiting for resource measurements from the runtime.",
+
       empty: "No runtime metrics available",
+
       emptyDescription: "Resource measurements are available while the job is running.",
+
       unavailableDescription: "Resource measurements are temporarily unavailable.",
+
       wholeGpu: "Whole GPU; may include other processes",
+
       vram: "GPU memory",
+
       title: "Runtime metrics",
+
       sampled: "Sampled at {{time}}",
+
       pending: "Waiting for metrics...",
+
       refresh: "Refresh",
+
       memoryUsed: "{{memory}} used",
+
       waitingRunner: "Waiting for runner metrics",
+
       gpuUnavailable: "Not available",
+
       noGpu: "GPU memory data unavailable",
+
       cpuLimit: "{{count}} vCPU limit",
+
       cpuUsage: "Container CPU usage",
+
       cpu: "CPU",
+
       ram: "RAM",
+
       gpu: "GPU",
+
       noModelMetricsTitle: "No Experiment Tracking Logs Yet",
+
       noModelMetricsHint:
+
         "Call mlflow.autolog() or mlflow.log_metric() in your script to stream realtime training loss curves here.",
+
       hyperparameters: "Hyperparameters",
+
       trainingCurves: "Training & Validation Curves (Step History)",
+
       liveStreaming: "Live streaming",
+
       steps: "steps",
+
       step: "Step",
+
       insufficientPoints: "Insufficient data points",
+
     },
+
   },
+
   createFlow: {
+
     title: "Create Training Job",
+
     steps: { metadata: "Metadata", source: "Source", execution: "Execution" },
+
     actions: { back: "Back", continue: "Continue", finish: "Finish" },
+
     discard: {
+
       title: "Discard training changes?",
+
       description:
+
         "Your unsaved metadata, source, reference data, and execution settings will be lost.",
+
       confirm: "Discard and Quit",
+
     },
+
     messages: {
+
       loadFailed: "Unable to load the training workflow.",
+
       projectLoadFailed: "Unable to load the selected model.",
+
       jobLoadFailed: "Unable to load the selected training job.",
+
       nameRequired: "Model name is required.",
+
       metadataSaveFailed: "Unable to save model metadata.",
+
       metadataRequired: "Complete model metadata before continuing.",
+
       sourceRequired: "Add the required source inputs: {{fields}}.",
+
       sourceSaveFailed: "Unable to save source inputs.",
+
       trainingStarted: "Training job started.",
+
       trainingStartFailed: "Unable to start the training job.",
+
       runFirst: "Run training before finishing.",
+
       trainingStillRunning: "Wait until training reaches a terminal state.",
+
       completeSource: "Complete and save the source step first.",
+
     },
+
     metadata: {
+
       title: "Choose a model project",
+
       description: "Create a new model or retrain an existing project.",
+
       newModel: "New model",
+
       existingModel: "Existing model",
+
       modeLabel: "Training model mode",
+
       selectModel: "Select a model",
+
       selectPlaceholder: "Choose an existing model",
+
       name: "Model name",
+
       namePlaceholder: "e.g. Network intrusion classifier",
+
       descriptionLabel: "Description",
+
       modelDescription: "Description",
+
       descriptionPlaceholder: "What does this model learn?",
+
       access: "Access mode",
+
       accessMode: "Access mode",
+
       private: "Private",
+
       public: "Public",
+
       privateTitle: "Private API",
+
       privateDescription: "Requires a valid JWT or project API key.",
+
       publicTitle: "Public API",
+
       publicDescription: "Allows unauthenticated prediction requests.",
+
     },
+
     source: {
+
       title: "Source and training data",
+
       description:
+
         "Review the latest project workspace, then select the main training script in Source code.",
+
       flavor: "Model flavor",
+
       entryPoint: "Main training script",
+
       requirements: "Requirements (optional)",
+
       requirementsPlaceholder: "One Python dependency per line",
+
       requirementsHelper: "One dependency per line.",
+
       requirementsFile: "Upload requirements.txt",
+
       optional: "Optional",
+
       sourceCode: "Source code",
+
       trainingData: "Training data",
+
       referenceData: "Reference data",
+
       setReference: "Set as Reference",
+
       flavors: {
+
         sklearn: "Pickle or joblib estimators.",
+
         xgboost: "Booster or XGBModel artifacts.",
+
         pytorch: "PyTorch or MLflow artifacts.",
+
         tensorflow: "Keras, SavedModel, or MLflow artifacts.",
+
       },
+
     },
+
     execution: {
+
       localResourceUnavailable: "Unable to check Docker resources. Please try again.",
+
       localResourceCheckAgain: "Check resources again",
+
       localResourceReason: { insufficient_capacity: "Docker does not have enough memory for safe training.", docker_unavailable: "Docker is unavailable or does not support CPU and memory limits.", cache_unavailable: "Resource discovery is temporarily unavailable.", checking: "Checking Docker resources." },
+
       localResourceCapacity: "Docker: {{cpu}} vCPU / {{memory}} MiB. Training budget: {{budgetCpu}} vCPU / {{budgetMemory}} MiB.",
+
       localResourceRemaining: "Available for training: {{cpu}} vCPU / {{memory}} MiB.",
+
       localResourceExceeded: "Insufficient local training capacity. {{cpu}} vCPU / {{memory}} MiB remain; select another profile or retry later.",
+
       localResourceSelectionMissing: "The selected profile is no longer available. Select another profile.",
+
       quotaRemaining: "Weekly quota remaining: {{duration}}",
+
       quotaCrossWeek: "This job may cross the weekly reset; quota is reserved in both weeks when necessary.",
+
       title: "Execution resources",
+
       description:
+
         "Choose a runtime capability exposed by the Control Plane, then run training.",
+
       backend: "Backend",
+
       cpuProfile: "CPU and memory profile",
+
       accelerator: "Accelerator",
+
       cpuOnly: "CPU only",
+
       gpuT4: "NVIDIA T4 · 16 GB ×1",
+
       gpuA10g: "NVIDIA A10G · 24 GB ×1",
+
       gpuGeneric: "GPU ×1",
+
       gpuMemory: "VRAM: {{total}} total · {{free}} free (at last check)",
+
       gpuUnknown: "Unknown",
+
       gpuCheckAgain: "Check GPU again",
+
       gpuRefreshFailed: "Unable to check the GPU. Please try again.",
+
       gpuSelectionMissing: "The selected GPU is unavailable. Select another GPU or CPU.",
+
       gpuMemoryNote: "Free VRAM is a snapshot and does not guarantee the model or batch will fit.",
+
       gpuStatus: {
+
         available: "NVIDIA GPUs available to Docker",
+
         unavailable: "No verified NVIDIA GPU is available to Docker.",
+
         checking: "GPU detection is already in progress.",
+
         disabled: "GPU training is disabled in the local configuration.",
+
         error: "GPU detection is temporarily unavailable.",
+
       },
+
       gpuReason: {
+
         nvidia_unavailable: "Check the NVIDIA driver and container toolkit.",
+
         image_missing: "Build the training runner image before checking the GPU.",
+
         docker_unavailable: "Check that Docker is running and accessible.",
+
         probe_unavailable: "GPU detection could not be completed. Try again.",
+
         probe_in_progress: "Try checking again shortly.",
+
         gpu_disabled: "Enable GPU training in the local configuration to use a GPU.",
+
         device_selection_unsupported: "Docker cannot isolate the selected GPU.",
+
       },
+
       gpuCount: "GPU count",
+
       maxRuntime: "Maximum runtime (seconds)",
+
       console: "Training Console",
+
       placeholder: "Run training to stream lifecycle logs here.",
+
       train: "Train",
+
       retrain: "Re-Train",
+
       stop: "Stop",
+
       model: "Model",
+
       compute: "Compute",
+
       running: "Training running",
+
       status: "Current status: {{status}}",
+
       unavailableTitle: "Training is temporarily unavailable",
+
       unavailableDescription:
+
         "The training platform is being validated. Creating and submitting training jobs is disabled until the rollout is complete.",
+
     },
+
   },
+
   createJob: {
+
     steps: { sources: "Sources", compute: "Compute", execution: "Execution" },
+
     profiles: {
+
       small: "Small",
+
       medium: "Medium",
+
       large: "Large",
+
       cheaper: "Cheaper",
+
       recommended: "Recommended",
+
       moreMemory: "More memory",
+
     },
+
     accelerator: {
+
       none: "No accelerator",
+
       gpuOne: "GPU x1",
+
       gpuTwo: "GPU x2",
+
       gpuFour: "GPU x4",
+
       tpu: "TPU",
+
       trainium: "Trainium",
+
       cpuHelper: "Kubeflow CPU job",
+
       gpuHelper: "Requires GPU Karpenter capacity",
+
       comingSoon: "Coming soon",
+
     },
+
     started: "Training job started!",
+
     unableToStart: "Unable to start training job.",
+
     startFailed: "Failed to start training: {{message}}",
+
     cancelledTracking: "[SYSTEM] Training tracking cancelled by user.",
+
     backToTraining: "Back to Model Training",
+
     title: "New Training Job",
+
     titleFor: "New Training Job for {{name}}",
+
     codeData: "Code & Data",
+
     codeDataDescription:
+
       "Review and edit the model's source code and reference data before starting the training job.",
+
     sourceCode: "Source Code",
+
     referenceData: "Reference Data",
+
     computeResources: "Compute Resources",
+
     computeDescription:
+
       "Select the hardware configuration for the training job.",
+
     maxRuntime: "Max Runtime",
+
     cpu: "Compute (CPU)",
+
     acceleratorLabel: "Accelerator (GPU)",
+
     summary: "Summary & Execution",
+
     summaryDescription:
+
       "Review your configurations and start the training job.",
+
     mainFile: "Main File",
+
     notSet: "Not Set",
+
     compute: "Compute",
+
     acceleratorSummary: "Accelerator",
+
     none: "None",
+
     minutes: "{{count}} minutes",
+
     logTitle: "Training Logs (Kubeflow)",
+
     logPlaceholder:
+
       "Click 'Run Training' to submit a Kubeflow training job and execute your code.",
+
     run: "Run Training",
+
     stop: "Stop",
+
     rerun: "Re-Run Training",
+
     back: "Back",
+
     continue: "Continue",
+
     unsavedTitle: "Unsaved Changes",
+
     leaveDescription:
+
       "You have unsaved changes in your source code, reference data, or requirements. If you leave this page, your changes will be lost.",
+
     leaveDiscard: "Leave and Discard",
+
     stepDescription:
+
       "You have unsaved changes in your files. Are you sure you want to continue without saving? Your changes will not be included in the training job.",
+
     continueAnyway: "Continue Anyway",
+
     requirementsTitle: "Requirements Not Saved",
+
     requirementsIntro:
+
       "You have edited requirements.txt but have not saved it yet.",
+
     requirementsSavedVersion:
+
       "The training job will use the last saved version from the server, not your current unsaved edits.",
+
     requirementsSaveHint:
+
       "Go back and click Save in the requirements editor to include your latest changes.",
+
     proceedSaved: "Proceed with Saved Version",
+
     goBackSave: "Go Back and Save",
+
   },
+
 } as const;

@@ -14,9 +14,12 @@ def training_prefix_for(job):
 def expected_training_uris(job, bucket):
     prefix = training_prefix_for(job)
     mlflow_prefix = f"{prefix}/mlflow/artifacts/"
+    input_prefix = f"{prefix}/input"
+    if job.submission_token:
+        input_prefix += f"/submissions/{job.submission_token}"
     return {
-        "code": f"s3://{bucket}/{prefix}/input/code/source.zip",
-        "data": f"s3://{bucket}/{prefix}/input/data/data.zip",
+        "code": f"s3://{bucket}/{input_prefix}/code/source.zip",
+        "data": f"s3://{bucket}/{input_prefix}/data/data.zip",
         "output": f"s3://{bucket}/{prefix}/output/model.tar.gz",
         "mlflow": f"s3://{bucket}/{mlflow_prefix}",
     }

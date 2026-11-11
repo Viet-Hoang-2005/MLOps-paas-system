@@ -23,11 +23,6 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
                                     related_name="training_jobs", to=settings.AUTH_USER_MODEL),
         ),
-        migrations.AddField(
-            model_name="trainingjob", name="workspace",
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL,
-                                    related_name="jobs", to="training.trainingworkspace"),
-        ),
         migrations.RunPython(backfill_owners, migrations.RunPython.noop),
         migrations.AlterField(
             model_name="trainingjob", name="owner",

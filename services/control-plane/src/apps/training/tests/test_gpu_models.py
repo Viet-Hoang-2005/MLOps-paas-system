@@ -1,9 +1,10 @@
+from .test_job_drafts import studio as studio
 import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
-from apps.training.api.serializers import TrainingJobSerializer
+from apps.training.api.serializers import TrainingJobSerializer, TrainingDraftSettingsSerializer
 from apps.training.models import TrainingJob
 from apps.training.services.resources import validate_resources
 
@@ -67,12 +68,12 @@ def test_serializer_persists_gpu_model_and_response(settings, model):
     client.force_authenticate(user)
     request = client.get("/").wsgi_request
     request.user = user
-    serializer = TrainingJobSerializer(data={"project": str(project.public_id),
+    serializer = TrainingDraftSettingsSerializer(data={
         "model_flavor": "pytorch", "accelerator_type": "gpu", "accelerator_count": 1,
         "accelerator_model": model}, context={"request": request})
     assert serializer.is_valid(), serializer.errors
     job = TrainingJob.objects.create(project=project, model_flavor="pytorch",
-        accelerator_type="gpu", accelerator_count=1, accelerator_model=serializer.validated_data["accelerator_model"])
+        accelerator_type="gpu", accelerator_count=1, accelerator_model=serializer.validated_data["accelerator_model"], vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
     job.refresh_from_db()
     assert TrainingJobSerializer(job).data["accelerator_model"] == model
 
@@ -87,10 +88,9 @@ def test_create_and_read_gpu_job_over_api(settings, monkeypatch, model):
     settings.TRAINING_GPU_COUNTS = (1,)
     monkeypatch.setattr("apps.training.services.jobs.S3Storage", MemoryStorage)
     user = get_user_model().objects.create_user("gpu-api@example.com")
-    project = ModelProject.objects.create(owner=user, name="gpu project")
     client = APIClient()
     client.force_authenticate(user)
-    payload = {"project": str(project.public_id),  "model_flavor": "pytorch",
+    payload = {"model_flavor": "pytorch",
         "accelerator_type": "gpu", "accelerator_count": 1, "accelerator_model": model}
     created = client.post("/api/training-jobs/", payload, format="json")
     assert created.status_code == 201
@@ -108,7 +108,7 @@ def test_submit_rejects_legacy_production_gpu_without_model(settings):
     user = get_user_model().objects.create_user("gpu-legacy@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
     job = TrainingJob.objects.create(project=project, model_flavor="pytorch",
-        accelerator_type="gpu", accelerator_count=1, accelerator_model="", status="pending")
+        accelerator_type="gpu", accelerator_count=1, accelerator_model="", status="pending", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy")
     client = APIClient()
     client.force_authenticate(user)
     response = client.post(f"/api/training-jobs/{job.public_id}/submit/")
@@ -127,7 +127,7 @@ def test_argo_dispatch_includes_selected_gpu_model(settings, monkeypatch, model)
     user = get_user_model().objects.create_user("gpu-dispatch@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
     job = TrainingJob(project=project, owner=project.owner, model_flavor="pytorch",
-        accelerator_type="gpu", accelerator_count=1, accelerator_model=model)
+        accelerator_type="gpu", accelerator_count=1, accelerator_model=model, vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
     uris = expected_training_uris(job, "test-bucket")
     job.code_snapshot_uri, job.data_snapshot_uri, job.output_uri = uris["code"], uris["data"], uris["output"]
     storage = Mock(bucket="test-bucket")
@@ -144,21 +144,16 @@ def test_argo_dispatch_includes_selected_gpu_model(settings, monkeypatch, model)
 
 
 @pytest.mark.django_db
-def test_retry_copies_gpu_model(settings, monkeypatch):
-    from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
-    from apps.training.services.jobs import retry_job
-
-    settings.TRAINING_BACKEND = "argo"
-    settings.TRAINING_EXECUTION_WATCH_ENABLED = True
+def test_retry_copies_gpu_model(studio, settings):
+    import uuid
+    from apps.training.services import workspaces
+    from apps.training.services.drafts import submit_draft, clone_draft
+    job, storage, _, _ = studio
     settings.TRAINING_GPU_ENABLED = True
     settings.TRAINING_GPU_COUNTS = (1,)
-    user = get_user_model().objects.create_user("gpu-retry@example.com")
-    project = ModelProject.objects.create(owner=user, name="gpu project")
-    storage = MemoryStorage()
-    code = storage.put("orig/code.zip", b"code", "application/zip")
-    data = storage.put("orig/data.zip", b"data", "application/zip")
-    job = TrainingJob.objects.create(project=project, model_flavor="pytorch",
-        code_snapshot_uri=code.uri, data_snapshot_uri=data.uri, output_uri="s3://bucket/out",
-        status="failed", accelerator_type="gpu", accelerator_count=1, accelerator_model="t4")
-    retry = retry_job(job, storage=storage)
-    assert retry.accelerator_model == "t4" and retry.accelerator_count == 1
+    job = workspaces.update_workspace(job, revision=job.revision, changes={"accelerator_type": "gpu", "accelerator_count": 1, "accelerator_model": "t4"})
+    job = submit_draft(job, revision=job.revision, run_key=uuid.uuid4(), storage=storage)
+    TrainingJob.objects.filter(pk=job.pk).update(status="failed")
+    job.refresh_from_db()
+    retry = clone_draft(job, retry=True, creation_key=uuid.uuid4(), storage=storage)
+    assert retry.accelerator_model == "t4" and retry.accelerator_count == 1 and retry.status == "editing"

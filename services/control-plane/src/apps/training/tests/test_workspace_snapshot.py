@@ -6,7 +6,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.exceptions import ValidationError
 
-from apps.training.models import TrainingWorkspace, TrainingWorkspaceEntry
+from apps.training.models import TrainingJob, TrainingJobEntry
 from apps.training.services.workspaces import snapshot_input
 from common.api.exceptions import Conflict
 
@@ -31,13 +31,13 @@ class FakeStorage:
 @pytest.fixture
 def workspace_snapshot(db):
     user = get_user_model().objects.create_user("snapshot@example.test", "test-password")
-    workspace = TrainingWorkspace.objects.create(owner=user, entry_point="src/train.py")
-    TrainingWorkspaceEntry.objects.create(workspace=workspace, relative_path="src", kind="folder")
-    TrainingWorkspaceEntry.objects.create(workspace=workspace, relative_path="empty", kind="folder")
+    workspace = TrainingJob.objects.create(owner=user, entry_point="src/train.py")
+    TrainingJobEntry.objects.create(job=workspace, relative_path="src", kind="folder")
+    TrainingJobEntry.objects.create(job=workspace, relative_path="empty", kind="folder")
     payload = b"print('hello')\n"
-    uri = f"s3://training/users/{user.tenant_id}/training/workspaces/{workspace.public_id}/objects/source"
-    entry = TrainingWorkspaceEntry.objects.create(
-        workspace=workspace, relative_path="src/train.py", kind="script", s3_uri=uri,
+    uri = f"s3://training/users/{user.tenant_id}/training/jobs/{workspace.public_id}/draft/objects/source"
+    entry = TrainingJobEntry.objects.create(
+        job=workspace, relative_path="src/train.py", kind="script", s3_uri=uri,
         checksum=hashlib.sha256(payload).hexdigest(), size_bytes=len(payload),
     )
     return workspace, entry, FakeStorage({uri: payload})
@@ -56,7 +56,7 @@ def test_snapshot_preserves_paths_and_empty_folders(workspace_snapshot):
 @pytest.mark.django_db
 def test_snapshot_rejects_changed_workspace(workspace_snapshot):
     workspace, _, storage = workspace_snapshot
-    storage.on_read = lambda: TrainingWorkspace.objects.filter(pk=workspace.pk).update(revision=2)
+    storage.on_read = lambda: TrainingJob.objects.filter(pk=workspace.pk).update(revision=2)
     with pytest.raises(Conflict):
         snapshot_input(workspace, revision=1, storage=storage)
 

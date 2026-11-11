@@ -47,5 +47,19 @@ describe("Select Component", () => {
     await userEvent.click(optionThree);
     expect(handleChange).toHaveBeenCalledWith("opt-3");
   });
+
+  it("should render label when label prop is provided and link to button", () => {
+    render(
+      <Select
+        label="Test Label"
+        value="opt-1"
+        onChange={vi.fn()}
+        options={options}
+      />,
+    );
+
+    expect(screen.getByText("Test Label")).toBeInTheDocument();
+    expect(screen.getByLabelText("Test Label")).toBeInTheDocument();
+  });
 });
 

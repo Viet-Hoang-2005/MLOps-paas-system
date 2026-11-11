@@ -8,7 +8,7 @@ import { FileDropzone } from "@/shared/components/FileDropzone";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { toast } from "@/shared/lib/toastStore";
 import type { TrainingJob } from "@/features/training/types";
-import { assignTrainingProject } from "@/features/training/api/workspacesApi";
+import { assignTrainingProject } from "@/features/training/api/jobWorkspaceApi";
 import { getModelOutputSummary, patchModelOutput } from "@/features/training/api/trainingApi";
 
 export function TrainingProjectAssignment({ job, suggestedProject, onBack, onSaved }: { job: TrainingJob; suggestedProject?: string; onBack: () => void; onSaved: (job: TrainingJob) => void }) {

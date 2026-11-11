@@ -2,17 +2,16 @@
 
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.training.models import TrainingWorkspace
+from apps.training.models import TrainingJob
 from apps.training.services import workspaces as service
 
 
-def _workspace(user, workspace_id):
-    return get_object_or_404(TrainingWorkspace.objects.filter(owner=user), public_id=workspace_id)
+def _workspace(user, job_id):
+    return get_object_or_404(TrainingJob.objects.filter(owner=user), public_id=job_id)
 
 
 def _entry(workspace, entry_id):
@@ -21,23 +20,6 @@ def _entry(workspace, entry_id):
 
 def _serialize_entry(entry):
     return service.serialize_entries([entry])[0]
-
-
-def _serialize(workspace, *, detail=False):
-    result = {"id": str(workspace.public_id), "revision": workspace.revision,
-              "entry_point": workspace.entry_point, "created_at": workspace.created_at.isoformat(),
-              "updated_at": workspace.updated_at.isoformat()}
-    if detail:
-        result["entries"] = service.serialize_entries(workspace.entries.order_by("relative_path"))
-        result["environment"] = workspace.environment
-        result["secrets"] = [{"name": item.name, "updated_at": item.updated_at.isoformat()}
-                             for item in workspace.secrets.order_by("name")]
-        try:
-            service.cipher()
-            result["secrets_available"] = True
-        except service.ServiceUnavailable:
-            result["secrets_available"] = False
-    return result
 
 
 def _payload(request, *, required=False, max_bytes=service.MAX_DATA):
@@ -56,34 +38,9 @@ def _payload(request, *, required=False, max_bytes=service.MAX_DATA):
     return None, False
 
 
-class WorkspaceListEndpoint(APIView):
-    def get(self, request):
-        return Response([_serialize(item) for item in TrainingWorkspace.objects.filter(owner=request.user).order_by("-updated_at")])
-
-    def post(self, request):
-        workspace = TrainingWorkspace.objects.create(owner=request.user)
-        return Response(_serialize(workspace, detail=True), status=status.HTTP_201_CREATED)
-
-
-class WorkspaceDetailEndpoint(APIView):
-    def get(self, request, workspace_id):
-        return Response(_serialize(_workspace(request.user, workspace_id), detail=True))
-
-    def patch(self, request, workspace_id):
-        changes = {field: request.data[field] for field in ("entry_point", "environment") if field in request.data}
-        if not changes:
-            raise ValidationError("No workspace changes were provided.")
-        workspace = service.update_workspace(_workspace(request.user, workspace_id), revision=request.data.get("revision"), changes=changes)
-        return Response(_serialize(workspace, detail=True))
-
-    def delete(self, request, workspace_id):
-        service.delete_workspace(_workspace(request.user, workspace_id), revision=request.data.get("revision"))
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
 class WorkspaceEntriesEndpoint(APIView):
-    def post(self, request, workspace_id):
-        workspace = _workspace(request.user, workspace_id)
+    def post(self, request, job_id):
+        workspace = _workspace(request.user, job_id)
         kind = request.data.get("kind", "")
         payload, uploaded = _payload(request, max_bytes=service.MAX_DATA if kind == "data" else service.MAX_TEXT)
         if kind == "data" and not uploaded:
@@ -94,8 +51,8 @@ class WorkspaceEntriesEndpoint(APIView):
 
 
 class WorkspaceEntryEndpoint(APIView):
-    def patch(self, request, workspace_id, entry_id):
-        workspace = _workspace(request.user, workspace_id)
+    def patch(self, request, job_id, entry_id):
+        workspace = _workspace(request.user, job_id)
         entry = _entry(workspace, entry_id)
         kind = request.data.get("kind")
         payload, replacement = _payload(request, max_bytes=service.MAX_DATA if (kind or entry.kind) == "data" else service.MAX_TEXT)
@@ -107,53 +64,21 @@ class WorkspaceEntryEndpoint(APIView):
         entry.refresh_from_db()
         return Response({"entry": _serialize_entry(entry), "revision": revision})
 
-    def delete(self, request, workspace_id, entry_id):
-        workspace = _workspace(request.user, workspace_id)
+    def delete(self, request, job_id, entry_id):
+        workspace = _workspace(request.user, job_id)
         _entry(workspace, entry_id)
         revision = service.delete_entry(workspace, entry_id, revision=request.data.get("revision"))
         return Response({"revision": revision})
 
 
 class WorkspaceSecretEndpoint(APIView):
-    def put(self, request, workspace_id, name):
-        workspace = _workspace(request.user, workspace_id)
+    def put(self, request, job_id, name):
+        workspace = _workspace(request.user, job_id)
         secret, revision = service.set_secret(workspace, revision=request.data.get("revision"), name=name,
                                                value=request.data.get("value"))
         return Response({"name": secret.name, "updated_at": secret.updated_at.isoformat(), "revision": revision})
 
-    def delete(self, request, workspace_id, name):
-        workspace = _workspace(request.user, workspace_id)
+    def delete(self, request, job_id, name):
+        workspace = _workspace(request.user, job_id)
         revision = service.delete_secret(workspace, revision=request.data.get("revision"), name=name)
         return Response({"revision": revision})
-
-
-class WorkspaceRunSerializer(serializers.Serializer):
-    revision = serializers.IntegerField(min_value=1)
-    run_key = serializers.UUIDField()
-    model_flavor = serializers.ChoiceField(choices=["sklearn", "xgboost", "pytorch", "tensorflow"])
-    vcpu = serializers.IntegerField(min_value=1)
-    memory_mb = serializers.IntegerField(min_value=512)
-    max_runtime_seconds = serializers.IntegerField(min_value=1)
-    accelerator_type = serializers.ChoiceField(choices=["none", "gpu"], default="none")
-    accelerator_count = serializers.IntegerField(min_value=0, max_value=1, default=0)
-    accelerator_model = serializers.ChoiceField(choices=["", "t4", "a10g"], default="")
-    local_gpu_id = serializers.CharField(max_length=80, allow_blank=True, default="")
-
-
-class WorkspaceRunsEndpoint(APIView):
-    def get(self, request, workspace_id):
-        from apps.training.api.serializers import TrainingJobSerializer
-        workspace = _workspace(request.user, workspace_id)
-        return Response(TrainingJobSerializer(workspace.jobs.order_by("-created_at"), many=True).data)
-
-    def post(self, request, workspace_id):
-        from apps.training.api.endpoints import require_training_enabled
-        from apps.training.api.serializers import TrainingJobSerializer
-        from apps.training.services.workspace_runs import run_workspace
-        require_training_enabled()
-        workspace = _workspace(request.user, workspace_id)
-        serializer = WorkspaceRunSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        values = dict(serializer.validated_data)
-        job = run_workspace(workspace, revision=values.pop("revision"), run_key=values.pop("run_key"), values=values)
-        return Response(TrainingJobSerializer(job).data, status=status.HTTP_201_CREATED)

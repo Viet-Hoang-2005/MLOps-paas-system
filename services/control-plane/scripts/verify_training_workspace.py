@@ -5,6 +5,7 @@ Never prints credentials, capabilities or signed URLs.
 """
 import io
 import json
+import os
 import time
 import uuid
 from django.contrib.auth import get_user_model
@@ -53,8 +54,11 @@ def verify():
         if not capabilities["enabled"]:
             raise RuntimeError("Local training capacity is unavailable.")
         profile = min(capabilities["cpu_profiles"], key=lambda item: item["memory_mb"])
-        workspace = call("post", "/api/training-workspaces/", {}, expected=201)
-        root = f"/api/training-workspaces/{workspace['id']}/"
+        gpu = next((item for item in capabilities["accelerators"] if item["type"] == "gpu"), None) if os.environ.get("TRAINING_SMOKE_GPU") == "true" else None
+        if os.environ.get("TRAINING_SMOKE_GPU") == "true" and not gpu:
+            raise RuntimeError("No verified NVIDIA GPU is available for the requested smoke test.")
+        workspace = call("post", "/api/training-jobs/", {}, expected=201)
+        root = f"/api/training-jobs/{workspace['id']}/"
         revision = workspace["revision"]
         for path, kind, payload in [
             ("data", "folder", None),
@@ -72,6 +76,11 @@ except OSError as error:
 else:
     raise RuntimeError("Input was writable")
 assert os.environ["SMOKE_MARKER"] == "workspace"
+if os.environ.get("SMOKE_GPU_UUID"):
+    import subprocess
+    visible = subprocess.check_output(["nvidia-smi", "--query-gpu=uuid", "--format=csv,noheader"], text=True)
+    assert visible.strip().splitlines() == [os.environ["SMOKE_GPU_UUID"]], "Unexpected visible NVIDIA device"
+    print("EXACT_GPU_UUID_VERIFIED")
 Path(os.environ["MLOPS_WORK_DIR"], "scratch.txt").write_text("work is writable")
 Path(os.environ["SM_MODEL_DIR"], "model.json").write_text(json.dumps({"smoke": "verified"}))
 Path(os.environ["SM_OUTPUT_DIR"], "metrics.json").write_text(json.dumps({"accuracy": 0.9}))
@@ -83,14 +92,15 @@ print("READ_ONLY_VERIFIED")
                 data["file"] = SimpleUploadedFile(path.split("/")[-1], payload)
             result = call("post", root + "entries/", data, expected=201)
             revision = result["revision"]
-        result = call("patch", root, {"revision": revision, "entry_point": "train.py", "environment": {"SMOKE_MARKER": "workspace"}})
-        payload = {"revision": result["revision"], "run_key": str(uuid.uuid4()),
+        result = call("patch", root, {"revision": revision, "entry_point": "train.py", "environment": {"SMOKE_MARKER": "workspace", **({"SMOKE_GPU_UUID": gpu["device_id"]} if gpu else {})},
             "model_flavor": "sklearn", "vcpu": profile["vcpu"], "memory_mb": profile["memory_mb"],
-            "max_runtime_seconds": capabilities["runtime_options_seconds"][0], "accelerator_type": "none", "accelerator_count": 0}
-        job = call("post", root + "runs/", payload, expected=201)
+            "max_runtime_seconds": capabilities["runtime_options_seconds"][0], "accelerator_type": "gpu" if gpu else "none", "accelerator_count": 1 if gpu else 0,
+            "local_gpu_id": gpu["device_id"] if gpu else ""})
+        payload = {"revision": result["revision"], "run_key": str(uuid.uuid4())}
+        job = call("post", root + "submit/", payload, expected=202)
         jobs.append(job["id"])
-        assert job["project_id"] is None
-        replay = call("post", root + "runs/", payload, expected=201)
+        assert job["id"] == workspace["id"] and job["project_id"] is None
+        replay = call("post", root + "submit/", payload, expected=202)
         assert replay["id"] == job["id"]
         print("SMOKE: unassigned run created; idempotent replay verified", flush=True)
 
@@ -108,13 +118,27 @@ print("READ_ONLY_VERIFIED")
             assert json.load(archive.extractfile("model.json")) == {"smoke": "verified"}
         assert "READ_ONLY_VERIFIED" in call("get", f"/api/training-jobs/{job['id']}/logs/")["logs"][-20:].__str__()
         print("SMOKE: Input is kernel read-only; Work, model export, upload and cleanup verified", flush=True)
+        if gpu:
+            assert "EXACT_GPU_UUID_VERIFIED" in str(call("get", f"/api/training-jobs/{job['id']}/logs/")["logs"])
+            print("SMOKE: runner sees exactly the selected NVIDIA GPU UUID", flush=True)
+        clone_key = {"creation_key": str(uuid.uuid4())}
+        clone = call("post", f"/api/training-jobs/{job['id']}/clone/", clone_key, expected=201)
+        assert clone["id"] != job["id"] and clone["status"] == "editing" and clone["submitted_at"] is None
+        assert clone["project_id"] is None and clone["outputs"] == []
+        replay = call("post", f"/api/training-jobs/{job['id']}/clone/", clone_key, expected=201)
+        assert replay["id"] == clone["id"]
+        copied = call("get", f"/api/training-jobs/{clone['id']}/")
+        assert {entry["path"] for entry in copied["entries"]} == {"train.py", "requirements.txt", "data", "data/train.csv"}
+        call("delete", f"/api/training-jobs/{clone['id']}/", expected=202)
+        wait_for(lambda: not TrainingJob.objects.filter(public_id=clone["id"]).exists(), "Editing clone cleanup")
+        print("SMOKE: clone replay, new Editing UUID, frozen Input copy and draft deletion verified", flush=True)
         project_id = str(uuid.uuid4())
         job = call("post", f"/api/training-jobs/{job['id']}/project/", {"output_revision": job["output_revision"],
             "new_project": {"id": project_id, "name": "Disposable smoke project", "access_mode": "private"}})
         project = ModelProject.objects.get(public_id=project_id)
 
         # A legacy object exercises copy+checksum+pointer migration on real S3.
-        legacy = TrainingJob(project=project, owner=owner, model_flavor="sklearn", status="completed", backend="docker")
+        legacy = TrainingJob(project=project, owner=owner, model_flavor="sklearn", status="completed", backend="docker", max_runtime_seconds=900, submitted_at=__import__("django.utils.timezone", fromlist=["now"]).now())
         uris = expected_training_uris(legacy, storage.bucket)
         legacy.code_snapshot_uri, legacy.data_snapshot_uri = uris["code"], uris["data"]
         legacy.output_uri, legacy.mlflow_artifact_uri = uris["output"], uris["mlflow"]
@@ -136,7 +160,7 @@ print("READ_ONLY_VERIFIED")
         stopped = True
         for job in TrainingJob.objects.filter(owner=owner).select_related("owner", "project"):
             try:
-                result = training_backend(job.backend).cleanup(job)
+                result = training_backend(job.backend).cleanup(job) if job.submitted_at else {"confirmed": True}
                 if not result.get("confirmed"):
                     raise RuntimeError("Runtime cleanup is not confirmed.")
                 from apps.training.services.local_resources import release

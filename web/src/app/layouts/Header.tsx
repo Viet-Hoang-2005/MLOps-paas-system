@@ -106,6 +106,7 @@ export default function Header({
         <span className="text-style-section-title font-semibold text-color-foreground">
           {/* i18n-ignore: MLlife is the product brand. */}
           <span className="text-color-info">ML</span>
+          {/* i18n-ignore: MLlife is the product brand. */}
           <span className="text-color-foreground italic">life</span>
         </span>
       </button>

@@ -12,7 +12,7 @@ Training resource capabilities expose at most one GPU. Argo jobs require `accele
 2. **`access`:** Project-scoped API keys (`ApiKey`) hashed with SHA-256 for machine-to-machine authentication.
 3. **`catalog`:** Project metadata, one revision-checked `ModelPreview` per project, legacy project workspace assets, Running snapshot access, async retryable hard deletion.
 4. **`registry`:** Immutable registered versions (`ModelVersion`), artifacts, metrics, insights, dynamic aliases (`champion`/`challenger`).
-5. **`training`:** Account-owned drafts (`TrainingWorkspace`) and jobs (`TrainingJob`) with optional Project links, short-lived Capability Tokens, Presigned S3 URLs, resource quotas, graceful cancellation.
+5. **`training`:** Account-owned `TrainingJob` drafts and executions (one UUID, one owned workspace, at most one submission) with optional Project links, short-lived Capability Tokens, Presigned S3 URLs, resource quotas, graceful cancellation.
 6. **`deployment`:** Immutable Build input snapshots, explicit asynchronous idempotent registration, serving deployment/readiness. Project.active_deployment is the Running source of truth; runtime uses deployment UUID, not Build UUID.
 7. **`drift`:** Drift monitors (`DriftMonitor`), scheduled and event-driven drift runs (`DriftRun`), report access, threshold configuration.
 8. **`ct` (Continuous Training):** Retraining policies, automated retraining triggers (`RetrainingTrigger`), pipeline orchestration upon drift signals.
@@ -62,4 +62,4 @@ Local runtime metrics are read-only Docker SDK snapshots of the project's explic
 
 ## Training workspace changes
 
-Use [training-workspaces.md](training-workspaces.md) when changing projectless jobs, assignment or deletion. Workspace admission/mutation share a workspace lock; operations involving Project/job coordinate Project before job. Nullable joined Project rows cannot be locked by PostgreSQL select_for_update without narrowing the lock with of=("self",). Test these paths on PostgreSQL as well as isolated fixtures.
+Use [training-workspaces.md](training-workspaces.md) when changing projectless jobs, assignment or deletion. Draft mutation/preparation/admission share the TrainingJob lock; operations involving Project/job coordinate Project before job. Nullable joined Project rows cannot be locked by PostgreSQL select_for_update without narrowing the lock with of=("self",). Test these paths on PostgreSQL as well as isolated fixtures.

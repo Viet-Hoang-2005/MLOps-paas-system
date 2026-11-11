@@ -1,3 +1,4 @@
+from django.utils import timezone
 import hashlib
 import uuid
 from types import SimpleNamespace
@@ -382,7 +383,7 @@ def test_training_build_provenance_survives_source_job_deletion(project):
         status="completed",
         entry_point="train.py",
         code_snapshot_uri=code.uri,
-    )
+     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     TrainingOutput.objects.create(job=job, kind="model", relative_path="model.tar.gz", s3_uri=output.uri)
     TrainingOutput.objects.create(job=job, kind="source_code", relative_path="train.py", s3_uri=source_file.uri)
     TrainingOutput.objects.create(job=job, kind="reference_data", relative_path="reference.csv", s3_uri=ref_file.uri)
@@ -505,39 +506,31 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
 
 
 def test_training_retry_preserves_frozen_inputs_not_updated_workspace(project, monkeypatch, settings):
-    settings.TRAINING_BACKEND = "argo"
-    settings.TRAINING_EXECUTION_WATCH_ENABLED = True
+    from io import BytesIO
+    from zipfile import ZipFile
     from apps.catalog.models import WorkspaceAsset
     from apps.training.models import TrainingJob
     from apps.training.services.jobs import retry_job
-
+    from apps.training.services.storage_scope import expected_training_uris
+    settings.TRAINING_BACKEND = "argo"
     storage = MemoryStorage()
-    inputs = {}
-    for kind, name, content in (
-        ("code", "code.zip", b"old code"),
-        ("data", "data.zip", b"old data"),
-    ):
-        inputs[kind] = storage.put(f"original/{name}", SimpleUploadedFile(name, content), "application/octet-stream")
-    job = TrainingJob.objects.create(
-        project=project,
-        status="failed",
-        model_flavor="xgboost",
-        code_snapshot_uri=inputs["code"].uri,
-        data_snapshot_uri=inputs["data"].uri,
-    )
-    WorkspaceAsset.objects.create(
-        project=project, kind="data", relative_path="data.zip", s3_uri="s3://test-bucket/new-workspace.zip"
-    )
-    monkeypatch.setattr("apps.observability.services.outbox._publish_pending", lambda: None)
-    retry = retry_job(job, storage=storage)
-    assert retry.status == "queued"
-    assert retry.retry_of_id == job.pk
-    for field, kind in (
-        ("code_snapshot_uri", "code"),
-        ("data_snapshot_uri", "data"),
-    ):
-        assert str(retry.public_id) in getattr(retry, field)
-        assert storage.read(getattr(retry, field)) == storage.read(inputs[kind].uri)
+    job = TrainingJob.objects.create(project=project, status="failed", model_flavor="xgboost",
+        entry_point="train.py", vcpu=2, memory_mb=4096, max_runtime_seconds=3600,
+        input_contract="workspace", submitted_at=timezone.now())
+    uris = expected_training_uris(job, storage.bucket)
+    archive = BytesIO()
+    with ZipFile(archive, "w") as zipped:
+        zipped.writestr("train.py", b"print('old code')")
+        zipped.writestr("data.csv", b"x\n1\n")
+    job.code_snapshot_uri = storage.put(storage.parse_uri(uris["code"])[1], archive.getvalue()).uri
+    job.save()
+    WorkspaceAsset.objects.create(project=project, kind="data", relative_path="data.csv",
+        s3_uri="s3://test-bucket/new-workspace.csv")
+    retry = retry_job(job, storage=storage, creation_key=uuid.uuid4())
+    assert retry.status == "editing" and retry.retry_of_id == job.pk
+    assert retry.project_id is None and not retry.submitted_at
+    assert storage.read(retry.entries.get(relative_path="train.py").s3_uri) == b"print('old code')"
+    assert storage.read(retry.entries.get(relative_path="data.csv").s3_uri) == b"x\n1\n"
     assert job.status == "failed"
 
 

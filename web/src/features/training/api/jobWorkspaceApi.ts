@@ -1,6 +1,6 @@
 import { apiClient } from "@/shared/api/client";
 import { controlPlaneURL } from "@/shared/api/config";
-import type { TrainingJob, TrainingJobFormValues } from "@/features/training/types";
+import type { TrainingJob } from "@/features/training/types";
 import type { TrainingFileKind, TrainingFileSelection } from "@/features/training/components/TrainingFileDialog";
 
 export interface WorkspaceEntry {
@@ -10,27 +10,20 @@ export interface WorkspaceEntry {
   size_bytes: number;
   download_url?: string;
 }
-export interface TrainingWorkspace {
+export interface JobWorkspace extends TrainingJob {
   id: string; revision: number; entry_point: string;
   entries: WorkspaceEntry[]; environment: Record<string, string>;
   secrets: { name: string; updated_at: string }[]; secrets_available: boolean;
 }
-const url = (id?: string) => controlPlaneURL(`/training-workspaces/${id ? `${id}/` : ""}`);
-export const createWorkspace = async () => (await apiClient.post<TrainingWorkspace>(url(), {})).data;
-export const getWorkspace = async (id: string) => (await apiClient.get<TrainingWorkspace>(url(id))).data;
-export const listWorkspaces = async () => (await apiClient.get<Pick<TrainingWorkspace, "id" | "revision">[]>(url())).data;
-export const updateWorkspace = async (id: string, revision: number, changes: Partial<Pick<TrainingWorkspace, "entry_point" | "environment">>) =>
-  (await apiClient.patch<TrainingWorkspace>(url(id), { revision, ...changes })).data;
-export const listWorkspaceRuns = async (id: string) => (await apiClient.get<TrainingJob[]>(`${url(id)}runs/`)).data;
-export const runWorkspace = async (id: string, revision: number, runKey: string, values: TrainingJobFormValues) =>
-  (await apiClient.post<TrainingJob>(`${url(id)}runs/`, {
-    revision, run_key: runKey, model_flavor: values.model_flavor,
-    vcpu: values.vcpu, memory_mb: values.memory, max_runtime_seconds: values.max_runtime_seconds,
-    accelerator_type: values.accelerator_type, accelerator_count: values.accelerator_count,
-    accelerator_model: values.accelerator_model, local_gpu_id: values.local_gpu_id,
-  })).data;
+const url = (id?: string) => controlPlaneURL(`/training-jobs/${id ? `${id}/` : ""}`);
+export const createJobDraft = async () => (await apiClient.post<JobWorkspace>(url(), {})).data;
+export const getJobWorkspace = async (id: string) => (await apiClient.get<JobWorkspace>(url(id))).data;
+export const updateJobWorkspace = async (id: string, revision: number, changes: Partial<Pick<JobWorkspace, "entry_point" | "environment" | "model_flavor" | "vcpu" | "memory_mb" | "max_runtime_seconds" | "accelerator_type" | "accelerator_count" | "accelerator_model" | "local_gpu_id">>) =>
+  (await apiClient.patch<JobWorkspace>(url(id), { revision, ...changes })).data;
+export const runJob = async (id: string, revision: number, runKey: string) =>
+  (await apiClient.post<TrainingJob>(`${url(id)}submit/`, { revision, run_key: runKey })).data;
 
-export async function saveWorkspaceEntry(id: string, revision: number, selection: TrainingFileSelection | { path: string; kind: "folder"; file: null }, entryId?: string, content?: string) {
+export async function saveJobEntry(id: string, revision: number, selection: TrainingFileSelection | { path: string; kind: "folder"; file: null }, entryId?: string, content?: string) {
   const form = new FormData();
   form.append("revision", String(revision)); form.append("path", selection.path); form.append("kind", selection.kind);
   if (selection.file) form.append("file", selection.file);
@@ -39,11 +32,11 @@ export async function saveWorkspaceEntry(id: string, revision: number, selection
     url: `${url(id)}entries/${entryId ? `${entryId}/` : ""}`, method: entryId ? "PATCH" : "POST", data: form,
   })).data;
 }
-export const deleteWorkspaceEntry = async (id: string, entry: string, revision: number) =>
+export const deleteJobEntry = async (id: string, entry: string, revision: number) =>
   (await apiClient.delete<{ revision: number }>(`${url(id)}entries/${entry}/`, { data: { revision } })).data;
-export const putWorkspaceSecret = async (id: string, revision: number, name: string, value: string) =>
+export const putJobSecret = async (id: string, revision: number, name: string, value: string) =>
   (await apiClient.put<{ revision: number }>(`${url(id)}secrets/${encodeURIComponent(name)}/`, { revision, value })).data;
-export const deleteWorkspaceSecret = async (id: string, revision: number, name: string) =>
+export const deleteJobSecret = async (id: string, revision: number, name: string) =>
   (await apiClient.delete<{ revision: number }>(`${url(id)}secrets/${encodeURIComponent(name)}/`, { data: { revision } })).data;
 export const getRunInput = async (id: string) =>
   (await apiClient.get<{ entries: WorkspaceEntry[]; entry_point: string }>(controlPlaneURL(`/training-jobs/${id}/input/`))).data;

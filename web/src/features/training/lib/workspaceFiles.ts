@@ -1,5 +1,5 @@
 import type { DragEvent } from "react";
-import type { WorkspaceEntry } from "@/features/training/api/workspacesApi";
+import type { WorkspaceEntry } from "@/features/training/api/jobWorkspaceApi";
 import type { TrainingFileKind } from "@/features/training/components/TrainingFileDialog";
 import type { SourceTreeNode } from "@/shared/types/sourceTreeModel";
 
@@ -22,7 +22,7 @@ export function workspaceTree(entries: WorkspaceEntry[]): SourceTreeNode[] {
   return root.children;
 }
 export function kindForPath(path: string): TrainingFileKind {
-  if (path === "requirements.txt") return "requirements";
+  if (path === "requirements.txt" || path.endsWith(".txt")) return "requirements";
   if (path.endsWith(".py")) return "script";
   if (path.endsWith(".csv")) return "data";
   if (path.endsWith(".json")) return "config";
@@ -51,4 +51,23 @@ export async function droppedEntries(event: DragEvent): Promise<{ path: string; 
   }
   for (const entry of roots) await visit(entry, "");
   return result;
+}
+
+export function isReadableFile(path: string): boolean {
+  const p = path.toLowerCase();
+  return (
+    p.endsWith(".py") ||
+    p.endsWith(".csv") ||
+    p.endsWith(".json") ||
+    p.endsWith(".md") ||
+    p.endsWith(".txt")
+  );
+}
+
+export function getFileLanguage(path: string): "python" | "json" | "markdown" | "plaintext" {
+  const p = path.toLowerCase();
+  if (p.endsWith(".py")) return "python";
+  if (p.endsWith(".json")) return "json";
+  if (p.endsWith(".md")) return "markdown";
+  return "plaintext";
 }

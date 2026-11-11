@@ -83,6 +83,7 @@ def claim(kind, public_id=None):
         candidates = Q(status__in=ACTIVE) | Q(observation_status="cleanup_pending")
         if kind == "training":
             candidates |= Q(deletion_requested_at__isnull=False)
+            candidates &= Q(submitted_at__isnull=False)
         rows = model_for(kind).objects.select_for_update(skip_locked=True).filter(
             candidates
         ).filter(Q(execution_check_lease_until__isnull=True) | Q(execution_check_lease_until__lte=now))
@@ -225,7 +226,7 @@ def _finish(row, kind, status, message="", finished_at=None):
         row.mark_finished(status)
         if finished_at:
             row.completed_at = finished_at
-            started = row.runtime_started_at or row.started_at or row.created_at
+            started = row.runtime_started_at or row.started_at or finished_at
             row.runtime_seconds = max(0, int((finished_at - started).total_seconds()))
         row.save(update_fields=["status", "completed_at", "runtime_seconds"])
         if status == "completed":

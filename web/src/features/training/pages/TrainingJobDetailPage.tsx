@@ -86,9 +86,11 @@ export default function TrainingJobDetailPage() {
   const [deleteJobOpen, setDeleteJobOpen] = useState(false);
   const [retryJobOpen, setRetryJobOpen] = useState(false);
   const [liveElapsed, setLiveElapsed] = useState<number | null>(null);
+  const retryKey = useRef<string | null>(null);
   const lastToastedStatus = useRef<string | null>(null);
 
   const statusLabels: Record<TrainingJobStatus, string> = {
+    editing: t("statusFilter.editing"),
     pending: t("detail.statuses.pending"),
     queued: t("detail.statuses.queued"),
     uploading: t("detail.statuses.uploading"),
@@ -225,15 +227,18 @@ export default function TrainingJobDetailPage() {
   });
 
   const retryJobMutation = useMutation({
-    mutationFn: () => retryTrainingJob(parsedJobId),
+    mutationFn: () => {
+      retryKey.current ??= crypto.randomUUID();
+      return retryTrainingJob(parsedJobId, retryKey.current);
+    },
     onSuccess: async (newJob) => {
       setRetryJobOpen(false);
-      toast.success(t("createFlow.messages.trainingStarted"));
+      toast.success(t("studio.draftCreated"));
       await queryClient.invalidateQueries({ queryKey: trainingQueryKeys.usage() });
       await queryClient.invalidateQueries({
         queryKey: trainingQueryKeys.jobs(),
       });
-      navigate(`/dashboard/training/jobs/${newJob.id}/overview`);
+      navigate(`/dashboard/training/${newJob.id}/workspace${job?.project_id ? `?project=${job.project_id}` : ""}`);
     },
     onError: (error) =>
       toast.error(
@@ -390,6 +395,7 @@ export default function TrainingJobDetailPage() {
                   {t("studio.assignProject")}
                 </Button>
               )}
+              <Button variant="secondary" onClick={() => navigate(`/dashboard/training/${job.id}/workspace`)}>{t("studio.openDraft")}</Button>
               <Button
                 size="icon"
                 variant="secondary"

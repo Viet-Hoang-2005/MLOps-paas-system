@@ -1,3 +1,4 @@
+from django.utils import timezone
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 import docker.errors
@@ -22,7 +23,7 @@ class DockerTrainingAsyncTests(TestCase):
             model_flavor="sklearn",
             status="queued",
             backend="docker",
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
         uris = expected_training_uris(self.job, "bucket")
         self.job.code_snapshot_uri = uris["code"]
         self.job.data_snapshot_uri = uris["data"]

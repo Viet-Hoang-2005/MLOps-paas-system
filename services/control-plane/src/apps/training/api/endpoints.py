@@ -49,10 +49,12 @@ class TrainingJobListCreateEndpoint(generics.ListCreateAPIView):
             ),
         )
 
-    def perform_create(self, serializer):
-        require_training_enabled()
-        project = serializer.validated_data.pop("project")
-        serializer.instance = create_job(project=project, validated_data=serializer.validated_data)
+    def create(self, request, *args, **kwargs):
+        from .serializers import TrainingDraftSettingsSerializer
+        serializer = TrainingDraftSettingsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        job = create_job(owner=request.user, validated_data=serializer.validated_data)
+        return Response(TrainingJobSerializer(job, context={"include_workspace": True}).data, status=status.HTTP_201_CREATED)
 
 
 class TrainingJobDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
@@ -68,6 +70,19 @@ class TrainingJobDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
                 queryset=Build.objects.select_related("version").prefetch_related("version__deployments"),
             ),
         )
+
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), "include_workspace": True}
+
+    def update(self, request, *args, **kwargs):
+        from .serializers import TrainingDraftSettingsSerializer
+        from apps.training.services.workspaces import update_workspace
+        serializer = TrainingDraftSettingsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = dict(serializer.validated_data)
+        revision = values.pop("revision", None)
+        job = update_workspace(self.get_object(), revision=revision, changes=values)
+        return Response(self.get_serializer(job).data)
 
     def delete(self, request, *args, **kwargs):
         job = request_job_deletion(self.get_object())
@@ -86,7 +101,10 @@ class TrainingJobDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
 class TrainingJobSubmitEndpoint(APIView):
     def post(self, request, job_id):
         require_training_enabled()
-        job = submit_job(job_for_user(request.user, job_id))
+        from .serializers import TrainingSubmissionSerializer
+        serializer = TrainingSubmissionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        job = submit_job(job_for_user(request.user, job_id), **serializer.validated_data)
         return Response(TrainingJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
 
 
@@ -110,7 +128,20 @@ class TrainingJobCancelEndpoint(APIView):
 class TrainingJobRetryEndpoint(APIView):
     def post(self, request, job_id):
         require_training_enabled()
-        job = retry_job(job_for_user(request.user, job_id))
+        from .serializers import TrainingCloneSerializer
+        serializer = TrainingCloneSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        job = retry_job(job_for_user(request.user, job_id), **serializer.validated_data)
+        return Response(TrainingJobSerializer(job).data, status=status.HTTP_201_CREATED)
+
+
+class TrainingJobCloneEndpoint(APIView):
+    def post(self, request, job_id):
+        from .serializers import TrainingCloneSerializer
+        from apps.training.services.drafts import clone_draft
+        serializer = TrainingCloneSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        job = clone_draft(job_for_user(request.user, job_id), **serializer.validated_data)
         return Response(TrainingJobSerializer(job).data, status=status.HTTP_201_CREATED)
 
 

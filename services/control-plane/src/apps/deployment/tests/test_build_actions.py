@@ -241,7 +241,7 @@ def test_rebuild_copies_current_preview_into_new_build(project, status, monkeypa
 
 
 def test_rebuild_uses_original_completed_training_job(project, monkeypatch):
-    job = TrainingJob.objects.create(project=project, model_flavor="xgboost", status="completed")
+    job = TrainingJob.objects.create(project=project, model_flavor="xgboost", status="completed", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     TrainingOutput.objects.create(
         job=job, kind="model", relative_path="model.tar.gz", s3_uri="s3://test-bucket/trained.tar.gz"
     )
@@ -260,7 +260,7 @@ def test_rebuild_uses_original_completed_training_job(project, monkeypatch):
 
 
 def test_rebuild_does_not_reuse_training_build_being_deleted(project):
-    job = TrainingJob.objects.create(project=project, model_flavor="xgboost", status="completed")
+    job = TrainingJob.objects.create(project=project, model_flavor="xgboost", status="completed", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     original = Build.objects.create(project=project, source_job=job, flavor="xgboost", status="failed")
     Build.objects.create(
         project=project, source_job=job, flavor="xgboost", status="building", deletion_state="deleting"

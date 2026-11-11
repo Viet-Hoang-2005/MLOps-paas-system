@@ -1,3 +1,4 @@
+from django.utils import timezone
 from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
@@ -27,7 +28,7 @@ class CopyStorage(MemoryStorage):
 def test_storage_copy_verifies_before_switching_and_resumes():
     user = get_user_model().objects.create_user("copy-owner@example.test", "test-password")
     project = ModelProject.objects.create(owner=user, name="Copy", deletion_state="deleting", is_active=False)
-    job = TrainingJob(project=project, model_flavor="sklearn", status="completed")
+    job = TrainingJob(project=project, model_flavor="sklearn", status="completed", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     storage = CopyStorage()
     uris = expected_training_uris(job, storage.bucket)
     job.code_snapshot_uri, job.data_snapshot_uri, job.output_uri, job.mlflow_artifact_uri = uris.values()

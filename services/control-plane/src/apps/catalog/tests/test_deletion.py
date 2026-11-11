@@ -1,3 +1,4 @@
+from django.utils import timezone
 from types import SimpleNamespace
 
 import pytest
@@ -27,7 +28,7 @@ def test_project_deletion_preserves_existing_training_jobs(monkeypatch):
 
     owner = get_user_model().objects.create_user("preserve-training@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="Preserve training")
-    job = TrainingJob.objects.create(project=project, model_flavor="sklearn")
+    job = TrainingJob.objects.create(project=project, model_flavor="sklearn", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
     storage = FakeStorage()
 
     monkeypatch.setattr("apps.catalog.services.deletion._enqueue", lambda project: None)
@@ -48,7 +49,7 @@ def test_project_cleanup_retains_tenant_scoped_training_history(monkeypatch):
     owner = get_user_model().objects.create_user("detached-training@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="Detach training", deletion_state="deleting", is_active=False)
     job = TrainingJob.objects.create(project=project, model_flavor="sklearn",
-                                     status="completed", storage_layout="tenant")
+                                     status="completed", storage_layout="tenant", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     output = TrainingOutput.objects.create(job=job, kind="model", relative_path="model.tar.gz", s3_uri="s3://bucket/model")
     event = LifecycleEvent.objects.create(project=project, aggregate_type="training_job", aggregate_id=job.public_id,
                                           event_type="completed")

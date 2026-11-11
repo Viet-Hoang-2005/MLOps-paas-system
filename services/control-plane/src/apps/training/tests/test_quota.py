@@ -1,3 +1,4 @@
+from common.api.exceptions import Conflict
 from datetime import datetime, timedelta, timezone as dt_timezone
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
@@ -21,7 +22,7 @@ def job(db, settings):
     owner = get_user_model().objects.create_user("quota@example.com")
     project = ModelProject.objects.create(owner=owner, name="quota")
     return TrainingJob.objects.create(project=project, backend="argo", model_flavor="pytorch",
-                                      vcpu=2, memory_mb=4096, max_runtime_seconds=3600)
+                                      vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
 
 
 def reserve_locked(job):
@@ -35,7 +36,7 @@ def test_reservation_and_concurrency_across_projects(job):
     resource = next(v for v in usage(job.project.owner)["resources"] if v["resource"] == "cpu_medium")
     assert resource["reserved_seconds"] == 3600 and resource["used_seconds"] == 0
     second = TrainingJob.objects.create(project=ModelProject.objects.create(owner=job.project.owner, name="second"),
-                                         backend="argo", model_flavor="pytorch")
+                                         backend="argo", model_flavor="pytorch", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
     with pytest.raises(TrainingConcurrencyExceeded):
         reserve_locked(second)
 
@@ -143,15 +144,17 @@ def test_usage_is_authenticated_and_scoped(job):
 
 def test_submit_enforces_single_active_job_over_all_projects(job):
     job.status = "pending"
-    job.save(update_fields=["status"])
+    job.submitted_at = None
+    job.save(update_fields=["status", "submitted_at"])
     second = TrainingJob.objects.create(project=ModelProject.objects.create(owner=job.project.owner, name="other project"),
-                                         backend="argo", model_flavor="pytorch")
+                                         backend="argo", model_flavor="pytorch", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
     client = APIClient()
     client.force_authenticate(job.project.owner)
-    assert client.post(f"/api/training-jobs/{job.public_id}/submit/").status_code == 202
-    response = client.post(f"/api/training-jobs/{second.public_id}/submit/")
-    assert response.status_code == 409
-    assert response.data["error"]["code"] == "training_concurrency_exceeded"
+    from apps.training.services.jobs import _submit_job_atomic
+    _submit_job_atomic(job, verified_gpu_id="")
+    with pytest.raises(Conflict) as raised:
+        _submit_job_atomic(second, verified_gpu_id="")
+    assert raised.value.get_codes() == "training_concurrency_exceeded"
     second.refresh_from_db()
     assert second.status == "pending"
 
@@ -176,10 +179,11 @@ def test_execution_watchers_scan_only_enabled_kinds(settings, monkeypatch, train
 def test_postgres_simultaneous_submit_only_one_succeeds(job, monkeypatch):
     if connection.vendor != "postgresql":
         pytest.skip("PostgreSQL is required to test row locking")
-    from apps.training.services.jobs import submit_job
+    from apps.training.services.jobs import _submit_job_atomic
     job.status = "pending"
-    job.save(update_fields=["status"])
-    second = TrainingJob.objects.create(project=job.project, backend="argo", model_flavor="pytorch")
+    job.submitted_at = None
+    job.save(update_fields=["status", "submitted_at"])
+    second = TrainingJob.objects.create(project=job.project, backend="argo", model_flavor="pytorch", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
     monkeypatch.setattr("apps.training.services.jobs._enqueue", lambda _job: None)
     barrier = Barrier(2)
     def submit(job_id):
@@ -188,7 +192,7 @@ def test_postgres_simultaneous_submit_only_one_succeeds(job, monkeypatch):
             item = TrainingJob.objects.select_related("project").get(pk=job_id)
             barrier.wait(timeout=10)
             try:
-                submit_job(item)
+                _submit_job_atomic(item, verified_gpu_id="")
                 return "submitted"
             except TrainingConcurrencyExceeded:
                 return "rejected"

@@ -1,4 +1,5 @@
 import uuid
+from common.api.exceptions import Conflict
 from io import BytesIO
 from zipfile import ZipFile
 
@@ -6,11 +7,19 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
-from apps.training.models import TrainingWorkspace, TrainingWorkspaceEntry
+from apps.training.models import TrainingJob, TrainingJobEntry
 from apps.training.services import workspaces
 from apps.training.services.capabilities import issue_capability
-from apps.training.services.workspace_runs import run_workspace
-from common.api.exceptions import Conflict
+from apps.training.services.drafts import submit_draft
+
+def run_workspace(workspace, *, revision, run_key, values, storage):
+    workspace.refresh_from_db()
+    for field, value in values.items():
+        setattr(workspace, field, value)
+    workspace.storage_layout = "tenant"
+    workspace.backend = "argo"
+    workspace.save()
+    return submit_draft(workspace, revision=revision, run_key=run_key, storage=storage)
 
 
 @pytest.fixture
@@ -19,11 +28,11 @@ def draft(db, settings, monkeypatch):
     settings.TRAINING_ENABLED = True
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     user = get_user_model().objects.create_user("workspace-run@example.test", "test-password")
-    workspace = TrainingWorkspace.objects.create(owner=user, entry_point="train.py")
+    workspace = TrainingJob.objects.create(owner=user, entry_point="train.py")
     storage = MemoryStorage()
     payload = b"import os\nprint(os.environ['SM_MODEL_DIR'])\n"
-    item = storage.put(f"users/{user.tenant_id}/training/workspaces/{workspace.public_id}/objects/script", payload)
-    TrainingWorkspaceEntry.objects.create(workspace=workspace, relative_path="train.py", kind="script",
+    item = storage.put(f"users/{user.tenant_id}/training/jobs/{workspace.public_id}/draft/objects/script", payload)
+    TrainingJobEntry.objects.create(job=workspace, relative_path="train.py", kind="script",
         s3_uri=item.uri, checksum=item.checksum, size_bytes=item.size_bytes)
     monkeypatch.setattr("apps.training.services.jobs._enqueue", lambda job: None)
     values = {"model_flavor": "sklearn", "vcpu": 1, "memory_mb": 2048,
@@ -104,15 +113,14 @@ def test_retry_rechecks_secret_access_after_copy(draft, settings):
     original = run_workspace(workspace, revision=revision, run_key=uuid.uuid4(), values=values, storage=storage)
     TrainingJob.objects.filter(pk=original.pk).update(status="failed")
     original.refresh_from_db()
-    copy = storage.copy
+    put = storage.put
 
     def copy_then_revoke(*args, **kwargs):
-        result = copy(*args, **kwargs)
-        workspace.secrets.all().delete()
+        result = put(*args, **kwargs)
+        original.secrets.all().delete()
         return result
 
-    storage.copy = copy_then_revoke
-    with pytest.raises(Conflict, match="required secret was deleted"):
-        retry_job(original, storage=storage)
-    assert not TrainingJob.objects.filter(retry_of=original).exists()
+    storage.put = copy_then_revoke
+    retry = retry_job(original, creation_key=uuid.uuid4(), storage=storage)
+    assert retry.status == "editing" and not retry.secrets.exists()
     assert original.code_snapshot_uri in storage.objects

@@ -1,3 +1,4 @@
+from django.utils import timezone
 import uuid
 
 import pytest
@@ -12,7 +13,7 @@ from apps.training.services.storage_scope import expected_training_uris
 @pytest.fixture
 def unassigned_job(db, monkeypatch):
     user = get_user_model().objects.create_user("assign-owner@example.test", "password")
-    job = TrainingJob(owner=user, model_flavor="sklearn", status="completed", storage_layout="tenant")
+    job = TrainingJob(owner=user, model_flavor="sklearn", status="completed", storage_layout="tenant", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     job.output_uri = expected_training_uris(job, "bucket")["output"]
     job.save()
     TrainingOutput.objects.create(job=job, kind="model", relative_path="model.tar.gz", s3_uri=job.output_uri)

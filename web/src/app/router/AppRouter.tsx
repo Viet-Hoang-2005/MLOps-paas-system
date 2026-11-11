@@ -166,7 +166,7 @@ const router = createBrowserRouter(
           element={<DriftMonitoringDetailPage />}
         />
         <Route path="training/new" element={<NewTrainingWorkspacePage />} />
-        <Route path="training/workspaces/:workspaceId" element={<TrainingWorkspacePage />} />
+        <Route path="training/:jobId/workspace" element={<TrainingWorkspacePage />} />
         <Route path="training/jobs/:jobId" element={<TrainingJobDetailPage />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<TrainingJobOverviewPage />} />

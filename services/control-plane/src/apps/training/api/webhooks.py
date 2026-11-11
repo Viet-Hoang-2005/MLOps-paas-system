@@ -63,7 +63,7 @@ class TrainingJobWebhookEndpoint(APIView):
                 purpose="trusted_reporter",
                 token=_bearer_token(request),
             )
-            if not capability:
+            if not capability or not job.submitted_at:
                 return Response({"detail": "Invalid training reporter capability."}, status=status.HTTP_403_FORBIDDEN)
             if has_event(aggregate_type="training_job", aggregate_id=job.public_id, idempotency_key=key):
                 return Response({"status": job.status, "duplicate": True})

@@ -7,7 +7,6 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { listModelProjects } from "@/shared/api/catalogApi";
-import { listWorkspaces } from "@/features/training/api/workspacesApi";
 import {
   deleteTrainingJob,
   getTrainingUsage,
@@ -38,10 +37,11 @@ const ACTIVE_STATUSES: TrainingJobStatus[] = [
   "cancelling",
 ];
 
-type TrainingSummaryStatus = "pending" | "success" | "failed";
+type TrainingSummaryStatus = "editing" | "pending" | "success" | "failed";
 
 const summaryStatusForJob = (job: TrainingJob): TrainingSummaryStatus => {
   const status = displayStatus(job);
+  if (status === "editing") return "editing";
   return status === "success" || status === "failed" ? status : "pending";
 };
 
@@ -58,6 +58,7 @@ const elapsedForJob = (job: TrainingJob) => {
 
 const displayStatus = (job: TrainingJob) => {
   if (job.deletion_pending) return "deleting";
+  if (job.status === "editing") return "editing";
   if (job.status === "completed") return "success";
   if (job.status === "failed" || job.status === "cancelled") return "failed";
   return "pending";
@@ -70,10 +71,10 @@ export default function TrainingModelPage() {
   const queryClient = useQueryClient();
   const [projectFilter, setProjectFilter] = useState(modelId ?? "all");
   const { data: projects } = useQuery({ queryKey: ["training", "projects"], queryFn: listModelProjects });
-  const { data: workspaces } = useQuery({ queryKey: ["training", "workspaces"], queryFn: listWorkspaces });
   const [statusFilter, setStatusFilter] = useState<TrainingStatusFilter>("all");
   const [jobToDelete, setJobToDelete] = useState<TrainingJob | null>(null);
   const [jobToRetry, setJobToRetry] = useState<TrainingJob | null>(null);
+  const retryKeys = useRef(new Map<string, string>());
   const pendingDeletionIds = useRef<Set<string>>(new Set());
 
   const {
@@ -116,6 +117,7 @@ export default function TrainingModelPage() {
   const statusOptions = useMemo<SelectOption[]>(
     () => [
       { value: "all", label: t("statusFilter.all") },
+      { value: "editing", label: t("statusFilter.editing") },
       { value: "pending", label: t("statusFilter.pending") },
       { value: "success", label: t("statusFilter.success") },
       { value: "failed", label: t("statusFilter.failed") },
@@ -137,6 +139,7 @@ export default function TrainingModelPage() {
   const trainingStatusSummary = useMemo(() => {
     const total = selectedModelTrainingJobs.length;
     const counts: Record<TrainingSummaryStatus, number> = {
+      editing: 0,
       pending: 0,
       success: 0,
       failed: 0,
@@ -205,15 +208,19 @@ export default function TrainingModelPage() {
   });
 
   const retryMutation = useMutation({
-    mutationFn: (job: TrainingJob) => retryTrainingJob(job.id),
-    onSuccess: (newJob) => {
+    mutationFn: (job: TrainingJob) => {
+      const key = retryKeys.current.get(job.id) ?? crypto.randomUUID();
+      retryKeys.current.set(job.id, key);
+      return retryTrainingJob(job.id, key);
+    },
+    onSuccess: (newJob, sourceJob) => {
       setJobToRetry(null);
-      toast.success(t("createFlow.messages.trainingStarted"));
+      toast.success(t("studio.draftCreated"));
       void queryClient.invalidateQueries({ queryKey: trainingQueryKeys.usage() });
       void queryClient.invalidateQueries({
         queryKey: trainingQueryKeys.jobs(),
       });
-      navigate(`/dashboard/training/jobs/${newJob.id}/overview`);
+      navigate(`/dashboard/training/${newJob.id}/workspace${sourceJob.project_id ? `?project=${sourceJob.project_id}` : ""}`);
     },
     onError: (error) => {
       toast.error(
@@ -231,7 +238,7 @@ export default function TrainingModelPage() {
           <button
             type="button"
             className="break-all text-left font-medium hover:text-color-primary"
-            onClick={() => navigate(`/dashboard/training/jobs/${row.original.id}/overview`)}
+            onClick={() => navigate(`/dashboard/training/${row.original.id}/workspace`)}
           >
             {row.original.id}
           </button>
@@ -250,7 +257,7 @@ export default function TrainingModelPage() {
             type="button"
             className="text-left font-medium hover:text-color-primary transition-colors focus:outline-none"
             onClick={() =>
-              navigate(`/dashboard/training/jobs/${row.original.id}/overview`)
+              navigate(`/dashboard/training/${row.original.id}/workspace`)
             }
           >
             {row.original.started_at
@@ -294,6 +301,7 @@ export default function TrainingModelPage() {
         enableSorting: false,
         cell: ({ row }) => {
           const job = row.original;
+          if (job.vcpu == null || job.memory_mb == null) return "—";
           const digits = job.memory_mb % 1024 === 0 ? 0 : 1;
           const memoryGb = formatNumber(job.memory_mb / 1024, i18n.language, {
             minimumFractionDigits: digits,
@@ -350,7 +358,7 @@ export default function TrainingModelPage() {
                 icon={<Eye className="h-4 w-4" />}
                 disabled={deleting}
                 onClick={() =>
-                  navigate(`/dashboard/training/jobs/${job.id}/overview`)
+                  navigate(`/dashboard/training/${job.id}/workspace`)
                 }
               />
               {(job.status === "failed" || job.status === "cancelled") && (
@@ -387,7 +395,6 @@ export default function TrainingModelPage() {
       <PageHeader title={t("title")} />
       <div className="flex flex-wrap gap-3">
         <label className="space-y-2 text-style-body-strong"><span>{t("studio.project")}</span><select className="block h-11 rounded-control border border-input bg-surface px-3 text-style-body" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">{t("studio.allProjects")}</option><option value="unassigned">{t("studio.unassigned")}</option>{projects?.models.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
-        <label className="space-y-2 text-style-body-strong"><span>{t("studio.drafts")}</span><select className="block h-11 rounded-control border border-input bg-surface px-3 text-style-body" value="" onChange={(event) => { if (event.target.value) navigate(`/dashboard/training/workspaces/${event.target.value}`); }}><option value="">{t("studio.openDraft")}</option>{workspaces?.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.id}</option>)}</select></label>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -414,8 +421,9 @@ export default function TrainingModelPage() {
             {t("totalJobs")}
           </p>
           <span className="mt-3 text-style-page-title font-semibold text-color-foreground">
-            {selectedModelTrainingJobs.length}
+            {selectedModelTrainingJobs.filter((job) => Boolean(job.submitted_at)).length}
           </span>
+          <p className="mt-2 text-style-caption">{t("studio.draftCount", { count: selectedModelTrainingJobs.filter((job) => job.status === "editing").length })}</p>
           <div
             className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-muted"
             aria-label={t("statusDistribution.label")}

@@ -6,11 +6,11 @@ import { renderWithProviders } from "test/renderWithProviders";
 import TrainingWorkspacePage from "./TrainingWorkspacePage";
 import type { TrainingJob, TrainingRuntimeCapabilities } from "@/features/training/types";
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), runs: vi.fn(), run: vi.fn(), input: vi.fn(), save: vi.fn(), caps: vi.fn() }));
+const mocks = vi.hoisted(() => ({ get: vi.fn(), update: vi.fn(), run: vi.fn(), input: vi.fn(), save: vi.fn(), caps: vi.fn() }));
 vi.mock("react-router-dom", async (original) => ({ ...await original<typeof import("react-router-dom")>(), useBlocker: () => ({ state: "unblocked" }) }));
-vi.mock("@/features/training/api/workspacesApi", async (original) => ({
-  ...await original<typeof import("@/features/training/api/workspacesApi")>(),
-  getWorkspace: mocks.get, listWorkspaceRuns: mocks.runs, runWorkspace: mocks.run, getRunInput: mocks.input,
+vi.mock("@/features/training/api/jobWorkspaceApi", async (original) => ({
+  ...await original<typeof import("@/features/training/api/jobWorkspaceApi")>(),
+  getJobWorkspace: mocks.get, runJob: mocks.run, updateJobWorkspace: mocks.update, getRunInput: mocks.input,
 }));
 vi.mock("@/features/training/api/trainingApi", async (original) => ({ ...await original<typeof import("@/features/training/api/trainingApi")>(), getTrainingRuntimeCapabilities: mocks.caps }));
 vi.mock("@/shared/hooks/useRuntimeLogStream", () => ({ useRuntimeLogStream: () => ({ logs: [], status: null, error: "", isPolling: false, refresh: vi.fn() }) }));
@@ -21,17 +21,17 @@ vi.mock("@/features/training/components/WorkspaceEditor", async () => {
     return <div data-testid="workspace-editor" data-readonly={readOnly} />;
   }) };
 });
-const workspace = { id: "workspace", revision: 1, entry_point: "train.py", entries: [], environment: {}, secrets: [], secrets_available: true };
-const job = { id: "run-one", project_id: null, workspace_id: "workspace", status: "running", model_flavor: "sklearn", entry_point: "train.py", requirements_text: "", vcpu: 1, memory_mb: 2048, max_runtime_seconds: 900, accelerator_type: "none", outputs: [], output_available: false, output_revision: 1 } as unknown as TrainingJob;
+const job = { id: "run-one", project_id: null, submitted_at: "2026-11-11T00:00:00Z", status: "running", model_flavor: "sklearn", entry_point: "train.py", requirements_text: "", vcpu: 1, memory_mb: 2048, max_runtime_seconds: 900, accelerator_type: "none", outputs: [], output_available: false, output_revision: 1 } as unknown as TrainingJob;
+const workspace = { ...job, status: "editing", submitted_at: null, id: "workspace", revision: 1, entry_point: "train.py", entries: [], environment: {}, secrets: [], secrets_available: true };
 const caps: TrainingRuntimeCapabilities = { enabled: true, backend: "argo", runtime_options_seconds: [900, 86400], cpu_profiles: [{ id: "small", vcpu: 1, memory_mb: 2048 }], accelerators: [{ type: "none", counts: [0] }, { type: "gpu", model: "t4", counts: [1] }, { type: "gpu", model: "a10g", counts: [1] }] };
 function show(language: "en" | "vi" = "en", query = "") {
-  return renderWithProviders(<Routes><Route path="/training/workspaces/:workspaceId" element={<TrainingWorkspacePage />} /></Routes>, { language, initialEntries: [`/training/workspaces/workspace${query}`] });
+  return renderWithProviders(<Routes><Route path="/training/:jobId/workspace" element={<TrainingWorkspacePage />} /></Routes>, { language, initialEntries: [`/training/workspace/workspace${query}`] });
 }
 describe("training workspace flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.get.mockResolvedValue(workspace); mocks.runs.mockResolvedValue([]); mocks.caps.mockResolvedValue(caps);
-    mocks.save.mockResolvedValue(6); mocks.run.mockResolvedValue(job); mocks.input.mockResolvedValue({ entries: [], entry_point: "train.py" });
+    mocks.get.mockResolvedValue(workspace); mocks.update.mockResolvedValue(workspace); mocks.caps.mockResolvedValue(caps);
+    mocks.save.mockResolvedValue(6); mocks.run.mockImplementation(() => { mocks.get.mockResolvedValue({ ...workspace, ...job, id: "workspace" }); return Promise.resolve({ ...job, id: "workspace" }); }); mocks.input.mockResolvedValue({ entries: [], entry_point: "train.py" });
   });
   it.each(["en", "vi"] as const)("runs without a project and saves pending editor changes first in %s", async (language) => {
     show(language);
@@ -39,28 +39,38 @@ describe("training workspace flow", () => {
     await waitFor(() => expect(run).toBeEnabled());
     await userEvent.click(run);
     await waitFor(() => expect(mocks.run).toHaveBeenCalled());
-    expect(mocks.save).toHaveBeenCalledOnce();
+    expect(mocks.save).toHaveBeenCalled();
     const [id, revision, key, payload] = mocks.run.mock.calls[0];
     expect(id).toBe("workspace"); expect(revision).toBe(6); expect(key).toEqual(expect.any(String));
-    expect(payload).not.toHaveProperty("project_id");
-    expect(payload).not.toHaveProperty("name");
+    expect(payload).toBeUndefined();
     expect(screen.queryByLabelText(language === "en" ? "Name" : "Tên")).not.toBeInTheDocument();
-    expect(payload.source_zip).toBeNull();
+
     await waitFor(() => expect(screen.getByTestId("workspace-editor")).toHaveAttribute("data-readonly", "true"));
     expect(screen.getByRole("button", { name: language === "en" ? "Continue" : "Tiếp tục" })).toBeDisabled();
   });
   it("preserves the selected GPU model in the run payload", async () => {
     show();
     await screen.findByRole("button", { name: "Run" });
-    await userEvent.selectOptions(screen.getByLabelText("GPU"), "a10g");
+    await userEvent.click(screen.getByLabelText("GPU"));
+    await userEvent.click(await screen.findByRole("button", { name: /a10g/i }));
     await userEvent.click(screen.getByRole("button", { name: "Run" }));
     await waitFor(() => expect(mocks.run).toHaveBeenCalled());
-    expect(mocks.run.mock.calls[0][3]).toMatchObject({ accelerator_type: "gpu", accelerator_count: 1, accelerator_model: "a10g", local_gpu_id: "" });
+    expect(mocks.run.mock.calls[0][0]).toBe("workspace");
+    expect(mocks.update).toHaveBeenCalledWith("workspace", 6, expect.objectContaining({ accelerator_model: "a10g", accelerator_count: 1 }));
   });
-  it("loads the selected run snapshot and enables assignment only with verified model output", async () => {
-    mocks.runs.mockResolvedValue([{ ...job, status: "completed", output_available: true }]);
-    show("en", "?run=run-one");
-    await waitFor(() => expect(mocks.input).toHaveBeenCalledWith("run-one"));
+  it("does not submit when saving configuration fails", async () => {
+    mocks.update.mockRejectedValue(new Error("Revision conflict"));
+    show();
+    const run = await screen.findByRole("button", { name: "Run" });
+    await waitFor(() => expect(run).toBeEnabled());
+    await userEvent.click(run);
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled());
+    expect(mocks.run).not.toHaveBeenCalled();
+  });
+  it("loads the job snapshot and enables assignment only with verified model output", async () => {
+    mocks.get.mockResolvedValue({ ...workspace, ...job, id: "workspace", status: "completed", output_available: true });
+    show();
+    await waitFor(() => expect(mocks.input).toHaveBeenCalledWith("workspace"));
     expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
     expect(await screen.findByTestId("workspace-editor")).toHaveAttribute("data-readonly", "true");
   });

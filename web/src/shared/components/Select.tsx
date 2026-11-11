@@ -2,7 +2,7 @@ import { cn } from "@/shared/lib/cn";
 import * as Popover from "@radix-ui/react-popover";
 import { Check, ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 export interface SelectOption {
   value: string;
@@ -11,31 +11,43 @@ export interface SelectOption {
 }
 
 export interface SelectProps {
+  id?: string;
+  label?: ReactNode;
   value: string;
   onChange: (value: string) => void;
   options: SelectOption[];
   placeholder?: string;
   className?: string;
+  wrapperClassName?: string;
   disabled?: boolean;
+  "aria-label"?: string;
 }
 
 export function Select({
+  id,
+  label,
   value,
   onChange,
   options,
   placeholder = "Select an option",
   className,
+  wrapperClassName,
   disabled = false,
+  "aria-label": ariaLabel,
 }: SelectProps) {
+  const generatedId = useId();
+  const selectId = id || generatedId;
   const [open, setOpen] = useState(false);
   const selectedOption = options.find((opt) => opt.value === value);
 
-  return (
+  const selectNode = (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button
+          id={selectId}
           type="button"
           disabled={disabled}
+          aria-label={ariaLabel || (typeof label === "string" ? label : undefined)}
           className={cn(
             "flex h-14 w-full items-center justify-between gap-3 rounded-surface border bg-surface px-4 text-left text-style-body-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20",
             open ? "border-ring" : "border-input hover:border-input-hover",
@@ -88,5 +100,21 @@ export function Select({
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
+  );
+
+  if (!label) {
+    return selectNode;
+  }
+
+  return (
+    <div className={cn("flex w-full flex-col gap-2", wrapperClassName)}>
+      <label
+        htmlFor={selectId}
+        className="text-style-body-strong text-color-foreground"
+      >
+        {label}
+      </label>
+      {selectNode}
+    </div>
   );
 }

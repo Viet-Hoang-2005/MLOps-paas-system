@@ -8,6 +8,7 @@ import requests
 from django.core.cache import cache
 from rest_framework.exceptions import ValidationError
 
+from apps.catalog.models import ModelProject
 from apps.training.services import local_gpu
 
 GPU = "GPU-01234567-89ab-cdef-0123-456789abcdef"
@@ -186,7 +187,6 @@ def test_capabilities_keep_cpu_when_docker_unavailable(settings, monkeypatch):
 def test_submit_checks_selected_device_before_queuing(settings, monkeypatch):
     from django.contrib.auth import get_user_model
     from rest_framework.test import APIClient
-    from apps.catalog.models import ModelProject
     from apps.training.models import TrainingJob
 
     settings.TRAINING_BACKEND = "docker"
@@ -195,14 +195,14 @@ def test_submit_checks_selected_device_before_queuing(settings, monkeypatch):
     user = get_user_model().objects.create_user("gpu-submit-test@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
     job = TrainingJob.objects.create(project=project, model_flavor="pytorch",
-        accelerator_type="gpu", accelerator_count=1, local_gpu_id=GPU)
+        accelerator_type="gpu", accelerator_count=1, local_gpu_id=GPU, vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="workspace", status="editing", backend="docker")
     check = Mock(side_effect=ValidationError({"local_gpu_id": "Selected GPU is unavailable."}))
     monkeypatch.setattr(local_gpu, "require_device", check)
     client = APIClient()
     client.force_authenticate(user)
-    response = client.post(f"/api/training-jobs/{job.public_id}/submit/")
+    response = client.post(f"/api/training-jobs/{job.public_id}/submit/", {"revision": 1, "run_key": str(__import__("uuid").uuid4())}, format="json")
     assert response.status_code == 400
-    assert TrainingJob.objects.get(pk=job.pk).status == "pending"
+    assert TrainingJob.objects.get(pk=job.pk).status == "editing"
     check.assert_called_once_with(GPU)
 
 
@@ -227,7 +227,6 @@ def test_rejects_invalid_device_contract(settings, backend, kind, device_id):
 def test_create_persists_only_a_verified_local_gpu(settings, monkeypatch):
     from django.contrib.auth import get_user_model
     from rest_framework.test import APIClient
-    from apps.catalog.models import ModelProject
     from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
 
     settings.TRAINING_BACKEND = "docker"
@@ -237,22 +236,20 @@ def test_create_persists_only_a_verified_local_gpu(settings, monkeypatch):
     check = Mock(return_value={"id": GPU})
     monkeypatch.setattr(local_gpu, "require_device", check)
     user = get_user_model().objects.create_user("gpu-create-test@example.com")
-    project = ModelProject.objects.create(owner=user, name="gpu project")
     client = APIClient()
     client.force_authenticate(user)
-    payload = {"project": str(project.public_id),  "model_flavor": "pytorch",
+    payload = {"model_flavor": "pytorch",
                "accelerator_type": "gpu", "accelerator_count": 1, "local_gpu_id": GPU}
     response = client.post("/api/training-jobs/", payload, format="json")
     assert response.status_code == 201
     assert response.data["local_gpu_id"] == GPU
     assert client.get(f'/api/training-jobs/{response.data["id"]}/').data["local_gpu_id"] == GPU
-    check.assert_called_once_with(GPU)
+    check.assert_not_called()
 
 
 @pytest.mark.django_db
 def test_docker_dispatch_uses_exact_verified_uuid(settings, monkeypatch):
     from django.contrib.auth import get_user_model
-    from apps.catalog.models import ModelProject
     from apps.training.models import TrainingJob
     from apps.training.services.storage_scope import expected_training_uris
     from infrastructure.execution.docker_backends import DockerTrainingBackend
@@ -260,7 +257,7 @@ def test_docker_dispatch_uses_exact_verified_uuid(settings, monkeypatch):
     user = get_user_model().objects.create_user("gpu-dispatch-test@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
     job = TrainingJob(project=project, owner=project.owner, model_flavor="pytorch", accelerator_type="gpu",
-                      accelerator_count=1, local_gpu_id=GPU)
+                      accelerator_count=1, local_gpu_id=GPU, vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
     uris = expected_training_uris(job, "test-bucket")
     job.code_snapshot_uri, job.data_snapshot_uri, job.output_uri = uris["code"], uris["data"], uris["output"]
     docker_client = Mock()

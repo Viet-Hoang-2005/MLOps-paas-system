@@ -2,13 +2,13 @@
 
 ## 1. Training Lifecycle (Untrusted Sandbox)
 
-1. User creates an account-owned workspace without a Project, edits unified Input and separate Environment/Secrets, and chooses CPU/GPU/framework/runtime from capabilities.
-2. POST /api/training-workspaces/{id}/runs/ saves a revision-checked immutable Input ZIP and creates a new owner/tenant-scoped job. Storage I/O is outside transactions; final revision validation and reservations commit before Celery dispatch.
+1. User creates an account-owned TrainingJob in editing, without a Project, edits unified Input and separate Environment/Secrets, and chooses CPU/GPU/framework/runtime from capabilities.
+2. POST /api/training-jobs/{id}/submit/ uses revision and run_key to prepare an immutable Input ZIP and submit the same job UUID exactly once. Preparation is fenced by submission_token; storage I/O stays outside transactions. Only final admission records submitted_at, reserves quota/resources, and queues execution on commit. Interrupted unsubmitted preparation returns to editing.
 3. Docker uses an asynchronous labeled helper and per-job volume; Kubernetes uses a trusted init container and emptyDir. Main training mounts Input read-only. Legacy jobs retain their original input_contract.
 4. Runner installs root requirements.txt, fetches one-use job runtime configuration, and runs Python in writable Work. SM_CHANNEL_TRAIN names unified Input, SM_MODEL_DIR the official model, SM_OUTPUT_DIR supported metadata, MLOPS_WORK_DIR temporary work. No mlops SDK. Stream sanitized logs and experiment metrics; Docker/Prometheus provide runtime resource snapshots separately.
 5. User process must succeed and model output pass path/link/type/count/size validation before packaging model.tar.gz and verifying upload. Trusted observation/reporting finalizes lifecycle; tenant stdout cannot authoritatively declare success. Missing model or failed upload fails the run.
-6. Successful verified jobs may be assigned to a new/existing owned Project with output_revision. Save preserves Model Preview and immutable model/input; no automatic build/register/deploy. Retry creates a new job from original snapshots and revalidates current Secret access.
-7. Project deletion stops active jobs, copies/checksums/checkpoints legacy training objects to tenant/job storage, then detaches and preserves jobs/logs/artifacts/quota before Project cleanup. Workspace deletion also preserves historical run snapshots.
+6. Successful verified jobs may be assigned to a new/existing owned Project with output_revision. Save preserves Model Preview and immutable model/input; no automatic build/register/deploy. Retry/clone create a new editing job from frozen Input and currently existing same-owner encrypted Secrets; revoked Secrets are never recovered from history.
+7. Project deletion stops active jobs, copies/checksums/checkpoints legacy training objects to tenant/job storage, then detaches and preserves jobs/logs/artifacts/quota before Project cleanup. Deleting an unsubmitted draft cleans only its own files/Secrets and never cancels a runtime.
 
 ## 2. Packaging & Build Lifecycle
 

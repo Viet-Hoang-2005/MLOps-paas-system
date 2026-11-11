@@ -313,3 +313,12 @@ Quy trình xác minh:
    - **Redpanda / Kafka Metrics:** Tốc độ tiêu thụ tin nhắn và độ trễ hàng đợi (Consumer Group Lag).
    - **K3s Infrastructure Metrics:** Tỷ lệ chiếm dụng CPU, RAM và GPU vRAM của toàn cụm.
 3. Kiểm tra **Grafana Loki**: Xác nhận log của các tác vụ huấn luyện và đóng gói được thu thập đầy đủ và có thể tra cứu nhanh chóng.
+
+
+### Job-owned training workspace
+
+A new job starts in `editing` with its own Input, environment, Secrets and revision. Run submits the same UUID once; retry/clone create another Editing UUID. No independent workspace API or saved-workspace dropdown remains.
+
+Run the Control Plane training and observability tests and `web` training tests. `scripts/verify_training_workspace.py` (inside the Control Plane service) checks a disposable CPU job on Docker: same-UUID submission replay, real read-only Input, writable Work/output, verified upload, idempotent clone into a new Editing UUID, draft deletion, Project assignment/deletion, and retained artifacts. It creates and cleans only its own test tenant. Set `TRAINING_SMOKE_GPU=true` when invoking the script for GPU smoke; it requires an available NVIDIA device/toolkit and checks that the runner sees exactly the selected device UUID.
+
+The edited initial training migrations require a fresh **local Control Plane application database**. Stop database writers before reset; preserve object storage, registry, tracking databases and other service volumes. This reset is a development-only operation, never a production upgrade procedure.

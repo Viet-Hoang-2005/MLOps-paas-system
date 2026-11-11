@@ -11,7 +11,7 @@
 ## Current coordinated workflows
 
 - Project creation/edit is one Preview form; deployment wizard is Build → explicit Register → Deploy. Editing Preview never changes Running snapshots.
-- Training creation: Run training → Assign Project. /dashboard/training/new creates an account-owned draft and opens /dashboard/training/workspaces/:workspaceId. Query run selects an immutable historical job; step=project opens assignment. Project is only an optional suggestion until Save.
+- Training creation: Run training → Assign Project. /dashboard/training/new creates an account-owned Editing Training Job and opens /dashboard/training/:jobId/workspace. The same job UUID remains selected through submission/completion; no workspace history selector or separate workspace ID. step=project opens assignment. Project is only an optional suggestion until Save.
 - Training detail: overview, logs, metrics, artifacts, config, and project nested routes. Completed unassigned jobs can open project assignment from detail even when their workspace was deleted.
 - Main pages use `/dashboard/projects/:projectId/{overview,deployment,monitoring,training,evolution}`; Build/monitoring forms own explicit project selectors; `/dashboard/training` is global with all/unassigned/Project filters and always allows creation. API tokens live at `/dashboard/api-keys`.
 - Build selects Preview/Training via URL `projectId/source/jobId`, snapshots inputs, and persists `buildId`. Register polls until `registered` plus `version_id`, then opens `/dashboard/deployment/run/:projectId/:buildId` without deploying. Run validates registered Build/project/version, changes Build route when selecting another version, and creates deployment only on explicit Terminal action; `deploymentId` query restores the attempt/logs. Evolution only navigates to Run. No legacy create-deployment route or step query.
@@ -30,6 +30,6 @@
 ## Training workspace state
 
 - Merge code/data into one Input tree and editor. Double-click and selected-row Edit open the same dialog; give drag/drop equivalent menu/keyboard actions. Output is read-only. Keep fixed singleton root requirements.txt rules in both frontend and backend.
-- Run awaits every dirty editor save and draft-name update, then submits the checked revision. Failure stops submission. An active run locks editing; historical selection displays that run snapshot/logs/output. Closing does not cancel the runtime. Continue requires completed plus verified available model.
+- Run awaits every dirty editor/config save, then submits revision/run_key on the same job. Retry/clone navigate to a new Editing UUID. Failure stops submission. An active run locks editing; a submitted job displays its frozen snapshot/logs/output. Closing does not cancel the runtime. Continue requires completed plus verified available model.
 - Keep Environment/Secrets outside the tree/downloads. Secret API reads show names only. Show local GPU UUID capability and current memory availability; retain production T4/A10G and quota validation.
 - Assignment preserves existing Project metadata and Model Preview. Supplemental artifacts/build requirements use output_revision conflicts. Build chooses Preview or an assigned successful Training Job explicitly. Local frontend state must not silently overwrite a newer server revision.

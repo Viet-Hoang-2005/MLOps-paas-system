@@ -1,3 +1,4 @@
+from django.utils import timezone
 from types import SimpleNamespace
 
 import pytest
@@ -45,7 +46,7 @@ def completed_job(email="training-build@example.com"):
         data_snapshot_uri="s3://bucket/reference.csv",
         output_uri="s3://bucket/model.tar.gz",
         status="completed",
-    )
+     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     TrainingOutput.objects.create(
         job=job,
         kind="model",

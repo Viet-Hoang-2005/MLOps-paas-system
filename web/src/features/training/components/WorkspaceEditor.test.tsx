@@ -4,12 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderWithProviders } from "test/renderWithProviders";
 import { WorkspaceEditor, type WorkspaceEditorHandle } from "./WorkspaceEditor";
-import type { TrainingWorkspace } from "@/features/training/api/workspacesApi";
+import type { JobWorkspace } from "@/features/training/api/jobWorkspaceApi";
 
 const mocks = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn() }));
-vi.mock("@/features/training/api/workspacesApi", async (original) => ({ ...await original<typeof import("@/features/training/api/workspacesApi")>(), readEntry: mocks.read, saveWorkspaceEntry: mocks.save }));
+vi.mock("@/features/training/api/jobWorkspaceApi", async (original) => ({ ...await original<typeof import("@/features/training/api/jobWorkspaceApi")>(), readEntry: mocks.read, saveJobEntry: mocks.save }));
 vi.mock("@/shared/components/CodeViewer", () => ({ CodeViewer: ({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: { readOnly: boolean } }) => <textarea aria-label="test-editor" value={value} readOnly={options.readOnly} onChange={(event) => onChange(event.target.value)} /> }));
-const workspace: TrainingWorkspace = { id: "workspace", revision: 1, entry_point: "train.py", environment: {}, secrets: [], secrets_available: true, entries: [{ id: "file", path: "train.py", kind: "script", size_bytes: 8, download_url: "https://example.test/file" }] };
+const workspace = { id: "workspace", revision: 1, entry_point: "train.py", environment: {}, secrets: [], secrets_available: true, entries: [{ id: "file", path: "train.py", kind: "script", size_bytes: 8, download_url: "https://example.test/file" }] } as unknown as JobWorkspace;
 describe("workspace file editor", () => {
   beforeEach(() => { vi.clearAllMocks(); mocks.read.mockResolvedValue("print(1)"); mocks.save.mockResolvedValue({ revision: 2, entry: workspace.entries[0] }); });
   it("saves unsaved content before exposing a revision for Run", async () => {

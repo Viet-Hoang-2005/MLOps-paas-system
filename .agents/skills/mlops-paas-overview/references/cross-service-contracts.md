@@ -16,7 +16,7 @@ Training dispatch carries `accelerator_type`, `accelerator_count`, and `accelera
 
 ## 2. Storage & S3 Layout
 
-New training drafts use users/{tenant_id}/training/workspaces/{workspace_uuid}/objects/. Runs use users/{tenant_id}/training/jobs/{job_uuid}/ with input/code/source.zip (unified Input), input/data/data.zip, output/model.tar.gz and mlflow/artifacts/. The Project-scoped tree below remains the legacy layout; resolve through training_prefix_for and immutable storage_project_id until verified migration. Assignment never changes paths.
+A TrainingJob owns its draft and at most one execution under users/{tenant_id}/training/jobs/{job_uuid}/. Draft file keys are immutable draft/objects/{object_id}; frozen Input uses input/submissions/{submission_token}/code/source.zip (unified Input) and data/data.zip. Output is output/model.tar.gz with mlflow/artifacts/. The Project-scoped tree below remains the legacy layout; resolve through training_prefix_for and immutable storage_project_id until verified migration. Assignment never changes paths.
 
 Bucket: `mlops-paas-artifacts`
 

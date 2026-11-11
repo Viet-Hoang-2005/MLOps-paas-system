@@ -1,3 +1,4 @@
+from django.utils import timezone
 import hashlib
 from unittest.mock import patch
 from django.contrib.auth import get_user_model
@@ -108,7 +109,7 @@ class MLflowCompatibilityTests(APITestCase):
             project=self.project,
             model_flavor="sklearn",
             status="running",
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
         self.token = issue_capability(self.job, "tracking")
 
     def test_mlflow_unauthenticated_rejected(self):
@@ -185,7 +186,7 @@ class MLflowCompatibilityTests(APITestCase):
             project=other_project,
             model_flavor="sklearn",
             status="running",
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
 
         # Try logging to other_job using self.token (tenant-1234)
         response = self.client.post(
@@ -257,7 +258,7 @@ class MLflowCompatibilityTests(APITestCase):
             project=self.project,
             model_flavor="sklearn",
             status="completed",
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
         TrainingJobMetric.objects.create(job=self.job, name="accuracy", value=0.91, step=1)
         TrainingJobMetric.objects.create(job=job2, name="accuracy", value=0.96, step=1)
         TrainingJobParam.objects.create(job=self.job, name="lr", value="0.01")
@@ -390,7 +391,7 @@ class MLflowCompatibilityTests(APITestCase):
         User = get_user_model()
         attacker = User.objects.create_user("attacker@example.com", "password123", tenant_id="tenant-attacker")
         attacker_proj = ModelProject.objects.create(owner=attacker, name="attacker-proj")
-        attacker_job = TrainingJob.objects.create(project=attacker_proj, status="running")
+        attacker_job = TrainingJob.objects.create(project=attacker_proj, status="running", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
         attacker_token = issue_capability(attacker_job, "tracking")
 
         target_url = (
@@ -487,7 +488,7 @@ class MLflowCompatibilityTests(APITestCase):
             project=self.project,
             model_flavor="sklearn",
             status="running",
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
 
         headers = {"HTTP_AUTHORIZATION": f"Bearer {self.token}"}
 
@@ -572,7 +573,7 @@ class MLflowCompatibilityTests(APITestCase):
             project=project2,
             model_flavor="sklearn",
             status="running",
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
 
         raw_key, prefix, key_hash = UserAPIKey.issue()
         api_key = UserAPIKey.objects.create(
@@ -1000,7 +1001,7 @@ class MLflowCompatibilityTests(APITestCase):
             project=self.project,
             model_flavor="sklearn",
             status="running",
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
 
         exp_artifact_path = (
             f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
