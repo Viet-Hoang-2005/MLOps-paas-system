@@ -38,7 +38,7 @@ export default function NotificationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 20;
-  
+
   const filterParams = useMemo(() => {
     return {
       is_read:
@@ -52,13 +52,9 @@ export default function NotificationsPage() {
       page,
       page_size: pageSize,
     };
-
   }, [readStatus, selectedType, searchQuery, page]);
 
-  const {
-    data: listData,
-    isLoading,
-  } = useNotifications(filterParams);
+  const { data: listData, isLoading } = useNotifications(filterParams);
 
   const { data: countData } = useUnreadNotificationCount();
   const unreadCount = countData?.unread_count ?? 0;
@@ -72,112 +68,117 @@ export default function NotificationsPage() {
     setPage(1);
   };
 
-  const readStatusOptions = useMemo<SelectOption[]>(() => [
-    {
-      value: "all",
-      label: (
-        <span className="flex items-center gap-2">
-          <Inbox className="h-4 w-4 text-color-foreground-muted" />
-          <span>{t("readStatus.all")}</span>
-        </span>
-      ),
-    },
-    {
-      value: "unread",
-      label: (
-        <span className="flex items-center gap-2">
-          <Bell className="h-4 w-4 text-color-foreground-muted" />
-          <span>{t("readStatus.unread")}</span>
-        </span>
-      ),
-      badge: unreadCount > 0 ? (
-        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-style-caption-strong text-color-danger-foreground">
-          {unreadCount}
-        </span>
-      ) : undefined,
-    },
-    {
-      value: "read",
-      label: (
-        <span className="flex items-center gap-2">
-          <CheckCheck className="h-4 w-4 text-color-foreground-muted" />
-          <span>{t("readStatus.read")}</span>
-        </span>
-      ),
-    },
-  ], [t, unreadCount]);
+  const readStatusOptions = useMemo<SelectOption[]>(
+    () => [
+      {
+        value: "all",
+        label: (
+          <span className="flex items-center gap-2">
+            <Inbox className="h-4 w-4 text-color-foreground-muted" />
+            <span>{t("readStatus.all")}</span>
+          </span>
+        ),
+      },
+      {
+        value: "unread",
+        label: (
+          <span className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-color-foreground-muted" />
+            <span>{t("readStatus.unread")}</span>
+          </span>
+        ),
+        badge:
+          unreadCount > 0 ? (
+            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-style-caption-strong text-color-danger-foreground">
+              {unreadCount}
+            </span>
+          ) : undefined,
+      },
+      {
+        value: "read",
+        label: (
+          <span className="flex items-center gap-2">
+            <CheckCheck className="h-4 w-4 text-color-foreground-muted" />
+            <span>{t("readStatus.read")}</span>
+          </span>
+        ),
+      },
+    ],
+    [t, unreadCount],
+  );
 
-  const typeOptions = useMemo<SelectOption[]>(() => [
-    {
-      value: "all",
-      label: (
-        <span className="flex items-center gap-2">
-          <Funnel className="h-4 w-4 text-color-foreground-muted" />
-          <span>{t("filters.all")}</span>
-        </span>
-      ),
-    },
-    {
-      value: "project",
-      label: (
-        <span className="flex items-center gap-2">
-          <Bot className="h-4 w-4 text-color-foreground-muted" />
-          <span>{t("filters.project")}</span>
-        </span>
-      ),
-    },
-    {
-      value: "training",
-      label: (
-        <span className="flex items-center gap-2">
-          <Cpu className="h-4 w-4 text-color-foreground-muted" />
-          <span>{t("filters.training")}</span>
-        </span>
-      ),
-    },
-    {
-      value: "build",
-      label: (
-        <span className="flex items-center gap-2">
-          <Box className="h-4 w-4 text-color-foreground-muted" />
-          <span>{t("filters.build")}</span>
-        </span>
-      ),
-    },
-    {
-      value: "deployment",
-      label: (
-        <span className="flex items-center gap-2">
-          <Rocket className="h-4 w-4 text-color-foreground-muted" />
-          <span>{t("filters.deployment")}</span>
-        </span>
-      ),
-    },
-    {
-      value: "drift",
-      label: (
-        <span className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-color-foreground-muted" />
-          <span>{t("filters.drift")}</span>
-        </span>
-      ),
-    },
-    {
-      value: "alert",
-      label: (
-        <span className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-color-foreground-muted" />
-          <span>{t("filters.alert")}</span>
-        </span>
-      ),
-    },
-  ], [t]);
+  const typeOptions = useMemo<SelectOption[]>(
+    () => [
+      {
+        value: "all",
+        label: (
+          <span className="flex items-center gap-2">
+            <Funnel className="h-4 w-4 text-color-foreground-muted" />
+            <span>{t("filters.all")}</span>
+          </span>
+        ),
+      },
+      {
+        value: "project",
+        label: (
+          <span className="flex items-center gap-2">
+            <Bot className="h-4 w-4 text-color-foreground-muted" />
+            <span>{t("filters.project")}</span>
+          </span>
+        ),
+      },
+      {
+        value: "training",
+        label: (
+          <span className="flex items-center gap-2">
+            <Cpu className="h-4 w-4 text-color-foreground-muted" />
+            <span>{t("filters.training")}</span>
+          </span>
+        ),
+      },
+      {
+        value: "build",
+        label: (
+          <span className="flex items-center gap-2">
+            <Box className="h-4 w-4 text-color-foreground-muted" />
+            <span>{t("filters.build")}</span>
+          </span>
+        ),
+      },
+      {
+        value: "deployment",
+        label: (
+          <span className="flex items-center gap-2">
+            <Rocket className="h-4 w-4 text-color-foreground-muted" />
+            <span>{t("filters.deployment")}</span>
+          </span>
+        ),
+      },
+      {
+        value: "drift",
+        label: (
+          <span className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-color-foreground-muted" />
+            <span>{t("filters.drift")}</span>
+          </span>
+        ),
+      },
+      {
+        value: "alert",
+        label: (
+          <span className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-color-foreground-muted" />
+            <span>{t("filters.alert")}</span>
+          </span>
+        ),
+      },
+    ],
+    [t],
+  );
 
   return (
     <section className="flex flex-1 flex-col gap-6">
-      <PageHeader
-        title={t("title")}
-      />
+      <PageHeader title={t("title")} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4">
         <div className="flex flex-1 items-center gap-2">
@@ -212,16 +213,14 @@ export default function NotificationsPage() {
             className="h-10 text-style-body"
             value={selectedType}
             onChange={(val) => {
-
               setSelectedType(val as TypeFilter);
 
               setPage(1);
-
             }}
             options={typeOptions}
             placeholder={t("filters.all")}
           />
-          </div>
+        </div>
       </div>
 
       {/* Notifications List */}
@@ -245,7 +244,6 @@ export default function NotificationsPage() {
               {t("status.emptyDescription")}
             </p>
           </div>
-
         ) : (
           <div className="flex flex-col gap-2.5">
             {notifications.map((item) => (
@@ -279,7 +277,7 @@ export default function NotificationsPage() {
               <span className="text-style-caption px-2 font-medium">
                 {page} / {totalPages}
               </span>
-              
+
               <Button
                 variant="secondary"
                 size="sm"
@@ -297,4 +295,3 @@ export default function NotificationsPage() {
     </section>
   );
 }
-

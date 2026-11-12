@@ -29,9 +29,14 @@ def studio(settings, monkeypatch):
     enqueue = Mock()
     monkeypatch.setattr("apps.training.services.jobs._enqueue", enqueue)
     job = drafts.create_draft(owner=user)
-    entry, revision = workspaces.create_entry(job, revision=1, path="train.py", kind="script", payload=b"print('training')", storage=storage)
-    job = workspaces.update_workspace(job, revision=revision, changes={"entry_point": "train.py", "vcpu": 1,
-        "memory_mb": 2048, "max_runtime_seconds": 900})
+    entry, revision = workspaces.create_entry(
+        job, revision=1, path="train.py", kind="script", payload=b"print('training')", storage=storage
+    )
+    job = workspaces.update_workspace(
+        job,
+        revision=revision,
+        changes={"entry_point": "train.py", "vcpu": 1, "memory_mb": 2048, "max_runtime_seconds": 900},
+    )
     client = APIClient()
     client.force_authenticate(user)
     return job, storage, client, enqueue
@@ -43,7 +48,9 @@ def run(job, storage, key=None):
 
 def test_create_draft_needs_no_project_or_docker(studio, monkeypatch):
     _, _, client, _ = studio
-    monkeypatch.setattr("apps.training.services.local_resources.require_capacity", Mock(side_effect=AssertionError("must not probe")))
+    monkeypatch.setattr(
+        "apps.training.services.local_resources.require_capacity", Mock(side_effect=AssertionError("must not probe"))
+    )
     response = client.post("/api/training-jobs/", {}, format="json")
     assert response.status_code == 201
     assert response.data["status"] == "editing"
@@ -90,10 +97,12 @@ def test_quota_failure_does_not_admit_runtime(studio, monkeypatch):
 def test_second_request_during_preparation_cannot_replace_submission(studio):
     job, storage, _, _ = studio
     read = storage.read
+
     def concurrent_read(*args, **kwargs):
         with pytest.raises(Conflict):
             run(job, storage)
         return read(*args, **kwargs)
+
     storage.read = concurrent_read
     assert run(job, storage).status == "queued"
 
@@ -101,10 +110,12 @@ def test_second_request_during_preparation_cannot_replace_submission(studio):
 def test_abandoned_preparation_is_fenced_before_old_writer_commits(studio):
     job, storage, _, _ = studio
     read = storage.read
+
     def expire(*args, **kwargs):
         TrainingJob.objects.filter(pk=job.pk).update(preparation_started_at=timezone.now() - timedelta(minutes=11))
         assert drafts.recover_preparations() == 1
         return read(*args, **kwargs)
+
     storage.read = expire
     with pytest.raises(Conflict):
         run(job, storage)
@@ -136,7 +147,9 @@ def test_clone_and_retry_are_editing_and_copy_current_secrets_only(studio):
 def test_submitted_input_is_readonly_but_terminal_secret_can_be_revoked(studio):
     job, storage, client, _ = studio
     run(job, storage)
-    response = client.patch(f"/api/training-jobs/{job.public_id}/", {"revision": job.revision, "environment": {}}, format="json")
+    response = client.patch(
+        f"/api/training-jobs/{job.public_id}/", {"revision": job.revision, "environment": {}}, format="json"
+    )
     assert response.status_code == 409
 
 
@@ -146,7 +159,10 @@ def test_job_files_and_config_are_owner_scoped(studio):
     client.force_authenticate(other)
     url = f"/api/training-jobs/{job.public_id}/"
     assert client.get(url).status_code == 404
-    assert client.post(url + "entries/", {"revision": 1, "kind": "script", "path": "x.py"}, format="json").status_code == 404
+    assert (
+        client.post(url + "entries/", {"revision": 1, "kind": "script", "path": "x.py"}, format="json").status_code
+        == 404
+    )
     assert client.post(url + "submit/", {"revision": 1, "run_key": str(uuid.uuid4())}, format="json").status_code == 404
 
 
@@ -177,6 +193,7 @@ def test_workspace_endpoint_is_removed(studio):
 
 def test_unsubmitted_draft_cannot_receive_a_runtime_capability(studio):
     from apps.training.services.capabilities import issue_capability
+
     job, _, _, _ = studio
     with pytest.raises(Conflict):
         issue_capability(job, "trusted_reporter")
@@ -185,8 +202,12 @@ def test_unsubmitted_draft_cannot_receive_a_runtime_capability(studio):
 def test_same_key_can_reclaim_an_expired_preparation(studio):
     job, storage, _, _ = studio
     key = uuid.uuid4()
-    TrainingJob.objects.filter(pk=job.pk).update(status="pending", run_key=key,
-        submission_token=uuid.uuid4(), preparation_started_at=timezone.now() - timedelta(minutes=11))
+    TrainingJob.objects.filter(pk=job.pk).update(
+        status="pending",
+        run_key=key,
+        submission_token=uuid.uuid4(),
+        preparation_started_at=timezone.now() - timedelta(minutes=11),
+    )
     assert run(job, storage, key).status == "queued"
 
 
@@ -195,7 +216,9 @@ def test_same_key_can_reclaim_an_expired_preparation(studio):
 def test_postgres_concurrent_run_admits_only_one_execution(studio, same_key):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
+
     from django.db import connection, connections
+
     if connection.vendor != "postgresql":
         pytest.skip("Submission locking requires disposable PostgreSQL.")
     job, storage, _, enqueue = studio

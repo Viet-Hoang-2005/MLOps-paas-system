@@ -184,7 +184,9 @@ def _copy_registration_artifacts(build, plan, storage):
     for asset in plan.assets:
         stored = storage.copy(asset.s3_uri, f"{prefix}/artifacts/{asset.kind}/{asset.name}")
         copies.append((asset, stored))
-    package = storage.copy(plan.package_uri, f"{prefix}/artifacts/package/model-package.zip") if plan.package_uri else None
+    package = (
+        storage.copy(plan.package_uri, f"{prefix}/artifacts/package/model-package.zip") if plan.package_uri else None
+    )
     return copies, package
 
 

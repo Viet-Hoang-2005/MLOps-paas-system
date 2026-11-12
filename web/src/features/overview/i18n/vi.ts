@@ -59,8 +59,7 @@ export const overviewVi = {
     noSource: "Phiên bản Đang chạy không có bản chụp mã nguồn.",
     noReference: "Phiên bản Đang chạy không có CSV tham chiếu.",
     noRunningCodeTitle: "Chưa có bản chụp mã nguồn",
-    noRunningCodeDesc:
-      "Phiên bản đang chạy này chưa có tệp mã nguồn đính kèm.",
+    noRunningCodeDesc: "Phiên bản đang chạy này chưa có tệp mã nguồn đính kèm.",
     noRunningDataTitle: "Chưa có dữ liệu tham chiếu",
     noRunningDataDesc:
       "Phiên bản đang chạy này chưa có tệp dữ liệu tham chiếu đính kèm.",
@@ -152,9 +151,11 @@ export const overviewVi = {
     metricsHint: "Tải lên tệp JSON chứa các chỉ số đánh giá của mô hình.",
     paramsHint: "Tải lên tệp JSON chứa các siêu tham số của mô hình.",
     labelMappingHint: "Tải lên tệp JSON ánh xạ chỉ số lớp sang nhãn.",
-    inputSchemaHint: "Tải lên tệp JSON Schema định nghĩa các trường dữ liệu đầu vào.",
+    inputSchemaHint:
+      "Tải lên tệp JSON Schema định nghĩa các trường dữ liệu đầu vào.",
     insightsHint: "Tải lên tệp JSON chứa thông tin giải thích mô hình.",
-    featureImportanceHint: "Tải lên tệp JSON chứa trọng số tầm quan trọng của các đặc trưng.",
+    featureImportanceHint:
+      "Tải lên tệp JSON chứa trọng số tầm quan trọng của các đặc trưng.",
     removeAttributeConfirmTitle: "Gỡ bỏ {{name}}?",
     removeAttributeConfirmDesc:
       "Bạn có chắc chắn muốn gỡ bỏ {{name}} khỏi bản xem trước này không? Bạn có thể tải lên tệp mới bất cứ lúc nào.",
@@ -170,7 +171,8 @@ export const overviewVi = {
     invalidJsonFile: "Tệp phải có định dạng JSON hợp lệ.",
     invalidLabelMappingFile: "Tệp phải có định dạng JSON hợp lệ.",
     noAttributesPlaceholder: "Chưa có thuộc tính nào",
-    noAttributesHint: "Tải lên các tệp cấu hình bên dưới để làm phong phú dữ liệu mô hình.",
+    noAttributesHint:
+      "Tải lên các tệp cấu hình bên dưới để làm phong phú dữ liệu mô hình.",
     copySchema: "Sao chép JSON Schema",
     schemaCopied: "Đã sao chép lược đồ vào khay nhớ tạm.",
     featureRank: "Thứ hạng",

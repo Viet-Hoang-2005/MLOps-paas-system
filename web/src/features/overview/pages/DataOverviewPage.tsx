@@ -55,12 +55,13 @@ export function DataOverviewPage({
 }: DataOverviewPageProps) {
   const { t } = useTranslation("overview");
   const navigate = useNavigate();
-  const [viewerContainerEl, setViewerContainerEl] = useState<HTMLDivElement | null>(null);
+  const [viewerContainerEl, setViewerContainerEl] =
+    useState<HTMLDivElement | null>(null);
   const [viewerHeight, setViewerHeight] = useState<number>(450);
 
   const initialData = isPreview
-    ? (previewReference.data || "")
-    : (reference.data || "");
+    ? previewReference.data || ""
+    : reference.data || "";
   const [editedCsv, setEditedCsv] = useState<string | null>(null);
   const csvContent = editedCsv ?? initialData;
   const [revertKey, setRevertKey] = useState(0);
@@ -69,8 +70,8 @@ export function DataOverviewPage({
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const fileName = isPreview
-    ? (previewReference.asset?.name || "reference_data.csv")
-    : (referenceDataName || "reference_data.csv");
+    ? previewReference.asset?.name || "reference_data.csv"
+    : referenceDataName || "reference_data.csv";
 
   const isDirty = isPreview && editedCsv !== null && editedCsv !== initialData;
 
@@ -80,7 +81,7 @@ export function DataOverviewPage({
   };
 
   const handleDownload = () => {
-    const content = isPreview ? csvContent : (reference.data || "");
+    const content = isPreview ? csvContent : reference.data || "";
     if (!content) return;
     const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -229,9 +230,7 @@ export function DataOverviewPage({
               title={fileName}
               badge={
                 <>
-                  <Badge variant="info">
-                    {t("workflow.previewBadge")}
-                  </Badge>
+                  <Badge variant="info">{t("workflow.previewBadge")}</Badge>
                   {isDirty && (
                     <Badge variant="warning">
                       {t("workflow.unsavedBadge")}

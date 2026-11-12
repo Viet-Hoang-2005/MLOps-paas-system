@@ -149,7 +149,12 @@ export function Loading({
         />
       )}
       {text && (
-        <p className={cn("mt-3 text-color-foreground", spinnerTitleClasses[size])}>
+        <p
+          className={cn(
+            "mt-3 text-color-foreground",
+            spinnerTitleClasses[size],
+          )}
+        >
           {text}
         </p>
       )}

@@ -1,10 +1,10 @@
-from django.utils import timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
@@ -13,13 +13,16 @@ from apps.training.services import local_resources as local
 from common.api.exceptions import Conflict, ServiceUnavailable
 
 
-@pytest.mark.parametrize("cpu,memory,expected", [
-    (4, 4096, [(1, 512), (1, 1280), (3, 2560)]),
-    (4, 6144, [(1, 1024), (1, 2304), (3, 4608)]),
-    (8, 8192, [(1, 1536), (3, 3072), (6, 6144)]),
-    (1, 2560, [(1, 512), (1, 1024)]),
-    (2, 2048, []),
-])
+@pytest.mark.parametrize(
+    "cpu,memory,expected",
+    [
+        (4, 4096, [(1, 512), (1, 1280), (3, 2560)]),
+        (4, 6144, [(1, 1024), (1, 2304), (3, 4608)]),
+        (8, 8192, [(1, 1536), (3, 3072), (6, 6144)]),
+        (1, 2560, [(1, 512), (1, 1024)]),
+        (2, 2048, []),
+    ],
+)
 def test_profiles_reserve_memory_and_remove_duplicates(cpu, memory, expected):
     assert [(p["vcpu"], p["memory_mb"]) for p in local.profiles(cpu, memory)] == expected
     if memory == 2560:
@@ -28,8 +31,13 @@ def test_profiles_reserve_memory_and_remove_duplicates(cpu, memory, expected):
 
 def test_docker_discovery_checks_limits_and_closes(monkeypatch):
     client = MagicMock()
-    client.info.return_value = {"ID": "daemon", "NCPU": 4, "MemTotal": 4096 * local.MIB,
-                                "MemoryLimit": True, "CpuCfsQuota": True}
+    client.info.return_value = {
+        "ID": "daemon",
+        "NCPU": 4,
+        "MemTotal": 4096 * local.MIB,
+        "MemoryLimit": True,
+        "CpuCfsQuota": True,
+    }
     monkeypatch.setattr(local, "DockerClient", lambda **kwargs: SimpleNamespace(client=client))
     result = local._discover()
     assert result["cpu_profiles"][-1] == {"id": "large", "vcpu": 3, "memory_mb": 2560}
@@ -74,14 +82,24 @@ def test_outstanding_memory_subtracts_verified_running_usage(settings, monkeypat
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     user = get_user_model().objects.create_user("memory@example.com")
     project = ModelProject.objects.create(owner=user, name="memory")
-    current = TrainingJob.objects.create(project=project, vcpu=1, memory_mb=1024, max_runtime_seconds=3600, input_contract="legacy", status="pending")
-    other = TrainingJob.objects.create(project=project, vcpu=1, memory_mb=2048,
-                                       external_job_id="runtime-id", max_runtime_seconds=3600, input_contract="legacy", status="pending")
+    current = TrainingJob.objects.create(
+        project=project, vcpu=1, memory_mb=1024, max_runtime_seconds=3600, input_contract="legacy", status="pending"
+    )
+    other = TrainingJob.objects.create(
+        project=project,
+        vcpu=1,
+        memory_mb=2048,
+        external_job_id="runtime-id",
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        status="pending",
+    )
     snapshot = {"daemon_id": "daemon", "cpu_profiles": [{"id": "large", "vcpu": 4, "memory_mb": 4096}]}
     with transaction.atomic():
         local.reserve(current, snapshot)
         local.reserve(other, snapshot)
     from infrastructure.execution.job_containers import labels_for
+
     client = MagicMock()
     container = client.containers.get.return_value
     container.id = "runtime-id"
@@ -96,8 +114,17 @@ def test_reservation_is_shared_and_released_only_explicitly(settings):
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     first = get_user_model().objects.create_user("local-first@example.com")
     second = get_user_model().objects.create_user("local-second@example.com")
-    jobs = [TrainingJob.objects.create(project=ModelProject.objects.create(owner=user, name=str(i)),
-                                       vcpu=2, memory_mb=2048, max_runtime_seconds=3600, input_contract="legacy", status="pending") for i, user in enumerate((first, second))]
+    jobs = [
+        TrainingJob.objects.create(
+            project=ModelProject.objects.create(owner=user, name=str(i)),
+            vcpu=2,
+            memory_mb=2048,
+            max_runtime_seconds=3600,
+            input_contract="legacy",
+            status="pending",
+        )
+        for i, user in enumerate((first, second))
+    ]
     snapshot = {"daemon_id": "daemon", "cpu_profiles": [{"id": "large", "vcpu": 3, "memory_mb": 4096}]}
     with transaction.atomic():
         local.reserve(jobs[0], snapshot)
@@ -115,10 +142,20 @@ def test_reservation_is_shared_and_released_only_explicitly(settings):
 def test_dispatch_guard_rejects_low_memory_and_releases_lock(settings, monkeypatch):
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     user = get_user_model().objects.create_user("guard@example.com")
-    job = TrainingJob.objects.create(project=ModelProject.objects.create(owner=user, name="guard"),
-                                      vcpu=2, memory_mb=2048, max_runtime_seconds=3600, input_contract="legacy", status="pending")
-    snapshot = {"daemon_id": "daemon", "status": "available", "total_memory_mb": 8192,
-                "cpu_profiles": [{"id": "large", "vcpu": 6, "memory_mb": 6144}]}
+    job = TrainingJob.objects.create(
+        project=ModelProject.objects.create(owner=user, name="guard"),
+        vcpu=2,
+        memory_mb=2048,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        status="pending",
+    )
+    snapshot = {
+        "daemon_id": "daemon",
+        "status": "available",
+        "total_memory_mb": 8192,
+        "cpu_profiles": [{"id": "large", "vcpu": 6, "memory_mb": 6144}],
+    }
     with transaction.atomic():
         local.reserve(job, snapshot)
     lock = MagicMock()
@@ -136,8 +173,14 @@ def test_dispatch_guard_rejects_low_memory_and_releases_lock(settings, monkeypat
 def test_capability_exposes_dynamic_profiles_and_only_aggregate_usage(settings, monkeypatch):
     settings.TRAINING_BACKEND = "docker"
     settings.TRAINING_GPU_ENABLED = False
-    snapshot = {"status": "available", "reason": "", "daemon_id": "private-id", "total_vcpu": 4,
-                "total_memory_mb": 4096, "cpu_profiles": local.profiles(4, 4096)}
+    snapshot = {
+        "status": "available",
+        "reason": "",
+        "daemon_id": "private-id",
+        "total_vcpu": 4,
+        "total_memory_mb": 4096,
+        "cpu_profiles": local.profiles(4, 4096),
+    }
     monkeypatch.setattr(local, "capacity", lambda **kwargs: snapshot)
     user = get_user_model().objects.create_user("capacity@example.com")
     client = APIClient()
@@ -151,15 +194,26 @@ def test_capability_exposes_dynamic_profiles_and_only_aggregate_usage(settings, 
 @pytest.mark.django_db
 def test_reconciliation_releases_reservation_only_after_confirmed_stop(settings):
     from apps.observability.services import executions
+
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     user = get_user_model().objects.create_user("release@example.com")
-    job = TrainingJob.objects.create(project=ModelProject.objects.create(owner=user, name="release"),
-                                      backend="docker", status="queued", vcpu=1, memory_mb=1024, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+    job = TrainingJob.objects.create(
+        project=ModelProject.objects.create(owner=user, name="release"),
+        backend="docker",
+        status="queued",
+        vcpu=1,
+        memory_mb=1024,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
     snapshot = {"daemon_id": "daemon", "cpu_profiles": [{"id": "large", "vcpu": 2, "memory_mb": 2048}]}
     with transaction.atomic():
         local.reserve(job, snapshot)
     token = executions.claim("training", str(job.public_id))[0][1]
-    executions.apply_observation("training", str(job.public_id), token, {"status": "error", "error": "Docker unavailable"})
+    executions.apply_observation(
+        "training", str(job.public_id), token, {"status": "error", "error": "Docker unavailable"}
+    )
     assert local.totals("daemon") == (1, 1024)
     token = executions.claim("training", str(job.public_id))[0][1]
     executions.apply_observation("training", str(job.public_id), token, {"status": "stopped"})
@@ -170,6 +224,7 @@ def test_reconciliation_releases_reservation_only_after_confirmed_stop(settings)
 def test_concurrent_reservations_share_a_postgres_pool(settings):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
+
     from django.db import close_old_connections, connection
 
     if connection.vendor != "postgresql":
@@ -177,7 +232,12 @@ def test_concurrent_reservations_share_a_postgres_pool(settings):
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     user = get_user_model().objects.create_user("concurrent@example.com")
     project = ModelProject.objects.create(owner=user, name="concurrent")
-    jobs = [TrainingJob.objects.create(project=project, vcpu=2, memory_mb=2048, max_runtime_seconds=3600, input_contract="legacy", status="pending") for i in range(2)]
+    jobs = [
+        TrainingJob.objects.create(
+            project=project, vcpu=2, memory_mb=2048, max_runtime_seconds=3600, input_contract="legacy", status="pending"
+        )
+        for i in range(2)
+    ]
     snapshot = {"daemon_id": "concurrent-daemon", "cpu_profiles": [{"id": "large", "vcpu": 2, "memory_mb": 2048}]}
     barrier = Barrier(2)
 

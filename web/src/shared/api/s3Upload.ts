@@ -46,7 +46,11 @@ export function uploadFileToPresignedUrl(
     };
 
     xhr.onerror = () => {
-      reject(new Error("Network error during direct S3 artifact upload. Check connection and CORS settings."));
+      reject(
+        new Error(
+          "Network error during direct S3 artifact upload. Check connection and CORS settings.",
+        ),
+      );
     };
 
     xhr.ontimeout = () => {
@@ -56,4 +60,3 @@ export function uploadFileToPresignedUrl(
     xhr.send(file);
   });
 }
-

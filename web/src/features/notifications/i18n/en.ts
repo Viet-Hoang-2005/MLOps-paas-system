@@ -1,6 +1,7 @@
 export const notificationsEn = {
   title: "Notifications",
-  pageSubtitle: "Monitor training workflows, image packaging, endpoint deployments, and system alerts.",
+  pageSubtitle:
+    "Monitor training workflows, image packaging, endpoint deployments, and system alerts.",
   searchPlaceholder: "Search notifications...",
   actions: {
     markAllAsRead: "Mark all as read",

@@ -52,4 +52,3 @@ describe("i18n Language Detection & Synchronization", () => {
     expect(() => persistLanguage(faultyStorage, "vi")).not.toThrow();
   });
 });
-

@@ -49,10 +49,7 @@ export function FeatureImportanceCard({
 
   const maxInsightValue = useMemo(() => {
     if (insightItems.length === 0) return 1;
-    return Math.max(
-      ...insightItems.map((item) => Math.abs(item.value)),
-      1e-10,
-    );
+    return Math.max(...insightItems.map((item) => Math.abs(item.value)), 1e-10);
   }, [insightItems]);
 
   const displayedInsights = showAllInsights
@@ -142,8 +139,7 @@ export function FeatureImportanceCard({
                   onClick={onRequestRemove}
                   title={t("workflow.removeFeatureImportance")}
                   aria-label={t("workflow.removeFeatureImportance")}
-                >
-                </Button>
+                ></Button>
               )}
             </div>
           }
@@ -192,4 +188,3 @@ export function FeatureImportanceCard({
 }
 
 export default FeatureImportanceCard;
-

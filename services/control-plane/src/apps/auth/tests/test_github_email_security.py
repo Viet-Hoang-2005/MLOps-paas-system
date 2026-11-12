@@ -62,21 +62,26 @@ def test_github_sign_in_uses_only_verified_primary_email(github_settings, profil
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("emails", [
-    [],
-    [{"email": "victim@example.com", "primary": True, "verified": False}],
-    [{"email": "victim@example.com", "primary": False, "verified": True}],
-    [{"email": "victim@example.com", "primary": "true", "verified": "true"}],
-    [{"email": "", "primary": True, "verified": True}],
-    {"message": "not authorized"},
-])
+@pytest.mark.parametrize(
+    "emails",
+    [
+        [],
+        [{"email": "victim@example.com", "primary": True, "verified": False}],
+        [{"email": "victim@example.com", "primary": False, "verified": True}],
+        [{"email": "victim@example.com", "primary": "true", "verified": "true"}],
+        [{"email": "", "primary": True, "verified": True}],
+        {"message": "not authorized"},
+    ],
+)
 def test_github_invalid_email_list_does_not_issue_session(github_settings, monkeypatch, emails):
     victim = get_user_model().objects.create_user("victim@example.com")
     client = GitHubClient([emails])
     monkeypatch.setattr("apps.auth.services.oauth.HttpClient", lambda: client)
     response = APIClient().post(
-        "/api/auth/oauth/github/", {"code": "code", "redirect_uri": "http://localhost/callback"},
-        format="json", **browser_auth_headers(),
+        "/api/auth/oauth/github/",
+        {"code": "code", "redirect_uri": "http://localhost/callback"},
+        format="json",
+        **browser_auth_headers(),
     )
     assert response.status_code in (401, 403)
     assert "access" not in response.data
@@ -86,10 +91,12 @@ def test_github_invalid_email_list_does_not_issue_session(github_settings, monke
 
 @pytest.mark.django_db
 def test_github_finds_verified_primary_on_later_page(github_settings):
-    client = GitHubClient([
-        [{"email": "secondary@example.com", "primary": False, "verified": True}],
-        [{"email": "owner@example.com", "primary": True, "verified": True}],
-    ])
+    client = GitHubClient(
+        [
+            [{"email": "secondary@example.com", "primary": False, "verified": True}],
+            [{"email": "owner@example.com", "primary": True, "verified": True}],
+        ]
+    )
     user, created = authenticate_github("code", "http://localhost/callback", http=client)
     assert created is True and user.email == "owner@example.com"
     assert [call["params"]["page"] for call in client.email_calls] == [1, 2]
@@ -101,8 +108,10 @@ def test_github_verified_primary_issues_browser_session(github_settings, monkeyp
     client = GitHubClient([[{"email": owner.email, "primary": True, "verified": True}]])
     monkeypatch.setattr("apps.auth.services.oauth.HttpClient", lambda: client)
     response = APIClient().post(
-        "/api/auth/oauth/github/", {"code": "code", "redirect_uri": "http://localhost/callback"},
-        format="json", **browser_auth_headers(),
+        "/api/auth/oauth/github/",
+        {"code": "code", "redirect_uri": "http://localhost/callback"},
+        format="json",
+        **browser_auth_headers(),
     )
     assert response.status_code == 200
     assert response.data["tenant_id"] == owner.tenant_id
@@ -115,8 +124,10 @@ def test_github_email_pagination_is_bounded(github_settings, monkeypatch):
     client = GitHubClient([[] for _ in range(11)])
     monkeypatch.setattr("apps.auth.services.oauth.HttpClient", lambda: client)
     response = APIClient().post(
-        "/api/auth/oauth/github/", {"code": "code", "redirect_uri": "http://localhost/callback"},
-        format="json", **browser_auth_headers(),
+        "/api/auth/oauth/github/",
+        {"code": "code", "redirect_uri": "http://localhost/callback"},
+        format="json",
+        **browser_auth_headers(),
     )
     assert response.status_code in (401, 403)
     assert len(client.email_calls) == 10
@@ -129,8 +140,10 @@ def test_github_email_api_failure_never_falls_back_to_profile(github_settings, m
     client = GitHubClient([requests.ConnectionError("provider unavailable")])
     monkeypatch.setattr("apps.auth.services.oauth.HttpClient", lambda: client)
     response = APIClient(raise_request_exception=False).post(
-        "/api/auth/oauth/github/", {"code": "code", "redirect_uri": "http://localhost/callback"},
-        format="json", **browser_auth_headers(),
+        "/api/auth/oauth/github/",
+        {"code": "code", "redirect_uri": "http://localhost/callback"},
+        format="json",
+        **browser_auth_headers(),
     )
     assert response.status_code >= 400
     assert "refresh_token" not in response.cookies

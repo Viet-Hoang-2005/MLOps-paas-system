@@ -151,11 +151,7 @@ class PasswordResetCompleteEndpoint(APIView):
         try:
             user = user_model.objects.get(email__iexact=clean_email, is_active=True)
         except user_model.MultipleObjectsReturned:
-            user = (
-                user_model.objects.filter(email__iexact=clean_email, is_active=True)
-                .order_by("-date_joined")
-                .first()
-            )
+            user = user_model.objects.filter(email__iexact=clean_email, is_active=True).order_by("-date_joined").first()
         except user_model.DoesNotExist:
             raise serializers.ValidationError({"token": "User account not found or inactive."})
 

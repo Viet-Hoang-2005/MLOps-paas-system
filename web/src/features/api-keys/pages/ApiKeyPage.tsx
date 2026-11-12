@@ -206,9 +206,7 @@ export default function DeveloperSettingPage() {
         loading={loading}
         pageSize={10}
         emptyMessage={
-          scopeFilter !== "all"
-            ? t("apiKey.noMatchingKeys")
-            : t("apiKey.empty")
+          scopeFilter !== "all" ? t("apiKey.noMatchingKeys") : t("apiKey.empty")
         }
       />
 

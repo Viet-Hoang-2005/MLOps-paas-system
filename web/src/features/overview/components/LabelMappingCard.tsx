@@ -37,10 +37,7 @@ export function LabelMappingCard({
   const labelMappingEntries = useMemo<[string, string][]>(() => {
     if (!labelMapping?.mapping) return [];
     if (Array.isArray(labelMapping.mapping)) {
-      return labelMapping.mapping.map((val, idx) => [
-        String(idx),
-        String(val),
-      ]);
+      return labelMapping.mapping.map((val, idx) => [String(idx), String(val)]);
     }
     if (
       typeof labelMapping.mapping === "object" &&
@@ -115,8 +112,7 @@ export function LabelMappingCard({
                     onClick={onRequestRemove}
                     title={t("workflow.removeLabelMapping")}
                     aria-label={t("workflow.removeLabelMapping")}
-                  >
-                  </Button>
+                  ></Button>
                 )}
               </div>
             ) : undefined
@@ -124,10 +120,7 @@ export function LabelMappingCard({
         />
         <div className="space-y-3">
           {labelMappingEntries.map(([k, v]) => (
-            <div
-              key={k}
-              className="flex items-center gap-2 py-1"
-            >
+            <div key={k} className="flex items-center gap-2 py-1">
               {/* Khối giá trị số mô hình trả về (Model Output) */}
               <div
                 className="flex h-9 min-w-10 shrink-0 items-center justify-center rounded-surface border border-border bg-muted px-3 font-mono text-style-body font-semibold text-color-foreground shadow-xs"

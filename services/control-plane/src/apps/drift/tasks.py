@@ -13,13 +13,20 @@ TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled", "skipped"
 
 
 @shared_task(
-    bind=True, autoretry_for=(ConnectionError, TimeoutError), retry_backoff=True, retry_jitter=True, max_retries=5,
-    soft_time_limit=50, time_limit=55,
+    bind=True,
+    autoretry_for=(ConnectionError, TimeoutError),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=5,
+    soft_time_limit=50,
+    time_limit=55,
 )
 def execute_drift_run(self, run_id):
     from django.conf import settings
+
     if settings.DRIFT_EXECUTION_WATCH_ENABLED:
         from apps.observability.services.executions import reconcile
+
         return reconcile("drift", run_id)
     from .models import DriftRun
 
@@ -92,8 +99,10 @@ def execute_drift_run(self, run_id):
 @shared_task(bind=True, max_retries=120, soft_time_limit=50, time_limit=55)
 def poll_drift_run_status(self, run_id):
     from django.conf import settings
+
     if settings.DRIFT_EXECUTION_WATCH_ENABLED:
         from apps.observability.services.executions import reconcile
+
         return reconcile("drift", run_id)
     from .models import DriftRun
 
@@ -168,8 +177,9 @@ def poll_drift_run_status(self, run_id):
 
 @shared_task(bind=True, soft_time_limit=30, time_limit=35)
 def cancel_drift_run(self, run_id):
-    from .models import DriftRun
     from infrastructure.execution import drift_backend
+
+    from .models import DriftRun
 
     try:
         run = DriftRun.objects.select_related("monitor").get(public_id=run_id)

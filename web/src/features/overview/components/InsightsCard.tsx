@@ -36,9 +36,12 @@ export function InsightsCard({
 
   const hasInsights = Boolean(
     insights &&
-      typeof insights === "object" &&
-      Object.keys(insights).length > 0 &&
-      !(insights.kind === "feature_importance" && Object.keys(insights).length <= 2),
+    typeof insights === "object" &&
+    Object.keys(insights).length > 0 &&
+    !(
+      insights.kind === "feature_importance" &&
+      Object.keys(insights).length <= 2
+    ),
   );
 
   if (!hasInsights) {
@@ -107,8 +110,7 @@ export function InsightsCard({
                     onClick={onRequestRemove}
                     title={t("workflow.removeAttribute")}
                     aria-label={t("workflow.removeAttribute")}
-                  >
-                  </Button>
+                  ></Button>
                 )}
               </div>
             ) : undefined
@@ -123,4 +125,3 @@ export function InsightsCard({
 }
 
 export default InsightsCard;
-

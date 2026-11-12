@@ -428,6 +428,7 @@ def test_safe_extract_zip_rejects_symlinks(tmp_path):
 
 def test_load_production_data_multi_tenant_scoping():
     from src import data
+
     executed_queries = []
     executed_params = []
 
@@ -447,7 +448,9 @@ def test_load_production_data_multi_tenant_scoping():
         min_samples=1,
         create_engine=lambda *_: DummyEngine(),
         sql_text=lambda q: q,
-        pandas_module=SimpleNamespace(read_sql=dummy_read_sql, json_normalize=pd.json_normalize, DataFrame=pd.DataFrame),
+        pandas_module=SimpleNamespace(
+            read_sql=dummy_read_sql, json_normalize=pd.json_normalize, DataFrame=pd.DataFrame
+        ),
         detail=lambda *_: None,
         db_schema="control_plane",
         tenant_id="T-tenant-123",
@@ -458,8 +461,8 @@ def test_load_production_data_multi_tenant_scoping():
     query = executed_queries[0]
     assert 'INNER JOIN "control_plane"."catalog_modelproject" AS project' in query
     assert 'INNER JOIN "control_plane"."identity_customuser" AS owner_user' in query
-    assert 'project.public_id = CAST(:project_id AS uuid)' in query
-    assert 'owner_user.tenant_id = :tenant_id' in query
+    assert "project.public_id = CAST(:project_id AS uuid)" in query
+    assert "owner_user.tenant_id = :tenant_id" in query
     params = executed_params[0]
     assert params["tenant_id"] == "T-tenant-123"
     assert params["project_id"] == "00000000-0000-0000-0000-000000000002"
@@ -475,10 +478,11 @@ def test_run_fails_fast_when_s3_upload_fails(monkeypatch):
     monkeypatch.setattr(main, "get_column_mapping", lambda *a: main.ColumnMapping())
     # Drift analysis succeeded locally, but S3 upload failed so html_s3_uri is missing
     monkeypatch.setattr(main, "HTML_UPLOAD_URL", "http://upload-target")
-    monkeypatch.setattr(main, "run_drift_analysis", lambda *a: {
-        "dataset_drift": False,
-        "report_artifacts": {"local_html_path": "/tmp/report.html"}
-    })
+    monkeypatch.setattr(
+        main,
+        "run_drift_analysis",
+        lambda *a: {"dataset_drift": False, "report_artifacts": {"local_html_path": "/tmp/report.html"}},
+    )
     webhook = Mock()
     monkeypatch.setattr(main, "trigger_django_webhook", webhook)
 
@@ -525,7 +529,9 @@ def test_string_predictions_do_not_register_as_drift_against_numeric_reference(m
     labels = rng.integers(0, 2, size=300)
     reference = pd.DataFrame({**features, "prediction": labels})
     # Same distribution, but production stores predictions as text.
-    production = pd.DataFrame({**{k: rng.normal(size=300) for k in features}, "prediction": rng.permutation(labels).astype(str)})
+    production = pd.DataFrame(
+        {**{k: rng.normal(size=300) for k in features}, "prediction": rng.permutation(labels).astype(str)}
+    )
 
     summary = _real_drift_run(monkeypatch, reference, production)
 
@@ -540,7 +546,12 @@ def test_prediction_column_is_not_part_of_the_feature_drift_share(monkeypatch):
 
     rng = np.random.default_rng(1)
     reference = pd.DataFrame(
-        {"a": rng.normal(size=400), "b": rng.normal(size=400), "c": rng.normal(size=400), "prediction": rng.integers(0, 2, 400)}
+        {
+            "a": rng.normal(size=400),
+            "b": rng.normal(size=400),
+            "c": rng.normal(size=400),
+            "prediction": rng.integers(0, 2, 400),
+        }
     )
     # Only `a` really moves; the prediction distribution shifts heavily as well.
     production = pd.DataFrame(

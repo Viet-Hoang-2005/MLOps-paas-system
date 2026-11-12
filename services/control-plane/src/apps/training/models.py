@@ -2,15 +2,21 @@ import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-
 from django.db import models
 from django.utils import timezone
+
 from common.execution_watch import ExecutionWatch
 
 
 class TrainingJobEntry(models.Model):
-    KINDS = (("folder", "Folder"), ("script", "Script"), ("data", "Data"),
-             ("config", "Config"), ("document", "Document"), ("requirements", "Requirements"))
+    KINDS = (
+        ("folder", "Folder"),
+        ("script", "Script"),
+        ("data", "Data"),
+        ("config", "Config"),
+        ("document", "Document"),
+        ("requirements", "Requirements"),
+    )
 
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     job = models.ForeignKey("TrainingJob", on_delete=models.CASCADE, related_name="entries")
@@ -69,13 +75,19 @@ class TrainingJob(ExecutionWatch):
     ACCELERATORS = (("none", "None"), ("gpu", "GPU"))
 
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    project = models.ForeignKey("catalog.ModelProject", on_delete=models.SET_NULL, related_name="training_jobs", null=True, blank=True)
+    project = models.ForeignKey(
+        "catalog.ModelProject", on_delete=models.SET_NULL, related_name="training_jobs", null=True, blank=True
+    )
     storage_project_id = models.UUIDField(null=True, blank=True, editable=False)
-    storage_layout = models.CharField(max_length=16, choices=(("project", "Project"), ("tenant", "Tenant")), default="project")
+    storage_layout = models.CharField(
+        max_length=16, choices=(("project", "Project"), ("tenant", "Tenant")), default="project"
+    )
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="training_jobs")
     environment = models.JSONField(default=dict, blank=True)
     revision = models.PositiveIntegerField(default=1)
-    input_contract = models.CharField(max_length=16, default="workspace", choices=(("legacy", "Legacy"), ("workspace", "Workspace")))
+    input_contract = models.CharField(
+        max_length=16, default="workspace", choices=(("legacy", "Legacy"), ("workspace", "Workspace"))
+    )
     input_revision = models.PositiveIntegerField(null=True, blank=True)
     run_key = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     submission_token = models.UUIDField(null=True, blank=True, editable=False)
@@ -155,7 +167,10 @@ class TrainingJob(ExecutionWatch):
 
     @property
     def runtime_project_id(self):
-        return str(self.storage_project_id or (self.project.public_id if self.storage_layout == "project" and self.project_id else ""))
+        return str(
+            self.storage_project_id
+            or (self.project.public_id if self.storage_layout == "project" and self.project_id else "")
+        )
 
     def mark_finished(self, status):
         self.completed_at = timezone.now()
@@ -189,7 +204,9 @@ class LocalTrainingReservation(models.Model):
 class TrainingQuotaReservation(models.Model):
     """Durable usage survives deletion of the job and its project."""
 
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="training_quota_reservations")
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="training_quota_reservations"
+    )
     job_id = models.UUIDField(unique=True)
     resource = models.CharField(max_length=16)
     submitted_at = models.DateTimeField()
@@ -211,7 +228,9 @@ class TrainingQuotaWeek(models.Model):
     used_seconds = models.PositiveIntegerField(default=0)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["reservation", "week_start"], name="training_quota_job_week_unique")]
+        constraints = [
+            models.UniqueConstraint(fields=["reservation", "week_start"], name="training_quota_job_week_unique")
+        ]
         indexes = [models.Index(fields=["week_start"], name="training_quota_week_idx")]
 
     def __str__(self):
@@ -342,4 +361,3 @@ class TrainingStorageCopy(models.Model):
 
     def __str__(self):
         return f"{self.job_id}: {self.source_uri}"
-

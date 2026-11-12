@@ -56,7 +56,7 @@ export function InformationOverviewPage({
   // 3. Running Status
   const isRunning = Boolean(
     model.active_endpoint?.deployment_status === "succeeded" ||
-      model.lifecycle_status === "running",
+    model.lifecycle_status === "running",
   );
   const isStopped =
     model.endpoint_status === "stopped" ||
@@ -66,9 +66,7 @@ export function InformationOverviewPage({
     : isStopped
       ? t("workflow.stopped")
       : t("workflow.notRunning");
-  const runningStatusTone = isRunning
-    ? "success"
-    : "neutral";
+  const runningStatusTone = isRunning ? "success" : "neutral";
 
   // 4. Build Status
   const rawBuildStatus =
@@ -143,10 +141,7 @@ export function InformationOverviewPage({
     >
       <div className="grid grid-cols-1 gap-x-12 gap-y-7 md:grid-cols-2">
         {/* Row 1: Model Name & Flavor */}
-        <InfoItem
-          label={t("workflow.name")}
-          value={model.name}
-        />
+        <InfoItem label={t("workflow.name")} value={model.name} />
         <InfoItem
           label={t("workflow.flavor")}
           value={model.flavor || latestBuild?.flavor}
@@ -157,18 +152,12 @@ export function InformationOverviewPage({
           label={t("workflow.accessMode")}
           value={t(`workflow.${model.access_mode}`)}
         />
-        <InfoItem
-          label={t("workflow.version")}
-          value=
-          {versionNumber}
-        />
+        <InfoItem label={t("workflow.version")} value={versionNumber} />
 
         {/* Row 3: Build Status & Deployment Status */}
         <InfoItem
           label={t("workflow.buildStatus")}
-          value={
-            <Badge variant={buildStatusTone}>{buildStatusLabel}</Badge>
-          }
+          value={<Badge variant={buildStatusTone}>{buildStatusLabel}</Badge>}
         />
         <InfoItem
           label={t("workflow.deploymentStatus")}
@@ -206,27 +195,17 @@ export function InformationOverviewPage({
         />
         <InfoItem
           label={t("workflow.health")}
-          value={
-            <Badge variant={healthStatusTone}>{healthStatusLabel}</Badge>
-          }
+          value={<Badge variant={healthStatusTone}>{healthStatusLabel}</Badge>}
         />
 
         {/* Row 6: Created at & Updated at */}
         <InfoItem
           label={t("workflow.createdAt")}
-          value={
-          <>
-            {formatDateTime(model.created_at, i18n.language)}
-          </>
-          }
+          value={<>{formatDateTime(model.created_at, i18n.language)}</>}
         />
         <InfoItem
           label={t("workflow.updatedAt")}
-          value={
-          <>
-            {formatDateTime(model.updated_at, i18n.language)}
-          </>
-          }
+          value={<>{formatDateTime(model.updated_at, i18n.language)}</>}
         />
       </div>
     </section>

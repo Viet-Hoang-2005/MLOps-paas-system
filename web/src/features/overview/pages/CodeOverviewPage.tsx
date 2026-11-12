@@ -57,10 +57,11 @@ export function CodeOverviewPage({
 }: CodeOverviewPageProps) {
   const { t } = useTranslation("overview");
   const navigate = useNavigate();
-  const [editorContainerEl, setEditorContainerEl] = useState<HTMLDivElement | null>(null);
+  const [editorContainerEl, setEditorContainerEl] =
+    useState<HTMLDivElement | null>(null);
   const [editorHeight, setEditorHeight] = useState<number>(450);
 
-  const initialCode = isPreview ? (previewSource.data || "") : (source.data || "");
+  const initialCode = isPreview ? previewSource.data || "" : source.data || "";
   const [editedCode, setEditedCode] = useState<string | null>(null);
   const codeContent = editedCode ?? initialCode;
   const [saving, setSaving] = useState(false);
@@ -68,17 +69,18 @@ export function CodeOverviewPage({
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const fileName = isPreview
-    ? (previewSource.asset?.name || sourceCodeName || "unknown")
-    : (sourceCodeName || "unknown");
+    ? previewSource.asset?.name || sourceCodeName || "unknown"
+    : sourceCodeName || "unknown";
 
-  const isDirty = isPreview && editedCode !== null && editedCode !== initialCode;
+  const isDirty =
+    isPreview && editedCode !== null && editedCode !== initialCode;
 
   const handleDiscard = () => {
     setEditedCode(null);
   };
 
   const handleDownload = () => {
-    const content = isPreview ? codeContent : (source.data || "");
+    const content = isPreview ? codeContent : source.data || "";
     if (!content) return;
     const blob = new Blob([content], { type: "text/x-python;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -231,9 +233,7 @@ export function CodeOverviewPage({
               title={fileName}
               badge={
                 <>
-                  <Badge variant="info">
-                    {t("workflow.previewBadge")}
-                  </Badge>
+                  <Badge variant="info">{t("workflow.previewBadge")}</Badge>
                   {isDirty && (
                     <Badge variant="warning">
                       {t("workflow.unsavedBadge")}
@@ -289,9 +289,12 @@ export function CodeOverviewPage({
               value={codeContent}
               onChange={(val) => setEditedCode(val ?? "")}
               onMount={(editor, monaco) => {
-                editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-                  saveRef.current?.();
-                });
+                editor.addCommand(
+                  monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+                  () => {
+                    saveRef.current?.();
+                  },
+                );
               }}
               options={{
                 readOnly: false,

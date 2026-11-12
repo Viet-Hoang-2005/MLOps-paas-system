@@ -1,7 +1,10 @@
 import * as authSession from "@/shared/api/authSession";
 import * as clientModule from "@/shared/api/client";
 import { inferenceClient } from "@/shared/api/inferenceClient";
-import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
+import axios, {
+  type AxiosResponse,
+  type InternalAxiosRequestConfig,
+} from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("inferenceClient - Public/Private, Token Injection & Single Refresh", () => {
@@ -57,7 +60,9 @@ describe("inferenceClient - Public/Private, Token Injection & Single Refresh", (
   it("should retry with new token on 401 'Token has expired'", async () => {
     let callCount = 0;
     let currentToken = "initial-token";
-    vi.spyOn(authSession, "getAccessToken").mockImplementation(() => currentToken);
+    vi.spyOn(authSession, "getAccessToken").mockImplementation(
+      () => currentToken,
+    );
     const refreshSpy = vi
       .spyOn(clientModule, "refreshAccessToken")
       .mockImplementation(() => {
@@ -74,13 +79,21 @@ describe("inferenceClient - Public/Private, Token Injection & Single Refresh", (
           : undefined,
       );
       if (callCount === 1) {
-        return Promise.reject(new axios.AxiosError("Expired", "ERR_BAD_RESPONSE", config, {}, {
-          status: 401,
-          statusText: "Unauthorized",
-          data: { detail: "Unauthorized: Token has expired" },
-          headers: {},
-          config,
-        }));
+        return Promise.reject(
+          new axios.AxiosError(
+            "Expired",
+            "ERR_BAD_RESPONSE",
+            config,
+            {},
+            {
+              status: 401,
+              statusText: "Unauthorized",
+              data: { detail: "Unauthorized: Token has expired" },
+              headers: {},
+              config,
+            },
+          ),
+        );
       }
       return Promise.resolve({
         data: { prediction: [42] },
@@ -91,7 +104,9 @@ describe("inferenceClient - Public/Private, Token Injection & Single Refresh", (
       } as AxiosResponse);
     };
 
-    const res = await inferenceClient.post("http://gateway/predict", { data: [[1]] });
+    const res = await inferenceClient.post("http://gateway/predict", {
+      data: [[1]],
+    });
     expect(res.status).toBe(200);
     expect(res.data).toEqual({ prediction: [42] });
     expect(refreshSpy).toHaveBeenCalledTimes(1);
@@ -105,13 +120,21 @@ describe("inferenceClient - Public/Private, Token Injection & Single Refresh", (
 
     for (const code of [403, 500, 504]) {
       inferenceClient.defaults.adapter = (config) => {
-        return Promise.reject(new axios.AxiosError("Error", "ERR_BAD_RESPONSE", config, {}, {
-          status: code,
-          statusText: "Error",
-          data: { detail: "Unauthorized: Invalid token" },
-          headers: {},
-          config,
-        }));
+        return Promise.reject(
+          new axios.AxiosError(
+            "Error",
+            "ERR_BAD_RESPONSE",
+            config,
+            {},
+            {
+              status: code,
+              statusText: "Error",
+              data: { detail: "Unauthorized: Invalid token" },
+              headers: {},
+              config,
+            },
+          ),
+        );
       };
 
       await expect(

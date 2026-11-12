@@ -27,8 +27,13 @@ def runtime(db):
     deployment = Deployment.objects.create(version=version, build=build, status="succeeded")
     project.active_deployment = deployment
     project.save(update_fields=["active_deployment"])
-    endpoint = Endpoint.objects.create(deployment=deployment, public_url="http://gateway.test",
-        internal_url="http://runtime:5001", health_status="healthy", last_checked_at=timezone.now() - timedelta(seconds=20))
+    endpoint = Endpoint.objects.create(
+        deployment=deployment,
+        public_url="http://gateway.test",
+        internal_url="http://runtime:5001",
+        health_status="healthy",
+        last_checked_at=timezone.now() - timedelta(seconds=20),
+    )
     return project, deployment, endpoint
 
 
@@ -48,14 +53,19 @@ def test_scan_claims_once_and_enqueues_after_commit(runtime, monkeypatch, django
         assert dispatch_health_checks() == 1
         enqueue.assert_not_called()
     endpoint.refresh_from_db()
-    enqueue.assert_called_once_with(args=[str(deployment.public_id), str(endpoint.health_check_token)],
-        queue="runtime-health", expires=15)
+    enqueue.assert_called_once_with(
+        args=[str(deployment.public_id), str(endpoint.health_check_token)], queue="runtime-health", expires=15
+    )
     assert dispatch_health_checks() == 0
 
 
-def test_failed_publish_releases_lease_without_marking_runtime_unhealthy(runtime, monkeypatch, django_capture_on_commit_callbacks):
+def test_failed_publish_releases_lease_without_marking_runtime_unhealthy(
+    runtime, monkeypatch, django_capture_on_commit_callbacks
+):
     _, _, endpoint = runtime
-    monkeypatch.setattr("apps.deployment.health_tasks.probe_runtime_health.apply_async", Mock(side_effect=RuntimeError("broker down")))
+    monkeypatch.setattr(
+        "apps.deployment.health_tasks.probe_runtime_health.apply_async", Mock(side_effect=RuntimeError("broker down"))
+    )
     with django_capture_on_commit_callbacks(execute=True):
         dispatch_health_checks()
     endpoint.refresh_from_db()
@@ -92,7 +102,9 @@ def test_late_probe_cannot_write_after_state_changed(runtime, change):
             new = Deployment.objects.create(version=deployment.version, build=deployment.build, status="succeeded")
             ModelProject.objects.filter(pk=project.pk).update(active_deployment=new)
         elif change == "expire":
-            Endpoint.objects.filter(pk=endpoint.pk).update(health_check_lease_until=timezone.now() - timedelta(seconds=1))
+            Endpoint.objects.filter(pk=endpoint.pk).update(
+                health_check_lease_until=timezone.now() - timedelta(seconds=1)
+            )
         elif change == "new-token":
             Endpoint.objects.filter(pk=endpoint.pk).update(health_check_token=uuid.uuid4())
         else:
@@ -123,7 +135,9 @@ def test_monitor_infrastructure_error_leaves_observation_untouched(runtime):
     token = claim(endpoint)
     old = endpoint.last_checked_at
     with pytest.raises(RuntimeError, match="monitor failed"):
-        probe_running_health(str(deployment.public_id), token, Mock(check=Mock(side_effect=RuntimeError("monitor failed"))))
+        probe_running_health(
+            str(deployment.public_id), token, Mock(check=Mock(side_effect=RuntimeError("monitor failed")))
+        )
     endpoint.refresh_from_db()
     assert endpoint.health_status == "healthy" and endpoint.last_checked_at == old
     assert effective_health(endpoint, old + timedelta(seconds=46)) == "unknown"
@@ -185,25 +199,58 @@ def fake_response(monkeypatch, body=None, status_code=200, error=None):
     return session
 
 
-@pytest.mark.parametrize("flavor,method", [("xgboost", "GET"), ("sklearn", "GET"), ("pytorch", "POST"), ("tensorflow", "POST")])
+@pytest.mark.parametrize(
+    "flavor,method", [("xgboost", "GET"), ("sklearn", "GET"), ("pytorch", "POST"), ("tensorflow", "POST")]
+)
 def test_probe_method_identity_and_network_bounds(monkeypatch, flavor, method):
-    session = fake_response(monkeypatch, {"status": "healthy", "model_loaded": True, "project_id": "p", "model_version_id": "v"})
+    session = fake_response(
+        monkeypatch, {"status": "healthy", "model_loaded": True, "project_id": "p", "model_version_id": "v"}
+    )
     assert RuntimeHealthProbe().check(url="http://runtime/", flavor=flavor, project_id="p", version_id="v") == "healthy"
-    session.request.assert_called_once_with(method, "http://runtime/health", timeout=(1, 2), allow_redirects=False,
-        stream=True, **({"json": {}} if method == "POST" else {}))
+    session.request.assert_called_once_with(
+        method,
+        "http://runtime/health",
+        timeout=(1, 2),
+        allow_redirects=False,
+        stream=True,
+        **({"json": {}} if method == "POST" else {}),
+    )
     assert session.trust_env is False
 
 
-@pytest.mark.parametrize("body,status,error", [
-    ({"status": "healthy", "model_loaded": True, "project_id": "other", "model_version_id": "v"}, 200, None),
-    ({"status": "healthy", "model_loaded": False, "project_id": "p", "model_version_id": "v"}, 200, None),
-    ({"status": "healthy", "model_loaded": True, "project_id": "p", "model_version_id": "old"}, 200, None),
-    ([], 200, None), (b"invalid json", 200, None), (b"x" * 65537, 200, None),
-    ({}, 503, None), ({}, 302, None), ({}, 200, requests.Timeout()), ({}, 200, requests.ConnectionError()),
-], ids=["wrong-project", "not-loaded", "wrong-version", "array", "invalid-json", "too-large", "http-error", "redirect", "timeout", "connection-error"])
+@pytest.mark.parametrize(
+    "body,status,error",
+    [
+        ({"status": "healthy", "model_loaded": True, "project_id": "other", "model_version_id": "v"}, 200, None),
+        ({"status": "healthy", "model_loaded": False, "project_id": "p", "model_version_id": "v"}, 200, None),
+        ({"status": "healthy", "model_loaded": True, "project_id": "p", "model_version_id": "old"}, 200, None),
+        ([], 200, None),
+        (b"invalid json", 200, None),
+        (b"x" * 65537, 200, None),
+        ({}, 503, None),
+        ({}, 302, None),
+        ({}, 200, requests.Timeout()),
+        ({}, 200, requests.ConnectionError()),
+    ],
+    ids=[
+        "wrong-project",
+        "not-loaded",
+        "wrong-version",
+        "array",
+        "invalid-json",
+        "too-large",
+        "http-error",
+        "redirect",
+        "timeout",
+        "connection-error",
+    ],
+)
 def test_invalid_or_unreachable_runtime_is_unhealthy(monkeypatch, body, status, error):
     fake_response(monkeypatch, body, status, error)
-    assert RuntimeHealthProbe().check(url="http://runtime", flavor="xgboost", project_id="p", version_id="v") == "unhealthy"
+    assert (
+        RuntimeHealthProbe().check(url="http://runtime", flavor="xgboost", project_id="p", version_id="v")
+        == "unhealthy"
+    )
 
 
 def test_missing_internal_url_is_unknown():
@@ -227,17 +274,29 @@ def test_readiness_timeout_fails_candidate_and_preserves_running(runtime, monkey
     project, running, _ = runtime
     candidate = Deployment.objects.create(version=running.version, build=running.build, status="deploying")
     Endpoint.objects.create(deployment=candidate, public_url="http://candidate")
-    monkeypatch.setattr("apps.deployment.tasks.deployment_backend", lambda _: Mock(health=Mock(return_value=(False, {}))))
+    monkeypatch.setattr(
+        "apps.deployment.tasks.deployment_backend", lambda _: Mock(health=Mock(return_value=(False, {})))
+    )
     for name in ("invalidate_model_server_cache", "append_deployment_log"):
         monkeypatch.setattr(f"apps.deployment.tasks.{name}", Mock())
     from apps.deployment.services.local_execution import check_execution
+
     token = uuid.uuid4()
     Deployment.objects.filter(pk=candidate.pk).update(
-        execution_check_token=token, execution_check_lease_until=timezone.now() + timedelta(seconds=30),
+        execution_check_token=token,
+        execution_check_lease_until=timezone.now() + timedelta(seconds=30),
         execution_deadline_at=timezone.now() - timedelta(seconds=1),
     )
-    assert check_execution("deploy", str(candidate.public_id), str(token), inspector=Mock(return_value=Mock(
-        attrs={"State": {"Status": "running"}})), remover=Mock()) == "waiting"
+    assert (
+        check_execution(
+            "deploy",
+            str(candidate.public_id),
+            str(token),
+            inspector=Mock(return_value=Mock(attrs={"State": {"Status": "running"}})),
+            remover=Mock(),
+        )
+        == "waiting"
+    )
     project.refresh_from_db()
     candidate.refresh_from_db()
     assert project.active_deployment_id == running.pk

@@ -46,4 +46,3 @@ export function InfoItem({
 }
 
 export default InfoItem;
-

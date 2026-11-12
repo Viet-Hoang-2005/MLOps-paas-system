@@ -6,14 +6,17 @@ from infrastructure.redpanda import RedpandaProducer
 @shared_task(ignore_result=True)
 def scan_job_executions():
     from apps.training.services.drafts import recover_preparations
+
     recover_preparations()
     from apps.observability.services.executions import scan
+
     return scan()
 
 
 @shared_task(ignore_result=True, soft_time_limit=50, time_limit=55)
 def reconcile_job_execution(kind, public_id, token):
     from apps.observability.services.executions import reconcile
+
     return reconcile(kind, public_id, token)
 
 

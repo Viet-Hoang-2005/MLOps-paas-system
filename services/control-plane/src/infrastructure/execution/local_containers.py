@@ -66,7 +66,9 @@ def start_container(docker_client, resource, kind, **kwargs):
         current_project = ModelProject.objects.select_for_update().filter(pk=project.pk).first()
         current = type(resource).objects.select_for_update().filter(pk=resource.pk).first()
         if (
-            not current or not current_project or not current_project.is_active
+            not current
+            or not current_project
+            or not current_project.is_active
             or current_project.deletion_state != "active"
             or getattr(current, "deletion_state", "active") != "active"
             or current.status in {"cancelled", "stopped"}
@@ -74,18 +76,24 @@ def start_container(docker_client, resource, kind, **kwargs):
             rejected = True
         else:
             now = timezone.now()
-            deadline = current.execution_deadline_at or now + timedelta(seconds=(
-                settings.LOCAL_BUILD_TIMEOUT_SECONDS if kind == "build"
-                else settings.LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS
-            ))
+            deadline = current.execution_deadline_at or now + timedelta(
+                seconds=(
+                    settings.LOCAL_BUILD_TIMEOUT_SECONDS
+                    if kind == "build"
+                    else settings.LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS
+                )
+            )
             if kind == "deploy" and not current.external_deployment_id:
                 created = parse_datetime(container.attrs.get("Created", ""))
                 if created and timezone.is_aware(created):
                     deadline = created + timedelta(seconds=settings.LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS)
-            type(resource).objects.filter(pk=current.pk).update(**{
-                field: container.id, "execution_deadline_at": deadline,
-                "next_execution_check_at": now,
-            })
+            type(resource).objects.filter(pk=current.pk).update(
+                **{
+                    field: container.id,
+                    "execution_deadline_at": deadline,
+                    "next_execution_check_at": now,
+                }
+            )
             setattr(resource, field, container.id)
             resource.execution_deadline_at = deadline
     if rejected:

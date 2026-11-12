@@ -88,13 +88,35 @@ export function DirectoryTree({
               <button
                 type="button"
                 draggable={Boolean(onMove)}
-                onDragStart={onMove ? (event) => { event.stopPropagation(); event.dataTransfer.setData("application/x-training-path", node.path); } : undefined}
-                onDragOver={onMove || onDropFiles ? (event) => event.preventDefault() : undefined}
-                onDrop={onMove || onDropFiles ? (event) => {
-                  event.preventDefault(); event.stopPropagation();
-                  const path = event.dataTransfer.getData("application/x-training-path");
-                  if (path) onMove?.(path, node.path); else onDropFiles?.(event, node.path);
-                } : undefined}
+                onDragStart={
+                  onMove
+                    ? (event) => {
+                        event.stopPropagation();
+                        event.dataTransfer.setData(
+                          "application/x-training-path",
+                          node.path,
+                        );
+                      }
+                    : undefined
+                }
+                onDragOver={
+                  onMove || onDropFiles
+                    ? (event) => event.preventDefault()
+                    : undefined
+                }
+                onDrop={
+                  onMove || onDropFiles
+                    ? (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const path = event.dataTransfer.getData(
+                          "application/x-training-path",
+                        );
+                        if (path) onMove?.(path, node.path);
+                        else onDropFiles?.(event, node.path);
+                      }
+                    : undefined
+                }
                 onClick={(event) => {
                   event.stopPropagation();
                   onSelect(node.path);
@@ -122,7 +144,8 @@ export function DirectoryTree({
               {isExpanded ? (
                 <div className="relative">
                   {(node.children.length > 0 ||
-                    (creatingFile && creatingFile.parentPath === node.path)) && (
+                    (creatingFile &&
+                      creatingFile.parentPath === node.path)) && (
                     <div
                       aria-hidden="true"
                       data-testid={`indent-guide-${node.path}`}
@@ -157,9 +180,21 @@ export function DirectoryTree({
             <button
               type="button"
               draggable={Boolean(onMove) && node.path !== "requirements.txt"}
-              onDragStart={onMove ? (event) => { event.stopPropagation(); event.dataTransfer.setData("application/x-training-path", node.path); } : undefined}
+              onDragStart={
+                onMove
+                  ? (event) => {
+                      event.stopPropagation();
+                      event.dataTransfer.setData(
+                        "application/x-training-path",
+                        node.path,
+                      );
+                    }
+                  : undefined
+              }
               onClick={() => onSelect(node.path)}
-              onDoubleClick={onEditFile ? () => onEditFile(node.path) : undefined}
+              onDoubleClick={
+                onEditFile ? () => onEditFile(node.path) : undefined
+              }
               className={`flex min-w-0 flex-1 items-center gap-1.5 truncate rounded-compact px-2 py-1.5 text-left text-style-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) ${
                 isSelected
                   ? "bg-(--color-primary-subtle) font-medium text-(--color-primary)"

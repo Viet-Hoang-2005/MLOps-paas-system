@@ -25,19 +25,39 @@ def files(monkeypatch):
     owner = get_user_model().objects.create_user("downloads@example.test", "password")
     job = TrainingJob.objects.create(owner=owner, storage_layout="tenant")
     storage = Storage()
-    for path, payload in [("train.py", b"print(1)\r\n"), ("data/a.csv", b"a,b\r\n1,2\r\n"),
-                          ("database/other.csv", b"x\n1\n"), ("zero.md", b"")]:
+    for path, payload in [
+        ("train.py", b"print(1)\r\n"),
+        ("data/a.csv", b"a,b\r\n1,2\r\n"),
+        ("database/other.csv", b"x\n1\n"),
+        ("zero.md", b""),
+    ]:
         stored = storage.put(f"{training_prefix_for(job)}/draft/objects/{path}", payload)
-        TrainingJobEntry.objects.create(job=job, relative_path=path, kind="script" if path.endswith(".py") else "document",
-            s3_uri=stored.uri, checksum=stored.checksum, size_bytes=stored.size_bytes)
+        TrainingJobEntry.objects.create(
+            job=job,
+            relative_path=path,
+            kind="script" if path.endswith(".py") else "document",
+            s3_uri=stored.uri,
+            checksum=stored.checksum,
+            size_bytes=stored.size_bytes,
+        )
     for path in ["data", "data/empty", "empty"]:
         TrainingJobEntry.objects.create(job=job, relative_path=path, kind="folder")
-    for path, payload in [("model.pkl", b"\x00\xff\x80model"), ("reports/a.json", b'{"a":1}'),
-                          ("reports/nested/b.bin", b"\xff\x00"), ("reports2/out.json", b"{}")]:
+    for path, payload in [
+        ("model.pkl", b"\x00\xff\x80model"),
+        ("reports/a.json", b'{"a":1}'),
+        ("reports/nested/b.bin", b"\xff\x00"),
+        ("reports2/out.json", b"{}"),
+    ]:
         stored = storage.put(f"{training_prefix_for(job)}/output/{path}", payload)
-        TrainingOutput.objects.create(job=job, relative_path=("Model/" if path.endswith(".pkl") else "Metadata/") + path, kind="model" if path.endswith(".pkl") else "file",
+        TrainingOutput.objects.create(
+            job=job,
+            relative_path=("Model/" if path.endswith(".pkl") else "Metadata/") + path,
+            kind="model" if path.endswith(".pkl") else "file",
             metadata={"contract": 2, "group": "model" if path.endswith(".pkl") else "metadata"},
-            s3_uri=stored.uri, checksum=stored.checksum, size_bytes=stored.size_bytes)
+            s3_uri=stored.uri,
+            checksum=stored.checksum,
+            size_bytes=stored.size_bytes,
+        )
     monkeypatch.setattr(downloads, "S3Storage", lambda: storage)
     client = APIClient()
     client.force_authenticate(owner)
@@ -45,7 +65,10 @@ def files(monkeypatch):
 
 
 def get(client, job, area, path=None, **params):
-    return client.get(f"/api/training-jobs/{job.public_id}/{area}/download/", {**params, **({"path": path} if path is not None else {})})
+    return client.get(
+        f"/api/training-jobs/{job.public_id}/{area}/download/",
+        {**params, **({"path": path} if path is not None else {})},
+    )
 
 
 def body(response):
@@ -59,8 +82,10 @@ def freeze(job, storage):
     bundle = BytesIO()
     with ZipFile(bundle, "w") as archive:
         for entry in job.entries.all():
-            archive.writestr(entry.relative_path + ("/" if entry.kind == "folder" else ""),
-                b"" if entry.kind == "folder" else storage.objects[entry.s3_uri])
+            archive.writestr(
+                entry.relative_path + ("/" if entry.kind == "folder" else ""),
+                b"" if entry.kind == "folder" else storage.objects[entry.s3_uri],
+            )
     job.code_snapshot_uri = expected_training_uris(job, storage.bucket)["code"]
     storage.objects[job.code_snapshot_uri] = bundle.getvalue()
     job.submitted_at = timezone.now()
@@ -134,10 +159,12 @@ def test_copy_failure_closes_temporary_files(files, monkeypatch):
     job, storage, _ = files
     opened = []
     factory = downloads._temporary
+
     def temporary():
         stream = factory()
         opened.append(stream)
         return stream
+
     monkeypatch.setattr(downloads, "_temporary", temporary)
     monkeypatch.setattr(storage, "open_stream", lambda uri: (_ for _ in ()).throw(OSError("S3 unavailable")))
     with pytest.raises(OSError):
@@ -174,8 +201,9 @@ def test_failed_integrity_and_size_checks_do_not_return_partial_downloads(files,
 
 def test_cross_origin_download_exposes_attachment_filename(files):
     job, _, client = files
-    response = client.get(f"/api/training-jobs/{job.public_id}/input/download/", {"path": "train.py"},
-        HTTP_ORIGIN="http://localhost:5173")
+    response = client.get(
+        f"/api/training-jobs/{job.public_id}/input/download/", {"path": "train.py"}, HTTP_ORIGIN="http://localhost:5173"
+    )
     assert response.status_code == 200
     assert "content-disposition" in response["Access-Control-Expose-Headers"].lower()
     response.close()

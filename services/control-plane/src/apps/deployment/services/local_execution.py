@@ -14,8 +14,8 @@ from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.logs import append_deployment_log
 from common.logging import record_transition, runtime_line
-from infrastructure.execution.local_containers import inspect_container, remove_container
 from infrastructure.execution.image_references import temporary_image_reference
+from infrastructure.execution.local_containers import inspect_container, remove_container
 from infrastructure.runtime_health import RuntimeHealthProbe
 
 logger = logging.getLogger(__name__)
@@ -29,21 +29,28 @@ def dispatch_execution_checks():
     now = timezone.now()
     for model, kind in ((Build, "build"), (Deployment, "deploy")):
         with transaction.atomic():
-            rows = list(model.objects.filter(backend="docker", next_execution_check_at__lte=now)
+            rows = list(
+                model.objects.filter(backend="docker", next_execution_check_at__lte=now)
                 .filter(Q(execution_check_lease_until__isnull=True) | Q(execution_check_lease_until__lte=now))
-                .select_for_update(skip_locked=True).order_by("next_execution_check_at", "pk")[:100])
+                .select_for_update(skip_locked=True)
+                .order_by("next_execution_check_at", "pk")[:100]
+            )
             for row in rows:
                 token = uuid.uuid4()
                 model.objects.filter(pk=row.pk).update(
-                    execution_check_token=token, execution_check_lease_until=now + timedelta(seconds=30),
+                    execution_check_token=token,
+                    execution_check_lease_until=now + timedelta(seconds=30),
                 )
 
                 def publish(model=model, pk=row.pk, kind=kind, public_id=str(row.public_id), token=token):
                     try:
-                        check_local_execution.apply_async(args=[kind, public_id, str(token)], queue="celery", expires=10)
+                        check_local_execution.apply_async(
+                            args=[kind, public_id, str(token)], queue="celery", expires=10
+                        )
                     except Exception:
                         model.objects.filter(pk=pk, execution_check_token=token).update(
-                            execution_check_token=None, execution_check_lease_until=None,
+                            execution_check_token=None,
+                            execution_check_lease_until=None,
                         )
                         logger.warning("Local execution enqueue failed kind=%s id=%s", kind, public_id)
                         raise
@@ -65,7 +72,9 @@ def _locked(model, resource, token):
 
 
 def _release(row, *, finished=False):
-    row.next_execution_check_at = None if finished else timezone.now() + timedelta(seconds=settings.LOCAL_EXECUTION_POLL_SECONDS)
+    row.next_execution_check_at = (
+        None if finished else timezone.now() + timedelta(seconds=settings.LOCAL_EXECUTION_POLL_SECONDS)
+    )
     row.execution_check_token = None
     row.execution_check_lease_until = None
     row.save(update_fields=WATCH_FIELDS)
@@ -118,22 +127,33 @@ def check_execution(kind, public_id, token, *, inspector=None, remover=None, pro
         return "ignored"
     model = Build if kind == "build" else Deployment
     related = "project__owner" if kind == "build" else "version__project__owner"
-    row = model.objects.select_related(related).filter(
-        public_id=public_id, backend="docker", execution_check_token=token,
-        execution_check_lease_until__gt=timezone.now(),
-    ).first()
+    row = (
+        model.objects.select_related(related)
+        .filter(
+            public_id=public_id,
+            backend="docker",
+            execution_check_token=token,
+            execution_check_lease_until__gt=timezone.now(),
+        )
+        .first()
+    )
     if not row:
         return "ignored"
     new_token = uuid.uuid4()
-    if not model.objects.filter(pk=row.pk, execution_check_token=token,
-        execution_check_lease_until__gt=timezone.now()).update(execution_check_token=new_token):
+    if not model.objects.filter(
+        pk=row.pk, execution_check_token=token, execution_check_lease_until__gt=timezone.now()
+    ).update(execution_check_token=new_token):
         return "ignored"
     token = new_token
     inspector = inspector or inspect_container
     remover = remover or remove_container
     project = row.project if kind == "build" else row.version.project
     expired = bool(row.execution_deadline_at and row.execution_deadline_at <= timezone.now())
-    inactive = not project.is_active or project.deletion_state != "active" or getattr(row, "deletion_state", "active") != "active"
+    inactive = (
+        not project.is_active
+        or project.deletion_state != "active"
+        or getattr(row, "deletion_state", "active") != "active"
+    )
     logs = ""
     health = "unknown"
     try:
@@ -165,8 +185,10 @@ def check_execution(kind, public_id, token, *, inspector=None, remover=None, pro
         elif kind == "deploy" and running and row.status == "deploying":
             endpoint = Endpoint.objects.filter(deployment=row).first()
             health = (probe or RuntimeHealthProbe()).check(
-                url=endpoint.internal_url if endpoint else "", flavor=row.version.flavor,
-                project_id=project.public_id, version_id=row.version.public_id,
+                url=endpoint.internal_url if endpoint else "",
+                flavor=row.version.flavor,
+                project_id=project.public_id,
+                version_id=row.version.public_id,
             )
     except Exception as exc:
         # Docker/monitor outages are not fabricated model failures. Retry until
@@ -183,7 +205,11 @@ def check_execution(kind, public_id, token, *, inspector=None, remover=None, pro
         current_project, current = _locked(model, row, token)
         if not current:
             return "ignored"
-        inactive = not current_project.is_active or current_project.deletion_state != "active" or getattr(current, "deletion_state", "active") != "active"
+        inactive = (
+            not current_project.is_active
+            or current_project.deletion_state != "active"
+            or getattr(current, "deletion_state", "active") != "active"
+        )
         expired = bool(current.execution_deadline_at and current.execution_deadline_at <= timezone.now())
         if logs and kind == "build":
             current.logs = logs
@@ -213,7 +239,9 @@ def check_execution(kind, public_id, token, *, inspector=None, remover=None, pro
                 message = "Build container exited with an error. See build logs."
             elif not running:
                 if current.callback_wait_until is None:
-                    current.callback_wait_until = timezone.now() + timedelta(seconds=settings.LOCAL_BUILD_CALLBACK_GRACE_SECONDS)
+                    current.callback_wait_until = timezone.now() + timedelta(
+                        seconds=settings.LOCAL_BUILD_CALLBACK_GRACE_SECONDS
+                    )
                     current.save(update_fields=["callback_wait_until"])
                 elif current.callback_wait_until <= timezone.now():
                     message = "Build container exited successfully but no valid result callback was received."
@@ -237,6 +265,8 @@ def check_execution(kind, public_id, token, *, inspector=None, remover=None, pro
             _release(current, finished=True)
             return "succeeded"
         else:
-            transaction.on_commit(lambda: append_deployment_log(current, "Runtime is not ready yet; next check is scheduled."))
+            transaction.on_commit(
+                lambda: append_deployment_log(current, "Runtime is not ready yet; next check is scheduled.")
+            )
         _release(current)
     return "waiting"

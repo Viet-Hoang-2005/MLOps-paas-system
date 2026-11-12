@@ -80,7 +80,10 @@ class TenantTokenRefreshSerializer(TokenRefreshSerializer):
             raise TokenError("Token does not belong to this tenant.")
         data = {"access": str(refresh_token.access_token), "tenant_id": user.tenant_id}
         if api_settings.ROTATE_REFRESH_TOKENS:
-            if api_settings.BLACKLIST_AFTER_ROTATION and "rest_framework_simplejwt.token_blacklist" in settings.INSTALLED_APPS:
+            if (
+                api_settings.BLACKLIST_AFTER_ROTATION
+                and "rest_framework_simplejwt.token_blacklist" in settings.INSTALLED_APPS
+            ):
                 # The unique blacklist insertion claims the token. SimpleJWT's
                 # default rotation ignores whether a competing request won it.
                 _, created = refresh_token.blacklist()

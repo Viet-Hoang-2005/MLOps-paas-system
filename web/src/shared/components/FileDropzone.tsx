@@ -1,7 +1,13 @@
 import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
 import { UploadCloud, X } from "lucide-react";
-import { useRef, useState, type MouseEvent, type ChangeEvent, type DragEvent } from "react";
+import {
+  useRef,
+  useState,
+  type MouseEvent,
+  type ChangeEvent,
+  type DragEvent,
+} from "react";
 
 export interface FileDropzoneProps {
   accept: string;

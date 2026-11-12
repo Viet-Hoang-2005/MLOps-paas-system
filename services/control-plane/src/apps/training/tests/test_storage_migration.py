@@ -20,7 +20,9 @@ def test_migration_keeps_original_storage_project_for_existing_jobs():
     try:
         executor = MigrationExecutor(connection)
         executor.migrate(new_target)
-        migrated = executor.loader.project_state(new_target).apps.get_model("training", "TrainingJob").objects.get(pk=job.pk)
+        migrated = (
+            executor.loader.project_state(new_target).apps.get_model("training", "TrainingJob").objects.get(pk=job.pk)
+        )
         assert migrated.storage_layout == "project"
         assert migrated.storage_project_id == project.public_id
         assert migrated.project_id == project.pk

@@ -1,4 +1,5 @@
 """One current avatar per account; upload before locking and clean after commit."""
+
 import logging
 import uuid
 
@@ -32,7 +33,7 @@ def avatar_storage():
 def cleanup_avatar(tenant_id, key):
     """Never delete a prefix, another tenant's key, or an active avatar."""
     prefix = f"users/{tenant_id}/avatar/"
-    if not key or not key.startswith(prefix) or "/" in key[len(prefix):] or key[len(prefix):] in {"", ".", ".."}:
+    if not key or not key.startswith(prefix) or "/" in key[len(prefix) :] or key[len(prefix) :] in {"", ".", ".."}:
         raise ValueError("Invalid avatar storage scope.")
     if get_user_model().objects.filter(avatar=key).exists():
         return
@@ -43,6 +44,7 @@ def schedule_cleanup(tenant_id, key):
     if not key:
         return
     from apps.auth.tasks import delete_avatar_object
+
     try:
         delete_avatar_object.delay(tenant_id, key)
     except Exception:

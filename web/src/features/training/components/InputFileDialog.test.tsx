@@ -15,7 +15,7 @@ describe("InputFileDialog - File Extension Auto-mapping and Validation", () => {
         hasRequirements={false}
         onClose={handleClose}
         onSave={handleSave}
-      />
+      />,
     );
 
     const nameInput = screen.getByLabelText(/File name/i);
@@ -42,7 +42,7 @@ describe("InputFileDialog - File Extension Auto-mapping and Validation", () => {
         hasRequirements={false}
         onClose={handleClose}
         onSave={handleSave}
-      />
+      />,
     );
 
     const nameInput = screen.getByLabelText(/File name/i);
@@ -69,7 +69,7 @@ describe("InputFileDialog - File Extension Auto-mapping and Validation", () => {
         hasRequirements={false}
         onClose={handleClose}
         onSave={handleSave}
-      />
+      />,
     );
 
     const nameInput = screen.getByLabelText(/File name/i);
@@ -81,7 +81,7 @@ describe("InputFileDialog - File Extension Auto-mapping and Validation", () => {
 
     expect(handleSave).not.toHaveBeenCalled();
     expect(
-      screen.getByText(/Enter a valid name with the selected extension/i)
+      screen.getByText(/Enter a valid name with the selected extension/i),
     ).toBeInTheDocument();
   });
 
@@ -95,7 +95,7 @@ describe("InputFileDialog - File Extension Auto-mapping and Validation", () => {
         hasRequirements={false}
         onClose={handleClose}
         onSave={handleSave}
-      />
+      />,
     );
 
     const nameInput = screen.getByLabelText(/File name/i);
@@ -107,7 +107,7 @@ describe("InputFileDialog - File Extension Auto-mapping and Validation", () => {
 
     expect(handleSave).not.toHaveBeenCalled();
     expect(
-      screen.getByText(/Enter a valid name with the selected extension/i)
+      screen.getByText(/Enter a valid name with the selected extension/i),
     ).toBeInTheDocument();
   });
 
@@ -122,7 +122,7 @@ describe("InputFileDialog - File Extension Auto-mapping and Validation", () => {
         hasRequirements={false}
         onClose={handleClose}
         onSave={handleSave}
-      />
+      />,
     );
 
     const nameInput = screen.getByLabelText(/File name/i);

@@ -16,20 +16,20 @@ RAW_MODEL_EXTENSIONS = {
 
 MAX_SOURCE_ARTIFACT_BYTES = {
     "sklearn": {
-        "raw": 200 * 1024 * 1024,        # 200 MiB
+        "raw": 200 * 1024 * 1024,  # 200 MiB
         "mlflow_zip": 500 * 1024 * 1024,  # 500 MiB
     },
     "xgboost": {
-        "raw": 200 * 1024 * 1024,        # 200 MiB (< 200 MB)
+        "raw": 200 * 1024 * 1024,  # 200 MiB (< 200 MB)
         "mlflow_zip": 500 * 1024 * 1024,  # 500 MiB
     },
     "pytorch": {
-        "raw": 1024 * 1024 * 1024,       # 1 GiB
-        "mlflow_zip": 1024 * 1024 * 1024, # 1 GiB
+        "raw": 1024 * 1024 * 1024,  # 1 GiB
+        "mlflow_zip": 1024 * 1024 * 1024,  # 1 GiB
     },
     "tensorflow": {
-        "raw": 1024 * 1024 * 1024,       # 1 GiB
-        "mlflow_zip": 1024 * 1024 * 1024, # 1 GiB
+        "raw": 1024 * 1024 * 1024,  # 1 GiB
+        "mlflow_zip": 1024 * 1024 * 1024,  # 1 GiB
     },
 }
 
@@ -39,7 +39,9 @@ def get_max_source_artifact_bytes(flavor: str, artifact_format: str = "raw") -> 
     return flavor_limits.get(artifact_format, 200 * 1024 * 1024)
 
 
-def validate_source_artifact(*, filename: str, flavor: str, artifact_format: str, size_bytes: int | None = None) -> None:
+def validate_source_artifact(
+    *, filename: str, flavor: str, artifact_format: str, size_bytes: int | None = None
+) -> None:
     extension = Path(filename).suffix.lower()
     if artifact_format == "mlflow_zip":
         if extension != ".zip":

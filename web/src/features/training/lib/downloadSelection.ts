@@ -1,8 +1,16 @@
 export function hasDownloadableFiles(paths: string[], selected: string | null) {
-  return paths.some((path) => !selected || path === selected || path.startsWith(`${selected}/`));
+  return paths.some(
+    (path) => !selected || path === selected || path.startsWith(`${selected}/`),
+  );
 }
 
-export function saveDownload({ blob, filename }: { blob: Blob; filename: string }) {
+export function saveDownload({
+  blob,
+  filename,
+}: {
+  blob: Blob;
+  filename: string;
+}) {
   const href = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = href;

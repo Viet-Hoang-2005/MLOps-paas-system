@@ -2,7 +2,6 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import docker.errors
-
 import pytest
 from django.contrib.auth import get_user_model
 
@@ -19,8 +18,14 @@ class HealthyHttpClient:
     def request(self, method, url):
         assert method == "GET"
         assert url.endswith(":5001/health")
-        return SimpleNamespace(json=lambda: {"status": "healthy", "model_loaded": True,
-            "project_id": str(self.version.project.public_id), "model_version_id": str(self.version.public_id)})
+        return SimpleNamespace(
+            json=lambda: {
+                "status": "healthy",
+                "model_loaded": True,
+                "project_id": str(self.version.project.public_id),
+                "model_version_id": str(self.version.public_id),
+            }
+        )
 
 
 class RecordingDockerClient:
@@ -76,7 +81,10 @@ def test_health_requires_healthy_payload_status():
             return SimpleNamespace(json=lambda: {"status": "unhealthy", "model_loaded": True})
 
     endpoint = SimpleNamespace(internal_url="http://worker:5001")
-    deployment = SimpleNamespace(endpoint=endpoint, version=SimpleNamespace(flavor="xgboost", public_id="v", project=SimpleNamespace(public_id="p")))
+    deployment = SimpleNamespace(
+        endpoint=endpoint,
+        version=SimpleNamespace(flavor="xgboost", public_id="v", project=SimpleNamespace(public_id="p")),
+    )
 
     healthy, payload = DockerDeploymentBackend(
         docker_client=SimpleNamespace(),

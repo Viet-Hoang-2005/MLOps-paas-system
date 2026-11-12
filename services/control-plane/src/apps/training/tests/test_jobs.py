@@ -1,13 +1,14 @@
-from .test_job_drafts import studio as studio
-from django.utils import timezone
 import pytest
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment
 from apps.registry.models import ModelVersion
 from apps.training.models import TrainingJob
+
+from .test_job_drafts import studio as studio
 
 
 @pytest.mark.django_db
@@ -20,7 +21,6 @@ def test_training_job_paths_are_job_scoped(studio):
     assert f"/training/jobs/{job.public_id}/draft/" in job.entries.get().s3_uri
     rejected = client.post("/api/training-jobs/", {"code_snapshot_uri": "s3://other/source.zip"}, format="json")
     assert rejected.status_code == 400
-
 
 
 @pytest.mark.django_db
@@ -40,10 +40,21 @@ def test_runtime_capabilities_only_expose_configured_accelerators(settings, monk
     assert cpu_only.data["accelerators"] == [{"type": "none", "counts": [0]}]
 
     settings.TRAINING_GPU_ENABLED = True
-    monkeypatch.setattr("apps.training.services.local_gpu.inventory", lambda **kwargs: {
-        "status": "available", "reason": "", "devices": [{"id": "GPU-01234567-89ab-cdef-0123-456789abcdef"}]})
+    monkeypatch.setattr(
+        "apps.training.services.local_gpu.inventory",
+        lambda **kwargs: {
+            "status": "available",
+            "reason": "",
+            "devices": [{"id": "GPU-01234567-89ab-cdef-0123-456789abcdef"}],
+        },
+    )
     with_gpu = client.get("/api/training-jobs/runtime-capabilities/")
-    assert with_gpu.data["accelerators"][-1] == {"type": "gpu", "model": "", "counts": [1], "device_id": "GPU-01234567-89ab-cdef-0123-456789abcdef"}
+    assert with_gpu.data["accelerators"][-1] == {
+        "type": "gpu",
+        "model": "",
+        "counts": [1],
+        "device_id": "GPU-01234567-89ab-cdef-0123-456789abcdef",
+    }
 
 
 @pytest.mark.django_db
@@ -52,10 +63,16 @@ def test_editing_is_available_while_submission_is_disabled(studio, settings):
     settings.TRAINING_ENABLED = False
     assert client.get("/api/training-jobs/runtime-capabilities/").data["enabled"] is False
     assert client.post("/api/training-jobs/", {}, format="json").status_code == 201
-    assert client.post(f"/api/training-jobs/{job.public_id}/submit/", {"revision": job.revision, "run_key": str(__import__("uuid").uuid4())}, format="json").status_code == 503
+    assert (
+        client.post(
+            f"/api/training-jobs/{job.public_id}/submit/",
+            {"revision": job.revision, "run_key": str(__import__("uuid").uuid4())},
+            format="json",
+        ).status_code
+        == 503
+    )
     job.refresh_from_db()
     assert job.status == "editing"
-
 
 
 @pytest.mark.django_db
@@ -71,7 +88,12 @@ def test_training_job_list_reports_model_lifecycle_status():
             data_snapshot_uri=f"s3://bucket/{name}/data.csv",
             output_uri=f"s3://bucket/{name}/model.tar.gz",
             status=status,
-         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+            vcpu=2,
+            memory_mb=4096,
+            max_runtime_seconds=3600,
+            input_contract="legacy",
+            submitted_at=timezone.now(),
+        )
 
     not_trained = create_job("failed", status="failed")
     trained = create_job("trained")
@@ -129,6 +151,7 @@ def test_training_job_list_reports_model_lifecycle_status():
 @pytest.mark.django_db
 def test_submit_job_is_idempotent_for_one_run_key(studio, monkeypatch):
     import uuid
+
     job, storage, client, _ = studio
     monkeypatch.setattr("apps.training.services.drafts.S3Storage", lambda: storage)
     payload = {"revision": job.revision, "run_key": str(uuid.uuid4())}
@@ -140,11 +163,12 @@ def test_submit_job_is_idempotent_for_one_run_key(studio, monkeypatch):
     assert job.status == "queued"
 
 
-
 @pytest.mark.django_db
 def test_failed_job_retry_endpoint_creates_editing_job(studio, monkeypatch):
     import uuid
+
     from apps.training.services.drafts import submit_draft
+
     job, storage, client, _ = studio
     original = submit_draft(job, revision=job.revision, run_key=uuid.uuid4(), storage=storage)
     TrainingJob.objects.filter(pk=job.pk).update(status="failed")

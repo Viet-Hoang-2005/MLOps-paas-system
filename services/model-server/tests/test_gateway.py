@@ -160,11 +160,23 @@ async def test_access_jwt_missing_kid_expired_and_invalid(monkeypatch):
 
 def test_resolve_worker_url_local_and_kubernetes(monkeypatch):
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
-    assert index.resolve_worker_url({"flavor": "xgboost", "deployment_status": "succeeded", "endpoint_container_name": "worker"}, "/predict") == "http://worker:5001/predict"
-    assert index.resolve_worker_url({"flavor": "pytorch", "deployment_status": "succeeded", "endpoint_container_name": "worker"}, "/health") == "http://worker:5002/health"
+    assert (
+        index.resolve_worker_url(
+            {"flavor": "xgboost", "deployment_status": "succeeded", "endpoint_container_name": "worker"}, "/predict"
+        )
+        == "http://worker:5001/predict"
+    )
+    assert (
+        index.resolve_worker_url(
+            {"flavor": "pytorch", "deployment_status": "succeeded", "endpoint_container_name": "worker"}, "/health"
+        )
+        == "http://worker:5002/health"
+    )
     monkeypatch.setenv("KUBERNETES_SERVICE_HOST", "yes")
     assert (
-        index.resolve_worker_url({"flavor": "tensorflow", "deployment_status": "succeeded", "endpoint_container_name": "worker"}, "/predict")
+        index.resolve_worker_url(
+            {"flavor": "tensorflow", "deployment_status": "succeeded", "endpoint_container_name": "worker"}, "/predict"
+        )
         == "http://worker-svc.mlops-paas-serving.svc.cluster.local:5002/predict"
     )
     with pytest.raises(HTTPException) as exc:
@@ -209,7 +221,9 @@ def test_send_to_redpanda_payload_and_failure(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_health_proxy_success_and_failure(monkeypatch):
-    token = {"model_record": {"flavor": "sklearn", "deployment_status": "succeeded", "endpoint_container_name": "worker"}}
+    token = {
+        "model_record": {"flavor": "sklearn", "deployment_status": "succeeded", "endpoint_container_name": "worker"}
+    }
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
     monkeypatch.setattr(index, "worker_client", FakeAsyncClient(get=FakeResponse(payload={"status": "healthy"})))
     assert (await index.model_health("v", token))["status"] == "healthy"
@@ -230,7 +244,10 @@ async def test_predict_proxy_success_and_background_event(monkeypatch):
         "deployment_status": "succeeded",
     }
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
-    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(
+    monkeypatch.setattr(
+        index,
+        "worker_client",
+        FakeAsyncClient(
             post=FakeResponse(
                 payload={
                     "prediction": "attack",
@@ -238,7 +255,8 @@ async def test_predict_proxy_success_and_background_event(monkeypatch):
                     "engine": "machine-learning-serving",
                 }
             )
-        ))
+        ),
+    )
     tasks = BackgroundTasks()
     response = await index.predict(
         "v",
@@ -369,12 +387,18 @@ def test_only_succeeded_runtime_can_be_resolved_without_fallback(monkeypatch, st
 
 def test_runtime_health_is_not_a_routing_or_version_selection_gate(monkeypatch):
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
-    record = {"deployment_status": "succeeded", "health_status": "unhealthy", "flavor": "xgboost", "endpoint_container_name": "runtime"}
+    record = {
+        "deployment_status": "succeeded",
+        "health_status": "unhealthy",
+        "flavor": "xgboost",
+        "endpoint_container_name": "runtime",
+    }
     assert index.resolve_worker_url(record, "/predict") == "http://runtime:5001/predict"
 
 
 def test_publish_inference_event_handles_numpy_scalars_and_arrays():
     import numpy as np
+
     from src.events import publish_inference_event
 
     producer = Mock()
@@ -411,6 +435,7 @@ def test_publish_inference_event_handles_numpy_scalars_and_arrays():
 
 def test_parse_worker_prediction_normalizes_numpy_and_tensors():
     import numpy as np
+
     from src.inference import parse_worker_prediction
 
     data = {
@@ -462,8 +487,14 @@ def _record(flavor):
 async def test_predict_sends_the_body_shape_each_runtime_expects(monkeypatch, flavor, port, expected_body):
     RecordingAsyncClient.calls = []
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
-    monkeypatch.setattr(index, "worker_client", RecordingAsyncClient(post=FakeResponse(payload={"prediction": "ok", "confidence": None})))
-    await index.predict("v", Mock(), index.InferenceRequest(features={"x": 1}), BackgroundTasks(), {"model_record": _record(flavor)})
+    monkeypatch.setattr(
+        index,
+        "worker_client",
+        RecordingAsyncClient(post=FakeResponse(payload={"prediction": "ok", "confidence": None})),
+    )
+    await index.predict(
+        "v", Mock(), index.InferenceRequest(features={"x": 1}), BackgroundTasks(), {"model_record": _record(flavor)}
+    )
 
     method, url, kwargs = RecordingAsyncClient.calls[0]
     assert (method, url) == ("POST", f"http://worker:{port}/predict")

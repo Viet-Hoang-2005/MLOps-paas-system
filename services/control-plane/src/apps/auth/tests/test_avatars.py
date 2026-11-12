@@ -74,7 +74,9 @@ def test_invalid_avatar_does_not_change_profile(account, kind):
     if kind == "invalid":
         payload["avatar"] = SimpleUploadedFile("fake.png", b"not an image", content_type="image/png")
     elif kind == "oversized":
-        payload["avatar"] = SimpleUploadedFile("large.png", b"x" * (avatars.MAX_AVATAR_BYTES + 1), content_type="image/png")
+        payload["avatar"] = SimpleUploadedFile(
+            "large.png", b"x" * (avatars.MAX_AVATAR_BYTES + 1), content_type="image/png"
+        )
     else:
         payload["remove_avatar"] = "true"
     assert client.put("/api/auth/profile/", payload, format="multipart").status_code == 400
@@ -99,9 +101,11 @@ def test_upload_response_loss_cleans_only_new_object(account):
     owner = avatars.update_profile(owner, avatar=image())
     previous = owner.avatar.name
     save = storage.save
+
     def broken(*args):
         save(*args)
         raise OSError("Upload response lost")
+
     storage.save = broken
     with pytest.raises(OSError):
         avatars.update_profile(owner, avatar=image("red"))
@@ -150,7 +154,12 @@ def test_history_routes_and_model_are_removed(account):
 
 def test_avatar_upload_requires_a_file_and_an_authenticated_account(account):
     owner, storage, client = account
-    assert client.put("/api/auth/profile/", {"avatar": f"users/{owner.tenant_id}/avatar/key.png"}, format="json").status_code == 400
+    assert (
+        client.put(
+            "/api/auth/profile/", {"avatar": f"users/{owner.tenant_id}/avatar/key.png"}, format="json"
+        ).status_code
+        == 400
+    )
     client.force_authenticate(user=None)
     assert client.put("/api/auth/profile/", {"avatar": image()}, format="multipart").status_code == 401
     assert not storage.objects
@@ -158,13 +167,22 @@ def test_avatar_upload_requires_a_file_and_an_authenticated_account(account):
 
 def test_registration_rejects_invalid_image_before_consuming_token(account, monkeypatch):
     from apps.auth.api import registration_endpoints
+
     _, _, client = account
     client.force_authenticate(user=None)
     read = Mock(return_value={"email": "new-avatar@example.test"})
     monkeypatch.setattr(registration_endpoints, "read_token", read)
-    response = client.post("/api/auth/register/complete/", {"registration_token": "test-token",
-        "password": "Strong-avatar-password-842!", "avatar": SimpleUploadedFile("x.png", b"invalid")},
-        format="multipart", HTTP_ORIGIN="http://localhost:5173", HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+    response = client.post(
+        "/api/auth/register/complete/",
+        {
+            "registration_token": "test-token",
+            "password": "Strong-avatar-password-842!",
+            "avatar": SimpleUploadedFile("x.png", b"invalid"),
+        },
+        format="multipart",
+        HTTP_ORIGIN="http://localhost:5173",
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
     assert response.status_code == 400
     assert all(call.kwargs.get("consume") is False for call in read.call_args_list)
     assert not get_user_model().objects.filter(email="new-avatar@example.test").exists()
@@ -172,12 +190,17 @@ def test_registration_rejects_invalid_image_before_consuming_token(account, monk
 
 def test_registration_uses_the_single_avatar_service(account, monkeypatch):
     from apps.auth.api import registration_endpoints
+
     _, storage, client = account
     client.force_authenticate(user=None)
     monkeypatch.setattr(registration_endpoints, "read_token", Mock(return_value={"email": "new-avatar@example.test"}))
-    response = client.post("/api/auth/register/complete/", {"registration_token": "test-token",
-        "password": "Strong-avatar-password-842!", "avatar": image()}, format="multipart",
-        HTTP_ORIGIN="http://localhost:5173", HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+    response = client.post(
+        "/api/auth/register/complete/",
+        {"registration_token": "test-token", "password": "Strong-avatar-password-842!", "avatar": image()},
+        format="multipart",
+        HTTP_ORIGIN="http://localhost:5173",
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
     assert response.status_code == 201
     user = get_user_model().objects.get(email="new-avatar@example.test")
     assert list(storage.objects) == [user.avatar.name]
@@ -190,13 +213,19 @@ def test_postgres_concurrent_avatar_changes_keep_only_current_object(account, re
     owner, storage, _ = account
     owner = avatars.update_profile(owner, avatar=image())
     gate = Barrier(2)
+
     def change(index):
         try:
             user = get_user_model().objects.get(pk=owner.pk)
             gate.wait(timeout=10)
-            return avatars.update_profile(user, remove=True) if remove and index == 1 else avatars.update_profile(user, avatar=image("red"))
+            return (
+                avatars.update_profile(user, remove=True)
+                if remove and index == 1
+                else avatars.update_profile(user, avatar=image("red"))
+            )
         finally:
             connections.close_all()
+
     with ThreadPoolExecutor(max_workers=2) as pool:
         list(pool.map(change, [0, 1]))
     owner.refresh_from_db()

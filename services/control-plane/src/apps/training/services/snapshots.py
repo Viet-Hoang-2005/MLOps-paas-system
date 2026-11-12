@@ -1,9 +1,12 @@
 from io import BytesIO
 from zipfile import ZipFile
+
 from rest_framework.exceptions import ValidationError
+
 from common.api.exceptions import Conflict
 from infrastructure.storage import S3Storage
-from .storage_scope import validate_training_uri, training_prefix_for
+
+from .storage_scope import training_prefix_for, validate_training_uri
 from .workspaces import safe_path
 
 
@@ -29,14 +32,24 @@ def input_snapshot(job, *, path=None, download=False, storage=None):
         kinds = {".py": "script", ".csv": "data", ".json": "config", ".md": "document"}
         for info in archive.infolist():
             relative = safe_path(info.filename.rstrip("/"))
-            kind = "folder" if info.is_dir() else ("requirements" if relative == "requirements.txt" else next((kind for suffix, kind in kinds.items() if relative.lower().endswith(suffix)), "document"))
+            kind = (
+                "folder"
+                if info.is_dir()
+                else (
+                    "requirements"
+                    if relative == "requirements.txt"
+                    else next((kind for suffix, kind in kinds.items() if relative.lower().endswith(suffix)), "document")
+                )
+            )
             entries.append({"id": relative, "path": relative, "kind": kind, "size_bytes": info.file_size})
         return {"entries": entries, "entry_point": job.entry_point}
 
 
 def output_download(job, output_id, *, storage=None):
     from django.shortcuts import get_object_or_404
+
     from .output_index import public_outputs
+
     output = get_object_or_404(public_outputs(job), public_id=output_id)
     if job.outputs_purged_at:
         raise Conflict("Training outputs have been purged.")

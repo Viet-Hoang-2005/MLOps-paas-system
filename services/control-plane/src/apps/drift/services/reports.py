@@ -49,6 +49,7 @@ def report_uri_for_run(run, field):
 def get_drift_report_data(run):
     import json
     import logging
+
     from infrastructure.storage import S3Storage
 
     logger = logging.getLogger(__name__)
@@ -74,11 +75,7 @@ def get_drift_report_data(run):
                 exc_info=True,
             )
 
-    metrics_list = (
-        parsed_report.get("metrics", [])
-        if isinstance(parsed_report, dict)
-        else []
-    )
+    metrics_list = parsed_report.get("metrics", []) if isinstance(parsed_report, dict) else []
 
     dataset_drift_metric = {}
     data_drift_table_metric = {}
@@ -95,15 +92,11 @@ def get_drift_report_data(run):
         if "dataset_drift" in dataset_drift_metric
         else summary.get("dataset_drift", summary.get("has_drift", False))
     )
-    drift_share = dataset_drift_metric.get(
-        "drift_share", summary.get("drift_threshold", 0.6)
-    )
+    drift_share = dataset_drift_metric.get("drift_share", summary.get("drift_threshold", 0.6))
     drift_score = (
         dataset_drift_metric.get("share_of_drifted_columns")
         if "share_of_drifted_columns" in dataset_drift_metric
-        else summary.get(
-            "drift_score", summary.get("share_drifted_features", 0.0)
-        )
+        else summary.get("drift_score", summary.get("share_drifted_features", 0.0))
     )
     number_of_columns = (
         dataset_drift_metric.get("number_of_columns")
@@ -127,16 +120,10 @@ def get_drift_report_data(run):
                 {
                     "column_name": col_data.get("column_name", col_name),
                     "column_type": col_data.get("column_type", "num"),
-                    "stattest_name": col_data.get(
-                        "stattest_name", "Statistical test"
-                    ),
-                    "stattest_threshold": col_data.get(
-                        "stattest_threshold", 0.0
-                    ),
+                    "stattest_name": col_data.get("stattest_name", "Statistical test"),
+                    "stattest_threshold": col_data.get("stattest_threshold", 0.0),
                     "drift_score": col_data.get("drift_score", 0.0),
-                    "drift_detected": bool(
-                        col_data.get("drift_detected", False)
-                    ),
+                    "drift_detected": bool(col_data.get("drift_detected", False)),
                     "current": col_data.get("current", {}),
                     "reference": col_data.get("reference", {}),
                 }
@@ -157,9 +144,7 @@ def get_drift_report_data(run):
                 }
             )
 
-    columns.sort(
-        key=lambda c: (not c["drift_detected"], c["column_name"].lower())
-    )
+    columns.sort(key=lambda c: (not c["drift_detected"], c["column_name"].lower()))
 
     version_str = ""
     try:
@@ -188,19 +173,9 @@ def get_drift_report_data(run):
         "dataset_drift": bool(dataset_drift),
         "drift_share": float(drift_share) if drift_share is not None else 0.6,
         "drift_score": float(drift_score) if drift_score is not None else 0.0,
-        "number_of_columns": (
-            int(number_of_columns)
-            if number_of_columns is not None
-            else len(columns)
-        ),
-        "number_of_drifted_columns": (
-            int(number_of_drifted_columns)
-            if number_of_drifted_columns is not None
-            else 0
-        ),
-        "production_records": summary.get(
-            "production_records", summary.get("samples", 0)
-        ),
+        "number_of_columns": (int(number_of_columns) if number_of_columns is not None else len(columns)),
+        "number_of_drifted_columns": (int(number_of_drifted_columns) if number_of_drifted_columns is not None else 0),
+        "production_records": summary.get("production_records", summary.get("samples", 0)),
         "data_quality": summary.get("data_quality", {}),
         "columns": columns,
         "artifacts": {
@@ -208,4 +183,3 @@ def get_drift_report_data(run):
             "json_url": json_url,
         },
     }
-

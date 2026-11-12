@@ -7,9 +7,9 @@ from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 
-from apps.deployment.models import Build, Deployment, Endpoint
-from apps.deployment.health_tasks import probe_runtime_health, scan_runtime_health  # noqa: F401
 from apps.deployment.execution_tasks import check_local_execution, scan_local_executions  # noqa: F401
+from apps.deployment.health_tasks import probe_runtime_health, scan_runtime_health  # noqa: F401
+from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.services.logs import append_deployment_log, reset_deployment_logs
 from apps.observability.services.outbox import enqueue_event
@@ -56,7 +56,11 @@ def _mark_deployment_succeeded(deployment):
     with transaction.atomic():
         project = ModelProject.objects.select_for_update().get(pk=deployment.version.project_id)
         deployment = Deployment.objects.select_for_update(of=("self",)).get(pk=deployment.pk)
-        if not project.is_active or project.deletion_state != "active" or deployment.status not in {"deploying", "unconfirmed"}:
+        if (
+            not project.is_active
+            or project.deletion_state != "active"
+            or deployment.status not in {"deploying", "unconfirmed"}
+        ):
             return False
         old_id = project.active_deployment_id
         Deployment.objects.filter(pk=deployment.pk).update(
@@ -111,7 +115,8 @@ def execute_build(self, build_id):
         build.save(update_fields=["status", "started_at", "celery_task_id", "error_message", "updated_at"])
         if build.backend == "docker":
             Build.objects.filter(pk=build.pk).update(
-                execution_deadline_at=build.execution_deadline_at or timezone.now() + timedelta(seconds=settings.LOCAL_BUILD_TIMEOUT_SECONDS),
+                execution_deadline_at=build.execution_deadline_at
+                or timezone.now() + timedelta(seconds=settings.LOCAL_BUILD_TIMEOUT_SECONDS),
                 next_execution_check_at=timezone.now(),
             )
         record_transition(build, "building")
@@ -166,7 +171,12 @@ def register_build(build_id):
 
 
 @shared_task(
-    bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, max_retries=5, reject_on_worker_lost=True
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=5,
+    reject_on_worker_lost=True,
 )
 def cancel_build(self, build_id):
     build = Build.objects.select_related("project").filter(public_id=build_id).first()
@@ -180,7 +190,12 @@ def cancel_build(self, build_id):
 
 
 @shared_task(
-    bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, max_retries=5, reject_on_worker_lost=True
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=5,
+    reject_on_worker_lost=True,
 )
 def cleanup_failed_build_artifacts(self, build_id, delete_image=False):
     build = (
@@ -303,7 +318,8 @@ def execute_deployment(self, deployment_id):
         deployment.save(update_fields=["status", "celery_task_id", "error_message", "updated_at"])
         if deployment.backend == "docker":
             Deployment.objects.filter(pk=deployment.pk).update(
-                execution_deadline_at=deployment.execution_deadline_at or timezone.now() + timedelta(seconds=settings.LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS),
+                execution_deadline_at=deployment.execution_deadline_at
+                or timezone.now() + timedelta(seconds=settings.LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS),
                 next_execution_check_at=timezone.now(),
             )
         record_transition(deployment, "deploying")
@@ -338,7 +354,10 @@ def execute_deployment(self, deployment_id):
         Deployment.objects.filter(pk=deployment.pk).update(status="stopped", stopped_at=timezone.now())
         Endpoint = type(endpoint)
         Endpoint.objects.filter(pk=endpoint.pk).update(
-            health_status="unknown", last_checked_at=None, health_check_token=None, health_check_lease_until=None,
+            health_status="unknown",
+            last_checked_at=None,
+            health_check_token=None,
+            health_check_lease_until=None,
         )
         return "stopped"
     deployment.refresh_from_db()
@@ -426,7 +445,9 @@ def reconcile_stopped_deployments():
     cutoff = timezone.now() - timedelta(seconds=settings.STOP_RECONCILE_GRACE_SECONDS)
     stale = Deployment.objects.filter(status="stopped", stopped_at__isnull=True, updated_at__lt=cutoff)
     dispatched = 0
-    for public_id in stale.order_by("updated_at").values_list("public_id", flat=True)[: settings.STOP_RECONCILE_BATCH_SIZE]:
+    for public_id in stale.order_by("updated_at").values_list("public_id", flat=True)[
+        : settings.STOP_RECONCILE_BATCH_SIZE
+    ]:
         # A failing stop is retried at most once per grace period, not on every scan.
         if cache.add(f"deployment-stop-reconcile:{public_id}", 1, timeout=settings.STOP_RECONCILE_GRACE_SECONDS):
             stop_deployment.delay(str(public_id))

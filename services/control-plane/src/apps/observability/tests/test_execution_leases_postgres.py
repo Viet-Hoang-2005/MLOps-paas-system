@@ -1,4 +1,3 @@
-from django.utils import timezone
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event
 from unittest.mock import Mock
@@ -6,11 +5,12 @@ from unittest.mock import Mock
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connection, connections, transaction
+from django.utils import timezone
 
 from apps.catalog.models import ModelProject
-from apps.training.models import TrainingJob
-from apps.observability.services.executions import claim
 from apps.observability.services import executions
+from apps.observability.services.executions import claim
+from apps.training.models import TrainingJob
 
 
 @pytest.mark.django_db(transaction=True)
@@ -19,7 +19,23 @@ def test_concurrent_claims_have_one_owner_per_job(settings):
         pytest.skip("Lease concurrency requires disposable PostgreSQL.")
     owner = get_user_model().objects.create_user("leases@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="lease-concurrency")
-    TrainingJob.objects.bulk_create([TrainingJob(project=project, owner=project.owner, model_flavor="sklearn", backend="docker", status="queued", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now()) for index in range(24)])
+    TrainingJob.objects.bulk_create(
+        [
+            TrainingJob(
+                project=project,
+                owner=project.owner,
+                model_flavor="sklearn",
+                backend="docker",
+                status="queued",
+                vcpu=2,
+                memory_mb=4096,
+                max_runtime_seconds=3600,
+                input_contract="legacy",
+                submitted_at=timezone.now(),
+            )
+            for index in range(24)
+        ]
+    )
     gate = Barrier(3)
 
     def claimant():
@@ -43,7 +59,17 @@ def postgres_job(settings):
         pytest.skip("Observation concurrency requires disposable PostgreSQL.")
     owner = get_user_model().objects.create_user("observations@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="observation-concurrency")
-    return TrainingJob.objects.create(project=project, model_flavor="sklearn", backend="docker", status="running", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+    return TrainingJob.objects.create(
+        project=project,
+        model_flavor="sklearn",
+        backend="docker",
+        status="running",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
 
 
 @pytest.mark.django_db(transaction=True)
@@ -80,7 +106,9 @@ def test_cancellation_lock_prevents_concurrent_completion(postgres_job, monkeypa
     with ThreadPoolExecutor(max_workers=1) as workers:
         with transaction.atomic():
             ModelProject.objects.select_for_update().get(pk=job.project_id)
-            TrainingJob.objects.select_for_update().filter(pk=job.pk).update(status="cancelling", execution_stop_requested=True)
+            TrainingJob.objects.select_for_update().filter(pk=job.pk).update(
+                status="cancelling", execution_stop_requested=True
+            )
             result = workers.submit(report)
             assert verified.wait(timeout=10)
         assert result.result(timeout=10) == "cancelling"

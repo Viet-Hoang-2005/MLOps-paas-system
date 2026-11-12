@@ -90,7 +90,7 @@ export default function DriftMonitoringDetailPage() {
   });
 
   const activeRun = effectiveRunId
-    ? results?.find((r) => r.id === effectiveRunId) ?? results?.[0]
+    ? (results?.find((r) => r.id === effectiveRunId) ?? results?.[0])
     : results?.[0];
 
   const currentRunStatus =
@@ -100,7 +100,7 @@ export default function DriftMonitoringDetailPage() {
   const isRunActive = Boolean(
     isRunning ||
     (currentRunStatus &&
-      ["pending", "queued", "running"].includes(currentRunStatus))
+      ["pending", "queued", "running"].includes(currentRunStatus)),
   );
 
   const statusBadge = currentRunStatus ? (
@@ -404,10 +404,7 @@ export default function DriftMonitoringDetailPage() {
         </div>
 
         <div className="border-t border-border pt-6 space-y-4">
-          <Title
-            title={t("history")}
-            description={t("historyDescription")}
-          />
+          <Title title={t("history")} description={t("historyDescription")} />
           <Table
             data={results ?? []}
             columns={columns}

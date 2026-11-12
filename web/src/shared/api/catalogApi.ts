@@ -146,8 +146,11 @@ export const predictWithModelProject = async (
   endpointUrl: string,
   features: Record<string, unknown>,
 ): Promise<ModelPredictionResponse> =>
-  (await inferenceClient.post<ModelPredictionResponse>(endpointUrl, { features }))
-    .data;
+  (
+    await inferenceClient.post<ModelPredictionResponse>(endpointUrl, {
+      features,
+    })
+  ).data;
 
 export const listSourceCodeFiles = async (
   modelId: string,
@@ -277,8 +280,14 @@ export interface ModelAttributesResponse {
   supplemental_summaries?: Record<string, unknown>;
 }
 
-export const getPreviewAttributes = async (modelId: string): Promise<ModelAttributesResponse> =>
-  (await apiClient.get<ModelAttributesResponse>(controlPlaneURL(`/models/${modelId}/preview/attributes/`))).data;
+export const getPreviewAttributes = async (
+  modelId: string,
+): Promise<ModelAttributesResponse> =>
+  (
+    await apiClient.get<ModelAttributesResponse>(
+      controlPlaneURL(`/models/${modelId}/preview/attributes/`),
+    )
+  ).data;
 
 export const getRunningAttributes = async (
   modelId: string,
@@ -303,4 +312,3 @@ export const getRunningLabelMapping = async (
     )
   ).data;
 };
-

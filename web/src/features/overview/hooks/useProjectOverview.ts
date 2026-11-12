@@ -51,12 +51,21 @@ export const useRunningSource = (projectId?: string, versionId?: string) =>
     enabled: Boolean(projectId && versionId),
   });
 
-export const useRunningAttributes = (projectId?: string, versionId?: string, isPreview = false) =>
+export const useRunningAttributes = (
+  projectId?: string,
+  versionId?: string,
+  isPreview = false,
+) =>
   useQuery({
-    queryKey: overviewQueryKeys.attributes(projectId ?? "", isPreview ? "preview" : (versionId ?? "")),
-    queryFn: () => isPreview ? getPreviewAttributes(projectId!) : getRunningAttributes(projectId!, versionId),
+    queryKey: overviewQueryKeys.attributes(
+      projectId ?? "",
+      isPreview ? "preview" : (versionId ?? ""),
+    ),
+    queryFn: () =>
+      isPreview
+        ? getPreviewAttributes(projectId!)
+        : getRunningAttributes(projectId!, versionId),
     enabled: Boolean(projectId),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
-

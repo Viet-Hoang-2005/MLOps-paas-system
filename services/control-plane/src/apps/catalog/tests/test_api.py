@@ -164,10 +164,13 @@ def test_running_attributes_and_label_mapping_with_json(monkeypatch):
             class FakeClient:
                 def get_object(self, **kwargs):
                     from io import BytesIO
+
                     return {"Body": BytesIO(mapping_bytes)}
+
             return FakeClient()
 
     from apps.catalog.services import snapshots
+
     monkeypatch.setattr(snapshots, "S3Storage", lambda: FakeStorage())
 
     client = APIClient()
@@ -292,5 +295,3 @@ def test_running_version_number_in_project_serializer():
     res = client.get(f"/api/models/{project.public_id}/")
     assert res.status_code == 200
     assert res.data["running_version_number"] == "1"
-
-

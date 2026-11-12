@@ -41,7 +41,10 @@ const TYPE_ICONS: Record<NotificationType, React.ReactNode> = {
   project: <Bot className="h-5 w-5" />,
 };
 
-const LEVEL_VARIANTS: Record<NotificationLevel, "neutral" | "info" | "success" | "warning" | "danger"> = {
+const LEVEL_VARIANTS: Record<
+  NotificationLevel,
+  "neutral" | "info" | "success" | "warning" | "danger"
+> = {
   info: "info",
   success: "success",
   warning: "warning",
@@ -90,10 +93,14 @@ export const NotificationItemComponent: React.FC<NotificationItemProps> = ({
       <div
         className={cn(
           "flex shrink-0 items-center justify-center rounded-surface border",
-          notification.level === "error" && "border-danger-border bg-danger-subtle text-color-danger",
-          notification.level === "warning" && "border-warning-border bg-warning-subtle text-color-warning",
-          notification.level === "success" && "border-success-border bg-success-subtle text-color-success",
-          notification.level === "info" && "border-info-border bg-info-subtle text-color-info",
+          notification.level === "error" &&
+            "border-danger-border bg-danger-subtle text-color-danger",
+          notification.level === "warning" &&
+            "border-warning-border bg-warning-subtle text-color-warning",
+          notification.level === "success" &&
+            "border-success-border bg-success-subtle text-color-success",
+          notification.level === "info" &&
+            "border-info-border bg-info-subtle text-color-info",
           isCompact ? "h-8 w-8" : "h-9 w-9",
         )}
       >
@@ -108,7 +115,9 @@ export const NotificationItemComponent: React.FC<NotificationItemProps> = ({
               <span
                 className={cn(
                   "shrink-0 select-none text-color-danger font-bold",
-                  isCompact ? "text-style-caption-strong" : "text-style-body-strong",
+                  isCompact
+                    ? "text-style-caption-strong"
+                    : "text-style-body-strong",
                 )}
                 title={t("status.unread")}
                 aria-label={t("status.unread")}
@@ -119,7 +128,9 @@ export const NotificationItemComponent: React.FC<NotificationItemProps> = ({
             <h4
               className={cn(
                 "truncate font-semibold text-color-foreground",
-                isCompact ? "text-style-caption-strong" : "text-style-body-strong",
+                isCompact
+                  ? "text-style-caption-strong"
+                  : "text-style-body-strong",
               )}
             >
               {notification.title}
@@ -161,8 +172,16 @@ export const NotificationItemComponent: React.FC<NotificationItemProps> = ({
                 size="icon"
                 border={false}
                 disabled={notification.is_read}
-                title={notification.is_read ? t("actions.alreadyRead") : t("actions.markAsRead")}
-                aria-label={notification.is_read ? t("actions.alreadyRead") : t("actions.markAsRead")}
+                title={
+                  notification.is_read
+                    ? t("actions.alreadyRead")
+                    : t("actions.markAsRead")
+                }
+                aria-label={
+                  notification.is_read
+                    ? t("actions.alreadyRead")
+                    : t("actions.markAsRead")
+                }
                 onClick={(e) => {
                   e.stopPropagation();
                   if (!notification.is_read) {

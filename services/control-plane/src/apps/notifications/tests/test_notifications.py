@@ -1,4 +1,5 @@
 import uuid
+
 import pytest
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -156,9 +157,9 @@ def test_alertmanager_webhook_creates_notification():
 def test_project_lifecycle_notifications():
     from apps.notifications.hooks import (
         notify_project_created,
+        notify_project_deleted,
         notify_project_metadata_updated,
         notify_project_preview_updated,
-        notify_project_deleted,
     )
 
     user = get_user_model().objects.create_user("project_owner@example.com", "pass123")

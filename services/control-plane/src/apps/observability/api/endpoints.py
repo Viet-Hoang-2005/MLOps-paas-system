@@ -49,7 +49,10 @@ class MetricsEndpoint(APIView):
 
     def get(self, request):
         from apps.observability.services.executions import execution_metrics
-        return HttpResponse(generate_latest() + shared_celery_metrics() + execution_metrics(), content_type=CONTENT_TYPE_LATEST)
+
+        return HttpResponse(
+            generate_latest() + shared_celery_metrics() + execution_metrics(), content_type=CONTENT_TYPE_LATEST
+        )
 
 
 class ModelObservabilityEndpoint(APIView):
@@ -74,6 +77,7 @@ class ProductionDataEndpoint(APIView):
         serializer.is_valid(raise_exception=True)
         if serializer.validated_data.get("count"):
             from apps.production.models import PredictionRecord
+
             qs = PredictionRecord.objects.filter(project=project)
             if serializer.validated_data.get("version_id"):
                 qs = qs.filter(model_version__public_id=serializer.validated_data["version_id"])

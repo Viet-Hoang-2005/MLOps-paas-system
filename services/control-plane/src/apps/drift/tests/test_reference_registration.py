@@ -65,7 +65,9 @@ def test_failed_snapshot_copy_rolls_back_version_artifact_and_removes_upload(run
 
 def test_monitor_insert_failure_cleans_only_new_objects(running_version, monkeypatch):
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.drift.services.monitors.DriftMonitor.objects.create", Mock(side_effect=RuntimeError("DB failed")))
+    monkeypatch.setattr(
+        "apps.drift.services.monitors.DriftMonitor.objects.create", Mock(side_effect=RuntimeError("DB failed"))
+    )
     with pytest.raises(RuntimeError):
         create(running_version, storage)
     assert not running_version.artifacts.exists()
@@ -85,12 +87,31 @@ def test_missing_reference_and_changed_running_rejected(running_version):
     assert storage.objects == {}
 
 
-@pytest.mark.parametrize("filename,content", [
-    ("reference.json", b"a\n1\n"), ("empty.csv", b""), ("header.csv", b"a\n"),
-    ("broken.csv", b"a,b\n1\n"), ("duplicate.csv", b"a,a\n1,2\n"),
-    ("blank.csv", b"a,\n1,2\n"), ("invalid.csv", b"\xff\xfe"), ("nul.csv", b"a\n\x00\n"),
-    ("large.csv", b"a" * (MAX_REFERENCE_BYTES + 1)),
-], ids=["extension", "empty", "header-only", "width", "duplicate-header", "blank-header", "encoding", "nul", "oversize"])
+@pytest.mark.parametrize(
+    "filename,content",
+    [
+        ("reference.json", b"a\n1\n"),
+        ("empty.csv", b""),
+        ("header.csv", b"a\n"),
+        ("broken.csv", b"a,b\n1\n"),
+        ("duplicate.csv", b"a,a\n1,2\n"),
+        ("blank.csv", b"a,\n1,2\n"),
+        ("invalid.csv", b"\xff\xfe"),
+        ("nul.csv", b"a\n\x00\n"),
+        ("large.csv", b"a" * (MAX_REFERENCE_BYTES + 1)),
+    ],
+    ids=[
+        "extension",
+        "empty",
+        "header-only",
+        "width",
+        "duplicate-header",
+        "blank-header",
+        "encoding",
+        "nul",
+        "oversize",
+    ],
+)
 def test_invalid_csv_rejected_and_stream_rewound(filename, content):
     upload = SimpleUploadedFile(filename, content)
     with pytest.raises(ValidationError):
@@ -104,13 +125,20 @@ def test_reference_endpoints_enforce_tenant_and_existing_reference(running_versi
     client = APIClient()
     client.force_authenticate(running_version.project.owner)
     url = "/api/drift-monitors/"
-    payload = {"version": str(running_version.public_id), "name": "default", "trigger_threshold": 1000,
-               "reference_file": SimpleUploadedFile("reference.csv", b"x\n1\n")}
+    payload = {
+        "version": str(running_version.public_id),
+        "name": "default",
+        "trigger_threshold": 1000,
+        "reference_file": SimpleUploadedFile("reference.csv", b"x\n1\n"),
+    }
     response = client.post(url, payload, format="multipart")
     assert response.status_code == 201
     monitor_id = response.data["id"]
     reference_url = f"/api/drift-monitors/{monitor_id}/reference-url/"
-    monkeypatch.setattr("apps.drift.services.monitors.S3Storage", lambda: Mock(presigned_get=lambda uri, expires: "https://s3.example/reference"))
+    monkeypatch.setattr(
+        "apps.drift.services.monitors.S3Storage",
+        lambda: Mock(presigned_get=lambda uri, expires: "https://s3.example/reference"),
+    )
     assert client.get(reference_url).data == {"url": "https://s3.example/reference"}
     other = get_user_model().objects.create_user("other-reference@example.test", "test-password")
     client.force_authenticate(other)
@@ -122,6 +150,10 @@ def test_reference_endpoints_enforce_tenant_and_existing_reference(running_versi
     assert client.post(url, payload, format="multipart").status_code == 409
     payload.update(name="zero", trigger_threshold=0)
     assert client.post(url, payload, format="multipart").status_code == 400
-    response = client.patch(f"/api/drift-monitors/{monitor_id}/", {"reference_file": SimpleUploadedFile("replace.csv", b"x\n2\n")}, format="multipart")
+    response = client.patch(
+        f"/api/drift-monitors/{monitor_id}/",
+        {"reference_file": SimpleUploadedFile("replace.csv", b"x\n2\n")},
+        format="multipart",
+    )
     assert response.status_code == 400
     assert client.get(f"/api/drift-monitors/{uuid.uuid4()}/reference-url/").status_code == 404

@@ -1,7 +1,8 @@
 """Durable per-account weekly training reservations and usage."""
 
 import math
-from datetime import timedelta, timezone as datetime_timezone
+from datetime import timedelta
+from datetime import timezone as datetime_timezone
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -20,9 +21,13 @@ def week_start(value):
 
 
 def limits():
-    return {"cpu_small": None, "cpu_medium": settings.TRAINING_CPU_MEDIUM_WEEKLY_SECONDS,
-            "cpu_large": settings.TRAINING_CPU_LARGE_WEEKLY_SECONDS, "t4": settings.TRAINING_GPU_T4_WEEKLY_SECONDS,
-            "a10g": settings.TRAINING_GPU_A10G_WEEKLY_SECONDS}
+    return {
+        "cpu_small": None,
+        "cpu_medium": settings.TRAINING_CPU_MEDIUM_WEEKLY_SECONDS,
+        "cpu_large": settings.TRAINING_CPU_LARGE_WEEKLY_SECONDS,
+        "t4": settings.TRAINING_GPU_T4_WEEKLY_SECONDS,
+        "a10g": settings.TRAINING_GPU_A10G_WEEKLY_SECONDS,
+    }
 
 
 def resource_for(job):
@@ -71,22 +76,41 @@ def reserve(job):
     limit = limits()[resource]
     overlaps = _window_overlaps(now, deadline, job.max_runtime_seconds)
     for week, amount in overlaps.items():
-        used = TrainingQuotaWeek.objects.filter(reservation__owner_id=job.owner_id,
-            reservation__resource=resource, week_start=week).aggregate(
-                used=Sum("used_seconds"), reserved=Sum("reserved_seconds"))
+        used = TrainingQuotaWeek.objects.filter(
+            reservation__owner_id=job.owner_id, reservation__resource=resource, week_start=week
+        ).aggregate(used=Sum("used_seconds"), reserved=Sum("reserved_seconds"))
         remaining = None if limit is None else max(0, limit - (used["used"] or 0) - (used["reserved"] or 0))
         if remaining is not None and amount > remaining:
-            raise QuotaExceeded({"resource": resource, "required_seconds": amount,
-                                 "remaining_seconds": remaining, "reset_at": (week + WEEK).isoformat()})
-    reservation = TrainingQuotaReservation.objects.create(owner_id=job.owner_id, job_id=job.public_id,
-        resource=resource, submitted_at=now, dispatch_deadline_at=deadline, max_runtime_seconds=job.max_runtime_seconds)
-    TrainingQuotaWeek.objects.bulk_create([TrainingQuotaWeek(reservation=reservation, week_start=week,
-        reserved_seconds=amount) for week, amount in overlaps.items()])
+            raise QuotaExceeded(
+                {
+                    "resource": resource,
+                    "required_seconds": amount,
+                    "remaining_seconds": remaining,
+                    "reset_at": (week + WEEK).isoformat(),
+                }
+            )
+    reservation = TrainingQuotaReservation.objects.create(
+        owner_id=job.owner_id,
+        job_id=job.public_id,
+        resource=resource,
+        submitted_at=now,
+        dispatch_deadline_at=deadline,
+        max_runtime_seconds=job.max_runtime_seconds,
+    )
+    TrainingQuotaWeek.objects.bulk_create(
+        [
+            TrainingQuotaWeek(reservation=reservation, week_start=week, reserved_seconds=amount)
+            for week, amount in overlaps.items()
+        ]
+    )
     job.dispatch_deadline_at = deadline
 
 
 def require_reservation(job):
-    if job.backend == "argo" and not TrainingQuotaReservation.objects.filter(job_id=job.public_id, active=True).exists():
+    if (
+        job.backend == "argo"
+        and not TrainingQuotaReservation.objects.filter(job_id=job.public_id, active=True).exists()
+    ):
         raise ServiceUnavailable("Training quota reservation is unavailable.")
 
 
@@ -112,8 +136,15 @@ def update_observation(job, *, started_at=None, finished_at=None, stopped=False,
     if not reservation.started_at and job.external_job_id and not never_started:
         return False  # Runtime creation was attempted but no trustworthy start is available.
     end = reservation.runtime_finished_at or finished_at or timezone.now()
-    overlaps = _window_overlaps(reservation.started_at, reservation.started_at,
-        max(0, math.ceil((end - reservation.started_at).total_seconds()))) if reservation.started_at else {}
+    overlaps = (
+        _window_overlaps(
+            reservation.started_at,
+            reservation.started_at,
+            max(0, math.ceil((end - reservation.started_at).total_seconds())),
+        )
+        if reservation.started_at
+        else {}
+    )
     for row in reservation.weeks.all():
         row.used_seconds = overlaps.pop(row.week_start, 0)
         row.reserved_seconds = 0
@@ -130,10 +161,17 @@ def usage(user):
     current = week_start(now)
     backend = settings.TRAINING_BACKEND
     values = []
-    available = limits() if backend == "argo" else {"cpu_small": None, "cpu_medium": None, "cpu_large": None, "gpu_local": None}
+    available = (
+        limits() if backend == "argo" else {"cpu_small": None, "cpu_medium": None, "cpu_large": None, "gpu_local": None}
+    )
     for resource, limit in available.items():
-        rows = TrainingQuotaWeek.objects.filter(reservation__owner=user, reservation__resource=resource,
-                                                week_start=current).select_related("reservation") if backend == "argo" else []
+        rows = (
+            TrainingQuotaWeek.objects.filter(
+                reservation__owner=user, reservation__resource=resource, week_start=current
+            ).select_related("reservation")
+            if backend == "argo"
+            else []
+        )
         used = reserved = 0
         for row in rows:
             live = 0
@@ -144,9 +182,22 @@ def usage(user):
             used += row.used_seconds + live
             reserved += max(0, row.reserved_seconds - live)
         effective_limit = limit if backend == "argo" else None
-        values.append({"resource": resource, "limit_seconds": effective_limit, "used_seconds": used,
-                       "reserved_seconds": reserved,
-                       "remaining_seconds": max(0, effective_limit - used - reserved) if effective_limit is not None else None})
-    return {"backend": backend, "week_start": current.isoformat(), "reset_at": (current + WEEK).isoformat(),
-            "active_jobs_count": TrainingQuotaReservation.objects.filter(owner=user, active=True).count() if backend == "argo" else None,
-            "max_active_jobs": 1 if backend == "argo" else None, "resources": values}
+        values.append(
+            {
+                "resource": resource,
+                "limit_seconds": effective_limit,
+                "used_seconds": used,
+                "reserved_seconds": reserved,
+                "remaining_seconds": max(0, effective_limit - used - reserved) if effective_limit is not None else None,
+            }
+        )
+    return {
+        "backend": backend,
+        "week_start": current.isoformat(),
+        "reset_at": (current + WEEK).isoformat(),
+        "active_jobs_count": TrainingQuotaReservation.objects.filter(owner=user, active=True).count()
+        if backend == "argo"
+        else None,
+        "max_active_jobs": 1 if backend == "argo" else None,
+        "resources": values,
+    }

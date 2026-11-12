@@ -107,9 +107,7 @@ def test_stop_task_records_runtime_stop_after_backend(runtimes, monkeypatch):
     assert running.status == "stopped" and running.stopped_at is not None
 
 
-def test_late_argo_success_for_stopped_deployment_removes_runtime_again(
-    runtimes, django_capture_on_commit_callbacks
-):
+def test_late_argo_success_for_stopped_deployment_removes_runtime_again(runtimes, django_capture_on_commit_callbacks):
     project, running, candidate, stops = runtimes
     with django_capture_on_commit_callbacks(execute=True):
         request_stop(candidate)

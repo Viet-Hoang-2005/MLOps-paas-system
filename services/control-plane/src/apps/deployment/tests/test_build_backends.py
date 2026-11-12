@@ -2,7 +2,6 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import docker.errors
-
 import pytest
 from django.contrib.auth import get_user_model
 
@@ -81,7 +80,10 @@ def test_docker_build_backend_uses_build_input_s3_uri():
     storage = RecordingStorage()
     docker = RecordingDocker()
 
-    assert DockerBuildBackend(docker_client=docker, storage=storage).run(build) == {"dispatched": True, "container_id": "packager-container"}
+    assert DockerBuildBackend(docker_client=docker, storage=storage).run(build) == {
+        "dispatched": True,
+        "container_id": "packager-container",
+    }
     assert storage.downloaded_uri == asset.s3_uri
     assert docker.environment["SOURCE_DOWNLOAD_URL"] == "https://storage.example/download"
     assert docker.environment["PROJECT_ID"] == str(build.project.public_id)

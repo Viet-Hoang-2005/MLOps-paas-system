@@ -208,6 +208,7 @@ def test_create_model_archive_rejects_symlinks(runner_workspace, tmp_path):
 def test_create_model_archive_limits_total_size(runner_workspace, tmp_path, monkeypatch):
     (runner_workspace["MODEL_DIR"] / "model.pkl").write_bytes(b"model")
     import src.output_contract as contract
+
     monkeypatch.setattr(contract, "MAX_MODEL_BYTES", 4)
     with pytest.raises(ValueError, match="size limit"):
         runner.create_model_archive(tmp_path / "model.tar.gz")

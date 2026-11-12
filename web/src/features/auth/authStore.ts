@@ -5,4 +5,3 @@ export {
   isAuthenticated,
   setAuthSession as setAuthTokens,
 } from "@/shared/api/authSession";
-

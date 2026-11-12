@@ -2,14 +2,7 @@ import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { Title } from "@/shared/components/Title";
 import { toast } from "@/shared/lib/toastStore";
-import {
-  Check,
-  Code2,
-  Copy,
-  FileCode,
-  Table,
-  Trash2,
-} from "lucide-react";
+import { Check, Code2, Copy, FileCode, Table, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -217,11 +210,7 @@ export function InputSchemaCard({
                   )}
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopySchema}
-              >
+              <Button variant="outline" size="sm" onClick={handleCopySchema}>
                 {copiedSchema ? (
                   <Check className="mr-1.5 h-3.5 w-3.5" />
                 ) : (
@@ -238,8 +227,7 @@ export function InputSchemaCard({
                   onClick={onRequestRemove}
                   title={t("workflow.removeAttribute")}
                   aria-label={t("workflow.removeAttribute")}
-                >
-                </Button>
+                ></Button>
               )}
             </div>
           }
@@ -250,9 +238,7 @@ export function InputSchemaCard({
             <table className="w-full text-left text-style-caption">
               <thead className="bg-muted text-style-caption-strong text-color-foreground">
                 <tr>
-                  <th className="px-4 py-2.5">
-                    {t("workflow.schemaField")}
-                  </th>
+                  <th className="px-4 py-2.5">{t("workflow.schemaField")}</th>
                   <th className="px-4 py-2.5">{t("workflow.schemaType")}</th>
                   <th className="px-4 py-2.5">
                     {t("workflow.schemaRequired")}
@@ -297,4 +283,3 @@ export function InputSchemaCard({
 }
 
 export default InputSchemaCard;
-

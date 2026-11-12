@@ -5,9 +5,7 @@ import zipfile
 from pathlib import Path
 from urllib.parse import urlparse
 
-ALLOWED_PIP_ENV_VARS = frozenset(
-    {"PATH", "HOME", "LANG", "LC_ALL", "TZ", "TMPDIR", "TEMP", "TMP", "PYTHONPATH"}
-)
+ALLOWED_PIP_ENV_VARS = frozenset({"PATH", "HOME", "LANG", "LC_ALL", "TZ", "TMPDIR", "TEMP", "TMP", "PYTHONPATH"})
 
 
 def get_isolated_pip_env(base_env: dict | None = None) -> dict[str, str]:

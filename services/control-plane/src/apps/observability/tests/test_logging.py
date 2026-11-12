@@ -1,4 +1,3 @@
-from django.utils import timezone
 import logging
 import uuid
 from types import SimpleNamespace
@@ -10,6 +9,7 @@ from django.db import transaction
 from django.http import HttpResponse
 from django.test import RequestFactory
 from django.urls import ResolverMatch
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
@@ -233,7 +233,16 @@ def test_build_dispatch_is_not_completion(project, monkeypatch, django_capture_o
 
 
 def test_training_dispatch_is_not_completion(project, monkeypatch, django_capture_on_commit_callbacks):
-    job = TrainingJob.objects.create(project=project, status="queued", backend="argo",  vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+    job = TrainingJob.objects.create(
+        project=project,
+        status="queued",
+        backend="argo",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
     monkeypatch.setattr(
         "apps.training.tasks.training_backend", lambda _: SimpleNamespace(run=lambda _: {"dispatched": True})
     )

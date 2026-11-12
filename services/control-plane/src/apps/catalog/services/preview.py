@@ -24,6 +24,7 @@ from common.validation.artifacts import (
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import project_prefix
 
+
 def generate_preview_upload_urls(
     *, tenant_id, project_id, files_data, storage=None, flavor=None, artifact_format="raw"
 ):
@@ -60,7 +61,9 @@ def generate_preview_upload_urls(
                 raise ValidationError({"reference_data": "Reference dataset must be a CSV (.csv) file."})
             if size_bytes > MAX_REFERENCE_DATA_BYTES:
                 raise ValidationError(
-                    {"reference_data": f"Reference data file must be at most {MAX_REFERENCE_DATA_BYTES // (1024 * 1024)} MiB."}
+                    {
+                        "reference_data": f"Reference data file must be at most {MAX_REFERENCE_DATA_BYTES // (1024 * 1024)} MiB."
+                    }
                 )
         elif kind == "label_mapping":
             if Path(filename).suffix.lower() != ".json":
@@ -81,9 +84,7 @@ def generate_preview_upload_urls(
         key = f"staging/{project_prefix(tenant_id, project_id)}/preview/{upload_batch_id}/{kind}/{filename}"
         s3_uri = f"s3://{storage.bucket}/{key}"
         content_type = item.get("content_type") or "application/octet-stream"
-        upload_url = storage.presigned_put(
-            s3_uri, expires_in=900, content_type=content_type, size_bytes=size_bytes
-        )
+        upload_url = storage.presigned_put(s3_uri, expires_in=900, content_type=content_type, size_bytes=size_bytes)
         result.append(
             {
                 "kind": kind,
@@ -135,12 +136,16 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                 s3_uri = item["s3_uri"]
                 # Enforce that uploaded asset must come strictly from the staging prefix
                 if not s3_uri.startswith(expected_staging_prefix):
-                    raise ValidationError({"assets": f"Storage URI for '{kind}' does not belong to this project's preview staging area."})
+                    raise ValidationError(
+                        {"assets": f"Storage URI for '{kind}' does not belong to this project's preview staging area."}
+                    )
 
                 try:
                     stored = storage.head(s3_uri)
                 except Exception as exc:
-                    raise ValidationError({"assets": f"Could not verify uploaded asset '{kind}' in storage: {exc}"}) from exc
+                    raise ValidationError(
+                        {"assets": f"Could not verify uploaded asset '{kind}' in storage: {exc}"}
+                    ) from exc
 
                 if stored.size_bytes == 0:
                     raise ValidationError({"assets": f"Uploaded asset '{kind}' is empty."})
@@ -165,7 +170,9 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                         raise ValidationError({"source_code": "Source code must be a Python (.py) file."})
                     if stored.size_bytes > MAX_SOURCE_CODE_BYTES:
                         raise ValidationError(
-                            {"source_code": f"Source code file must be at most {MAX_SOURCE_CODE_BYTES // (1024 * 1024)} MiB."}
+                            {
+                                "source_code": f"Source code file must be at most {MAX_SOURCE_CODE_BYTES // (1024 * 1024)} MiB."
+                            }
                         )
                     content = storage.read(s3_uri, max_bytes=MAX_SOURCE_CODE_BYTES + 1)
                     validate_source_code_content(name, content, error_key="source_code")
@@ -175,12 +182,21 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                         raise ValidationError({"reference_data": "Reference dataset must be a CSV (.csv) file."})
                     if stored.size_bytes > MAX_REFERENCE_DATA_BYTES:
                         raise ValidationError(
-                            {"reference_data": f"Reference data file must be at most {MAX_REFERENCE_DATA_BYTES // (1024 * 1024)} MiB."}
+                            {
+                                "reference_data": f"Reference data file must be at most {MAX_REFERENCE_DATA_BYTES // (1024 * 1024)} MiB."
+                            }
                         )
                     content = storage.read(s3_uri, max_bytes=MAX_REFERENCE_DATA_BYTES + 1)
                     validate_reference_data_content(name, content, error_key="reference_data")
                     checksum = hashlib.sha256(content).hexdigest()
-                elif kind in {"label_mapping", "metrics", "params", "model_insights", "feature_importance", "input_schema"}:
+                elif kind in {
+                    "label_mapping",
+                    "metrics",
+                    "params",
+                    "model_insights",
+                    "feature_importance",
+                    "input_schema",
+                }:
                     if not name.lower().endswith(".json"):
                         raise ValidationError({kind: "Upload a JSON file."})
                     if stored.size_bytes > 4 * 1024 * 1024:
@@ -195,7 +211,9 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                             value = json.loads(content)
                             if not isinstance(value, (dict, list)):
                                 raise ValueError
-                            if kind in {"metrics", "params", "model_insights", "input_schema"} and not isinstance(value, dict):
+                            if kind in {"metrics", "params", "model_insights", "input_schema"} and not isinstance(
+                                value, dict
+                            ):
                                 raise ValueError
                     except Exception as exc:
                         if isinstance(exc, ValidationError):
@@ -212,7 +230,9 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                 ((name, size) for k, name, _, _, size, *_ in verified_staging_assets if k == "source_artifact"),
                 None,
             )
-            existing_artifact = current_preview.assets.filter(kind="source_artifact").first() if current_preview else None
+            existing_artifact = (
+                current_preview.assets.filter(kind="source_artifact").first() if current_preview else None
+            )
             effective_artifact_name = (
                 new_artifact_item[0]
                 if new_artifact_item
@@ -239,7 +259,15 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
             # Crucial for data integrity (P1): Once saved, the preview asset points to a committed key
             # that has NEVER had a presigned PUT URL issued for it. Any post-save reuse of the presigned
             # URL only affects the abandoned staging key and CANNOT overwrite the saved preview object.
-            for kind, name, staging_uri, staging_checksum, staging_size, staging_content_type, staging_etag in verified_staging_assets:
+            for (
+                kind,
+                name,
+                staging_uri,
+                staging_checksum,
+                staging_size,
+                staging_content_type,
+                staging_etag,
+            ) in verified_staging_assets:
                 commit_token = uuid.uuid4()
                 committed_key = (
                     f"{project_prefix(tenant_id, project_id)}/preview/committed/{commit_token}/{kind}/{name}"

@@ -1,8 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
-import docker.errors
-from infrastructure.execution.job_containers import labels_for
 
+import docker.errors
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
@@ -12,6 +11,7 @@ from apps.drift.models import DriftMonitor, DriftRun
 from apps.drift.tasks import execute_drift_run, poll_drift_run_status
 from apps.registry.models import ModelVersion
 from infrastructure.execution.docker_backends import DockerDriftBackend
+from infrastructure.execution.job_containers import labels_for
 
 
 def _create_drift_fixtures():
@@ -44,7 +44,10 @@ class DockerDriftAsyncTests(TestCase):
 
     def test_docker_drift_run_dispatches_without_blocking(self):
         fake_container = SimpleNamespace(id="drift-container-123", attrs={})
-        docker_client = SimpleNamespace(run=Mock(return_value=fake_container), client=SimpleNamespace(containers=SimpleNamespace(get=Mock(side_effect=docker.errors.NotFound("missing")))))
+        docker_client = SimpleNamespace(
+            run=Mock(return_value=fake_container),
+            client=SimpleNamespace(containers=SimpleNamespace(get=Mock(side_effect=docker.errors.NotFound("missing")))),
+        )
         storage = SimpleNamespace(
             bucket="bucket",
             presigned_get=Mock(return_value="https://s3.test/presigned-get"),

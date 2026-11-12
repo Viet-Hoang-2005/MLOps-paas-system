@@ -109,7 +109,9 @@ export function useProfileSettings() {
   const updateAvatarMutation = useMutation({
     mutationFn: updateProfileAvatar,
     onSuccess: async (_response, variables) => {
-      await queryClient.invalidateQueries({ queryKey: settingsQueryKeys.profile() });
+      await queryClient.invalidateQueries({
+        queryKey: settingsQueryKeys.profile(),
+      });
       toast.success(
         variables.remove_avatar
           ? t("profilePage.avatarRemoved")

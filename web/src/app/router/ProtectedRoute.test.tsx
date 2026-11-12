@@ -27,10 +27,15 @@ describe("ProtectedRoute Component", () => {
 
   it("should redirect to /login when unauthenticated and refreshSession fails", async () => {
     vi.spyOn(authStore, "isAuthenticated").mockReturnValue(false);
-    vi.spyOn(authApi, "refreshSession").mockRejectedValue(new axios.AxiosError(
-      "Unauthorized", "ERR_BAD_REQUEST", undefined, undefined,
-      { status: 401, data: {} } as AxiosResponse,
-    ));
+    vi.spyOn(authApi, "refreshSession").mockRejectedValue(
+      new axios.AxiosError(
+        "Unauthorized",
+        "ERR_BAD_REQUEST",
+        undefined,
+        undefined,
+        { status: 401, data: {} } as AxiosResponse,
+      ),
+    );
 
     renderWithProviders(
       <Routes>
@@ -49,7 +54,9 @@ describe("ProtectedRoute Component", () => {
 
     const loginPage = await screen.findByText("Login Page");
     expect(loginPage).toBeInTheDocument();
-    expect(screen.queryByText("Protected Dashboard Content")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Protected Dashboard Content"),
+    ).not.toBeInTheDocument();
   });
 
   it("should render protected content when refreshSession succeeds", async () => {
@@ -79,29 +86,47 @@ describe("ProtectedRoute Component", () => {
     async (failure) => {
       vi.spyOn(authStore, "isAuthenticated").mockReturnValue(false);
       const clear = vi.spyOn(authStore, "clearAuthStore");
-      const refresh = vi.spyOn(authApi, "refreshSession").mockRejectedValueOnce(
-        new axios.AxiosError(
-          "Unavailable", failure === "timeout" ? "ECONNABORTED" : "ERR_NETWORK",
-          undefined, undefined,
-          typeof failure === "number"
-            ? { status: failure, data: { error: { code: "permission_denied" } } } as AxiosResponse
-            : undefined,
-        ),
-      );
+      const refresh = vi
+        .spyOn(authApi, "refreshSession")
+        .mockRejectedValueOnce(
+          new axios.AxiosError(
+            "Unavailable",
+            failure === "timeout" ? "ECONNABORTED" : "ERR_NETWORK",
+            undefined,
+            undefined,
+            typeof failure === "number"
+              ? ({
+                  status: failure,
+                  data: { error: { code: "permission_denied" } },
+                } as AxiosResponse)
+              : undefined,
+          ),
+        );
       renderWithProviders(
         <Routes>
-          <Route path="/dashboard" element={<ProtectedRoute><div>Protected content</div></ProtectedRoute>} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <div>Protected content</div>
+              </ProtectedRoute>
+            }
+          />
           <Route path="/login" element={<div>Login Page</div>} />
         </Routes>,
         { initialEntries: ["/dashboard?project=keep-me"] },
       );
 
-      expect(await screen.findByRole("alert")).toHaveTextContent("Unable to verify your session");
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Unable to verify your session",
+      );
       expect(screen.queryByText("Login Page")).not.toBeInTheDocument();
       expect(screen.queryByText("Protected content")).not.toBeInTheDocument();
       expect(clear).not.toHaveBeenCalled();
       refresh.mockResolvedValueOnce("new-access");
-      await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
+      await userEvent
+        .setup()
+        .click(screen.getByRole("button", { name: "Retry" }));
       expect(await screen.findByText("Protected content")).toBeInTheDocument();
       expect(refresh).toHaveBeenCalledTimes(2);
     },
@@ -111,13 +136,25 @@ describe("ProtectedRoute Component", () => {
     "redirects to login for DRF 403 authentication failure %s",
     async (code) => {
       vi.spyOn(authStore, "isAuthenticated").mockReturnValue(false);
-      vi.spyOn(authApi, "refreshSession").mockRejectedValue(new axios.AxiosError(
-        "Invalid session", "ERR_BAD_REQUEST", undefined, undefined,
-        { status: 403, data: { error: { code } } } as AxiosResponse,
-      ));
+      vi.spyOn(authApi, "refreshSession").mockRejectedValue(
+        new axios.AxiosError(
+          "Invalid session",
+          "ERR_BAD_REQUEST",
+          undefined,
+          undefined,
+          { status: 403, data: { error: { code } } } as AxiosResponse,
+        ),
+      );
       renderWithProviders(
         <Routes>
-          <Route path="/dashboard" element={<ProtectedRoute><div>Protected content</div></ProtectedRoute>} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <div>Protected content</div>
+              </ProtectedRoute>
+            }
+          />
           <Route path="/login" element={<div>Login Page</div>} />
         </Routes>,
         { initialEntries: ["/dashboard"] },

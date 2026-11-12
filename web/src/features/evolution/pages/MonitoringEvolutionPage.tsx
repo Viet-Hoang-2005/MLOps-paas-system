@@ -171,7 +171,10 @@ export function MonitoringEvolutionPage({
         role="tabpanel"
         className="min-h-80"
         icon={<LineChart className="h-6 w-6 text-color-primary" />}
-        title={t("workspace.noMonitoringJobTitle", "No Drift Monitor Configured")}
+        title={t(
+          "workspace.noMonitoringJobTitle",
+          "No Drift Monitor Configured",
+        )}
         description={t(
           "workspace.noMonitoringJobDesc",
           "There is no drift monitoring job configured for this model version yet.",

@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 
 from apps.training.models import TrainingJobTag
 from apps.training.services.storage_scope import training_prefix_for
+
 from ..auth import (
     _is_job_active_for_mutation,
     _require_auth,
@@ -56,7 +57,10 @@ class MLflowRunsCreateView(APIView):
                 proj_uuid = uuid.UUID(str(exp_id))
                 if (target_job.storage_project_id or target_job.public_id) != proj_uuid:
                     return Response(
-                        {"error_code": "PERMISSION_DENIED", "message": "Capability token cannot create runs in another experiment."},
+                        {
+                            "error_code": "PERMISSION_DENIED",
+                            "message": "Capability token cannot create runs in another experiment.",
+                        },
                         status=status.HTTP_403_FORBIDDEN,
                     )
             except (ValueError, TypeError):
@@ -171,7 +175,9 @@ class MLflowRunsGetView(APIView):
         mlflow_status = current_tracking.get("mlflow_status") or (
             "FINISHED" if job.status == "completed" else "RUNNING" if job.status == "running" else job.status.upper()
         )
-        end_time = current_tracking.get("end_time") or (int(job.completed_at.timestamp() * 1000) if job.completed_at else None)
+        end_time = current_tracking.get("end_time") or (
+            int(job.completed_at.timestamp() * 1000) if job.completed_at else None
+        )
 
         return Response(
             {
@@ -195,4 +201,3 @@ class MLflowRunsGetView(APIView):
                 }
             }
         )
-

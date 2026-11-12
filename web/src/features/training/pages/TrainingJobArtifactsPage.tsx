@@ -589,7 +589,9 @@ export default function TrainingJobArtifactsPage() {
                 {t("detail.artifactPage.sourceCardTitle")}
               </h3>
               {isSourceDirty && (
-                <Badge variant="warning">{t("detail.artifactPage.unsaved")}</Badge>
+                <Badge variant="warning">
+                  {t("detail.artifactPage.unsaved")}
+                </Badge>
               )}
             </div>
             <p className="mt-1 text-style-caption text-color-muted-foreground">
@@ -739,7 +741,11 @@ export default function TrainingJobArtifactsPage() {
               <h3 className="text-style-body-strong font-semibold text-color-foreground">
                 {t("detail.artifactPage.refCardTitle")}
               </h3>
-              {isRefDirty && <Badge variant="warning">{t("detail.artifactPage.unsaved")}</Badge>}
+              {isRefDirty && (
+                <Badge variant="warning">
+                  {t("detail.artifactPage.unsaved")}
+                </Badge>
+              )}
             </div>
             <p className="mt-1 text-style-caption text-color-muted-foreground">
               {t("detail.artifactPage.refCardDesc")}

@@ -64,7 +64,11 @@ class DockerBuildBackend:
             "SOURCE_DOWNLOAD_URL": self.storage.presigned_get(source_uri, 14400),
             "LABEL_MAPPING_DOWNLOAD_URL": label_mapping_url,
             "LABEL_MAPPING_FILENAME": label_mapping_filename,
-            "INPUT_SCHEMA_DOWNLOAD_URL": self.storage.presigned_get(build.input_assets.get(kind="input_schema").s3_uri, 14400) if build.input_assets.filter(kind="input_schema").exists() else "",
+            "INPUT_SCHEMA_DOWNLOAD_URL": self.storage.presigned_get(
+                build.input_assets.get(kind="input_schema").s3_uri, 14400
+            )
+            if build.input_assets.filter(kind="input_schema").exists()
+            else "",
             "OUTPUT_UPLOAD_URL": self.storage.presigned_put(package_uri, 14400),
             "CONTROL_PLANE_WEBHOOK_URL": webhook,
             "CONTROL_PLANE_WEBHOOK_SECRET": settings.CONTROL_PLANE_WEBHOOK_SECRET,
@@ -98,6 +102,7 @@ class DockerTrainingBackend:
     def run(self, job):
         if job.accelerator_type == "gpu":
             from apps.training.services.local_gpu import require_device
+
             require_device(job.local_gpu_id, client=self.docker.client)
         validate_training_uri(job, self.storage.bucket, "code", job.code_snapshot_uri)
         validate_training_uri(job, self.storage.bucket, "data", job.data_snapshot_uri)
@@ -135,16 +140,28 @@ class DockerTrainingBackend:
         options = {}
         if job.input_contract == "workspace":
             from . import workspace_docker
+
             if not workspace_docker.prepare(self.docker.client, job, environment, settings.DOCKER_NETWORK_NAME):
                 return {"dispatched": True, "preparing": True}
-            environment.update(INPUT_CONTRACT="workspace", PREPARED_INPUT_DIR="/prepared/input",
+            environment.update(
+                INPUT_CONTRACT="workspace",
+                PREPARED_INPUT_DIR="/prepared/input",
                 RUNTIME_CONFIG_URL=f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/training-jobs/{job.public_id}/runtime-config/",
-                RUNTIME_CONFIG_CAPABILITY=issue_capability(job, "runtime_config", preserve_existing=True))
+                RUNTIME_CONFIG_CAPABILITY=issue_capability(job, "runtime_config", preserve_existing=True),
+            )
             # Input tokens belong exclusively to the helper.
-            for key in ("S3_SOURCE_URI", "S3_TRAINING_DATA_URI", "S3_INPUT_DOWNLOAD_URL", "S3_INPUT_DOWNLOAD_CAPABILITY"):
+            for key in (
+                "S3_SOURCE_URI",
+                "S3_TRAINING_DATA_URI",
+                "S3_INPUT_DOWNLOAD_URL",
+                "S3_INPUT_DOWNLOAD_CAPABILITY",
+            ):
                 environment.pop(key, None)
-            options = {"volumes": {workspace_docker.names(job)[1]: {"bind": "/prepared", "mode": "ro"}},
-                       "cap_drop": ["ALL"], "security_opt": ["no-new-privileges:true"]}
+            options = {
+                "volumes": {workspace_docker.names(job)[1]: {"bind": "/prepared", "mode": "ro"}},
+                "cap_drop": ["ALL"],
+                "security_opt": ["no-new-privileges:true"],
+            }
 
         container = start(
             self.docker,
@@ -157,16 +174,20 @@ class DockerTrainingBackend:
             nano_cpus=job.vcpu * 1_000_000_000,
             mem_limit=f"{job.memory_mb}m",
             memswap_limit=f"{job.memory_mb}m",
-            device_requests=[docker.types.DeviceRequest(device_ids=[job.local_gpu_id], capabilities=[["gpu"]])] if job.accelerator_type == "gpu" else [],
+            device_requests=[docker.types.DeviceRequest(device_ids=[job.local_gpu_id], capabilities=[["gpu"]])]
+            if job.accelerator_type == "gpu"
+            else [],
             **options,
         )
         return {"dispatched": True, "container_id": container.id}
 
     def poll(self, job):
         from .job_containers import observe
+
         result = observe(self.docker.client, job, "training")
         if job.input_contract == "workspace" and result["status"] == "not_found" and not job.external_job_id:
             from . import workspace_docker
+
             return workspace_docker.observe(self.docker.client, job)
         return result
 
@@ -176,6 +197,7 @@ class DockerTrainingBackend:
         result = remove(self.docker.client, job, "training")
         if job.input_contract == "workspace":
             from . import workspace_docker
+
             workspace_docker.cleanup(self.docker.client, job)
         return result
 
@@ -250,9 +272,13 @@ class DockerDeploymentBackend:
             return False, {"status": "missing"}
         try:
             method = "POST" if deployment.version.flavor in {"pytorch", "tensorflow"} else "GET"
-            response = self.http.request(method, f"{endpoint.internal_url}/health", **({"json": {}} if method == "POST" else {}))
+            response = self.http.request(
+                method, f"{endpoint.internal_url}/health", **({"json": {}} if method == "POST" else {})
+            )
             payload = response.json()
-            healthy = healthy_payload(payload, project_id=deployment.version.project.public_id, version_id=deployment.version.public_id)
+            healthy = healthy_payload(
+                payload, project_id=deployment.version.project.public_id, version_id=deployment.version.public_id
+            )
             return healthy, payload if isinstance(payload, dict) else {"status": "unhealthy"}
         except Exception as exc:
             return False, {"status": "unhealthy", "detail": str(exc)}
@@ -317,8 +343,15 @@ class DockerDriftBackend:
         rows = type(drift_run).objects.filter(pk=drift_run.pk)
         if drift_run.execution_check_token:
             from django.utils import timezone
-            rows = rows.filter(execution_check_token=drift_run.execution_check_token, execution_check_lease_until__gt=timezone.now())
-        rows.update(report_html_uri=drift_run.report_html_uri, report_json_uri=drift_run.report_json_uri, summary_uri=drift_run.summary_uri)
+
+            rows = rows.filter(
+                execution_check_token=drift_run.execution_check_token, execution_check_lease_until__gt=timezone.now()
+            )
+        rows.update(
+            report_html_uri=drift_run.report_html_uri,
+            report_json_uri=drift_run.report_json_uri,
+            summary_uri=drift_run.summary_uri,
+        )
         container = start(
             self.docker,
             drift_run,

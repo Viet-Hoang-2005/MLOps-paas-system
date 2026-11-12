@@ -1,2 +1,1 @@
 """MLflow app test package."""
-

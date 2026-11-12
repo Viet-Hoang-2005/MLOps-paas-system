@@ -49,9 +49,9 @@ export function DriftDistributionModal({
 
   const getCatCategories = () => {
     if (isNumerical) return [];
-    const curX = (column.current?.small_distribution?.x ?? []);
+    const curX = column.current?.small_distribution?.x ?? [];
     const curY = column.current?.small_distribution?.y ?? [];
-    const refX = (column.reference?.small_distribution?.x ?? []);
+    const refX = column.reference?.small_distribution?.x ?? [];
     const refY = column.reference?.small_distribution?.y ?? [];
 
     const allCats = Array.from(new Set([...curX, ...refX].map(String)));
@@ -158,10 +158,14 @@ export function DriftDistributionModal({
                     <span>{cat.category}</span>
                     <div className="flex items-center gap-4 text-style-caption">
                       <span className="text-color-foreground">
-                        {t("reportPage.refShort")}: {formatNumber(cat.refCount, i18n.language)} ({cat.refPct.toFixed(1)}%)
+                        {t("reportPage.refShort")}:{" "}
+                        {formatNumber(cat.refCount, i18n.language)} (
+                        {cat.refPct.toFixed(1)}%)
                       </span>
                       <span className="text-color-foreground">
-                        {t("reportPage.curShort")}: {formatNumber(cat.curCount, i18n.language)} ({cat.curPct.toFixed(1)}%)
+                        {t("reportPage.curShort")}:{" "}
+                        {formatNumber(cat.curCount, i18n.language)} (
+                        {cat.curPct.toFixed(1)}%)
                       </span>
                     </div>
                   </div>
@@ -170,13 +174,17 @@ export function DriftDistributionModal({
                     <div className="h-2 w-full rounded-full bg-surface-muted overflow-hidden">
                       <div
                         className="h-full bg-chart-1 rounded-full transition-all"
-                        style={{ width: `${Math.min(100, Math.max(1, cat.refPct))}%` }}
+                        style={{
+                          width: `${Math.min(100, Math.max(1, cat.refPct))}%`,
+                        }}
                       />
                     </div>
                     <div className="h-2 w-full rounded-full bg-surface-muted overflow-hidden">
                       <div
                         className="h-full bg-chart-2 rounded-full transition-all"
-                        style={{ width: `${Math.min(100, Math.max(1, cat.curPct))}%` }}
+                        style={{
+                          width: `${Math.min(100, Math.max(1, cat.curPct))}%`,
+                        }}
                       />
                     </div>
                   </div>

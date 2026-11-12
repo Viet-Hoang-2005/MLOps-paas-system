@@ -1,20 +1,27 @@
 from celery import shared_task
 from django.db import transaction
 
+from apps.training.services.storage_scope import training_prefix_for
 from common.logging import record_transition
 from infrastructure.execution import polls_runtime_status, training_backend
 from infrastructure.storage import S3Storage
-from apps.training.services.storage_scope import training_prefix_for
 
 
 @shared_task(
-    bind=True, autoretry_for=(ConnectionError, TimeoutError), retry_backoff=True, retry_jitter=True, max_retries=5,
-    soft_time_limit=50, time_limit=55,
+    bind=True,
+    autoretry_for=(ConnectionError, TimeoutError),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=5,
+    soft_time_limit=50,
+    time_limit=55,
 )
 def execute_training_job(self, job_id):
     from django.conf import settings
+
     if settings.TRAINING_EXECUTION_WATCH_ENABLED:
         from apps.observability.services.executions import reconcile
+
         return reconcile("training", job_id)
     from apps.observability.services.lifecycle import record_training_event
 
@@ -22,8 +29,16 @@ def execute_training_job(self, job_id):
     from .services.logs import append_training_log
 
     with transaction.atomic():
-        job = TrainingJob.objects.select_for_update(of=("self",)).select_related("project", "project__owner").get(public_id=job_id)
-        if job.status != "queued" or job.deletion_requested_at or (job.project_id and job.project.deletion_state != "active"):
+        job = (
+            TrainingJob.objects.select_for_update(of=("self",))
+            .select_related("project", "project__owner")
+            .get(public_id=job_id)
+        )
+        if (
+            job.status != "queued"
+            or job.deletion_requested_at
+            or (job.project_id and job.project.deletion_state != "active")
+        ):
             return job.status
         job.mark_started()
         job.celery_task_id = self.request.id or job.celery_task_id
@@ -33,7 +48,11 @@ def execute_training_job(self, job_id):
         record_transition(job, "running")
     append_training_log(job.public_id, "[SYSTEM] Training execution started.")
     with transaction.atomic():
-        job = TrainingJob.objects.select_for_update(of=("self",)).select_related("project", "project__owner").get(pk=job.pk)
+        job = (
+            TrainingJob.objects.select_for_update(of=("self",))
+            .select_related("project", "project__owner")
+            .get(pk=job.pk)
+        )
         if job.status in {"cancelling", "cancelled"} or job.deletion_requested_at:
             should_confirm = job.status == "cancelling"
         else:
@@ -74,6 +93,7 @@ def execute_training_job(self, job_id):
             append_training_log(job.public_id, "[SYSTEM] Waiting for trusted callback.")
         return "running"
     from .services.output_finalization import enqueue_output
+
     enqueue_output(job)
     return "uploading"
 
@@ -81,8 +101,10 @@ def execute_training_job(self, job_id):
 @shared_task(bind=True, max_retries=7200, soft_time_limit=50, time_limit=55)
 def poll_training_job_status(self, job_id):
     from django.conf import settings
+
     if settings.TRAINING_EXECUTION_WATCH_ENABLED:
         from apps.observability.services.executions import reconcile
+
         return reconcile("training", job_id)
     from apps.observability.services.lifecycle import record_training_event
 
@@ -109,6 +131,7 @@ def poll_training_job_status(self, job_id):
 
     if current_status == "completed":
         from .services.output_finalization import enqueue_output
+
         enqueue_output(job)
         raise self.retry(countdown=5)
 
@@ -158,8 +181,10 @@ def poll_training_job_status(self, job_id):
 )
 def cancel_training_job(self, job_id):
     from django.conf import settings
+
     if settings.TRAINING_EXECUTION_WATCH_ENABLED:
         from apps.observability.services.executions import reconcile
+
         return reconcile("training", job_id)
     from .models import TrainingJob
     from .services.logs import append_training_log
@@ -255,6 +280,7 @@ def delete_training_job(self, job_id):
     if job.status in {"pending", "queued", "uploading", "running", "cancelling"}:
         return "waiting-for-cancellation"
     from django.conf import settings
+
     if settings.TRAINING_EXECUTION_WATCH_ENABLED and job.observation_status == "cleanup_pending":
         return "waiting-for-runtime-cleanup"
     if job.builds.filter(status__in=("pending", "queued", "building")).exists():
@@ -310,5 +336,6 @@ def purge_training_job_outputs(self, job_id):
         )
         record_transition(job, job.status, phase="outputs_purged")
     return "purged"
+
 
 from .services.output_finalization import finalize_output  # noqa: F401,E402 - Celery task registration

@@ -6,7 +6,10 @@ import NotFoundPage from "./NotFoundPage";
 
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  const actual =
+    await vi.importActual<typeof import("react-router-dom")>(
+      "react-router-dom",
+    );
   return {
     ...actual,
     useNavigate: () => mockNavigate,
@@ -20,7 +23,9 @@ describe("NotFoundPage Component", () => {
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.getByText("404 Not found")).toBeInTheDocument();
-    expect(screen.getByText("This page or model project does not exist.")).toBeInTheDocument();
+    expect(
+      screen.getByText("This page or model project does not exist."),
+    ).toBeInTheDocument();
 
     const fallbackBtn = screen.getByRole("button", { name: "Model Projects" });
     expect(fallbackBtn).toBeInTheDocument();

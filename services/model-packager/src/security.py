@@ -26,16 +26,42 @@ _PLAIN_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 # Module trees where any CapWords class may be referenced (no functions, no
 # imported modules, no dotted attribute paths).
 ALLOWED_CLASS_MODULES = (
-    "sklearn.base", "sklearn.calibration", "sklearn.cluster", "sklearn.compose",
-    "sklearn.covariance", "sklearn.cross_decomposition", "sklearn.decomposition",
-    "sklearn.discriminant_analysis", "sklearn.dummy", "sklearn.ensemble",
-    "sklearn.feature_extraction", "sklearn.feature_selection", "sklearn.gaussian_process",
-    "sklearn.impute", "sklearn.isotonic", "sklearn.kernel_approximation",
-    "sklearn.kernel_ridge", "sklearn.linear_model", "sklearn.manifold", "sklearn.mixture",
-    "sklearn.model_selection", "sklearn.multiclass", "sklearn.multioutput",
-    "sklearn.naive_bayes", "sklearn.neighbors", "sklearn.neural_network", "sklearn.pipeline",
-    "sklearn.preprocessing", "sklearn.semi_supervised", "sklearn.svm", "sklearn.tree",
-    "sklearn.metrics._scorer", "sklearn.metrics._dist_metrics", "sklearn.utils._bunch", "sklearn._loss", "_loss",
+    "sklearn.base",
+    "sklearn.calibration",
+    "sklearn.cluster",
+    "sklearn.compose",
+    "sklearn.covariance",
+    "sklearn.cross_decomposition",
+    "sklearn.decomposition",
+    "sklearn.discriminant_analysis",
+    "sklearn.dummy",
+    "sklearn.ensemble",
+    "sklearn.feature_extraction",
+    "sklearn.feature_selection",
+    "sklearn.gaussian_process",
+    "sklearn.impute",
+    "sklearn.isotonic",
+    "sklearn.kernel_approximation",
+    "sklearn.kernel_ridge",
+    "sklearn.linear_model",
+    "sklearn.manifold",
+    "sklearn.mixture",
+    "sklearn.model_selection",
+    "sklearn.multiclass",
+    "sklearn.multioutput",
+    "sklearn.naive_bayes",
+    "sklearn.neighbors",
+    "sklearn.neural_network",
+    "sklearn.pipeline",
+    "sklearn.preprocessing",
+    "sklearn.semi_supervised",
+    "sklearn.svm",
+    "sklearn.tree",
+    "sklearn.metrics._scorer",
+    "sklearn.metrics._dist_metrics",
+    "sklearn.utils._bunch",
+    "sklearn._loss",
+    "_loss",
     "xgboost",
     "pandas.core",
     "torch.nn",
@@ -43,29 +69,75 @@ ALLOWED_CLASS_MODULES = (
 
 _NUMPY_NAMES = frozenset(
     {
-        "dtype", "ndarray", "matrix", "float16", "float32", "float64", "int8", "int16",
-        "int32", "int64", "uint8", "uint16", "uint32", "uint64", "bool_", "complex64",
-        "complex128", "object_", "str_",
+        "dtype",
+        "ndarray",
+        "matrix",
+        "float16",
+        "float32",
+        "float64",
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "uint8",
+        "uint16",
+        "uint32",
+        "uint64",
+        "bool_",
+        "complex64",
+        "complex128",
+        "object_",
+        "str_",
     }
 )
 _NUMPY_INTERNALS = frozenset({"_reconstruct", "scalar", "_frombuffer", "_mareconstruct"})
 _TORCH_DTYPES = frozenset(
     {
-        "float16", "float32", "float64", "bfloat16", "int8", "int16", "int32", "int64",
-        "uint8", "bool", "complex64", "complex128",
+        "float16",
+        "float32",
+        "float64",
+        "bfloat16",
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "uint8",
+        "bool",
+        "complex64",
+        "complex128",
     }
 )
 _TORCH_STORAGES = frozenset(
     {
-        "FloatStorage", "DoubleStorage", "HalfStorage", "BFloat16Storage", "LongStorage",
-        "IntStorage", "ShortStorage", "CharStorage", "ByteStorage", "BoolStorage",
+        "FloatStorage",
+        "DoubleStorage",
+        "HalfStorage",
+        "BFloat16Storage",
+        "LongStorage",
+        "IntStorage",
+        "ShortStorage",
+        "CharStorage",
+        "ByteStorage",
+        "BoolStorage",
     }
 )
 
 _TORCH_ACTIVATIONS = frozenset(
     {
-        "relu", "relu6", "gelu", "silu", "elu", "selu", "leaky_relu", "sigmoid", "tanh",
-        "softmax", "log_softmax", "softplus", "hardtanh", "mish",
+        "relu",
+        "relu6",
+        "gelu",
+        "silu",
+        "elu",
+        "selu",
+        "leaky_relu",
+        "sigmoid",
+        "tanh",
+        "softmax",
+        "log_softmax",
+        "softplus",
+        "hardtanh",
+        "mish",
     }
 )
 
@@ -73,8 +145,21 @@ _TORCH_ACTIVATIONS = frozenset(
 ALLOWED_GLOBALS: dict[str, frozenset[str]] = {
     "builtins": frozenset(
         {
-            "set", "frozenset", "list", "dict", "tuple", "int", "float", "complex", "str",
-            "bytes", "bytearray", "bool", "slice", "range", "object",
+            "set",
+            "frozenset",
+            "list",
+            "dict",
+            "tuple",
+            "int",
+            "float",
+            "complex",
+            "str",
+            "bytes",
+            "bytearray",
+            "bool",
+            "slice",
+            "range",
+            "object",
         }
     ),
     "collections": frozenset({"OrderedDict", "defaultdict", "deque", "Counter"}),
@@ -91,9 +176,7 @@ ALLOWED_GLOBALS: dict[str, frozenset[str]] = {
     "numpy.core.numeric": _NUMPY_INTERNALS,
     "numpy._core.numeric": _NUMPY_INTERNALS,
     "numpy.ma.core": frozenset({"_mareconstruct", "MaskedArray"}),
-    "numpy.random._pickle": frozenset(
-        {"__randomstate_ctor", "__bit_generator_ctor", "__generator_ctor"}
-    ),
+    "numpy.random._pickle": frozenset({"__randomstate_ctor", "__bit_generator_ctor", "__generator_ctor"}),
     "numpy.random.mtrand": frozenset({"RandomState"}),
     "numpy.random._mt19937": frozenset({"MT19937"}),
     "numpy.random._pcg64": frozenset({"PCG64", "PCG64DXSM"}),
@@ -116,9 +199,7 @@ ALLOWED_GLOBALS: dict[str, frozenset[str]] = {
     "sklearn.neighbors._ball_tree": frozenset({"newObj"}),
     "sklearn.metrics._dist_metrics": frozenset({"newObj"}),
     "sklearn.compose._column_transformer": frozenset({"make_column_selector"}),
-    "sklearn.feature_selection._univariate_selection": frozenset(
-        {"f_classif", "f_regression", "chi2", "f_oneway"}
-    ),
+    "sklearn.feature_selection._univariate_selection": frozenset({"f_classif", "f_regression", "chi2", "f_oneway"}),
     "sklearn.feature_selection._mutual_info": frozenset({"mutual_info_classif", "mutual_info_regression"}),
 }
 
@@ -190,9 +271,7 @@ def validate_safe_requirements(requirements_text: str) -> None:
         )
         for prefix in disallowed_prefixes:
             if lower_line.startswith(prefix):
-                raise PackageSecurityError(
-                    f"Disallowed pip option in requirements: '{line}'"
-                )
+                raise PackageSecurityError(f"Disallowed pip option in requirements: '{line}'")
 
         # Check for remote URL protocols or local paths
         disallowed_schemes = (
@@ -205,29 +284,21 @@ def validate_safe_requirements(requirements_text: str) -> None:
             "file://",
         )
         if any(scheme in lower_line for scheme in disallowed_schemes):
-            raise PackageSecurityError(
-                f"URL and VCS dependencies are not allowed in requirements: '{line}'"
-            )
+            raise PackageSecurityError(f"URL and VCS dependencies are not allowed in requirements: '{line}'")
 
         # Check for path traversal or local file references
         if line.startswith((".", "/", "\\")) or ".." in line:
-            raise PackageSecurityError(
-                f"Local path references are not allowed in requirements: '{line}'"
-            )
+            raise PackageSecurityError(f"Local path references are not allowed in requirements: '{line}'")
 
         # Check for command injection shell characters
         if any(char in line for char in (";", "&", "|", "`", "$")):
-            raise PackageSecurityError(
-                f"Invalid characters detected in requirement: '{line}'"
-            )
+            raise PackageSecurityError(f"Invalid characters detected in requirement: '{line}'")
 
         # Check against standard package specification pattern
         # Strip comments at end of line if present
         clean_spec = line.split("#", 1)[0].strip()
         if not SAFE_REQUIREMENT_LINE_REGEX.match(clean_spec):
-            raise PackageSecurityError(
-                f"Suspicious requirement specification: '{line}'"
-            )
+            raise PackageSecurityError(f"Suspicious requirement specification: '{line}'")
 
 
 _STRING_OPS = frozenset(
@@ -387,12 +458,12 @@ def _walk_pickle(data: bytes, source_name: str, single_pickle: bool = False) -> 
             if pickletools.markobject in before:
                 if not marks:
                     raise _MalformedPickle
-                del stack[marks.pop():]
+                del stack[marks.pop() :]
                 below = before.index(pickletools.markobject)
                 if below:
                     del stack[-below:]
             elif before:
-                del stack[-len(before):]
+                del stack[-len(before) :]
             stack.extend(_UNKNOWN for _ in op.stack_after)
     except PackageSecurityError:
         raise
@@ -508,9 +579,29 @@ def _is_torch_suffix(name: str) -> bool:
 # model.pkl to weights.dat does not skip the scan.
 SAFE_MEMBER_SUFFIXES = frozenset(
     {
-        ".json", ".yaml", ".yml", ".txt", ".md", ".csv", ".npy", ".npz", ".safetensors", ".onnx",
-        ".pb", ".pbtxt", ".h5", ".keras", ".xgb", ".ubj", ".index", ".lock", ".cfg", ".ini",
-        ".toml", ".tflite", ".proto",
+        ".json",
+        ".yaml",
+        ".yml",
+        ".txt",
+        ".md",
+        ".csv",
+        ".npy",
+        ".npz",
+        ".safetensors",
+        ".onnx",
+        ".pb",
+        ".pbtxt",
+        ".h5",
+        ".keras",
+        ".xgb",
+        ".ubj",
+        ".index",
+        ".lock",
+        ".cfg",
+        ".ini",
+        ".toml",
+        ".tflite",
+        ".proto",
     }
 )
 MAX_SNIFFED_MEMBER_BYTES = 256 * 1024 * 1024
@@ -574,9 +665,7 @@ def validate_archive_structure(
         with zipfile.ZipFile(archive_path, "r") as archive:
             members = archive.infolist()
             if len(members) > max_files:
-                raise PackageSecurityError(
-                    f"Archive exceeds maximum file count limit ({len(members)} > {max_files})"
-                )
+                raise PackageSecurityError(f"Archive exceeds maximum file count limit ({len(members)} > {max_files})")
 
             total_size = sum(m.file_size for m in members)
             if total_size > max_uncompressed_bytes:
@@ -588,9 +677,7 @@ def validate_archive_structure(
                 # Disallow symbolic links (UNIX mode 0o120000)
                 is_symlink = (member.external_attr >> 16) & 0o170000 == 0o120000
                 if is_symlink:
-                    raise PackageSecurityError(
-                        f"Archive contains unsupported symbolic link: {member.filename}"
-                    )
+                    raise PackageSecurityError(f"Archive contains unsupported symbolic link: {member.filename}")
 
                 # Check path traversal
                 filename = member.filename
@@ -600,9 +687,7 @@ def validate_archive_structure(
                     or ":\\" in filename
                     or ".." in Path(filename).parts
                 ):
-                    raise PackageSecurityError(
-                        f"Archive contains unsafe path traversal: {member.filename}"
-                    )
+                    raise PackageSecurityError(f"Archive contains unsafe path traversal: {member.filename}")
 
                 # Check compression ratio for zip bomb defense
                 if member.compress_size > 0:
@@ -616,9 +701,7 @@ def validate_archive_structure(
         with tarfile.open(archive_path, "r:*") as archive:
             members = archive.getmembers()
             if len(members) > max_files:
-                raise PackageSecurityError(
-                    f"Archive exceeds maximum file count limit ({len(members)} > {max_files})"
-                )
+                raise PackageSecurityError(f"Archive exceeds maximum file count limit ({len(members)} > {max_files})")
 
             total_size = sum(m.size for m in members)
             if total_size > max_uncompressed_bytes:
@@ -628,19 +711,10 @@ def validate_archive_structure(
 
             for member in members:
                 if member.islnk() or member.issym():
-                    raise PackageSecurityError(
-                        f"Archive contains unsupported link: {member.name}"
-                    )
+                    raise PackageSecurityError(f"Archive contains unsupported link: {member.name}")
                 name = member.name
-                if (
-                    name.startswith(("/", "\\"))
-                    or ":/" in name
-                    or ":\\" in name
-                    or ".." in Path(name).parts
-                ):
-                    raise PackageSecurityError(
-                        f"Archive contains unsafe path traversal: {member.name}"
-                    )
+                if name.startswith(("/", "\\")) or ":/" in name or ":\\" in name or ".." in Path(name).parts:
+                    raise PackageSecurityError(f"Archive contains unsafe path traversal: {member.name}")
 
 
 def validate_no_dangerous_binaries(directory: Path) -> None:
@@ -651,9 +725,7 @@ def validate_no_dangerous_binaries(directory: Path) -> None:
     for item in directory.rglob("*"):
         if item.is_file():
             if item.suffix.lower() in DANGEROUS_FILE_EXTENSIONS:
-                raise PackageSecurityError(
-                    f"Prohibited executable or script binary detected: {item.name}"
-                )
+                raise PackageSecurityError(f"Prohibited executable or script binary detected: {item.name}")
 
 
 def validate_model_package_security(
@@ -670,9 +742,7 @@ def validate_model_package_security(
                     name = member.filename
                     suffix = Path(name).suffix.lower()
                     if suffix in DANGEROUS_FILE_EXTENSIONS:
-                        raise PackageSecurityError(
-                            f"Prohibited executable or script detected in archive: {name}"
-                        )
+                        raise PackageSecurityError(f"Prohibited executable or script detected in archive: {name}")
                     if not member.is_dir():
                         _scan_archive_member(
                             name,
@@ -698,9 +768,7 @@ def validate_model_package_security(
                     name = member.name
                     suffix = Path(name).suffix.lower()
                     if suffix in DANGEROUS_FILE_EXTENSIONS:
-                        raise PackageSecurityError(
-                            f"Prohibited executable or script detected in archive: {name}"
-                        )
+                        raise PackageSecurityError(f"Prohibited executable or script detected in archive: {name}")
                     if member.isreg():
                         extracted = archive.extractfile(member)
                         if extracted:

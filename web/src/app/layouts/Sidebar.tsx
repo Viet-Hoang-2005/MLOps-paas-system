@@ -110,9 +110,12 @@ export default function Sidebar({
 
   const modelItems = sectionItems.map((item) => ({
     ...item,
-    to: item.section === "training" ? "/dashboard/training" : selectedModel
-      ? `/dashboard/projects/${selectedModel.id}/${item.section}`
-      : `/dashboard/${item.section}`,
+    to:
+      item.section === "training"
+        ? "/dashboard/training"
+        : selectedModel
+          ? `/dashboard/projects/${selectedModel.id}/${item.section}`
+          : `/dashboard/${item.section}`,
   }));
 
   const systemItems = utilityItems;
@@ -171,7 +174,9 @@ export default function Sidebar({
         to={item.to}
         onClick={handleCloseAll}
         className={itemClass(active)}
-        title={!narrowExpanded || collapsed ? t(`navigation.${item.key}`) : undefined}
+        title={
+          !narrowExpanded || collapsed ? t(`navigation.${item.key}`) : undefined
+        }
       >
         <Icon className={cn("h-5 w-5 shrink-0", iconClassName)} />
         <span className={labelClass}>{t(`navigation.${item.key}`)}</span>
@@ -256,7 +261,10 @@ export default function Sidebar({
             onClick={handleToggle}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-surface text-color-muted-foreground hover:bg-muted hover:text-color-foreground"
             aria-label={
-              narrowExpanded || (!collapsed && typeof window !== "undefined" && window.innerWidth >= 1280)
+              narrowExpanded ||
+              (!collapsed &&
+                typeof window !== "undefined" &&
+                window.innerWidth >= 1280)
                 ? t("actions.collapseSidebar")
                 : t("actions.expandSidebar")
             }
@@ -322,10 +330,10 @@ export default function Sidebar({
             </button>
           </div>
 
-          {((narrowExpanded ? modelGroupOpen : true) &&
-            (collapsed ? true : modelGroupOpen)) && (
-            <div className="space-y-1">{modelItems.map(renderItem)}</div>
-          )}
+          {(narrowExpanded ? modelGroupOpen : true) &&
+            (collapsed ? true : modelGroupOpen) && (
+              <div className="space-y-1">{modelItems.map(renderItem)}</div>
+            )}
 
           <div
             className={cn(
@@ -378,10 +386,10 @@ export default function Sidebar({
             </button>
           </div>
 
-          {((narrowExpanded ? systemGroupOpen : true) &&
-            (collapsed ? true : systemGroupOpen)) && (
-            <div className="space-y-1">{systemItems.map(renderItem)}</div>
-          )}
+          {(narrowExpanded ? systemGroupOpen : true) &&
+            (collapsed ? true : systemGroupOpen) && (
+              <div className="space-y-1">{systemItems.map(renderItem)}</div>
+            )}
 
           <div className="mt-auto pt-3 border-t border-border">
             <button
@@ -396,7 +404,9 @@ export default function Sidebar({
                   ? "xl:justify-center xl:px-0"
                   : "xl:justify-start xl:px-3",
               )}
-              title={!narrowExpanded || collapsed ? t("actions.logout") : undefined}
+              title={
+                !narrowExpanded || collapsed ? t("actions.logout") : undefined
+              }
             >
               <LogOut className="h-5 w-5 shrink-0" />
               <span className={labelClass}>{t("actions.logout")}</span>

@@ -1,12 +1,14 @@
-from django.utils import timezone
 from types import SimpleNamespace
+
 import pytest
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+
 from apps.catalog.models import ModelProject
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
 from apps.training.models import TrainingJob, TrainingOutput
-from apps.training.services.storage_scope import expected_training_uris
 from apps.training.services.storage_migration import migrate_job_storage
+from apps.training.services.storage_scope import expected_training_uris
 
 
 class CopyStorage(MemoryStorage):
@@ -16,7 +18,11 @@ class CopyStorage(MemoryStorage):
         self.fail_copy = False
 
     def paginate(self, Bucket, Prefix):
-        yield {"Contents": [{"Key": uri.split("/", 3)[3]} for uri in list(self.objects) if uri.startswith(f"s3://{Bucket}/{Prefix}")]}
+        yield {
+            "Contents": [
+                {"Key": uri.split("/", 3)[3]} for uri in list(self.objects) if uri.startswith(f"s3://{Bucket}/{Prefix}")
+            ]
+        }
 
     def copy(self, *args, **kwargs):
         if self.fail_copy:
@@ -28,7 +34,16 @@ class CopyStorage(MemoryStorage):
 def test_storage_copy_verifies_before_switching_and_resumes():
     user = get_user_model().objects.create_user("copy-owner@example.test", "test-password")
     project = ModelProject.objects.create(owner=user, name="Copy", deletion_state="deleting", is_active=False)
-    job = TrainingJob(project=project, model_flavor="sklearn", status="completed", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+    job = TrainingJob(
+        project=project,
+        model_flavor="sklearn",
+        status="completed",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
     storage = CopyStorage()
     uris = expected_training_uris(job, storage.bucket)
     job.code_snapshot_uri, job.data_snapshot_uri, job.output_uri, job.mlflow_artifact_uri = uris.values()

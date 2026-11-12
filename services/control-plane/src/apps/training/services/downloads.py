@@ -1,4 +1,5 @@
 """Authorized file/folder downloads without persisting derived archives in S3."""
+
 import hashlib
 import mimetypes
 import stat
@@ -10,6 +11,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 
 from common.api.exceptions import Conflict
 from infrastructure.storage import S3Storage
+
 from .storage_scope import training_prefix_for, validate_training_uri
 from .workspaces import MAX_WORKSPACE_SNAPSHOT, safe_path
 
@@ -60,7 +62,7 @@ def _filename(path, area, single):
 
 def _archive_name(name, path):
     # Keep the selected folder as the ZIP root, without unrelated parent folders.
-    return name[len(path.rpartition('/')[0]) + 1:] if path and "/" in path else name
+    return name[len(path.rpartition("/")[0]) + 1 :] if path and "/" in path else name
 
 
 def _result(stream, filename):
@@ -89,7 +91,11 @@ def _snapshot(job, storage, path):
             for item in infos:
                 name = safe_path(item.filename.rstrip("/"))
                 mode = stat.S_IFMT(item.external_attr >> 16)
-                if name in names or mode not in {0, stat.S_IFDIR if item.is_dir() else stat.S_IFREG} or item.flag_bits & 1:
+                if (
+                    name in names
+                    or mode not in {0, stat.S_IFDIR if item.is_dir() else stat.S_IFREG}
+                    or item.flag_bits & 1
+                ):
                     raise ValidationError("Input snapshot contains invalid entries.")
                 names.add(name)
                 if not item.is_dir():
@@ -107,7 +113,9 @@ def _snapshot(job, storage, path):
                         with archive.open(files[name]) as source, bundle.open(_archive_name(name, path), "w") as target:
                             _copy(source, target, files[name].file_size)
                     for item in infos:
-                        if item.is_dir() and (item.filename.rstrip("/") == path or item.filename.startswith(path + "/")):
+                        if item.is_dir() and (
+                            item.filename.rstrip("/") == path or item.filename.startswith(path + "/")
+                        ):
                             bundle.writestr(_archive_name(item.filename, path), b"")
             return _result(result, _filename(path, "input", single))
     except Exception as exc:
@@ -138,6 +146,7 @@ def workspace_download(job, *, area, path=None, revision=None, storage=None):
         if job.outputs_purged_at:
             raise Conflict("Training outputs have been purged.")
         from .output_index import public_outputs
+
         entries = list(public_outputs(job))
         files = {entry.relative_path: entry for entry in entries}
         prefix = training_prefix_for(job) + "/"
@@ -173,7 +182,9 @@ def workspace_download(job, *, area, path=None, revision=None, storage=None):
                         copy_file(name, target)
                 if area == "input":
                     for entry in entries:
-                        if entry.kind == "folder" and (path is None or entry.relative_path == path or entry.relative_path.startswith(path + "/")):
+                        if entry.kind == "folder" and (
+                            path is None or entry.relative_path == path or entry.relative_path.startswith(path + "/")
+                        ):
                             safe_path(entry.relative_path)
                             archive.writestr(_archive_name(entry.relative_path + "/", path), b"")
         if area == "input" and not type(job).objects.filter(pk=job.pk, revision=job.revision).exists():

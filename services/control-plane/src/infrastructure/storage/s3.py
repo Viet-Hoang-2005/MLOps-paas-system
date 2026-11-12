@@ -146,26 +146,36 @@ class S3Storage:
 
         options = {"CopySourceIfMatch": expected_etag} if expected_etag else {}
         if size_bytes > 5 * 1024**3:
-            upload = self.client.create_multipart_upload(Bucket=self.bucket, Key=destination_key,
-                Metadata={"sha256": checksum}, ContentType=content_type)
+            upload = self.client.create_multipart_upload(
+                Bucket=self.bucket, Key=destination_key, Metadata={"sha256": checksum}, ContentType=content_type
+            )
             upload_id = upload["UploadId"]
             try:
                 parts = []
                 chunk_size = 128 * 1024**2
                 for index, start in enumerate(range(0, size_bytes, chunk_size), start=1):
-                    copied = self.client.upload_part_copy(Bucket=self.bucket, Key=destination_key, UploadId=upload_id,
-                        PartNumber=index, CopySource={"Bucket": source_bucket, "Key": source_key},
-                        CopySourceRange=f"bytes={start}-{min(size_bytes - 1, start + chunk_size - 1)}", **options)
+                    copied = self.client.upload_part_copy(
+                        Bucket=self.bucket,
+                        Key=destination_key,
+                        UploadId=upload_id,
+                        PartNumber=index,
+                        CopySource={"Bucket": source_bucket, "Key": source_key},
+                        CopySourceRange=f"bytes={start}-{min(size_bytes - 1, start + chunk_size - 1)}",
+                        **options,
+                    )
                     parts.append({"PartNumber": index, "ETag": copied["CopyPartResult"]["ETag"]})
-                self.client.complete_multipart_upload(Bucket=self.bucket, Key=destination_key, UploadId=upload_id,
-                    MultipartUpload={"Parts": parts})
+                self.client.complete_multipart_upload(
+                    Bucket=self.bucket, Key=destination_key, UploadId=upload_id, MultipartUpload={"Parts": parts}
+                )
             except Exception:
                 try:
                     self.client.abort_multipart_upload(Bucket=self.bucket, Key=destination_key, UploadId=upload_id)
                 except Exception:
                     pass
                 raise
-            return StoredObject(destination_key, f"s3://{self.bucket}/{destination_key}", checksum, size_bytes, content_type)
+            return StoredObject(
+                destination_key, f"s3://{self.bucket}/{destination_key}", checksum, size_bytes, content_type
+            )
         self.client.copy_object(
             Bucket=self.bucket,
             Key=destination_key,

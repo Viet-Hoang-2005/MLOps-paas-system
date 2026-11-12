@@ -66,8 +66,7 @@ export function Switch<T extends string | number>({
                     ? "rounded-r-control -ml-px"
                     : "-ml-px",
                 fullWidth && "flex-1",
-                disabled &&
-                  "cursor-not-allowed opacity-60 pointer-events-none",
+                disabled && "cursor-not-allowed opacity-60 pointer-events-none",
               )}
             >
               {option.title}

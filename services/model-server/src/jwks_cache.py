@@ -104,4 +104,3 @@ class JwksKeyCache:
         now = time.monotonic()
         self._evict_expired(now)
         return len(self._entries)
-

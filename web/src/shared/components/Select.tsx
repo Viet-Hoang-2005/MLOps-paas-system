@@ -53,7 +53,9 @@ export function Select({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          aria-label={ariaLabel || (typeof label === "string" ? label : undefined)}
+          aria-label={
+            ariaLabel || (typeof label === "string" ? label : undefined)
+          }
           className={cn(
             "flex h-12 w-full items-center justify-between gap-3 rounded-surface border bg-surface px-4 text-left text-style-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20",
             open ? "border-ring" : "border-input hover:border-input-hover",

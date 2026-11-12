@@ -4,19 +4,20 @@ import logging
 import re
 import tempfile
 import uuid
-from rest_framework.exceptions import ValidationError
 
 from django.conf import settings
 from django.http import StreamingHttpResponse
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import BaseParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.catalog.models import ModelProject
 from apps.training.models import TrainingJob, TrainingOutput
-from infrastructure.storage import S3Storage
 from apps.training.services.storage_scope import training_prefix_for
+from infrastructure.storage import S3Storage
+
 from ..auth import (
     _is_job_active_for_mutation,
     _is_project_allowed_for_api_key,
@@ -31,7 +32,9 @@ logger = logging.getLogger(__name__)
 def _safe_relative(path):
     if "_mlops" in str(path).replace("\\", "/").split("/"):
         raise ValidationError("System artifacts are not publicly accessible.")
-    if path and ("\\" in path or any(part in {"", ".", ".."} for part in path.split("/")) or any(ord(c) < 32 for c in path)):
+    if path and (
+        "\\" in path or any(part in {"", ".", ".."} for part in path.split("/")) or any(ord(c) < 32 for c in path)
+    ):
         raise ValidationError("Unsafe artifact path.")
     return path
 
@@ -112,7 +115,10 @@ class MLflowArtifactsUploadUrlView(APIView):
         artifact_path = request.data.get("path", "").strip().lstrip("/")
         _safe_relative(artifact_path)
         if not artifact_path:
-            return Response({"error_code": "INVALID_PARAMETER_VALUE", "message": "Path is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error_code": "INVALID_PARAMETER_VALUE", "message": "Path is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         job, err_job = _resolve_target_job(job_from_auth, run_id, tenant_id, api_key=api_key, for_mutation=True)
         if err_job:
@@ -161,7 +167,10 @@ class MLflowArtifactsProxyView(APIView):
 
         if not path_tenant_id or not path_job_id:
             return Response(
-                {"error_code": "INVALID_PARAMETER_VALUE", "message": "Artifact upload requires a job-scoped path with a valid job ID."},
+                {
+                    "error_code": "INVALID_PARAMETER_VALUE",
+                    "message": "Artifact upload requires a job-scoped path with a valid job ID.",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -281,7 +290,11 @@ class MLflowArtifactsProxyView(APIView):
                 size_bytes=size_bytes,
             )
 
-        kind = "model" if rel_path.startswith("model") or rel_path.endswith((".pkl", ".pt", ".onnx", ".bin", ".h5")) else "file"
+        kind = (
+            "model"
+            if rel_path.startswith("model") or rel_path.endswith((".pkl", ".pt", ".onnx", ".bin", ".h5"))
+            else "file"
+        )
 
         TrainingOutput.objects.update_or_create(
             job=job,
@@ -309,7 +322,10 @@ class MLflowArtifactsProxyView(APIView):
 
         if not path_tenant_id or (not path_project_id and not path_job_id):
             return Response(
-                {"error_code": "INVALID_PARAMETER_VALUE", "message": "Artifact URI must use the project-scoped or job-scoped MLflow path."},
+                {
+                    "error_code": "INVALID_PARAMETER_VALUE",
+                    "message": "Artifact URI must use the project-scoped or job-scoped MLflow path.",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -339,7 +355,10 @@ class MLflowArtifactsProxyView(APIView):
 
             if job_from_auth and job_from_auth.project_id != target_project.id:
                 return Response(
-                    {"error_code": "PERMISSION_DENIED", "message": "Capability token is only authorized for its assigned project."},
+                    {
+                        "error_code": "PERMISSION_DENIED",
+                        "message": "Capability token is only authorized for its assigned project.",
+                    },
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
@@ -485,7 +504,7 @@ class MLflowArtifactsProxyView(APIView):
         outputs = TrainingOutput.objects.filter(job=job, relative_path__startswith=prefix)
         items = {}
         for out in outputs:
-            sub = out.relative_path[len(prefix):]
+            sub = out.relative_path[len(prefix) :]
             if not sub:
                 continue
             parts = sub.split("/", 1)
@@ -511,7 +530,10 @@ class MLflowArtifactsProxyView(APIView):
 
         if not path_tenant_id or not path_job_id:
             return Response(
-                {"error_code": "INVALID_PARAMETER_VALUE", "message": "Artifact deletion requires a job-scoped path with a valid job ID."},
+                {
+                    "error_code": "INVALID_PARAMETER_VALUE",
+                    "message": "Artifact deletion requires a job-scoped path with a valid job ID.",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -610,7 +632,7 @@ class MLflowArtifactsListView(APIView):
         outputs = TrainingOutput.objects.filter(job=job, relative_path__startswith=prefix)
         items = {}
         for out in outputs:
-            sub = out.relative_path[len(prefix):]
+            sub = out.relative_path[len(prefix) :]
             if not sub:
                 continue
             parts = sub.split("/", 1)
@@ -657,4 +679,3 @@ class MLflowArtifactsMultipartFallbackView(APIView):
 
     def delete(self, request, subpath=""):
         return self._fallback()
-

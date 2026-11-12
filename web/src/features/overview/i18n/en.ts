@@ -153,7 +153,8 @@ export const overviewEn = {
     labelMappingHint: "Upload a JSON file mapping class indices to labels.",
     inputSchemaHint: "Upload a JSON Schema defining expected model inputs.",
     insightsHint: "Upload a JSON file containing model insights.",
-    featureImportanceHint: "Upload a JSON file containing feature importance scores.",
+    featureImportanceHint:
+      "Upload a JSON file containing feature importance scores.",
     removeAttributeConfirmTitle: "Remove {{name}}?",
     removeAttributeConfirmDesc:
       "Are you sure you want to remove {{name}} from this preview model? You can upload a new one at any time.",
@@ -169,7 +170,8 @@ export const overviewEn = {
     invalidJsonFile: "File must be a valid JSON format.",
     invalidLabelMappingFile: "File must be a valid JSON format.",
     noAttributesPlaceholder: "No attributes configured",
-    noAttributesHint: "Upload configuration attributes below to enrich your model.",
+    noAttributesHint:
+      "Upload configuration attributes below to enrich your model.",
     copySchema: "Copy JSON Schema",
     schemaCopied: "Schema copied to clipboard.",
     featureRank: "Rank",

@@ -24,16 +24,25 @@ def validate_resources(values, instance=None, *, local_capacity=None):
     choices = CPU_PROFILES
     if settings.TRAINING_BACKEND == "docker" and not submitted:
         from apps.training.services.local_resources import require_capacity
+
         local_capacity = local_capacity or require_capacity()
         choices = [(item["vcpu"], item["memory_mb"]) for item in local_capacity["cpu_profiles"]]
         if instance is None and "vcpu" not in values and "memory_mb" not in values:
-            default = next((item for item in local_capacity["cpu_profiles"] if item["id"] == "medium"), local_capacity["cpu_profiles"][0])
+            default = next(
+                (item for item in local_capacity["cpu_profiles"] if item["id"] == "medium"),
+                local_capacity["cpu_profiles"][0],
+            )
             values["vcpu"], values["memory_mb"] = default["vcpu"], default["memory_mb"]
-    if not (submitted and settings.TRAINING_BACKEND == "docker") and (value("vcpu", 2), value("memory_mb", 4096)) not in choices:
+    if (
+        not (submitted and settings.TRAINING_BACKEND == "docker")
+        and (value("vcpu", 2), value("memory_mb", 4096)) not in choices
+    ):
         errors["vcpu"] = "Select a supported CPU/memory profile."
         errors["memory_mb"] = "Select a supported CPU/memory profile."
     runtime = value("max_runtime_seconds", 3600)
-    invalid_submitted = submitted and ((runtime is None or runtime <= 0) or (instance.backend == "argo" and runtime > 86400))
+    invalid_submitted = submitted and (
+        (runtime is None or runtime <= 0) or (instance.backend == "argo" and runtime > 86400)
+    )
     if invalid_submitted or ((not submitted or "max_runtime_seconds" in values) and runtime not in runtime_options()):
         errors["max_runtime_seconds"] = "Select a supported maximum runtime."
     kind, count = value("accelerator_type", "none"), value("accelerator_count", 0)
@@ -59,10 +68,12 @@ def validate_resources(values, instance=None, *, local_capacity=None):
             errors["accelerator_model"] = "Local GPU training does not select a GPU model."
         if settings.TRAINING_BACKEND == "docker":
             from apps.training.services.local_gpu import GPU_UUID
+
             if not GPU_UUID.fullmatch(local_gpu_id or ""):
                 errors["local_gpu_id"] = (
                     "This GPU job has no selected device; create a new training job."
-                    if instance and not local_gpu_id else "Select an available NVIDIA GPU."
+                    if instance and not local_gpu_id
+                    else "Select an available NVIDIA GPU."
                 )
     if errors:
         raise ValidationError(errors)

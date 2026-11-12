@@ -212,13 +212,13 @@ export const deploymentsVi = {
       choosePackage: "Chọn gói ZIP mô hình",
       packageHint:
         "Tải lên một gói .zip chứa đầy đủ artifact mô hình (tối đa {{maxSize}})",
-      allowedFiles: "Tệp {{flavor}} được phép: {{extensions}} (tối đa {{maxSize}})",
+      allowedFiles:
+        "Tệp {{flavor}} được phép: {{extensions}} (tối đa {{maxSize}})",
       artifactTooLarge:
         "Tệp artifact mô hình vượt quá kích thước cho phép tối đa {{max}}.",
       artifactRemovedExceedsLimit:
         "Đã gỡ artifact mô hình đã chọn do vượt quá giới hạn {{max}} của framework mới.",
-      jsonTooLarge:
-        "Tệp đính kèm vượt quá kích thước cho phép tối đa {{max}}.",
+      jsonTooLarge: "Tệp đính kèm vượt quá kích thước cho phép tối đa {{max}}.",
       jsonFormatError: "Tệp đính kèm phải là tệp .json.",
       packageLayout: "Cấu trúc gói {{flavor}} yêu cầu",
       packageLayoutHint:

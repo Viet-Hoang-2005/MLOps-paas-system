@@ -4,10 +4,22 @@ import { formatDateTime } from "@/shared/i18n/formatters";
 import { formatQuotaDuration } from "./quotaFormatting";
 import { getApiErrorMessage } from "@/shared/api/errors";
 
-export function getTrainingStartError(error: unknown, t: TFunction<"training">, language: string): string {
-  const body = axios.isAxiosError(error) ? error.response?.data as { error?: { code?: string; detail?: Record<string, string> } } : undefined;
-  if (body?.error?.code === "training_concurrency_exceeded") return t("quotaConcurrencyError");
-  if (body?.error?.code === "local_training_capacity_exceeded" && body.error.detail) {
+export function getTrainingStartError(
+  error: unknown,
+  t: TFunction<"training">,
+  language: string,
+): string {
+  const body = axios.isAxiosError(error)
+    ? (error.response?.data as {
+        error?: { code?: string; detail?: Record<string, string> };
+      })
+    : undefined;
+  if (body?.error?.code === "training_concurrency_exceeded")
+    return t("quotaConcurrencyError");
+  if (
+    body?.error?.code === "local_training_capacity_exceeded" &&
+    body.error.detail
+  ) {
     return t("createFlow.execution.localResourceExceeded", {
       cpu: body.error.detail.available_vcpu,
       memory: body.error.detail.available_memory_mb,
@@ -22,5 +34,8 @@ export function getTrainingStartError(error: unknown, t: TFunction<"training">, 
       reset: formatDateTime(detail.reset_at, language),
     });
   }
-  return getApiErrorMessage(error, t("createFlow.messages.trainingStartFailed"));
+  return getApiErrorMessage(
+    error,
+    t("createFlow.messages.trainingStartFailed"),
+  );
 }

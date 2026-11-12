@@ -138,11 +138,7 @@ export function ModelProjectTable({
                   ? "success"
                   : "neutral";
 
-          return (
-            <Badge variant={variant}>
-              {t(`workflow.${statusKey}`)}
-            </Badge>
-          );
+          return <Badge variant={variant}>{t(`workflow.${statusKey}`)}</Badge>;
         },
       },
       {

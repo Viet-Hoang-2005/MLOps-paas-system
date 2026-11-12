@@ -3,6 +3,7 @@ import time
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+
 from src import auth as auth_service
 from src.jwks_cache import JwksKeyCache
 
@@ -23,7 +24,7 @@ def test_jwks_cache_expiration(monkeypatch):
     cache = JwksKeyCache(max_size=10, positive_ttl=3600.0, negative_ttl=60.0)
     cache.set("key-1", "pubkey-1")
     assert cache.get("key-1") == "pubkey-1"
-    
+
     now += 3601.0
     assert cache.get("key-1") is None
     assert "key-1" not in cache
@@ -68,7 +69,7 @@ async def test_fetch_public_key_negative_caching_protects_jwks_endpoint():
     summary = Mock()
     response = Mock()
     response.json.return_value = {"keys": [{"kid": "real-key", "n": "abc"}]}
-    
+
     client = AsyncMock()
     client.__aenter__.return_value = client
     client.get.return_value = response
@@ -144,7 +145,6 @@ async def test_fetch_public_key_caches_all_returned_keys():
     )
     assert res2 is not None
     assert client.get.call_count == 1  # Still 1!
-
 
 
 def _jwks_client(delay=0.0):

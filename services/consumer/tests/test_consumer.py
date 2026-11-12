@@ -123,6 +123,7 @@ def test_flush_rejects_mixed_partitions():
     else:
         raise AssertionError("Expected partition validation failure")
 
+
 def test_is_production_sample_rejects_non_uuid():
     valid = {
         "id": "00000000-0000-0000-0000-000000000001",

@@ -96,7 +96,9 @@ const ProfileSettingPage = lazy(
 const ApiTokensPage = lazy(
   () => import("@/features/api-keys/pages/ApiKeyPage"),
 );
-const ApiKeyPage = lazy(() => import("@/features/api-keys/pages/CreateApiKeyPage"));
+const ApiKeyPage = lazy(
+  () => import("@/features/api-keys/pages/CreateApiKeyPage"),
+);
 const NotFoundPage = lazy(() => import("./NotFoundPage"));
 const ProjectRouteBoundary = lazy(() => import("./ProjectRouteBoundary"));
 
@@ -110,7 +112,10 @@ const router = createBrowserRouter(
         <Route path="/oauth/github/callback" element={<GitHubCallbackPage />} />
       </Route>
       <Route path="/" element={<Navigate to="/dashboard/projects" replace />} />
-      <Route path="/projects" element={<Navigate to="/dashboard/projects" replace />} />
+      <Route
+        path="/projects"
+        element={<Navigate to="/dashboard/projects" replace />}
+      />
       <Route
         path="/dashboard"
         element={
@@ -166,7 +171,10 @@ const router = createBrowserRouter(
           element={<DriftMonitoringDetailPage />}
         />
         <Route path="training/new" element={<NewTrainingWorkspacePage />} />
-        <Route path="training/:jobId/workspace" element={<TrainingWorkspacePage />} />
+        <Route
+          path="training/:jobId/workspace"
+          element={<TrainingWorkspacePage />}
+        />
         <Route path="training/jobs/:jobId" element={<TrainingJobDetailPage />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<TrainingJobOverviewPage />} />

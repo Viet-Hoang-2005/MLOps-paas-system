@@ -19,14 +19,7 @@ import { Input, InputPassword } from "@/shared/components/Input";
 import { OTPInput } from "@/shared/components/OTPInput";
 import { toast } from "@/shared/lib/toastStore";
 import { useGoogleLogin } from "@react-oauth/google";
-import {
-  Camera,
-  Lock,
-  LockKeyhole,
-  Mail,
-  User,
-  UserPlus,
-} from "lucide-react";
+import { Camera, Lock, LockKeyhole, Mail, User, UserPlus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -81,10 +74,7 @@ function SignUpOTPStep({ email, onVerified, onBack }: SignUpOTPStepProps) {
 
   return (
     <div className="flex flex-col max-w-sm w-full mx-auto text-center gap-8">
-      <Back
-        onBack={onBack}
-        title={t("otp.back")}
-      />
+      <Back onBack={onBack} title={t("otp.back")} />
 
       <div className="flex flex-col items-center justify-center gap-3">
         <Mail className="h-8 w-8 text-color-foreground" />
@@ -239,11 +229,7 @@ function SignUpProfileStep({
 
   return (
     <div className="max-w-sm w-full mx-auto">
-      <Back
-        onBack={onBack}
-        title={t("profile.back")}
-        className="mb-4"
-      />
+      <Back onBack={onBack} title={t("profile.back")} className="mb-4" />
 
       <h2 className="mb-1 text-style-page-title font-bold text-color-foreground">
         {t("profile.title")}

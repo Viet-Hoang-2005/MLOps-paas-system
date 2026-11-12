@@ -1,7 +1,7 @@
 """Account-owned training drafts. Object keys never depend on editable paths."""
 
-import json
 import hashlib
+import json
 import re
 import uuid
 from io import BytesIO
@@ -24,13 +24,32 @@ MAX_DATA = 100 * 1024 * 1024
 MAX_WORKSPACE_SNAPSHOT = 256 * 1024 * 1024
 MAX_WORKSPACE_ENTRIES = 10_000
 ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
-RESERVED_ENV = {"PATH", "PYTHONPATH", "PYTHONHOME", "HOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "TMPDIR", "MODEL_VERSION", "INPUT_CONTRACT", "PREPARED_INPUT_DIR", "RUNTIME_CONFIG_URL", "RUNTIME_CONFIG_CAPABILITY"}
+RESERVED_ENV = {
+    "PATH",
+    "PYTHONPATH",
+    "PYTHONHOME",
+    "HOME",
+    "LD_PRELOAD",
+    "LD_LIBRARY_PATH",
+    "TMPDIR",
+    "MODEL_VERSION",
+    "INPUT_CONTRACT",
+    "PREPARED_INPUT_DIR",
+    "RUNTIME_CONFIG_URL",
+    "RUNTIME_CONFIG_CAPABILITY",
+}
 RESERVED_PREFIXES = ("MLOPS_", "SM_", "AWS_", "S3_", "REDIS_", "DJANGO_", "MLFLOW_", "TRAINING_")
 
 
 def safe_path(value):
-    if (not isinstance(value, str) or not value or len(value) > 512 or "\\" in value
-            or value.startswith("/") or any(ord(ch) < 32 for ch in value)):
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > 512
+        or "\\" in value
+        or value.startswith("/")
+        or any(ord(ch) < 32 for ch in value)
+    ):
         raise ValidationError({"path": "Use a safe relative path."})
     parts = value.split("/")
     if any(not part or part in {".", ".."} or len(part) > 255 for part in parts):
@@ -41,8 +60,12 @@ def safe_path(value):
 
 
 def validate_name(name):
-    if (not isinstance(name, str) or not ENV_NAME.fullmatch(name) or name in RESERVED_ENV
-            or name.startswith(RESERVED_PREFIXES)):
+    if (
+        not isinstance(name, str)
+        or not ENV_NAME.fullmatch(name)
+        or name in RESERVED_ENV
+        or name.startswith(RESERVED_PREFIXES)
+    ):
         raise ValidationError({"name": "Invalid or reserved environment variable name."})
     return name
 
@@ -156,8 +179,13 @@ def serialize_entries(entries):
     storage = S3Storage() if any(entry.s3_uri for entry in entries) else None
     result = []
     for entry in entries:
-        item = {"id": str(entry.public_id), "path": entry.relative_path, "kind": entry.kind,
-                "size_bytes": entry.size_bytes, "updated_at": entry.updated_at.isoformat()}
+        item = {
+            "id": str(entry.public_id),
+            "path": entry.relative_path,
+            "kind": entry.kind,
+            "size_bytes": entry.size_bytes,
+            "updated_at": entry.updated_at.isoformat(),
+        }
         if entry.s3_uri:
             item["download_url"] = storage.presigned_get(entry.s3_uri)
         result.append(item)
@@ -185,7 +213,16 @@ def update_workspace(workspace, *, revision, changes):
             if locked.secrets.filter(name__in=environment).exists():
                 raise Conflict("An environment variable conflicts with a secret name.")
             locked.environment = environment
-        config_fields = {"model_flavor", "vcpu", "memory_mb", "max_runtime_seconds", "accelerator_type", "accelerator_count", "accelerator_model", "local_gpu_id"}
+        config_fields = {
+            "model_flavor",
+            "vcpu",
+            "memory_mb",
+            "max_runtime_seconds",
+            "accelerator_type",
+            "accelerator_count",
+            "accelerator_model",
+            "local_gpu_id",
+        }
         for field in config_fields & changes.keys():
             setattr(locked, field, changes[field])
         _bump(locked)
@@ -218,9 +255,15 @@ def create_entry(workspace, *, revision, path, kind, payload=None, storage=None)
             _parent_exists(locked, path)
             if locked.entries.filter(relative_path=path).exists():
                 raise Conflict("A file or folder already exists at this path.")
-            entry = TrainingJobEntry.objects.create(job=locked, relative_path=path, kind=kind,
-                s3_uri=stored.uri if stored else "", checksum=stored.checksum if stored else "",
-                size_bytes=stored.size_bytes if stored else 0, content_type=stored.content_type if stored else "")
+            entry = TrainingJobEntry.objects.create(
+                job=locked,
+                relative_path=path,
+                kind=kind,
+                s3_uri=stored.uri if stored else "",
+                checksum=stored.checksum if stored else "",
+                size_bytes=stored.size_bytes if stored else 0,
+                content_type=stored.content_type if stored else "",
+            )
             _bump(locked)
         return entry, locked.revision
     except Exception:
@@ -272,7 +315,17 @@ def edit_file(workspace, entry_id, *, revision, path=None, kind=None, payload=No
             if stored:
                 entry.s3_uri, entry.checksum = stored.uri, stored.checksum
                 entry.size_bytes, entry.content_type = stored.size_bytes, stored.content_type
-            entry.save(update_fields=["relative_path", "kind", "s3_uri", "checksum", "size_bytes", "content_type", "updated_at"])
+            entry.save(
+                update_fields=[
+                    "relative_path",
+                    "kind",
+                    "s3_uri",
+                    "checksum",
+                    "size_bytes",
+                    "content_type",
+                    "updated_at",
+                ]
+            )
             if locked.entry_point == old_path:
                 locked.entry_point = path if kind == "script" else ""
             _bump(locked)
@@ -298,17 +351,21 @@ def move_entry(workspace, entry_id, *, revision, path):
         if entry.kind != "folder" and not path.lower().endswith(EXTENSIONS[entry.kind]):
             raise ValidationError({"path": "The file extension does not match its type."})
         _parent_exists(locked, path)
-        entries = list(locked.entries.select_for_update().filter(relative_path__startswith=old + "/")) if entry.kind == "folder" else []
+        entries = (
+            list(locked.entries.select_for_update().filter(relative_path__startswith=old + "/"))
+            if entry.kind == "folder"
+            else []
+        )
         entries.append(entry)
         old_paths = {item.relative_path for item in entries}
-        targets = {path + item.relative_path[len(old):] for item in entries}
+        targets = {path + item.relative_path[len(old) :] for item in entries}
         if locked.entries.filter(relative_path__in=targets).exclude(relative_path__in=old_paths).exists():
             raise Conflict("A file or folder already exists at this path.")
         for item in entries:
-            item.relative_path = path + item.relative_path[len(old):]
+            item.relative_path = path + item.relative_path[len(old) :]
             item.save(update_fields=["relative_path", "updated_at"])
         if locked.entry_point == old or locked.entry_point.startswith(old + "/"):
-            locked.entry_point = path + locked.entry_point[len(old):]
+            locked.entry_point = path + locked.entry_point[len(old) :]
         _bump(locked)
         return locked.revision
 
@@ -349,8 +406,9 @@ def set_secret(workspace, *, revision, name, value):
             raise Conflict("This name is already used by an environment variable.")
         if not locked.secrets.filter(name=name).exists() and locked.secrets.count() >= 100:
             raise ValidationError({"name": "At most 100 secrets are supported per workspace."})
-        secret, _ = TrainingJobSecret.objects.update_or_create(job=locked, name=name,
-            defaults={"ciphertext": encrypted})
+        secret, _ = TrainingJobSecret.objects.update_or_create(
+            job=locked, name=name, defaults={"ciphertext": encrypted}
+        )
         _bump(locked)
         return secret, locked.revision
 

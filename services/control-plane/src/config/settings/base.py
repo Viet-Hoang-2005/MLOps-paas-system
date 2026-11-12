@@ -307,12 +307,15 @@ DRIFT_EXECUTION_WATCH_ENABLED = env_bool("DRIFT_EXECUTION_WATCH_ENABLED", False)
 TRAINING_EXECUTION_WATCH_ENABLED = env_bool("TRAINING_EXECUTION_WATCH_ENABLED", False)
 EXECUTION_DISPATCH_TIMEOUT_SECONDS = env_int("EXECUTION_DISPATCH_TIMEOUT_SECONDS", 1800)
 EXECUTION_CHECK_LEASE_SECONDS = env_int("EXECUTION_CHECK_LEASE_SECONDS", 300)
-EXECUTION_OBSERVATION_TOKEN_TTL_SECONDS = env_int("EXECUTION_OBSERVATION_TOKEN_TTL_SECONDS", EXECUTION_CHECK_LEASE_SECONDS)
+EXECUTION_OBSERVATION_TOKEN_TTL_SECONDS = env_int(
+    "EXECUTION_OBSERVATION_TOKEN_TTL_SECONDS", EXECUTION_CHECK_LEASE_SECONDS
+)
 DRIFT_MAX_RUNTIME_SECONDS = env_int("DRIFT_MAX_RUNTIME_SECONDS", 3600)
 ARGO_RECONCILE_WEBHOOK_URL = env("ARGO_RECONCILE_WEBHOOK_URL", "")
 if DRIFT_EXECUTION_WATCH_ENABLED or TRAINING_EXECUTION_WATCH_ENABLED:
     CELERY_BEAT_SCHEDULE["job-execution-scan"] = {
-        "task": "apps.observability.tasks.scan_job_executions", "schedule": 15,
+        "task": "apps.observability.tasks.scan_job_executions",
+        "schedule": 15,
         "options": {"queue": "celery", "expires": 15},
     }
 MODEL_SERVER_PUBLIC_URL = str(env("MODEL_SERVER_PUBLIC_URL", "http://localhost:5002")).rstrip("/")
@@ -337,8 +340,15 @@ DEPLOYMENT_BACKEND = execution_backend_override("DEPLOYMENT_BACKEND")
 TRAINING_BACKEND = execution_backend_override("TRAINING_BACKEND")
 if TRAINING_MAX_RUNTIME_SECONDS <= 0 or (TRAINING_BACKEND == "argo" and TRAINING_MAX_RUNTIME_SECONDS > 86400):
     raise ImproperlyConfigured("TRAINING_MAX_RUNTIME_SECONDS must be positive and no more than 86400 for Argo.")
-if any(value < 0 for value in (TRAINING_CPU_MEDIUM_WEEKLY_SECONDS, TRAINING_CPU_LARGE_WEEKLY_SECONDS,
-                               TRAINING_GPU_T4_WEEKLY_SECONDS, TRAINING_GPU_A10G_WEEKLY_SECONDS)):
+if any(
+    value < 0
+    for value in (
+        TRAINING_CPU_MEDIUM_WEEKLY_SECONDS,
+        TRAINING_CPU_LARGE_WEEKLY_SECONDS,
+        TRAINING_GPU_T4_WEEKLY_SECONDS,
+        TRAINING_GPU_A10G_WEEKLY_SECONDS,
+    )
+):
     raise ImproperlyConfigured("Training weekly quotas must not be negative.")
 DRIFT_BACKEND = execution_backend_override("DRIFT_BACKEND")
 TRAINING_ENABLED = str(env("TRAINING_ENABLED", "true")).lower() in {

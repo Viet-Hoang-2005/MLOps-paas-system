@@ -5,9 +5,20 @@ export const overviewQueryKeys = {
   source: (projectId: string, versionId: string) =>
     [...overviewQueryKeys.all, "source", projectId, versionId] as const,
   metrics: (projectId: string, deploymentId: string, window: string) =>
-    [...overviewQueryKeys.all, "metrics", projectId, deploymentId, window] as const,
+    [
+      ...overviewQueryKeys.all,
+      "metrics",
+      projectId,
+      deploymentId,
+      window,
+    ] as const,
   attributes: (projectId: string, versionId?: string) =>
-    [...overviewQueryKeys.all, "attributes", projectId, versionId ?? ""] as const,
+    [
+      ...overviewQueryKeys.all,
+      "attributes",
+      projectId,
+      versionId ?? "",
+    ] as const,
 };
 
 export const projectOverviewKeys = overviewQueryKeys;

@@ -123,8 +123,9 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
                 : "# Environment and Secret declared in the UI"}
             </span>
             {"\n"}
-            <span className="text-color-syntax-variable">batch_size</span> ={" "}
-            <span className="text-color-syntax-function">int</span>(
+            <span className="text-color-syntax-variable">
+              batch_size
+            </span> = <span className="text-color-syntax-function">int</span>(
             <span className="text-color-syntax-variable">os</span>.
             <span className="text-color-syntax-property">environ</span>.
             <span className="text-color-syntax-function">get</span>(
@@ -177,8 +178,7 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
             <span className="text-color-syntax-variable">work_dir</span> /{" "}
             <span className="text-color-syntax-string">"sample.csv"</span>,{" "}
             <span className="text-color-syntax-property">index</span>=
-            <span className="text-color-syntax-keyword">False</span>)
-            {"\n\n"}
+            <span className="text-color-syntax-keyword">False</span>){"\n\n"}
             <span className="text-color-syntax-comment">
               {isVi
                 ? "# Sau khi huấn luyện, lưu model chính thức"
@@ -201,13 +201,14 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
               {isVi ? "# Xuất metrics" : "# Export metrics"}
             </span>
             {"\n"}
-            <span className="text-color-syntax-variable">output_dir</span> ={" "}
-            <span className="text-color-syntax-type">Path</span>(
+            <span className="text-color-syntax-variable">
+              output_dir
+            </span> = <span className="text-color-syntax-type">Path</span>(
             <span className="text-color-syntax-variable">os</span>.
             <span className="text-color-syntax-property">environ</span>[
             <span className="text-color-syntax-string">"SM_OUTPUT_DIR"</span>])
-            {"\n"}
-            (<span className="text-color-syntax-variable">output_dir</span> /{" "}
+            {"\n"}(
+            <span className="text-color-syntax-variable">output_dir</span> /{" "}
             <span className="text-color-syntax-string">"metrics.json"</span>
             ).
             <span className="text-color-syntax-function">write_text</span>(
@@ -219,9 +220,7 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
             {"}"}),
             {"\n    "}
             <span className="text-color-syntax-property">encoding</span>=
-            <span className="text-color-syntax-string">"utf-8"</span>,
-            {"\n"}
-            )
+            <span className="text-color-syntax-string">"utf-8"</span>,{"\n"})
           </pre>
           <button
             type="button"

@@ -125,6 +125,7 @@ class Deployment(ExecutionWatch):
         FAILED = "failed", "Failed"
         STOPPED = "stopped", "Stopped"
         UNCONFIRMED = "unconfirmed", "Unconfirmed"
+
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     version = models.ForeignKey("registry.ModelVersion", on_delete=models.PROTECT, related_name="deployments")
     build = models.ForeignKey(Build, on_delete=models.PROTECT, related_name="deployments")
@@ -140,10 +141,12 @@ class Deployment(ExecutionWatch):
 
     class Meta:
         ordering = ["-created_at"]
-        constraints = [models.CheckConstraint(
-            check=models.Q(status__in=("pending", "deploying", "succeeded", "failed", "stopped", "unconfirmed")),
-            name="deployment_status_valid",
-        )]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(status__in=("pending", "deploying", "succeeded", "failed", "stopped", "unconfirmed")),
+                name="deployment_status_valid",
+            )
+        ]
 
     def __str__(self):
         return f"Deployment {self.public_id} ({self.status})"
@@ -170,9 +173,12 @@ class Endpoint(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [models.CheckConstraint(
-            check=models.Q(health_status__in=("unknown", "healthy", "unhealthy")), name="endpoint_health_valid",
-        )]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(health_status__in=("unknown", "healthy", "unhealthy")),
+                name="endpoint_health_valid",
+            )
+        ]
 
     def __str__(self):
         return self.public_url

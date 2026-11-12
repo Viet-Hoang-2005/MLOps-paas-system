@@ -61,11 +61,14 @@ def dispatch_health_checks():
             def publish(deployment_id=deployment_id, token=token, endpoint_pk=endpoint.pk):
                 try:
                     probe_runtime_health.apply_async(
-                        args=[deployment_id, str(token)], queue="runtime-health", expires=15,
+                        args=[deployment_id, str(token)],
+                        queue="runtime-health",
+                        expires=15,
                     )
                 except Exception:
                     Endpoint.objects.filter(pk=endpoint_pk, health_check_token=token).update(
-                        health_check_token=None, health_check_lease_until=None,
+                        health_check_token=None,
+                        health_check_lease_until=None,
                     )
                     logger.exception("Unable to enqueue runtime health probe for deployment %s", deployment_id)
                     raise
@@ -78,7 +81,8 @@ def dispatch_health_checks():
 def probe_running_health(deployment_id, token, probe=None):
     now = timezone.now()
     endpoint = (
-        running_endpoints().select_related("deployment__version__project")
+        running_endpoints()
+        .select_related("deployment__version__project")
         .filter(deployment__public_id=deployment_id, health_check_token=token, health_check_lease_until__gt=now)
         .first()
     )
@@ -90,15 +94,19 @@ def probe_running_health(deployment_id, token, probe=None):
     # Keep the compare-and-swap predicate on the updated row, not inside a
     # joined/subquery update, so PostgreSQL rechecks it after a concurrent writer.
     claimed = Endpoint.objects.filter(
-        pk=endpoint.pk, health_check_token=token, health_check_lease_until__gt=timezone.now(),
+        pk=endpoint.pk,
+        health_check_token=token,
+        health_check_lease_until__gt=timezone.now(),
     ).update(health_check_token=probe_token)
     if not claimed:
         return "ignored"
     token = probe_token
     version = endpoint.deployment.version
     health = (probe or RuntimeHealthProbe()).check(
-        url=endpoint.internal_url, flavor=version.flavor,
-        project_id=version.project.public_id, version_id=version.public_id,
+        url=endpoint.internal_url,
+        flavor=version.flavor,
+        project_id=version.project.public_id,
+        version_id=version.public_id,
     )
     checked_at = timezone.now()
     with transaction.atomic():
@@ -108,11 +116,13 @@ def probe_running_health(deployment_id, token, probe=None):
         if not project or not deployment or not current:
             return "ignored"
         if (
-            not project.is_active or project.deletion_state != "active"
+            not project.is_active
+            or project.deletion_state != "active"
             or project.active_deployment_id != deployment.pk
             or deployment.status != Deployment.Status.SUCCEEDED
             or str(current.health_check_token) != str(token)
-            or not current.health_check_lease_until or current.health_check_lease_until <= timezone.now()
+            or not current.health_check_lease_until
+            or current.health_check_lease_until <= timezone.now()
         ):
             return "ignored"
         previous = current.health_status
@@ -120,11 +130,22 @@ def probe_running_health(deployment_id, token, probe=None):
         current.last_checked_at = checked_at
         current.health_check_token = None
         current.health_check_lease_until = None
-        current.save(update_fields=[
-            "health_status", "last_checked_at", "health_check_token", "health_check_lease_until", "updated_at",
-        ])
+        current.save(
+            update_fields=[
+                "health_status",
+                "last_checked_at",
+                "health_check_token",
+                "health_check_lease_until",
+                "updated_at",
+            ]
+        )
         if previous != health:
-            transaction.on_commit(lambda: logger.info(
-                "Runtime health changed deployment=%s from=%s to=%s", deployment_id, previous, health,
-            ))
+            transaction.on_commit(
+                lambda: logger.info(
+                    "Runtime health changed deployment=%s from=%s to=%s",
+                    deployment_id,
+                    previous,
+                    health,
+                )
+            )
     return health

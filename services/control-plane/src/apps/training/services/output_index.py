@@ -13,6 +13,7 @@ from django.db import transaction
 from django.db.models import Q
 
 from apps.training.models import TrainingJob, TrainingOutput
+
 from .storage_scope import training_prefix_for, validate_training_uri
 
 MODEL_EXTENSIONS = {

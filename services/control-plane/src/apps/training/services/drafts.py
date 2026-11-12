@@ -1,4 +1,5 @@
 """A job owns one editable input and admits at most one execution."""
+
 import uuid
 from datetime import timedelta
 from io import BytesIO
@@ -16,13 +17,23 @@ from common.api.exceptions import Conflict
 from infrastructure.storage import S3Storage
 
 TERMINAL = {"completed", "failed", "cancelled"}
-CONFIG_FIELDS = ("model_flavor", "entry_point", "vcpu", "memory_mb", "max_runtime_seconds",
-                 "accelerator_type", "accelerator_count", "accelerator_model", "local_gpu_id")
+CONFIG_FIELDS = (
+    "model_flavor",
+    "entry_point",
+    "vcpu",
+    "memory_mb",
+    "max_runtime_seconds",
+    "accelerator_type",
+    "accelerator_count",
+    "accelerator_model",
+    "local_gpu_id",
+)
 PREPARATION_LEASE = timedelta(minutes=10)
 
 
 def create_draft(*, owner, values=None):
     from apps.observability.services.lifecycle import record_training_event
+
     with transaction.atomic():
         job = TrainingJob.objects.create(owner=owner, storage_layout="tenant", backend=settings.TRAINING_BACKEND)
         changes = {key: value for key, value in (values or {}).items() if key != "revision"}
@@ -34,10 +45,18 @@ def create_draft(*, owner, values=None):
 
 def recover_preparations():
     """Fence abandoned snapshot writers. No runtime has been admitted for these rows."""
-    return TrainingJob.objects.filter(status="pending", submitted_at__isnull=True,
+    return TrainingJob.objects.filter(
+        status="pending",
+        submitted_at__isnull=True,
         preparation_started_at__lt=timezone.now() - PREPARATION_LEASE,
-        deletion_requested_at__isnull=True).update(status="editing", submission_token=None,
-            preparation_started_at=None, run_key=None, error_message="Preparation interrupted. Run again.")
+        deletion_requested_at__isnull=True,
+    ).update(
+        status="editing",
+        submission_token=None,
+        preparation_started_at=None,
+        run_key=None,
+        error_message="Preparation interrupted. Run again.",
+    )
 
 
 def submit_draft(job, *, revision, run_key, storage=None):
@@ -49,8 +68,11 @@ def submit_draft(job, *, revision, run_key, storage=None):
         if locked.deletion_requested_at:
             raise Conflict("This training job is being deleted.")
         if locked.run_key == run_key:
-            if locked.submitted_at or (locked.status == "pending" and locked.preparation_started_at
-                                      and locked.preparation_started_at > timezone.now() - PREPARATION_LEASE):
+            if locked.submitted_at or (
+                locked.status == "pending"
+                and locked.preparation_started_at
+                and locked.preparation_started_at > timezone.now() - PREPARATION_LEASE
+            ):
                 return locked
         elif locked.submitted_at or locked.status != "editing":
             raise Conflict("This job already has a submission.")
@@ -71,7 +93,16 @@ def submit_draft(job, *, revision, run_key, storage=None):
         locked.error_message = ""
         try:
             with transaction.atomic():
-                locked.save(update_fields=["run_key", "submission_token", "preparation_started_at", "status", "error_message", "updated_at"])
+                locked.save(
+                    update_fields=[
+                        "run_key",
+                        "submission_token",
+                        "preparation_started_at",
+                        "status",
+                        "error_message",
+                        "updated_at",
+                    ]
+                )
         except IntegrityError as exc:
             raise Conflict("This submission key is unavailable.") from exc
     job = locked
@@ -82,16 +113,20 @@ def submit_draft(job, *, revision, run_key, storage=None):
         capacity = None
         if settings.TRAINING_BACKEND == "docker":
             from apps.training.services.local_resources import require_capacity
+
             capacity = require_capacity(force=True)
         validate_resources({}, job, local_capacity=capacity)
         verified_gpu_id = ""
         if job.accelerator_type == "gpu" and job.backend == "docker":
             from apps.training.services.local_gpu import require_device
+
             require_device(job.local_gpu_id)
             verified_gpu_id = job.local_gpu_id
         snapshot = workspaces.snapshot_input(job, revision=revision, storage=storage, preparing=True)
         with ZipFile(BytesIO(snapshot["archive"])) as archive:
-            requirements = archive.read("requirements.txt").decode("utf-8") if "requirements.txt" in archive.namelist() else ""
+            requirements = (
+                archive.read("requirements.txt").decode("utf-8") if "requirements.txt" in archive.namelist() else ""
+            )
         staged = True
         storage.put(storage.parse_uri(uris["code"])[1], snapshot["archive"], "application/zip")
         empty = BytesIO()
@@ -101,13 +136,21 @@ def submit_draft(job, *, revision, run_key, storage=None):
         with transaction.atomic():
             if job.backend == "argo":
                 from apps.training.services.quota import lock_owner
+
                 lock_owner(job.owner_id)
             current = TrainingJob.objects.select_for_update().get(pk=job.pk)
-            if (current.status != "pending" or current.submission_token != token or current.revision != revision
-                    or current.deletion_requested_at or current.submitted_at):
+            if (
+                current.status != "pending"
+                or current.submission_token != token
+                or current.revision != revision
+                or current.deletion_requested_at
+                or current.submitted_at
+            ):
                 raise Conflict("The preparation is no longer current.")
             current.environment_snapshot = dict(current.environment)
-            current.secret_snapshot = {secret.name: bytes(secret.ciphertext).decode("ascii") for secret in current.secrets.all()}
+            current.secret_snapshot = {
+                secret.name: bytes(secret.ciphertext).decode("ascii") for secret in current.secrets.all()
+            }
             current.input_revision = revision
             current.requirements_text = requirements
             current.code_snapshot_uri, current.data_snapshot_uri = uris["code"], uris["data"]
@@ -123,7 +166,9 @@ def submit_draft(job, *, revision, run_key, storage=None):
                 current.status = "editing"
                 current.run_key = current.submission_token = None
                 current.preparation_started_at = None
-                current.save(update_fields=["status", "run_key", "submission_token", "preparation_started_at", "updated_at"])
+                current.save(
+                    update_fields=["status", "run_key", "submission_token", "preparation_started_at", "updated_at"]
+                )
         if not accepted and staged:
             storage.delete_prefix(f"{training_prefix_for(job)}/input/submissions/{token}/")
         raise
@@ -140,14 +185,20 @@ def clone_draft(source, *, creation_key, retry=False, storage=None):
     if source.status not in ({"failed", "cancelled"} if retry else TERMINAL) or source.deletion_requested_at:
         raise Conflict("Only finished jobs can be copied.")
     storage = storage or S3Storage()
-    draft = TrainingJob(owner=source.owner, storage_layout="tenant", backend=settings.TRAINING_BACKEND,
-        creation_key=creation_key, environment=dict(source.environment_snapshot),
-        **{field: getattr(source, field) for field in CONFIG_FIELDS})
+    draft = TrainingJob(
+        owner=source.owner,
+        storage_layout="tenant",
+        backend=settings.TRAINING_BACKEND,
+        creation_key=creation_key,
+        environment=dict(source.environment_snapshot),
+        **{field: getattr(source, field) for field in CONFIG_FIELDS},
+    )
     if retry:
         draft.retry_of, draft.trigger_kind = source, "retry"
     else:
         draft.cloned_from = source
     from .snapshots import input_snapshot
+
     entries = input_snapshot(source, storage=storage)["entries"]
     if not any(item["path"] == source.entry_point and item["kind"] == "script" for item in entries):
         raise Conflict("The source Input is missing its Python entry point.")
@@ -160,8 +211,11 @@ def clone_draft(source, *, creation_key, retry=False, storage=None):
                 if item["kind"] != "folder":
                     payload = archive.read(item["path"])
                     workspaces.validate_file(item["path"], item["kind"], payload)
-                    stored = storage.put(f"{training_prefix_for(draft)}/draft/objects/{uuid.uuid4().hex}", payload,
-                                         "text/csv" if item["kind"] == "data" else "text/plain; charset=utf-8")
+                    stored = storage.put(
+                        f"{training_prefix_for(draft)}/draft/objects/{uuid.uuid4().hex}",
+                        payload,
+                        "text/csv" if item["kind"] == "data" else "text/plain; charset=utf-8",
+                    )
                     entry.s3_uri, entry.checksum = stored.uri, stored.checksum
                     entry.size_bytes, entry.content_type = stored.size_bytes, stored.content_type
                 staged.append(entry)
@@ -174,8 +228,12 @@ def clone_draft(source, *, creation_key, retry=False, storage=None):
             for entry in staged:
                 entry.job = draft
             TrainingJobEntry.objects.bulk_create(staged)
-            TrainingJobSecret.objects.bulk_create([TrainingJobSecret(job=draft, name=secret.name,
-                ciphertext=bytes(secret.ciphertext)) for secret in secrets])
+            TrainingJobSecret.objects.bulk_create(
+                [
+                    TrainingJobSecret(job=draft, name=secret.name, ciphertext=bytes(secret.ciphertext))
+                    for secret in secrets
+                ]
+            )
         return draft
     except Exception:
         if not TrainingJob.objects.filter(public_id=draft.public_id).exists():

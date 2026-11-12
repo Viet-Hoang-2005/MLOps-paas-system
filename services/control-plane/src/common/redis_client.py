@@ -28,7 +28,9 @@ def redis_client(db: int | str = 0) -> Redis:
                 settings, "CELERY_SENTINEL_PASSWORD", getattr(settings, "REDIS_SENTINEL_PASSWORD", "")
             )
             master_name = getattr(
-                settings, "CELERY_SENTINEL_MASTER_NAME", getattr(settings, "REDIS_SENTINEL_MASTER_NAME", "redis-queue-master")
+                settings,
+                "CELERY_SENTINEL_MASTER_NAME",
+                getattr(settings, "REDIS_SENTINEL_MASTER_NAME", "redis-queue-master"),
             )
             sentinel = Sentinel(
                 sentinels,
@@ -40,11 +42,17 @@ def redis_client(db: int | str = 0) -> Redis:
                 db=0,
                 password=settings.REDIS_PASSWORD,
             )
-        url = settings.CELERY_RESULT_BACKEND if (db in {4, "result"} and hasattr(settings, "CELERY_RESULT_BACKEND")) else settings.CELERY_BROKER_URL
+        url = (
+            settings.CELERY_RESULT_BACKEND
+            if (db in {4, "result"} and hasattr(settings, "CELERY_RESULT_BACKEND"))
+            else settings.CELERY_BROKER_URL
+        )
         return Redis.from_url(url)
 
     # Cache instance
-    if getattr(settings, "REDIS_CONNECTION_MODE", "direct") == "sentinel" and getattr(settings, "REDIS_SENTINELS", None):
+    if getattr(settings, "REDIS_CONNECTION_MODE", "direct") == "sentinel" and getattr(
+        settings, "REDIS_SENTINELS", None
+    ):
         sentinel = Sentinel(
             settings.REDIS_SENTINELS,
             sentinel_kwargs={"password": settings.REDIS_SENTINEL_PASSWORD, "socket_timeout": 2},

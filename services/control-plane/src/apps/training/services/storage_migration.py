@@ -1,5 +1,7 @@
 """Restartable copy/verify before deleting a legacy Project storage namespace."""
+
 from django.db import transaction
+
 from apps.catalog.models import ModelProject
 from apps.training.models import TrainingJob, TrainingStorageCopy
 from apps.training.services.storage_scope import training_prefix_for
@@ -10,7 +12,7 @@ from infrastructure.storage.paths import tenant_training_job_prefix
 
 def _replace(value, source, destination):
     if isinstance(value, str):
-        return destination + value[len(source):] if value.startswith(source) else value
+        return destination + value[len(source) :] if value.startswith(source) else value
     if isinstance(value, list):
         return [_replace(item, source, destination) for item in value]
     if isinstance(value, dict):
@@ -31,7 +33,10 @@ def migrate_job_storage(job, *, storage=None):
     source = f"s3://{storage.bucket}/{source_key}"
     destination = f"s3://{storage.bucket}/{destination_key}"
     outputs = list(job.outputs.values_list("s3_uri", flat=True))
-    pointers = {field: getattr(job, field) for field in ("code_snapshot_uri", "data_snapshot_uri", "output_uri", "mlflow_artifact_uri")}
+    pointers = {
+        field: getattr(job, field)
+        for field in ("code_snapshot_uri", "data_snapshot_uri", "output_uri", "mlflow_artifact_uri")
+    }
     if any(uri and not uri.startswith(source) for uri in [*pointers.values(), *outputs]):
         raise Conflict("A training object is outside its original storage scope; deletion is blocked.")
     listed = set()
@@ -42,7 +47,7 @@ def migrate_job_storage(job, *, storage=None):
             if not key.startswith(source_key):
                 raise Conflict("Unexpected storage listing scope.")
             uri = f"s3://{storage.bucket}/{key}"
-            target = destination_key + key[len(source_key):]
+            target = destination_key + key[len(source_key) :]
             target_uri = f"s3://{storage.bucket}/{target}"
             head = storage.head(uri)
             checkpoint = TrainingStorageCopy.objects.filter(job=job, source_uri=uri, source_etag=head.etag).first()
@@ -54,12 +59,21 @@ def migrate_job_storage(job, *, storage=None):
                 except Exception:
                     pass
             checksum = storage.compute_sha256(uri)
-            storage.copy(uri, target, checksum=checksum, size_bytes=head.size_bytes,
-                         content_type=head.content_type, expected_etag=head.etag)
+            storage.copy(
+                uri,
+                target,
+                checksum=checksum,
+                size_bytes=head.size_bytes,
+                content_type=head.content_type,
+                expected_etag=head.etag,
+            )
             if storage.head(uri).etag != head.etag or storage.compute_sha256(target_uri) != checksum:
                 raise Conflict("Training object verification failed; source objects were retained.")
-            TrainingStorageCopy.objects.update_or_create(job=job, source_uri=uri, defaults={
-                "destination_uri": target_uri, "source_etag": head.etag, "checksum": checksum})
+            TrainingStorageCopy.objects.update_or_create(
+                job=job,
+                source_uri=uri,
+                defaults={"destination_uri": target_uri, "source_etag": head.etag, "checksum": checksum},
+            )
             listed.add(uri)
     if any(uri and uri not in listed for uri in outputs):
         raise Conflict("A recorded training artifact is missing; Project deletion is blocked.")
@@ -68,7 +82,11 @@ def migrate_job_storage(job, *, storage=None):
         current = TrainingJob.objects.select_for_update().get(pk=job.pk)
         if current.storage_layout == "tenant":
             return current
-        if project.deletion_state != "deleting" or current.output_revision != job.output_revision or current.status not in {"completed", "failed", "cancelled"}:
+        if (
+            project.deletion_state != "deleting"
+            or current.output_revision != job.output_revision
+            or current.status not in {"completed", "failed", "cancelled"}
+        ):
             raise Conflict("Training changed during storage migration.")
         for field, original in pointers.items():
             if getattr(current, field) != original:

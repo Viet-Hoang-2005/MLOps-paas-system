@@ -1,6 +1,7 @@
 """Pure batch transformations for persisted inference events."""
 
 import uuid
+
 import pandas as pd
 from src.models import KafkaRecord
 

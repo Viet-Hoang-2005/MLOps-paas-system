@@ -252,9 +252,7 @@ export default function DeploymentPage() {
           title={t("workflow.deploymentModel")}
           description={t("workflow.noProjectDeployment")}
           icon={<Box className="h-6 w-6" />}
-          additional={
-            tCommon("modelSelector.empty")
-          }
+          additional={tCommon("modelSelector.empty")}
           action={
             <Button
               size="md"

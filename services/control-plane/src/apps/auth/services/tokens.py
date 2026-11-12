@@ -10,9 +10,7 @@ def revoke_user_refresh_tokens(user) -> int:
     Revokes (blacklists) all outstanding refresh tokens for the given user,
     invalidating all existing sessions.
     """
-    outstanding_tokens = OutstandingToken.objects.filter(user=user).exclude(
-        blacklistedtoken__isnull=False
-    )
+    outstanding_tokens = OutstandingToken.objects.filter(user=user).exclude(blacklistedtoken__isnull=False)
     revoked = 0
     for token in outstanding_tokens:
         BlacklistedToken.objects.get_or_create(token=token)

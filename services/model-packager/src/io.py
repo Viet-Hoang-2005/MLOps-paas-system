@@ -78,8 +78,9 @@ def post_webhook(webhook_url, payload, requests_module, headers):
     delivery_headers = {**headers, "Idempotency-Key": f"build-{payload.get('build_id', '')}-{key}"}
     for attempt in range(3):
         try:
-            response = requests_module.post(webhook_url, json=payload, headers=delivery_headers,
-                timeout=(2, 5), allow_redirects=False)
+            response = requests_module.post(
+                webhook_url, json=payload, headers=delivery_headers, timeout=(2, 5), allow_redirects=False
+            )
             if 200 <= response.status_code < 300:
                 return
             retry = response.status_code == 429 or response.status_code >= 500

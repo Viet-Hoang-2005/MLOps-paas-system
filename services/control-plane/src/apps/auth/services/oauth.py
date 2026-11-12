@@ -31,11 +31,7 @@ def authenticate_google(access_token, http=None):
         raise ValidationError({"google": "Google OAuth is not configured."})
 
     client = http or HttpClient()
-    token_param = (
-        {"id_token": access_token}
-        if access_token.count(".") == 2
-        else {"access_token": access_token}
-    )
+    token_param = {"id_token": access_token} if access_token.count(".") == 2 else {"access_token": access_token}
     try:
         tokeninfo_res = client.request(
             "GET",
@@ -131,7 +127,9 @@ def _github_verified_primary_email(client, headers):
     # Build each page URL ourselves so an untrusted Link header cannot redirect credentials.
     for page in range(1, 11):
         response = client.request(
-            "GET", "https://api.github.com/user/emails", headers=headers,
+            "GET",
+            "https://api.github.com/user/emails",
+            headers=headers,
             params={"per_page": 100, "page": page},
         )
         emails = response.json()
@@ -141,7 +139,12 @@ def _github_verified_primary_email(client, headers):
             if not isinstance(item, dict):
                 continue
             email = item.get("email")
-            if item.get("primary") is True and item.get("verified") is True and isinstance(email, str) and email.strip():
+            if (
+                item.get("primary") is True
+                and item.get("verified") is True
+                and isinstance(email, str)
+                and email.strip()
+            ):
                 return email.strip()
         if "next" not in getattr(response, "links", {}):
             break
@@ -157,11 +160,7 @@ def _oauth_user(email, full_name, provider, avatar_url="", http=None):
             defaults={"email": clean_email, "full_name": full_name, "auth_provider": provider},
         )
     except user_model.MultipleObjectsReturned:
-        user = (
-            user_model.objects.filter(email__iexact=clean_email)
-            .order_by("-is_active", "-date_joined")
-            .first()
-        )
+        user = user_model.objects.filter(email__iexact=clean_email).order_by("-is_active", "-date_joined").first()
         created = False
         if not user:
             raise AuthenticationFailed("Account lookup error.")

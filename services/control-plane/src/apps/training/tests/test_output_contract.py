@@ -225,6 +225,7 @@ def test_failed_index_never_publishes_partial_files_and_can_retry(output_job, mo
 
 def test_async_completion_preserves_runtime_end_and_is_idempotent(output_job, monkeypatch):
     from datetime import timedelta
+
     from apps.training.services.output_finalization import finalize_output
 
     _, job, storage = output_job
@@ -258,8 +259,8 @@ def test_cancelled_job_cannot_publish_output(output_job):
 
 
 def test_build_uses_exact_selection_without_tracking_or_filename_fallback(output_job, monkeypatch):
-    from apps.training.services.project_assignment import assign_project
     from apps.deployment.services.builds import request_training_build
+    from apps.training.services.project_assignment import assign_project
 
     owner, job, storage = output_job
     publish(job, storage)
@@ -340,9 +341,10 @@ def test_concurrent_index_attempts_do_not_delete_winning_files(output_job, monke
 def test_internal_files_are_indexed_but_never_downloadable_and_archive_is_deleted(
     output_job, monkeypatch, django_capture_on_commit_callbacks
 ):
+    from unittest.mock import Mock
+
     from apps.training.services.output_finalization import cleanup_output_archive
     from apps.training.services.outputs import verify_training_output
-    from unittest.mock import Mock
 
     owner, job, storage = output_job
     queued = Mock()
@@ -362,6 +364,7 @@ def test_internal_files_are_indexed_but_never_downloadable_and_archive_is_delete
     assert client.get(f"/api/training-jobs/{job.public_id}/outputs/download/", {"path": "_mlops"}).status_code == 404
     assert len(client.get(f"/api/training-jobs/{job.public_id}/").data["outputs"]) == 4
     from zipfile import ZipFile
+
     response = client.get(f"/api/training-jobs/{job.public_id}/outputs/download/")
     assert response.status_code == 200
     with ZipFile(io.BytesIO(b"".join(response.streaming_content))) as bundle:
@@ -377,8 +380,9 @@ def test_internal_files_are_indexed_but_never_downloadable_and_archive_is_delete
 
 
 def test_archive_cleanup_failure_keeps_index_and_can_retry(output_job, monkeypatch):
-    from apps.training.services.output_finalization import cleanup_output_archive
     from unittest.mock import Mock
+
+    from apps.training.services.output_finalization import cleanup_output_archive
 
     _, job, storage = output_job
     publish(job, storage)

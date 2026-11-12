@@ -76,8 +76,11 @@ def test_production_preview_returns_at_most_available_rows_and_scopes_version():
     for version, count in ((first, 3), (second, 2), (foreign, 1)):
         for index in range(count):
             PredictionRecord.objects.create(
-                project=version.project, model_version=version, observed_at=f"2026-01-01T00:00:0{index}Z",
-                features={"x": index}, prediction=str(index),
+                project=version.project,
+                model_version=version,
+                observed_at=f"2026-01-01T00:00:0{index}Z",
+                features={"x": index},
+                prediction=str(index),
             )
     client = APIClient()
     client.force_authenticate(owner)
@@ -100,4 +103,7 @@ def test_production_preview_empty_version_returns_empty_list():
     version = project.versions.create(version="1")
     client = APIClient()
     client.force_authenticate(owner)
-    assert client.get(f"/api/models/{project.public_id}/production-data/?limit=100&version_id={version.public_id}").data == []
+    assert (
+        client.get(f"/api/models/{project.public_id}/production-data/?limit=100&version_id={version.public_id}").data
+        == []
+    )

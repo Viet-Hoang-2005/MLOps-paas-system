@@ -1,5 +1,5 @@
-from rest_framework.exceptions import NotFound, ValidationError
 import requests
+from rest_framework.exceptions import NotFound, ValidationError
 
 from apps.deployment.models import Endpoint
 from apps.registry.models import RegistryAlias
@@ -29,7 +29,9 @@ def predict_version(*, version, payload, http=None):
         raise ValidationError({"version": "The model version has no Running succeeded deployment."})
     try:
         response = (http or HttpClient(timeout=(3.05, 60))).request(
-            "POST", f"{endpoint.internal_url}/predict", json=payload,
+            "POST",
+            f"{endpoint.internal_url}/predict",
+            json=payload,
         )
     except requests.RequestException as exc:
         from rest_framework.exceptions import APIException

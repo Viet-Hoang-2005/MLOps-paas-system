@@ -36,7 +36,9 @@ export function useMarkNotificationRead() {
     mutationFn: (id: string) => markNotificationAsRead(id),
     onSuccess: () => {
       // Invalidate list and count queries
-      queryClient.invalidateQueries({ queryKey: notificationQueryKeys.lists() });
+      queryClient.invalidateQueries({
+        queryKey: notificationQueryKeys.lists(),
+      });
       queryClient.invalidateQueries({
         queryKey: notificationQueryKeys.unreadCount(),
       });
@@ -50,7 +52,9 @@ export function useMarkAllNotificationsRead() {
   return useMutation({
     mutationFn: markAllNotificationsAsRead,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: notificationQueryKeys.lists() });
+      queryClient.invalidateQueries({
+        queryKey: notificationQueryKeys.lists(),
+      });
       queryClient.invalidateQueries({
         queryKey: notificationQueryKeys.unreadCount(),
       });
@@ -64,7 +68,9 @@ export function useDeleteNotification() {
   return useMutation({
     mutationFn: (id: string) => deleteNotification(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: notificationQueryKeys.lists() });
+      queryClient.invalidateQueries({
+        queryKey: notificationQueryKeys.lists(),
+      });
       queryClient.invalidateQueries({
         queryKey: notificationQueryKeys.unreadCount(),
       });

@@ -39,7 +39,10 @@ describe("Deployment Eligibility & Build Matching", () => {
       isDeployableBuild({ ...registeredBuild, version_id: null }, "project-a"),
     ).toBe(false);
     expect(
-      isDeployableBuild({ ...registeredBuild, status: "building" }, "project-a"),
+      isDeployableBuild(
+        { ...registeredBuild, status: "building" },
+        "project-a",
+      ),
     ).toBe(false);
     expect(
       isDeployableBuild(
@@ -59,10 +62,16 @@ describe("Deployment Eligibility & Build Matching", () => {
 
     expect(deploymentMatchesBuild(deployment, registeredBuild)).toBe(true);
     expect(
-      deploymentMatchesBuild({ ...deployment, build_id: "build-b" }, registeredBuild),
+      deploymentMatchesBuild(
+        { ...deployment, build_id: "build-b" },
+        registeredBuild,
+      ),
     ).toBe(false);
     expect(
-      deploymentMatchesBuild({ ...deployment, version_id: "version-b" }, registeredBuild),
+      deploymentMatchesBuild(
+        { ...deployment, version_id: "version-b" },
+        registeredBuild,
+      ),
     ).toBe(false);
   });
 
@@ -76,9 +85,9 @@ describe("Deployment Eligibility & Build Matching", () => {
       },
     ] as unknown as Deployment[];
 
-    expect(
-      projectDeploymentBlocked(activeDeployments, [registeredBuild]),
-    ).toBe(true);
+    expect(projectDeploymentBlocked(activeDeployments, [registeredBuild])).toBe(
+      true,
+    );
 
     expect(
       projectDeploymentBlocked(

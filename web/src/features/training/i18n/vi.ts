@@ -1,8 +1,19 @@
 export const trainingVi = {
   studio: {
     artifactSelection: {
-      model: "Model gốc", chooseModel: "Chọn model", label_mapping: "Ánh xạ nhãn", input_schema: "Lược đồ đầu vào", metrics: "Chỉ số", params: "Tham số", model_insights: "Thông tin mô hình", feature_importance: "Mức độ quan trọng đặc trưng",
-      none: "Không sử dụng", fromMetadata: "Chọn từ Metadata", upload: "Upload JSON mới", chooseMetadata: "Chọn file JSON", jsonLimit: "JSON · 1 MiB",
+      model: "Model gốc",
+      chooseModel: "Chọn model",
+      label_mapping: "Ánh xạ nhãn",
+      input_schema: "Lược đồ đầu vào",
+      metrics: "Chỉ số",
+      params: "Tham số",
+      model_insights: "Thông tin mô hình",
+      feature_importance: "Mức độ quan trọng đặc trưng",
+      none: "Không sử dụng",
+      fromMetadata: "Chọn từ Metadata",
+      upload: "Upload JSON mới",
+      chooseMetadata: "Chọn file JSON",
+      jsonLimit: "JSON · 1 MiB",
     },
     saved: "Đã lưu tất cả thay đổi.",
     cancel: "Hủy",

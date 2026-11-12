@@ -18,6 +18,7 @@ from apps.training.models import TrainingJob
 )
 def cleanup_output_archive(job_id):
     from infrastructure.storage import S3Storage
+
     from .storage_scope import validate_training_uri
 
     job = TrainingJob.objects.filter(public_id=job_id).first()
@@ -55,9 +56,11 @@ def enqueue_output(job, finished_at=None):
     bind=True, max_retries=5, acks_late=True, reject_on_worker_lost=True, soft_time_limit=3500, time_limit=3600
 )
 def finalize_output(self, job_id):
-    from .outputs import verify_training_output
-    from apps.observability.services.lifecycle import record_training_event
     from django.utils.dateparse import parse_datetime
+
+    from apps.observability.services.lifecycle import record_training_event
+
+    from .outputs import verify_training_output
 
     try:
         job = TrainingJob.objects.get(public_id=job_id)
@@ -111,6 +114,7 @@ def finalize_output(self, job_id):
 
 def _notify_result(job):
     import logging
+
     from apps.notifications.hooks import notify_training_result
     from common.logging import record_transition
 

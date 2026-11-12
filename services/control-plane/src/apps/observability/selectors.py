@@ -1,5 +1,6 @@
-from apps.production.models import PredictionRecord
 from django.shortcuts import get_object_or_404
+
+from apps.production.models import PredictionRecord
 
 
 def latest_production_data(project, limit=100, version_id=None):

@@ -12,7 +12,10 @@ describe("Training Zip Packaging & Inspection", () => {
     const file = buildStoredZip(
       [
         { name: "train.py", data: encoder.encode("print('hello train')") },
-        { name: "requirements.txt", data: encoder.encode("scikit-learn\npandas") },
+        {
+          name: "requirements.txt",
+          data: encoder.encode("scikit-learn\npandas"),
+        },
       ],
       "test_source.zip",
     );
@@ -45,4 +48,3 @@ describe("Training Zip Packaging & Inspection", () => {
     );
   });
 });
-

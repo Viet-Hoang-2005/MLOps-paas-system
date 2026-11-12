@@ -107,6 +107,7 @@ class DeploymentWebhookEndpoint(APIView):
                 )
         try:
             from apps.notifications.hooks import notify_deployment_result
+
             notify_deployment_result(deployment)
         except Exception:
             pass
@@ -170,7 +171,9 @@ class BuildWebhookEndpoint(APIView):
                 or not build.package_uri
                 or request.data.get("package_uri", build.package_uri) != build.package_uri
             ):
-                return Response({"detail": "A valid build-scoped image, digest and package manifest are required."}, status=400)
+                return Response(
+                    {"detail": "A valid build-scoped image, digest and package manifest are required."}, status=400
+                )
         if build.backend == "docker" and build.execution_deadline_at and build.execution_deadline_at <= timezone.now():
             return Response({"detail": "Build result arrived after the execution deadline."}, status=409)
         build.execution_completed_at = timezone.now()
@@ -201,7 +204,9 @@ class BuildWebhookEndpoint(APIView):
                     image_digest=image_digest,
                     metrics=None if build.source_job_reference else _dict_payload(request.data.get("metrics_summary")),
                     params=None if build.source_job_reference else _dict_payload(request.data.get("params_summary")),
-                    insights=None if build.source_job_reference else _dict_payload(request.data.get("insights_summary")),
+                    insights=None
+                    if build.source_job_reference
+                    else _dict_payload(request.data.get("insights_summary")),
                     requirements=request.data.get("requirements_snapshot")
                     if isinstance(request.data.get("requirements_snapshot"), str)
                     else None,
@@ -234,6 +239,7 @@ class BuildWebhookEndpoint(APIView):
         )
         try:
             from apps.notifications.hooks import notify_build_result
+
             notify_build_result(build)
         except Exception:
             pass

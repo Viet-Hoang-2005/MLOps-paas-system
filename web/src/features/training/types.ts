@@ -32,7 +32,8 @@ export interface TrainingBuild {
 
 export interface TrainingOutput {
   id: ResourceId;
-  kind: "model" | "metric" | "insight" | "source_code" | "reference_data" | "file";
+  kind:
+    "model" | "metric" | "insight" | "source_code" | "reference_data" | "file";
   relative_path: string;
   s3_uri: string;
   checksum: string;
@@ -149,16 +150,24 @@ export interface TrainingRuntimeCapabilities {
     available_vcpu?: number;
     available_memory_mb?: number;
   };
-  accelerators: Array<{ type: TrainingAcceleratorType; model?: TrainingAcceleratorModel; device_id?: string; counts: number[] }>;
+  accelerators: Array<{
+    type: TrainingAcceleratorType;
+    model?: TrainingAcceleratorModel;
+    device_id?: string;
+    counts: number[];
+  }>;
   local_gpu?: {
     status: "available" | "unavailable" | "checking" | "disabled" | "error";
     reason: string;
     checked_at?: string;
-    devices: Array<{ id: string; name: string; memory_total_mib: number | null; memory_free_mib: number | null }>;
+    devices: Array<{
+      id: string;
+      name: string;
+      memory_total_mib: number | null;
+      memory_free_mib: number | null;
+    }>;
   };
 }
-
-
 
 export interface TrainingJobLogsResponse {
   job_id: ResourceId;
@@ -213,15 +222,21 @@ export interface TrainingUsageResponse {
   reset_at: string;
   active_jobs_count: number | null;
   max_active_jobs: number | null;
-  resources: { resource: string; limit_seconds: number | null; used_seconds: number;
-    reserved_seconds: number; remaining_seconds: number | null }[];
+  resources: {
+    resource: string;
+    limit_seconds: number | null;
+    used_seconds: number;
+    reserved_seconds: number;
+    remaining_seconds: number | null;
+  }[];
 }
 
 export interface TrainingOutputSummaryAsset {
   id: ResourceId;
   name: string;
   relative_path: string;
-  kind: "model" | "metric" | "insight" | "source_code" | "reference_data" | "file";
+  kind:
+    "model" | "metric" | "insight" | "source_code" | "reference_data" | "file";
   checksum: string;
   size_bytes: number;
   content_type: string;
@@ -300,4 +315,3 @@ export interface TrainingRunsCompareResponse {
   metric_names: string[];
   param_names: string[];
 }
-

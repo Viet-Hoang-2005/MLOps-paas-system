@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 
 from confluent_kafka import Producer
-
 from src.logging_utils import get_logger, log_event
 
 logger = get_logger(__name__)

@@ -1,4 +1,5 @@
 from datetime import timedelta
+
 from django.conf import settings
 from rest_framework.exceptions import PermissionDenied
 
@@ -61,4 +62,3 @@ def verify_auth_security_headers(request):
     clean_allowed = [str(value).rstrip("/") for value in allowed]
     if clean_origin not in clean_allowed:
         raise PermissionDenied("Origin not allowed.")
-

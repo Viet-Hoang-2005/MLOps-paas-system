@@ -20,13 +20,15 @@ def request_run(monitor, idempotency_key=None):
 
 def _enqueue(run):
     from apps.observability.services.executions import enqueue_safely
+
     enqueue_safely(run, execute_drift_run)
 
 
 def request_cancel(run):
     from django.utils import timezone
-    from common.logging import record_transition
+
     from apps.drift.tasks import cancel_drift_run
+    from common.logging import record_transition
 
     with transaction.atomic():
         run = DriftRun.objects.select_for_update().get(pk=run.pk)
@@ -38,4 +40,3 @@ def request_cancel(run):
         record_transition(run, "cancelled")
         transaction.on_commit(lambda: cancel_drift_run.delay(str(run.public_id)))
     return run
-

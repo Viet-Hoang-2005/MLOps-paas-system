@@ -1,4 +1,5 @@
 import uuid
+
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -67,7 +68,11 @@ class TrainingJobsCompareEndpoint(APIView):
         if not parsed_uuids:
             return Response({"runs": []})
 
-        user_jobs = jobs_for_user(request.user).filter(public_id__in=parsed_uuids).prefetch_related("step_metrics", "hyperparameters")
+        user_jobs = (
+            jobs_for_user(request.user)
+            .filter(public_id__in=parsed_uuids)
+            .prefetch_related("step_metrics", "hyperparameters")
+        )
 
         runs = []
         all_metric_names = set()
@@ -116,4 +121,3 @@ class TrainingJobsCompareEndpoint(APIView):
                 "param_names": sorted(all_param_names),
             }
         )
-

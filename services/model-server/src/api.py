@@ -21,17 +21,17 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.datastructures import Headers
 from fastapi.security import APIKeyHeader
 from jwt.algorithms import RSAAlgorithm
 from prometheus_client import Counter, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from redis.sentinel import Sentinel
+from starlette.datastructures import Headers
 
 from src import auth as auth_service
-from src.jwks_cache import JwksKeyCache
 from src.events import publish_inference_event
 from src.inference import parse_worker_prediction
+from src.jwks_cache import JwksKeyCache
 from src.logging_utils import (
     RequestLoggingMiddleware,
     Summary,
@@ -338,7 +338,9 @@ def readiness():
 
     checks = dependency_checks(model_registry_engine, _redis_connection, kafka_producer)
     ready = all(value == "ok" for value in checks.values())
-    return JSONResponse({"status": "ok" if ready else "unavailable", "checks": checks}, status_code=200 if ready else 503)
+    return JSONResponse(
+        {"status": "ok" if ready else "unavailable", "checks": checks}, status_code=200 if ready else 503
+    )
 
 
 @app.get("/models/{version_id}/health")
@@ -527,8 +529,7 @@ async def _predict(
             fresh_record = None
 
         if fresh_record and (
-            fresh_record.get("deployment_status") != "succeeded"
-            or not fresh_record.get("endpoint_container_name")
+            fresh_record.get("deployment_status") != "succeeded" or not fresh_record.get("endpoint_container_name")
         ):
             current_status = fresh_record.get("deployment_status") or "stopped"
             raise HTTPException(

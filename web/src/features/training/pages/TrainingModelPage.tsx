@@ -94,11 +94,23 @@ export default function TrainingModelPage() {
       { value: "all", label: t("statusFilter.all") },
       { value: "editing", label: t("detail.statuses.editing", "Editing") },
       { value: "running", label: t("detail.statuses.running", "Running") },
-      { value: "uploading", label: t("detail.statuses.uploading", "Uploading") },
-      { value: "cancelling", label: t("detail.statuses.cancelling", "Cancelling") },
-      { value: "completed", label: t("detail.statuses.completed", "Completed") },
+      {
+        value: "uploading",
+        label: t("detail.statuses.uploading", "Uploading"),
+      },
+      {
+        value: "cancelling",
+        label: t("detail.statuses.cancelling", "Cancelling"),
+      },
+      {
+        value: "completed",
+        label: t("detail.statuses.completed", "Completed"),
+      },
       { value: "failed", label: t("detail.statuses.failed", "Failed") },
-      { value: "cancelled", label: t("detail.statuses.cancelled", "Cancelled") },
+      {
+        value: "cancelled",
+        label: t("detail.statuses.cancelled", "Cancelled"),
+      },
       { value: "pending", label: t("detail.statuses.pending", "Pending") },
       { value: "queued", label: t("detail.statuses.queued", "Queued") },
     ],
@@ -204,7 +216,9 @@ export default function TrainingModelPage() {
           <button
             type="button"
             className="break-all text-left font-medium hover:text-color-primary focus:outline-none"
-            onClick={() => navigate(`/dashboard/training/${row.original.id}/workspace`)}
+            onClick={() =>
+              navigate(`/dashboard/training/${row.original.id}/workspace`)
+            }
           >
             {row.original.id}
           </button>
@@ -225,8 +239,9 @@ export default function TrainingModelPage() {
         accessorKey: "project_id",
         header: t("studio.project", "Model Project"),
         cell: ({ row }) =>
-          projects?.models.find((project) => project.id === row.original.project_id)?.name ??
-          t("studio.unassigned", "Unassigned"),
+          projects?.models.find(
+            (project) => project.id === row.original.project_id,
+          )?.name ?? t("studio.unassigned", "Unassigned"),
       },
       {
         accessorKey: "status",
@@ -234,7 +249,11 @@ export default function TrainingModelPage() {
         cell: ({ row }) => {
           const job = row.original;
           if (job.deletion_pending) {
-            return <Badge variant="warning">{t("table.deleting", "Deleting…")}</Badge>;
+            return (
+              <Badge variant="warning">
+                {t("table.deleting", "Deleting…")}
+              </Badge>
+            );
           }
           const status = job.status;
           const variant =
@@ -346,7 +365,9 @@ export default function TrainingModelPage() {
           onClick={() =>
             navigate(
               `/dashboard/training/new${
-                projectFilter && projectFilter !== "all" && projectFilter !== "unassigned"
+                projectFilter &&
+                projectFilter !== "all" &&
+                projectFilter !== "unassigned"
                   ? `?project=${projectFilter}`
                   : ""
               }`,

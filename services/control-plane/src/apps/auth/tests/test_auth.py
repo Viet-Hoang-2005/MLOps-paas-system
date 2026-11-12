@@ -1,13 +1,13 @@
-from urllib.parse import urlparse
 from io import BytesIO
-from PIL import Image
+from urllib.parse import urlparse
 
 import jwt
 import pytest
 from django.contrib.auth import get_user_model
-from django.db import OperationalError
 from django.core.files.base import ContentFile
+from django.db import OperationalError
 from django.test import override_settings
+from PIL import Image
 from rest_framework.test import APIClient
 
 from apps.auth.services.oauth import _oauth_user, authenticate_github, authenticate_google
@@ -549,7 +549,6 @@ def test_google_oauth_rejects_invalid_tokeninfo_response():
         authenticate_google("invalid-token", http=client)
 
 
-
 @pytest.mark.django_db
 @pytest.mark.parametrize("method", ["post", "get", "put"])
 def test_legacy_register_endpoint_is_gone(method):
@@ -633,7 +632,6 @@ def test_password_reset_complete_survives_duplicate_casing_without_500():
     assert response.status_code == 200
     user.refresh_from_db()
     assert user.check_password("NewStrongPassword123!")
-
 
 
 def _login(client, email, password="wrong-password", **extra):

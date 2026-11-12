@@ -13,7 +13,10 @@ describe("Projects Navigation - projectSelectionPath", () => {
   it("should preserve active section when switching projects from an existing project path", () => {
     for (const section of sections) {
       expect(
-        projectSelectionPath(`/dashboard/projects/old-proj/${section}`, "new-proj"),
+        projectSelectionPath(
+          `/dashboard/projects/old-proj/${section}`,
+          "new-proj",
+        ),
       ).toBe(`/dashboard/projects/new-proj/${section}`);
     }
   });
@@ -45,4 +48,3 @@ describe("Projects Navigation - projectSelectionPath", () => {
     }
   });
 });
-

@@ -25,7 +25,8 @@ export default function TrainingJobMetricsPage() {
     refreshMetrics,
   } = useTrainingJobDetailContext();
 
-  const latest = job.status === "running" && !metricsError ? metrics?.latest : null;
+  const latest =
+    job.status === "running" && !metricsError ? metrics?.latest : null;
   const highCpu = latest?.cpu_percent != null && latest.cpu_percent > 85;
   const highRam = latest?.memory_percent != null && latest.memory_percent > 85;
   const memoryValue =
@@ -51,8 +52,7 @@ export default function TrainingJobMetricsPage() {
       ? formatMetricPercent(latest.gpu_percent)
       : t("detail.metricsPage.gpuUnavailable");
   const gpuDetail =
-    latest?.gpu_memory_used_mb != null &&
-    latest.gpu_memory_total_mb != null
+    latest?.gpu_memory_used_mb != null && latest.gpu_memory_total_mb != null
       ? `${formatMegabytes(latest.gpu_memory_used_mb)} / ${formatMegabytes(
           latest.gpu_memory_total_mb,
         )}`
@@ -141,7 +141,11 @@ export default function TrainingJobMetricsPage() {
             <MetricCell
               icon={<HardDrive className="h-3.5 w-3.5" />}
               label={t("detail.metricsPage.vram")}
-              value={latest.gpu_memory_percent == null ? t("detail.metricsPage.gpuUnavailable") : formatMetricPercent(latest.gpu_memory_percent)}
+              value={
+                latest.gpu_memory_percent == null
+                  ? t("detail.metricsPage.gpuUnavailable")
+                  : formatMetricPercent(latest.gpu_memory_percent)
+              }
               detail={gpuDetail}
               muted={latest.gpu_memory_percent == null}
               progress={latest.gpu_memory_percent}
@@ -150,11 +154,12 @@ export default function TrainingJobMetricsPage() {
           </div>
         ) : (
           <div className="py-6 text-center text-style-caption text-color-muted-foreground">
-            {job.status === "running" && (metricsError || metrics?.status === "unavailable")
+            {job.status === "running" &&
+            (metricsError || metrics?.status === "unavailable")
               ? t("detail.metricsPage.unavailableDescription")
               : activeStatuses.includes(job.status)
-              ? t("detail.metricsPage.startingDescription")
-              : t("detail.metricsPage.emptyDescription")}
+                ? t("detail.metricsPage.startingDescription")
+                : t("detail.metricsPage.emptyDescription")}
           </div>
         )}
       </section>

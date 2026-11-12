@@ -42,9 +42,7 @@ def test_s3storage_head_falls_back_to_etag_without_download_when_metadata_missin
     assert stored.checksum == "d41d8cd98f00b204e9800998ecf8427e"
     assert stored.etag == '"d41d8cd98f00b204e9800998ecf8427e"'
     assert stored.size_bytes == len(content)
-    client.head_object.assert_called_once_with(
-        Bucket="test-bucket", Key="staging/users/u1/models/m1/preview/model.pkl"
-    )
+    client.head_object.assert_called_once_with(Bucket="test-bucket", Key="staging/users/u1/models/m1/preview/model.pkl")
     client.get_object.assert_not_called()
 
 
@@ -124,4 +122,3 @@ def test_s3storage_copy_requires_verified_source_etag():
     )
 
     assert client.copy_object.call_args.kwargs["CopySourceIfMatch"] == "verified-etag"
-

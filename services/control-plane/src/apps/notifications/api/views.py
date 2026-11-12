@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.api.pagination import DefaultPagination
+
 from ..selectors import get_user_unread_count, list_user_notifications
 from ..services import (
     delete_notification,

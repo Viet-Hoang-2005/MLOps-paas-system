@@ -45,8 +45,9 @@ class WorkspaceEntriesEndpoint(APIView):
         payload, uploaded = _payload(request, max_bytes=service.MAX_DATA if kind == "data" else service.MAX_TEXT)
         if kind == "data" and not uploaded:
             raise ValidationError({"file": "Upload a CSV file."})
-        entry, revision = service.create_entry(workspace, revision=request.data.get("revision"),
-            path=request.data.get("path"), kind=kind, payload=payload)
+        entry, revision = service.create_entry(
+            workspace, revision=request.data.get("revision"), path=request.data.get("path"), kind=kind, payload=payload
+        )
         return Response({"entry": _serialize_entry(entry), "revision": revision}, status=status.HTTP_201_CREATED)
 
 
@@ -55,12 +56,21 @@ class WorkspaceEntryEndpoint(APIView):
         workspace = _workspace(request.user, job_id)
         entry = _entry(workspace, entry_id)
         kind = request.data.get("kind")
-        payload, replacement = _payload(request, max_bytes=service.MAX_DATA if (kind or entry.kind) == "data" else service.MAX_TEXT)
+        payload, replacement = _payload(
+            request, max_bytes=service.MAX_DATA if (kind or entry.kind) == "data" else service.MAX_TEXT
+        )
         if (kind or entry.kind) == "data" and payload is not None and not replacement:
             raise ValidationError({"file": "Upload a CSV file."})
         path = request.data.get("path")
-        entry, revision = service.edit_file(workspace, entry_id, revision=request.data.get("revision"),
-            path=path, kind=kind, payload=payload, replacement=replacement)
+        entry, revision = service.edit_file(
+            workspace,
+            entry_id,
+            revision=request.data.get("revision"),
+            path=path,
+            kind=kind,
+            payload=payload,
+            replacement=replacement,
+        )
         entry.refresh_from_db()
         return Response({"entry": _serialize_entry(entry), "revision": revision})
 
@@ -74,8 +84,9 @@ class WorkspaceEntryEndpoint(APIView):
 class WorkspaceSecretEndpoint(APIView):
     def put(self, request, job_id, name):
         workspace = _workspace(request.user, job_id)
-        secret, revision = service.set_secret(workspace, revision=request.data.get("revision"), name=name,
-                                               value=request.data.get("value"))
+        secret, revision = service.set_secret(
+            workspace, revision=request.data.get("revision"), name=name, value=request.data.get("value")
+        )
         return Response({"name": secret.name, "updated_at": secret.updated_at.isoformat(), "revision": revision})
 
     def delete(self, request, job_id, name):

@@ -9,7 +9,6 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from apps.auth.throttles import LoginAccountRateThrottle, LoginIpRateThrottle
 from apps.auth.api.serializers import (
     TenantTokenRefreshSerializer,
     TenantTokenSerializer,
@@ -21,6 +20,7 @@ from apps.auth.services.cookies import (
     set_refresh_token_cookie,
     verify_auth_security_headers,
 )
+from apps.auth.throttles import LoginAccountRateThrottle, LoginIpRateThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,9 @@ class LogoutEndpoint(APIView):
             # Never report success for a session the server could not revoke, but still
             # drop the browser cookie so this client stops presenting the token.
             response = Response(
-                {"detail": "Signed out locally, but the session could not be revoked on the server; it expires on its own."},
+                {
+                    "detail": "Signed out locally, but the session could not be revoked on the server; it expires on its own."
+                },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         else:

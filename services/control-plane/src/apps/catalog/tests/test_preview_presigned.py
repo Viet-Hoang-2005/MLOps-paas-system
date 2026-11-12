@@ -181,6 +181,7 @@ def test_presigned_preview_update_promotes_to_committed_and_prevents_overwrite(p
     assert asset.size_bytes == len(b"original-valid-model")
     # Checksum MUST be SHA-256 hex string (64 chars), not MD5 ETag
     import hashlib
+
     assert asset.checksum == hashlib.sha256(b"original-valid-model").hexdigest()
 
     # P1 Integrity Check 2: Staging object is deleted upon commit
@@ -256,7 +257,9 @@ def test_presigned_security_confinement_and_validation(project, owner, monkeypat
     client.force_authenticate(owner)
 
     # 1. Attempt to use S3 URI belonging to another project/tenant
-    malicious_uri = f"s3://{storage.bucket}/staging/users/other-tenant/models/{uuid.uuid4()}/preview/x/source_artifact/model.pkl"
+    malicious_uri = (
+        f"s3://{storage.bucket}/staging/users/other-tenant/models/{uuid.uuid4()}/preview/x/source_artifact/model.pkl"
+    )
     res1 = client.patch(
         f"/api/models/{project.public_id}/preview/",
         {
@@ -399,7 +402,9 @@ def test_save_preview_validates_existing_retained_artifact_on_flavor_or_format_c
 
     prefix = project_prefix(owner.tenant_id, project.public_id)
     committed_key = f"{prefix}/preview/committed/c1/source_artifact/model.pkl"
-    stored_committed = storage.put(committed_key, SimpleUploadedFile("model.pkl", b"valid-pkl"), "application/octet-stream")
+    stored_committed = storage.put(
+        committed_key, SimpleUploadedFile("model.pkl", b"valid-pkl"), "application/octet-stream"
+    )
     project.preview.assets.create(
         kind="source_artifact",
         name="model.pkl",
@@ -409,7 +414,9 @@ def test_save_preview_validates_existing_retained_artifact_on_flavor_or_format_c
 
     # Put a metrics file in staging
     staging_metrics_key_1 = f"staging/{prefix}/preview/b2/metrics/metrics.json"
-    stored_metrics_1 = storage.put(staging_metrics_key_1, SimpleUploadedFile("metrics.json", b'{"acc": 0.9}'), "application/json")
+    stored_metrics_1 = storage.put(
+        staging_metrics_key_1, SimpleUploadedFile("metrics.json", b'{"acc": 0.9}'), "application/json"
+    )
 
     client = APIClient()
     client.force_authenticate(owner)
@@ -430,7 +437,9 @@ def test_save_preview_validates_existing_retained_artifact_on_flavor_or_format_c
 
     # 2. User changes artifact_format to "mlflow_zip" without re-uploading artifact (model.pkl is not a .zip)
     staging_metrics_key_2 = f"staging/{prefix}/preview/b3/metrics/metrics.json"
-    stored_metrics_2 = storage.put(staging_metrics_key_2, SimpleUploadedFile("metrics.json", b'{"acc": 0.9}'), "application/json")
+    stored_metrics_2 = storage.put(
+        staging_metrics_key_2, SimpleUploadedFile("metrics.json", b'{"acc": 0.9}'), "application/json"
+    )
     res_bad_format = client.patch(
         f"/api/models/{project.public_id}/preview/",
         {
@@ -447,7 +456,9 @@ def test_save_preview_validates_existing_retained_artifact_on_flavor_or_format_c
 
     # 3. User changes flavor to "xgboost" (which accepts .pkl) -> SUCCESS
     staging_metrics_key_3 = f"staging/{prefix}/preview/b4/metrics/metrics.json"
-    stored_metrics_3 = storage.put(staging_metrics_key_3, SimpleUploadedFile("metrics.json", b'{"acc": 0.9}'), "application/json")
+    stored_metrics_3 = storage.put(
+        staging_metrics_key_3, SimpleUploadedFile("metrics.json", b'{"acc": 0.9}'), "application/json"
+    )
     res_ok = client.patch(
         f"/api/models/{project.public_id}/preview/",
         {
@@ -605,7 +616,9 @@ def test_save_preview_validates_source_code_and_reference_data_content(project, 
 
     # 3. Valid source code and reference data succeed
     good_code_key = f"staging/{prefix}/preview/b-good/source_code/serve.py"
-    stored_good_code = storage.put(good_code_key, SimpleUploadedFile("serve.py", b"def predict(data): return 1\n"), "text/x-python")
+    stored_good_code = storage.put(
+        good_code_key, SimpleUploadedFile("serve.py", b"def predict(data): return 1\n"), "text/x-python"
+    )
     good_csv_key = f"staging/{prefix}/preview/b-good/reference_data/ref.csv"
     stored_good_csv = storage.put(good_csv_key, SimpleUploadedFile("ref.csv", b"f1,f2\n1.0,2.0\n3.0,4.0\n"), "text/csv")
 
@@ -623,4 +636,3 @@ def test_save_preview_validates_source_code_and_reference_data_content(project, 
     assert res3.status_code == 200, res3.data
     project.refresh_from_db()
     assert project.preview.assets.count() == 2
-

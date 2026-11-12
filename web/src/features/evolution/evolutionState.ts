@@ -125,10 +125,16 @@ export function comparisonRows(left: ModelVersion, right: ModelVersion) {
       ]),
     ),
     ...Object.fromEntries(
-      Object.entries(version.supplemental_summaries ?? {}).flatMap(([kind, item]) =>
-        item.value && typeof item.value === "object" && !Array.isArray(item.value)
-          ? Object.entries(item.value).map(([key, value]) => [`supplemental.${kind}.${key}`, value])
-          : [[`supplemental.${kind}`, item.value]],
+      Object.entries(version.supplemental_summaries ?? {}).flatMap(
+        ([kind, item]) =>
+          item.value &&
+          typeof item.value === "object" &&
+          !Array.isArray(item.value)
+            ? Object.entries(item.value).map(([key, value]) => [
+                `supplemental.${kind}.${key}`,
+                value,
+              ])
+            : [[`supplemental.${kind}`, item.value]],
       ),
     ),
     ...Object.fromEntries(

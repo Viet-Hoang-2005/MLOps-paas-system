@@ -5,18 +5,18 @@ from apps.catalog.api.webhooks import ProjectDeletionWebhookEndpoint
 from apps.deployment.api.urls import build_patterns, deployment_patterns, endpoint_patterns
 from apps.deployment.api.webhooks import BuildWebhookEndpoint, DeploymentWebhookEndpoint
 from apps.drift.api.webhooks import AutomaticDriftWebhookEndpoint, DriftRunWebhookEndpoint
-from apps.observability.api.endpoints import ProductionDataEndpoint
-from apps.observability.api.executions import ExecutionObservationEndpoint
 from apps.mlflow.views import (
     MLflowArtifactsMultipartFallbackView,
     MLflowArtifactsProxyView,
 )
 from apps.notifications.api.webhooks import AlertWebhookEndpoint
+from apps.observability.api.endpoints import ProductionDataEndpoint
+from apps.observability.api.executions import ExecutionObservationEndpoint
 from apps.training.api.webhooks import (
     TrainingCancellationWebhookEndpoint,
+    TrainingInputDownloadURLEndpoint,
     TrainingJobWebhookEndpoint,
     TrainingOutputUploadURLEndpoint,
-    TrainingInputDownloadURLEndpoint,
     TrainingRuntimeConfigEndpoint,
 )
 

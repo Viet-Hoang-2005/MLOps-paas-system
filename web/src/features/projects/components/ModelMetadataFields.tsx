@@ -45,9 +45,7 @@ export function ModelMetadataFields({
       <Picker
         title={t("uploadFlow.metadata.accessMode")}
         value={form.access_mode}
-        onChange={(value) =>
-          setField("access_mode", value)
-        }
+        onChange={(value) => setField("access_mode", value)}
         options={[
           {
             value: "private",

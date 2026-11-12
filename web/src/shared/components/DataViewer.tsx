@@ -102,7 +102,9 @@ export function DataViewer({
           )}
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            {icon ?? <TableIcon className="h-4 w-4 text-color-primary shrink-0" />}
+            {icon ?? (
+              <TableIcon className="h-4 w-4 text-color-primary shrink-0" />
+            )}
             {typeof title === "string" ? (
               <span className="truncate font-mono text-style-body font-semibold text-color-foreground">
                 {title}
@@ -151,7 +153,9 @@ export function DataViewer({
                     <tr
                       key={actualRowIndex}
                       className={
-                        isHeader ? "bg-muted sticky top-0 z-10" : "hover:bg-muted"
+                        isHeader
+                          ? "bg-muted sticky top-0 z-10"
+                          : "hover:bg-muted"
                       }
                     >
                       <td className="w-12 px-2 py-1 text-style-caption text-color-muted-foreground bg-muted border-r border-b text-center sticky left-0 z-20">

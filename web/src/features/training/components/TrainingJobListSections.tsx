@@ -2,7 +2,8 @@ import { useTranslation } from "react-i18next";
 import { useMemo } from "react";
 import { Select, type SelectOption } from "@/shared/components/Select";
 
-export type TrainingStatusFilter = "editing" | "pending" | "success" | "failed" | "all";
+export type TrainingStatusFilter =
+  "editing" | "pending" | "success" | "failed" | "all";
 
 export function TrainingJobStatusFilter({
   value,

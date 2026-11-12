@@ -1,8 +1,5 @@
 import { refreshSession } from "@/features/auth/api/authApi";
-import {
-  clearAuthStore,
-  isAuthenticated,
-} from "@/features/auth/authStore";
+import { clearAuthStore, isAuthenticated } from "@/features/auth/authStore";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";

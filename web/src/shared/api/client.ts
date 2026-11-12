@@ -95,9 +95,7 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error: unknown) =>
-    Promise.reject(
-      error instanceof Error ? error : new Error(String(error)),
-    ),
+    Promise.reject(error instanceof Error ? error : new Error(String(error))),
 );
 
 apiClient.interceptors.response.use(

@@ -115,7 +115,12 @@ export function useProductionData(modelId?: string, versionId?: string) {
 
 export function useProductionDataCount(projectId?: string, versionId?: string) {
   return useQuery({
-    queryKey: [...driftQueryKeys.all, "production-count", projectId ?? "", versionId ?? ""],
+    queryKey: [
+      ...driftQueryKeys.all,
+      "production-count",
+      projectId ?? "",
+      versionId ?? "",
+    ],
     queryFn: () => getProductionDataCount(projectId!, versionId),
     enabled: Boolean(projectId),
     refetchInterval: 15000,
@@ -189,5 +194,3 @@ export function useDriftReportData(runId?: string) {
     enabled: Boolean(runId),
   });
 }
-
-

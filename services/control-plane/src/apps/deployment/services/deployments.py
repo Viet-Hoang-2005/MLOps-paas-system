@@ -38,9 +38,7 @@ def request_stop(deployment):
 
     with transaction.atomic():
         project = ModelProject.objects.select_for_update().get(pk=deployment.version.project_id)
-        deployment = (
-            Deployment.objects.select_for_update(of=("self",)).select_related("version").get(pk=deployment.pk)
-        )
+        deployment = Deployment.objects.select_for_update(of=("self",)).select_related("version").get(pk=deployment.pk)
         claim_deployment_stop(project, deployment)
     return deployment
 

@@ -1,4 +1,4 @@
-from infrastructure.storage.paths import training_job_prefix, tenant_training_job_prefix
+from infrastructure.storage.paths import tenant_training_job_prefix, training_job_prefix
 
 
 def training_prefix_for(job):
@@ -30,4 +30,3 @@ def validate_training_uri(job, bucket, kind, uri):
     if uri != expected:
         raise ValueError(f"Training {kind} URI is outside the job-scoped storage path.")
     return uri
-

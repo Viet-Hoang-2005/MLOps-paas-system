@@ -195,7 +195,6 @@ export default function ProfileSettingPage() {
     }
   };
 
-
   return (
     <div className="flex w-full flex-1 flex-col space-y-6">
       <PageHeader title={t("setting")} />

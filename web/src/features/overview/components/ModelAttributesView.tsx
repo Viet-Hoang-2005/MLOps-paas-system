@@ -117,7 +117,7 @@ export function ModelAttributesView({
           onRefresh={handleRefresh}
         />
       </div>
-      
+
       {/* Row 2 (2 cols): Evaluation Metrics (50%) + Hyperparameters (50%) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-stretch">
         <MetricsCard
@@ -155,9 +155,7 @@ export function ModelAttributesView({
       {/* Row 3 (1 col - Full Width 100%): Input Schema */}
       <InputSchemaCard
         inputSchema={inputSchema}
-        filename={
-          inputSchema?.filename || getArtifactFilename("input_schema")
-        }
+        filename={inputSchema?.filename || getArtifactFilename("input_schema")}
         projectId={projectId}
         versionId={versionId}
         isPreview={isPreview}

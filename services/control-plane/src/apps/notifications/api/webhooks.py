@@ -1,4 +1,5 @@
 import logging
+
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.response import Response
@@ -6,6 +7,7 @@ from rest_framework.views import APIView
 
 from apps.catalog.models import ModelProject
 from common.api.permissions import HasInternalWebhookSecret
+
 from ..models import Notification
 from ..services import create_notification
 
@@ -41,11 +43,7 @@ class AlertWebhookEndpoint(APIView):
 
             title = annotations.get("summary") or f"Alert: {alertname}"
             description = annotations.get("description") or title
-            level = (
-                Notification.Level.ERROR
-                if severity == "critical"
-                else Notification.Level.WARNING
-            )
+            level = Notification.Level.ERROR if severity == "critical" else Notification.Level.WARNING
 
             # Route to model project owner if project_id is present
             if project_id:

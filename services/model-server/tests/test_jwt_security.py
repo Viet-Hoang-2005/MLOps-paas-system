@@ -21,15 +21,24 @@ def signing_key():
 def access_claims():
     now = int(time.time())
     return {
-        "tenant_id": "tenant", "user_id": 1, "token_type": "access", "jti": "test-id",
-        "iss": "django-control-plane", "aud": "mlops-paas", "iat": now, "exp": now + 60,
+        "tenant_id": "tenant",
+        "user_id": 1,
+        "token_type": "access",
+        "jti": "test-id",
+        "iss": "django-control-plane",
+        "aud": "mlops-paas",
+        "iat": now,
+        "exp": now + 60,
     }
 
 
 async def authorize(claims, signing_key, *, access_mode="private", verification_key=None):
     token = jwt.encode(claims, signing_key, algorithm="RS256", headers={"kid": "test-key"})
     return await authorize_model_access(
-        VERSION_ID, None, f"Bearer {token}", redis_client=None,
+        VERSION_ID,
+        None,
+        f"Bearer {token}",
+        redis_client=None,
         get_model_version_record=lambda *a, **kw: {"tenant_id": "tenant", "access_mode": access_mode},
         verify_project_api_key=None,
         get_public_key=AsyncMock(return_value=verification_key or signing_key.public_key()),

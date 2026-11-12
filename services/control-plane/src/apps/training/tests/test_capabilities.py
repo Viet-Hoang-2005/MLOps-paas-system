@@ -22,7 +22,12 @@ def _job(email="owner@example.com"):
         data_snapshot_uri="pending",
         output_uri="pending",
         status="running",
-     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
     uris = expected_training_uris(job, settings.AWS_STORAGE_BUCKET_NAME)
     job.code_snapshot_uri = uris["code"]
     job.data_snapshot_uri = uris["data"]
@@ -57,6 +62,7 @@ def test_dispatch_retry_preserves_existing_capability_and_caps_ttl(settings):
     first = issue_capability(job, "input_download", preserve_existing=True)
     second = issue_capability(job, "input_download", preserve_existing=True)
     from apps.training.services.capabilities import capability_for_token
+
     assert capability_for_token(job=job, purpose="input_download", token=first)
     assert capability_for_token(job=job, purpose="input_download", token=second)
     capability = capability_for_token(job=job, purpose="input_download", token=first)
@@ -152,13 +158,21 @@ def test_trusted_reporter_cannot_overwrite_cancelled_job():
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("error,expected_status", [(ValueError("empty"), "failed"), (TimeoutError("temporary"), "uploading")])
+@pytest.mark.parametrize(
+    "error,expected_status", [(ValueError("empty"), "failed"), (TimeoutError("temporary"), "uploading")]
+)
 def test_trusted_completion_requires_output(monkeypatch, error, expected_status):
     from apps.training.services.output_finalization import finalize_output
+
     monkeypatch.setattr("apps.training.services.outputs.verify_training_output", Mock(side_effect=error))
     job = _job()
     token = issue_capability(job, "trusted_reporter")
-    response = APIClient().post(f"/internal/webhooks/training-jobs/{job.public_id}/", {"workflow_status": "Succeeded"}, format="json", HTTP_AUTHORIZATION=f"Bearer {token}")
+    response = APIClient().post(
+        f"/internal/webhooks/training-jobs/{job.public_id}/",
+        {"workflow_status": "Succeeded"},
+        format="json",
+        HTTP_AUTHORIZATION=f"Bearer {token}",
+    )
     assert response.status_code == 202
     if isinstance(error, TimeoutError):
         with pytest.raises(RuntimeError, match="temporarily unavailable"):

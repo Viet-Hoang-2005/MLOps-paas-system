@@ -1,4 +1,5 @@
 from django.urls import path
+
 from .views import (
     MLflowArtifactsListView,
     MLflowArtifactsMultipartFallbackView,
@@ -35,11 +36,26 @@ urlpatterns = [
     # Artifacts (standard MLflow and proxy routes)
     path("artifacts/list", MLflowArtifactsListView.as_view(), name="mlflow-artifacts-list"),
     path("artifacts/upload-url", MLflowArtifactsUploadUrlView.as_view(), name="mlflow-artifacts-upload-url"),
-    path("api/2.0/mlflow-artifacts/artifacts/<path:subpath>", MLflowArtifactsProxyView.as_view(), name="mlflow-artifacts-proxy-subpath"),
+    path(
+        "api/2.0/mlflow-artifacts/artifacts/<path:subpath>",
+        MLflowArtifactsProxyView.as_view(),
+        name="mlflow-artifacts-proxy-subpath",
+    ),
     path("api/2.0/mlflow-artifacts/artifacts", MLflowArtifactsProxyView.as_view(), name="mlflow-artifacts-proxy-root"),
-    path("mlflow-artifacts/artifacts/<path:subpath>", MLflowArtifactsProxyView.as_view(), name="mlflow-artifacts-proxy-alt-subpath"),
+    path(
+        "mlflow-artifacts/artifacts/<path:subpath>",
+        MLflowArtifactsProxyView.as_view(),
+        name="mlflow-artifacts-proxy-alt-subpath",
+    ),
     path("mlflow-artifacts/artifacts", MLflowArtifactsProxyView.as_view(), name="mlflow-artifacts-proxy-alt-root"),
-    path("api/2.0/mlflow-artifacts/mpu/<path:subpath>", MLflowArtifactsMultipartFallbackView.as_view(), name="mlflow-mpu-fallback"),
-    path("mlflow-artifacts/mpu/<path:subpath>", MLflowArtifactsMultipartFallbackView.as_view(), name="mlflow-mpu-fallback-alt"),
+    path(
+        "api/2.0/mlflow-artifacts/mpu/<path:subpath>",
+        MLflowArtifactsMultipartFallbackView.as_view(),
+        name="mlflow-mpu-fallback",
+    ),
+    path(
+        "mlflow-artifacts/mpu/<path:subpath>",
+        MLflowArtifactsMultipartFallbackView.as_view(),
+        name="mlflow-mpu-fallback-alt",
+    ),
 ]
-

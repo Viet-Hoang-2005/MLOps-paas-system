@@ -86,10 +86,7 @@ export function AttributeDropzoneCard({
     onSuccess: (updated) => {
       setStagedFile(null);
       toast.success(t("workspace.supplementalSuccess"));
-      queryClient.setQueryData(
-        evolutionQueryKeys.snapshot(versionId),
-        updated,
-      );
+      queryClient.setQueryData(evolutionQueryKeys.snapshot(versionId), updated);
       void queryClient.invalidateQueries({
         queryKey: evolutionQueryKeys.versions(projectId),
       });
@@ -105,9 +102,7 @@ export function AttributeDropzoneCard({
       onSuccess?.();
     },
     onError: (err) => {
-      toast.error(
-        getApiErrorMessage(err, t("workspace.supplementalFailed")),
-      );
+      toast.error(getApiErrorMessage(err, t("workspace.supplementalFailed")));
     },
   });
 
@@ -135,10 +130,7 @@ export function AttributeDropzoneCard({
               "workspace.dragSupplementalJson",
               "Drag & drop JSON file or browse",
             )}
-            subtitle={t(
-              "workspace.maxJsonSize",
-              "Supported: .json, max 4MB",
-            )}
+            subtitle={t("workspace.maxJsonSize", "Supported: .json, max 4MB")}
             hint={t(
               "workspace.supplementalHint",
               "File will become immutable once registered.",
@@ -182,4 +174,3 @@ export function AttributeDropzoneCard({
     </section>
   );
 }
-

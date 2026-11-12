@@ -69,7 +69,8 @@ export const registryEn = {
       "This version does not belong to the selected project or no longer exists.",
     invalidTab: "This section does not exist.",
     backToDetails: "Open Details",
-    noProject: "No model project available for evolution. Create a new project and register a model to start tracking versions.",
+    noProject:
+      "No model project available for evolution. Create a new project and register a model to start tracking versions.",
     registeredAt: "Registered at",
     source: "Build source",
     preview: "Preview",

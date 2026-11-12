@@ -27,7 +27,12 @@ PROBE_PREFIX = "mlops-local-gpu-probe-"
 
 
 def _result(status, reason="", devices=None):
-    return {"status": status, "reason": reason, "devices": devices or [], "checked_at": datetime.now(timezone.utc).isoformat()}
+    return {
+        "status": status,
+        "reason": reason,
+        "devices": devices or [],
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 def _number(value):
@@ -46,8 +51,9 @@ def _parse(output):
         identifier, name, total, free = (value.strip() for value in row)
         if not GPU_UUID.fullmatch(identifier) or not name:
             continue
-        devices.append({"id": identifier, "name": name[:160], "memory_total_mib": _number(total),
-                        "memory_free_mib": _number(free)})
+        devices.append(
+            {"id": identifier, "name": name[:160], "memory_total_mib": _number(total), "memory_free_mib": _number(free)}
+        )
     return devices
 
 
@@ -56,8 +62,11 @@ def _reap_stale(client):
     for container in client.containers.list(all=True, filters={"label": "mlops_paas.gpu_probe=true"}):
         labels = container.attrs.get("Config", {}).get("Labels") or {}
         expires = labels.get("mlops_paas.gpu_probe_expires", "")
-        if (re.fullmatch(PROBE_PREFIX + r"[0-9a-f]{32}", container.name or "")
-                and str(expires).isdigit() and int(expires) < time.time()):
+        if (
+            re.fullmatch(PROBE_PREFIX + r"[0-9a-f]{32}", container.name or "")
+            and str(expires).isdigit()
+            and int(expires) < time.time()
+        ):
             with suppress(Exception):
                 container.remove(force=True)
 
@@ -70,12 +79,24 @@ def _probe(device_id=None, client=None, *, metrics=False):
         client = client or DockerClient(timeout=3).client
         _reap_stale(client)
         client.images.get(IMAGE)
-        request = (docker.types.DeviceRequest(device_ids=[device_id], capabilities=[["gpu"]])
-                   if device_id else docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]]))
+        request = (
+            docker.types.DeviceRequest(device_ids=[device_id], capabilities=[["gpu"]])
+            if device_id
+            else docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])
+        )
         container = client.containers.create(
-            IMAGE, name=name, entrypoint="nvidia-smi", command=METRICS_QUERY if metrics else QUERY, device_requests=[request],
-            network_disabled=True, user="10001:10001", mem_limit="256m", nano_cpus=250_000_000,
-            pids_limit=64, cap_drop=["ALL"], security_opt=["no-new-privileges:true"],
+            IMAGE,
+            name=name,
+            entrypoint="nvidia-smi",
+            command=METRICS_QUERY if metrics else QUERY,
+            device_requests=[request],
+            network_disabled=True,
+            user="10001:10001",
+            mem_limit="256m",
+            nano_cpus=250_000_000,
+            pids_limit=64,
+            cap_drop=["ALL"],
+            security_opt=["no-new-privileges:true"],
             labels={"mlops_paas.gpu_probe": "true", "mlops_paas.gpu_probe_expires": str(int(time.time()) + 120)},
             detach=True,
         )
@@ -90,8 +111,14 @@ def _probe(device_id=None, client=None, *, metrics=False):
             if len(rows) == 1 and len(rows[0]) == 4:
                 identifier, utilization, used, total = (value.strip() for value in rows[0])
                 if GPU_UUID.fullmatch(identifier):
-                    devices = [{"id": identifier, "gpu_percent": _number(utilization),
-                                "gpu_memory_used_mb": _number(used), "gpu_memory_total_mb": _number(total)}]
+                    devices = [
+                        {
+                            "id": identifier,
+                            "gpu_percent": _number(utilization),
+                            "gpu_memory_used_mb": _number(used),
+                            "gpu_memory_total_mb": _number(total),
+                        }
+                    ]
         else:
             devices = _parse(output)
         if not devices:

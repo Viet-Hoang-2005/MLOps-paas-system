@@ -6,7 +6,6 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-
 from src import io, tasks
 from src.image_build import (
     PROTECTED_PACKAGES,
@@ -143,4 +142,3 @@ def test_notify_task_cleans_a_context_prepared_with_nan(tmp_path, monkeypatch):
     monkeypatch.setattr(tasks, "post_webhook", posted)
     tasks.run_notify_task(str(tmp_path), "http://callback")
     assert posted.call_args.args[1]["metrics_summary"] == {"loss": None}
-

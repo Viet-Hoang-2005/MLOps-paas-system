@@ -29,16 +29,23 @@ def test_rejects_job_owner_inconsistent_with_project_or_workspace():
         TrainingJob.objects.create(project=project, owner=other, model_flavor="sklearn")
 
 
-
 @pytest.mark.django_db
 def test_unassigned_job_tracking_is_tenant_and_capability_scoped():
     from types import SimpleNamespace
-    from apps.mlflow.auth import authenticate_mlflow_request, _resolve_target_job
+
+    from apps.mlflow.auth import _resolve_target_job, authenticate_mlflow_request
     from apps.training.services.capabilities import issue_capability
 
     owner = get_user_model().objects.create_user("tracking-owner@example.test", "test-password")
     other = get_user_model().objects.create_user("tracking-other@example.test", "test-password")
-    job = TrainingJob.objects.create(owner=owner, model_flavor="sklearn", status="running", storage_layout="tenant", max_runtime_seconds=900, submitted_at=__import__("django.utils.timezone", fromlist=["now"]).now())
+    job = TrainingJob.objects.create(
+        owner=owner,
+        model_flavor="sklearn",
+        status="running",
+        storage_layout="tenant",
+        max_runtime_seconds=900,
+        submitted_at=__import__("django.utils.timezone", fromlist=["now"]).now(),
+    )
     token = issue_capability(job, "tracking")
     request = SimpleNamespace(headers={"Authorization": f"Bearer {token}"}, user=None)
     authed_job, project, user, tenant, _ = authenticate_mlflow_request(request)

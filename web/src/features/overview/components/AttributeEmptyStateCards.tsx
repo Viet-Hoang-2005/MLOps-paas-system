@@ -216,4 +216,3 @@ export function AttributeMissingVersionCard({
     </section>
   );
 }
-

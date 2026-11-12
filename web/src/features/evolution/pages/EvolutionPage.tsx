@@ -11,7 +11,10 @@ import { AttributesEvolutionPage } from "@/features/evolution/pages/AttributesEv
 import { CodeEvolutionPage } from "@/features/evolution/pages/CodeEvolutionPage";
 import { DataEvolutionPage } from "@/features/evolution/pages/DataEvolutionPage";
 import { ComparisonVersionDialog } from "@/features/evolution/components/ComparisonVersionDialog";
-import { buildDeploymentPath, runDeploymentPath } from "@/features/deployments/navigation";
+import {
+  buildDeploymentPath,
+  runDeploymentPath,
+} from "@/features/deployments/navigation";
 import { routes } from "@/app/router/paths";
 import { Placeholder } from "@/shared/components/Placeholder";
 import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
@@ -64,9 +67,7 @@ export default function EvolutionPage() {
         title={t("workspace.title")}
         description={t("workspace.noProject")}
         icon={<GitBranch className="h-6 w-6" />}
-        additional={
-          tCommon("modelSelector.empty")
-        }
+        additional={tCommon("modelSelector.empty")}
         action={
           <Button
             size="md"
@@ -216,7 +217,7 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
                     <Button
                       size="md"
                       variant="primary"
-                      icon={<Play className="h-4 w-4"/>}
+                      icon={<Play className="h-4 w-4" />}
                       disabled={
                         !state.deployableBuild || Boolean(state.builds.error)
                       }
@@ -347,20 +348,20 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
         </div>
 
         {/* Outermost right: Vertical Version Lineage */}
-        {!state.loading && !blocked && (state.versions.data?.length ?? 0) > 0 && (
-          <aside
-            className="custom-scrollbar w-full lg:w-20 shrink-0 self-stretch rounded-surface border border-border bg-surface py-5 px-2 flex flex-col items-center overflow-x-auto lg:overflow-y-auto overscroll-contain shadow-xs"
-          >
-            <VersionLineage
-              versions={state.versions.data!}
-              selectedId={state.selected?.id}
-              runningId={state.runningId}
-              projectStatus={state.project.data?.lifecycle_status}
-              onSelect={select}
-              orientation="vertical"
-            />
-          </aside>
-        )}
+        {!state.loading &&
+          !blocked &&
+          (state.versions.data?.length ?? 0) > 0 && (
+            <aside className="custom-scrollbar w-full lg:w-20 shrink-0 self-stretch rounded-surface border border-border bg-surface py-5 px-2 flex flex-col items-center overflow-x-auto lg:overflow-y-auto overscroll-contain shadow-xs">
+              <VersionLineage
+                versions={state.versions.data!}
+                selectedId={state.selected?.id}
+                runningId={state.runningId}
+                projectStatus={state.project.data?.lifecycle_status}
+                onSelect={select}
+                orientation="vertical"
+              />
+            </aside>
+          )}
       </div>
 
       {compare && version && (

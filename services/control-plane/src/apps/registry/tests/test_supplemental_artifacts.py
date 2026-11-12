@@ -1,16 +1,16 @@
 from unittest.mock import patch
 
+import pytest
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-import pytest
 from rest_framework.exceptions import ValidationError
 
 from apps.catalog.models import ModelProject
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
 from apps.deployment.models import Build
+from apps.registry.api.serializers import ModelVersionSerializer
 from apps.registry.models import ModelArtifact, ModelVersion
 from apps.registry.services.versions import add_supplemental_artifacts
-from apps.registry.api.serializers import ModelVersionSerializer
 from common.api.exceptions import Conflict
 
 
@@ -203,7 +203,9 @@ def test_supplemental_upload_holds_no_transaction_while_talking_to_s3(version_wi
             return self.inner.__exit__(*exc)
 
     monkeypatch.setattr(versions_module.transaction, "atomic", CountingAtomic)
-    storage = _HookedStorage(on_put=lambda key: pytest.fail("S3 upload inside a transaction") if depth["value"] else None)
+    storage = _HookedStorage(
+        on_put=lambda key: pytest.fail("S3 upload inside a transaction") if depth["value"] else None
+    )
 
     add_supplemental_artifacts(
         version=version,

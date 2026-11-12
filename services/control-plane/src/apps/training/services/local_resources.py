@@ -55,15 +55,31 @@ def _discover():
         info = client.info()
         cpu, memory = int(info["NCPU"]), int(info["MemTotal"]) // MIB
         daemon_id = info["ID"]
-        if not isinstance(daemon_id, str) or not daemon_id or len(daemon_id) > 128 or not info.get("MemoryLimit") or not info.get("CpuCfsQuota"):
+        if (
+            not isinstance(daemon_id, str)
+            or not daemon_id
+            or len(daemon_id) > 128
+            or not info.get("MemoryLimit")
+            or not info.get("CpuCfsQuota")
+        ):
             raise ValueError("Unsupported Docker resource limits")
         choices = profiles(cpu, memory)
-        return {"status": "available" if choices else "unavailable", "reason": "" if choices else "insufficient_capacity",
-                "daemon_id": daemon_id, "total_vcpu": cpu, "total_memory_mb": memory,
-                "cpu_profiles": choices, "checked_at": datetime.now(timezone.utc).isoformat()}
+        return {
+            "status": "available" if choices else "unavailable",
+            "reason": "" if choices else "insufficient_capacity",
+            "daemon_id": daemon_id,
+            "total_vcpu": cpu,
+            "total_memory_mb": memory,
+            "cpu_profiles": choices,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }
     except Exception:
-        return {"status": "error", "reason": "docker_unavailable", "cpu_profiles": [],
-                "checked_at": datetime.now(timezone.utc).isoformat()}
+        return {
+            "status": "error",
+            "reason": "docker_unavailable",
+            "cpu_profiles": [],
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }
     finally:
         if client is not None:
             with suppress(Exception):
@@ -79,8 +95,11 @@ def capacity(*, force=False):
         token = uuid.uuid4().hex
         key = CACHE_KEY + ":lock"
         if not cache.add(key, token, timeout=15):
-            return (cached if cached is not None and not force else
-                    {"status": "checking", "reason": "checking", "cpu_profiles": []})
+            return (
+                cached
+                if cached is not None and not force
+                else {"status": "checking", "reason": "checking", "cpu_profiles": []}
+            )
         try:
             result = _discover()
             cache.set(CACHE_KEY, result, timeout=30)
@@ -106,8 +125,12 @@ def _check_unmanaged(daemon_id):
     client = None
     try:
         client = DockerClient(timeout=3).client
-        known = {str(job_id) for job_id in LocalTrainingReservation.objects.filter(
-            pool__daemon_id=daemon_id, active=True).values_list("job_id", flat=True)}
+        known = {
+            str(job_id)
+            for job_id in LocalTrainingReservation.objects.filter(pool__daemon_id=daemon_id, active=True).values_list(
+                "job_id", flat=True
+            )
+        }
         for container in client.containers.list(all=True):
             if not (container.name or "").startswith("training-"):
                 continue
@@ -120,7 +143,9 @@ def _check_unmanaged(daemon_id):
                 labels.get("mlops_role") == "input" and container.name == f"training-input-{job_id}"
             )
             if job_id not in known or not managed_name:
-                raise ServiceUnavailable("An existing training container has no capacity reservation. Stop or reconcile it first.")
+                raise ServiceUnavailable(
+                    "An existing training container has no capacity reservation. Stop or reconcile it first."
+                )
     except ServiceUnavailable:
         raise
     except Exception as exc:
@@ -133,7 +158,8 @@ def _check_unmanaged(daemon_id):
 
 def totals(daemon_id):
     sums = LocalTrainingReservation.objects.filter(pool__daemon_id=daemon_id, active=True).aggregate(
-        cpu=Sum("vcpu"), memory=Sum("memory_mb"))
+        cpu=Sum("vcpu"), memory=Sum("memory_mb")
+    )
     return sums["cpu"] or 0, sums["memory"] or 0
 
 
@@ -142,10 +168,14 @@ def public_capacity(snapshot):
     if snapshot.get("status") == "available":
         large = next(p for p in snapshot["cpu_profiles"] if p["id"] == "large")
         cpu, memory = totals(snapshot["daemon_id"])
-        result.update(budget_vcpu=large["vcpu"], budget_memory_mb=large["memory_mb"],
-                      reserved_vcpu=cpu, reserved_memory_mb=memory,
-                      available_vcpu=max(0, large["vcpu"] - cpu),
-                      available_memory_mb=max(0, large["memory_mb"] - memory))
+        result.update(
+            budget_vcpu=large["vcpu"],
+            budget_memory_mb=large["memory_mb"],
+            reserved_vcpu=cpu,
+            reserved_memory_mb=memory,
+            available_vcpu=max(0, large["vcpu"] - cpu),
+            available_memory_mb=max(0, large["memory_mb"] - memory),
+        )
     return result
 
 
@@ -158,14 +188,20 @@ def reserve(job, snapshot):
     large = next(p for p in snapshot["cpu_profiles"] if p["id"] == "large")
     cpu, memory = totals(pool.daemon_id)
     if cpu + job.vcpu > large["vcpu"] or memory + job.memory_mb > large["memory_mb"]:
-        raise LocalTrainingCapacityExceeded({"detail": "Insufficient local training capacity.",
-                                            "available_vcpu": max(0, large["vcpu"] - cpu),
-                                            "available_memory_mb": max(0, large["memory_mb"] - memory)})
+        raise LocalTrainingCapacityExceeded(
+            {
+                "detail": "Insufficient local training capacity.",
+                "available_vcpu": max(0, large["vcpu"] - cpu),
+                "available_memory_mb": max(0, large["memory_mb"] - memory),
+            }
+        )
     LocalTrainingReservation.objects.create(pool=pool, job_id=job.public_id, vcpu=job.vcpu, memory_mb=job.memory_mb)
 
 
 def release(job):
-    LocalTrainingReservation.objects.filter(job_id=job.public_id, active=True).update(active=False, stopped_at=django_timezone.now())
+    LocalTrainingReservation.objects.filter(job_id=job.public_id, active=True).update(
+        active=False, stopped_at=django_timezone.now()
+    )
 
 
 def _memory_available(client, expected_memory_mb):
@@ -175,15 +211,27 @@ def _memory_available(client, expected_memory_mb):
         for stale in client.containers.list(all=True, filters={"label": "mlops_paas.memory_probe=true"}):
             labels = (stale.attrs.get("Config") or {}).get("Labels") or {}
             expires = labels.get("mlops_paas.memory_probe_expires", "")
-            if (re.fullmatch(r"mlops-local-memory-probe-[0-9a-f]{32}", stale.name or "")
-                    and str(expires).isdigit() and int(expires) < time.time()):
+            if (
+                re.fullmatch(r"mlops-local-memory-probe-[0-9a-f]{32}", stale.name or "")
+                and str(expires).isdigit()
+                and int(expires) < time.time()
+            ):
                 with suppress(Exception):
                     stale.remove(force=True)
         client.images.get(IMAGE)
         container = client.containers.create(
-            IMAGE, name=name, entrypoint="cat", command=["/proc/meminfo"], network_disabled=True,
-            user="10001:10001", mem_limit="64m", nano_cpus=250_000_000, pids_limit=32,
-            cap_drop=["ALL"], security_opt=["no-new-privileges:true"], detach=True,
+            IMAGE,
+            name=name,
+            entrypoint="cat",
+            command=["/proc/meminfo"],
+            network_disabled=True,
+            user="10001:10001",
+            mem_limit="64m",
+            nano_cpus=250_000_000,
+            pids_limit=32,
+            cap_drop=["ALL"],
+            security_opt=["no-new-privileges:true"],
+            detach=True,
             labels={"mlops_paas.memory_probe": "true", "mlops_paas.memory_probe_expires": str(int(time.time()) + 120)},
         )
         container.start()
@@ -219,9 +267,12 @@ def _outstanding_memory(client, daemon_id, current_job):
                 container = client.containers.get(f"training-{job.public_id}")
                 container.reload()
                 labels = (container.attrs.get("Config") or {}).get("Labels") or {}
-                if (job.external_job_id and container.id == job.external_job_id
-                        and (container.attrs.get("State") or {}).get("Status") == "running"
-                        and all(labels.get(key) == value for key, value in labels_for(job, "training").items())):
+                if (
+                    job.external_job_id
+                    and container.id == job.external_job_id
+                    and (container.attrs.get("State") or {}).get("Status") == "running"
+                    and all(labels.get(key) == value for key, value in labels_for(job, "training").items())
+                ):
                     used = parse_stats(container.stats(stream=False))["memory"]
                     if used is not None and math.isfinite(used) and used >= 0:
                         unused = max(0, reservation.memory_mb - min(reservation.memory_mb, used))
@@ -236,12 +287,17 @@ def dispatch_guard(job, client):
     """Serialize preflight and container creation; a cache failure is fail-closed."""
     lock = None
     try:
-        lock = cache.lock(LOCK_KEY, timeout=max(120, settings.EXECUTION_CHECK_LEASE_SECONDS + 30), blocking_timeout=0) if hasattr(cache, "lock") else None
+        lock = (
+            cache.lock(LOCK_KEY, timeout=max(120, settings.EXECUTION_CHECK_LEASE_SECONDS + 30), blocking_timeout=0)
+            if hasattr(cache, "lock")
+            else None
+        )
         if lock is None or not lock.acquire(blocking=False):
             raise ServiceUnavailable("Local training dispatch is busy. Please retry.")
         snapshot = require_capacity(force=True)
-        reservation = LocalTrainingReservation.objects.filter(job_id=job.public_id, active=True,
-            pool__daemon_id=snapshot["daemon_id"]).first()
+        reservation = LocalTrainingReservation.objects.filter(
+            job_id=job.public_id, active=True, pool__daemon_id=snapshot["daemon_id"]
+        ).first()
         if not reservation or (reservation.vcpu, reservation.memory_mb) != (job.vcpu, job.memory_mb):
             raise ServiceUnavailable("Local training reservation is unavailable.")
         large = next(p for p in snapshot["cpu_profiles"] if p["id"] == "large")

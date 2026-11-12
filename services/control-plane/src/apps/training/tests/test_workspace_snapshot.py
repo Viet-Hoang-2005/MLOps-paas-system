@@ -37,8 +37,12 @@ def workspace_snapshot(db):
     payload = b"print('hello')\n"
     uri = f"s3://training/users/{user.tenant_id}/training/jobs/{workspace.public_id}/draft/objects/source"
     entry = TrainingJobEntry.objects.create(
-        job=workspace, relative_path="src/train.py", kind="script", s3_uri=uri,
-        checksum=hashlib.sha256(payload).hexdigest(), size_bytes=len(payload),
+        job=workspace,
+        relative_path="src/train.py",
+        kind="script",
+        s3_uri=uri,
+        checksum=hashlib.sha256(payload).hexdigest(),
+        size_bytes=len(payload),
     )
     return workspace, entry, FakeStorage({uri: payload})
 

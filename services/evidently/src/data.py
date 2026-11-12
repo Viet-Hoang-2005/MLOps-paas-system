@@ -51,14 +51,10 @@ def load_production_data(
     where_clauses = ["version.public_id = CAST(:model_version_id AS uuid)"]
     params = {"model_version_id": str(model_version_id), "lim": max_samples}
 
-    joins = [
-        f'INNER JOIN "{db_schema}"."registry_modelversion" AS version ON version.id = record.model_version_id'
-    ]
+    joins = [f'INNER JOIN "{db_schema}"."registry_modelversion" AS version ON version.id = record.model_version_id']
 
     if project_id or tenant_id:
-        joins.append(
-            f'INNER JOIN "{db_schema}"."catalog_modelproject" AS project ON project.id = version.project_id'
-        )
+        joins.append(f'INNER JOIN "{db_schema}"."catalog_modelproject" AS project ON project.id = version.project_id')
     if project_id:
         where_clauses.append("project.public_id = CAST(:project_id AS uuid)")
         params["project_id"] = str(project_id)

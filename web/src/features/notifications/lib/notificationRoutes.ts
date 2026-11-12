@@ -10,7 +10,9 @@ import type { NotificationItem } from "@/features/notifications/types";
  * - Data drift: /dashboard/projects/<projectId>/monitoring
  * - Alert: /dashboard/projects/<projectId>/overview
  */
-export function getNotificationDestination(notification: NotificationItem): string {
+export function getNotificationDestination(
+  notification: NotificationItem,
+): string {
   const metadataProjectId =
     typeof notification.metadata?.project_id === "string"
       ? notification.metadata.project_id
@@ -49,7 +51,10 @@ export function getNotificationDestination(notification: NotificationItem): stri
 
     default:
       if (notification.link) {
-        const sanitized = notification.link.replace(/\/deployments\b/g, "/deployment");
+        const sanitized = notification.link.replace(
+          /\/deployments\b/g,
+          "/deployment",
+        );
         return sanitized.startsWith("/dashboard")
           ? sanitized
           : `/dashboard${sanitized.startsWith("/") ? "" : "/"}${sanitized}`;
@@ -57,4 +62,3 @@ export function getNotificationDestination(notification: NotificationItem): stri
       return "/dashboard/projects";
   }
 }
-

@@ -9,6 +9,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.training.models import TrainingOutput
 from infrastructure.storage import S3Storage
+
 from .output_index import public_outputs
 from .storage_scope import training_prefix_for
 
@@ -102,7 +103,9 @@ def importance_summary(value):
     """Normalize only the explicitly selected role for the version display."""
     if isinstance(value, list):
         return {"kind": "feature_importance", "items": value}
-    mapping = next((value[key] for key in ("feature_importance", "coefficients") if isinstance(value.get(key), dict)), None)
+    mapping = next(
+        (value[key] for key in ("feature_importance", "coefficients") if isinstance(value.get(key), dict)), None
+    )
     if mapping is None and isinstance(value.get("items"), list):
         return {**value, "kind": "feature_importance"}
     if mapping is None:

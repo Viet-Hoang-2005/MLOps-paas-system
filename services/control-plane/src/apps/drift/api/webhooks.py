@@ -31,8 +31,14 @@ class DriftRunWebhookEndpoint(APIView):
         verified_summary = None
         if settings.DRIFT_EXECUTION_WATCH_ENABLED and not is_skipped:
             from apps.observability.services.executions import _completion_data, resource_for
+
             candidate = resource_for("drift", run_id)
-            if candidate and candidate.status not in {"completed", "failed", "cancelled", "skipped"} and not candidate.execution_stop_requested and candidate.monitor.version.project.deletion_state == "active":
+            if (
+                candidate
+                and candidate.status not in {"completed", "failed", "cancelled", "skipped"}
+                and not candidate.execution_stop_requested
+                and candidate.monitor.version.project.deletion_state == "active"
+            ):
                 try:
                     verified_summary = _completion_data(candidate, "drift")
                 except Exception:
@@ -47,7 +53,11 @@ class DriftRunWebhookEndpoint(APIView):
             run = DriftRun.objects.select_for_update().filter(public_id=run_id).first()
             if not run:
                 return Response({"status": "deleted", "ignored": True})
-            if project.deletion_state != "active" or run.status in {"cancelled", "failed", "skipped"} or run.execution_stop_requested:
+            if (
+                project.deletion_state != "active"
+                or run.status in {"cancelled", "failed", "skipped"}
+                or run.execution_stop_requested
+            ):
                 return Response({"status": run.status, "duplicate": True})
 
             if is_skipped:
@@ -63,11 +73,19 @@ class DriftRunWebhookEndpoint(APIView):
                 run.observation_status = "cleanup_pending"
                 run.execution_stop_requested = True
                 run.next_execution_check_at = timezone.now()
-                run.save(update_fields=[
-                    "summary", "drift_score", "has_drift", "status",
-                    "completed_at", "error_message", "observation_status",
-                    "execution_stop_requested", "next_execution_check_at"
-                ])
+                run.save(
+                    update_fields=[
+                        "summary",
+                        "drift_score",
+                        "has_drift",
+                        "status",
+                        "completed_at",
+                        "error_message",
+                        "observation_status",
+                        "execution_stop_requested",
+                        "next_execution_check_at",
+                    ]
+                )
                 record_transition(run, "skipped")
                 return Response({"status": "skipped"})
 
@@ -96,7 +114,17 @@ class DriftRunWebhookEndpoint(APIView):
             run.observation_status = "cleanup_pending"
             run.execution_stop_requested = True
             run.next_execution_check_at = timezone.now()
-            update_fields = ["summary", "drift_score", "has_drift", "status", "completed_at", "error_message", "observation_status", "execution_stop_requested", "next_execution_check_at"]
+            update_fields = [
+                "summary",
+                "drift_score",
+                "has_drift",
+                "status",
+                "completed_at",
+                "error_message",
+                "observation_status",
+                "execution_stop_requested",
+                "next_execution_check_at",
+            ]
             for field, uri in report_uris.items():
                 if uri and not getattr(run, field):
                     setattr(run, field, uri)
@@ -110,6 +138,7 @@ class DriftRunWebhookEndpoint(APIView):
             )
         try:
             from apps.notifications.hooks import notify_drift_result
+
             notify_drift_result(run)
         except Exception:
             pass

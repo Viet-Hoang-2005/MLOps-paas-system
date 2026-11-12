@@ -39,7 +39,10 @@ model_registry_engine = (
         CONTROL_PLANE_DATABASE_URL,
         pool_pre_ping=True,
         pool_timeout=2,
-        connect_args={"connect_timeout": 2, "options": f"-c search_path={CONTROL_PLANE_DB_SCHEMA},public -c statement_timeout=2000"},
+        connect_args={
+            "connect_timeout": 2,
+            "options": f"-c search_path={CONTROL_PLANE_DB_SCHEMA},public -c statement_timeout=2000",
+        },
     )
     if CONTROL_PLANE_DATABASE_URL
     else None

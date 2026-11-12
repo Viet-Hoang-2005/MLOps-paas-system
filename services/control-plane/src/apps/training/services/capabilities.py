@@ -12,6 +12,7 @@ def issue_capability(job, purpose, *, ttl_seconds=None, preserve_existing=False)
     """Create a short-lived, opaque capability without persisting its raw value."""
     if not job.submitted_at:
         from common.api.exceptions import Conflict
+
         raise Conflict("An unsubmitted draft cannot receive runtime capabilities.")
     token = secrets.token_urlsafe(32)
     expires_at = timezone.now() + timedelta(seconds=ttl_seconds if ttl_seconds is not None else _ttl_seconds(job))
@@ -42,7 +43,11 @@ def capability_for_token(*, job, purpose, token):
 
 
 def _ttl_seconds(job):
-    requested = int(job.max_runtime_seconds) + settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS + settings.TRAINING_CAPABILITY_GRACE_SECONDS
+    requested = (
+        int(job.max_runtime_seconds)
+        + settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS
+        + settings.TRAINING_CAPABILITY_GRACE_SECONDS
+    )
     configured_cap = settings.TRAINING_CAPABILITY_MAX_TTL_SECONDS
     if configured_cap and configured_cap < requested:
         raise ValueError("TRAINING_CAPABILITY_MAX_TTL_SECONDS is shorter than the required training lifetime.")

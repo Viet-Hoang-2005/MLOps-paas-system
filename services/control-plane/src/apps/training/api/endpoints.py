@@ -1,16 +1,16 @@
 from django.conf import settings
-from django.db.models import Prefetch
 from django.db import DatabaseError
+from django.db.models import Prefetch
 from rest_framework import generics, status
-from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.deployment.models import Build
 from apps.deployment.services.builds import request_training_build
 from apps.observability.services.lifecycle import events_for_aggregate
-from apps.training.selectors import job_for_user, jobs_for_user
 from apps.training.api.serializers import TrainingJobBuildRequestSerializer, TrainingJobProjectRequestSerializer
+from apps.training.selectors import job_for_user, jobs_for_user
 from apps.training.services.jobs import (
     cancel_job,
     create_job,
@@ -20,12 +20,12 @@ from apps.training.services.jobs import (
     submit_job,
 )
 from apps.training.services.logs import training_logs
-from apps.training.services.resources import CPU_PROFILES, GPU_MODELS, runtime_options
 from apps.training.services.outputs import (
     get_job_reference_preview,
     get_model_output_summary,
     mutate_training_output,
 )
+from apps.training.services.resources import CPU_PROFILES, GPU_MODELS, runtime_options
 from common.api.exceptions import Conflict, ServiceUnavailable
 from infrastructure.runtime_logs import runtime_log_page
 
@@ -51,10 +51,13 @@ class TrainingJobListCreateEndpoint(generics.ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         from .serializers import TrainingDraftSettingsSerializer
+
         serializer = TrainingDraftSettingsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         job = create_job(owner=request.user, validated_data=serializer.validated_data)
-        return Response(TrainingJobSerializer(job, context={"include_workspace": True}).data, status=status.HTTP_201_CREATED)
+        return Response(
+            TrainingJobSerializer(job, context={"include_workspace": True}).data, status=status.HTTP_201_CREATED
+        )
 
 
 class TrainingJobDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
@@ -75,8 +78,10 @@ class TrainingJobDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
         return {**super().get_serializer_context(), "include_workspace": True}
 
     def update(self, request, *args, **kwargs):
-        from .serializers import TrainingDraftSettingsSerializer
         from apps.training.services.workspaces import update_workspace
+
+        from .serializers import TrainingDraftSettingsSerializer
+
         serializer = TrainingDraftSettingsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         values = dict(serializer.validated_data)
@@ -102,6 +107,7 @@ class TrainingJobSubmitEndpoint(APIView):
     def post(self, request, job_id):
         require_training_enabled()
         from .serializers import TrainingSubmissionSerializer
+
         serializer = TrainingSubmissionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         job = submit_job(job_for_user(request.user, job_id), **serializer.validated_data)
@@ -115,6 +121,7 @@ class TrainingJobProjectEndpoint(APIView):
         job = job_for_user(request.user, job_id)
         payload = {key: value for key, value in request.data.items() if key not in request.FILES}
         import json
+
         for field in ("new_project", "artifacts"):
             if isinstance(payload.get(field), str):
                 try:
@@ -137,6 +144,7 @@ class TrainingJobRetryEndpoint(APIView):
     def post(self, request, job_id):
         require_training_enabled()
         from .serializers import TrainingCloneSerializer
+
         serializer = TrainingCloneSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         job = retry_job(job_for_user(request.user, job_id), **serializer.validated_data)
@@ -145,8 +153,10 @@ class TrainingJobRetryEndpoint(APIView):
 
 class TrainingJobCloneEndpoint(APIView):
     def post(self, request, job_id):
-        from .serializers import TrainingCloneSerializer
         from apps.training.services.drafts import clone_draft
+
+        from .serializers import TrainingCloneSerializer
+
         serializer = TrainingCloneSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         job = clone_draft(job_for_user(request.user, job_id), **serializer.validated_data)
@@ -180,21 +190,33 @@ class TrainingJobLogsEndpoint(APIView):
 class TrainingJobInputEndpoint(APIView):
     def get(self, request, job_id):
         from apps.training.services.snapshots import input_snapshot
-        return Response(input_snapshot(job_for_user(request.user, job_id), path=request.query_params.get("path"), download=request.query_params.get("download") == "1"))
+
+        return Response(
+            input_snapshot(
+                job_for_user(request.user, job_id),
+                path=request.query_params.get("path"),
+                download=request.query_params.get("download") == "1",
+            )
+        )
 
 
 class TrainingOutputDownloadEndpoint(APIView):
     def get(self, request, job_id, output_id):
         from apps.training.services.snapshots import output_download
+
         return Response(output_download(job_for_user(request.user, job_id), output_id))
 
 
 class TrainingWorkspaceDownloadEndpoint(APIView):
     def get(self, request, job_id, area):
         from django.http import FileResponse
+
         from apps.training.services.downloads import workspace_download
+
         stream, filename, content_type = workspace_download(
-            job_for_user(request.user, job_id), area=area, path=request.query_params.get("path"),
+            job_for_user(request.user, job_id),
+            area=area,
+            path=request.query_params.get("path"),
             revision=request.query_params.get("revision"),
         )
         response = FileResponse(stream, as_attachment=True, filename=filename, content_type=content_type)
@@ -252,6 +274,7 @@ class TrainingJobOutputsEndpoint(APIView):
 class TrainingUsageEndpoint(APIView):
     def get(self, request):
         from apps.training.services.quota import usage
+
         try:
             return Response(usage(request.user))
         except DatabaseError as exc:
@@ -273,23 +296,31 @@ class TrainingRuntimeCapabilitiesEndpoint(APIView):
         accelerators = [{"type": "none", "counts": [0]}]
         local_gpu = None
         local_resources = None
-        cpu_profiles = [{"id": name, "vcpu": cpu, "memory_mb": memory}
-                        for name, (cpu, memory) in zip(("small", "medium", "large"), CPU_PROFILES, strict=True)]
+        cpu_profiles = [
+            {"id": name, "vcpu": cpu, "memory_mb": memory}
+            for name, (cpu, memory) in zip(("small", "medium", "large"), CPU_PROFILES, strict=True)
+        ]
         if settings.TRAINING_BACKEND == "docker":
             from apps.training.services.local_resources import capacity, public_capacity
+
             snapshot = capacity(force=request.query_params.get("refresh") == "1")
             local_resources = public_capacity(snapshot)
             cpu_profiles = snapshot["cpu_profiles"]
             from apps.training.services.local_gpu import inventory
-            local_gpu = (inventory(force=request.query_params.get("refresh") == "1")
-                         if settings.TRAINING_GPU_ENABLED and 1 in settings.TRAINING_GPU_COUNTS
-                         else {"status": "disabled", "reason": "gpu_disabled", "devices": []})
+
+            local_gpu = (
+                inventory(force=request.query_params.get("refresh") == "1")
+                if settings.TRAINING_GPU_ENABLED and 1 in settings.TRAINING_GPU_COUNTS
+                else {"status": "disabled", "reason": "gpu_disabled", "devices": []}
+            )
         if settings.TRAINING_GPU_ENABLED and 1 in settings.TRAINING_GPU_COUNTS:
             if settings.TRAINING_BACKEND == "argo":
                 accelerators.extend({"type": "gpu", "model": model, "counts": [1]} for model in GPU_MODELS)
             elif local_gpu and local_gpu["status"] == "available":
-                accelerators.extend({"type": "gpu", "model": "", "device_id": device["id"], "counts": [1]}
-                                    for device in local_gpu["devices"])
+                accelerators.extend(
+                    {"type": "gpu", "model": "", "device_id": device["id"], "counts": [1]}
+                    for device in local_gpu["devices"]
+                )
         return Response(
             {
                 "enabled": bool(cpu_profiles),

@@ -11,11 +11,11 @@ from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
+from apps.observability.services import executions
 from apps.registry.models import ModelVersion
 from apps.training.models import TrainingJob
 from apps.training.services.resources import validate_resources
-from apps.observability.services import executions
-from infrastructure.execution.job_containers import labels_for, start, observe
+from infrastructure.execution.job_containers import labels_for, observe, start
 
 
 @pytest.fixture
@@ -24,7 +24,17 @@ def job(db, settings):
     settings.DRIFT_EXECUTION_WATCH_ENABLED = True
     owner = get_user_model().objects.create_user("p1-test@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="P1")
-    return TrainingJob.objects.create(project=project, model_flavor="sklearn", backend="docker", status="queued", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+    return TrainingJob.objects.create(
+        project=project,
+        model_flavor="sklearn",
+        backend="docker",
+        status="queued",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
 
 
 def backend_mock(monkeypatch):
@@ -67,7 +77,9 @@ def test_beat_enqueue_failure_preserves_cleanup_intent(job, monkeypatch):
     job.observation_status = "cleanup_pending"
     job.execution_stop_requested = True
     job.save()
-    monkeypatch.setattr("apps.observability.tasks.reconcile_job_execution.apply_async", Mock(side_effect=ConnectionError()))
+    monkeypatch.setattr(
+        "apps.observability.tasks.reconcile_job_execution.apply_async", Mock(side_effect=ConnectionError())
+    )
     assert executions.scan() == 0
     job.refresh_from_db()
     assert job.observation_status == "cleanup_pending" and job.execution_stop_requested
@@ -117,6 +129,7 @@ def test_terminal_commit_precedes_cleanup(job, monkeypatch):
     assert job.status == "uploading" and not job.outputs.exists()
     backend.cleanup.assert_not_called()
     from apps.training.services.output_finalization import finalize_output
+
     monkeypatch.setattr("apps.training.services.outputs.verify_training_output", lambda job: None)
     finalize_output.run(str(job.public_id))
     executions.reconcile("training", job.public_id)
@@ -134,7 +147,13 @@ def test_cleanup_recovers_timestamps_and_logs_before_runtime_removal(job, monkey
     started = timezone.now() - timedelta(minutes=20)
     finished = started + timedelta(minutes=10)
     backend = backend_mock(monkeypatch)
-    backend.poll.return_value = {"status": "completed", "runtime_id": "owned-runtime", "started_at": started.isoformat(), "finished_at": finished.isoformat(), "logs": "Training done"}
+    backend.poll.return_value = {
+        "status": "completed",
+        "runtime_id": "owned-runtime",
+        "started_at": started.isoformat(),
+        "finished_at": finished.isoformat(),
+        "logs": "Training done",
+    }
 
     def cleanup(row):
         saved = TrainingJob.objects.get(pk=job.pk)
@@ -183,12 +202,17 @@ def test_completed_before_runtime_deadline_recovers_after_long_outage(job, monke
     job.status = "running"
     job.save()
     backend = backend_mock(monkeypatch)
-    backend.poll.return_value = {"status": "completed", "started_at": start_time.isoformat(), "finished_at": (start_time + timedelta(minutes=10)).isoformat()}
+    backend.poll.return_value = {
+        "status": "completed",
+        "started_at": start_time.isoformat(),
+        "finished_at": (start_time + timedelta(minutes=10)).isoformat(),
+    }
     monkeypatch.setattr(executions, "_completion_data", lambda row, kind: None)
     executions.reconcile("training", job.public_id)
     job.refresh_from_db()
     assert job.status == "uploading"
     from apps.training.services.output_finalization import finalize_output
+
     monkeypatch.setattr("apps.training.services.outputs.verify_training_output", lambda job: None)
     finalize_output.run(str(job.public_id))
     job.refresh_from_db()
@@ -226,8 +250,9 @@ def test_observation_capability_resource_binding_and_replay(job):
 
 def test_observation_token_valid_beyond_60s_within_lease(job, monkeypatch):
     import time
-    from django.utils import timezone
     from datetime import timedelta
+
+    from django.utils import timezone
 
     base_time = time.time()
     base_now = timezone.now()
@@ -261,8 +286,9 @@ def test_observation_token_valid_beyond_60s_within_lease(job, monkeypatch):
 
 def test_observation_token_expires_after_ttl(job, monkeypatch):
     import time
-    from django.utils import timezone
     from datetime import timedelta
+
+    from django.utils import timezone
 
     base_time = time.time()
     base_now = timezone.now()
@@ -282,8 +308,12 @@ def test_observation_token_expires_after_ttl(job, monkeypatch):
 
 
 def test_recover_container_created_before_id_was_saved(job):
-    container = Mock(id="existing", attrs={"Config": {"Labels": labels_for(job, "training")}, "State": {"Status": "running"}})
-    docker_client = SimpleNamespace(run=Mock(), client=SimpleNamespace(containers=SimpleNamespace(get=Mock(return_value=container))))
+    container = Mock(
+        id="existing", attrs={"Config": {"Labels": labels_for(job, "training")}, "State": {"Status": "running"}}
+    )
+    docker_client = SimpleNamespace(
+        run=Mock(), client=SimpleNamespace(containers=SimpleNamespace(get=Mock(return_value=container)))
+    )
     assert start(docker_client, job, "training", image="unused") is container
     job.refresh_from_db()
     assert job.external_job_id == "existing"
@@ -308,6 +338,7 @@ def test_pre_migration_container_without_mlops_labels_is_observed_and_cleaned_up
     assert res["status"] == "completed"
 
     from infrastructure.execution.job_containers import remove
+
     remove(client, job, "training")
     container.remove.assert_called_once_with(force=True)
 
@@ -325,9 +356,11 @@ def test_pre_migration_container_reconcile_cleans_up_and_stops_claiming(job):
     client = SimpleNamespace(containers=SimpleNamespace(get=Mock(return_value=container)))
 
     from infrastructure.execution.docker_backends import DockerTrainingBackend
+
     backend = DockerTrainingBackend(docker_client=SimpleNamespace(client=client))
 
     from unittest.mock import patch
+
     with patch("apps.observability.services.executions.backend_for", return_value=backend):
         executions.reconcile("training", job.public_id)
 
@@ -345,12 +378,17 @@ def test_terminal_deletion_request_remains_scannable(job):
     assert executions.claim("training", job.public_id)
 
 
-def test_delete_request_requires_runtime_cleanup_before_hard_delete(job, monkeypatch, django_capture_on_commit_callbacks):
+def test_delete_request_requires_runtime_cleanup_before_hard_delete(
+    job, monkeypatch, django_capture_on_commit_callbacks
+):
     from apps.training.services.jobs import request_job_deletion
     from apps.training.tasks import delete_training_job
+
     job.status = "completed"
     job.save()
-    monkeypatch.setattr("apps.training.services.jobs.cancel_training_job.delay", Mock(return_value=SimpleNamespace(id="test-task")))
+    monkeypatch.setattr(
+        "apps.training.services.jobs.cancel_training_job.delay", Mock(return_value=SimpleNamespace(id="test-task"))
+    )
     with django_capture_on_commit_callbacks(execute=True):
         request_job_deletion(job)
     job.refresh_from_db()
@@ -364,6 +402,7 @@ def test_stale_dispatch_cannot_create_a_runtime(job):
     TrainingJob.objects.filter(pk=job.pk).update(execution_check_lease_until=timezone.now() - timedelta(seconds=1))
     docker_client = SimpleNamespace(run=Mock(), client=Mock())
     from common.api.exceptions import Conflict
+
     with pytest.raises(Conflict):
         start(docker_client, job, "training", image="unused")
     docker_client.run.assert_not_called()
@@ -403,8 +442,11 @@ def test_drift_timeout_uses_same_recovery(job, monkeypatch):
     assert run.status == "running" and run.observation_status == "retrying"
 
 
-@pytest.mark.parametrize("values", [{"vcpu": 3}, {"memory_mb": 1024}, {"accelerator_count": 1}, {"max_runtime_seconds": 1}])
+@pytest.mark.parametrize(
+    "values", [{"vcpu": 3}, {"memory_mb": 1024}, {"accelerator_count": 1}, {"max_runtime_seconds": 1}]
+)
 def test_invalid_resources_are_rejected(job, values):
     from rest_framework.exceptions import ValidationError
+
     with pytest.raises(ValidationError):
         validate_resources(values, job)

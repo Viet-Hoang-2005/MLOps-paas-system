@@ -21,16 +21,31 @@ from infrastructure.storage import S3Storage
 logger = logging.getLogger(__name__)
 TERMINAL = {"completed", "failed", "cancelled", "skipped"}
 ACTIVE = {"queued", "running", "uploading", "cancelling"}
-WATCH_FIELDS = [field.name for field in TrainingJob._meta.fields if field.name in {
-    "next_execution_check_at", "execution_check_token", "execution_check_lease_until",
-    "dispatch_deadline_at", "execution_deadline_at", "runtime_started_at",
-    "execution_stop_requested", "observation_status", "observation_error", "observation_failures",
-}]
+WATCH_FIELDS = [
+    field.name
+    for field in TrainingJob._meta.fields
+    if field.name
+    in {
+        "next_execution_check_at",
+        "execution_check_token",
+        "execution_check_lease_until",
+        "dispatch_deadline_at",
+        "execution_deadline_at",
+        "runtime_started_at",
+        "execution_stop_requested",
+        "observation_status",
+        "observation_error",
+        "observation_failures",
+    }
+]
 
 
 def _enqueue_observation_status():
-    return Case(When(observation_status="cleanup_pending", then=Value("cleanup_pending")),
-        default=Value("retrying"), output_field=CharField())
+    return Case(
+        When(observation_status="cleanup_pending", then=Value("cleanup_pending")),
+        default=Value("retrying"),
+        output_field=CharField(),
+    )
 
 
 def model_for(kind):
@@ -40,7 +55,11 @@ def model_for(kind):
 
 
 def resource_for(kind, public_id):
-    related = ("project__owner", "owner") if kind == "training" else ("monitor__version__project__owner", "monitor__reference_asset")
+    related = (
+        ("project__owner", "owner")
+        if kind == "training"
+        else ("monitor__version__project__owner", "monitor__reference_asset")
+    )
     return model_for(kind).objects.select_related(*related).filter(public_id=public_id).first()
 
 
@@ -60,11 +79,16 @@ def backend_for(row, kind):
 
 
 def ensure_watch(row):
-    from django.db.models.functions import Coalesce
     from django.db.models import Value
+    from django.db.models.functions import Coalesce
+
     now = timezone.now()
-    type(row).objects.filter(pk=row.pk).update(next_execution_check_at=now,
-        dispatch_deadline_at=Coalesce("dispatch_deadline_at", Value(now + timedelta(seconds=settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS))))
+    type(row).objects.filter(pk=row.pk).update(
+        next_execution_check_at=now,
+        dispatch_deadline_at=Coalesce(
+            "dispatch_deadline_at", Value(now + timedelta(seconds=settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS))
+        ),
+    )
 
 
 def enqueue_safely(row, task):
@@ -73,7 +97,10 @@ def enqueue_safely(row, task):
         result = task.delay(str(row.public_id))
         type(row).objects.filter(pk=row.pk).update(celery_task_id=result.id)
     except Exception as exc:
-        type(row).objects.filter(pk=row.pk).update(observation_status=_enqueue_observation_status(), observation_error=f"Enqueue unavailable: {type(exc).__name__}")
+        type(row).objects.filter(pk=row.pk).update(
+            observation_status=_enqueue_observation_status(),
+            observation_error=f"Enqueue unavailable: {type(exc).__name__}",
+        )
         logger.warning("Execution dispatch deferred kind=%s id=%s", row._meta.model_name, row.public_id)
 
 
@@ -84,9 +111,12 @@ def claim(kind, public_id=None):
         if kind == "training":
             candidates |= Q(deletion_requested_at__isnull=False)
             candidates &= Q(submitted_at__isnull=False)
-        rows = model_for(kind).objects.select_for_update(skip_locked=True).filter(
-            candidates
-        ).filter(Q(execution_check_lease_until__isnull=True) | Q(execution_check_lease_until__lte=now))
+        rows = (
+            model_for(kind)
+            .objects.select_for_update(skip_locked=True)
+            .filter(candidates)
+            .filter(Q(execution_check_lease_until__isnull=True) | Q(execution_check_lease_until__lte=now))
+        )
         if public_id:
             rows = rows.filter(public_id=public_id)
         else:
@@ -96,7 +126,9 @@ def claim(kind, public_id=None):
         for row in rows.order_by("pk")[:100]:
             row.execution_check_token = uuid.uuid4()
             row.execution_check_lease_until = now + timedelta(seconds=lease_seconds)
-            row.dispatch_deadline_at = row.dispatch_deadline_at or now + timedelta(seconds=settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS)
+            row.dispatch_deadline_at = row.dispatch_deadline_at or now + timedelta(
+                seconds=settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS
+            )
             row.save(update_fields=WATCH_FIELDS)
             claimed.append((str(row.public_id), str(row.execution_check_token)))
         return claimed
@@ -120,13 +152,20 @@ def scan():
                 count += 1
             except Exception:
                 model_for(kind).objects.filter(public_id=public_id, execution_check_token=token).update(
-                    execution_check_lease_until=None, observation_status=_enqueue_observation_status(), observation_error="Broker unavailable.",
+                    execution_check_lease_until=None,
+                    observation_status=_enqueue_observation_status(),
+                    observation_error="Broker unavailable.",
                 )
     return count
 
 
 def _valid(row, token):
-    return bool(row and str(row.execution_check_token) == str(token) and row.execution_check_lease_until and row.execution_check_lease_until > timezone.now())
+    return bool(
+        row
+        and str(row.execution_check_token) == str(token)
+        and row.execution_check_lease_until
+        and row.execution_check_lease_until > timezone.now()
+    )
 
 
 def _release(row, error=""):
@@ -143,8 +182,10 @@ def _release(row, error=""):
 
 def signed_observation_token(kind, row, token):
     tenant, project_id = ownership_for(row, kind)
-    return signing.dumps({"kind": kind, "id": str(row.public_id), "lease": str(token),
-        "tenant": tenant, "project": project_id}, salt="execution-observation")
+    return signing.dumps(
+        {"kind": kind, "id": str(row.public_id), "lease": str(token), "tenant": tenant, "project": project_id},
+        salt="execution-observation",
+    )
 
 
 def reconcile(kind, public_id, token=None):
@@ -163,8 +204,13 @@ def reconcile(kind, public_id, token=None):
         return apply_observation(kind, public_id, token, {"status": "error", "error": type(exc).__name__})
     now = timezone.now()
     project = project_for(row, kind)
-    stopping = (row.execution_stop_requested or row.status == "cancelling" or row.status in TERMINAL
-        or (project and project.deletion_state != "active") or bool(getattr(row, "deletion_requested_at", None)))
+    stopping = (
+        row.execution_stop_requested
+        or row.status == "cancelling"
+        or row.status in TERMINAL
+        or (project and project.deletion_state != "active")
+        or bool(getattr(row, "deletion_requested_at", None))
+    )
     if stopping:
         with transaction.atomic():
             current = model_for(kind).objects.select_for_update().get(pk=row.pk)
@@ -194,14 +240,19 @@ def reconcile(kind, public_id, token=None):
             backend.reconcile(row, kind, token)
             return "awaiting_observation"
         result = backend.poll(row)
-        if (result["status"] == "created" or (result["status"] == "not_found" and row.status == "queued")) and row.dispatch_deadline_at > now:
+        if (
+            result["status"] == "created" or (result["status"] == "not_found" and row.status == "queued")
+        ) and row.dispatch_deadline_at > now:
             if kind == "training":
                 from apps.training.services.resources import validate_resources
+
                 validate_resources({}, row)
                 from apps.training.services.quota import require_reservation
+
                 require_reservation(row)
             if kind == "training" and row.backend == "docker":
                 from apps.training.services.local_resources import dispatch_guard
+
                 with dispatch_guard(row, backend.docker.client):
                     backend.run(row)
             else:
@@ -209,11 +260,23 @@ def reconcile(kind, public_id, token=None):
             return apply_observation(kind, public_id, token, {"status": "dispatched"})
         return apply_observation(kind, public_id, token, result)
     except Exception as exc:
-        from rest_framework.exceptions import ValidationError
-        from common.api.exceptions import ServiceUnavailable
         import docker.errors
-        if kind == "training" and row.accelerator_type == "gpu" and isinstance(exc, docker.errors.APIError) and any(word in str(exc).lower() for word in ("gpu", "device driver", "nvidia")):
-            return apply_observation(kind, public_id, token, {"status": "failed", "error": "Requested GPU is unavailable on this Docker host."})
+        from rest_framework.exceptions import ValidationError
+
+        from common.api.exceptions import ServiceUnavailable
+
+        if (
+            kind == "training"
+            and row.accelerator_type == "gpu"
+            and isinstance(exc, docker.errors.APIError)
+            and any(word in str(exc).lower() for word in ("gpu", "device driver", "nvidia"))
+        ):
+            return apply_observation(
+                kind,
+                public_id,
+                token,
+                {"status": "failed", "error": "Requested GPU is unavailable on this Docker host."},
+            )
         if isinstance(exc, ValidationError):
             return apply_observation(kind, public_id, token, {"status": "failed", "error": str(exc.detail)})
         if isinstance(exc, ServiceUnavailable):
@@ -224,6 +287,7 @@ def reconcile(kind, public_id, token=None):
 def _finish(row, kind, status, message="", finished_at=None):
     if kind == "training" and status == "completed" and row.tracking.get("output_contract") != 2:
         from apps.training.services.output_finalization import enqueue_output
+
         enqueue_output(row, finished_at)
         return
 
@@ -235,6 +299,7 @@ def _finish(row, kind, status, message="", finished_at=None):
             row.runtime_seconds = max(0, int((finished_at - started).total_seconds()))
         row.save(update_fields=["status", "completed_at", "runtime_seconds"])
         from apps.observability.services.lifecycle import record_training_event
+
         record_training_event(job=row, event_type=status, message=(message or f"Training {status}.")[:1000])
     else:
         row.status, row.completed_at = status, timezone.now()
@@ -279,12 +344,17 @@ def _completion_data(row, kind):
     if kind == "training":
         return None
     from botocore.config import Config
+
     storage = S3Storage(client_config=Config(connect_timeout=3, read_timeout=5, retries={"max_attempts": 0}))
     from infrastructure.storage.paths import drift_run_prefix
 
     project = project_for(row, kind)
     prefix = f"s3://{storage.bucket}/{drift_run_prefix(project.owner.tenant_id, project.public_id, row.monitor.public_id, row.public_id)}"
-    for field, filename in (("summary_uri", "summary.json"), ("report_html_uri", "report.html"), ("report_json_uri", "report.json")):
+    for field, filename in (
+        ("summary_uri", "summary.json"),
+        ("report_html_uri", "report.html"),
+        ("report_json_uri", "report.json"),
+    ):
         if getattr(row, field) != prefix + filename:
             raise ValueError("Drift output does not belong to this run.")
     summary = json.loads(storage.read(row.summary_uri))
@@ -307,8 +377,13 @@ def apply_observation(kind, public_id, token, observation):
             data = _completion_data(row, kind)
         except Exception as exc:
             from botocore.exceptions import ClientError
-            missing = isinstance(exc, ValueError) or (isinstance(exc, ClientError) and exc.response["Error"]["Code"] in {"404", "NoSuchKey", "NotFound"})
-            if getattr(row, "status", None) == "skipped" or (isinstance(getattr(row, "summary", None), dict) and row.summary.get("status") == "skipped"):
+
+            missing = isinstance(exc, ValueError) or (
+                isinstance(exc, ClientError) and exc.response["Error"]["Code"] in {"404", "NoSuchKey", "NotFound"}
+            )
+            if getattr(row, "status", None) == "skipped" or (
+                isinstance(getattr(row, "summary", None), dict) and row.summary.get("status") == "skipped"
+            ):
                 observed = "skipped"
             else:
                 observed = "failed" if missing else "error"
@@ -317,6 +392,7 @@ def apply_observation(kind, public_id, token, observation):
     with transaction.atomic():
         if kind == "training" and row.backend == "argo":
             from apps.training.services.quota import lock_owner
+
             lock_owner(row.owner_id)
         if project:
             project = type(project).objects.select_for_update().get(pk=project.pk)
@@ -327,25 +403,49 @@ def apply_observation(kind, public_id, token, observation):
         quota_settled = True
         if kind == "training" and current.backend == "argo":
             from apps.training.services.quota import update_observation
-            quota_settled = update_observation(current, started_at=current.runtime_started_at, finished_at=finished,
-                                               stopped=observed == "stopped", never_started=observation.get("never_started", False))
+
+            quota_settled = update_observation(
+                current,
+                started_at=current.runtime_started_at,
+                finished_at=finished,
+                stopped=observed == "stopped",
+                never_started=observation.get("never_started", False),
+            )
         now = timezone.now()
-        dispatch_expired = bool(current.dispatch_deadline_at and (current.runtime_started_at or now) > current.dispatch_deadline_at)
+        dispatch_expired = bool(
+            current.dispatch_deadline_at and (current.runtime_started_at or now) > current.dispatch_deadline_at
+        )
         runtime_expired = bool(current.execution_deadline_at and now >= current.execution_deadline_at)
-        output_finished = parse_datetime(current.tracking.get("output_runtime_finished_at", "")) if kind == "training" and current.status == "uploading" else None
+        output_finished = (
+            parse_datetime(current.tracking.get("output_runtime_finished_at", ""))
+            if kind == "training" and current.status == "uploading"
+            else None
+        )
         end = finished or output_finished
-        finished_in_time = bool(end and current.execution_deadline_at and end <= current.execution_deadline_at and (observed == "completed" or output_finished))
-        if (dispatch_expired or (runtime_expired and not finished_in_time)) and current.status not in TERMINAL and current.status != "cancelling":
+        finished_in_time = bool(
+            end
+            and current.execution_deadline_at
+            and end <= current.execution_deadline_at
+            and (observed == "completed" or output_finished)
+        )
+        if (
+            (dispatch_expired or (runtime_expired and not finished_in_time))
+            and current.status not in TERMINAL
+            and current.status != "cancelling"
+        ):
             _finish(current, kind, "failed", "Execution deadline exceeded.")
             current.execution_stop_requested = True
             current.observation_status = "cleanup_pending"
         if observed == "error":
             _release(current, observation.get("error", "Observation unavailable."))
             return current.status
-        inactive = (project and project.deletion_state != "active") or bool(getattr(current, "deletion_requested_at", None))
+        inactive = (project and project.deletion_state != "active") or bool(
+            getattr(current, "deletion_requested_at", None)
+        )
         if observed == "stopped":
             if kind == "training" and current.backend == "docker":
                 from apps.training.services.local_resources import release
+
                 release(current)
             if not quota_settled:
                 current.observation_status = "cleanup_pending"
@@ -360,6 +460,7 @@ def apply_observation(kind, public_id, token, observation):
             current.save(update_fields=["next_execution_check_at"])
             if kind == "training" and current.deletion_requested_at:
                 from apps.training.tasks import delete_training_job
+
                 transaction.on_commit(lambda: enqueue_safely(current, delete_training_job))
             return current.status
         if inactive or current.execution_stop_requested or current.status in TERMINAL or current.status == "cancelling":
@@ -372,11 +473,17 @@ def apply_observation(kind, public_id, token, observation):
             current.save(update_fields=["status", "started_at"])
             if kind == "training" and was_queued:
                 from apps.observability.services.lifecycle import record_training_event
+
                 record_training_event(job=current, event_type="started", message="Training workload dispatched.")
         elif kind == "training" and current.status == "uploading" and observed in {"completed", "not_found"}:
             from apps.training.services.output_finalization import enqueue_output
+
             enqueue_output(current, finished)
-        elif observed == "not_found" and not current.runtime_started_at and (row.backend if kind == "training" else row.monitor.backend) == "argo":
+        elif (
+            observed == "not_found"
+            and not current.runtime_started_at
+            and (row.backend if kind == "training" else row.monitor.backend) == "argo"
+        ):
             current.status = "queued"
             current.save(update_fields=["status"])
         elif observed in {"completed", "failed", "not_found", "skipped"}:
@@ -391,7 +498,13 @@ def apply_observation(kind, public_id, token, observation):
                 status = "skipped"
             else:
                 status = "failed"
-            _finish(current, kind, status, observation.get("error", "Runtime is missing." if observed == "not_found" else ""), finished_at=finished)
+            _finish(
+                current,
+                kind,
+                status,
+                observation.get("error", "Runtime is missing." if observed == "not_found" else ""),
+                finished_at=finished,
+            )
             if current.status != "uploading":
                 current.observation_status = "cleanup_pending"
                 current.execution_stop_requested = True

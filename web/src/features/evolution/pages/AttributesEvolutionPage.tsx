@@ -60,26 +60,23 @@ export function AttributesEvolutionPage({
   const hasParams = Boolean(params && Object.keys(params).length > 0);
   const hasInsights = Boolean(
     insights &&
-      (Array.isArray(insights.items)
-        ? insights.items.length > 0
-        : Object.keys(insights).length > 0),
+    (Array.isArray(insights.items)
+      ? insights.items.length > 0
+      : Object.keys(insights).length > 0),
   );
   const hasFeatureImportance = Boolean(
     featureImportance &&
-      ((featureImportance.items && featureImportance.items.length > 0) ||
-        Object.keys(featureImportance).length > 0),
+    ((featureImportance.items && featureImportance.items.length > 0) ||
+      Object.keys(featureImportance).length > 0),
   );
   const hasLabelMapping = Boolean(
     labelMapping &&
-      ((Array.isArray(labelMapping.mapping) && labelMapping.mapping.length > 0) ||
-        (labelMapping.mapping &&
-          typeof labelMapping.mapping === "object" &&
-          Object.keys(labelMapping.mapping).length > 0)),
+    ((Array.isArray(labelMapping.mapping) && labelMapping.mapping.length > 0) ||
+      (labelMapping.mapping &&
+        typeof labelMapping.mapping === "object" &&
+        Object.keys(labelMapping.mapping).length > 0)),
   );
-  const hasInputSchema = Boolean(
-    inputSchema &&
-      Boolean(inputSchema.schema),
-  );
+  const hasInputSchema = Boolean(inputSchema && Boolean(inputSchema.schema));
 
   const getArtifactFilename = (kind: string): string | undefined => {
     return (
@@ -232,4 +229,3 @@ export function AttributesEvolutionPage({
 }
 
 export { AttributesEvolutionPage as EvolutionAttributesTab };
-

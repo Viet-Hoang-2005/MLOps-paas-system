@@ -20,7 +20,9 @@ inferenceClient.interceptors.response.use(
   (response) => response,
   async (error: unknown) => {
     if (!axios.isAxiosError(error)) {
-      return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+      return Promise.reject(
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
     const request = error.config as InferenceRequest | undefined;
     if (

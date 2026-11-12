@@ -79,8 +79,7 @@ class ModelVersionSerializer(serializers.ModelSerializer):
                 "uploaded_at": artifact.metadata.get("uploaded_at"),
             }
             for artifact in instance.artifacts.all()
-            if artifact.metadata.get("provenance") == "supplemental_upload"
-            and "summary" in artifact.metadata
+            if artifact.metadata.get("provenance") == "supplemental_upload" and "summary" in artifact.metadata
         }
 
     @staticmethod

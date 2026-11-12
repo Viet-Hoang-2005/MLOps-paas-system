@@ -17,8 +17,14 @@ def test_large_artifact_copy_is_conditional_and_aborts_partial_upload(fail):
     size = 5 * 1024**3 + 1
 
     def copy():
-        return storage.copy("s3://test-bucket/source", "destination", checksum="sha256",
-                            content_type="application/gzip", size_bytes=size, expected_etag='"source-etag"')
+        return storage.copy(
+            "s3://test-bucket/source",
+            "destination",
+            checksum="sha256",
+            content_type="application/gzip",
+            size_bytes=size,
+            expected_etag='"source-etag"',
+        )
 
     if fail:
         with pytest.raises(RuntimeError):

@@ -7,4 +7,3 @@ export const evolutionQueryKeys = {
   referencePreview: (versionId: string) =>
     [...evolutionQueryKeys.all, "referencePreview", versionId] as const,
 };
-

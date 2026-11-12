@@ -46,9 +46,17 @@ def start(docker_client, resource, kind, **kwargs):
         locked_project = type(project).objects.select_for_update().get(pk=project.pk) if project else None
         current = type(resource).objects.select_for_update().get(pk=resource.pk)
         lease = resource.execution_check_token
-        if lease and (current.execution_check_token != lease or not current.execution_check_lease_until or current.execution_check_lease_until <= timezone.now()):
+        if lease and (
+            current.execution_check_token != lease
+            or not current.execution_check_lease_until
+            or current.execution_check_lease_until <= timezone.now()
+        ):
             raise Conflict("Execution lease expired before dispatch.")
-        if (locked_project and locked_project.deletion_state != "active") or current.execution_stop_requested or current.status in {"cancelled", "cancelling", "failed", "completed"}:
+        if (
+            (locked_project and locked_project.deletion_state != "active")
+            or current.execution_stop_requested
+            or current.status in {"cancelled", "cancelling", "failed", "completed"}
+        ):
             raise Conflict("Execution is no longer active.")
     try:
         container = owned(docker_client.client, resource, kind)
@@ -91,9 +99,17 @@ def observe(client, resource, kind):
         finished = state.get("FinishedAt")
         if finished and not finished.startswith("0001-"):
             result["finished_at"] = finished
-        logs = sanitize(container.logs(stdout=True, stderr=True, tail=200).decode("utf-8", errors="replace"), limit=None)[-12000:]
+        logs = sanitize(
+            container.logs(stdout=True, stderr=True, tail=200).decode("utf-8", errors="replace"), limit=None
+        )[-12000:]
         code = state.get("ExitCode", 1)
-        return {**result, "status": "completed" if code == 0 else "failed", "exit_code": code, "logs": logs, "error": logs[-12000:] or "Runtime exited unsuccessfully." if code else ""}
+        return {
+            **result,
+            "status": "completed" if code == 0 else "failed",
+            "exit_code": code,
+            "logs": logs,
+            "error": logs[-12000:] or "Runtime exited unsuccessfully." if code else "",
+        }
     except docker.errors.NotFound:
         return {"status": "not_found"}
     except Exception as exc:

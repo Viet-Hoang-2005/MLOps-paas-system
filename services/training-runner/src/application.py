@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import re
-from functools import lru_cache
 import shutil
 import subprocess
 import sys
@@ -11,8 +10,10 @@ import threading
 import time
 from contextvars import copy_context
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 
+import mlflow
 import redis
 import requests
 from src import config, execution, io, metadata, resources
@@ -24,8 +25,6 @@ from src.logging_utils import (
     reset_context,
     sanitize,
 )
-
-import mlflow
 
 WORKSPACE = Path("/workspace")
 SOURCE_DIR = WORKSPACE / "source"
@@ -40,13 +39,19 @@ SECRET_VALUES = []
 @lru_cache(maxsize=1)
 def _secret_pattern(values):
     fragments = {fragment for value in values for fragment in [value, *value.splitlines()] if fragment}
-    return re.compile("|".join(re.escape(value) for value in sorted(fragments, key=len, reverse=True))) if fragments else None
+    return (
+        re.compile("|".join(re.escape(value) for value in sorted(fragments, key=len, reverse=True)))
+        if fragments
+        else None
+    )
 
 
 def redact_training_output(text):
     """Scrub both streamed and captured output before logs or artifacts use it."""
     pattern = _secret_pattern(tuple(SECRET_VALUES))
     return pattern.sub(lambda match: "[REDACTED]", text) if pattern else text
+
+
 MLOPS_DIR_NAME = "_mlops"
 RUNNER_VERSION = "mlops-metadata-bundle-v1"
 MODEL_FILE_EXTENSIONS = {".pkl", ".joblib", ".xgb"}
@@ -142,7 +147,7 @@ def parse_metric_events(stdout_text: str, warnings: list[dict]) -> tuple[list[di
         if not matched_prefix:
             continue
 
-        raw_payload = stripped[len(matched_prefix):].strip()
+        raw_payload = stripped[len(matched_prefix) :].strip()
         try:
             payload = json.loads(raw_payload)
         except json.JSONDecodeError as exc:
@@ -434,6 +439,7 @@ def write_mlops_bundle(
     # Validate before writing metadata or handing paths to MLflow, not only
     # when packaging the final archive.
     from src.output_contract import collect
+
     collect(MODEL_DIR, "model", require_env("MODEL_FLAVOR"))
     collect(OUTPUT_DIR, "metadata", require_env("MODEL_FLAVOR"))
     warnings: list[dict] = []
@@ -728,9 +734,13 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
     env.update(RUNTIME_ENV)
     workspace_contract = os.environ.get("INPUT_CONTRACT") == "workspace"
     if workspace_contract:
-        env.update(MLOPS_WORK_DIR=str(WORK_DIR), HOME=str(WORK_DIR / "home"),
-                   TMPDIR=str(WORK_DIR / "tmp"), PYTHONDONTWRITEBYTECODE="1",
-                   PYTHONPATH=str(SOURCE_DIR) + os.pathsep + env.get("PYTHONPATH", ""))
+        env.update(
+            MLOPS_WORK_DIR=str(WORK_DIR),
+            HOME=str(WORK_DIR / "home"),
+            TMPDIR=str(WORK_DIR / "tmp"),
+            PYTHONDONTWRITEBYTECODE="1",
+            PYTHONPATH=str(SOURCE_DIR) + os.pathsep + env.get("PYTHONPATH", ""),
+        )
 
     log(f"Running training entry point: {entry_point}")
     stop_metrics = threading.Event()
@@ -787,6 +797,7 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
 
 def create_model_archive(archive_path: Path) -> None:
     from src.output_contract import package
+
     package(archive_path, MODEL_DIR, OUTPUT_DIR, WORK_DIR / MLOPS_DIR_NAME, require_env("MODEL_FLAVOR"))
 
 
@@ -890,27 +901,44 @@ def _run_workspace():
         directory.mkdir(parents=True, exist_ok=True)
     entry = require_env("ENTRY_POINT")
     entry_path = (input_root / entry).resolve()
-    if not entry_path.is_relative_to(input_root.resolve()) or not entry_path.is_file() or entry_path.suffix.lower() != ".py":
+    if (
+        not entry_path.is_relative_to(input_root.resolve())
+        or not entry_path.is_file()
+        or entry_path.suffix.lower() != ".py"
+    ):
         raise RuntimeError("Invalid workspace entry point.")
     # Dependency build code never receives the user's secret/environment snapshot.
     os.environ["HOME"] = str(WORK_DIR / "home")
     os.environ["TMPDIR"] = str(WORK_DIR / "tmp")
     install_requirements(input_root / "requirements.txt")
-    response = requests.post(require_env("RUNTIME_CONFIG_URL"),
-        headers={"Authorization": "Bearer " + require_env("RUNTIME_CONFIG_CAPABILITY")}, timeout=30)
+    response = requests.post(
+        require_env("RUNTIME_CONFIG_URL"),
+        headers={"Authorization": "Bearer " + require_env("RUNTIME_CONFIG_CAPABILITY")},
+        timeout=30,
+    )
     response.raise_for_status()
     configuration = response.json()
     RUNTIME_ENV = configuration["environment"]
-    SECRET_VALUES = sorted([RUNTIME_ENV[name] for name in configuration["secret_names"] if RUNTIME_ENV.get(name)], key=len, reverse=True)
+    SECRET_VALUES = sorted(
+        [RUNTIME_ENV[name] for name in configuration["secret_names"] if RUNTIME_ENV.get(name)], key=len, reverse=True
+    )
     result = run_training(entry, "")
-    write_mlops_bundle(entry_point=entry, model_version="", training_job_id=require_env("TRAINING_JOB_ID"),
+    write_mlops_bundle(
+        entry_point=entry,
+        model_version="",
+        training_job_id=require_env("TRAINING_JOB_ID"),
         status="succeeded" if result.returncode == 0 else "failed",
-        stdout_text=redact_training_output(result.stdout or ""), stderr_text=redact_training_output(result.stderr or ""))
+        stdout_text=redact_training_output(result.stdout or ""),
+        stderr_text=redact_training_output(result.stderr or ""),
+    )
     if result.returncode:
         raise RuntimeError(f"Training entry point failed with exit code {result.returncode}")
     archive = WORK_DIR / "model.tar.gz"
     create_model_archive(archive)
-    upload_presigned_url(archive, request_output_upload_url(require_env("S3_OUTPUT_UPLOAD_URL"), require_env("S3_OUTPUT_UPLOAD_CAPABILITY")))
+    upload_presigned_url(
+        archive,
+        request_output_upload_url(require_env("S3_OUTPUT_UPLOAD_URL"), require_env("S3_OUTPUT_UPLOAD_CAPABILITY")),
+    )
 
 
 def main() -> None:

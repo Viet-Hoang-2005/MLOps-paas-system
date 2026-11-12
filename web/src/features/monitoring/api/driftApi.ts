@@ -108,7 +108,9 @@ export const deleteDriftMonitoringJob = async (id: string): Promise<void> => {
   await apiClient.delete(controlPlaneURL(`/drift-monitors/${id}/`));
 };
 
-export const deleteDriftMonitoringRun = async (runId: string): Promise<void> => {
+export const deleteDriftMonitoringRun = async (
+  runId: string,
+): Promise<void> => {
   await apiClient.delete(controlPlaneURL(`/drift-monitors/runs/${runId}/`));
 };
 
@@ -129,7 +131,6 @@ export const cancelDriftMonitoringJob = async (
       controlPlaneURL(`/drift-monitors/${monitorId}/cancel/`),
     )
   ).data;
-
 
 export const runDriftMonitoringJob = async (
   id: string,
@@ -159,4 +160,3 @@ export const getDriftReportData = async (
       controlPlaneURL(`/drift-monitors/runs/${runId}/report-data/`),
     )
   ).data;
-

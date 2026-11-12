@@ -135,6 +135,7 @@ def test_webhook_claim_uses_kind_destination_and_skip_locked(monkeypatch):
     assert "destination = 'automatic_drift'" in statement
     assert "FOR UPDATE SKIP LOCKED" in statement
 
+
 def test_records_converts_nat_and_nan_to_none():
     frame = pd.DataFrame(
         [
@@ -173,7 +174,12 @@ def test_records_make_hostile_values_storable_in_jsonb():
         [
             GOOD_ROW
             | {
-                "features": {"nan": float("nan"), "inf": float("inf"), "s\x00key": "a\x00b", "nested": [float("-inf"), {"k": "v\x00"}]},
+                "features": {
+                    "nan": float("nan"),
+                    "inf": float("inf"),
+                    "s\x00key": "a\x00b",
+                    "nested": [float("-inf"), {"k": "v\x00"}],
+                },
                 "prediction": "sa\x00fe",
                 "confidence": float("inf"),
                 "latency_ms": float("nan"),

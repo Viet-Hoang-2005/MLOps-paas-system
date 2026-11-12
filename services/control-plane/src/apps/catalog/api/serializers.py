@@ -130,9 +130,7 @@ class ModelProjectSerializer(serializers.ModelSerializer):
         if not self._has_running(instance):
             return None
         version = instance.active_deployment.version
-        artifact = version.artifacts.filter(
-            kind={"code": "source_code", "data": "reference_data"}[kind]
-        ).first()
+        artifact = version.artifacts.filter(kind={"code": "source_code", "data": "reference_data"}[kind]).first()
         return (
             {
                 "name": artifact.name,

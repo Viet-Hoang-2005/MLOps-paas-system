@@ -161,11 +161,7 @@ export default function DriftReportPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={t("reportPage.title")}
-        back
-      >
-      </PageHeader>
+      <PageHeader title={t("reportPage.title")} back></PageHeader>
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-24 text-color-muted-foreground">

@@ -1,7 +1,8 @@
-from django.utils import timezone
 import hashlib
 from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -63,6 +64,7 @@ class MockS3Storage:
             raise FileNotFoundError(f"Key not found: {uri}")
         payload = self.objects[uri]
         import io
+
         return io.BytesIO(payload), len(payload), "application/octet-stream"
 
     def read(self, uri, max_bytes=500 * 1024 * 1024):
@@ -109,7 +111,12 @@ class MLflowCompatibilityTests(APITestCase):
             project=self.project,
             model_flavor="sklearn",
             status="running",
-         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+            vcpu=2,
+            memory_mb=4096,
+            max_runtime_seconds=3600,
+            input_contract="legacy",
+            submitted_at=timezone.now(),
+        )
         self.token = issue_capability(self.job, "tracking")
 
     def test_mlflow_unauthenticated_rejected(self):
@@ -186,7 +193,12 @@ class MLflowCompatibilityTests(APITestCase):
             project=other_project,
             model_flavor="sklearn",
             status="running",
-         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+            vcpu=2,
+            memory_mb=4096,
+            max_runtime_seconds=3600,
+            input_contract="legacy",
+            submitted_at=timezone.now(),
+        )
 
         # Try logging to other_job using self.token (tenant-1234)
         response = self.client.post(
@@ -258,7 +270,12 @@ class MLflowCompatibilityTests(APITestCase):
             project=self.project,
             model_flavor="sklearn",
             status="completed",
-         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+            vcpu=2,
+            memory_mb=4096,
+            max_runtime_seconds=3600,
+            input_contract="legacy",
+            submitted_at=timezone.now(),
+        )
         TrainingJobMetric.objects.create(job=self.job, name="accuracy", value=0.91, step=1)
         TrainingJobMetric.objects.create(job=job2, name="accuracy", value=0.96, step=1)
         TrainingJobParam.objects.create(job=self.job, name="lr", value="0.01")
@@ -282,8 +299,7 @@ class MLflowCompatibilityTests(APITestCase):
         )
         self.assertEqual(create_resp.status_code, status.HTTP_200_OK)
         expected_prefix = (
-            f"mlflow-artifacts:/users/{self.user.tenant_id}/models/{self.project.public_id}/"
-            "training/jobs/"
+            f"mlflow-artifacts:/users/{self.user.tenant_id}/models/{self.project.public_id}/training/jobs/"
         )
         self.assertTrue(create_resp.data["run"]["info"]["artifact_uri"].startswith(expected_prefix))
 
@@ -391,7 +407,15 @@ class MLflowCompatibilityTests(APITestCase):
         User = get_user_model()
         attacker = User.objects.create_user("attacker@example.com", "password123", tenant_id="tenant-attacker")
         attacker_proj = ModelProject.objects.create(owner=attacker, name="attacker-proj")
-        attacker_job = TrainingJob.objects.create(project=attacker_proj, status="running", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+        attacker_job = TrainingJob.objects.create(
+            project=attacker_proj,
+            status="running",
+            vcpu=2,
+            memory_mb=4096,
+            max_runtime_seconds=3600,
+            input_contract="legacy",
+            submitted_at=timezone.now(),
+        )
         attacker_token = issue_capability(attacker_job, "tracking")
 
         target_url = (
@@ -488,7 +512,12 @@ class MLflowCompatibilityTests(APITestCase):
             project=self.project,
             model_flavor="sklearn",
             status="running",
-         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+            vcpu=2,
+            memory_mb=4096,
+            max_runtime_seconds=3600,
+            input_contract="legacy",
+            submitted_at=timezone.now(),
+        )
 
         headers = {"HTTP_AUTHORIZATION": f"Bearer {self.token}"}
 
@@ -573,7 +602,12 @@ class MLflowCompatibilityTests(APITestCase):
             project=project2,
             model_flavor="sklearn",
             status="running",
-         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+            vcpu=2,
+            memory_mb=4096,
+            max_runtime_seconds=3600,
+            input_contract="legacy",
+            submitted_at=timezone.now(),
+        )
 
         raw_key, prefix, key_hash = UserAPIKey.issue()
         api_key = UserAPIKey.objects.create(
@@ -924,7 +958,9 @@ class MLflowCompatibilityTests(APITestCase):
         self.assertEqual(resp.data["run"]["info"]["run_id"], run_id)
 
         # 2. metrics/get-history
-        resp = self.client.get(f"/api/2.0/mlflow/metrics/get-history?run_id={run_id}&metric_key=final_loss", **api_headers)
+        resp = self.client.get(
+            f"/api/2.0/mlflow/metrics/get-history?run_id={run_id}&metric_key=final_loss", **api_headers
+        )
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(resp.data["metrics"]), 1)
         self.assertEqual(resp.data["metrics"][0]["value"], 0.15)
@@ -1001,7 +1037,12 @@ class MLflowCompatibilityTests(APITestCase):
             project=self.project,
             model_flavor="sklearn",
             status="running",
-         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+            vcpu=2,
+            memory_mb=4096,
+            max_runtime_seconds=3600,
+            input_contract="legacy",
+            submitted_at=timezone.now(),
+        )
 
         exp_artifact_path = (
             f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
@@ -1075,6 +1116,3 @@ class MLflowCompatibilityTests(APITestCase):
         self.assertEqual(del_resp.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(del_resp.data["error_code"], "INVALID_PARAMETER_VALUE")
         self.assertIn("job ID", del_resp.data["message"])
-
-
-

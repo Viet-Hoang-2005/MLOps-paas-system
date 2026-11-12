@@ -110,21 +110,27 @@ def verify_otp(*, email: str, code: str, purpose: str) -> str:
     attempts = cache.get(attempts_key) or 0
     if attempts >= MAX_OTP_ATTEMPTS:
         cache.delete(key)
-        raise ValidationError({
-            "otp_code": "Too many failed attempts. This verification code is no longer valid. Please request a new code."
-        })
+        raise ValidationError(
+            {
+                "otp_code": "Too many failed attempts. This verification code is no longer valid. Please request a new code."
+            }
+        )
 
     if not secrets.compare_digest(str(expected), str(code).strip()):
         failed_attempts = _atomic_incr(attempts_key, OTP_TTL_SECONDS)
         if failed_attempts >= MAX_OTP_ATTEMPTS:
             cache.delete(key)
-            raise ValidationError({
-                "otp_code": "Too many failed attempts. This verification code is no longer valid. Please request a new code."
-            })
+            raise ValidationError(
+                {
+                    "otp_code": "Too many failed attempts. This verification code is no longer valid. Please request a new code."
+                }
+            )
         remaining = max(0, MAX_OTP_ATTEMPTS - failed_attempts)
-        raise ValidationError({
-            "otp_code": f"Invalid verification code. You have {remaining} attempt{'s' if remaining > 1 else ''} remaining."
-        })
+        raise ValidationError(
+            {
+                "otp_code": f"Invalid verification code. You have {remaining} attempt{'s' if remaining > 1 else ''} remaining."
+            }
+        )
 
     # Successful verification: delete code and attempt counter immediately
     if not cache.delete(key):

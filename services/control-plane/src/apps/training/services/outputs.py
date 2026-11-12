@@ -1,7 +1,7 @@
 import json
+import uuid
 from pathlib import Path
 from typing import Any
-import uuid
 
 from django.db import transaction
 from django.utils import timezone
@@ -23,6 +23,7 @@ from infrastructure.storage.paths import tenant_training_job_prefix, training_ou
 
 def verify_training_output(job, storage=None):
     from botocore.config import Config
+
     from .storage_scope import validate_training_uri
 
     storage = storage or S3Storage(client_config=Config(connect_timeout=3, read_timeout=5, retries={"max_attempts": 0}))
@@ -32,6 +33,7 @@ def verify_training_output(job, storage=None):
         if not storage.client.head_object(Bucket=bucket, Key=key).get("ContentLength"):
             raise ValueError("Training output is empty.")
     from .output_index import index_output
+
     index_output(job, storage)
 
 
@@ -62,6 +64,7 @@ def get_model_output_summary(job: TrainingJob, storage=None) -> dict[str, Any]:
     storage = storage or S3Storage()
 
     from .output_index import public_outputs
+
     selection = job.artifact_selection or {}
     selected = {str(a.public_id): a for a in public_outputs(job)}
     model_artifact = selected.get(selection.get("model_id"))
@@ -69,6 +72,7 @@ def get_model_output_summary(job: TrainingJob, storage=None) -> dict[str, Any]:
     reference_data = None if job.outputs_purged_at else job.outputs.filter(kind="reference_data").first()
     metrics, params, insights = {}, {}, {}
     from .artifact_selection import validate_json
+
     for role, identifier in selection.get("artifacts", {}).items():
         asset = selected.get(identifier)
         if asset is None:
@@ -97,8 +101,12 @@ def get_model_output_summary(job: TrainingJob, storage=None) -> dict[str, Any]:
         "build_requirements_text": job.build_requirements_text,
         "selection": selection,
         "available_outputs": [serialize_output_asset(a, storage) for a in public_outputs(job)],
-        "label_mapping": serialize_output_asset(selected[selection["artifacts"]["label_mapping"]], storage) if selection.get("artifacts", {}).get("label_mapping") in selected else None,
-        "input_schema": serialize_output_asset(selected[selection["artifacts"]["input_schema"]], storage) if selection.get("artifacts", {}).get("input_schema") in selected else None,
+        "label_mapping": serialize_output_asset(selected[selection["artifacts"]["label_mapping"]], storage)
+        if selection.get("artifacts", {}).get("label_mapping") in selected
+        else None,
+        "input_schema": serialize_output_asset(selected[selection["artifacts"]["input_schema"]], storage)
+        if selection.get("artifacts", {}).get("input_schema") in selected
+        else None,
         "model_artifact": serialize_output_asset(model_artifact, storage) if model_artifact else None,
         "source_code": serialize_output_asset(source_code, storage) if source_code else None,
         "reference_data": serialize_output_asset(reference_data, storage) if reference_data else None,
@@ -121,6 +129,7 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
             project = None
             if job.project_id:
                 from apps.catalog.models import ModelProject
+
                 project = ModelProject.objects.select_for_update().get(pk=job.project_id)
                 if project.deletion_state != "active":
                     raise Conflict("This project is being deleted.")

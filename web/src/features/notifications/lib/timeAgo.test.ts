@@ -24,4 +24,3 @@ describe("formatTimeAgo Utility", () => {
     expect(formatTimeAgo("invalid-iso-string")).toBe("invalid-iso-string");
   });
 });
-

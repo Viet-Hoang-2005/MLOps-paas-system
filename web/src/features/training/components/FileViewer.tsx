@@ -24,7 +24,14 @@ export function FileViewer({
   const { resolvedTheme } = useTheme();
   const lower = path.toLowerCase();
 
-  if (/\.(png|jpe?g)$/i.test(path)) return <img src={content || undefined} alt={path} className="max-h-full max-w-full object-contain" />;
+  if (/\.(png|jpe?g)$/i.test(path))
+    return (
+      <img
+        src={content || undefined}
+        alt={path}
+        className="max-h-full max-w-full object-contain"
+      />
+    );
   if (lower.endsWith(".csv")) {
     return (
       <div className={className || "h-full w-full flex-1 overflow-auto"}>

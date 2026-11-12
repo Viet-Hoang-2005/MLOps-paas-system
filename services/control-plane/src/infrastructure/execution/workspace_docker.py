@@ -1,6 +1,9 @@
 """Asynchronous, deterministic preparation of an isolated read-only Input volume."""
+
 import docker.errors
+
 from common.api.exceptions import Conflict
+
 from .job_containers import labels_for
 
 IMAGE = "mlops-paas-training-runner:latest"
@@ -55,12 +58,25 @@ def prepare(client, job, environment, network):
     except docker.errors.NotFound:
         client.volumes.create(name=volume_name, labels=labels)
     try:
-        client.containers.run(IMAGE, name=helper_name, command=["python", "-m", "src.prepare"],
-            detach=True, remove=False, user="0:0", labels=labels,
+        client.containers.run(
+            IMAGE,
+            name=helper_name,
+            command=["python", "-m", "src.prepare"],
+            detach=True,
+            remove=False,
+            user="0:0",
+            labels=labels,
             environment={k: environment[k] for k in ("S3_INPUT_DOWNLOAD_URL", "S3_INPUT_DOWNLOAD_CAPABILITY")},
-            volumes={volume_name: {"bind": "/prepared", "mode": "rw"}}, network=network,
-            nano_cpus=250_000_000, mem_limit="256m", memswap_limit="256m", cap_drop=["ALL"],
-            security_opt=["no-new-privileges:true"], read_only=True, tmpfs={"/tmp": "rw,nosuid,nodev,size=16m"})
+            volumes={volume_name: {"bind": "/prepared", "mode": "rw"}},
+            network=network,
+            nano_cpus=250_000_000,
+            mem_limit="256m",
+            memswap_limit="256m",
+            cap_drop=["ALL"],
+            security_opt=["no-new-privileges:true"],
+            read_only=True,
+            tmpfs={"/tmp": "rw,nosuid,nodev,size=16m"},
+        )
     except docker.errors.APIError as exc:
         if exc.status_code != 409:
             raise

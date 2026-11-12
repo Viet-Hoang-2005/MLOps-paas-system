@@ -41,7 +41,9 @@ describe("Monitoring productionPreview & Papaparse Serialization", () => {
 
     // Verify CSV serialization and round-trip parsing
     const csv = Papa.unparse(result);
-    const parsed = Papa.parse<Record<string, string>>(csv, { header: true }).data;
+    const parsed = Papa.parse<Record<string, string>>(csv, {
+      header: true,
+    }).data;
 
     expect(parsed).toEqual([
       { x: "1", label: 'comma, quote"', y: "", nested: "", prediction: "safe" },

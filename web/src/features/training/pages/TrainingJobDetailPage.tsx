@@ -130,9 +130,12 @@ export default function TrainingJobDetailPage() {
     queryKey: trainingQueryKeys.metrics(parsedJobId),
     queryFn: () => getTrainingJobMetrics(parsedJobId),
     enabled: job?.status === "running" && activeSection === "metrics",
-    refetchInterval: job?.status === "running" && activeSection === "metrics"
-      ? (job.backend === "docker" ? 15000 : 30000)
-      : false,
+    refetchInterval:
+      job?.status === "running" && activeSection === "metrics"
+        ? job.backend === "docker"
+          ? 15000
+          : 30000
+        : false,
   });
 
   const { data: eventsResponse, refetch: refetchEvents } = useQuery({
@@ -229,16 +232,18 @@ export default function TrainingJobDetailPage() {
     onSuccess: async (newJob) => {
       setRetryJobOpen(false);
       toast.success(t("studio.draftCreated"));
-      await queryClient.invalidateQueries({ queryKey: trainingQueryKeys.usage() });
+      await queryClient.invalidateQueries({
+        queryKey: trainingQueryKeys.usage(),
+      });
       await queryClient.invalidateQueries({
         queryKey: trainingQueryKeys.jobs(),
       });
-      navigate(`/dashboard/training/${newJob.id}/workspace${job?.project_id ? `?project=${job.project_id}` : ""}`);
+      navigate(
+        `/dashboard/training/${newJob.id}/workspace${job?.project_id ? `?project=${job.project_id}` : ""}`,
+      );
     },
     onError: (error) =>
-      toast.error(
-        getTrainingStartError(error, t, i18n.language),
-      ),
+      toast.error(getTrainingStartError(error, t, i18n.language)),
   });
 
   const refreshHeader = async () => {
@@ -385,12 +390,27 @@ export default function TrainingJobDetailPage() {
           <div className="flex shrink-0 flex-col items-end gap-3 sm:flex-row sm:items-center">
             {ACTIVE_STATUSES.includes(job.status) && <LiveStatusBadge />}
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {!job.project_id && job.status === "completed" && job.output_available && !job.deletion_pending && (
-                <Button variant="secondary" onClick={() => navigate(`/dashboard/training/jobs/${job.id}/project`)}>
-                  {t("studio.assignProject")}
-                </Button>
-              )}
-              <Button variant="secondary" onClick={() => navigate(`/dashboard/training/${job.id}/workspace`)}>{t("studio.openDraft")}</Button>
+              {!job.project_id &&
+                job.status === "completed" &&
+                job.output_available &&
+                !job.deletion_pending && (
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      navigate(`/dashboard/training/jobs/${job.id}/project`)
+                    }
+                  >
+                    {t("studio.assignProject")}
+                  </Button>
+                )}
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  navigate(`/dashboard/training/${job.id}/workspace`)
+                }
+              >
+                {t("studio.openDraft")}
+              </Button>
               <Button
                 size="icon"
                 variant="secondary"

@@ -219,7 +219,6 @@ def test_safe_extract_zip_rejects_symlink(tmp_path):
         packager_io.safe_extract_zip(sym_zip, extract_dest)
 
 
-
 class _Exploit:
     def __reduce__(self):
         return (os.system, ("echo pwned",))
@@ -333,8 +332,16 @@ def test_scan_pickle_data_rejects_unparseable_data(payload):
 
 
 COMMON_MODELS = (
-    "gradient-boosting", "hist-gradient-boosting", "hist-regressor", "knn", "knn-ball",
-    "knn-regressor", "column-selector", "select-k-best", "voting", "stacking",
+    "gradient-boosting",
+    "hist-gradient-boosting",
+    "hist-regressor",
+    "knn",
+    "knn-ball",
+    "knn-regressor",
+    "column-selector",
+    "select-k-best",
+    "voting",
+    "stacking",
 )
 
 _BUILD_REAL_ARTIFACTS = """
@@ -426,8 +433,14 @@ def real_artifacts(tmp_path_factory):
 @pytest.mark.parametrize(
     "name",
     [
-        "models.pkl", "pipeline-p0.pkl", "pipeline-p2.pkl", "pipeline-p4.pkl", "xgboost.pkl", "full.pt",
-        "state.pth", "transformer.pt",
+        "models.pkl",
+        "pipeline-p0.pkl",
+        "pipeline-p2.pkl",
+        "pipeline-p4.pkl",
+        "xgboost.pkl",
+        "full.pt",
+        "state.pth",
+        "transformer.pt",
         *[f"{name}.pkl" for name in COMMON_MODELS],
     ],
 )

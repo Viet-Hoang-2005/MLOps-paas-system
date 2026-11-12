@@ -2,12 +2,14 @@
 
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+
 from apps.catalog.models import ModelProject
 from apps.catalog.services.project_metadata import save_project_metadata
 from apps.observability.services.lifecycle import record_training_event
 from apps.training.models import TrainingJob, TrainingOutput
 from common.api.exceptions import Conflict
 from infrastructure.storage import S3Storage
+
 from .artifact_selection import prepare_selection
 
 

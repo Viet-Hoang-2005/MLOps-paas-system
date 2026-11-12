@@ -91,8 +91,7 @@ export function HyperparametersCard({
                     onClick={onRequestRemove}
                     title={t("workflow.removeHyperparameters")}
                     aria-label={t("workflow.removeHyperparameters")}
-                  >
-                  </Button>
+                  ></Button>
                 )}
               </div>
             ) : undefined
@@ -130,4 +129,3 @@ export function HyperparametersCard({
 }
 
 export default HyperparametersCard;
-

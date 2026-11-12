@@ -3,34 +3,43 @@ from django.urls import path
 from .endpoints import (
     TrainingJobBuildEndpoint,
     TrainingJobCancelEndpoint,
+    TrainingJobCloneEndpoint,
     TrainingJobDetailEndpoint,
     TrainingJobEventsEndpoint,
+    TrainingJobInputEndpoint,
     TrainingJobListCreateEndpoint,
     TrainingJobLogsEndpoint,
     TrainingJobModelOutputEndpoint,
     TrainingJobOutputsEndpoint,
     TrainingJobProjectEndpoint,
-    TrainingJobInputEndpoint,
-    TrainingOutputDownloadEndpoint,
-    TrainingWorkspaceDownloadEndpoint,
     TrainingJobReferencePreviewEndpoint,
     TrainingJobRetryEndpoint,
-    TrainingJobCloneEndpoint,
     TrainingJobSubmitEndpoint,
+    TrainingOutputDownloadEndpoint,
     TrainingRuntimeCapabilitiesEndpoint,
     TrainingUsageEndpoint,
+    TrainingWorkspaceDownloadEndpoint,
 )
 from .metrics_endpoints import (
     TrainingJobExperimentMetricsEndpoint,
     TrainingJobRuntimeMetricsEndpoint,
     TrainingJobsCompareEndpoint,
 )
-
 from .workspaces import WorkspaceEntriesEndpoint, WorkspaceEntryEndpoint, WorkspaceSecretEndpoint
 
 urlpatterns = [
-    path("<uuid:job_id>/input/download/", TrainingWorkspaceDownloadEndpoint.as_view(), {"area": "input"}, name="training-input-download"),
-    path("<uuid:job_id>/outputs/download/", TrainingWorkspaceDownloadEndpoint.as_view(), {"area": "output"}, name="training-outputs-download"),
+    path(
+        "<uuid:job_id>/input/download/",
+        TrainingWorkspaceDownloadEndpoint.as_view(),
+        {"area": "input"},
+        name="training-input-download",
+    ),
+    path(
+        "<uuid:job_id>/outputs/download/",
+        TrainingWorkspaceDownloadEndpoint.as_view(),
+        {"area": "output"},
+        name="training-outputs-download",
+    ),
     path("<uuid:job_id>/entries/", WorkspaceEntriesEndpoint.as_view(), name="training-job-entries"),
     path("<uuid:job_id>/entries/<uuid:entry_id>/", WorkspaceEntryEndpoint.as_view(), name="training-job-entry"),
     path("<uuid:job_id>/secrets/<str:name>/", WorkspaceSecretEndpoint.as_view(), name="training-job-secret"),
@@ -39,8 +48,16 @@ urlpatterns = [
     path("compare/", TrainingJobsCompareEndpoint.as_view(), name="training-jobs-compare"),
     path("usage/", TrainingUsageEndpoint.as_view(), name="training-usage"),
     path("<uuid:job_id>/", TrainingJobDetailEndpoint.as_view(), name="training-job-detail"),
-    path("<uuid:job_id>/experiment-metrics/", TrainingJobExperimentMetricsEndpoint.as_view(), name="training-job-experiment-metrics"),
-    path("<uuid:job_id>/runtime-metrics/", TrainingJobRuntimeMetricsEndpoint.as_view(), name="training-job-runtime-metrics"),
+    path(
+        "<uuid:job_id>/experiment-metrics/",
+        TrainingJobExperimentMetricsEndpoint.as_view(),
+        name="training-job-experiment-metrics",
+    ),
+    path(
+        "<uuid:job_id>/runtime-metrics/",
+        TrainingJobRuntimeMetricsEndpoint.as_view(),
+        name="training-job-runtime-metrics",
+    ),
     path("<uuid:job_id>/submit/", TrainingJobSubmitEndpoint.as_view(), name="training-job-submit"),
     path("<uuid:job_id>/project/", TrainingJobProjectEndpoint.as_view(), name="training-job-project"),
     path("<uuid:job_id>/retry/", TrainingJobRetryEndpoint.as_view(), name="training-job-retry"),
@@ -48,10 +65,18 @@ urlpatterns = [
     path("<uuid:job_id>/events/", TrainingJobEventsEndpoint.as_view(), name="training-job-events"),
     path("<uuid:job_id>/logs/", TrainingJobLogsEndpoint.as_view(), name="training-job-logs"),
     path("<uuid:job_id>/input/", TrainingJobInputEndpoint.as_view(), name="training-job-input"),
-    path("<uuid:job_id>/outputs/<uuid:output_id>/download/", TrainingOutputDownloadEndpoint.as_view(), name="training-output-download"),
+    path(
+        "<uuid:job_id>/outputs/<uuid:output_id>/download/",
+        TrainingOutputDownloadEndpoint.as_view(),
+        name="training-output-download",
+    ),
     path("<uuid:job_id>/build/", TrainingJobBuildEndpoint.as_view(), name="training-job-build"),
     path("<uuid:job_id>/model-output/", TrainingJobModelOutputEndpoint.as_view(), name="training-job-model-output"),
-    path("<uuid:job_id>/reference-preview/", TrainingJobReferencePreviewEndpoint.as_view(), name="training-job-reference-preview"),
+    path(
+        "<uuid:job_id>/reference-preview/",
+        TrainingJobReferencePreviewEndpoint.as_view(),
+        name="training-job-reference-preview",
+    ),
     path("<uuid:job_id>/outputs/", TrainingJobOutputsEndpoint.as_view(), name="training-job-outputs"),
     path(
         "runtime-capabilities/",

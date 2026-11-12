@@ -101,7 +101,12 @@ def running_label_mapping(project, version_id=None, storage=None):
                 "mapping": parse_label_mapping_payload(artifact.name, payload),
             }
         except Exception as exc:
-            logger.warning("Failed to parse label mapping %s for version %s: %s", artifact.name, getattr(version, "public_id", None), exc)
+            logger.warning(
+                "Failed to parse label mapping %s for version %s: %s",
+                artifact.name,
+                getattr(version, "public_id", None),
+                exc,
+            )
             return None
 
     return None
@@ -144,7 +149,9 @@ def running_attributes(project, version_id=None, storage=None):
             summary_sources["model_insights"] = "registered"
 
         for art in version.artifacts.all():
-            supplemental = art.metadata.get("summary") if art.metadata.get("provenance") == "supplemental_upload" else None
+            supplemental = (
+                art.metadata.get("summary") if art.metadata.get("provenance") == "supplemental_upload" else None
+            )
             if supplemental is not None:
                 supplemental_summaries[art.kind] = supplemental
                 if art.kind == "metrics" and isinstance(supplemental, dict):
@@ -157,18 +164,21 @@ def running_attributes(project, version_id=None, storage=None):
                     if not feature_importance:
                         feature_importance = (
                             {"kind": "feature_importance", "items": supplemental}
-                            if isinstance(supplemental, list) else supplemental
+                            if isinstance(supplemental, list)
+                            else supplemental
                         )
                         summary_sources["feature_importance"] = "supplemental"
                 elif art.kind == "model_insights":
                     if not model_insights:
                         model_insights = supplemental
                         summary_sources["model_insights"] = "supplemental"
-            artifacts_list.append({
-                "kind": art.kind,
-                "name": art.name,
-                "size_bytes": art.size_bytes,
-            })
+            artifacts_list.append(
+                {
+                    "kind": art.kind,
+                    "name": art.name,
+                    "size_bytes": art.size_bytes,
+                }
+            )
             if art.kind == "label_mapping" and label_mapping is None and art.uri:
                 try:
                     payload = _parse_artifact_data(art.uri, storage)
@@ -177,7 +187,12 @@ def running_attributes(project, version_id=None, storage=None):
                         "mapping": parse_label_mapping_payload(art.name, payload),
                     }
                 except Exception as exc:
-                    logger.warning("Failed to parse label mapping %s for version %s: %s", art.name, getattr(version, "public_id", None), exc)
+                    logger.warning(
+                        "Failed to parse label mapping %s for version %s: %s",
+                        art.name,
+                        getattr(version, "public_id", None),
+                        exc,
+                    )
             elif art.kind == "input_schema" and input_schema is None and art.uri:
                 try:
                     payload = _parse_artifact_data(art.uri, storage)
@@ -247,11 +262,13 @@ def preview_attributes(project, storage=None):
     preview = getattr(project, "preview", None)
     if preview:
         for art in preview.assets.all():
-            artifacts_list.append({
-                "kind": art.kind,
-                "name": art.name,
-                "size_bytes": art.size_bytes,
-            })
+            artifacts_list.append(
+                {
+                    "kind": art.kind,
+                    "name": art.name,
+                    "size_bytes": art.size_bytes,
+                }
+            )
             uri = getattr(art, "s3_uri", None) or getattr(art, "uri", None)
             if not uri:
                 continue
@@ -311,7 +328,9 @@ def preview_attributes(project, storage=None):
     )
 
 
-def _preview_attributes_result(metrics, params, model_insights, feature_importance, label_mapping, input_schema, artifacts_list):
+def _preview_attributes_result(
+    metrics, params, model_insights, feature_importance, label_mapping, input_schema, artifacts_list
+):
     return {
         "metrics": metrics,
         "params": params,

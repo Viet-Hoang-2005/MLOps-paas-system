@@ -69,28 +69,47 @@ function extractFilesFromForm(form: ModelBuildFormValues): PendingUploadFile[] {
 
 export async function getPreviewUploadUrls(
   projectId: string,
-  files: Array<{ kind: string; filename: string; size_bytes: number; content_type?: string }>,
+  files: Array<{
+    kind: string;
+    filename: string;
+    size_bytes: number;
+    content_type?: string;
+  }>,
   flavor?: string,
   artifact_format?: string,
 ): Promise<PresignedUploadResponse> {
   return (
     await apiClient.post<PresignedUploadResponse>(
       controlPlaneURL(`/models/${projectId}/preview/upload-urls/`),
-      { files, flavor: flavor || undefined, artifact_format: artifact_format || undefined },
+      {
+        files,
+        flavor: flavor || undefined,
+        artifact_format: artifact_format || undefined,
+      },
     )
   ).data;
 }
 
 export async function getNewProjectUploadUrls(
   name: string,
-  files: Array<{ kind: string; filename: string; size_bytes: number; content_type?: string }>,
+  files: Array<{
+    kind: string;
+    filename: string;
+    size_bytes: number;
+    content_type?: string;
+  }>,
   flavor?: string,
   artifact_format?: string,
 ): Promise<PresignedUploadResponse> {
   return (
     await apiClient.post<PresignedUploadResponse>(
       controlPlaneURL("/models/preview/upload-urls/"),
-      { name, files, flavor: flavor || undefined, artifact_format: artifact_format || undefined },
+      {
+        name,
+        files,
+        flavor: flavor || undefined,
+        artifact_format: artifact_format || undefined,
+      },
     )
   ).data;
 }
@@ -316,4 +335,3 @@ export async function removePreviewAsset(
     )
   ).data;
 }
-

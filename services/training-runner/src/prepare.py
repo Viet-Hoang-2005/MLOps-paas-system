@@ -1,8 +1,10 @@
 """Trusted Input preparation. Never imports or executes workspace code."""
+
 import os
 import shutil
 import time
 from pathlib import Path
+
 import requests
 from src.io import safe_extract_zip, validate_presigned_url
 
@@ -20,7 +22,11 @@ def prepare():
     endpoint = os.environ["S3_INPUT_DOWNLOAD_URL"]
     for attempt in range(10):
         try:
-            response = requests.post(endpoint, headers={"Authorization": "Bearer " + os.environ["S3_INPUT_DOWNLOAD_CAPABILITY"]}, timeout=(3, 15))
+            response = requests.post(
+                endpoint,
+                headers={"Authorization": "Bearer " + os.environ["S3_INPUT_DOWNLOAD_CAPABILITY"]},
+                timeout=(3, 15),
+            )
             if response.status_code < 500 or attempt == 9:
                 break
         except requests.ConnectionError:
@@ -54,5 +60,8 @@ if __name__ == "__main__":
             prepare()
     except Exception as error:
         status = getattr(getattr(error, "response", None), "status_code", None)
-        print(f"[SYSTEM] Input preparation failed: {type(error).__name__}" + (f" (HTTP {status})" if status else ""), flush=True)
+        print(
+            f"[SYSTEM] Input preparation failed: {type(error).__name__}" + (f" (HTTP {status})" if status else ""),
+            flush=True,
+        )
         raise SystemExit(1)

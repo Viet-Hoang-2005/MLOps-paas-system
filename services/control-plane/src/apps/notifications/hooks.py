@@ -1,4 +1,5 @@
 import logging
+
 from .models import Notification
 from .services import create_notification
 
@@ -113,7 +114,9 @@ def notify_drift_result(run):
             level = Notification.Level.WARNING
         elif run.status == "completed":
             title = f"Data Drift Check: {project.name} (Normal)"
-            message = f"Data distribution analysis for model '{project.name}' completed with no significant drift detected."
+            message = (
+                f"Data distribution analysis for model '{project.name}' completed with no significant drift detected."
+            )
             level = Notification.Level.INFO
         else:
             return

@@ -159,8 +159,7 @@ export function Table<T>({
               icon={<ChevronLeft className="h-5 w-5" />}
               title={t("pagination.previous")}
               aria-label={t("pagination.previous")}
-            >
-            </Button>
+            ></Button>
             <Button
               variant="outline"
               size="icon"

@@ -64,4 +64,3 @@ describe("Theme System & Storage", () => {
     expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 });
-

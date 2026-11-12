@@ -111,9 +111,7 @@ describe("Evolution State & Lifecycle Utilities", () => {
 
     for (const override of invalidOverrides) {
       expect(
-        registeredVersionBuild([
-          { ...build, ...override },
-        ], v1),
+        registeredVersionBuild([{ ...build, ...override }], v1),
       ).toBeUndefined();
     }
   });
@@ -171,9 +169,15 @@ describe("Evolution State & Lifecycle Utilities", () => {
     };
 
     const comparison = comparisonRows(left, right);
-    expect(comparison.find((r) => r.key === "metric.score")?.delta).toBeCloseTo(0.5);
-    expect(comparison.find((r) => r.key === "metric.loss")?.left).toBeUndefined();
-    expect(comparison.find((r) => r.key === "param.depth")?.right).toBeUndefined();
+    expect(comparison.find((r) => r.key === "metric.score")?.delta).toBeCloseTo(
+      0.5,
+    );
+    expect(
+      comparison.find((r) => r.key === "metric.loss")?.left,
+    ).toBeUndefined();
+    expect(
+      comparison.find((r) => r.key === "param.depth")?.right,
+    ).toBeUndefined();
     expect(comparison.find((r) => r.key === "requirements")?.left).toBe(
       v1.requirements_snapshot,
     );
@@ -183,11 +187,19 @@ describe("Evolution State & Lifecycle Utilities", () => {
   });
 
   it("should preserve query parameters with evolutionParams", () => {
-    const routeParams = new URLSearchParams("versionId=1&tab=metrics&other=keep");
+    const routeParams = new URLSearchParams(
+      "versionId=1&tab=metrics&other=keep",
+    );
 
-    expect(evolutionParams(routeParams, { versionId: "2" }).get("tab")).toBe("metrics");
-    expect(evolutionParams(routeParams, { tab: "history" }).get("versionId")).toBe("1");
-    expect(evolutionParams(routeParams, { tab: "history" }).get("other")).toBe("keep");
+    expect(evolutionParams(routeParams, { versionId: "2" }).get("tab")).toBe(
+      "metrics",
+    );
+    expect(
+      evolutionParams(routeParams, { tab: "history" }).get("versionId"),
+    ).toBe("1");
+    expect(evolutionParams(routeParams, { tab: "history" }).get("other")).toBe(
+      "keep",
+    );
     expect(routeParams.get("versionId")).toBe("1");
   });
 

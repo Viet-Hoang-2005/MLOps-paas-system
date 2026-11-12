@@ -56,7 +56,9 @@ def test_probe_reads_multiple_gpus_and_unknown_free_memory():
 def test_metrics_probe_selects_exact_uuid_and_cleans_up():
     client, container = docker_client(f"{GPU}, 42, 1024, 4096\n")
     result = local_gpu._probe(GPU, client=client, metrics=True)
-    assert result["devices"] == [{"id": GPU, "gpu_percent": 42, "gpu_memory_used_mb": 1024, "gpu_memory_total_mb": 4096}]
+    assert result["devices"] == [
+        {"id": GPU, "gpu_percent": 42, "gpu_memory_used_mb": 1024, "gpu_memory_total_mb": 4096}
+    ]
     options = client.containers.create.call_args.kwargs
     assert options["device_requests"][0]["DeviceIDs"] == [GPU]
     assert options["command"] == local_gpu.METRICS_QUERY and options["network_disabled"]
@@ -69,11 +71,14 @@ def test_metrics_probe_rejects_another_device():
     assert local_gpu._probe(GPU, client=client, metrics=True)["reason"] == "device_selection_unsupported"
 
 
-@pytest.mark.parametrize("error,status,reason", [
-    (docker.errors.ImageNotFound("missing"), "unavailable", "image_missing"),
-    (docker.errors.APIError("no gpu"), "unavailable", "nvidia_unavailable"),
-    (requests.Timeout("timeout"), "error", "docker_unavailable"),
-])
+@pytest.mark.parametrize(
+    "error,status,reason",
+    [
+        (docker.errors.ImageNotFound("missing"), "unavailable", "image_missing"),
+        (docker.errors.APIError("no gpu"), "unavailable", "nvidia_unavailable"),
+        (requests.Timeout("timeout"), "error", "docker_unavailable"),
+    ],
+)
 def test_probe_failures_are_bounded_and_do_not_pull(error, status, reason):
     client, _ = docker_client()
     client.images.get.side_effect = error
@@ -115,8 +120,12 @@ def test_selected_probe_requires_exactly_requested_gpu():
 
 
 def test_inventory_cached_and_force_refresh(monkeypatch):
-    probe = Mock(side_effect=[local_gpu._result("available", devices=[{"id": GPU}]),
-                              local_gpu._result("unavailable", "nvidia_unavailable")])
+    probe = Mock(
+        side_effect=[
+            local_gpu._result("available", devices=[{"id": GPU}]),
+            local_gpu._result("unavailable", "nvidia_unavailable"),
+        ]
+    )
     monkeypatch.setattr(local_gpu, "_probe", probe)
     assert local_gpu.inventory()["status"] == "available"
     assert local_gpu.inventory()["status"] == "available"
@@ -147,6 +156,7 @@ def test_selected_device_check_respects_shared_probe_lock(monkeypatch):
     from common.api.exceptions import ServiceUnavailable
 
     started, release = Event(), Event()
+
     def probe():
         started.set()
         assert release.wait(5)
@@ -187,6 +197,7 @@ def test_capabilities_keep_cpu_when_docker_unavailable(settings, monkeypatch):
 def test_submit_checks_selected_device_before_queuing(settings, monkeypatch):
     from django.contrib.auth import get_user_model
     from rest_framework.test import APIClient
+
     from apps.training.models import TrainingJob
 
     settings.TRAINING_BACKEND = "docker"
@@ -194,24 +205,42 @@ def test_submit_checks_selected_device_before_queuing(settings, monkeypatch):
     settings.TRAINING_GPU_COUNTS = (1,)
     user = get_user_model().objects.create_user("gpu-submit-test@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
-    job = TrainingJob.objects.create(project=project, model_flavor="pytorch",
-        accelerator_type="gpu", accelerator_count=1, local_gpu_id=GPU, vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="workspace", status="editing", backend="docker")
+    job = TrainingJob.objects.create(
+        project=project,
+        model_flavor="pytorch",
+        accelerator_type="gpu",
+        accelerator_count=1,
+        local_gpu_id=GPU,
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="workspace",
+        status="editing",
+        backend="docker",
+    )
     check = Mock(side_effect=ValidationError({"local_gpu_id": "Selected GPU is unavailable."}))
     monkeypatch.setattr(local_gpu, "require_device", check)
     client = APIClient()
     client.force_authenticate(user)
-    response = client.post(f"/api/training-jobs/{job.public_id}/submit/", {"revision": 1, "run_key": str(__import__("uuid").uuid4())}, format="json")
+    response = client.post(
+        f"/api/training-jobs/{job.public_id}/submit/",
+        {"revision": 1, "run_key": str(__import__("uuid").uuid4())},
+        format="json",
+    )
     assert response.status_code == 400
     assert TrainingJob.objects.get(pk=job.pk).status == "editing"
     check.assert_called_once_with(GPU)
 
 
-@pytest.mark.parametrize("backend,kind,device_id", [
-    ("docker", "gpu", ""),
-    ("docker", "gpu", "bad-input"),
-    ("docker", "none", GPU),
-    ("argo", "gpu", GPU),
-])
+@pytest.mark.parametrize(
+    "backend,kind,device_id",
+    [
+        ("docker", "gpu", ""),
+        ("docker", "gpu", "bad-input"),
+        ("docker", "none", GPU),
+        ("argo", "gpu", GPU),
+    ],
+)
 def test_rejects_invalid_device_contract(settings, backend, kind, device_id):
     from apps.training.services.resources import validate_resources
 
@@ -219,8 +248,14 @@ def test_rejects_invalid_device_contract(settings, backend, kind, device_id):
     settings.TRAINING_GPU_ENABLED = True
     settings.TRAINING_GPU_COUNTS = (1,)
     with pytest.raises(ValidationError):
-        validate_resources({"accelerator_type": kind, "accelerator_count": 0 if kind == "none" else 1,
-                            "accelerator_model": "t4" if backend == "argo" else "", "local_gpu_id": device_id})
+        validate_resources(
+            {
+                "accelerator_type": kind,
+                "accelerator_count": 0 if kind == "none" else 1,
+                "accelerator_model": "t4" if backend == "argo" else "",
+                "local_gpu_id": device_id,
+            }
+        )
 
 
 @pytest.mark.django_db
@@ -236,26 +271,37 @@ def test_create_persists_only_a_verified_local_gpu(settings, monkeypatch):
     user = get_user_model().objects.create_user("gpu-create-test@example.com")
     client = APIClient()
     client.force_authenticate(user)
-    payload = {"model_flavor": "pytorch",
-               "accelerator_type": "gpu", "accelerator_count": 1, "local_gpu_id": GPU}
+    payload = {"model_flavor": "pytorch", "accelerator_type": "gpu", "accelerator_count": 1, "local_gpu_id": GPU}
     response = client.post("/api/training-jobs/", payload, format="json")
     assert response.status_code == 201
     assert response.data["local_gpu_id"] == GPU
-    assert client.get(f'/api/training-jobs/{response.data["id"]}/').data["local_gpu_id"] == GPU
+    assert client.get(f"/api/training-jobs/{response.data['id']}/").data["local_gpu_id"] == GPU
     check.assert_not_called()
 
 
 @pytest.mark.django_db
 def test_docker_dispatch_uses_exact_verified_uuid(settings, monkeypatch):
     from django.contrib.auth import get_user_model
+
     from apps.training.models import TrainingJob
     from apps.training.services.storage_scope import expected_training_uris
     from infrastructure.execution.docker_backends import DockerTrainingBackend
 
     user = get_user_model().objects.create_user("gpu-dispatch-test@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
-    job = TrainingJob(project=project, owner=project.owner, model_flavor="pytorch", accelerator_type="gpu",
-                      accelerator_count=1, local_gpu_id=GPU, vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
+    job = TrainingJob(
+        project=project,
+        owner=project.owner,
+        model_flavor="pytorch",
+        accelerator_type="gpu",
+        accelerator_count=1,
+        local_gpu_id=GPU,
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        status="pending",
+    )
     uris = expected_training_uris(job, "test-bucket")
     job.code_snapshot_uri, job.data_snapshot_uri, job.output_uri = uris["code"], uris["data"], uris["output"]
     docker_client = Mock()

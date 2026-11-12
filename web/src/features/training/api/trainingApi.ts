@@ -23,7 +23,11 @@ export const listTrainingJobs = async (): Promise<TrainingJobListResponse> => {
 };
 
 export const getTrainingUsage = async (): Promise<TrainingUsageResponse> => {
-  return (await apiClient.get<TrainingUsageResponse>(controlPlaneURL("/training-jobs/usage/"))).data;
+  return (
+    await apiClient.get<TrainingUsageResponse>(
+      controlPlaneURL("/training-jobs/usage/"),
+    )
+  ).data;
 };
 
 export const getTrainingJob = async (jobId: string): Promise<TrainingJob> =>
@@ -44,14 +48,15 @@ export const deleteTrainingOutputs = async (
     )
   ).data;
 
-export const getTrainingRuntimeCapabilities =
-  async (refresh = false): Promise<TrainingRuntimeCapabilities> =>
-    (
-      await apiClient.get<TrainingRuntimeCapabilities>(
-        controlPlaneURL("/training-jobs/runtime-capabilities/"),
-        { params: refresh ? { refresh: "1" } : undefined },
-      )
-    ).data;
+export const getTrainingRuntimeCapabilities = async (
+  refresh = false,
+): Promise<TrainingRuntimeCapabilities> =>
+  (
+    await apiClient.get<TrainingRuntimeCapabilities>(
+      controlPlaneURL("/training-jobs/runtime-capabilities/"),
+      { params: refresh ? { refresh: "1" } : undefined },
+    )
+  ).data;
 
 export const getTrainingJobLogs = async (
   jobId: string,
@@ -78,9 +83,11 @@ export const getTrainingJobLogs = async (
 export const getTrainingJobMetrics = async (
   jobId: string,
 ): Promise<TrainingJobMetricsResponse> => {
-  return (await apiClient.get<TrainingJobMetricsResponse>(
-    controlPlaneURL(`/training-jobs/${jobId}/runtime-metrics/`),
-  )).data;
+  return (
+    await apiClient.get<TrainingJobMetricsResponse>(
+      controlPlaneURL(`/training-jobs/${jobId}/runtime-metrics/`),
+    )
+  ).data;
 };
 
 export const getTrainingJobEvents = async (
@@ -102,7 +109,10 @@ export const cancelTrainingJob = async (
   return "training_job" in data ? data.training_job : data;
 };
 
-export const retryTrainingJob = async (jobId: string, creationKey: string): Promise<TrainingJob> =>
+export const retryTrainingJob = async (
+  jobId: string,
+  creationKey: string,
+): Promise<TrainingJob> =>
   (
     await apiClient.post<TrainingJob>(
       controlPlaneURL(`/training-jobs/${jobId}/retry/`),
@@ -140,7 +150,8 @@ export const patchModelOutput = async (
 ): Promise<TrainingJobModelOutputSummary> => {
   const formData = new FormData();
   formData.append("output_revision", String(payload.output_revision));
-  if (payload.build_requirements_text !== undefined) formData.append("build_requirements_text", payload.build_requirements_text);
+  if (payload.build_requirements_text !== undefined)
+    formData.append("build_requirements_text", payload.build_requirements_text);
   if (payload.source_code_file) {
     formData.append("source_code_file", payload.source_code_file);
   }
@@ -170,22 +181,31 @@ export const getJobReferencePreview = async (
 
 export const getTrainingJobExperimentMetrics = async (
   jobId: string,
-): Promise<import("@/features/training/types").TrainingJobExperimentMetricsResponse> =>
+): Promise<
+  import("@/features/training/types").TrainingJobExperimentMetricsResponse
+> =>
   (
-    await apiClient.get<import("@/features/training/types").TrainingJobExperimentMetricsResponse>(
-      controlPlaneURL(`/training-jobs/${jobId}/experiment-metrics/`),
-    )
+    await apiClient.get<
+      import("@/features/training/types").TrainingJobExperimentMetricsResponse
+    >(controlPlaneURL(`/training-jobs/${jobId}/experiment-metrics/`))
   ).data;
 
 export const compareTrainingRuns = async (
   jobIds: string[],
 ): Promise<import("@/features/training/types").TrainingRunsCompareResponse> =>
   (
-    await apiClient.get<import("@/features/training/types").TrainingRunsCompareResponse>(
-      controlPlaneURL(`/training-jobs/compare/?job_ids=${jobIds.join(",")}`),
-    )
+    await apiClient.get<
+      import("@/features/training/types").TrainingRunsCompareResponse
+    >(controlPlaneURL(`/training-jobs/compare/?job_ids=${jobIds.join(",")}`))
   ).data;
 
-
-export const cloneTrainingJob = async (jobId: string, creationKey: string): Promise<TrainingJob> =>
-  (await apiClient.post<TrainingJob>(controlPlaneURL(`/training-jobs/${jobId}/clone/`), { creation_key: creationKey })).data;
+export const cloneTrainingJob = async (
+  jobId: string,
+  creationKey: string,
+): Promise<TrainingJob> =>
+  (
+    await apiClient.post<TrainingJob>(
+      controlPlaneURL(`/training-jobs/${jobId}/clone/`),
+      { creation_key: creationKey },
+    )
+  ).data;

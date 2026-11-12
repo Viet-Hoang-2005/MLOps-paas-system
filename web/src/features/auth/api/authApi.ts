@@ -14,8 +14,9 @@ import type {
 export const refreshSession = refreshAccessToken;
 
 export const logoutSession = async (): Promise<{ message: string }> => {
-  return runWithRefreshLock(async () =>
-    (await apiClient.post<{ message: string }>("/auth/logout/", {})).data,
+  return runWithRefreshLock(
+    async () =>
+      (await apiClient.post<{ message: string }>("/auth/logout/", {})).data,
   );
 };
 

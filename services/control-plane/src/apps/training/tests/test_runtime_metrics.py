@@ -1,4 +1,3 @@
-from django.utils import timezone
 import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
@@ -7,11 +6,13 @@ from unittest.mock import Mock
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.training.models import TrainingJob
-from apps.training.services import local_gpu, runtime_metrics as metrics
+from apps.training.services import local_gpu
+from apps.training.services import runtime_metrics as metrics
 from infrastructure.execution.job_containers import labels_for
 
 GPU = "GPU-01234567-89ab-cdef-0123-456789abcdef"
@@ -21,8 +22,18 @@ GPU = "GPU-01234567-89ab-cdef-0123-456789abcdef"
 def job(db):
     owner = get_user_model().objects.create_user("runtime@example.com")
     project = ModelProject.objects.create(owner=owner, name="Runtime")
-    return TrainingJob.objects.create(project=project, model_flavor="pytorch", status="running",
-                                      backend="docker", external_job_id="container-1", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+    return TrainingJob.objects.create(
+        project=project,
+        model_flavor="pytorch",
+        status="running",
+        backend="docker",
+        external_job_id="container-1",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -37,13 +48,19 @@ def test_docker_exact_owned_container_and_partial_gpu(job, monkeypatch):
     job.local_gpu_id = GPU
     container = Mock(id="container-1")
     container.attrs = {"Config": {"Labels": labels_for(job, "training")}, "State": {"Status": "running"}}
-    container.stats.return_value = {"cpu_stats": {"cpu_usage": {"total_usage": 60}, "system_cpu_usage": 200, "online_cpus": 4},
-                                   "precpu_stats": {"cpu_usage": {"total_usage": 10}, "system_cpu_usage": 100},
-                                   "memory_stats": {"usage": 120 * 1048576, "stats": {"inactive_file": 20 * 1048576}}}
+    container.stats.return_value = {
+        "cpu_stats": {"cpu_usage": {"total_usage": 60}, "system_cpu_usage": 200, "online_cpus": 4},
+        "precpu_stats": {"cpu_usage": {"total_usage": 10}, "system_cpu_usage": 100},
+        "memory_stats": {"usage": 120 * 1048576, "stats": {"inactive_file": 20 * 1048576}},
+    }
     client = Mock()
     client.containers.get.return_value = container
     monkeypatch.setattr(metrics.docker, "from_env", lambda **kwargs: client)
-    monkeypatch.setattr(local_gpu, "device_metrics", lambda gpu: {"gpu_percent": 20, "gpu_memory_used_mb": 1000, "gpu_memory_total_mb": 4000})
+    monkeypatch.setattr(
+        local_gpu,
+        "device_metrics",
+        lambda gpu: {"gpu_percent": 20, "gpu_memory_used_mb": 1000, "gpu_memory_total_mb": 4000},
+    )
     point = metrics._docker_snapshot(job)
     assert point["cpu_percent"] == 100
     assert point["memory_used_mb"] == 100
@@ -79,14 +96,24 @@ def test_prometheus_scopes_all_metrics_to_owned_pod(job):
     labels = {"namespace": "mlops-paas-training", "pod": "owned", "container": "node"}
     gpu = {**labels, "UUID": GPU}
     client = Mock(enabled=True)
-    client.query.side_effect = [vector(1, namespace=labels["namespace"], pod="owned"), vector(1, **labels),
-                                vector(1024 * 1048576, **labels), vector(40, **gpu),
-                                vector(1024, **gpu), vector(3000, **gpu), vector(72, **gpu)]
+    client.query.side_effect = [
+        vector(1, namespace=labels["namespace"], pod="owned"),
+        vector(1, **labels),
+        vector(1024 * 1048576, **labels),
+        vector(40, **gpu),
+        vector(1024, **gpu),
+        vector(3000, **gpu),
+        vector(72, **gpu),
+    ]
     point = metrics._prometheus_snapshot(job, client)
     assert point["cpu_percent"] == 50 and point["memory_percent"] == 25
     assert point["gpu_percent"] == 40 and point["gpu_memory_percent"] == 25
     query = client.query.call_args_list[0].args[0]
-    assert str(job.public_id) in query and str(job.project.public_id) in query and str(job.project.owner.tenant_id) in query
+    assert (
+        str(job.public_id) in query
+        and str(job.project.public_id) in query
+        and str(job.project.owner.tenant_id) in query
+    )
     assert all('pod="owned"' in c.args[0] for c in client.query.call_args_list[1:])
 
 
@@ -94,8 +121,12 @@ def test_prometheus_rejects_ambiguous_gpu_and_keeps_cpu(job):
     job.backend, job.accelerator_type = "argo", "gpu"
     labels = {"namespace": "mlops-paas-training", "pod": "owned", "container": "node"}
     client = Mock(enabled=True)
-    client.query.side_effect = [vector(1, namespace=labels["namespace"], pod="owned"), vector(1, **labels),
-                                vector(100, **labels), vector(10, **{**labels, "UUID": GPU}) * 2]
+    client.query.side_effect = [
+        vector(1, namespace=labels["namespace"], pod="owned"),
+        vector(1, **labels),
+        vector(100, **labels),
+        vector(10, **{**labels, "UUID": GPU}) * 2,
+    ]
     point = metrics._prometheus_snapshot(job, client)
     assert point["cpu_percent"] == 50 and point["gpu_percent"] is None
 
@@ -113,8 +144,15 @@ def test_prometheus_missing_reserved_memory_does_not_guess_total(job):
     labels = {"namespace": "mlops-paas-training", "pod": "owned", "container": "node"}
     gpu = {**labels, "UUID": GPU}
     client = Mock(enabled=True)
-    client.query.side_effect = [vector(1, namespace=labels["namespace"], pod="owned"), vector(1, **labels),
-                                vector(100, **labels), vector(40, **gpu), vector(1024, **gpu), vector(3072, **gpu), []]
+    client.query.side_effect = [
+        vector(1, namespace=labels["namespace"], pod="owned"),
+        vector(1, **labels),
+        vector(100, **labels),
+        vector(40, **gpu),
+        vector(1024, **gpu),
+        vector(3072, **gpu),
+        [],
+    ]
     point = metrics._prometheus_snapshot(job, client)
     assert point["gpu_percent"] == 40 and point["gpu_memory_used_mb"] == 1024
     assert point["gpu_memory_total_mb"] is None and point["gpu_memory_percent"] is None
@@ -129,10 +167,12 @@ def test_runtime_failure_returns_sanitized_unavailable(job, monkeypatch):
 
 def test_cache_coalesces_requests_and_terminal_jobs_hide_metrics(job, monkeypatch):
     entered, finish = Event(), Event()
+
     def sample(_job):
         entered.set()
         assert finish.wait(5)
         return {**metrics._point(job), "cpu_percent": 50}
+
     monkeypatch.setattr(metrics, "_docker_snapshot", sample)
     with ThreadPoolExecutor(max_workers=2) as executor:
         first = executor.submit(metrics.runtime_metrics, job)

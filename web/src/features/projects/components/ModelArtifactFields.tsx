@@ -166,12 +166,12 @@ export function ModelArtifactFields({
 
   const hasAdvancedAssets = Boolean(
     existingAssets &&
-      (existingAssets.label_mapping ||
-        existingAssets.input_schema ||
-        existingAssets.metrics ||
-        existingAssets.params ||
-        existingAssets.model_insights ||
-        existingAssets.feature_importance),
+    (existingAssets.label_mapping ||
+      existingAssets.input_schema ||
+      existingAssets.metrics ||
+      existingAssets.params ||
+      existingAssets.model_insights ||
+      existingAssets.feature_importance),
   );
 
   const maxSizeBytes =
@@ -216,9 +216,7 @@ export function ModelArtifactFields({
             setField("flavor", value);
             if (form.source_artifact) {
               const newMax =
-                MAX_SOURCE_ARTIFACT_BYTES[value][
-                  form.artifact_format
-                ];
+                MAX_SOURCE_ARTIFACT_BYTES[value][form.artifact_format];
               if (form.source_artifact.size > newMax) {
                 setField("source_artifact", null);
                 toast.warning(
@@ -385,16 +383,12 @@ export function ModelArtifactFields({
                 }
                 subtitle={t("uploadFlow.build.attachments.metricsSubtitle")}
                 hint={t("uploadFlow.build.attachments.metricsIndicators")}
-                hasFile={Boolean(
-                  form.metrics_file || existingAssets?.metrics,
-                )}
+                hasFile={Boolean(form.metrics_file || existingAssets?.metrics)}
                 onRemove={() => {
                   onRemoveAsset?.("metrics");
                   setField("metrics_file", null);
                 }}
-                onChange={(file) =>
-                  handleJsonFileChange(file, "metrics_file")
-                }
+                onChange={(file) => handleJsonFileChange(file, "metrics_file")}
               />
               <FileDropzone
                 accept=".json"
@@ -406,16 +400,12 @@ export function ModelArtifactFields({
                 }
                 subtitle={t("uploadFlow.build.attachments.paramsSubtitle")}
                 hint={t("uploadFlow.build.attachments.paramsIndicators")}
-                hasFile={Boolean(
-                  form.params_file || existingAssets?.params,
-                )}
+                hasFile={Boolean(form.params_file || existingAssets?.params)}
                 onRemove={() => {
                   onRemoveAsset?.("params");
                   setField("params_file", null);
                 }}
-                onChange={(file) =>
-                  handleJsonFileChange(file, "params_file")
-                }
+                onChange={(file) => handleJsonFileChange(file, "params_file")}
               />
               <FileDropzone
                 accept=".json"
@@ -453,7 +443,8 @@ export function ModelArtifactFields({
                   "uploadFlow.build.attachments.featureImportanceIndicators",
                 )}
                 hasFile={Boolean(
-                  form.feature_importance_file || existingAssets?.feature_importance,
+                  form.feature_importance_file ||
+                  existingAssets?.feature_importance,
                 )}
                 onRemove={() => {
                   onRemoveAsset?.("feature_importance");

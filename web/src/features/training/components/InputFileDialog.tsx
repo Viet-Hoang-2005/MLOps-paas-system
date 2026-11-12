@@ -7,8 +7,13 @@ import { FileDropzone } from "@/shared/components/FileDropzone";
 import { Input } from "@/shared/components/Input";
 import { Select, type SelectOption } from "@/shared/components/Select";
 
-export type InputFileKind = "script" | "data" | "config" | "document" | "requirements";
-export interface InputFileSelection { path: string; kind: InputFileKind; file: File | null }
+export type InputFileKind =
+  "script" | "data" | "config" | "document" | "requirements";
+export interface InputFileSelection {
+  path: string;
+  kind: InputFileKind;
+  file: File | null;
+}
 export interface InputFileDialogProps {
   existing?: { path: string; kind: InputFileKind };
   parentPath?: string;
@@ -19,10 +24,21 @@ export interface InputFileDialogProps {
 }
 
 const extensions: Record<InputFileKind, string> = {
-  script: ".py", data: ".csv", config: ".json", document: ".md", requirements: ".txt",
+  script: ".py",
+  data: ".csv",
+  config: ".json",
+  document: ".md",
+  requirements: ".txt",
 };
 
-export function InputFileDialog({ existing, parentPath = "", hasRequirements, saving = false, onClose, onSave }: InputFileDialogProps) {
+export function InputFileDialog({
+  existing,
+  parentPath = "",
+  hasRequirements,
+  saving = false,
+  onClose,
+  onSave,
+}: InputFileDialogProps) {
   const { t } = useTranslation("training");
   const [kind, setKind] = useState<InputFileKind>(existing?.kind ?? "script");
   const [name, setName] = useState(existing?.path.split("/").pop() ?? "");
@@ -98,12 +114,29 @@ export function InputFileDialog({ existing, parentPath = "", hasRequirements, sa
       setError(t("workspace.fileDialog.requirementsExists"));
       return;
     }
-    const parent = existing?.path.includes("/") ? existing.path.slice(0, existing.path.lastIndexOf("/")) : parentPath;
-    onSave({ kind, path: isRequirements ? filename : (parent ? `${parent}/${filename}` : filename), file });
+    const parent = existing?.path.includes("/")
+      ? existing.path.slice(0, existing.path.lastIndexOf("/"))
+      : parentPath;
+    onSave({
+      kind,
+      path: isRequirements
+        ? filename
+        : parent
+          ? `${parent}/${filename}`
+          : filename,
+      file,
+    });
   };
 
   return (
-    <BaseDialog title={existing ? t("workspace.fileDialog.edit") : t("workspace.fileDialog.create")} onClose={onClose}>
+    <BaseDialog
+      title={
+        existing
+          ? t("workspace.fileDialog.edit")
+          : t("workspace.fileDialog.create")
+      }
+      onClose={onClose}
+    >
       <form onSubmit={submit} className="space-y-4">
         <Select
           label={t("workspace.fileDialog.type")}
@@ -116,16 +149,58 @@ export function InputFileDialog({ existing, parentPath = "", hasRequirements, sa
           }}
           options={kinds}
         />
-        <Input label={t("workspace.fileDialog.name")} value={isRequirements ? "requirements.txt" : name}
-          disabled={isRequirements || saving} onChange={(event) => { setName(event.target.value); setError(""); }} error={error || undefined} />
-        {!lockedRequirements && <FileDropzone accept={extensions[kind]} title={file?.name ?? t("workspace.fileDialog.upload")}
-          subtitle={kind === "data" && !existing ? t("workspace.fileDialog.required") : t("workspace.fileDialog.optional")}
-          hasFile={Boolean(file)} onChange={(next) => { setFile(next); setError(""); }} disabled={saving} removeTitle={t("workspace.fileDialog.removeUpload")} />}
-        {lockedRequirements && <p className="text-style-caption text-color-muted-foreground">{t("workspace.fileDialog.requirementsEdit")}</p>}
-        {hasRequirements && !existing && <p className="text-style-caption text-color-muted-foreground">{t("workspace.fileDialog.requirementsExists")}</p>}
+        <Input
+          label={t("workspace.fileDialog.name")}
+          value={isRequirements ? "requirements.txt" : name}
+          disabled={isRequirements || saving}
+          onChange={(event) => {
+            setName(event.target.value);
+            setError("");
+          }}
+          error={error || undefined}
+        />
+        {!lockedRequirements && (
+          <FileDropzone
+            accept={extensions[kind]}
+            title={file?.name ?? t("workspace.fileDialog.upload")}
+            subtitle={
+              kind === "data" && !existing
+                ? t("workspace.fileDialog.required")
+                : t("workspace.fileDialog.optional")
+            }
+            hasFile={Boolean(file)}
+            onChange={(next) => {
+              setFile(next);
+              setError("");
+            }}
+            disabled={saving}
+            removeTitle={t("workspace.fileDialog.removeUpload")}
+          />
+        )}
+        {lockedRequirements && (
+          <p className="text-style-caption text-color-muted-foreground">
+            {t("workspace.fileDialog.requirementsEdit")}
+          </p>
+        )}
+        {hasRequirements && !existing && (
+          <p className="text-style-caption text-color-muted-foreground">
+            {t("workspace.fileDialog.requirementsExists")}
+          </p>
+        )}
         <div className="flex justify-end gap-3">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>{t("workspace.fileDialog.cancel")}</Button>
-          <Button type="submit" loading={saving}>{existing ? t("workspace.fileDialog.save") : t("workspace.fileDialog.createAction")}</Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={saving}
+          >
+            {t("workspace.fileDialog.cancel")}
+          </Button>
+          <Button type="submit" loading={saving}>
+            {existing
+              ? t("workspace.fileDialog.save")
+              : t("workspace.fileDialog.createAction")}
+          </Button>
         </div>
       </form>
     </BaseDialog>

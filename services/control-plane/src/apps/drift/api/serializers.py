@@ -32,6 +32,7 @@ class DriftRunSerializer(serializers.ModelSerializer):
             return run.evidence_window.samples.count()
         try:
             from apps.production.models import PredictionRecord
+
             return PredictionRecord.objects.filter(
                 project=run.monitor.version.project,
                 model_version=run.monitor.version,

@@ -86,7 +86,7 @@ export function Back({
     >
       <ArrowLeft className="h-4 w-4" />
       {title !== undefined && title !== null && (
-      <span className={titleClassName}>{title}</span>
+        <span className={titleClassName}>{title}</span>
       )}
     </button>
   );

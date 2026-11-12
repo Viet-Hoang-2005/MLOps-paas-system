@@ -122,9 +122,7 @@ export function CodeEvolutionPage({
       });
     },
     onError: (err) => {
-      toast.error(
-        getApiErrorMessage(err, t("workspace.supplementalFailed")),
-      );
+      toast.error(getApiErrorMessage(err, t("workspace.supplementalFailed")));
     },
   });
 
@@ -195,10 +193,7 @@ export function CodeEvolutionPage({
             "workspace.dragSourceCode",
             "Drag & drop Python file (.py) or browse",
           )}
-          subtitle={t(
-            "workspace.maxSourceSize",
-            "Supported: .py, max 5MB",
-          )}
+          subtitle={t("workspace.maxSourceSize", "Supported: .py, max 5MB")}
           hint={t(
             "workspace.supplementalHint",
             "File will become immutable once registered.",

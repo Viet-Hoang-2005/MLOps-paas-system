@@ -441,7 +441,6 @@ def test_password_reset_endpoints_rate_throttled():
     assert "throttled" in str(res_throttled.data).lower()
 
 
-
 def _reset_complete(client, **headers):
     return client.post(
         "/api/auth/password-reset/complete/",
@@ -476,5 +475,15 @@ def test_throttle_separates_clients_behind_a_trusted_proxy(settings):
 def test_registration_otp_endpoints_rate_throttled():
     client = APIClient()
     for _ in range(10):
-        assert client.post("/api/auth/register/verify-otp/", {"email": "a@example.com", "otp_code": "123456"}, format="json").status_code == 400
-    assert client.post("/api/auth/register/verify-otp/", {"email": "a@example.com", "otp_code": "123456"}, format="json").status_code == 429
+        assert (
+            client.post(
+                "/api/auth/register/verify-otp/", {"email": "a@example.com", "otp_code": "123456"}, format="json"
+            ).status_code
+            == 400
+        )
+    assert (
+        client.post(
+            "/api/auth/register/verify-otp/", {"email": "a@example.com", "otp_code": "123456"}, format="json"
+        ).status_code
+        == 429
+    )

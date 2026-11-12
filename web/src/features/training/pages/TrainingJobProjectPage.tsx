@@ -10,15 +10,29 @@ export default function TrainingJobProjectPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation("training");
-  if (job.status !== "completed" || !job.output_available || job.deletion_pending) {
-    return <p className="text-style-body text-color-muted-foreground">{t("studio.noOutput")}</p>;
+  if (
+    job.status !== "completed" ||
+    !job.output_available ||
+    job.deletion_pending
+  ) {
+    return (
+      <p className="text-style-body text-color-muted-foreground">
+        {t("studio.noOutput")}
+      </p>
+    );
   }
-  return <TrainingProjectAssignment job={job}
-    onBack={() => navigate(`/dashboard/training/jobs/${job.id}/artifacts`)}
-    onSaved={(assigned) => {
-      queryClient.setQueryData(trainingQueryKeys.job(assigned.id), assigned);
-      void queryClient.invalidateQueries({ queryKey: trainingQueryKeys.jobs() });
-      void queryClient.invalidateQueries({ queryKey: ["models"] });
-      navigate(`/dashboard/training/jobs/${assigned.id}/artifacts`);
-    }} />;
+  return (
+    <TrainingProjectAssignment
+      job={job}
+      onBack={() => navigate(`/dashboard/training/jobs/${job.id}/artifacts`)}
+      onSaved={(assigned) => {
+        queryClient.setQueryData(trainingQueryKeys.job(assigned.id), assigned);
+        void queryClient.invalidateQueries({
+          queryKey: trainingQueryKeys.jobs(),
+        });
+        void queryClient.invalidateQueries({ queryKey: ["models"] });
+        navigate(`/dashboard/training/jobs/${assigned.id}/artifacts`);
+      }}
+    />
+  );
 }

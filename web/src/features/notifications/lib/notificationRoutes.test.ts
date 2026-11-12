@@ -30,7 +30,9 @@ describe("getNotificationDestination", () => {
       link: "/dashboard/projects/proj-123/training",
       metadata: { project_id: "proj-123" },
     };
-    expect(getNotificationDestination(notif)).toBe("/dashboard/projects/proj-123/training");
+    expect(getNotificationDestination(notif)).toBe(
+      "/dashboard/projects/proj-123/training",
+    );
   });
 
   it("navigates build (packaging) notifications to /dashboard/projects/<id>/deployment (without s)", () => {
@@ -40,7 +42,9 @@ describe("getNotificationDestination", () => {
       // Even if legacy link had /deployments with s
       link: "/dashboard/projects/proj-123/deployments",
     };
-    expect(getNotificationDestination(notif)).toBe("/dashboard/projects/proj-123/deployment");
+    expect(getNotificationDestination(notif)).toBe(
+      "/dashboard/projects/proj-123/deployment",
+    );
   });
 
   it("navigates deployment notifications to /dashboard/projects/<id>/deployment", () => {
@@ -49,7 +53,9 @@ describe("getNotificationDestination", () => {
       type: "deployment",
       metadata: { project_id: "proj-456" },
     };
-    expect(getNotificationDestination(notif)).toBe("/dashboard/projects/proj-456/deployment");
+    expect(getNotificationDestination(notif)).toBe(
+      "/dashboard/projects/proj-456/deployment",
+    );
   });
 
   it("navigates drift notifications to /dashboard/projects/<id>/monitoring", () => {
@@ -59,7 +65,9 @@ describe("getNotificationDestination", () => {
       link: "/dashboard/projects/proj-789/evolution",
       metadata: { project_id: "proj-789" },
     };
-    expect(getNotificationDestination(notif)).toBe("/dashboard/projects/proj-789/monitoring");
+    expect(getNotificationDestination(notif)).toBe(
+      "/dashboard/projects/proj-789/monitoring",
+    );
   });
 
   it("navigates alert notifications to /dashboard/projects/<id>/overview", () => {
@@ -68,14 +76,26 @@ describe("getNotificationDestination", () => {
       type: "alert",
       metadata: { project_id: "proj-alert-1" },
     };
-    expect(getNotificationDestination(notif)).toBe("/dashboard/projects/proj-alert-1/overview");
+    expect(getNotificationDestination(notif)).toBe(
+      "/dashboard/projects/proj-alert-1/overview",
+    );
   });
 
   it("falls back to generic routes when project_id is not present", () => {
-    expect(getNotificationDestination({ ...baseNotification, type: "training" })).toBe("/dashboard/training");
-    expect(getNotificationDestination({ ...baseNotification, type: "build" })).toBe("/dashboard/deployment");
-    expect(getNotificationDestination({ ...baseNotification, type: "deployment" })).toBe("/dashboard/deployment");
-    expect(getNotificationDestination({ ...baseNotification, type: "drift" })).toBe("/dashboard/monitoring");
-    expect(getNotificationDestination({ ...baseNotification, type: "alert" })).toBe("/dashboard/overview");
+    expect(
+      getNotificationDestination({ ...baseNotification, type: "training" }),
+    ).toBe("/dashboard/training");
+    expect(
+      getNotificationDestination({ ...baseNotification, type: "build" }),
+    ).toBe("/dashboard/deployment");
+    expect(
+      getNotificationDestination({ ...baseNotification, type: "deployment" }),
+    ).toBe("/dashboard/deployment");
+    expect(
+      getNotificationDestination({ ...baseNotification, type: "drift" }),
+    ).toBe("/dashboard/monitoring");
+    expect(
+      getNotificationDestination({ ...baseNotification, type: "alert" }),
+    ).toBe("/dashboard/overview");
   });
 });

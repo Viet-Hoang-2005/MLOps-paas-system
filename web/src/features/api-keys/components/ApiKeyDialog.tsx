@@ -55,8 +55,7 @@ export function ApiKeyDialog({
                 icon={<Clipboard className="h-4 w-4" />}
                 title={t("apiDialog.copy")}
                 aria-label={t("apiDialog.copy")}
-                >
-              </Button> 
+              ></Button>
             </div>
           </div>
           <div className="mt-6 flex justify-end">

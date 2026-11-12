@@ -1,4 +1,7 @@
-export function formatTimeAgo(isoString: string, locale: string = "vi"): string {
+export function formatTimeAgo(
+  isoString: string,
+  locale: string = "vi",
+): string {
   try {
     const date = new Date(isoString);
     if (Number.isNaN(date.getTime())) {
@@ -8,9 +11,12 @@ export function formatTimeAgo(isoString: string, locale: string = "vi"): string 
     const diffSeconds = Math.round((date.getTime() - now.getTime()) / 1000);
 
     const absSeconds = Math.abs(diffSeconds);
-    const rtf = new Intl.RelativeTimeFormat(locale === "vi" ? "vi-VN" : "en-US", {
-      numeric: "auto",
-    });
+    const rtf = new Intl.RelativeTimeFormat(
+      locale === "vi" ? "vi-VN" : "en-US",
+      {
+        numeric: "auto",
+      },
+    );
 
     if (absSeconds < 60) {
       return locale === "vi" ? "Vừa xong" : "Just now";
@@ -34,4 +40,3 @@ export function formatTimeAgo(isoString: string, locale: string = "vi"): string 
     return isoString;
   }
 }
-

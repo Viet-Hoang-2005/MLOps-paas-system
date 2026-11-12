@@ -127,9 +127,7 @@ export function DataEvolutionPage({
       });
     },
     onError: (err) => {
-      toast.error(
-        getApiErrorMessage(err, t("workspace.supplementalFailed")),
-      );
+      toast.error(getApiErrorMessage(err, t("workspace.supplementalFailed")));
     },
   });
 
@@ -195,10 +193,7 @@ export function DataEvolutionPage({
             "workspace.dragRefData",
             "Drag & drop CSV file (.csv) or browse",
           )}
-          subtitle={t(
-            "workspace.maxRefSize",
-            "Supported: .csv, max 100MB",
-          )}
+          subtitle={t("workspace.maxRefSize", "Supported: .csv, max 100MB")}
           hint={t(
             "workspace.supplementalHint",
             "File will become immutable once registered.",

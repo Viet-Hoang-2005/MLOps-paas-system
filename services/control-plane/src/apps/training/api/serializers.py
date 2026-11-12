@@ -8,7 +8,9 @@ from apps.training.models import TrainingJob, TrainingOutput
 class TrainingDraftSettingsSerializer(serializers.Serializer):
     revision = serializers.IntegerField(min_value=1, required=False)
     entry_point = serializers.CharField(max_length=512, allow_blank=True, required=False)
-    environment = serializers.DictField(child=serializers.CharField(allow_blank=True, trim_whitespace=False), required=False)
+    environment = serializers.DictField(
+        child=serializers.CharField(allow_blank=True, trim_whitespace=False), required=False
+    )
     model_flavor = serializers.ChoiceField(choices=TrainingJob.MODEL_FLAVORS, required=False)
     vcpu = serializers.IntegerField(min_value=1, allow_null=True, required=False)
     memory_mb = serializers.IntegerField(min_value=512, allow_null=True, required=False)
@@ -96,7 +98,9 @@ class TrainingJobSerializer(serializers.ModelSerializer):
 
     def get_outputs(self, instance):
         from apps.training.services.output_index import public_outputs
+
         return TrainingOutputSerializer(public_outputs(instance), many=True).data
+
     output_available = serializers.SerializerMethodField()
     registration_build = serializers.SerializerMethodField()
     model_status = serializers.SerializerMethodField()
@@ -109,7 +113,15 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "project_id",
             "input_contract",
             "input_revision",
-            "run_key", "revision", "environment", "entries", "secrets", "secrets_available", "retry_of", "cloned_from", "submitted_at",
+            "run_key",
+            "revision",
+            "environment",
+            "entries",
+            "secrets",
+            "secrets_available",
+            "retry_of",
+            "cloned_from",
+            "submitted_at",
             "model_flavor",
             "entry_point",
             "requirements_text",
@@ -150,8 +162,13 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = (
-            "input_contract", "input_revision", "run_key",
-            "observation_status", "observation_error", "execution_deadline_at", "runtime_started_at",
+            "input_contract",
+            "input_revision",
+            "run_key",
+            "observation_status",
+            "observation_error",
+            "execution_deadline_at",
+            "runtime_started_at",
             "backend",
             "code_snapshot_uri",
             "data_snapshot_uri",
@@ -177,6 +194,7 @@ class TrainingJobSerializer(serializers.ModelSerializer):
         if not self.context.get("include_workspace"):
             return []
         from apps.training.services.workspaces import serialize_entries
+
         return serialize_entries(instance.entries.order_by("relative_path"))
 
     @staticmethod
@@ -185,7 +203,8 @@ class TrainingJobSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_secrets_available(instance):
-        from apps.training.services.workspaces import cipher, ServiceUnavailable
+        from apps.training.services.workspaces import ServiceUnavailable, cipher
+
         try:
             cipher()
             return True
@@ -195,7 +214,13 @@ class TrainingJobSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_output_available(instance):
         from apps.training.services.output_index import public_outputs
-        return instance.status == "completed" and instance.outputs_purged_at is None and instance.tracking.get("output_contract") == 2 and public_outputs(instance).filter(kind="model").exists()
+
+        return (
+            instance.status == "completed"
+            and instance.outputs_purged_at is None
+            and instance.tracking.get("output_contract") == 2
+            and public_outputs(instance).filter(kind="model").exists()
+        )
 
     @staticmethod
     def get_registration_build(instance):

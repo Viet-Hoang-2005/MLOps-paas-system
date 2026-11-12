@@ -51,4 +51,3 @@ __all__ = [
     "_parse_artifact_path",
     "_project_mlflow_artifact_uri",
 ]
-

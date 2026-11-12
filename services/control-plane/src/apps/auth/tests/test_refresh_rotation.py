@@ -45,6 +45,7 @@ def test_failed_new_token_persistence_rolls_back_consumption(monkeypatch):
     raw = str(original)
     old_jti = original["jti"]
     with monkeypatch.context() as patch:
+
         def fail_create(*args, **kwargs):
             raise OperationalError("Database unavailable")
 

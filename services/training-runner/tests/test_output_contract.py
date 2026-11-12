@@ -3,7 +3,6 @@ import os
 import tarfile
 
 import pytest
-
 from src.output_contract import collect, package
 
 

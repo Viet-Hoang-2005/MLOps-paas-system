@@ -7,4 +7,3 @@ export const notificationQueryKeys = {
     [...notificationQueryKeys.lists(), filters ?? {}] as const,
   unreadCount: () => [...notificationQueryKeys.all, "unread-count"] as const,
 };
-

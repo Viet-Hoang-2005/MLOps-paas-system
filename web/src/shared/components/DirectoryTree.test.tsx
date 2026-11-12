@@ -49,7 +49,7 @@ describe("DirectoryTree", () => {
         unsavedContents={{}}
         expandedFolders={new Set()}
         toggleFolder={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText("data")).toBeInTheDocument();
@@ -67,7 +67,7 @@ describe("DirectoryTree", () => {
         unsavedContents={{}}
         expandedFolders={new Set(["data"])}
         toggleFolder={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText("train.csv")).toBeInTheDocument();
@@ -86,7 +86,7 @@ describe("DirectoryTree", () => {
         unsavedContents={{}}
         expandedFolders={new Set(["data", "data/raw"])}
         toggleFolder={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText("input.json")).toBeInTheDocument();
@@ -114,7 +114,7 @@ describe("DirectoryTree", () => {
         unsavedContents={{}}
         expandedFolders={new Set()}
         toggleFolder={handleToggle}
-      />
+      />,
     );
 
     await user.click(screen.getByText("data"));

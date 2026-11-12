@@ -1,7 +1,8 @@
 export const authEn = {
   session: {
     unavailableTitle: "Unable to verify your session",
-    unavailableDescription: "The server is unavailable or your connection was interrupted. Please try again.",
+    unavailableDescription:
+      "The server is unavailable or your connection was interrupted. Please try again.",
   },
   login: {
     title: "Welcome back",

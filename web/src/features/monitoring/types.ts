@@ -97,4 +97,3 @@ export interface DriftReportData {
     json_url: string | null;
   };
 }
-

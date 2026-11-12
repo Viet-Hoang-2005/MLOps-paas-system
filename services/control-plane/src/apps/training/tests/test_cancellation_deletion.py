@@ -25,7 +25,12 @@ def training_job(*, email="delete-training@example.com", status="completed"):
         data_snapshot_uri="s3://bucket/data.csv",
         output_uri="s3://bucket/output.tar.gz",
         status=status,
-     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
     return owner, job
 
 
@@ -151,6 +156,7 @@ def test_execute_failure_does_not_overwrite_cancelling(monkeypatch):
 @pytest.mark.django_db
 def test_docker_cancel_waits_for_exit_and_removes_container():
     from infrastructure.execution.job_containers import labels_for
+
     _, job = training_job(status="running")
     job.external_job_id = "container-id"
     calls = []
@@ -182,10 +188,15 @@ def test_docker_cancel_waits_for_exit_and_removes_container():
 @pytest.mark.django_db
 def test_docker_cancel_adopts_runtime_before_container_registration():
     from infrastructure.execution.job_containers import labels_for
+
     _, job = training_job(status="running")
-    container = Mock(id="unregistered", attrs={"Config": {"Labels": labels_for(job, "training")}, "State": {"Status": "running"}})
+    container = Mock(
+        id="unregistered", attrs={"Config": {"Labels": labels_for(job, "training")}, "State": {"Status": "running"}}
+    )
     backend = DockerTrainingBackend(
-        docker_client=SimpleNamespace(client=SimpleNamespace(containers=SimpleNamespace(get=Mock(return_value=container)))),
+        docker_client=SimpleNamespace(
+            client=SimpleNamespace(containers=SimpleNamespace(get=Mock(return_value=container)))
+        ),
         storage=SimpleNamespace(),
     )
 

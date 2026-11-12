@@ -66,14 +66,18 @@ export default function ProjectOverviewPage() {
   const model = project.data;
   const hasRunning = model?.active_endpoint?.deployment_status === "succeeded";
   const isPreview = Boolean(model) && !hasRunning;
-  const effectiveVersionId = hasRunning ? model?.active_endpoint?.version_id : undefined;
+  const effectiveVersionId = hasRunning
+    ? model?.active_endpoint?.version_id
+    : undefined;
 
   const source = useRunningSource(
     hasRunning && tab === "code" ? modelId : undefined,
     effectiveVersionId,
   );
   const reference = useSnapshotText(
-    hasRunning && tab === "data" ? model?.reference_data?.download_url : undefined,
+    hasRunning && tab === "data"
+      ? model?.reference_data?.download_url
+      : undefined,
     effectiveVersionId,
   );
   const attributes = useRunningAttributes(
@@ -146,9 +150,7 @@ export default function ProjectOverviewPage() {
           title={t("pageTitle")}
           description={t("workflow.noProjectOverview")}
           icon={<Home className="h-6 w-6" />}
-          additional={
-            tCommon("modelSelector.empty")
-          }
+          additional={tCommon("modelSelector.empty")}
           action={
             <Button
               size="md"

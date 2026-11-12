@@ -1,6 +1,7 @@
 export const notificationsVi = {
   title: "Thông báo",
-  pageSubtitle: "Theo dõi trạng thái tiến trình huấn luyện, đóng gói, triển khai và cảnh báo hệ thống.",
+  pageSubtitle:
+    "Theo dõi trạng thái tiến trình huấn luyện, đóng gói, triển khai và cảnh báo hệ thống.",
   searchPlaceholder: "Tìm kiếm thông báo...",
   actions: {
     markAllAsRead: "Đánh dấu tất cả đã đọc",

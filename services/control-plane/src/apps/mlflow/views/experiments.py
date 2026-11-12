@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from apps.catalog.models import ModelProject
 from infrastructure.storage.paths import project_prefix
+
 from ..auth import (
     _is_project_allowed_for_api_key,
     _require_auth,
@@ -15,8 +16,13 @@ from ..auth import (
 
 def _job_experiment(job):
     from .runs import _mlflow_artifact_uri
-    return {"experiment_id": str(job.storage_project_id or job.public_id), "name": str(job.public_id),
-            "artifact_location": _mlflow_artifact_uri(job), "lifecycle_stage": "active"}
+
+    return {
+        "experiment_id": str(job.storage_project_id or job.public_id),
+        "name": str(job.public_id),
+        "artifact_location": _mlflow_artifact_uri(job),
+        "lifecycle_stage": "active",
+    }
 
 
 def _project_mlflow_artifact_uri(project):
@@ -47,10 +53,15 @@ class MLflowExperimentsGetByNameView(APIView):
 
         if not target_project:
             if exp_name and api_key is not None and api_key.allowed_projects.exists():
-                forbidden = ModelProject.objects.filter(owner__tenant_id=tenant_id, name=exp_name, deletion_state="active").first()
+                forbidden = ModelProject.objects.filter(
+                    owner__tenant_id=tenant_id, name=exp_name, deletion_state="active"
+                ).first()
                 if forbidden:
                     return Response(
-                        {"error_code": "PERMISSION_DENIED", "message": "API key is not authorized for this experiment."},
+                        {
+                            "error_code": "PERMISSION_DENIED",
+                            "message": "API key is not authorized for this experiment.",
+                        },
                         status=status.HTTP_403_FORBIDDEN,
                     )
             return Response(
@@ -100,12 +111,18 @@ class MLflowExperimentsCreateView(APIView):
 
         if api_key is not None and api_key.allowed_projects.exists():
             return Response(
-                {"error_code": "PERMISSION_DENIED", "message": "API key with restricted project scope cannot create new experiments."},
+                {
+                    "error_code": "PERMISSION_DENIED",
+                    "message": "API key with restricted project scope cannot create new experiments.",
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         exp_name = request.data.get("name", "").strip() or "default-experiment"
-        target_project = project or ModelProject.objects.filter(owner__tenant_id=tenant_id, name=exp_name, deletion_state="active").first()
+        target_project = (
+            project
+            or ModelProject.objects.filter(owner__tenant_id=tenant_id, name=exp_name, deletion_state="active").first()
+        )
         if not target_project:
             target_project = ModelProject.objects.filter(owner__tenant_id=tenant_id, deletion_state="active").first()
 
@@ -131,7 +148,11 @@ class MLflowExperimentsGetView(APIView):
             return err_resp
 
         exp_id = request.query_params.get("experiment_id") or ""
-        if job and (not exp_id or exp_id == str(job.storage_project_id or job.public_id)) and not job.storage_project_id:
+        if (
+            job
+            and (not exp_id or exp_id == str(job.storage_project_id or job.public_id))
+            and not job.storage_project_id
+        ):
             return Response({"experiment": _job_experiment(job)})
         target_project = None
         try:
@@ -154,7 +175,10 @@ class MLflowExperimentsGetView(APIView):
 
         if job is not None and job.project_id != target_project.id:
             return Response(
-                {"error_code": "PERMISSION_DENIED", "message": "Capability token is only authorized for its assigned experiment."},
+                {
+                    "error_code": "PERMISSION_DENIED",
+                    "message": "Capability token is only authorized for its assigned experiment.",
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -174,4 +198,3 @@ class MLflowExperimentsGetView(APIView):
                 }
             }
         )
-

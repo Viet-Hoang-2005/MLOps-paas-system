@@ -34,7 +34,9 @@ export default function DriftMonitoringPage() {
   const navigate = useNavigate();
 
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [jobToDelete, setJobToDelete] = useState<DriftMonitoringJob | null>(null);
+  const [jobToDelete, setJobToDelete] = useState<DriftMonitoringJob | null>(
+    null,
+  );
   const [runningJobId, setRunningJobId] = useState<string | null>(null);
 
   const {
@@ -247,9 +249,7 @@ export default function DriftMonitoringPage() {
           title={tCommon("navigation.driftMonitoring")}
           description={tProjects("workflow.noProjectMonitoring")}
           icon={<LineChart className="h-6 w-6" />}
-          additional={
-            tCommon("modelSelector.empty")
-          }
+          additional={tCommon("modelSelector.empty")}
           action={
             <Button
               size="md"

@@ -1,8 +1,8 @@
 from rest_framework import permissions, serializers
 from rest_framework.views import APIView
 
-from apps.auth.services.oauth import authenticate_github, authenticate_google
 from apps.auth.services.cookies import verify_auth_security_headers
+from apps.auth.services.oauth import authenticate_github, authenticate_google
 from apps.auth.services.tokens import create_auth_response
 
 

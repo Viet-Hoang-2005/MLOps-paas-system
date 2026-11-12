@@ -1,4 +1,3 @@
-from django.utils import timezone
 import hashlib
 import uuid
 from types import SimpleNamespace
@@ -6,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
@@ -21,8 +21,8 @@ from apps.observability.services.runtime_metrics import runtime_metrics
 from apps.registry.models import ModelVersion
 from apps.registry.services.versions import register_successful_build
 from common.api.exceptions import Conflict
-from infrastructure.storage.s3 import StoredObject
 from infrastructure.storage.paths import project_prefix
+from infrastructure.storage.s3 import StoredObject
 
 
 class MemoryStorage:
@@ -78,7 +78,6 @@ class MemoryStorage:
     def presigned_get(self, uri, expires_in=900):
         return f"https://{self.bucket}.s3.test/{uri}?signature=mock-get"
 
-
     @staticmethod
     def parse_uri(uri):
         return uri.removeprefix("s3://").split("/", 1)
@@ -100,13 +99,17 @@ def project(db):
 
 
 def draft(project, storage, content=b"model-v1"):
-    assets = staged_assets(project, storage, [
-        ("source_artifact", "model.pkl", content),
-        ("source_code", "train.py", b"print('v1')"),
-        ("reference_data", "reference.csv", b"x,label\n1,A\n"),
-        ("label_mapping", "labels.json", b'["A", "B"]'),
-        ("metrics", "metrics.json", b'{"accuracy": 0.9}'),
-    ])
+    assets = staged_assets(
+        project,
+        storage,
+        [
+            ("source_artifact", "model.pkl", content),
+            ("source_code", "train.py", b"print('v1')"),
+            ("reference_data", "reference.csv", b"x,label\n1,A\n"),
+            ("label_mapping", "labels.json", b'["A", "B"]'),
+            ("metrics", "metrics.json", b'{"accuracy": 0.9}'),
+        ],
+    )
     return save_preview(
         project=project,
         storage=storage,
@@ -138,7 +141,10 @@ def test_preview_revision_and_snapshot_isolation(project, monkeypatch):
     save_preview(
         project=project,
         storage=storage,
-        data={"revision": preview.revision, "assets": staged_assets(project, storage, [("source_artifact", "model.pkl", b"model-v2")])},
+        data={
+            "revision": preview.revision,
+            "assets": staged_assets(project, storage, [("source_artifact", "model.pkl", b"model-v2")]),
+        },
     )
     assert storage.read(original.s3_uri) == b"model-v1"
     assert build.metrics_summary == {"accuracy": 0.9}
@@ -383,8 +389,19 @@ def test_training_build_provenance_survives_source_job_deletion(project):
         status="completed",
         entry_point="train.py",
         code_snapshot_uri=code.uri,
-     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
-    model = TrainingOutput.objects.create(job=job, kind="model", relative_path="Model/chosen.joblib", s3_uri=output.uri, metadata={"contract": 2, "group": "model"})
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
+    model = TrainingOutput.objects.create(
+        job=job,
+        kind="model",
+        relative_path="Model/chosen.joblib",
+        s3_uri=output.uri,
+        metadata={"contract": 2, "group": "model"},
+    )
     job.artifact_selection = {"model_id": str(model.public_id), "artifacts": {}}
     job.save()
     TrainingOutput.objects.create(job=job, kind="source_code", relative_path="train.py", s3_uri=source_file.uri)
@@ -444,10 +461,14 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
     client.force_authenticate(project.owner)
     upload = client.post(
         "/api/models/preview/upload-urls/",
-        {"name": "API lifecycle", "flavor": "xgboost", "files": [
-            {"kind": "source_artifact", "filename": "model.pkl", "size_bytes": 1024},
-            {"kind": "reference_data", "filename": "reference.csv", "size_bytes": 2048},
-        ]},
+        {
+            "name": "API lifecycle",
+            "flavor": "xgboost",
+            "files": [
+                {"kind": "source_artifact", "filename": "model.pkl", "size_bytes": 1024},
+                {"kind": "reference_data", "filename": "reference.csv", "size_bytes": 2048},
+            ],
+        },
         format="json",
     )
     assert upload.status_code == 200, upload.data
@@ -486,21 +507,32 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
 
     monkeypatch.setattr("apps.deployment.tasks.deployment_backend", lambda backend: SimpleNamespace(deploy=ready))
     execute_deployment(deployed.data["id"])
-    from apps.deployment.models import Deployment
-    from apps.deployment.services.local_execution import check_execution
     import uuid
     from datetime import timedelta
-    from django.utils import timezone
     from unittest.mock import Mock
+
+    from django.utils import timezone
+
+    from apps.deployment.models import Deployment
+    from apps.deployment.services.local_execution import check_execution
 
     candidate = Deployment.objects.get(public_id=deployed.data["id"])
     token = uuid.uuid4()
     Deployment.objects.filter(pk=candidate.pk).update(
-        execution_check_token=token, execution_check_lease_until=timezone.now() + timedelta(seconds=30),
+        execution_check_token=token,
+        execution_check_lease_until=timezone.now() + timedelta(seconds=30),
     )
-    assert check_execution("deploy", str(candidate.public_id), str(token),
-        inspector=Mock(return_value=Mock(attrs={"State": {"Status": "running"}})),
-        remover=Mock(), probe=Mock(check=Mock(return_value="healthy"))) == "succeeded"
+    assert (
+        check_execution(
+            "deploy",
+            str(candidate.public_id),
+            str(token),
+            inspector=Mock(return_value=Mock(attrs={"State": {"Status": "running"}})),
+            remover=Mock(),
+            probe=Mock(check=Mock(return_value="healthy")),
+        )
+        == "succeeded"
+    )
     overview = client.get(f"/api/models/{id}/")
     assert overview.data["lifecycle_status"] == "running"
     assert overview.data["active_endpoint"]["version_id"] == str(build.version.public_id)
@@ -510,15 +542,25 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
 def test_training_retry_preserves_frozen_inputs_not_updated_workspace(project, monkeypatch, settings):
     from io import BytesIO
     from zipfile import ZipFile
+
     from apps.catalog.models import WorkspaceAsset
     from apps.training.models import TrainingJob
     from apps.training.services.jobs import retry_job
     from apps.training.services.storage_scope import expected_training_uris
+
     settings.TRAINING_BACKEND = "argo"
     storage = MemoryStorage()
-    job = TrainingJob.objects.create(project=project, status="failed", model_flavor="xgboost",
-        entry_point="train.py", vcpu=2, memory_mb=4096, max_runtime_seconds=3600,
-        input_contract="workspace", submitted_at=timezone.now())
+    job = TrainingJob.objects.create(
+        project=project,
+        status="failed",
+        model_flavor="xgboost",
+        entry_point="train.py",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="workspace",
+        submitted_at=timezone.now(),
+    )
     uris = expected_training_uris(job, storage.bucket)
     archive = BytesIO()
     with ZipFile(archive, "w") as zipped:
@@ -526,8 +568,9 @@ def test_training_retry_preserves_frozen_inputs_not_updated_workspace(project, m
         zipped.writestr("data.csv", b"x\n1\n")
     job.code_snapshot_uri = storage.put(storage.parse_uri(uris["code"])[1], archive.getvalue()).uri
     job.save()
-    WorkspaceAsset.objects.create(project=project, kind="data", relative_path="data.csv",
-        s3_uri="s3://test-bucket/new-workspace.csv")
+    WorkspaceAsset.objects.create(
+        project=project, kind="data", relative_path="data.csv", s3_uri="s3://test-bucket/new-workspace.csv"
+    )
     retry = retry_job(job, storage=storage, creation_key=uuid.uuid4())
     assert retry.status == "editing" and retry.retry_of_id == job.pk
     assert retry.project_id is None and not retry.submitted_at

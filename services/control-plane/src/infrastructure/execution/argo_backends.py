@@ -39,12 +39,20 @@ class _ArgoBackend:
 
     def persist_dispatch(self, resource, **fields):
         from common.api.exceptions import Conflict
+
         project = resource.project if hasattr(resource, "project") else resource.monitor.version.project
         with transaction.atomic():
             locked_project = type(project).objects.select_for_update().get(pk=project.pk) if project else None
-            rows = type(resource).objects.filter(pk=resource.pk).exclude(status__in=["cancelling", "cancelled", "failed", "completed"]).filter(execution_stop_requested=False)
+            rows = (
+                type(resource)
+                .objects.filter(pk=resource.pk)
+                .exclude(status__in=["cancelling", "cancelled", "failed", "completed"])
+                .filter(execution_stop_requested=False)
+            )
             if resource.execution_check_token:
-                rows = rows.filter(execution_check_token=resource.execution_check_token, execution_check_lease_until__gt=timezone.now())
+                rows = rows.filter(
+                    execution_check_token=resource.execution_check_token, execution_check_lease_until__gt=timezone.now()
+                )
             if (locked_project and locked_project.deletion_state != "active") or not rows.update(**fields):
                 raise Conflict("Execution is inactive or dispatch lease expired.")
 
@@ -52,13 +60,18 @@ class _ArgoBackend:
         from apps.observability.services.executions import ownership_for, signed_observation_token
 
         tenant, project_id = ownership_for(resource, kind)
-        return self.client.trigger(settings.ARGO_RECONCILE_WEBHOOK_URL, {
-            "kind": kind, "resource_id": str(resource.public_id),
-            "project_id": project_id, "tenant_id": tenant,
-            "stop": stop,
-            "callback_url": f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/executions/{kind}/{resource.public_id}/observations/",
-            "callback_token": signed_observation_token(kind, resource, token),
-        })
+        return self.client.trigger(
+            settings.ARGO_RECONCILE_WEBHOOK_URL,
+            {
+                "kind": kind,
+                "resource_id": str(resource.public_id),
+                "project_id": project_id,
+                "tenant_id": tenant,
+                "stop": stop,
+                "callback_url": f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/executions/{kind}/{resource.public_id}/observations/",
+                "callback_token": signed_observation_token(kind, resource, token),
+            },
+        )
 
 
 class ArgoBuildBackend(_ArgoBackend):
@@ -98,7 +111,11 @@ class ArgoBuildBackend(_ArgoBackend):
             "source_download_url": self.storage.presigned_get(source_uri, 14400),
             "label_mapping_download_url": label_mapping_url,
             "label_mapping_filename": label_mapping_filename,
-            "input_schema_download_url": self.storage.presigned_get(build.input_assets.get(kind="input_schema").s3_uri, 14400) if build.input_assets.filter(kind="input_schema").exists() else "",
+            "input_schema_download_url": self.storage.presigned_get(
+                build.input_assets.get(kind="input_schema").s3_uri, 14400
+            )
+            if build.input_assets.filter(kind="input_schema").exists()
+            else "",
             "output_upload_url": self.storage.presigned_put(package_uri, 14400),
             "control_plane_webhook_url": (
                 f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/builds/{build.public_id}/"
@@ -293,9 +310,13 @@ class ArgoDeploymentBackend(_ArgoBackend):
             return False, {"status": "missing"}
         try:
             method = "POST" if deployment.version.flavor in {"pytorch", "tensorflow"} else "GET"
-            response = self.http.request(method, f"{endpoint.internal_url}/health", **({"json": {}} if method == "POST" else {}))
+            response = self.http.request(
+                method, f"{endpoint.internal_url}/health", **({"json": {}} if method == "POST" else {})
+            )
             payload = response.json()
-            healthy = healthy_payload(payload, project_id=deployment.version.project.public_id, version_id=deployment.version.public_id)
+            healthy = healthy_payload(
+                payload, project_id=deployment.version.project.public_id, version_id=deployment.version.public_id
+            )
             return healthy, payload if isinstance(payload, dict) else {"status": "unhealthy"}
         except Exception as exc:
             return False, {"status": "unhealthy", "detail": str(exc)}
@@ -324,7 +345,12 @@ class ArgoDriftBackend(_ArgoBackend):
         drift_run.report_html_uri = uris["report.html"]
         drift_run.report_json_uri = uris["report.json"]
         drift_run.summary_uri = uris["summary.json"]
-        self.persist_dispatch(drift_run, report_html_uri=drift_run.report_html_uri, report_json_uri=drift_run.report_json_uri, summary_uri=drift_run.summary_uri)
+        self.persist_dispatch(
+            drift_run,
+            report_html_uri=drift_run.report_html_uri,
+            report_json_uri=drift_run.report_json_uri,
+            summary_uri=drift_run.summary_uri,
+        )
         return self.trigger(
             {
                 "job_id": str(drift_run.public_id),

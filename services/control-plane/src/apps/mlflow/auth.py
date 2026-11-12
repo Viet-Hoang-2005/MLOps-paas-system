@@ -105,9 +105,19 @@ def authenticate_mlflow_request(request):
 def _require_auth(request):
     job, project, user, tenant_id, api_key = authenticate_mlflow_request(request)
     if not user or not tenant_id:
-        return None, None, None, None, None, Response(
-            {"error_code": "UNAUTHENTICATED", "message": "Valid tracking token, API key, or authentication is required."},
-            status=status.HTTP_401_UNAUTHORIZED,
+        return (
+            None,
+            None,
+            None,
+            None,
+            None,
+            Response(
+                {
+                    "error_code": "UNAUTHENTICATED",
+                    "message": "Valid tracking token, API key, or authentication is required.",
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            ),
         )
     return job, project, user, tenant_id, api_key, None
 
@@ -159,7 +169,10 @@ def _resolve_target_job(job_from_auth, run_id_str, tenant_id, api_key=None, for_
         )
         if not job:
             return None, Response(
-                {"error_code": "RESOURCE_DOES_NOT_EXIST", "message": f"Run '{run_id_str}' does not exist or unauthorized."},
+                {
+                    "error_code": "RESOURCE_DOES_NOT_EXIST",
+                    "message": f"Run '{run_id_str}' does not exist or unauthorized.",
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -167,7 +180,10 @@ def _resolve_target_job(job_from_auth, run_id_str, tenant_id, api_key=None, for_
         # A capability token issued for Job A can NEVER access Job B, even within the same tenant.
         if job_from_auth is not None and job_from_auth.public_id != job.public_id:
             return None, Response(
-                {"error_code": "PERMISSION_DENIED", "message": "Capability token is only authorized for its assigned job."},
+                {
+                    "error_code": "PERMISSION_DENIED",
+                    "message": "Capability token is only authorized for its assigned job.",
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -187,4 +203,3 @@ def _resolve_target_job(job_from_auth, run_id_str, tenant_id, api_key=None, for_
             )
 
     return job, None
-

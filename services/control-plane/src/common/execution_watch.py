@@ -9,9 +9,15 @@ class ExecutionWatch(models.Model):
     execution_deadline_at = models.DateTimeField(null=True, blank=True)
     runtime_started_at = models.DateTimeField(null=True, blank=True)
     execution_stop_requested = models.BooleanField(default=False)
-    observation_status = models.CharField(max_length=20, default="ok", choices=[
-        ("ok", "OK"), ("retrying", "Retrying"), ("cleanup_pending", "Cleanup pending"),
-    ])
+    observation_status = models.CharField(
+        max_length=20,
+        default="ok",
+        choices=[
+            ("ok", "OK"),
+            ("retrying", "Retrying"),
+            ("cleanup_pending", "Cleanup pending"),
+        ],
+    )
     observation_error = models.CharField(max_length=1000, blank=True)
     observation_failures = models.PositiveIntegerField(default=0)
 

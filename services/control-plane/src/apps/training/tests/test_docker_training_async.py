@@ -1,17 +1,17 @@
-from django.utils import timezone
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
-import docker.errors
-from infrastructure.execution.job_containers import labels_for
 
+import docker.errors
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 
 from apps.catalog.models import ModelProject
 from apps.training.models import TrainingJob
 from apps.training.services.storage_scope import expected_training_uris
 from apps.training.tasks import execute_training_job, poll_training_job_status
 from infrastructure.execution.docker_backends import DockerTrainingBackend
+from infrastructure.execution.job_containers import labels_for
 
 
 class DockerTrainingAsyncTests(TestCase):
@@ -23,7 +23,12 @@ class DockerTrainingAsyncTests(TestCase):
             model_flavor="sklearn",
             status="queued",
             backend="docker",
-         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+            vcpu=2,
+            memory_mb=4096,
+            max_runtime_seconds=3600,
+            input_contract="legacy",
+            submitted_at=timezone.now(),
+        )
         uris = expected_training_uris(self.job, "bucket")
         self.job.code_snapshot_uri = uris["code"]
         self.job.data_snapshot_uri = uris["data"]
@@ -32,7 +37,10 @@ class DockerTrainingAsyncTests(TestCase):
 
     def test_docker_training_run_dispatches_without_blocking(self):
         fake_container = SimpleNamespace(id="container-abc-123", attrs={})
-        docker_client = SimpleNamespace(run=Mock(return_value=fake_container), client=SimpleNamespace(containers=SimpleNamespace(get=Mock(side_effect=docker.errors.NotFound("missing")))))
+        docker_client = SimpleNamespace(
+            run=Mock(return_value=fake_container),
+            client=SimpleNamespace(containers=SimpleNamespace(get=Mock(side_effect=docker.errors.NotFound("missing")))),
+        )
         storage = SimpleNamespace(
             bucket="bucket",
             presigned_get=Mock(return_value="https://s3.test/presigned"),
@@ -132,6 +140,7 @@ class DockerTrainingAsyncTests(TestCase):
         }
 
         from celery.exceptions import Retry
+
         with patch("apps.training.tasks.training_backend", return_value=fake_backend), self.assertRaises(Retry):
             poll_training_job_status(str(self.job.public_id))
 

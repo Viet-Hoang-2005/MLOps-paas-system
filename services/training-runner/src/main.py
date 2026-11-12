@@ -2,6 +2,7 @@
 
 import sys
 
+
 def main() -> None:
     if "--worker" in sys.argv:
         from src import application

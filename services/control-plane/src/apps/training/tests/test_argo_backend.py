@@ -1,6 +1,6 @@
-from django.utils import timezone
 import pytest
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from apps.catalog.models import ModelProject
 from apps.training.models import TrainingJob
@@ -37,7 +37,13 @@ def test_argo_training_backend_records_runtime_selectors():
         data_snapshot_uri="s3://bucket/train.csv",
         output_uri="s3://bucket/model.tar.gz",
         mlflow_artifact_uri="s3://bucket/mlflow/",
-     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="queued", submitted_at=timezone.now())
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        status="queued",
+        submitted_at=timezone.now(),
+    )
     scoped_uris = expected_training_uris(job, "bucket")
     job.code_snapshot_uri = scoped_uris["code"]
     job.data_snapshot_uri = scoped_uris["data"]
@@ -78,7 +84,12 @@ def test_argo_cancel_uses_job_bound_callback_capability(settings):
         data_snapshot_uri="s3://bucket/train.csv",
         output_uri="s3://bucket/model.tar.gz",
         status="cancelling",
-     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
     client = FakeArgoClient()
     settings.ARGO_CANCEL_TRAINING_WEBHOOK_URL = "http://argo-events/cancel-train"
     settings.CONTROL_PLANE_INTERNAL_URL = "http://control-plane:8000"
@@ -97,6 +108,7 @@ def test_argo_cancel_uses_job_bound_callback_capability(settings):
     )
     assert payload["cancel_reporter_capability"]
     from apps.training.services.capabilities import capability_for_token
+
     assert capability_for_token(job=job, purpose="cancel_reporter", token=payload["cancel_reporter_capability"])
 
 
@@ -115,7 +127,17 @@ def test_argo_training_is_not_status_polled_without_the_watcher(settings, monkey
 
     owner = get_user_model().objects.create_user("argo-poll@example.com", "test-password")
     project = ModelProject.objects.create(owner=owner, name="argo-poll")
-    job = TrainingJob.objects.create(project=project, model_flavor="sklearn", backend="argo", status="running", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+    job = TrainingJob.objects.create(
+        project=project,
+        model_flavor="sklearn",
+        backend="argo",
+        status="running",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
     monkeypatch.setattr("apps.training.tasks.training_backend", lambda _: backend)
     assert poll_training_job_status.run(str(job.public_id)) == "running"
     job.refresh_from_db()

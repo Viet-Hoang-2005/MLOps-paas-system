@@ -71,7 +71,9 @@ def validate_reference_data_content(name: str, content: bytes, error_key: str = 
             if not row:
                 continue
             if len(row) != len(header):
-                raise ValidationError({error_key: "All CSV data rows must have the same number of columns as the header."})
+                raise ValidationError(
+                    {error_key: "All CSV data rows must have the same number of columns as the header."}
+                )
             count += 1
         if count == 0:
             raise ValidationError({error_key: "CSV must contain at least one row of data."})
@@ -116,4 +118,3 @@ def parse_reference_preview(data_bytes: bytes, filename: str, max_rows: int = 10
         "rows": rows,
         "total_rows": total_rows,
     }
-

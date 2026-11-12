@@ -109,7 +109,9 @@ def test_argo_failure_never_stores_a_reporter_chosen_image(build, monkeypatch):
     assert build.image_digest == ""
 
 
-def test_late_callback_of_a_cancelled_argo_build_cleans_up_its_output(build, monkeypatch, django_capture_on_commit_callbacks):
+def test_late_callback_of_a_cancelled_argo_build_cleans_up_its_output(
+    build, monkeypatch, django_capture_on_commit_callbacks
+):
     Build.objects.filter(pk=build.pk).update(status="cancelled")
     cleanup = Mock()
     monkeypatch.setattr("apps.deployment.api.webhooks.cleanup_failed_build_artifacts.delay", cleanup)
@@ -208,4 +210,3 @@ def test_stopping_a_failed_deployment_removes_the_runtime_but_keeps_the_outcome(
     assert failed_deployment.status == "failed"
     assert failed_deployment.stopped_at is not None
     transition.assert_not_called()
-

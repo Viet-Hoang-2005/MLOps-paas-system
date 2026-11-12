@@ -1,18 +1,26 @@
-from common.api.exceptions import Conflict
-from datetime import datetime, timedelta, timezone as dt_timezone
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 from threading import Barrier
+from unittest.mock import Mock
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import close_old_connections, connection, transaction
-from unittest.mock import Mock
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.training.models import TrainingJob, TrainingQuotaReservation
-from apps.training.services.quota import (QuotaExceeded, TrainingConcurrencyExceeded, lock_owner, reserve,
-                                           update_observation, usage, week_start)
+from apps.training.services.quota import (
+    QuotaExceeded,
+    TrainingConcurrencyExceeded,
+    lock_owner,
+    reserve,
+    update_observation,
+    usage,
+    week_start,
+)
+from common.api.exceptions import Conflict
 
 
 @pytest.fixture
@@ -21,8 +29,16 @@ def job(db, settings):
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     owner = get_user_model().objects.create_user("quota@example.com")
     project = ModelProject.objects.create(owner=owner, name="quota")
-    return TrainingJob.objects.create(project=project, backend="argo", model_flavor="pytorch",
-                                      vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
+    return TrainingJob.objects.create(
+        project=project,
+        backend="argo",
+        model_flavor="pytorch",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        status="pending",
+    )
 
 
 def reserve_locked(job):
@@ -35,14 +51,24 @@ def test_reservation_and_concurrency_across_projects(job):
     reserve_locked(job)
     resource = next(v for v in usage(job.project.owner)["resources"] if v["resource"] == "cpu_medium")
     assert resource["reserved_seconds"] == 3600 and resource["used_seconds"] == 0
-    second = TrainingJob.objects.create(project=ModelProject.objects.create(owner=job.project.owner, name="second"),
-                                         backend="argo", model_flavor="pytorch", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
+    second = TrainingJob.objects.create(
+        project=ModelProject.objects.create(owner=job.project.owner, name="second"),
+        backend="argo",
+        model_flavor="pytorch",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        status="pending",
+    )
     with pytest.raises(TrainingConcurrencyExceeded):
         reserve_locked(second)
 
 
 def test_gpu_charges_only_gpu_quota_and_enforces_limit(job, settings, monkeypatch):
-    monkeypatch.setattr("apps.training.services.quota.timezone.now", lambda: datetime(2026, 11, 4, tzinfo=dt_timezone.utc))
+    monkeypatch.setattr(
+        "apps.training.services.quota.timezone.now", lambda: datetime(2026, 11, 4, tzinfo=dt_timezone.utc)
+    )
     job.accelerator_type, job.accelerator_model = "gpu", "a10g"
     job.max_runtime_seconds = settings.TRAINING_GPU_A10G_WEEKLY_SECONDS + 1
     with pytest.raises(QuotaExceeded):
@@ -57,6 +83,7 @@ def test_gpu_charges_only_gpu_quota_and_enforces_limit(job, settings, monkeypatc
 def test_runtime_cap_and_token_cover_24_hours(job, settings):
     from apps.training.services.capabilities import _ttl_seconds
     from apps.training.services.resources import runtime_options, validate_resources
+
     settings.TRAINING_MAX_RUNTIME_SECONDS = 86400
     settings.TRAINING_CAPABILITY_MAX_TTL_SECONDS = 0
     assert 86400 in runtime_options()
@@ -146,11 +173,20 @@ def test_submit_enforces_single_active_job_over_all_projects(job):
     job.status = "pending"
     job.submitted_at = None
     job.save(update_fields=["status", "submitted_at"])
-    second = TrainingJob.objects.create(project=ModelProject.objects.create(owner=job.project.owner, name="other project"),
-                                         backend="argo", model_flavor="pytorch", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
+    second = TrainingJob.objects.create(
+        project=ModelProject.objects.create(owner=job.project.owner, name="other project"),
+        backend="argo",
+        model_flavor="pytorch",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        status="pending",
+    )
     client = APIClient()
     client.force_authenticate(job.project.owner)
     from apps.training.services.jobs import _submit_job_atomic
+
     _submit_job_atomic(job, verified_gpu_id="")
     with pytest.raises(Conflict) as raised:
         _submit_job_atomic(second, verified_gpu_id="")
@@ -159,14 +195,18 @@ def test_submit_enforces_single_active_job_over_all_projects(job):
     assert second.status == "pending"
 
 
-@pytest.mark.parametrize("training_enabled,drift_enabled,expected", [
-    (False, False, []),
-    (True, False, ["training"]),
-    (False, True, ["drift"]),
-    (True, True, ["training", "drift"]),
-])
+@pytest.mark.parametrize(
+    "training_enabled,drift_enabled,expected",
+    [
+        (False, False, []),
+        (True, False, ["training"]),
+        (False, True, ["drift"]),
+        (True, True, ["training", "drift"]),
+    ],
+)
 def test_execution_watchers_scan_only_enabled_kinds(settings, monkeypatch, training_enabled, drift_enabled, expected):
     from apps.observability.services.executions import scan
+
     settings.DRIFT_EXECUTION_WATCH_ENABLED = drift_enabled
     settings.TRAINING_EXECUTION_WATCH_ENABLED = training_enabled
     claim = Mock(return_value=[])
@@ -180,12 +220,23 @@ def test_postgres_simultaneous_submit_only_one_succeeds(job, monkeypatch):
     if connection.vendor != "postgresql":
         pytest.skip("PostgreSQL is required to test row locking")
     from apps.training.services.jobs import _submit_job_atomic
+
     job.status = "pending"
     job.submitted_at = None
     job.save(update_fields=["status", "submitted_at"])
-    second = TrainingJob.objects.create(project=job.project, backend="argo", model_flavor="pytorch", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
+    second = TrainingJob.objects.create(
+        project=job.project,
+        backend="argo",
+        model_flavor="pytorch",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        status="pending",
+    )
     monkeypatch.setattr("apps.training.services.jobs._enqueue", lambda _job: None)
     barrier = Barrier(2)
+
     def submit(job_id):
         close_old_connections()
         try:
@@ -198,6 +249,7 @@ def test_postgres_simultaneous_submit_only_one_succeeds(job, monkeypatch):
                 return "rejected"
         finally:
             close_old_connections()
+
     with ThreadPoolExecutor(max_workers=2) as pool:
         outcomes = list(pool.map(submit, [job.pk, second.pk]))
     assert sorted(outcomes) == ["rejected", "submitted"]

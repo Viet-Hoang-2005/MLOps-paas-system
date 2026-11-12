@@ -129,8 +129,7 @@ export const evolutionVi = {
     sizeErrorSource: "Tệp mã nguồn phải nhỏ hơn 5 MB.",
     formatErrorSource: "Chỉ hỗ trợ tệp .py cho mã nguồn.",
     sizeErrorRef: "Tệp dữ liệu tham chiếu phải nhỏ hơn 100 MB.",
-    formatErrorRef:
-      "Chỉ hỗ trợ tệp .csv cho dữ liệu tham chiếu.",
+    formatErrorRef: "Chỉ hỗ trợ tệp .csv cho dữ liệu tham chiếu.",
     previewEmpty: "Không có dòng nào trong bản xem trước",
     clear: "Xóa chọn",
     selectSourceFile: "Chọn tệp .py",

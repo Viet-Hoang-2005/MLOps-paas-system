@@ -13,7 +13,6 @@ from pathlib import Path
 
 from src.supervisor import run
 
-
 stage = sys.argv[1]
 reached = threading.Event()
 archive = io.BytesIO()
@@ -43,7 +42,9 @@ class Handler(BaseHTTPRequestHandler):
         self.respond(archive.getvalue() if self.path == "/source" else b"feature,target\n1,0\n")
 
     def do_POST(self):
-        self.respond(json.dumps({"upload_url": f"http://127.0.0.1:{server.server_port}/output"}).encode(), "application/json")
+        self.respond(
+            json.dumps({"upload_url": f"http://127.0.0.1:{server.server_port}/output"}).encode(), "application/json"
+        )
 
     def do_PUT(self):
         self.rfile.read(int(self.headers["Content-Length"]))
@@ -56,7 +57,14 @@ class Handler(BaseHTTPRequestHandler):
 server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 root = f"http://127.0.0.1:{server.server_port}"
-os.environ.update(S3_SOURCE_URI=root + "/source", S3_TRAINING_DATA_URI=root + "/data", S3_OUTPUT_UPLOAD_URL=root + "/broker", S3_OUTPUT_UPLOAD_CAPABILITY="isolated-smoke", MAX_RUNTIME_SECONDS="8", TRAINING_JOB_ID="00000000-0000-0000-0000-000000000001")
+os.environ.update(
+    S3_SOURCE_URI=root + "/source",
+    S3_TRAINING_DATA_URI=root + "/data",
+    S3_OUTPUT_UPLOAD_URL=root + "/broker",
+    S3_OUTPUT_UPLOAD_CAPABILITY="isolated-smoke",
+    MAX_RUNTIME_SECONDS="8",
+    TRAINING_JOB_ID="00000000-0000-0000-0000-000000000001",
+)
 if stage == "pip":
     os.environ["REQUIREMENTS_TEXT"] = base64.b64encode((root + "/p1fixture-0.0.1-py3-none-any.whl\n").encode()).decode()
 started = time.monotonic()
@@ -68,7 +76,7 @@ if stage == "train":
     heartbeat = Path("/tmp/p1-heartbeat")
     assert heartbeat.exists(), "Training descendant did not start"
     value = heartbeat.read_text()
-    time.sleep(.2)
+    time.sleep(0.2)
     assert heartbeat.read_text() == value, "Descendant survived deadline"
 else:
     assert reached.is_set(), f"Stage {stage} did not execute"

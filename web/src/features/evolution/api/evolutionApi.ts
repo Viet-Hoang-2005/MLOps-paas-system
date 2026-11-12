@@ -54,7 +54,9 @@ export async function addSupplementalArtifacts(
   }
   return (
     await apiClient.post<ModelVersion>(
-      controlPlaneURL(`/registry/versions/${versionId}/supplemental-artifacts/`),
+      controlPlaneURL(
+        `/registry/versions/${versionId}/supplemental-artifacts/`,
+      ),
       formData,
       { headers: { "Content-Type": "multipart/form-data" } },
     )
@@ -70,4 +72,3 @@ export async function getVersionReferencePreview(
     )
   ).data;
 }
-

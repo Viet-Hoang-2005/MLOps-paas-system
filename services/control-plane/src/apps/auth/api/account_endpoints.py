@@ -23,8 +23,12 @@ class ProfileEndpoint(APIView):
         upload = request.FILES.get("avatar")
         if "avatar" in request.data and upload is None:
             raise serializers.ValidationError({"avatar": "Upload an image file."})
-        update_profile(request.user, changes=serializer.validated_data, avatar=upload,
-                       remove=str(request.data.get("remove_avatar", "")).lower() == "true")
+        update_profile(
+            request.user,
+            changes=serializer.validated_data,
+            avatar=upload,
+            remove=str(request.data.get("remove_avatar", "")).lower() == "true",
+        )
         return Response({"message": "Profile updated."})
 
 
@@ -91,9 +95,11 @@ class PasswordChangeCompleteEndpoint(APIView):
         revoke_user_refresh_tokens(request.user)
 
         refresh = TenantTokenSerializer.get_token(request.user)
-        response = Response({
-            "message": "Password changed.",
-            "access": str(refresh.access_token),
-        })
+        response = Response(
+            {
+                "message": "Password changed.",
+                "access": str(refresh.access_token),
+            }
+        )
         set_refresh_token_cookie(response, str(refresh))
         return response

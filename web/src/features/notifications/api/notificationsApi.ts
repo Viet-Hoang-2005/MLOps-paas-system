@@ -54,7 +54,9 @@ export const markNotificationAsRead = async (
   return data;
 };
 
-export const markAllNotificationsAsRead = async (): Promise<{ updated: number }> => {
+export const markAllNotificationsAsRead = async (): Promise<{
+  updated: number;
+}> => {
   const { data } = await apiClient.post<{ updated: number }>(
     controlPlaneURL("/notifications/mark-all-read/"),
   );
@@ -64,4 +66,3 @@ export const markAllNotificationsAsRead = async (): Promise<{ updated: number }>
 export const deleteNotification = async (id: string): Promise<void> => {
   await apiClient.delete(controlPlaneURL(`/notifications/${id}/`));
 };
-

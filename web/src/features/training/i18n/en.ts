@@ -1,8 +1,19 @@
 export const trainingEn = {
   studio: {
     artifactSelection: {
-      model: "Raw Model Artifact", chooseModel: "Select a model", label_mapping: "Label mapping", input_schema: "Input schema", metrics: "Metrics", params: "Parameters", model_insights: "Model insights", feature_importance: "Feature importance",
-      none: "Not used", fromMetadata: "Select from Metadata", upload: "Upload new JSON", chooseMetadata: "Select a JSON file", jsonLimit: "JSON · 1 MiB",
+      model: "Raw Model Artifact",
+      chooseModel: "Select a model",
+      label_mapping: "Label mapping",
+      input_schema: "Input schema",
+      metrics: "Metrics",
+      params: "Parameters",
+      model_insights: "Model insights",
+      feature_importance: "Feature importance",
+      none: "Not used",
+      fromMetadata: "Select from Metadata",
+      upload: "Upload new JSON",
+      chooseMetadata: "Select a JSON file",
+      jsonLimit: "JSON · 1 MiB",
     },
     saved: "All changes saved.",
     draftCount: "Drafts: {{count}}",

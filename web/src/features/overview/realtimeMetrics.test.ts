@@ -67,4 +67,3 @@ describe("Overview realtimeMetrics Session & Rate Calculation", () => {
     expect(result.length).toBe(1);
   });
 });
-

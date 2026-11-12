@@ -58,7 +58,10 @@ function CsvPreview({
       <Placeholder
         className="h-125 justify-center"
         icon={<Database className="h-8 w-8 text-color-danger" />}
-        description={getApiErrorMessage(error, t("createPage.previewLoadFailed"))}
+        description={getApiErrorMessage(
+          error,
+          t("createPage.previewLoadFailed"),
+        )}
         action={
           <Button type="button" variant="secondary" onClick={onRetry}>
             {t("actions.retry")}
@@ -173,7 +176,8 @@ function CreateDriftMonitorContent({
             placeholder={t("selectProject")}
             options={(form.projects.data?.models ?? [])
               .filter(
-                (item) => item.active_endpoint?.deployment_status === "succeeded",
+                (item) =>
+                  item.active_endpoint?.deployment_status === "succeeded",
               )
               .map((item) => ({
                 value: item.id,
@@ -198,7 +202,9 @@ function CreateDriftMonitorContent({
                 accept=".csv"
                 title={referenceName || t("createPage.referenceData")}
                 subtitle={t("createPage.referenceUploadHint")}
-                disabled={form.loading || !form.versionId || form.save.isPending}
+                disabled={
+                  form.loading || !form.versionId || form.save.isPending
+                }
                 onChange={form.setReference}
               />
             ) : null}
@@ -209,7 +215,11 @@ function CreateDriftMonitorContent({
             )}
             <CsvPreview
               title={referenceName || "reference_data.csv"}
-              badge={<Badge variant="info">{t("createPage.referenceDataBadge")}</Badge>}
+              badge={
+                <Badge variant="info">
+                  {t("createPage.referenceDataBadge")}
+                </Badge>
+              }
               text={form.referenceQuery.data}
               loading={isReferenceLoading}
               loadingText={t("createPage.loadingReferenceData")}
@@ -256,7 +266,11 @@ function CreateDriftMonitorContent({
               description={t("createPage.previewDescription")}
             />
             <CsvPreview
-              title={<Badge variant="info">{t("createPage.productionDataBadge")}</Badge>}
+              title={
+                <Badge variant="info">
+                  {t("createPage.productionDataBadge")}
+                </Badge>
+              }
               text={productionCsv}
               loading={isProductionLoading}
               loadingText={t("createPage.loadingProduction")}
@@ -301,7 +315,6 @@ function CreateDriftMonitorContent({
             {t(monitorId ? "createPage.update" : "createPage.create")}
           </Button>
         </div>
-
       </form>
       <ConfirmDialog
         open={blocker.state === "blocked"}

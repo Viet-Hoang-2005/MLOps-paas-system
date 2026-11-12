@@ -1,7 +1,7 @@
-from django.utils import timezone
+import pytest
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-import pytest
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
@@ -22,7 +22,12 @@ def completed_training_job(db):
         data_snapshot_uri="s3://test-bucket/data.zip",
         output_uri="s3://test-bucket/model.tar.gz",
         output_revision=1,
-     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
     model = TrainingOutput.objects.create(
         job=job,
         kind="model",

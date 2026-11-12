@@ -39,7 +39,10 @@ export function AttributesOverviewPage({
       <Placeholder role="tabpanel" className="flex-1 min-h-105">
         <div className="flex flex-col items-center gap-4 text-center">
           <p className="text-style-body text-color-danger">
-            {t("workflow.loadAttributesFailed", "Failed to load model attributes.")}
+            {t(
+              "workflow.loadAttributesFailed",
+              "Failed to load model attributes.",
+            )}
           </p>
           {onRetry && (
             <Button variant="secondary" size="sm" onClick={onRetry}>
@@ -62,4 +65,3 @@ export function AttributesOverviewPage({
 }
 
 export default AttributesOverviewPage;
-

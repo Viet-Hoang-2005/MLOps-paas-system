@@ -79,4 +79,3 @@ describe("Auth Session & QueryClient Cache Isolation", () => {
     expect(calls).toBe(1);
   });
 });
-

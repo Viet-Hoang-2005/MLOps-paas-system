@@ -92,8 +92,7 @@ export function MetricsCard({
                     onClick={onRequestRemove}
                     title={t("workflow.removeAttribute")}
                     aria-label={t("workflow.removeAttribute")}
-                  >
-                  </Button>
+                  ></Button>
                 )}
               </div>
             ) : undefined
@@ -141,4 +140,3 @@ export function MetricsCard({
 }
 
 export default MetricsCard;
-

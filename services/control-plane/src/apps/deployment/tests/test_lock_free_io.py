@@ -97,15 +97,25 @@ def completed_job(project, storage):
         entry_point="train.py",
         code_snapshot_uri=code.uri,
         data_snapshot_uri=code.uri,
-     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
     for kind, name, payload in (
         ("model", "Model/chosen.joblib", b"model"),
         ("source_code", "train.py", b"print(1)"),
         ("file", "Metadata/scores.json", b'{"accuracy": 0.9}'),
     ):
         stored = storage.put(f"output/{name}", payload)
-        asset = TrainingOutput.objects.create(job=job, kind=kind, relative_path=name, s3_uri=stored.uri,
-            metadata={"contract": 2, "group": "model" if kind == "model" else "metadata"})
+        asset = TrainingOutput.objects.create(
+            job=job,
+            kind=kind,
+            relative_path=name,
+            s3_uri=stored.uri,
+            metadata={"contract": 2, "group": "model" if kind == "model" else "metadata"},
+        )
         if kind == "model":
             job.artifact_selection = {"model_id": str(asset.public_id), "artifacts": {}}
         elif kind == "file":
@@ -220,6 +230,7 @@ def test_failure_after_commit_keeps_the_inputs_of_the_created_build(project, sto
 @pytest.fixture
 def job_storage(monkeypatch, storage, settings):
     from apps.training.services import workspaces
+
     settings.TRAINING_BACKEND = "argo"
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     monkeypatch.setattr(workspaces, "S3Storage", lambda: storage)
@@ -229,11 +240,16 @@ def job_storage(monkeypatch, storage, settings):
 
 def editable_job(project, storage):
     from apps.training.services import workspaces
+
     job = job_service.create_job(owner=project.owner, validated_data={})
-    _, revision = workspaces.create_entry(job, revision=job.revision, path="train.py", kind="script",
-        payload=b"print(1)", storage=storage)
-    return workspaces.update_workspace(job, revision=revision, changes={"entry_point": "train.py",
-        "vcpu": 1, "memory_mb": 2048, "max_runtime_seconds": 900})
+    _, revision = workspaces.create_entry(
+        job, revision=job.revision, path="train.py", kind="script", payload=b"print(1)", storage=storage
+    )
+    return workspaces.update_workspace(
+        job,
+        revision=revision,
+        changes={"entry_point": "train.py", "vcpu": 1, "memory_mb": 2048, "max_runtime_seconds": 900},
+    )
 
 
 def submit(job, storage):
@@ -385,8 +401,16 @@ def test_stalled_deletions_are_dispatched_again(project, dispatch):
     stale_project = ModelProject.objects.create(owner=other_owner, name="gone", deletion_state="deleting")
     age(ModelProject, stale_project.pk)
     job = TrainingJob.objects.create(
-        project=project, model_flavor="sklearn", status="cancelled", deletion_requested_at=timezone.now()
-    , vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+        project=project,
+        model_flavor="sklearn",
+        status="cancelled",
+        deletion_requested_at=timezone.now(),
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
     TrainingJob.objects.filter(pk=job.pk).update(deletion_requested_at=timezone.now() - timedelta(hours=1))
     errored = TrainingJob.objects.create(
         project=project,
@@ -394,7 +418,12 @@ def test_stalled_deletions_are_dispatched_again(project, dispatch):
         status="cancelled",
         deletion_requested_at=timezone.now() - timedelta(hours=1),
         deletion_error="blocked",
-     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
 
     assert tasks.reconcile_stalled_deletions() == 3
     dispatch.build.assert_called_once_with(str(stale.public_id))

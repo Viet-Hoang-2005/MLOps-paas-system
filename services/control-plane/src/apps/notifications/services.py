@@ -1,4 +1,5 @@
 from django.utils import timezone
+
 from .models import Notification
 from .selectors import get_notification_by_public_id
 

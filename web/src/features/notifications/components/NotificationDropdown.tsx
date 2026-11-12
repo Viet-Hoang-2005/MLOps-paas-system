@@ -24,7 +24,8 @@ export const NotificationDropdown: React.FC = () => {
   });
 
   const { mutate: markRead } = useMarkNotificationRead();
-  const { mutate: markAllRead, isPending: isMarkingAll } = useMarkAllNotificationsRead();
+  const { mutate: markAllRead, isPending: isMarkingAll } =
+    useMarkAllNotificationsRead();
   const { mutate: deleteItem } = useDeleteNotification();
   const notifications = listData?.results ?? [];
 
@@ -131,4 +132,3 @@ export const NotificationDropdown: React.FC = () => {
     </DropdownMenu.Root>
   );
 };
-

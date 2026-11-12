@@ -76,6 +76,7 @@ def run_project_cleanup(project):
         raise ValidationError({"project": "Project deletion is not active."})
     _stop_project_jobs(project)
     from apps.training.services.storage_migration import migrate_project_storage
+
     migrate_project_storage(project)
     return project_cleanup_backend().run(project, project_cleanup_manifest(project))
 
@@ -93,8 +94,13 @@ def _stop_project_jobs(project):
         result = training_backend(job.backend).cancel(job)
         if isinstance(result, dict) and not result.get("confirmed", False):
             raise ValidationError("Training cancellation has not completed; retry project cleanup.")
-        type(job).objects.filter(pk=job.pk).update(status="cancelled", completed_at=timezone.now(),
-            execution_stop_requested=True, observation_status="cleanup_pending", next_execution_check_at=timezone.now())
+        type(job).objects.filter(pk=job.pk).update(
+            status="cancelled",
+            completed_at=timezone.now(),
+            execution_stop_requested=True,
+            observation_status="cleanup_pending",
+            next_execution_check_at=timezone.now(),
+        )
     for run in DriftRun.objects.filter(monitor__version__project=project).exclude(
         status__in=("completed", "failed", "cancelled")
     ):
@@ -171,7 +177,9 @@ def finalize_project_deletion(project, *, storage=None):
         Deployment.objects.filter(version__project=project).delete()
         EventOutbox.objects.filter(aggregate_id__in=aggregates).delete()
         training_ids = project.training_jobs.values_list("public_id", flat=True)
-        LifecycleEvent.objects.filter(project=project, aggregate_type="training_job", aggregate_id__in=training_ids).update(project=None)
+        LifecycleEvent.objects.filter(
+            project=project, aggregate_type="training_job", aggregate_id__in=training_ids
+        ).update(project=None)
         LifecycleEvent.objects.filter(project=project).delete()
         record_transition(project, "deleted")
         project.delete()

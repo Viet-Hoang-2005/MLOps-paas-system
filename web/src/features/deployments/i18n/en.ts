@@ -208,7 +208,8 @@ export const deployEn = {
       choosePackage: "Choose model package ZIP",
       packageHint:
         "Upload one .zip package containing the complete model artifact (max {{maxSize}})",
-      allowedFiles: "Allowed {{flavor}} files: {{extensions}} (max {{maxSize}})",
+      allowedFiles:
+        "Allowed {{flavor}} files: {{extensions}} (max {{maxSize}})",
       artifactTooLarge:
         "Model artifact file exceeds the maximum allowed size of {{max}}.",
       artifactRemovedExceedsLimit:

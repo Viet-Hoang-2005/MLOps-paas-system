@@ -1,8 +1,8 @@
-from django.utils import timezone
 from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
@@ -46,7 +46,12 @@ def completed_job(email="training-build@example.com"):
         data_snapshot_uri="s3://bucket/reference.csv",
         output_uri="s3://bucket/model.tar.gz",
         status="completed",
-     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
     model = TrainingOutput.objects.create(
         job=job,
         kind="model",
@@ -114,9 +119,7 @@ def test_training_build_api_requires_valid_output_revision():
     client.force_authenticate(job.project.owner)
 
     missing = client.post(f"/api/training-jobs/{job.public_id}/build/", {}, format="json")
-    invalid = client.post(
-        f"/api/training-jobs/{job.public_id}/build/", {"output_revision": "invalid"}, format="json"
-    )
+    invalid = client.post(f"/api/training-jobs/{job.public_id}/build/", {"output_revision": "invalid"}, format="json")
 
     assert missing.status_code == 400
     assert invalid.status_code == 400

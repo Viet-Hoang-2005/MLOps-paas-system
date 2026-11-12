@@ -1,7 +1,8 @@
 export const authVi = {
   session: {
     unavailableTitle: "Chưa thể xác minh phiên đăng nhập",
-    unavailableDescription: "Máy chủ chưa khả dụng hoặc kết nối bị gián đoạn. Vui lòng thử lại.",
+    unavailableDescription:
+      "Máy chủ chưa khả dụng hoặc kết nối bị gián đoạn. Vui lòng thử lại.",
   },
   login: {
     title: "Chào mừng trở lại",

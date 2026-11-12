@@ -1,16 +1,18 @@
 import uuid
-from common.api.exceptions import Conflict
 from io import BytesIO
 from zipfile import ZipFile
 
 import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
+
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
 from apps.training.models import TrainingJob, TrainingJobEntry
 from apps.training.services import workspaces
 from apps.training.services.capabilities import issue_capability
 from apps.training.services.drafts import submit_draft
+from common.api.exceptions import Conflict
+
 
 def run_workspace(workspace, *, revision, run_key, values, storage):
     workspace.refresh_from_db()
@@ -32,11 +34,23 @@ def draft(db, settings, monkeypatch):
     storage = MemoryStorage()
     payload = b"import os\nprint(os.environ['SM_MODEL_DIR'])\n"
     item = storage.put(f"users/{user.tenant_id}/training/jobs/{workspace.public_id}/draft/objects/script", payload)
-    TrainingJobEntry.objects.create(job=workspace, relative_path="train.py", kind="script",
-        s3_uri=item.uri, checksum=item.checksum, size_bytes=item.size_bytes)
+    TrainingJobEntry.objects.create(
+        job=workspace,
+        relative_path="train.py",
+        kind="script",
+        s3_uri=item.uri,
+        checksum=item.checksum,
+        size_bytes=item.size_bytes,
+    )
     monkeypatch.setattr("apps.training.services.jobs._enqueue", lambda job: None)
-    values = {"model_flavor": "sklearn", "vcpu": 1, "memory_mb": 2048,
-              "max_runtime_seconds": 900, "accelerator_type": "none", "accelerator_count": 0}
+    values = {
+        "model_flavor": "sklearn",
+        "vcpu": 1,
+        "memory_mb": 2048,
+        "max_runtime_seconds": 900,
+        "accelerator_type": "none",
+        "accelerator_count": 0,
+    }
     return workspace, storage, values
 
 
@@ -56,12 +70,14 @@ def test_run_without_project_is_immutable_and_idempotent(draft):
     with ZipFile(BytesIO(storage.objects[job.code_snapshot_uri])) as archive:
         assert archive.namelist() == ["train.py"]
     from apps.training.models import TrainingQuotaReservation
+
     assert TrainingQuotaReservation.objects.filter(job_id=job.public_id, owner=workspace.owner, active=True).exists()
 
 
 @pytest.mark.django_db
 def test_runtime_configuration_is_job_bound_and_one_time(draft, settings):
     from cryptography.fernet import Fernet
+
     workspace, storage, values = draft
     settings.TRAINING_SECRET_ENCRYPTION_KEY = Fernet.generate_key().decode()
     secret, revision = workspaces.set_secret(workspace, revision=1, name="EXAMPLE_KEY", value="synthetic-example-value")
@@ -86,7 +102,9 @@ def test_runtime_configuration_is_job_bound_and_one_time(draft, settings):
 def test_unassigned_argo_dispatch_has_job_identity_and_no_secret_values(draft):
     from types import SimpleNamespace
     from unittest.mock import Mock
+
     from infrastructure.execution.argo_backends import ArgoTrainingBackend
+
     workspace, storage, values = draft
     job = run_workspace(workspace, revision=1, run_key=uuid.uuid4(), values=values, storage=storage)
     client = SimpleNamespace(trigger=Mock(return_value={"accepted": True}))
@@ -105,8 +123,10 @@ def test_unassigned_argo_dispatch_has_job_identity_and_no_secret_values(draft):
 @pytest.mark.django_db
 def test_retry_rechecks_secret_access_after_copy(draft, settings):
     from cryptography.fernet import Fernet
+
     from apps.training.models import TrainingJob
     from apps.training.services.jobs import retry_job
+
     workspace, storage, values = draft
     settings.TRAINING_SECRET_ENCRYPTION_KEY = Fernet.generate_key().decode()
     secret, revision = workspaces.set_secret(workspace, revision=1, name="EXAMPLE_KEY", value="synthetic-value")

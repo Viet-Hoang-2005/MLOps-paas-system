@@ -115,10 +115,7 @@ export function InformationEvolutionPage({
         header: () => <div className="text-right">{t("workspace.status")}</div>,
         cell: () => (
           <div className="flex justify-end">
-            <Badge
-              variant="neutral"
-              className="inline-flex items-center gap-1"
-            >
+            <Badge variant="neutral" className="inline-flex items-center gap-1">
               <Lock className="h-3 w-3" />
               {t("workspace.immutableBadge")}
             </Badge>
@@ -175,7 +172,9 @@ export function InformationEvolutionPage({
           action={
             version.source_job_id ? (
               <Button asChild variant="secondary" size="sm">
-                <Link to={`/dashboard/training/jobs/${version.source_job_id}/overview`}>
+                <Link
+                  to={`/dashboard/training/jobs/${version.source_job_id}/overview`}
+                >
                   {t("workspace.trainingJob")}
                 </Link>
               </Button>

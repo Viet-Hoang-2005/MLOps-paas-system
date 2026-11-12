@@ -160,12 +160,19 @@ def test_deletion_blocks_registration_and_queued_execution(project, monkeypatch)
 def test_local_cleanup_removes_only_known_build_container(project, monkeypatch):
     build = Build.objects.create(project=project, flavor="sklearn", backend="docker")
     client = Mock()
-    monkeypatch.setattr("infrastructure.execution.local_containers.DockerClient", lambda **kwargs: SimpleNamespace(client=client))
+    monkeypatch.setattr(
+        "infrastructure.execution.local_containers.DockerClient", lambda **kwargs: SimpleNamespace(client=client)
+    )
     client.containers.get.return_value.id = "build-container"
-    client.containers.get.return_value.attrs = {"Config": {"Labels": {
-        "mlops_project_id": str(project.public_id), "mlops_tenant_id": str(project.owner.tenant_id),
-        "mlops_build_id": str(build.public_id),
-    }}}
+    client.containers.get.return_value.attrs = {
+        "Config": {
+            "Labels": {
+                "mlops_project_id": str(project.public_id),
+                "mlops_tenant_id": str(project.owner.tenant_id),
+                "mlops_build_id": str(build.public_id),
+            }
+        }
+    }
     stop_build_for_deletion(build)
     client.containers.get.assert_called_once_with(f"build-{build.public_id}")
     client.containers.get.return_value.remove.assert_called_once_with(force=True)
@@ -241,9 +248,22 @@ def test_rebuild_copies_current_preview_into_new_build(project, status, monkeypa
 
 
 def test_rebuild_uses_original_completed_training_job(project, monkeypatch):
-    job = TrainingJob.objects.create(project=project, model_flavor="xgboost", status="completed", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+    job = TrainingJob.objects.create(
+        project=project,
+        model_flavor="xgboost",
+        status="completed",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
     model = TrainingOutput.objects.create(
-        job=job, kind="model", relative_path="Model/chosen.joblib", s3_uri="s3://test-bucket/chosen.joblib", metadata={"contract": 2, "group": "model"}
+        job=job,
+        kind="model",
+        relative_path="Model/chosen.joblib",
+        s3_uri="s3://test-bucket/chosen.joblib",
+        metadata={"contract": 2, "group": "model"},
     )
     job.artifact_selection = {"model_id": str(model.public_id), "artifacts": {}}
     job.save()
@@ -262,7 +282,16 @@ def test_rebuild_uses_original_completed_training_job(project, monkeypatch):
 
 
 def test_rebuild_does_not_reuse_training_build_being_deleted(project):
-    job = TrainingJob.objects.create(project=project, model_flavor="xgboost", status="completed", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+    job = TrainingJob.objects.create(
+        project=project,
+        model_flavor="xgboost",
+        status="completed",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
     original = Build.objects.create(project=project, source_job=job, flavor="xgboost", status="failed")
     Build.objects.create(
         project=project, source_job=job, flavor="xgboost", status="building", deletion_state="deleting"

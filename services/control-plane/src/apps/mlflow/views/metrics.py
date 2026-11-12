@@ -1,6 +1,7 @@
 import json
 import logging
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime
+from datetime import timezone as dt_timezone
 
 from django.utils import timezone
 from rest_framework import status
@@ -13,6 +14,7 @@ from apps.training.models import (
     TrainingJobTag,
 )
 from common.redis_client import redis_client
+
 from ..auth import (
     _require_auth,
     _resolve_target_job,
@@ -51,9 +53,7 @@ class MLflowRunsLogBatchView(APIView):
             step = int(m.get("step") or 0)
             raw_ts = m.get("timestamp")
             ts = datetime.fromtimestamp(raw_ts / 1000.0, tz=dt_timezone.utc) if raw_ts else timezone.now()
-            metric_objects.append(
-                TrainingJobMetric(job=job, name=k, value=val, step=step, timestamp=ts)
-            )
+            metric_objects.append(TrainingJobMetric(job=job, name=k, value=val, step=step, timestamp=ts))
             tracking_metrics_update[k] = val
 
         if metric_objects:
@@ -124,7 +124,10 @@ class MLflowRunsLogMetricView(APIView):
         try:
             val = float(request.data.get("value"))
         except (TypeError, ValueError):
-            return Response({"error_code": "INVALID_PARAMETER_VALUE", "message": "Metric value must be float"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error_code": "INVALID_PARAMETER_VALUE", "message": "Metric value must be float"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         step = int(request.data.get("step") or 0)
         raw_ts = request.data.get("timestamp")
@@ -221,4 +224,3 @@ class MLflowMetricsGetHistoryView(APIView):
                 ]
             }
         )
-

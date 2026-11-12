@@ -1,4 +1,3 @@
-
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -18,16 +17,19 @@ ACTIVE_STATUSES = {"pending", "queued", "uploading", "running", "cancelling"}
 
 def create_job(*, owner, validated_data=None):
     from .drafts import create_draft
+
     return create_draft(owner=owner, values=validated_data)
 
 
 def retry_job(job, *, creation_key, storage=None):
     from .drafts import clone_draft
+
     return clone_draft(job, creation_key=creation_key, retry=True, storage=storage)
 
 
 def submit_job(job, *, revision, run_key, storage=None):
     from .drafts import submit_draft
+
     return submit_draft(job, revision=revision, run_key=run_key, storage=storage)
 
 
@@ -35,11 +37,14 @@ def submit_job(job, *, revision, run_key, storage=None):
 def _submit_job_atomic(job, *, verified_gpu_id, local_capacity=None):
     if job.backend == "argo":
         from apps.training.services.quota import lock_owner
+
         lock_owner(job.owner_id)
     from apps.catalog.models import ModelProject
+
     project = ModelProject.objects.select_for_update().filter(pk=job.project_id).first() if job.project_id else None
     job = TrainingJob.objects.select_for_update().get(pk=job.pk)
     from apps.training.services.resources import validate_resources
+
     validate_resources({}, job, local_capacity=local_capacity)
     if settings.TRAINING_BACKEND == "docker" and job.accelerator_type == "gpu" and job.local_gpu_id != verified_gpu_id:
         raise Conflict("The selected GPU changed; retry the request.")
@@ -51,9 +56,11 @@ def _submit_job_atomic(job, *, verified_gpu_id, local_capacity=None):
         raise Conflict("Only pending jobs can be submitted.")
     if job.backend == "argo":
         from apps.training.services.quota import reserve
+
         reserve(job)
     elif job.backend == "docker":
         from apps.training.services.local_resources import reserve
+
         reserve(job, local_capacity)
     job.status = "queued"
     job.submitted_at = timezone.now()
@@ -64,6 +71,7 @@ def _submit_job_atomic(job, *, verified_gpu_id, local_capacity=None):
 
 def _enqueue(job):
     from apps.observability.services.executions import enqueue_safely
+
     enqueue_safely(job, execute_training_job)
 
 
@@ -84,6 +92,7 @@ def cancel_job(job):
             message="Training cancellation requested.",
         )
         from apps.observability.services.executions import enqueue_safely
+
         transaction.on_commit(lambda: enqueue_safely(job, cancel_training_job))
     return job
 
@@ -132,6 +141,7 @@ def request_job_deletion(job):
         )
         record_training_event(job=job, event_type=event_type, message=message)
         from apps.observability.services.executions import enqueue_safely
+
         transaction.on_commit(lambda: enqueue_safely(job, task))
     return job
 
@@ -156,4 +166,3 @@ def request_output_purge(job):
         )
         transaction.on_commit(lambda: purge_training_job_outputs.delay(str(job.public_id)))
     return job
-

@@ -14,12 +14,6 @@ import redis
 import requests
 import yaml
 from src import config, image_build, io
-from src.image_build import serving_base_image, write_build_context
-from src.security import (
-    validate_model_package_security,
-    validate_no_dangerous_binaries,
-    validate_safe_requirements,
-)
 from src.core import (
     build_preview_tree,
     load_model,
@@ -27,6 +21,7 @@ from src.core import (
     parse_requirements,
     save_mlflow_model,
 )
+from src.image_build import serving_base_image, write_build_context
 from src.logging_utils import (
     RuntimeLog,
     bind_context,
@@ -36,9 +31,15 @@ from src.logging_utils import (
     reset_context,
     sanitize,
 )
+from src.security import (
+    validate_model_package_security,
+    validate_no_dangerous_binaries,
+    validate_safe_requirements,
+)
 
 logger = get_logger("model-packager")
 runtime_log = RuntimeLog(logger)
+
 
 class RedisLogHandler(logging.Handler):
     def __init__(self, redis_url: str, build_id: str):
@@ -168,7 +169,6 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
     else:
         workspace = Path(tempfile.mkdtemp(prefix=f"build-{build_id}-"))
     try:
-
         artifact_name = Path(source_artifact_name).name
         artifact_path = workspace / artifact_name
         download_presigned_file(source_download_url, artifact_path)
@@ -359,7 +359,9 @@ def run_test_zip_task(build_id: str, webhook_url: str) -> None:
             is_deep_learning = flavor in ["pytorch", "tensorflow", "keras"]
             write_build_context(
                 workspace,
-                serving_base_image("deep-learning-serving" if is_deep_learning else "machine-learning-serving", harbor_url),
+                serving_base_image(
+                    "deep-learning-serving" if is_deep_learning else "machine-learning-serving", harbor_url
+                ),
                 requirements_text,
                 runtime_log.detail,
             )
@@ -519,7 +521,9 @@ def main():
             else:
                 # Steps that run user code hold no callback secret; the workflow's exit
                 # handler reports the failure instead.
-                runtime_log.detail("No callback credential in this step; the workflow exit handler reports the failure.")
+                runtime_log.detail(
+                    "No callback credential in this step; the workflow exit handler reports the failure."
+                )
         except Exception as webhook_exc:
             runtime_log.event(
                 logging.ERROR,

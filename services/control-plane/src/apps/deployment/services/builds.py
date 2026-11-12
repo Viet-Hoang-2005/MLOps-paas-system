@@ -97,12 +97,15 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
         project = type(job.project).objects.select_for_update().get(pk=job.project_id)
         if project.deletion_state != "active":
             raise Conflict("This project is being deleted.")
-        job = type(job).objects.select_for_update(of=("self",)).select_related("project", "project__owner").get(pk=job.pk)
+        job = (
+            type(job).objects.select_for_update(of=("self",)).select_related("project", "project__owner").get(pk=job.pk)
+        )
         _check_training_job(job, expected_revision)
         existing = _existing_training_build(job)
         if existing:
             return existing, False
         from apps.training.services.output_index import public_outputs
+
         output = public_outputs(job).filter(kind="model", public_id=job.artifact_selection.get("model_id")).first()
         if not output or not output.s3_uri:
             raise ValidationError({"job": "This training job has no model output."})
@@ -119,7 +122,16 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
         ]
         for slot, identifier in job.artifact_selection.get("artifacts", {}).items():
             asset = job.outputs.get(public_id=identifier)
-            sources.append(_Source(kind=slot, name=slot + ".json", uri=asset.s3_uri, checksum=asset.checksum, size_bytes=asset.size_bytes, content_type=asset.content_type))
+            sources.append(
+                _Source(
+                    kind=slot,
+                    name=slot + ".json",
+                    uri=asset.s3_uri,
+                    checksum=asset.checksum,
+                    size_bytes=asset.size_bytes,
+                    content_type=asset.content_type,
+                )
+            )
         for supp in job.outputs.filter(kind__in=("source_code", "reference_data")):
             if supp.s3_uri:
                 sources.append(
@@ -130,13 +142,20 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
                         checksum=supp.checksum,
                         size_bytes=supp.size_bytes,
                         content_type=supp.content_type,
-                        metadata={"entry_point": Path(supp.relative_path).name} if supp.kind == "source_code" else supp.metadata,
+                        metadata={"entry_point": Path(supp.relative_path).name}
+                        if supp.kind == "source_code"
+                        else supp.metadata,
                     )
                 )
-        summary_sources = [(asset.kind, asset.name, asset.uri) for asset in sources if asset.kind in PREVIEW_SUMMARY_FIELDS]
+        summary_sources = [
+            (asset.kind, asset.name, asset.uri) for asset in sources if asset.kind in PREVIEW_SUMMARY_FIELDS
+        ]
         revision = job.output_revision
         tenant_id, project_public_id = job.project.owner.tenant_id, job.project.public_id
-        flavor, requirements = job.model_flavor, job.build_requirements_text if job.build_requirements_text is not None else job.requirements_text
+        flavor, requirements = (
+            job.model_flavor,
+            job.build_requirements_text if job.build_requirements_text is not None else job.requirements_text,
+        )
     build_public_id = uuid.uuid4()
 
     # 2. Copy with no lock held.
@@ -158,7 +177,12 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
             project = type(job.project).objects.select_for_update().get(pk=job.project_id)
             if project.deletion_state != "active":
                 raise Conflict("This project is being deleted.")
-            job = type(job).objects.select_for_update(of=("self",)).select_related("project", "project__owner").get(pk=job.pk)
+            job = (
+                type(job)
+                .objects.select_for_update(of=("self",))
+                .select_related("project", "project__owner")
+                .get(pk=job.pk)
+            )
             _check_training_job(job, expected_revision)
             if job.output_revision != revision:
                 raise Conflict("Training output changed while the build was being prepared. Try again.")
@@ -210,6 +234,7 @@ def _existing_training_build(job):
 
 def _training_summaries(storage, summary_sources):
     from apps.training.services.artifact_selection import importance_summary, validate_json
+
     result = {"metrics_summary": {}, "params_summary": {}, "insights_summary": {}}
     for kind, _, uri in summary_sources:
         value = validate_json(storage.read(uri, max_bytes=1024**2 + 1), kind)
@@ -229,10 +254,7 @@ def request_preview_build(*, project, revision, backend, storage=None):
     with transaction.atomic():
         project = type(project).objects.select_for_update().get(pk=project.pk)
         preview = _check_preview(project, revision)
-        sources = [
-            _Source(kind=asset.kind, name=asset.name, uri=asset.s3_uri)
-            for asset in preview.assets.all()
-        ]
+        sources = [_Source(kind=asset.kind, name=asset.name, uri=asset.s3_uri) for asset in preview.assets.all()]
         flavor, artifact_format, requirements = preview.flavor, preview.artifact_format, preview.requirements_text
         tenant_id, project_public_id = project.owner.tenant_id, project.public_id
     build_public_id = uuid.uuid4()

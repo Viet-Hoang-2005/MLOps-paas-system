@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import mlflow
 import pandas as pd
 import redis
 import requests
@@ -27,8 +28,6 @@ from src.logging_utils import (
     sanitize,
 )
 from urllib3.util.retry import Retry
-
-import mlflow
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(dotenv_path=os.path.join(ROOT_DIR, ".env"))
@@ -499,7 +498,7 @@ def save_drift_report(report, result_dict, summary):
                     reason=sanitize(str(last_err)),
                 )
 
-    all_uploads_succeeded = (uploaded_count == len(configured_uploads))
+    all_uploads_succeeded = uploaded_count == len(configured_uploads)
     if all_uploads_succeeded:
         artifacts.update(
             {

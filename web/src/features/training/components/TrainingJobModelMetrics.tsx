@@ -31,7 +31,10 @@ export function TrainingJobModelMetrics({
     return (
       <div className="flex h-48 items-center justify-center rounded-surface border border-border bg-surface">
         <p className="text-style-caption text-color-muted-foreground animate-pulse">
-          {t("detail.metricsPage.waitingRunner", "Loading experiment tracking data...")}
+          {t(
+            "detail.metricsPage.waitingRunner",
+            "Loading experiment tracking data...",
+          )}
         </p>
       </div>
     );
@@ -41,19 +44,23 @@ export function TrainingJobModelMetrics({
   const params = Object.entries(data?.params ?? {});
   const metricsSummary = Object.entries(data?.metrics_summary ?? {});
 
-  const hasAnyData = series.length > 0 || params.length > 0 || metricsSummary.length > 0;
+  const hasAnyData =
+    series.length > 0 || params.length > 0 || metricsSummary.length > 0;
 
   if (!hasAnyData) {
     return (
       <div className="rounded-surface border border-dashed border-border bg-muted/40 p-8 text-center">
         <TrendingUp className="mx-auto mb-3 h-8 w-8 text-color-muted-foreground/60" />
         <p className="text-style-body-strong text-color-foreground">
-          {t("detail.metricsPage.noModelMetricsTitle", "No Experiment Tracking Logs Yet")}
+          {t(
+            "detail.metricsPage.noModelMetricsTitle",
+            "No Experiment Tracking Logs Yet",
+          )}
         </p>
         <p className="mt-1 text-style-caption text-color-muted-foreground">
           {t(
             "detail.metricsPage.noModelMetricsHint",
-            "Call mlflow.autolog() or mlflow.log_metric() in your script to stream realtime training loss curves here."
+            "Call mlflow.autolog() or mlflow.log_metric() in your script to stream realtime training loss curves here.",
           )}
         </p>
       </div>
@@ -110,7 +117,10 @@ export function TrainingJobModelMetrics({
           <div className="flex items-center justify-between">
             <h4 className="flex items-center gap-2 text-style-overline uppercase text-color-foreground">
               <Activity className="h-4 w-4 text-color-info" />
-              {t("detail.metricsPage.trainingCurves", "Training & Validation Curves (Step History)")}
+              {t(
+                "detail.metricsPage.trainingCurves",
+                "Training & Validation Curves (Step History)",
+              )}
             </h4>
             {isRunning && (
               <span className="flex items-center gap-1.5 text-style-caption font-bold text-color-success">
@@ -136,16 +146,22 @@ export function TrainingJobModelMetrics({
                       {item.name}
                     </h5>
                     <span className="text-style-caption text-color-muted-foreground">
-                      {item.points.length} {t("detail.metricsPage.steps", "steps")}
+                      {item.points.length}{" "}
+                      {t("detail.metricsPage.steps", "steps")}
                     </span>
                   </div>
                   <Chart
                     allowNegative
                     data={chartData}
                     height={180}
-                    timeFormatter={(step) => `${t("detail.metricsPage.step", "Step")} ${number(step)}`}
+                    timeFormatter={(step) =>
+                      `${t("detail.metricsPage.step", "Step")} ${number(step)}`
+                    }
                     valueFormatter={number}
-                    emptyText={t("detail.metricsPage.insufficientPoints", "Insufficient data points")}
+                    emptyText={t(
+                      "detail.metricsPage.insufficientPoints",
+                      "Insufficient data points",
+                    )}
                   />
                 </div>
               );

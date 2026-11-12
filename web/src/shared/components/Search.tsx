@@ -12,8 +12,10 @@ import { Search as SearchIcon, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
 
-export interface SearchProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
+export interface SearchProps extends Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  "type"
+> {
   wrapperClassName?: string;
   onClear?: () => void;
   clearAriaLabel?: string;
