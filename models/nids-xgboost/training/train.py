@@ -573,11 +573,11 @@ def main(argv=None):
         model_path.unlink()
         raise TrainingError("Exported model prediction parity failed.")
     write_json(
-        model_dir / "label_mapping.json",
+        output_dir / "label_mapping.json",
         {str(i): name for i, name in enumerate(classes)},
     )
     write_json(
-        model_dir / "input_schema.json",
+        output_dir / "input_schema.json",
         {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
@@ -614,7 +614,7 @@ def main(argv=None):
     }
     write_json(output_dir / "model_insights.json", insights)
     # Runner normalizes insight items; preserve detailed evidence in the archive too.
-    write_json(model_dir / "training_report.json", insights)
+    write_json(output_dir / "training_report.json", insights)
     log("Training complete: " + json.dumps(metrics, allow_nan=False))
 
 

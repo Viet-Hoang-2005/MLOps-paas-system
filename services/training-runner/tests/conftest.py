@@ -27,6 +27,7 @@ def runner_workspace(tmp_path, monkeypatch):
     for name in ("SOURCE_DIR", "INPUT_TRAIN_DIR", "MODEL_DIR", "OUTPUT_DIR"):
         paths[name].mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(runner, "log_to_mlflow", lambda **kwargs: None)
+    monkeypatch.setenv("MODEL_FLAVOR", "sklearn")
     monkeypatch.setattr(runner, "RUNTIME_ENV", {})
     monkeypatch.setattr(runner, "SECRET_VALUES", [])
     return paths

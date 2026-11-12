@@ -114,8 +114,11 @@ def test_terminal_commit_precedes_cleanup(job, monkeypatch):
     monkeypatch.setattr(executions, "_completion_data", lambda row, kind: None)
     executions.reconcile("training", job.public_id)
     job.refresh_from_db()
-    assert job.status == "completed" and job.outputs.exists()
+    assert job.status == "uploading" and not job.outputs.exists()
     backend.cleanup.assert_not_called()
+    from apps.training.services.output_finalization import finalize_output
+    monkeypatch.setattr("apps.training.services.outputs.verify_training_output", lambda job: None)
+    finalize_output.run(str(job.public_id))
     executions.reconcile("training", job.public_id)
     backend.cleanup.assert_called_once()
     job.refresh_from_db()
@@ -183,6 +186,11 @@ def test_completed_before_runtime_deadline_recovers_after_long_outage(job, monke
     backend.poll.return_value = {"status": "completed", "started_at": start_time.isoformat(), "finished_at": (start_time + timedelta(minutes=10)).isoformat()}
     monkeypatch.setattr(executions, "_completion_data", lambda row, kind: None)
     executions.reconcile("training", job.public_id)
+    job.refresh_from_db()
+    assert job.status == "uploading"
+    from apps.training.services.output_finalization import finalize_output
+    monkeypatch.setattr("apps.training.services.outputs.verify_training_output", lambda job: None)
+    finalize_output.run(str(job.public_id))
     job.refresh_from_db()
     assert job.status == "completed"
     assert job.runtime_seconds == 600

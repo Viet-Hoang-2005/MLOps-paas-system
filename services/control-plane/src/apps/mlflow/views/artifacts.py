@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 
 
 def _safe_relative(path):
+    if "_mlops" in str(path).replace("\\", "/").split("/"):
+        raise ValidationError("System artifacts are not publicly accessible.")
     if path and ("\\" in path or any(part in {"", ".", ".."} for part in path.split("/")) or any(ord(c) < 32 for c in path)):
         raise ValidationError("Unsafe artifact path.")
     return path

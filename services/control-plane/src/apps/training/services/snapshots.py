@@ -36,7 +36,8 @@ def input_snapshot(job, *, path=None, download=False, storage=None):
 
 def output_download(job, output_id, *, storage=None):
     from django.shortcuts import get_object_or_404
-    output = get_object_or_404(job.outputs, public_id=output_id)
+    from .output_index import public_outputs
+    output = get_object_or_404(public_outputs(job), public_id=output_id)
     if job.outputs_purged_at:
         raise Conflict("Training outputs have been purged.")
     storage = storage or S3Storage()

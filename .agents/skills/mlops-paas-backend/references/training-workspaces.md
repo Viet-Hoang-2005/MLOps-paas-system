@@ -35,4 +35,18 @@ Apply additive training migrations, then update Control Plane/workers and runner
 
 ## Workspace downloads
 
+Output contract v2 is the only output contract. SM_MODEL_DIR holds raw models;
+SM_OUTPUT_DIR holds original reports. The private package has model/, metadata/,
+_mlops/. Completion queues the registered output finalizer; only after complete
+verification/materialization may the job become Completed. Keep attempt-isolated
+object keys, runtime finish timestamps and cancellation fences. Public APIs use
+public_outputs(), never the archive or _mlops, including UUID/path/download-all.
+
+Assignment requires explicit model_id and six optional slot UUIDs or JSON uploads
+under output_revision. Validate ownership, scope, checksum and JSON role before
+atomic assignment. No filename inference, singleton defaults or Preview mutation.
+Build snapshots the saved selection; never search/extract an archive for model or
+missing metadata. See docs/dev/training-model-output.md. Edit the original
+artifact_selection migration; the operator resets development DB/S3.
+
 GET /training-jobs/{job}/input/download/ and /outputs/download/ authorize the owning account before storage access and return attachments, accepting only an optional relative path. A file selection returns the exact bytes; a folder selection returns a ZIP rooted at that folder; no selection returns the entire area as a ZIP. Unsubmitted Input reads draft objects with an optional revision check; submitted Input reads the frozen ZIP, never mutable entries. Empty selections are unavailable. Keep safe-path/job-prefix/checksum validation and binary-safe streaming. Derived ZIPs use bounded temporary files, not persistent S3 objects; close streams on success/error and after the HTTP response.

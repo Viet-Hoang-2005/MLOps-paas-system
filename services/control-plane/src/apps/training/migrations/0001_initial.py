@@ -20,6 +20,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='TrainingJob',
             fields=[
+                ('artifact_selection', models.JSONField(default=dict, blank=True)),
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('public_id', models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
                 ('trigger_kind', models.CharField(choices=[('manual', 'Manual'), ('retry', 'Retry'), ('maintenance', 'Maintenance')], default='manual', max_length=32)),

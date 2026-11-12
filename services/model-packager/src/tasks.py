@@ -40,34 +40,6 @@ from src.logging_utils import (
 logger = get_logger("model-packager")
 runtime_log = RuntimeLog(logger)
 
-SUPPORTED_MODEL_EXTENSIONS = {".pkl", ".joblib", ".xgb", ".pt", ".pth", ".h5", ".keras"}
-PREFERRED_MODEL_FILENAMES = (
-    "model.pkl",
-    "model.joblib",
-    "model.xgb",
-    "model.pt",
-    "model.pth",
-    "model.h5",
-    "model.keras",
-)
-
-FLAVOR_MODEL_EXTENSIONS: dict[str, tuple[str, ...]] = {
-    "sklearn": (".pkl", ".joblib"),
-    "xgboost": (".xgb", ".pkl", ".joblib"),
-    "pytorch": (".pt", ".pth"),
-    "tensorflow": (".h5", ".keras"),
-    "keras": (".h5", ".keras"),
-}
-
-FLAVOR_PREFERRED_FILENAMES: dict[str, tuple[str, ...]] = {
-    "sklearn": ("model.pkl", "model.joblib"),
-    "xgboost": ("model.xgb", "model.pkl", "model.joblib"),
-    "pytorch": ("model.pt", "model.pth"),
-    "tensorflow": ("model.h5", "model.keras"),
-    "keras": ("model.h5", "model.keras"),
-}
-
-
 class RedisLogHandler(logging.Handler):
     def __init__(self, redis_url: str, build_id: str):
         super().__init__()
@@ -106,58 +78,6 @@ def safe_extract_tar(archive_path: Path, destination: Path) -> None:
 
 def safe_extract_zip(archive_path: Path, destination: Path) -> None:
     io.safe_extract_zip(archive_path, destination)
-
-
-def find_supported_model_file(root: Path, flavor: str = "") -> Path:
-    normalized_flavor = flavor.strip().lower() if flavor else ""
-    if normalized_flavor and normalized_flavor in FLAVOR_MODEL_EXTENSIONS:
-        allowed_extensions = set(FLAVOR_MODEL_EXTENSIONS[normalized_flavor])
-        preferred_filenames = FLAVOR_PREFERRED_FILENAMES.get(normalized_flavor, PREFERRED_MODEL_FILENAMES)
-    else:
-        allowed_extensions = SUPPORTED_MODEL_EXTENSIONS
-        preferred_filenames = PREFERRED_MODEL_FILENAMES
-
-    files = [item for item in root.rglob("*") if item.is_file() and item.suffix.lower() in allowed_extensions]
-    if not files:
-        if normalized_flavor and normalized_flavor in FLAVOR_MODEL_EXTENSIONS:
-            ext_str = ", ".join(sorted(allowed_extensions))
-            raise ValueError(
-                f"Training artifact is not deployable because no {ext_str} file was found for {normalized_flavor}."
-            )
-        raise ValueError(
-            "Training artifact is not deployable because no .pkl, .joblib, .xgb, .pt, .pth, .h5, or .keras file was found."
-        )
-
-    by_name = {item.name: item for item in sorted(files)}
-    for preferred in preferred_filenames:
-        if preferred in by_name:
-            if len(files) > 1:
-                runtime_log.event(
-                    logging.WARNING,
-                    "multiple_model_files",
-                    f"Warning: multiple model files found; using {preferred}.",
-                )
-            return by_name[preferred]
-
-    selected = sorted(files, key=lambda item: item.as_posix())[0]
-    if len(files) > 1:
-        runtime_log.event(
-            logging.WARNING,
-            "multiple_model_files",
-            f"Warning: multiple model files found; using {selected.relative_to(root).as_posix()}.",
-        )
-    return selected
-
-
-def find_label_mapping_file(root: Path) -> Path | None:
-    candidates = []
-    for item in root.rglob("*"):
-        if not item.is_file() or item.suffix.lower() not in {".json", ".pkl"}:
-            continue
-        lowered = item.name.lower()
-        if "mapping" in lowered or "label" in lowered or "dictionary" in lowered:
-            candidates.append(item)
-    return sorted(candidates, key=lambda item: item.as_posix())[0] if candidates else None
 
 
 def webhook_headers() -> dict[str, str]:
@@ -223,34 +143,6 @@ def parse_conda_pip_requirements(conda_file: Path) -> list[str]:
     return pip_requirements
 
 
-def read_training_summaries(extracted_dir: Path) -> tuple[dict[str, dict], Path | None]:
-    mlops_dir = next((path for path in sorted(extracted_dir.rglob("_mlops")) if path.is_dir()), None)
-    summaries = {"metrics_summary": {}, "params_summary": {}, "insights_summary": {}}
-    if mlops_dir is None:
-        return summaries, None
-    for filename, key in (
-        ("metrics.json", "metrics_summary"),
-        ("params.json", "params_summary"),
-        ("model_insights.json", "insights_summary"),
-    ):
-        path = mlops_dir / filename
-        if not path.exists():
-            continue
-        try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            runtime_log.event(
-                logging.WARNING,
-                "training_metadata_invalid",
-                f"Ignoring invalid training metadata file: {filename}",
-            )
-            continue
-        if isinstance(value, dict):
-            # json.loads accepts NaN/Infinity, but the callback must be strict JSON.
-            summaries[key] = io.finite_json(value)
-    return summaries, mlops_dir
-
-
 def run_build_task(build_id: str, webhook_url: str) -> None:
     flavor = os.environ.get("FLAVOR", "").lower()
     requirements_text = os.environ.get("REQUIREMENTS_TEXT", "")
@@ -263,7 +155,7 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
     tenant_id = os.environ.get("TENANT_ID", "unknown")
 
     if source_type == "training_job":
-        if not all([flavor, source_download_url, output_upload_url]):
+        if not all([flavor, source_download_url, source_artifact_name, output_upload_url]):
             raise ValueError("Missing presigned URLs for training artifact build.")
     elif not all([flavor, source_download_url, source_artifact_name, output_upload_url]):
         raise ValueError("Missing required environment variables for build.")
@@ -276,44 +168,11 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
     else:
         workspace = Path(tempfile.mkdtemp(prefix=f"build-{build_id}-"))
     try:
-        artifact_name = ""
-        extracted_label_mapping_path = None
-        training_summaries = {
-            "metrics_summary": {},
-            "params_summary": {},
-            "insights_summary": {},
-        }
-        extracted_mlops_dir = None
 
-        if source_type == "training_job":
-            training_archive_path = workspace / "training-model.tar.gz"
-            extracted_dir = workspace / "training-artifact"
-            download_presigned_file(source_download_url, training_archive_path)
-            runtime_log.detail("Scanning training artifact security...")
-            validate_model_package_security(training_archive_path)
-            runtime_log.detail("Extracting training artifact safely...")
-            safe_extract_tar(training_archive_path, extracted_dir)
-            validate_no_dangerous_binaries(extracted_dir)
-            artifact_path = find_supported_model_file(extracted_dir, flavor=flavor)
-            artifact_name = artifact_path.name
-            training_summaries, extracted_mlops_dir = read_training_summaries(extracted_dir)
-
-            if not requirements_text.strip():
-                requirements_file = next(iter(sorted(extracted_dir.rglob("requirements.txt"))), None)
-                if requirements_file:
-                    requirements_text = requirements_file.read_text(encoding="utf-8").strip()
-                    runtime_log.detail("Using requirements.txt from training artifact.")
-
-            extracted_label_mapping_path = find_label_mapping_file(extracted_dir)
-            if extracted_label_mapping_path:
-                runtime_log.detail(f"Using label mapping from training artifact: {extracted_label_mapping_path.name}")
-        else:
-            artifact_name = Path(source_artifact_name).name
-            artifact_path = workspace / artifact_name
-            download_presigned_file(source_download_url, artifact_path)
-            runtime_log.detail("Scanning uploaded artifact security...")
-            validate_model_package_security(artifact_path)
-
+        artifact_name = Path(source_artifact_name).name
+        artifact_path = workspace / artifact_name
+        download_presigned_file(source_download_url, artifact_path)
+        validate_model_package_security(artifact_path)
         if requirements_text.strip():
             validate_safe_requirements(requirements_text)
 
@@ -329,17 +188,12 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
         if requirements_text.strip():
             (package_dir / "requirements.txt").write_text(requirements_text.strip() + "\n", encoding="utf-8")
 
+        schema_url = os.environ.get("INPUT_SCHEMA_DOWNLOAD_URL", "")
+        if schema_url:
+            download_presigned_file(schema_url, package_dir / "input_schema.json")
         if label_mapping_download_url:
             mapping_path = package_dir / Path(label_mapping_filename or "label-mapping.json").name
             download_presigned_file(label_mapping_download_url, mapping_path)
-        elif extracted_label_mapping_path:
-            shutil.copy2(
-                extracted_label_mapping_path,
-                package_dir / extracted_label_mapping_path.name,
-            )
-        if extracted_mlops_dir:
-            shutil.copytree(extracted_mlops_dir, package_dir / "_mlops", dirs_exist_ok=True)
-
         preview_tree = build_preview_tree(package_dir)
         manifest = {
             "flavor": flavor,
@@ -375,7 +229,6 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
                 "package_preview_tree": preview_tree,
                 "task_type": "BUILD",
                 "requirements_snapshot": requirements_text,
-                **training_summaries,
             }
             (workspace / "webhook_payload.json").write_text(
                 json.dumps(io.finite_json(payload), allow_nan=False), encoding="utf-8"
@@ -398,7 +251,6 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
                 "package_manifest": manifest,
                 "package_preview_tree": preview_tree,
                 "task_type": "BUILD",
-                **training_summaries,
                 **built_image_metadata(),
             },
         )

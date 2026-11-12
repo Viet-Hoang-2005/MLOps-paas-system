@@ -78,7 +78,6 @@ export interface TrainingJob {
   sagemaker_job_name: string;
   external_job_id: string;
   output_s3_uri: string;
-  output_uri: string;
   model_artifact_uri: string;
   status: TrainingJobStatus;
   error_message: string;
@@ -159,9 +158,7 @@ export interface TrainingRuntimeCapabilities {
   };
 }
 
-export interface TrainingJobDownloadURLResponse {
-  download_url: string;
-}
+
 
 export interface TrainingJobLogsResponse {
   job_id: ResourceId;
@@ -234,6 +231,8 @@ export interface TrainingOutputSummaryAsset {
 }
 
 export interface TrainingJobModelOutputSummary {
+  selection?: { model_id?: string; artifacts?: Record<string, string> };
+  available_outputs?: TrainingOutputSummaryAsset[];
   job_id: ResourceId;
   project_id: ResourceId | null;
   output_revision: number;

@@ -81,12 +81,9 @@ def test_serializer_persists_gpu_model_and_response(settings, model):
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", ["t4", "a10g"])
 def test_create_and_read_gpu_job_over_api(settings, monkeypatch, model):
-    from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
-
     settings.TRAINING_BACKEND = "argo"
     settings.TRAINING_GPU_ENABLED = True
     settings.TRAINING_GPU_COUNTS = (1,)
-    monkeypatch.setattr("apps.training.services.jobs.S3Storage", MemoryStorage)
     user = get_user_model().objects.create_user("gpu-api@example.com")
     client = APIClient()
     client.force_authenticate(user)

@@ -73,24 +73,9 @@ def execute_training_job(self, job_id):
         else:
             append_training_log(job.public_id, "[SYSTEM] Waiting for trusted callback.")
         return "running"
-    with transaction.atomic():
-        job = TrainingJob.objects.select_for_update().get(pk=job.pk)
-        if job.status in {"cancelling", "cancelled"} or job.deletion_requested_at:
-            append_training_log(job.public_id, "[SYSTEM] Ignoring completion after cancellation.")
-            return job.status
-        job.mark_finished("completed")
-        job.tracking = {**job.tracking, "logs_tail": str(result)[-6000:]}
-        job.save(update_fields=["status", "completed_at", "runtime_seconds", "tracking", "updated_at"])
-        job.outputs.update_or_create(
-            relative_path="model.tar.gz",
-            defaults={"kind": "model", "s3_uri": job.output_uri, "content_type": "application/gzip"},
-        )
-        record_training_event(job=job, event_type="completed", message="Training execution completed.")
-        record_transition(job, "completed")
-    for line in str(result).splitlines()[-500:]:
-        append_training_log(job.public_id, line)
-    append_training_log(job.public_id, "[SYSTEM] Training completed successfully.")
-    return "completed"
+    from .services.output_finalization import enqueue_output
+    enqueue_output(job)
+    return "uploading"
 
 
 @shared_task(bind=True, max_retries=7200, soft_time_limit=50, time_limit=55)
@@ -123,24 +108,9 @@ def poll_training_job_status(self, job_id):
         raise self.retry(countdown=5)
 
     if current_status == "completed":
-        logs = result.get("logs", "")
-        with transaction.atomic():
-            job = TrainingJob.objects.select_for_update().get(pk=job.pk)
-            if job.status in {"cancelling", "cancelled"} or job.deletion_requested_at:
-                return job.status
-            job.mark_finished("completed")
-            job.tracking = {**job.tracking, "logs_tail": logs[-6000:]}
-            job.save(update_fields=["status", "completed_at", "runtime_seconds", "tracking", "updated_at"])
-            job.outputs.update_or_create(
-                relative_path="model.tar.gz",
-                defaults={"kind": "model", "s3_uri": job.output_uri, "content_type": "application/gzip"},
-            )
-            record_training_event(job=job, event_type="completed", message="Training execution completed.")
-            record_transition(job, "completed")
-        for line in logs.splitlines()[-500:]:
-            append_training_log(job.public_id, line)
-        append_training_log(job.public_id, "[SYSTEM] Training completed successfully.")
-        return "completed"
+        from .services.output_finalization import enqueue_output
+        enqueue_output(job)
+        raise self.retry(countdown=5)
 
     if current_status == "failed":
         logs = result.get("logs", "")
@@ -340,3 +310,5 @@ def purge_training_job_outputs(self, job_id):
         )
         record_transition(job, job.status, phase="outputs_purged")
     return "purged"
+
+from .services.output_finalization import finalize_output  # noqa: F401,E402 - Celery task registration

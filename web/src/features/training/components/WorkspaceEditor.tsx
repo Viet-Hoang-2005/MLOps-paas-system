@@ -120,7 +120,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(function
       size_bytes: out.size_bytes,
       download_url: "",
     }));
-    return workspaceTree(virtualEntries);
+    return workspaceTree([{ id: "model-root", path: "Model", kind: "folder", size_bytes: 0 }, { id: "metadata-root", path: "Metadata", kind: "folder", size_bytes: 0 }, ...virtualEntries]);
   }, [outputs]);
 
   const selectedOutputNode = useMemo(() => {
@@ -161,14 +161,16 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(function
 
   // Load output file content if readable
   useEffect(() => {
-    if (!selectedOutputNode || !runId || !isReadableFile(selectedOutputNode.relative_path)) return;
+    if (!selectedOutputNode || !runId || !isReadableFile(selectedOutputNode.relative_path, selectedOutputNode.size_bytes)) return;
     if (outputContents[selectedOutputNode.id] !== undefined) return;
     let alive = true;
     void downloadRunOutput(runId, selectedOutputNode.id)
       .then(async (url) => {
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to fetch output file");
-        const text = await res.text();
+        const text = /\.(png|jpe?g)$/i.test(selectedOutputNode.relative_path)
+          ? await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; void res.blob().then(blob => reader.readAsDataURL(blob)).catch(reject); })
+          : await res.text();
         if (alive) {
           setOutputContents((prev) => ({ ...prev, [selectedOutputNode.id]: text }));
         }
@@ -590,7 +592,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(function
                 description={t("studio.selectFileHint")}
               />
             </div>
-          ) : !isReadableFile(selectedOutputNode.relative_path) ? (
+          ) : !isReadableFile(selectedOutputNode.relative_path, selectedOutputNode.size_bytes) ? (
             <div className="flex flex-1 flex-col p-4 h-full">
               <Placeholder
                 className="h-full w-full flex-1"

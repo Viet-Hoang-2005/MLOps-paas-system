@@ -3,7 +3,6 @@ import { controlPlaneURL } from "@/shared/api/config";
 import { fetchAllPages } from "@/shared/api/pagination";
 import type {
   TrainingJob,
-  TrainingJobDownloadURLResponse,
   TrainingJobDeletionRequest,
   TrainingJobEventsResponse,
   TrainingJobListResponse,
@@ -35,15 +34,6 @@ export const getTrainingJob = async (jobId: string): Promise<TrainingJob> =>
   ).data;
 
 export const refreshTrainingJobStatus = getTrainingJob;
-
-export const getTrainingJobDownloadUrl = async (
-  jobId: string,
-): Promise<TrainingJobDownloadURLResponse> =>
-  (
-    await apiClient.get<TrainingJobDownloadURLResponse>(
-      controlPlaneURL(`/training-jobs/${jobId}/download/`),
-    )
-  ).data;
 
 export const deleteTrainingOutputs = async (
   jobId: string,
@@ -144,16 +134,12 @@ export const patchModelOutput = async (
     output_revision: number;
     source_code_file?: File | null;
     reference_data_file?: File | null;
-    label_mapping_file?: File | null;
-    input_schema_file?: File | null;
     build_requirements_text?: string;
     remove_assets?: string[];
   },
 ): Promise<TrainingJobModelOutputSummary> => {
   const formData = new FormData();
   formData.append("output_revision", String(payload.output_revision));
-  if (payload.label_mapping_file) formData.append("label_mapping_file", payload.label_mapping_file);
-  if (payload.input_schema_file) formData.append("input_schema_file", payload.input_schema_file);
   if (payload.build_requirements_text !== undefined) formData.append("build_requirements_text", payload.build_requirements_text);
   if (payload.source_code_file) {
     formData.append("source_code_file", payload.source_code_file);

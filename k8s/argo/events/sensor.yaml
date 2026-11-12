@@ -319,6 +319,8 @@ spec:
                       value: ""
                     - name: label_mapping_filename
                       value: ""
+                    - name: input_schema_download_url
+                      value: ""
           parameters:
             - src:
                 dependencyName: build-dep
@@ -380,6 +382,11 @@ spec:
                 dependencyName: build-dep
                 dataKey: body.label_mapping_filename
               dest: spec.arguments.parameters.14.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.input_schema_download_url
+              dest: spec.arguments.parameters.15.value
+
     - template:
         name: cancel-build-workflow-trigger
         conditions: "cancel-build-dep"

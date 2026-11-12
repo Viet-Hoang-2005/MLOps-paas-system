@@ -99,12 +99,19 @@ def completed_job(project, storage):
         data_snapshot_uri=code.uri,
      vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     for kind, name, payload in (
-        ("model", "model.tar.gz", b"model"),
+        ("model", "Model/chosen.joblib", b"model"),
         ("source_code", "train.py", b"print(1)"),
-        ("metric", "metrics.json", b'{"accuracy": 0.9}'),
+        ("file", "Metadata/scores.json", b'{"accuracy": 0.9}'),
     ):
         stored = storage.put(f"output/{name}", payload)
-        TrainingOutput.objects.create(job=job, kind=kind, relative_path=name, s3_uri=stored.uri)
+        asset = TrainingOutput.objects.create(job=job, kind=kind, relative_path=name, s3_uri=stored.uri,
+            metadata={"contract": 2, "group": "model" if kind == "model" else "metadata"})
+        if kind == "model":
+            job.artifact_selection = {"model_id": str(asset.public_id), "artifacts": {}}
+        elif kind == "file":
+            job.artifact_selection["artifacts"]["metrics"] = str(asset.public_id)
+    job.tracking = {"output_contract": 2}
+    job.save()
     return job
 
 
@@ -126,7 +133,7 @@ def test_training_build_copies_inputs_outside_any_transaction(project, storage):
     build, created = build_service.request_training_build(job=job, backend="docker", storage=storage)
     assert created and build.status == "queued"
     assert storage.inside_transaction == []
-    assert BuildInputAsset.objects.filter(build=build).count() == 2
+    assert BuildInputAsset.objects.filter(build=build).count() == 3
     assert build.metrics_summary == {"accuracy": 0.9}
     tasks.execute_build.delay.assert_called_once_with(str(build.public_id))
 

@@ -102,13 +102,14 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
         existing = _existing_training_build(job)
         if existing:
             return existing, False
-        output = job.outputs.filter(kind="model").order_by("-created_at").first()
+        from apps.training.services.output_index import public_outputs
+        output = public_outputs(job).filter(kind="model", public_id=job.artifact_selection.get("model_id")).first()
         if not output or not output.s3_uri:
             raise ValidationError({"job": "This training job has no model output."})
         sources = [
             _Source(
                 kind="training_output",
-                name=Path(output.relative_path).name or "model.tar.gz",
+                name=Path(output.relative_path).name,
                 uri=output.s3_uri,
                 checksum=output.checksum,
                 size_bytes=output.size_bytes,
@@ -116,7 +117,10 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
                 metadata={"source_job_id": str(job.public_id)},
             )
         ]
-        for supp in job.outputs.filter(kind__in=("source_code", "reference_data", "label_mapping", "input_schema")):
+        for slot, identifier in job.artifact_selection.get("artifacts", {}).items():
+            asset = job.outputs.get(public_id=identifier)
+            sources.append(_Source(kind=slot, name=slot + ".json", uri=asset.s3_uri, checksum=asset.checksum, size_bytes=asset.size_bytes, content_type=asset.content_type))
+        for supp in job.outputs.filter(kind__in=("source_code", "reference_data")):
             if supp.s3_uri:
                 sources.append(
                     _Source(
@@ -129,11 +133,7 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
                         metadata={"entry_point": Path(supp.relative_path).name} if supp.kind == "source_code" else supp.metadata,
                     )
                 )
-        summary_sources = [
-            (m_out.kind, m_out.relative_path, m_out.s3_uri)
-            for m_out in job.outputs.filter(kind__in=("metric", "insight"))
-            if m_out.s3_uri
-        ]
+        summary_sources = [(asset.kind, asset.name, asset.uri) for asset in sources if asset.kind in PREVIEW_SUMMARY_FIELDS]
         revision = job.output_revision
         tenant_id, project_public_id = job.project.owner.tenant_id, job.project.public_id
         flavor, requirements = job.model_flavor, job.build_requirements_text if job.build_requirements_text is not None else job.requirements_text
@@ -173,7 +173,7 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
                 source_job=job,
                 source_job_reference=job.public_id,
                 flavor=flavor,
-                artifact_format="training_output",
+                artifact_format="raw",
                 requirements_snapshot=requirements,
                 source_output_revision=revision,
                 backend=backend,
@@ -209,22 +209,17 @@ def _existing_training_build(job):
 
 
 def _training_summaries(storage, summary_sources):
-    metrics, params, insights = {}, {}, {}
-    for kind, relative_path, uri in summary_sources:
-        try:
-            value = json.loads(storage.read(uri).decode("utf-8"))
-        except Exception:
-            continue
-        if kind == "metric" and isinstance(value, dict):
-            metrics.update(value)
-        elif kind == "insight" and "param" in relative_path.lower() and isinstance(value, dict):
-            params.update(value)
-        elif kind == "insight":
-            if isinstance(value, dict):
-                insights.update(value)
-            elif isinstance(value, list):
-                insights[Path(relative_path).stem] = value
-    return {"metrics_summary": metrics, "params_summary": params, "insights_summary": insights}
+    from apps.training.services.artifact_selection import importance_summary, validate_json
+    result = {"metrics_summary": {}, "params_summary": {}, "insights_summary": {}}
+    for kind, _, uri in summary_sources:
+        value = validate_json(storage.read(uri, max_bytes=1024**2 + 1), kind)
+        if kind == "metrics":
+            result["metrics_summary"] = value
+        elif kind == "params":
+            result["params_summary"] = value
+        else:
+            result["insights_summary"][kind] = importance_summary(value) if kind == "feature_importance" else value
+    return result
 
 
 def request_preview_build(*, project, revision, backend, storage=None):

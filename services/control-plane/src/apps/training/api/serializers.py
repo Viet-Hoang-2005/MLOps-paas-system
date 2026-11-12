@@ -72,6 +72,8 @@ class NewTrainingProjectSerializer(serializers.Serializer):
 
 
 class TrainingJobProjectRequestSerializer(serializers.Serializer):
+    model_id = serializers.UUIDField()
+    artifacts = serializers.JSONField(required=False, default=dict)
     project_id = serializers.UUIDField(required=False)
     new_project = NewTrainingProjectSerializer(required=False)
     output_revision = serializers.IntegerField(min_value=1)
@@ -90,7 +92,11 @@ class TrainingJobSerializer(serializers.ModelSerializer):
     secrets_available = serializers.SerializerMethodField()
     retry_of = serializers.UUIDField(source="retry_of.public_id", read_only=True, allow_null=True)
     cloned_from = serializers.UUIDField(source="cloned_from.public_id", read_only=True, allow_null=True)
-    outputs = TrainingOutputSerializer(many=True, read_only=True)
+    outputs = serializers.SerializerMethodField()
+
+    def get_outputs(self, instance):
+        from apps.training.services.output_index import public_outputs
+        return TrainingOutputSerializer(public_outputs(instance), many=True).data
     output_available = serializers.SerializerMethodField()
     registration_build = serializers.SerializerMethodField()
     model_status = serializers.SerializerMethodField()
@@ -110,7 +116,6 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "code_snapshot_uri",
             "data_snapshot_uri",
             "output_revision",
-            "output_uri",
             "mlflow_artifact_uri",
             "mlflow_run_id",
             "backend",
@@ -151,7 +156,6 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "code_snapshot_uri",
             "data_snapshot_uri",
             "output_revision",
-            "output_uri",
             "mlflow_artifact_uri",
             "external_job_id",
             "celery_task_id",
@@ -190,7 +194,8 @@ class TrainingJobSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_output_available(instance):
-        return instance.outputs_purged_at is None and instance.outputs.filter(kind="model").exists()
+        from apps.training.services.output_index import public_outputs
+        return instance.status == "completed" and instance.outputs_purged_at is None and instance.tracking.get("output_contract") == 2 and public_outputs(instance).filter(kind="model").exists()
 
     @staticmethod
     def get_registration_build(instance):

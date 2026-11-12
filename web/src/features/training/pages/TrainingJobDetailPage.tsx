@@ -1,3 +1,5 @@
+import { downloadWorkspaceSelection } from "@/features/training/api/jobWorkspaceApi";
+import { saveDownload } from "@/features/training/lib/downloadSelection";
 import { formatDateTime } from "@/shared/i18n/formatters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -29,7 +31,6 @@ import {
   deleteTrainingJob,
   deleteTrainingOutputs,
   getTrainingJob,
-  getTrainingJobDownloadUrl,
   getTrainingJobEvents,
   getTrainingJobMetrics,
   refreshTrainingJobStatus,
@@ -186,14 +187,8 @@ export default function TrainingJobDetailPage() {
   });
 
   const downloadMutation = useMutation({
-    mutationFn: () => getTrainingJobDownloadUrl(parsedJobId),
-    onSuccess: ({ download_url: downloadUrl }) => {
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    },
+    mutationFn: () => downloadWorkspaceSelection(parsedJobId, "outputs"),
+    onSuccess: saveDownload,
     onError: (error) =>
       toast.error(getApiErrorMessage(error, t("detail.downloadFailed"))),
   });

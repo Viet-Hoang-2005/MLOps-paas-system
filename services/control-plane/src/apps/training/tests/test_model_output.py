@@ -23,15 +23,19 @@ def completed_training_job(db):
         output_uri="s3://test-bucket/model.tar.gz",
         output_revision=1,
      vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
-    TrainingOutput.objects.create(
+    model = TrainingOutput.objects.create(
         job=job,
         kind="model",
-        relative_path="model.tar.gz",
+        relative_path="Model/model.joblib",
+        metadata={"contract": 2, "group": "model"},
         s3_uri="s3://test-bucket/model.tar.gz",
         checksum="sha256model",
         size_bytes=1000,
         content_type="application/gzip",
     )
+    job.artifact_selection = {"model_id": str(model.public_id), "artifacts": {}}
+    job.tracking = {"output_contract": 2}
+    job.save(update_fields=["artifact_selection", "tracking"])
     return project, job, user
 
 
@@ -51,7 +55,7 @@ def test_get_and_patch_model_output_flow(completed_training_job, monkeypatch):
     assert get_res.data["model_flavor"] == "xgboost"
     assert get_res.data["can_edit"] is True
     assert get_res.data["can_build"] is True
-    assert get_res.data["model_artifact"]["name"] == "model.tar.gz"
+    assert get_res.data["model_artifact"]["name"] == "model.joblib"
     assert get_res.data["source_code"] is None
     assert get_res.data["reference_data"] is None
 

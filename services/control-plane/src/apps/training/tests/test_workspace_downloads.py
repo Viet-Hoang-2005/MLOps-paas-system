@@ -35,7 +35,8 @@ def files(monkeypatch):
     for path, payload in [("model.pkl", b"\x00\xff\x80model"), ("reports/a.json", b'{"a":1}'),
                           ("reports/nested/b.bin", b"\xff\x00"), ("reports2/out.json", b"{}")]:
         stored = storage.put(f"{training_prefix_for(job)}/output/{path}", payload)
-        TrainingOutput.objects.create(job=job, relative_path=path, kind="model" if path.endswith(".pkl") else "metric",
+        TrainingOutput.objects.create(job=job, relative_path=("Model/" if path.endswith(".pkl") else "Metadata/") + path, kind="model" if path.endswith(".pkl") else "file",
+            metadata={"contract": 2, "group": "model" if path.endswith(".pkl") else "metadata"},
             s3_uri=stored.uri, checksum=stored.checksum, size_bytes=stored.size_bytes)
     monkeypatch.setattr(downloads, "S3Storage", lambda: storage)
     client = APIClient()
@@ -92,15 +93,15 @@ def test_input_selection_preserves_exact_file_and_folder_scope(files, submitted)
 
 def test_output_download_is_binary_safe_and_download_all_is_a_zip(files):
     job, _, client = files
-    response = get(client, job, "outputs", "model.pkl")
+    response = get(client, job, "outputs", "Model/model.pkl")
     assert response.status_code == 200 and body(response) == b"\x00\xff\x80model"
-    with ZipFile(BytesIO(body(get(client, job, "outputs", "reports")))) as archive:
+    with ZipFile(BytesIO(body(get(client, job, "outputs", "Metadata/reports")))) as archive:
         assert set(archive.namelist()) == {"reports/a.json", "reports/nested/b.bin"}
         assert archive.read("reports/nested/b.bin") == b"\xff\x00"
-    with ZipFile(BytesIO(body(get(client, job, "outputs", "reports/nested")))) as archive:
+    with ZipFile(BytesIO(body(get(client, job, "outputs", "Metadata/reports/nested")))) as archive:
         assert archive.namelist() == ["nested/b.bin"]
     with ZipFile(BytesIO(body(get(client, job, "outputs")))) as archive:
-        assert len(archive.namelist()) == 4 and archive.read("model.pkl") == b"\x00\xff\x80model"
+        assert len(archive.namelist()) == 4 and archive.read("Model/model.pkl") == b"\x00\xff\x80model"
 
 
 def test_empty_missing_invalid_and_stale_selections_are_rejected(files):
@@ -122,8 +123,8 @@ def test_downloads_are_owner_scoped_and_check_storage_scope(files):
     assert get(client, job, "input").status_code == 404
     assert get(client, job, "outputs").status_code == 404
     client.force_authenticate(job.owner)
-    job.outputs.filter(relative_path="model.pkl").update(s3_uri="s3://test-bucket/users/other/model.pkl")
-    assert get(client, job, "outputs", "model.pkl").status_code == 409
+    job.outputs.filter(relative_path="Model/model.pkl").update(s3_uri="s3://test-bucket/users/other/model.pkl")
+    assert get(client, job, "outputs", "Model/model.pkl").status_code == 409
     job.outputs_purged_at = timezone.now()
     job.save()
     assert get(client, job, "outputs").status_code == 409

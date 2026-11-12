@@ -180,15 +180,16 @@ def test_artifact_kind(name, expected):
 
 def test_create_model_archive_requires_model_and_packages_metadata(runner_workspace, tmp_path):
     archive_path = tmp_path / "model.tar.gz"
-    with pytest.raises(RuntimeError, match="does not contain"):
+    with pytest.raises(ValueError, match="at least one"):
         runner.create_model_archive(archive_path)
     model_dir = runner_workspace["MODEL_DIR"]
     (model_dir / "model.pkl").write_bytes(b"model")
-    (model_dir / "_mlops").mkdir()
-    (model_dir / "_mlops" / "summary.json").write_text("{}", encoding="utf-8")
+    system_dir = runner_workspace["WORK_DIR"] / "_mlops"
+    system_dir.mkdir(parents=True)
+    (system_dir / "summary.json").write_text("{}", encoding="utf-8")
     runner.create_model_archive(archive_path)
     with tarfile.open(archive_path) as archive:
-        assert set(archive.getnames()) == {"model.pkl", "_mlops/summary.json"}
+        assert set(archive.getnames()) == {"model/model.pkl", "_mlops/summary.json", "_mlops/output_manifest.json"}
 
 
 def test_create_model_archive_rejects_symlinks(runner_workspace, tmp_path):
@@ -200,12 +201,13 @@ def test_create_model_archive_rejects_symlinks(runner_workspace, tmp_path):
         (model_dir / "link").symlink_to(external)
     except OSError:
         pytest.skip("Creating symbolic links is not permitted")
-    with pytest.raises(RuntimeError, match="link or unsupported"):
+    with pytest.raises(ValueError, match="link or special"):
         runner.create_model_archive(tmp_path / "model.tar.gz")
 
 
 def test_create_model_archive_limits_total_size(runner_workspace, tmp_path, monkeypatch):
     (runner_workspace["MODEL_DIR"] / "model.pkl").write_bytes(b"model")
-    monkeypatch.setattr(runner.execution, "MAX_MODEL_BYTES", 4)
-    with pytest.raises(RuntimeError, match="file count or size"):
+    import src.output_contract as contract
+    monkeypatch.setattr(contract, "MAX_MODEL_BYTES", 4)
+    with pytest.raises(ValueError, match="size limit"):
         runner.create_model_archive(tmp_path / "model.tar.gz")

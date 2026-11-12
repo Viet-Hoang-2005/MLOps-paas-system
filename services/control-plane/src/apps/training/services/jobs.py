@@ -5,7 +5,6 @@ from django.utils import timezone
 
 from apps.observability.services.lifecycle import record_training_event
 from apps.training.models import TrainingJob
-from apps.training.services.storage_scope import validate_training_uri
 from apps.training.tasks import (
     cancel_training_job,
     delete_training_job,
@@ -13,7 +12,6 @@ from apps.training.tasks import (
     purge_training_job_outputs,
 )
 from common.api.exceptions import Conflict
-from infrastructure.storage import S3Storage
 
 ACTIVE_STATUSES = {"pending", "queued", "uploading", "running", "cancelling"}
 
@@ -138,14 +136,6 @@ def request_job_deletion(job):
     return job
 
 
-def output_download_url(job):
-    if job.outputs_purged_at is not None or not job.outputs.filter(kind="model").exists():
-        raise Conflict("Training output is no longer available.")
-    storage = S3Storage()
-    validate_training_uri(job, storage.bucket, "output", job.output_uri)
-    return storage.presigned_get(job.output_uri, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS)
-
-
 def request_output_purge(job):
     with transaction.atomic():
         job = type(job).objects.select_for_update().get(pk=job.pk)
@@ -156,7 +146,9 @@ def request_output_purge(job):
         if job.builds.filter(status__in=("pending", "queued", "building")).exists():
             raise Conflict("Training output is being used by an active model build.")
         job.outputs_purged_at = timezone.now()
-        job.save(update_fields=["outputs_purged_at", "updated_at"])
+        job.artifact_selection = {}
+        job.output_revision += 1
+        job.save(update_fields=["outputs_purged_at", "artifact_selection", "output_revision", "updated_at"])
         record_training_event(
             job=job,
             event_type="outputs_purge_requested",

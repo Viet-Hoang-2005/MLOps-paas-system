@@ -62,8 +62,16 @@ export async function downloadWorkspaceSelection(id: string, area: "input" | "ou
 }
 export const downloadRunOutput = async (id: string, outputId: string) =>
   (await apiClient.get<{ download_url: string }>(controlPlaneURL(`/training-jobs/${id}/outputs/${outputId}/download/`))).data.download_url;
-export const assignTrainingProject = async (id: string, outputRevision: number, project: { project_id: string } | { new_project: { id: string; name: string; description: string; access_mode: "private" | "public" } }) =>
-  (await apiClient.post<TrainingJob>(controlPlaneURL(`/training-jobs/${id}/project/`), { output_revision: outputRevision, ...project })).data;
+export async function assignTrainingProject(id: string, outputRevision: number, project: { project_id: string } | { new_project: { id: string; name: string; description: string; access_mode: "private" | "public" } }, selection: { modelId: string; artifacts: Record<string, string>; files: Record<string, File | null> }) {
+  const data = new FormData();
+  data.append("output_revision", String(outputRevision));
+  data.append("model_id", selection.modelId);
+  data.append("artifacts", JSON.stringify(selection.artifacts));
+  if ("project_id" in project) data.append("project_id", project.project_id);
+  else data.append("new_project", JSON.stringify(project.new_project));
+  for (const [slot, file] of Object.entries(selection.files)) if (file) data.append(slot + "_file", file);
+  return (await apiClient.post<TrainingJob>(controlPlaneURL(`/training-jobs/${id}/project/`), data)).data;
+}
 
 export async function readEntry(entry: WorkspaceEntry) {
   if (!entry.download_url) return "";
