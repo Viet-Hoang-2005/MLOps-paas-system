@@ -44,13 +44,52 @@ export function InputFileDialog({ existing, parentPath = "", hasRequirements, sa
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const filename = isRequirements ? "requirements.txt" : name.trim();
-    if (!filename || filename === "." || filename === ".." || /[\\/]/.test(filename)
-      || Array.from(filename).some((character) => character.charCodeAt(0) < 32)
-      || !filename.toLowerCase().endsWith(extensions[kind]) || (!isRequirements && filename.toLowerCase() === "requirements.txt")) {
-      setError(t("workspace.fileDialog.invalidName"));
-      return;
+    let filename: string;
+
+    if (isRequirements) {
+      filename = "requirements.txt";
+    } else {
+      const raw = name.trim();
+      const expectedExt = extensions[kind];
+
+      if (
+        !raw ||
+        raw === "." ||
+        raw === ".." ||
+        /[\\/]/.test(raw) ||
+        Array.from(raw).some((character) => character.charCodeAt(0) < 32)
+      ) {
+        setError(t("workspace.fileDialog.invalidName"));
+        return;
+      }
+
+      const lastDot = raw.lastIndexOf(".");
+      if (lastDot === -1) {
+        // Tự map đuôi file theo loại file đã chọn trong Select khi người dùng không nhập đuôi
+        filename = `${raw}${expectedExt}`;
+      } else {
+        // Người dùng có nhập đuôi file (hoặc có dấu chấm)
+        if (lastDot === 0 || lastDot === raw.length - 1) {
+          setError(t("workspace.fileDialog.invalidName"));
+          return;
+        }
+
+        const userExt = raw.slice(lastDot).toLowerCase();
+        // Đảm bảo đuôi file phải khớp với loại file đã chọn trong Select
+        if (userExt !== expectedExt) {
+          setError(t("workspace.fileDialog.invalidName"));
+          return;
+        }
+
+        filename = raw;
+      }
+
+      if (filename.toLowerCase() === "requirements.txt") {
+        setError(t("workspace.fileDialog.invalidName"));
+        return;
+      }
     }
+
     if (!existing && kind === "data" && !file) {
       setError(t("workspace.fileDialog.csvRequired"));
       return;

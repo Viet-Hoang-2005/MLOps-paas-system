@@ -1,8 +1,7 @@
+import BaseDialog from "@/shared/components/BaseDialog";
+import { Button } from "@/shared/components/Button";
 import { useState } from "react";
 import Cropper, { type Area, type Point } from "react-easy-crop";
-import { X } from "lucide-react";
-import { createPortal } from "react-dom";
-import { Button } from "@/shared/components/Button";
 import { useTranslation } from "react-i18next";
 
 const createImage = (url: string) =>
@@ -77,6 +76,8 @@ export function CropDialog({
 
   if (!imageSrc) return null;
 
+  const isBusy = loading || internalLoading;
+
   const handleConfirm = async () => {
     if (!croppedAreaPixels) return;
 
@@ -97,71 +98,65 @@ export function CropDialog({
     }
   };
 
-  if (typeof document === "undefined") return null;
-
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay px-4">
-      <div className="w-full max-w-xl rounded-surface border border-border bg-surface shadow-xl">
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h2 className="text-style-section-title font-bold text-color-foreground">
-            {t("avatarDialog.crop")}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-surface text-color-muted-foreground hover:bg-muted hover:text-color-foreground"
-            aria-label={t("avatarDialog.closeCrop")}
-          >
-            <X className="h-6 w-6" />
-          </button>
+  return (
+    <BaseDialog
+      title={t("avatarDialog.crop")}
+      onClose={onClose}
+      disabled={isBusy}
+      className="w-[min(92vw,36rem)]"
+    >
+      <div className="space-y-5">
+        <div className="relative h-72 overflow-hidden rounded-surface bg-terminal">
+          <Cropper
+            image={imageSrc}
+            crop={crop}
+            zoom={zoom}
+            aspect={1}
+            cropShape="round"
+            showGrid={false}
+            onCropChange={setCrop}
+            onZoomChange={setZoom}
+            onCropComplete={(_, croppedPixels) =>
+              setCroppedAreaPixels(croppedPixels)
+            }
+          />
         </div>
-        <div className="space-y-5 px-5 py-5">
-          <div className="relative h-72 overflow-hidden bg-terminal">
-            <Cropper
-              image={imageSrc}
-              crop={crop}
-              zoom={zoom}
-              aspect={1}
-              cropShape="round"
-              showGrid={false}
-              onCropChange={setCrop}
-              onZoomChange={setZoom}
-              onCropComplete={(_, croppedPixels) =>
-                setCroppedAreaPixels(croppedPixels)
-              }
-            />
-          </div>
-          <label
-            htmlFor="avatar-zoom"
-            className="flex flex-col gap-2 text-style-body-strong text-color-foreground"
+        <label
+          htmlFor="avatar-zoom"
+          className="flex flex-col gap-2 text-style-body-strong text-color-foreground"
+        >
+          {t("avatarDialog.zoom")}
+          <input
+            id="avatar-zoom"
+            type="range"
+            min="1"
+            max="3"
+            step="0.1"
+            value={zoom}
+            onChange={(event) => setZoom(Number(event.target.value))}
+            className="w-full accent-primary"
+            disabled={isBusy}
+          />
+        </label>
+        <div className="flex justify-end gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={isBusy}
           >
-            {t("avatarDialog.zoom")}
-            <input
-              id="avatar-zoom"
-              type="range"
-              min="1"
-              max="3"
-              step="0.1"
-              value={zoom}
-              onChange={(event) => setZoom(Number(event.target.value))}
-              className="w-full accent-primary"
-            />
-          </label>
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              {t("avatarDialog.cancel")}
-            </Button>
-            <Button
-              type="button"
-              loading={loading || internalLoading}
-              onClick={handleConfirm}
-            >
-              {t("avatarDialog.use")}
-            </Button>
-          </div>
+            {t("avatarDialog.cancel")}
+          </Button>
+          <Button
+            type="button"
+            loading={isBusy}
+            disabled={isBusy}
+            onClick={handleConfirm}
+          >
+            {t("avatarDialog.use")}
+          </Button>
         </div>
       </div>
-    </div>,
-    document.body,
+    </BaseDialog>
   );
 }

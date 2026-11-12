@@ -5,18 +5,20 @@ import {
   Eye,
   FileCode2,
   FilePlus,
-  Plus,
   FolderOpen,
   FolderPlus,
   HelpCircle,
   KeyRound,
+  PenLine,
   Play,
+  Plus,
   RotateCcw,
   Save,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/shared/components/Button";
 import { Placeholder } from "@/shared/components/Placeholder";
+import { Loading } from "@/shared/components/Loading";
 import BaseDialog from "@/shared/components/BaseDialog";
 import { Input } from "@/shared/components/Input";
 import { DirectoryTree } from "@/shared/components/DirectoryTree";
@@ -362,136 +364,145 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(function
   return (
     <div className="rounded-surface border border-border bg-surface overflow-hidden shadow-sm">
       {/* Top Header Toolbar */}
-      <div className="flex flex-wrap items-center justify-between border-b border-border bg-surface px-3 py-1.5 gap-2">
-        {/* Action Buttons on Far Left */}
-        <div className="flex flex-wrap items-center gap-2">
-          {activeTab === "input" ? (
-            <>
-              {/* Save as Main (Python scripts only) */}
-              {file?.kind === "script" && (
+      <div className="grid border-b border-border bg-surface md:grid-cols-[minmax(0,1fr)_18rem]">
+        {/* Left Column (Editor Header): File Name on left, Action Buttons on right */}
+        <div className="flex flex-wrap items-center justify-between px-3 py-1.5 gap-2 min-w-0">
+          {/* Left: Selected File Name / Dirty Indicator */}
+          <div className="flex items-center gap-1 font-mono text-style-body font-medium text-color-foreground pl-1 min-w-0">
+            {activeTab === "input" && selected ? (
+              <>
+                <span className="truncate max-w-60">{selected}</span>
+                {dirty[selected] !== undefined && (
+                  <span
+                    className="text-color-danger font-bold text-style-body"
+                    title={t("studio.unsaved")}
+                  >
+                    *
+                  </span>
+                )}
+              </>
+            ) : activeTab === "output" && selectedOutputNode ? (
+              <span className="truncate max-w-60">{selectedOutputNode.relative_path}</span>
+            ) : null}
+          </div>
+
+          {/* Right: Editor Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            {activeTab === "input" ? (
+              <>
+                {/* Save as Main (Python scripts only) */}
+                {file?.kind === "script" && (
+                  <Button
+                    size="sm"
+                    variant={entryPoint === file.path ? "primary" : "secondary"}
+                    icon={<Play className="h-3.5 w-3.5" />}
+                    disabled={readOnly || busy || entryPoint === file.path}
+                    onClick={() =>
+                      void task(async () => {
+                        const current = await cleanDraft();
+                        await updateJobWorkspace(workspace.id, current.revision, {
+                          entry_point: file.path,
+                        });
+                        await refresh();
+                      })
+                    }
+                    title={entryPoint === file.path ? t("studio.isMain") : t("studio.saveAsMain")}
+                  >
+                    {entryPoint === file.path ? t("studio.isMain") : t("studio.saveAsMain")}
+                  </Button>
+                )}
+
+                {/* Markdown Preview (.md documents only) */}
+                {file?.kind === "document" && (
+                  <Button
+                    size="sm"
+                    variant={preview ? "primary" : "secondary"}
+                    icon={<Eye className="h-4 w-4" />}
+                    onClick={() => setPreview(!preview)}
+                  >
+                    {t(preview ? "studio.editor" : "studio.markdownPreview")}
+                  </Button>
+                )}
+
+                {/* Save all (Ctrl+S) */}
                 <Button
                   size="sm"
-                  variant={entryPoint === file.path ? "primary" : "secondary"}
-                  icon={<Play className="h-3.5 w-3.5" />}
-                  disabled={readOnly || busy || entryPoint === file.path}
+                  icon={<Save className="h-4 w-4" />}
+                  disabled={readOnly || busy || !Object.keys(dirty).length}
                   onClick={() =>
                     void task(async () => {
-                      const current = await cleanDraft();
-                      await updateJobWorkspace(workspace.id, current.revision, {
-                        entry_point: file.path,
-                      });
-                      await refresh();
+                      await saveAll();
                     })
                   }
-                  title={entryPoint === file.path ? t("studio.isMain") : t("studio.saveAsMain")}
+                  title={`${t("studio.saveAll")} (Ctrl+S)`}
                 >
-                  {entryPoint === file.path ? t("studio.isMain") : t("studio.saveAsMain")}
+                  {t("studio.saveAll")}
                 </Button>
-              )}
 
-              {/* Markdown Preview (.md documents only) */}
-              {file?.kind === "document" && (
-                <Button
-                  size="sm"
-                  variant={preview ? "primary" : "secondary"}
-                  icon={<Eye className="h-4 w-4" />}
-                  onClick={() => setPreview(!preview)}
-                >
-                  {t(preview ? "studio.editor" : "studio.markdownPreview")}
-                </Button>
-              )}
-
-              {/* Save all (Ctrl+S) */}
-              <Button
-                size="sm"
-                icon={<Save className="h-4 w-4" />}
-                disabled={readOnly || busy || !Object.keys(dirty).length}
-                onClick={() =>
-                  void task(async () => {
-                    await saveAll();
-                  })
-                }
-                title={`${t("studio.saveAll")} (Ctrl+S)`}
-              >
-                {t("studio.saveAll")}
-              </Button>
-
-              {/* Remove all */}
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={<Trash2 className="h-4 w-4" />}
-                disabled={readOnly || busy || !entries.length}
-                onClick={() => setRemoveAllOpen(true)}
-                title={t("studio.removeAll")}
-              >
-                {t("studio.removeAll")}
-              </Button>
-
-              {/* Reset all */}
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={<RotateCcw className="h-4 w-4" />}
-                disabled={readOnly || busy || !Object.keys(dirty).length}
-                onClick={() => setResetAllOpen(true)}
-                title={t("studio.resetAll")}
-              >
-                {t("studio.resetAll")}
-              </Button>
-
-              {/* Environment & Secrets */}
-              {onOpenEnvironment && (
+                {/* Remove all */}
                 <Button
                   size="sm"
                   variant="secondary"
-                  icon={<KeyRound className="h-4 w-4" />}
-                  disabled={readOnly || busy}
-                  onClick={onOpenEnvironment}
+                  icon={<Trash2 className="h-4 w-4" />}
+                  disabled={readOnly || busy || !entries.length}
+                  onClick={() => setRemoveAllOpen(true)}
+                  title={t("studio.removeAll")}
                 >
-                  {t("studio.environment")}
+                  {t("studio.removeAll")}
                 </Button>
-              )}
 
-              {/* Help */}
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={<HelpCircle className="h-4 w-4" />}
-                onClick={() => setHelpOpen(true)}
-              >
-                {t("studio.help")}
-              </Button>
-            </>
-          ) : (
-            selectedOutput?.endsWith(".md") && (
-              <Button
-                size="sm"
-                variant={outputPreview ? "primary" : "secondary"}
-                icon={<Eye className="h-4 w-4" />}
-                onClick={() => setOutputPreview(!outputPreview)}
-              >
-                {t(outputPreview ? "studio.editor" : "studio.markdownPreview")}
-              </Button>
-            )
-          )}
+                {/* Reset all */}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<RotateCcw className="h-4 w-4" />}
+                  disabled={readOnly || busy || !Object.keys(dirty).length}
+                  onClick={() => setResetAllOpen(true)}
+                  title={t("studio.resetAll")}
+                >
+                  {t("studio.resetAll")}
+                </Button>
 
-          {/* Selected File Name / Dirty Indicator */}
-          {activeTab === "input" && selected && (
-            <div className="flex items-center gap-1.5 text-style-caption text-color-muted-foreground ml-2">
-              <span className="truncate max-w-50">{selected}</span>
-              {dirty[selected] !== undefined && (
-                <span
-                  className="h-2 w-2 rounded-full bg-warning"
-                  title={t("studio.unsaved")}
-                />
-              )}
-            </div>
-          )}
+                {/* Environment & Secrets */}
+                {onOpenEnvironment && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={<KeyRound className="h-4 w-4" />}
+                    disabled={readOnly || busy}
+                    onClick={onOpenEnvironment}
+                  >
+                    {t("studio.environment")}
+                  </Button>
+                )}
+
+                {/* Help */}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<HelpCircle className="h-4 w-4" />}
+                  onClick={() => setHelpOpen(true)}
+                >
+                  {t("studio.help")}
+                </Button>
+              </>
+            ) : (
+              selectedOutput?.endsWith(".md") && (
+                <Button
+                  size="sm"
+                  variant={outputPreview ? "primary" : "secondary"}
+                  icon={<Eye className="h-4 w-4" />}
+                  onClick={() => setOutputPreview(!outputPreview)}
+                >
+                  {t(outputPreview ? "studio.editor" : "studio.markdownPreview")}
+                </Button>
+              )
+            )}
+          </div>
         </div>
 
-        {/* PageTabs on Far Right */}
-        <div className="ml-auto flex items-center">
+        {/* Right Column (DirectoryTree Header Top): PageTabs above DirectoryTree */}
+        <div className="flex items-center justify-end px-3 py-1.5 border-t md:border-t-0 md:border-l border-border bg-surface">
           <PageTabs
             tabs={[
               {
@@ -542,11 +553,17 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(function
                   description={t("studio.selectFileHint")}
                 />
               </div>
+            ) : contents[key(file.path)] === undefined ? (
+              <div className="flex flex-1 flex-col p-4 h-full">
+                <Placeholder className="h-full w-full flex-1">
+                  <Loading size="lg" text={t("studio.loadingFile")} />
+                </Placeholder>
+              </div>
             ) : (
               <FileViewer
                 path={file.path}
                 content={selectedText}
-                readOnly={readOnly || busy || contents[key(file.path)] === undefined}
+                readOnly={readOnly || busy}
                 showMarkdownPreview={preview}
                 onChange={(value) => {
                   if (!readOnly && file) {
@@ -591,6 +608,12 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(function
                 }
               />
             </div>
+          ) : outputContents[selectedOutputNode.id] === undefined ? (
+            <div className="flex flex-1 flex-col p-4 h-full">
+              <Placeholder className="h-full w-full flex-1">
+                <Loading size="lg" text={t("studio.loadingFile")} />
+              </Placeholder>
+            </div>
           ) : (
             <FileViewer
               path={selectedOutputNode.relative_path}
@@ -633,6 +656,20 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(function
                     className="rounded-surface p-1.5 text-color-foreground hover:bg-surface-hover disabled:opacity-30 disabled:pointer-events-none"
                   >
                     <FolderPlus className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selected && file && file.kind !== "folder") {
+                        setDialog("edit");
+                      }
+                    }}
+                    title={t("studio.edit")}
+                    aria-label={t("studio.edit")}
+                    disabled={readOnly || busy || !selected || !file || file.kind === "folder"}
+                    className="rounded-surface p-1.5 text-color-foreground hover:bg-surface-hover disabled:opacity-30 disabled:pointer-events-none"
+                  >
+                    <PenLine className="h-4 w-4" />
                   </button>
                   <button
                     type="button"

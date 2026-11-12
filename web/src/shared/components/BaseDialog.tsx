@@ -11,6 +11,8 @@ export interface BaseDialogProps {
   className?: string;
   description?: string;
   onCloseAutoFocus?: (event: Event) => void;
+  disabled?: boolean;
+  modal?: boolean;
 }
 
 export default function BaseDialog({
@@ -20,14 +22,28 @@ export default function BaseDialog({
   className,
   description,
   onCloseAutoFocus,
+  disabled = false,
+  modal = true,
 }: BaseDialogProps) {
   const { t } = useTranslation("common");
   return (
-    <Dialog.Root open onOpenChange={(open) => !open && onClose()}>
+    <Dialog.Root
+      open
+      modal={modal}
+      onOpenChange={(open) => {
+        if (!open && !disabled) onClose();
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-overlay animate-fade-in" />
         <Dialog.Content
           onCloseAutoFocus={onCloseAutoFocus}
+          onPointerDownOutside={(e) => {
+            if (disabled) e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            if (disabled) e.preventDefault();
+          }}
           className={cn(
             "fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[min(92vw,34rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overflow-x-hidden rounded-overlay border border-border bg-surface shadow-(--shadow-overlay) animate-fade-in",
             className,
@@ -38,10 +54,14 @@ export default function BaseDialog({
               {title}
             </Dialog.Title>
             <Dialog.Close
-              className="flex h-9 w-9 items-center justify-center rounded-surface text-color-foreground-subtle hover:bg-surface-hover hover:text-color-foreground active:bg-surface-active"
+              disabled={disabled}
+              className={cn(
+                "flex h-9 w-9 items-center justify-center rounded-surface text-color-foreground-subtle hover:bg-surface-hover hover:text-color-foreground active:bg-surface-active",
+                disabled && "cursor-not-allowed opacity-50 pointer-events-none",
+              )}
               aria-label={t("accessibility.closeModal")}
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </Dialog.Close>
           </div>
           <div className="p-5">

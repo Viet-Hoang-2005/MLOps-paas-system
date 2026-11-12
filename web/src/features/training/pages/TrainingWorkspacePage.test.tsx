@@ -57,7 +57,7 @@ describe("training workspace flow", () => {
     show();
     await screen.findByRole("button", { name: "Run" });
     await userEvent.click(screen.getByLabelText("GPU"));
-    await userEvent.click(await screen.findByRole("button", { name: /a10g/i }));
+    await userEvent.click(await screen.findByRole("option", { name: /a10g/i }));
     await userEvent.click(screen.getByRole("button", { name: "Run" }));
     await waitFor(() => expect(mocks.run).toHaveBeenCalled());
     expect(mocks.run.mock.calls[0][0]).toBe("workspace");
@@ -98,9 +98,10 @@ describe("training workspace flow", () => {
         gpu_memory_percent: null,
       },
     });
-    show("en");
+    const { unmount } = show("en");
     expect(screen.queryByText("% CPU")).not.toBeInTheDocument();
 
+    unmount();
     mocks.get.mockResolvedValue({ ...workspace, ...job, id: "workspace", status: "running", started_at: "2026-11-11T00:00:00Z" });
     show("en", "?running=1");
     expect(await screen.findByText("% CPU")).toBeInTheDocument();

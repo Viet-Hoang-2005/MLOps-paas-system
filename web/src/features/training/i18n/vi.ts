@@ -96,6 +96,7 @@ export const trainingVi = {
     save: "Lưu",
     edit: "Sửa",
     selectFile: "Chọn một file",
+    loadingFile: "Đang tải tập tin…",
     entryPoint: "Chọn làm file chính",
     editor: "Trình soạn thảo",
     preview: "Xem trước",

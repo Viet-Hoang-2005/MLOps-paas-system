@@ -95,6 +95,7 @@ export const trainingEn = {
     save: "Save",
     edit: "Edit",
     selectFile: "Select a file",
+    loadingFile: "Loading file…",
     entryPoint: "Set as main",
     editor: "Editor",
     preview: "Preview",

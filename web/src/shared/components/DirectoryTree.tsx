@@ -4,7 +4,6 @@ import {
   Database,
   FileCode2,
   Folder as FolderIcon,
-  Pencil,
   Play,
 } from "lucide-react";
 import { useState, type DragEvent } from "react";
@@ -75,7 +74,6 @@ export function DirectoryTree({
   onFinishCreating,
   currentParentPath = "",
 }: DirectoryTreeProps) {
-  const { t } = useTranslation("projects");
   return (
     <ul className="space-y-0.5">
       {nodes.map((node) => {
@@ -122,22 +120,33 @@ export function DirectoryTree({
                 <span className="min-w-0 flex-1 truncate">{node.name}</span>
               </button>
               {isExpanded ? (
-                <DirectoryTree
-                  nodes={node.children}
-                  level={level + 1}
-                  selectedPath={selectedPath}
-                  onSelect={onSelect}
-                  onEditFile={onEditFile}
-                  onMove={onMove}
-                  onDropFiles={onDropFiles}
-                  unsavedContents={unsavedContents}
-                  currentEntryPoint={currentEntryPoint}
-                  expandedFolders={expandedFolders}
-                  toggleFolder={toggleFolder}
-                  creatingFile={creatingFile}
-                  onFinishCreating={onFinishCreating}
-                  currentParentPath={node.path}
-                />
+                <div className="relative">
+                  {(node.children.length > 0 ||
+                    (creatingFile && creatingFile.parentPath === node.path)) && (
+                    <div
+                      aria-hidden="true"
+                      data-testid={`indent-guide-${node.path}`}
+                      className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-border"
+                      style={{ left: `${level * 12 + 16}px` }}
+                    />
+                  )}
+                  <DirectoryTree
+                    nodes={node.children}
+                    level={level + 1}
+                    selectedPath={selectedPath}
+                    onSelect={onSelect}
+                    onEditFile={onEditFile}
+                    onMove={onMove}
+                    onDropFiles={onDropFiles}
+                    unsavedContents={unsavedContents}
+                    currentEntryPoint={currentEntryPoint}
+                    expandedFolders={expandedFolders}
+                    toggleFolder={toggleFolder}
+                    creatingFile={creatingFile}
+                    onFinishCreating={onFinishCreating}
+                    currentParentPath={node.path}
+                  />
+                </div>
               ) : null}
             </li>
           );
@@ -166,23 +175,14 @@ export function DirectoryTree({
               )}
               <span className="min-w-0 flex-1 truncate">
                 {node.name}
-                {isModified ? " *" : ""}
+                {isModified ? (
+                  <span className="text-color-danger font-bold ml-0.5">*</span>
+                ) : null}
               </span>
               {currentEntryPoint === node.path ? (
                 <Play className="h-3 w-3 shrink-0 text-(--color-primary)" />
               ) : null}
             </button>
-            {isSelected && onEditFile && (
-              <button
-                type="button"
-                onClick={() => onEditFile(node.path)}
-                aria-label={t("sourceEditor.editFile", { path: node.path })}
-                title={t("sourceEditor.editFile", { path: node.path })}
-                className="shrink-0 rounded-compact p-1.5 text-color-muted-foreground hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-            )}
           </li>
         );
       })}

@@ -4,6 +4,7 @@ import { useBlocker, useNavigate, useParams, useSearchParams } from "react-route
 import { useTranslation } from "react-i18next";
 import { Activity, Clock, Cpu, HardDrive, Pause, Play } from "lucide-react";
 import { Button } from "@/shared/components/Button";
+import { Badge } from "@/shared/components/Badge";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { CardSummary } from "@/shared/components/Card";
@@ -395,6 +396,27 @@ function TrainingJobWorkspace() {
   const runtimeProgressTone = runtimePct > 90 ? "warning" : "default";
 
   const isJobActive = Boolean(selectedJob?.submitted_at && active(selectedJob));
+  const currentStatus = selectedJob?.status ?? workspace?.status;
+  const statusBadge = currentStatus ? (
+    <Badge
+      variant={
+        currentStatus === "completed"
+          ? "success"
+          : currentStatus === "failed"
+            ? "danger"
+            : currentStatus === "running" || currentStatus === "uploading"
+              ? "primary"
+              : ["cancelling", "cancelled"].includes(currentStatus)
+                ? "warning"
+                : ["pending", "queued"].includes(currentStatus)
+                  ? "info"
+                  : "neutral"
+      }
+    >
+      {t(`detail.statuses.${currentStatus}`, currentStatus)}
+    </Badge>
+  ) : undefined;
+
   const runActionButton: TerminalActionItem = isJobActive
     ? {
         label: t("studio.stop"),
@@ -436,7 +458,7 @@ function TrainingJobWorkspace() {
     {params.get("step") === "project" && selectedJob?.status === "completed" && selectedJob.output_available ?
       <TrainingProjectAssignment key={selectedJob.id} job={selectedJob} suggestedProject={params.get("project") ?? undefined} onBack={() => { const next = new URLSearchParams(params); next.delete("step"); setParams(next); }} onSaved={(job) => { void queryClient.invalidateQueries({ queryKey: ["models"] }); void queryClient.invalidateQueries({ queryKey: trainingQueryKeys.jobs() }); navigate(`/dashboard/training/jobs/${job.id}/overview`); }} /> : <>
       <div className="space-y-4 rounded-surface border border-border bg-surface p-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
           <Select
             label={t("studio.cpu")}
             className="h-12 text-style-body"
@@ -529,7 +551,9 @@ function TrainingJobWorkspace() {
       )}
       <TerminalViewer
         title={t("studio.terminal")}
+        badge={statusBadge}
         logs={logStream.logs}
+        bodyClassName="h-96 max-h-[45vh] min-h-72"
         placeholder={t("studio.logPlaceholder")}
         actionButtons={[runActionButton]}
       />
