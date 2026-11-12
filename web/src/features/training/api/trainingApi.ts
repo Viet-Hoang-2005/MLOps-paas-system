@@ -6,7 +6,6 @@ import type {
   TrainingJobDownloadURLResponse,
   TrainingJobDeletionRequest,
   TrainingJobEventsResponse,
-  TrainingJobFormValues,
   TrainingJobListResponse,
   TrainingJobLogsResponse,
   TrainingJobMetricsResponse,
@@ -16,41 +15,6 @@ import type {
   TrainingUsageResponse,
   ReferenceDataPreview,
 } from "@/features/training/types";
-
-const trainingJobFormData = (payload: TrainingJobFormValues) => {
-  const formData = new FormData();
-  formData.append("name", payload.name);
-  formData.append("model_flavor", payload.model_flavor);
-  formData.append("project", payload.project_id || "");
-  formData.append("entry_point", payload.entry_point || "train.py");
-  formData.append("requirements_text", payload.requirements_text);
-  formData.append("vcpu", String(payload.vcpu));
-  formData.append("memory_mb", String(payload.memory));
-  formData.append("max_runtime_seconds", String(payload.max_runtime_seconds));
-  formData.append("accelerator_type", payload.accelerator_type);
-  formData.append("accelerator_count", String(payload.accelerator_count));
-  formData.append("accelerator_model", payload.accelerator_model);
-  formData.append("local_gpu_id", payload.local_gpu_id);
-  if (payload.source_zip) formData.append("source_zip", payload.source_zip);
-  if (payload.training_data)
-    formData.append("training_data", payload.training_data);
-  return formData;
-};
-
-export const createTrainingJob = async (
-  payload: TrainingJobFormValues,
-): Promise<TrainingJob> => {
-  const { data: job } = await apiClient.post<TrainingJob>(
-    controlPlaneURL("/training-jobs/"),
-    trainingJobFormData(payload),
-    { headers: { "Content-Type": "multipart/form-data" } },
-  );
-  return (
-    await apiClient.post<TrainingJob>(
-      controlPlaneURL(`/training-jobs/${job.id}/submit/`),
-    )
-  ).data;
-};
 
 export const listTrainingJobs = async (): Promise<TrainingJobListResponse> => {
   const data = await fetchAllPages<TrainingJob>(
@@ -148,10 +112,11 @@ export const cancelTrainingJob = async (
   return "training_job" in data ? data.training_job : data;
 };
 
-export const retryTrainingJob = async (jobId: string): Promise<TrainingJob> =>
+export const retryTrainingJob = async (jobId: string, creationKey: string): Promise<TrainingJob> =>
   (
     await apiClient.post<TrainingJob>(
       controlPlaneURL(`/training-jobs/${jobId}/retry/`),
+      { creation_key: creationKey },
     )
   ).data;
 
@@ -179,11 +144,17 @@ export const patchModelOutput = async (
     output_revision: number;
     source_code_file?: File | null;
     reference_data_file?: File | null;
+    label_mapping_file?: File | null;
+    input_schema_file?: File | null;
+    build_requirements_text?: string;
     remove_assets?: string[];
   },
 ): Promise<TrainingJobModelOutputSummary> => {
   const formData = new FormData();
   formData.append("output_revision", String(payload.output_revision));
+  if (payload.label_mapping_file) formData.append("label_mapping_file", payload.label_mapping_file);
+  if (payload.input_schema_file) formData.append("input_schema_file", payload.input_schema_file);
+  if (payload.build_requirements_text !== undefined) formData.append("build_requirements_text", payload.build_requirements_text);
   if (payload.source_code_file) {
     formData.append("source_code_file", payload.source_code_file);
   }
@@ -229,3 +200,6 @@ export const compareTrainingRuns = async (
     )
   ).data;
 
+
+export const cloneTrainingJob = async (jobId: string, creationKey: string): Promise<TrainingJob> =>
+  (await apiClient.post<TrainingJob>(controlPlaneURL(`/training-jobs/${jobId}/clone/`), { creation_key: creationKey })).data;

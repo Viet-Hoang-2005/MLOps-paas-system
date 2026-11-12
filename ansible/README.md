@@ -50,8 +50,8 @@ Trong kiến trúc tổng thể của MLOps PaaS, Ansible đóng vai trò là **
 
 5. **Hạ tầng Huấn luyện Đàn hồi (`roles/platform_training` - Tùy chọn):**
    - Xuất K3s agent token an toàn lên AWS Secrets Manager để trình quản lý mở rộng node tự động (**Karpenter**) sử dụng khi cấp phát các worker node tạm thời (Spot/On-Demand CPU/GPU).
-   - Chờ các CRD và Controller (Kubeflow Training Operator, GPU Operator, Karpenter) sẵn sàng.
-   - Khởi chạy bài kiểm tra khói (**Smoke test**) với `PyTorchJob` dùng ảnh CUDA trên namespace cô lập `ansible-training-smoke` và dọn dẹp sạch sẽ sau kiểm tra.
+   - Chờ các CRD và Controller (Kubeflow Trainer v2, GPU Operator, Karpenter) sẵn sàng.
+   - Khởi chạy bài kiểm tra khói (**Smoke test**) với `TrainJob` dùng ảnh CUDA trên namespace cô lập `ansible-training-smoke` và dọn dẹp sạch sẽ sau kiểm tra.
 
 6. **Kiểm tra & Nghiệm thu (`roles/verify`):**
    - Thực thi các kiểm tra xác thực tính sẵn sàng của Node, Pod hệ thống, CRD và trạng thái đồng bộ (`Synced` & `Healthy`) của các ứng dụng GitOps.
@@ -90,7 +90,7 @@ flowchart TD
     subgraph TrainingInit ["Phase 4: Training & Smoke Test"]
         F1["Đẩy K3s token lên AWS Secrets Manager"]
         F2["Chờ Karpenter, Kubeflow & GPU Operator sẵn sàng"]
-        F3["Chạy PyTorchJob Smoke Test & Dọn dẹp"]
+        F3["Chạy TrainJob Smoke Test & Dọn dẹp"]
         F1 --> F2 --> F3
     end
     F --> TrainingInit

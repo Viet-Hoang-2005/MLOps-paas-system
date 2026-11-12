@@ -117,7 +117,7 @@ Mọi luồng xử lý ghi trạng thái trong Control Plane đều tuân thủ 
    - Hook `on_commit` đẩy tác vụ `dispatch_training_job` vào hàng đợi Celery.
    - Celery worker kích hoạt container huấn luyện:
      - Nếu là môi trường `docker`: Khởi chạy container `training-runner` trên mạng Docker nội bộ.
-     - Nếu là môi trường `argo`: Bắn webhook tới Argo Events EventSource để khởi chạy Kubernetes `Workflow` hoặc Kubeflow `PyTorchJob`.
+     - Nếu là môi trường `argo`: Bắn webhook tới Argo Events EventSource để khởi chạy Kubernetes `Workflow` hoặc Kubeflow `TrainJob`.
    - `training-runner` khởi động, dùng token gọi Control Plane lấy Presigned URL tải mã nguồn/dữ liệu và Presigned URL tải artifacts kết quả lên S3.
    - Khi hoàn tất, `training-runner` gọi callback `POST /internal/webhooks/training-jobs/<uuid>/`. Control Plane kiểm tra token, cập nhật trạng thái `COMPLETED`, không tự đăng ký version. Source/data/reference của job được đóng băng; retry tạo job mới từ snapshot gốc.
 

@@ -43,7 +43,7 @@ describe("Frontend i18n Quality and Completeness", () => {
   const brands = new Set([
     "ML",
     "drift",
-    "AdaptML",
+    "MLlife",
     "Google",
     "GitHub",
     "MLflow",

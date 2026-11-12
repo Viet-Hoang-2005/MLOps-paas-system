@@ -5,13 +5,14 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.observability.services.executions import apply_observation, project_for, resource_for
+from apps.observability.services.executions import apply_observation, ownership_for, resource_for
 
 
 class ObservationSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=["running", "completed", "failed", "not_found", "stopped", "error"])
     started_at = serializers.DateTimeField(required=False, allow_null=True)
     finished_at = serializers.DateTimeField(required=False, allow_null=True)
+    never_started = serializers.BooleanField(required=False, default=False)
     error = serializers.CharField(max_length=1000, required=False, allow_blank=True)
 
 
@@ -31,8 +32,8 @@ class ExecutionObservationEndpoint(APIView):
         row = resource_for(kind, public_id)
         if not row:
             raise PermissionDenied("Observation resource no longer exists.")
-        project = project_for(row, kind)
-        if claims.get("project") != str(project.public_id) or claims.get("tenant") != str(project.owner.tenant_id):
+        tenant, project_id = ownership_for(row, kind)
+        if claims.get("project") != project_id or claims.get("tenant") != tenant:
             raise PermissionDenied("Observation capability ownership mismatch.")
         serializer = ObservationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

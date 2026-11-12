@@ -1,11 +1,3 @@
-"""Prepare local secrets and publish selected groups to Terraform-owned AWS containers.
-
-Internal secrets (Control Plane, Redis, PostgreSQL database passwords) are generated
-automatically if missing or when rotated. External credentials must be obtained from
-their respective providers and entered in .env or supplied when prompted.
-Secret values, PEM keys and AWS payloads are never printed.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -13,7 +5,6 @@ import getpass
 import io
 import json
 import os
-import re
 import secrets
 import stat
 import string
@@ -25,12 +16,13 @@ from typing import Any
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
+from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dotenv import dotenv_values
+from dotenv.parser import parse_stream
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CONTROL_PLANE_GROUP = 5
 JWT_KEYS = ("JWT_PRIVATE_KEY", "JWT_PUBLIC_KEY")
 GENERATED_KEYS = (
     "DJANGO_SECRET_KEY",
@@ -45,9 +37,7 @@ ROTATION_KEYS = {
     "argo-events-webhook": ("ARGO_EVENTS_WEBHOOK_TOKEN",),
     "redis": ("REDIS_PASSWORD", "REDIS_SENTINEL_PASSWORD"),
     "db": ("DB_PASSWORD",),
-    "harbor": ("HARBOR_PASSWORD", "HARBOR_GITHUB_PASSWORD"),
 }
-ASSIGNMENT = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z_0-9]*)\s*=")
 
 DEFAULT_VALUES: dict[str, str] = {
     "DB_USER": "postgres",
@@ -56,12 +46,9 @@ DEFAULT_VALUES: dict[str, str] = {
     "GITHUB_REPO": "Viet-Hoang-2005/MLOps-paas-system",
 }
 
-HYBRID_PASSWORD_KEYS: tuple[str, ...] = (
-    "HARBOR_PASSWORD",
-    "HARBOR_GITHUB_PASSWORD",
-)
-
 EXTERNAL_PROMPTS: dict[str, dict[str, Any]] = {
+    "HARBOR_PASSWORD": {"label": "Harbor robot token", "secret": True},
+    "HARBOR_GITHUB_PASSWORD": {"label": "Harbor GitHub robot token", "secret": True},
     "TUNNEL_TOKEN": {
         "label": "Cloudflare Tunnel Token",
         "secret": True,
@@ -160,6 +147,11 @@ SECRET_GROUPS: dict[int, dict[str, Any]] = {
         "target": "mlops/aws-secrets",
         "keys": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
     },
+    11: {
+        "name": "Training Secret Encryption",
+        "target": "mlops/production-secrets",
+        "keys": ["TRAINING_SECRET_ENCRYPTION_KEY"],
+    },
 }
 
 
@@ -179,7 +171,7 @@ def parse_groups(raw: str) -> list[int]:
         return list(SECRET_GROUPS)
     if any(not part.isdigit() or int(part) not in SECRET_GROUPS for part in parts):
         raise SecretPreparationError(
-            "Invalid group selection; choose 0 or group numbers 1-10."
+            "Invalid group selection; choose 0 or group numbers 1-11."
         )
     return sorted({int(part) for part in parts})
 
@@ -222,29 +214,25 @@ def normalize_env_value(key: str, value: str) -> str:
 
 
 def parse_env_content(content: str) -> dict[str, str]:
-    parsed = dotenv_values(stream=io.StringIO(content))
+    parsed = dotenv_values(stream=io.StringIO(content), interpolate=False)
     return {
-        key: normalize_env_value(key, value)
+        key: normalize_env_value(key, value) if key in JWT_KEYS else value
         for key, value in parsed.items()
         if value is not None
     }
 
 
-def format_unquoted_env_value(value: str) -> str:
-    """Format an env value without enclosing quotes, serializing any newlines as literal \n."""
-    val = value.strip() if isinstance(value, str) else str(value)
-    if len(val) >= 2 and (
-        (val.startswith('"') and val.endswith('"'))
-        or (val.startswith("'") and val.endswith("'"))
-    ):
-        val = val[1:-1]
+def format_env_value(value: str) -> str:
+    """Quote special characters and serialize newlines safely for dotenv."""
+    val = value if isinstance(value, str) else str(value)
     normalized = val.replace("\r\n", "\n").replace("\r", "\n")
+    if any(char in normalized for char in " \t#'\"$"):
+        return (
+            '"'
+            + normalized.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+            + '"'
+        )
     return normalized.replace("\n", "\\n")
-
-
-def quoted_dotenv(value: str) -> str:
-    """Retained for backward compatibility; formats without enclosing quotes."""
-    return format_unquoted_env_value(value)
 
 
 def update_env_content(
@@ -252,22 +240,22 @@ def update_env_content(
 ) -> str:
     """Keep unrelated text and the final effective assignment of each managed key."""
     newline = "\r\n" if "\r\n" in original else "\n"
-    lines = original.splitlines(keepends=True)
+    bindings = list(parse_stream(io.StringIO(original)))
+    lines = [binding.original.string for binding in bindings]
     last_index: dict[str, int] = {}
     for index, line in enumerate(lines):
-        match = ASSIGNMENT.match(line)
-        if match and match.group(1) in managed_keys:
-            last_index[match.group(1)] = index
+        key = bindings[index].key
+        if key in managed_keys:
+            last_index[key] = index
 
     output: list[str] = []
     for index, line in enumerate(lines):
-        match = ASSIGNMENT.match(line)
-        key = match.group(1) if match else None
+        key = bindings[index].key
         if key not in managed_keys:
             output.append(line)
         elif last_index[key] == index:
             output.append(
-                f"{key}={format_unquoted_env_value(replacements[key])}{newline}"
+                f"{key}={format_env_value(replacements[key])}{newline}"
                 if key in replacements
                 else line
             )
@@ -277,7 +265,9 @@ def update_env_content(
         if output and not output[-1].endswith(("\r", "\n")):
             output.append(newline)
         for key in missing:
-            output.append(f"{key}={format_unquoted_env_value(replacements[key])}{newline}")
+            output.append(
+                f"{key}={format_env_value(replacements[key])}{newline}"
+            )
     return "".join(output)
 
 
@@ -334,6 +324,7 @@ def generate_strong_password(length: int = 32) -> str:
 
 
 AUTO_GENERATORS: dict[str, Callable[[], str]] = {
+    "TRAINING_SECRET_ENCRYPTION_KEY": lambda: Fernet.generate_key().decode("ascii"),
     "DJANGO_SECRET_KEY": lambda: secrets.token_urlsafe(64),
     "CONTROL_PLANE_WEBHOOK_SECRET": lambda: secrets.token_urlsafe(48),
     "ARGO_EVENTS_WEBHOOK_TOKEN": lambda: secrets.token_urlsafe(48),
@@ -348,10 +339,14 @@ def prepare_env_content(
     selected_groups: list[int],
     rotate: list[str],
     interactive: bool = True,
+    keys: list[str] | None = None,
+    auto: bool = True,
 ) -> tuple[str, dict[str, str]]:
     selected_keys = {
         key for group_id in selected_groups for key in SECRET_GROUPS[group_id]["keys"]
     }
+    if keys is not None:
+        selected_keys.intersection_update(keys)
     for name in rotate:
         target_keys = ROTATION_KEYS[name]
         if not any(k in selected_keys for k in target_keys):
@@ -372,30 +367,55 @@ def prepare_env_content(
                 "JWT key pair is incomplete; use --rotate jwt to replace both keys."
             )
         if "jwt" in rotate or not private_present:
-            replacements[JWT_KEYS[0]], replacements[JWT_KEYS[1]] = (
-                generate_jwt_key_pair()
-            )
+            if not auto and interactive:
+                choice = (
+                    input("JWT key pair: [a]uto-generate or [m]anual? [a]: ")
+                    .strip()
+                    .lower()
+                )
+                if choice == "m":
+                    replacements[JWT_KEYS[0]] = getpass.getpass(
+                        "JWT_PRIVATE_KEY (use literal \\n for line breaks): "
+                    )
+                    replacements[JWT_KEYS[1]] = getpass.getpass(
+                        "JWT_PUBLIC_KEY (use literal \\n for line breaks): "
+                    )
+                elif choice in {"", "a"}:
+                    replacements[JWT_KEYS[0]], replacements[JWT_KEYS[1]] = (
+                        generate_jwt_key_pair()
+                    )
+                else:
+                    raise SecretPreparationError("Choose a or m for JWT keys.")
+            elif not auto:
+                raise SecretPreparationError(
+                    "JWT keys missing; use --auto or enter them in .env."
+                )
+            else:
+                replacements[JWT_KEYS[0]], replacements[JWT_KEYS[1]] = (
+                    generate_jwt_key_pair()
+                )
         else:
             validate_jwt_key_pair(values[JWT_KEYS[0]], values[JWT_KEYS[1]])
 
     # 2. Automatically generated secure keys (Redis, DB, Django, Webhook tokens)
     for key, generator in AUTO_GENERATORS.items():
         if key in selected_keys and (key in rotated or not values.get(key, "").strip()):
-            replacements[key] = generator()
-
-    # 3. Hybrid keys (Harbor passwords: prompt or auto-generate compliant password)
-    for key in HYBRID_PASSWORD_KEYS:
-        if key in selected_keys and (key in rotated or not values.get(key, "").strip()):
-            if interactive:
-                try:
-                    val = getpass.getpass(
-                        f"Enter {key} (press Enter to auto-generate): "
-                    ).strip()
-                except (EOFError, KeyboardInterrupt):
-                    raise SecretPreparationError("Input aborted by operator.") from None
-                replacements[key] = val if val else generate_strong_password(24)
+            if auto:
+                replacements[key] = generator()
+            elif interactive:
+                choice = (
+                    input(f"{key}: [a]uto-generate or [m]anual? [a]: ").strip().lower()
+                )
+                if choice in {"", "a"}:
+                    replacements[key] = generator()
+                elif choice == "m":
+                    replacements[key] = getpass.getpass(f"Enter {key}: ")
+                else:
+                    raise SecretPreparationError(f"Choose a or m for {key}.")
             else:
-                replacements[key] = generate_strong_password(24)
+                raise SecretPreparationError(
+                    f"{key} requires a value; use --auto or enter it in .env."
+                )
 
     # 4. Defaultable identifier keys (DB_USER, GITHUB_REPO, HARBOR_USERNAME)
     for key, default_val in DEFAULT_VALUES.items():
@@ -434,7 +454,18 @@ def prepare_env_content(
         raise SecretPreparationError(
             "Selected groups have missing .env values: " + ", ".join(missing)
         )
-    if CONTROL_PLANE_GROUP in selected_groups:
+    if "TRAINING_SECRET_ENCRYPTION_KEY" in selected_keys:
+        try:
+            Fernet(effective["TRAINING_SECRET_ENCRYPTION_KEY"].encode("ascii"))
+        except (ValueError, UnicodeError):
+            raise SecretPreparationError(
+                "TRAINING_SECRET_ENCRYPTION_KEY must be a valid Fernet key."
+            ) from None
+    if JWT_KEYS[0] in selected_keys:
+        validate_jwt_key_pair(effective[JWT_KEYS[0]], effective[JWT_KEYS[1]])
+    if {"ARGO_EVENTS_WEBHOOK_TOKEN", "CONTROL_PLANE_WEBHOOK_SECRET"}.issubset(
+        selected_keys
+    ):
         argo_token = effective["ARGO_EVENTS_WEBHOOK_TOKEN"]
         callback_secret = effective["CONTROL_PLANE_WEBHOOK_SECRET"]
         if len(argo_token) < 32 or argo_token == callback_secret:
@@ -472,13 +503,16 @@ def write_atomically(path: Path, content: str) -> None:
             temporary_path.unlink()
 
 
-def make_payloads(env: dict[str, str], groups: list[int]) -> dict[str, dict[str, str]]:
+def make_payloads(
+    env: dict[str, str], groups: list[int], keys: list[str] | None = None
+) -> dict[str, dict[str, str]]:
     payloads: dict[str, dict[str, str]] = {}
     for group_id in groups:
         group = SECRET_GROUPS[group_id]
         target = payloads.setdefault(group["target"], {})
         for key in group["keys"]:
-            target[key] = env[key]
+            if keys is None or key in keys:
+                target[key] = env[key]
     return payloads
 
 
@@ -524,9 +558,10 @@ def confirm(
     for target, keys in changes.items():
         print(f"AWS {target}: " + (", ".join(keys) if keys else "unchanged"))
     try:
-        return input(
-            "Write .env and publish changed keys? [y/yes]: "
-        ).strip().lower() in {"y", "yes"}
+        return input("Apply the changes listed above? [y/yes]: ").strip().lower() in {
+            "y",
+            "yes",
+        }
     except EOFError:
         return False
 
@@ -540,6 +575,12 @@ def publish(
     yes: bool,
     interactive: bool = True,
     client: Any | None = None,
+    mode: str = "aws",
+    keys: list[str] | None = None,
+    auto: bool = True,
+    dry_run: bool = False,
+    profile: str | None = None,
+    region: str | None = None,
 ) -> int:
     if env_path.exists():
         original = env_path.read_text(encoding="utf-8")
@@ -548,12 +589,37 @@ def publish(
     else:
         raise SecretPreparationError(".env and .env.example are both missing.")
     updated, values = prepare_env_content(
-        original, groups, rotate, interactive=interactive
+        original, groups, rotate, interactive=interactive, keys=keys, auto=auto
     )
-    payloads = make_payloads(values, groups)
+    env_changed = not env_path.exists() or updated != original
+    selected_keys = keys or sorted(
+        {key for group in groups for key in SECRET_GROUPS[group]["keys"]}
+    )
+    print("Mode: " + mode)
+    before_values = parse_env_content(original)
+    for key in selected_keys:
+        before = before_values.get(key)
+        print(
+            f"  {key}: {'prepared' if before != values.get(key) else 'kept existing'}"
+        )
+    if dry_run:
+        print("Dry run: no local writes or AWS requests made.")
+        return 0
+    if mode == "local":
+        if not yes and not confirm(groups, {}, env_changed):
+            print("Cancelled; no changes made.")
+            return 0
+        if env_changed:
+            write_atomically(env_path, updated)
+        print(
+            f"Local {env_path.name}: {'updated' if env_changed else 'unchanged'}; AWS untouched."
+        )
+        return 0
+    payloads = make_payloads(values, groups, keys)
     if client is None:
         region = (
-            values.get("AWS_DEFAULT_REGION")
+            region
+            or values.get("AWS_DEFAULT_REGION")
             or os.environ.get("AWS_DEFAULT_REGION")
             or "ap-southeast-1"
         )
@@ -564,11 +630,21 @@ def publish(
         secret_key = values.get("AWS_SECRET_ACCESS_KEY") or os.environ.get(
             "AWS_SECRET_ACCESS_KEY"
         )
-        if access_key and secret_key:
+        if access_key and secret_key and not profile:
             client_kwargs.update(
                 aws_access_key_id=access_key, aws_secret_access_key=secret_key
             )
-        client = boto3.client("secretsmanager", **client_kwargs)
+            session_token = values.get("AWS_SESSION_TOKEN") or os.environ.get(
+                "AWS_SESSION_TOKEN"
+            )
+            if session_token:
+                client_kwargs["aws_session_token"] = session_token
+        if profile:
+            client = boto3.Session(profile_name=profile).client(
+                "secretsmanager", **client_kwargs
+            )
+        else:
+            client = boto3.client("secretsmanager", **client_kwargs)
 
     merged: dict[str, dict[str, Any]] = {}
     changes: dict[str, list[str]] = {}
@@ -579,28 +655,40 @@ def publish(
             key for key, value in payload.items() if existing.get(key) != value
         )
 
-    env_changed = not env_path.exists() or updated != original
     if not yes and not confirm(groups, changes, env_changed):
         print("Cancelled; no local or AWS changes made.")
         return 0
     if env_changed:
         write_atomically(env_path, updated)
         print(f"Updated local {env_path.name}.")
-    for target, keys in changes.items():
-        if not keys:
+    for target, changed_keys in changes.items():
+        if not changed_keys:
             print(f"Unchanged: {target}.")
             continue
         client.put_secret_value(
             SecretId=target, SecretString=json.dumps(merged[target], ensure_ascii=False)
         )
-        print(f"=> Published {target}: {', '.join(keys)}")
+        print(f"=> Published {target}: {', '.join(changed_keys)}")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument(
-        "--groups", help="Group numbers, comma separated; 0 selects all."
+        "--mode",
+        choices=("local", "aws"),
+        help="Update local .env only, or merge selected keys into AWS Secrets Manager.",
+    )
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument(
+        "-k",
+        "--keys",
+        help="Comma-separated exact key names; JWT keys are always handled as a pair.",
+    )
+    selection.add_argument(
+        "-g", "--groups", help="Group numbers, comma separated; 0 selects all."
     )
     parser.add_argument(
         "--rotate",
@@ -609,7 +697,28 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         help="Rotate one generated secret group; repeatable.",
     )
-    parser.add_argument("--env-file", type=Path, default=PROJECT_ROOT / ".env")
+    parser.add_argument("-f", "--env-file", type=Path, default=PROJECT_ROOT / ".env")
+    parser.add_argument(
+        "-a",
+        "--auto",
+        action="store_true",
+        help="Generate missing internal secrets without asking; never replace existing values.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate and preview key names only; no file writes or AWS requests.",
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="Show key names, groups and configured/missing status; no values.",
+    )
+    parser.add_argument(
+        "--profile",
+        help="AWS named profile; takes precedence over .env AWS credentials.",
+    )
+    parser.add_argument("--region", help="AWS region override.")
     parser.add_argument(
         "-y",
         "--yes",
@@ -623,16 +732,76 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        groups = select_groups(args.groups)
-        is_interactive = not (args.yes or args.non_interactive or not sys.stdin.isatty())
+        env_path = args.env_file.expanduser().resolve()
+        if args.list:
+            values = (
+                parse_env_content(env_path.read_text(encoding="utf-8"))
+                if env_path.exists()
+                else {}
+            )
+            for number, group in SECRET_GROUPS.items():
+                print(f"[{number}] {group['name']} -> {group['target']}")
+                for key in group["keys"]:
+                    print(f"  {key}: {'configured' if values.get(key) else 'missing'}")
+            return 0
+        is_interactive = not (args.non_interactive or not sys.stdin.isatty())
+        mode = args.mode
+        if mode is None:
+            if not is_interactive:
+                raise SecretPreparationError("Specify --mode local or --mode aws.")
+            print(
+                "1. Update local .env\n2. Push secrets to AWS"
+            )
+            mode = {"1": "local", "2": "aws", "local": "local", "aws": "aws"}.get(
+                input("Choose mode [1/2]: ").strip()
+            )
+            if mode is None:
+                raise SecretPreparationError("Choose 1/local or 2/aws.")
+        keys = None
+        if args.keys:
+            keys = list(
+                dict.fromkeys(
+                    key.strip() for key in args.keys.split(",") if key.strip()
+                )
+            )
+            known = {key for group in SECRET_GROUPS.values() for key in group["keys"]}
+            if not keys or set(keys) - known:
+                raise SecretPreparationError(
+                    "Unknown or empty --keys selection; use --list."
+                )
+            if set(keys).intersection(JWT_KEYS):
+                keys = list(dict.fromkeys([*keys, *JWT_KEYS]))
+            groups = [
+                number
+                for number, group in SECRET_GROUPS.items()
+                if set(keys).intersection(group["keys"])
+            ]
+        elif args.groups is not None or is_interactive:
+            groups = select_groups(args.groups)
+        else:
+            raise SecretPreparationError(
+                "Specify --keys or --groups in non-interactive mode."
+            )
+        if not is_interactive and not args.yes and not args.dry_run:
+            raise SecretPreparationError(
+                "Use --yes to authorize writes in non-interactive mode."
+            )
         return publish(
-            env_path=args.env_file.expanduser().resolve(),
+            env_path=env_path,
             example_path=PROJECT_ROOT / ".env.example",
             groups=groups,
             rotate=args.rotate,
             yes=args.yes,
             interactive=is_interactive,
+            mode=mode,
+            keys=keys,
+            auto=args.auto,
+            dry_run=args.dry_run,
+            profile=args.profile,
+            region=args.region,
         )
+    except (EOFError, KeyboardInterrupt):
+        print("Cancelled by operator.", file=sys.stderr)
     except SecretPreparationError as exc:
         print(f"Error: {exc}", file=sys.stderr)
     except ClientError as exc:

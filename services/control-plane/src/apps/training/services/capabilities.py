@@ -10,6 +10,9 @@ from apps.training.models import TrainingJobCapability
 
 def issue_capability(job, purpose, *, ttl_seconds=None, preserve_existing=False):
     """Create a short-lived, opaque capability without persisting its raw value."""
+    if not job.submitted_at:
+        from common.api.exceptions import Conflict
+        raise Conflict("An unsubmitted draft cannot receive runtime capabilities.")
     token = secrets.token_urlsafe(32)
     expires_at = timezone.now() + timedelta(seconds=ttl_seconds if ttl_seconds is not None else _ttl_seconds(job))
     if not preserve_existing:

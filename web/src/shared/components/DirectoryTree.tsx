@@ -6,7 +6,7 @@ import {
   Folder as FolderIcon,
   Play,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -46,6 +46,9 @@ interface DirectoryTreeProps {
   level?: number;
   selectedPath: string | null;
   onSelect: (path: string) => void;
+  onEditFile?: (path: string) => void;
+  onMove?: (path: string, folder: string) => void;
+  onDropFiles?: (event: DragEvent, folder: string) => void;
   unsavedContents: Record<string, string>;
   currentEntryPoint?: string;
   expandedFolders: Set<string>;
@@ -60,6 +63,9 @@ export function DirectoryTree({
   level = 0,
   selectedPath,
   onSelect,
+  onEditFile,
+  onMove,
+  onDropFiles,
   unsavedContents,
   currentEntryPoint,
   expandedFolders,
@@ -81,6 +87,14 @@ export function DirectoryTree({
             <li key={node.path}>
               <button
                 type="button"
+                draggable={Boolean(onMove)}
+                onDragStart={onMove ? (event) => { event.stopPropagation(); event.dataTransfer.setData("application/x-training-path", node.path); } : undefined}
+                onDragOver={onMove || onDropFiles ? (event) => event.preventDefault() : undefined}
+                onDrop={onMove || onDropFiles ? (event) => {
+                  event.preventDefault(); event.stopPropagation();
+                  const path = event.dataTransfer.getData("application/x-training-path");
+                  if (path) onMove?.(path, node.path); else onDropFiles?.(event, node.path);
+                } : undefined}
                 onClick={(event) => {
                   event.stopPropagation();
                   onSelect(node.path);
@@ -106,30 +120,47 @@ export function DirectoryTree({
                 <span className="min-w-0 flex-1 truncate">{node.name}</span>
               </button>
               {isExpanded ? (
-                <DirectoryTree
-                  nodes={node.children}
-                  level={level + 1}
-                  selectedPath={selectedPath}
-                  onSelect={onSelect}
-                  unsavedContents={unsavedContents}
-                  currentEntryPoint={currentEntryPoint}
-                  expandedFolders={expandedFolders}
-                  toggleFolder={toggleFolder}
-                  creatingFile={creatingFile}
-                  onFinishCreating={onFinishCreating}
-                  currentParentPath={node.path}
-                />
+                <div className="relative">
+                  {(node.children.length > 0 ||
+                    (creatingFile && creatingFile.parentPath === node.path)) && (
+                    <div
+                      aria-hidden="true"
+                      data-testid={`indent-guide-${node.path}`}
+                      className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-border"
+                      style={{ left: `${level * 12 + 16}px` }}
+                    />
+                  )}
+                  <DirectoryTree
+                    nodes={node.children}
+                    level={level + 1}
+                    selectedPath={selectedPath}
+                    onSelect={onSelect}
+                    onEditFile={onEditFile}
+                    onMove={onMove}
+                    onDropFiles={onDropFiles}
+                    unsavedContents={unsavedContents}
+                    currentEntryPoint={currentEntryPoint}
+                    expandedFolders={expandedFolders}
+                    toggleFolder={toggleFolder}
+                    creatingFile={creatingFile}
+                    onFinishCreating={onFinishCreating}
+                    currentParentPath={node.path}
+                  />
+                </div>
               ) : null}
             </li>
           );
         }
 
         return (
-          <li key={node.path}>
+          <li key={node.path} className="flex items-center">
             <button
               type="button"
+              draggable={Boolean(onMove) && node.path !== "requirements.txt"}
+              onDragStart={onMove ? (event) => { event.stopPropagation(); event.dataTransfer.setData("application/x-training-path", node.path); } : undefined}
               onClick={() => onSelect(node.path)}
-              className={`flex w-full items-center gap-1.5 truncate rounded-compact px-2 py-1.5 text-left text-style-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) ${
+              onDoubleClick={onEditFile ? () => onEditFile(node.path) : undefined}
+              className={`flex min-w-0 flex-1 items-center gap-1.5 truncate rounded-compact px-2 py-1.5 text-left text-style-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) ${
                 isSelected
                   ? "bg-(--color-primary-subtle) font-medium text-(--color-primary)"
                   : "text-(--color-muted-foreground) hover:bg-(--color-muted)"
@@ -144,7 +175,9 @@ export function DirectoryTree({
               )}
               <span className="min-w-0 flex-1 truncate">
                 {node.name}
-                {isModified ? " *" : ""}
+                {isModified ? (
+                  <span className="text-color-danger font-bold ml-0.5">*</span>
+                ) : null}
               </span>
               {currentEntryPoint === node.path ? (
                 <Play className="h-3 w-3 shrink-0 text-(--color-primary)" />

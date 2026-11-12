@@ -41,20 +41,20 @@ class _ArgoBackend:
         from common.api.exceptions import Conflict
         project = resource.project if hasattr(resource, "project") else resource.monitor.version.project
         with transaction.atomic():
-            locked_project = type(project).objects.select_for_update().get(pk=project.pk)
+            locked_project = type(project).objects.select_for_update().get(pk=project.pk) if project else None
             rows = type(resource).objects.filter(pk=resource.pk).exclude(status__in=["cancelling", "cancelled", "failed", "completed"]).filter(execution_stop_requested=False)
             if resource.execution_check_token:
                 rows = rows.filter(execution_check_token=resource.execution_check_token, execution_check_lease_until__gt=timezone.now())
-            if locked_project.deletion_state != "active" or not rows.update(**fields):
+            if (locked_project and locked_project.deletion_state != "active") or not rows.update(**fields):
                 raise Conflict("Execution is inactive or dispatch lease expired.")
 
     def reconcile(self, resource, kind, token, stop=False):
-        from apps.observability.services.executions import project_for, signed_observation_token
+        from apps.observability.services.executions import ownership_for, signed_observation_token
 
-        project = project_for(resource, kind)
+        tenant, project_id = ownership_for(resource, kind)
         return self.client.trigger(settings.ARGO_RECONCILE_WEBHOOK_URL, {
             "kind": kind, "resource_id": str(resource.public_id),
-            "project_id": str(project.public_id), "tenant_id": str(project.owner.tenant_id),
+            "project_id": project_id, "tenant_id": tenant,
             "stop": stop,
             "callback_url": f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/executions/{kind}/{resource.public_id}/observations/",
             "callback_token": signed_observation_token(kind, resource, token),
@@ -144,7 +144,7 @@ class ArgoTrainingBackend(_ArgoBackend):
             "runtime": {
                 "backend": "argo",
                 "namespace": "mlops-paas-training",
-                "pytorch_job_name": runtime_name,
+                "train_job_name": runtime_name,
                 "workflow_selector": f"mlops-paas.io/training-job-id={job.public_id}",
                 "pod_selector": f"mlops-paas.io/training-job-id={job.public_id}",
             },
@@ -153,8 +153,11 @@ class ArgoTrainingBackend(_ArgoBackend):
         return self.trigger(
             {
                 "job_id": str(job.public_id),
-                "project_id": str(job.project.public_id),
-                "tenant_id": job.project.owner.tenant_id,
+                "project_id": job.runtime_project_id,
+                "tenant_id": job.owner.tenant_id,
+                "input_contract": job.input_contract,
+                "runtime_config_url": f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/training-jobs/{job.public_id}/runtime-config/",
+                "runtime_config_capability": issue_capability(job, "runtime_config", preserve_existing=True),
                 "job_name": runtime_name,
                 "vcpu": job.vcpu,
                 "memory": job.memory_mb,
@@ -199,6 +202,8 @@ class ArgoTrainingBackend(_ArgoBackend):
                 {
                     "job_id": str(job.public_id),
                     "job_name": job.external_job_id or f"training-{str(job.public_id).lower()}",
+                    "project_id": job.runtime_project_id,
+                    "tenant_id": job.owner.tenant_id,
                     "control_plane_callback_url": (
                         f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/"
                         f"training-jobs/{job.public_id}/cancellation/"

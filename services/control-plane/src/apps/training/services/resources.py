@@ -16,7 +16,7 @@ def validate_resources(values, instance=None, *, local_capacity=None):
         return values.get(name, getattr(instance, name, default))
 
     errors = {}
-    submitted = instance is not None and instance.status != "pending"
+    submitted = instance is not None and instance.status not in {"editing", "pending"}
     if submitted:
         for field in ("vcpu", "memory_mb"):
             if field in values and values[field] != getattr(instance, field):
@@ -33,7 +33,7 @@ def validate_resources(values, instance=None, *, local_capacity=None):
         errors["vcpu"] = "Select a supported CPU/memory profile."
         errors["memory_mb"] = "Select a supported CPU/memory profile."
     runtime = value("max_runtime_seconds", 3600)
-    invalid_submitted = submitted and (runtime <= 0 or (instance.backend == "argo" and runtime > 86400))
+    invalid_submitted = submitted and ((runtime is None or runtime <= 0) or (instance.backend == "argo" and runtime > 86400))
     if invalid_submitted or ((not submitted or "max_runtime_seconds" in values) and runtime not in runtime_options()):
         errors["max_runtime_seconds"] = "Select a supported maximum runtime."
     kind, count = value("accelerator_type", "none"), value("accelerator_count", 0)

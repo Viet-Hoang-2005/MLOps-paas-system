@@ -11,7 +11,7 @@ spec:
   description: Pinned upstream controllers, CRDs and drivers for the production K3s environment.
   sourceRepos:
     - https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
-    - https://github.com/kubeflow/trainer.git
+    - ghcr.io/kubeflow/charts
     - https://kubernetes-sigs.github.io/aws-ebs-csi-driver
     - https://charts.external-secrets.io
     - https://cloudnative-pg.github.io/charts
@@ -41,7 +41,7 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: mlops-paas-core
       server: https://kubernetes.default.svc
-    - namespace: kubeflow
+    - namespace: kubeflow-system
       server: https://kubernetes.default.svc
     - namespace: karpenter
       server: https://kubernetes.default.svc

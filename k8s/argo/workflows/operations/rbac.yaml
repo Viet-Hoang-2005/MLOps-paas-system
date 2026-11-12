@@ -35,9 +35,15 @@ metadata:
   name: argo-job-observation
   namespace: mlops-paas-training
 rules:
-  - apiGroups: [kubeflow.org]
-    resources: [pytorchjobs]
+  - apiGroups: [trainer.kubeflow.org]
+    resources: [trainjobs]
     verbs: [get, delete]
+  - apiGroups: [jobset.x-k8s.io]
+    resources: [jobsets]
+    verbs: [get, list, delete]
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [get, list, delete]
   - apiGroups: [""]
     resources: [pods]
     verbs: [get, list, delete]

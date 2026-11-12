@@ -4,11 +4,7 @@ from django.db import transaction
 from common.logging import record_transition
 from infrastructure.execution import polls_runtime_status, training_backend
 from infrastructure.storage import S3Storage
-from infrastructure.storage.paths import (
-    training_job_prefix,
-    training_mlflow_prefix,
-    training_output_prefix,
-)
+from apps.training.services.storage_scope import training_prefix_for
 
 
 @shared_task(
@@ -26,8 +22,8 @@ def execute_training_job(self, job_id):
     from .services.logs import append_training_log
 
     with transaction.atomic():
-        job = TrainingJob.objects.select_for_update().select_related("project", "project__owner").get(public_id=job_id)
-        if job.status != "queued" or job.deletion_requested_at or job.project.deletion_state != "active":
+        job = TrainingJob.objects.select_for_update(of=("self",)).select_related("project", "project__owner").get(public_id=job_id)
+        if job.status != "queued" or job.deletion_requested_at or (job.project_id and job.project.deletion_state != "active"):
             return job.status
         job.mark_started()
         job.celery_task_id = self.request.id or job.celery_task_id
@@ -37,7 +33,7 @@ def execute_training_job(self, job_id):
         record_transition(job, "running")
     append_training_log(job.public_id, "[SYSTEM] Training execution started.")
     with transaction.atomic():
-        job = TrainingJob.objects.select_for_update().select_related("project", "project__owner").get(pk=job.pk)
+        job = TrainingJob.objects.select_for_update(of=("self",)).select_related("project", "project__owner").get(pk=job.pk)
         if job.status in {"cancelling", "cancelled"} or job.deletion_requested_at:
             should_confirm = job.status == "cancelling"
         else:
@@ -306,9 +302,7 @@ def delete_training_job(self, job_id):
         Build.objects.filter(public_id__in=disposable_builds).delete()
 
         storage = S3Storage()
-        storage.delete_prefix(
-            f"{training_job_prefix(job.project.owner.tenant_id, job.project.public_id, job.public_id)}/"
-        )
+        storage.delete_prefix(f"{training_prefix_for(job)}/")
         delete_training_logs(job.public_id)
         job.delete()
         record_transition(job, "deleted")
@@ -333,10 +327,9 @@ def purge_training_job_outputs(self, job_id):
 
     job = TrainingJob.objects.select_related("project", "project__owner").get(public_id=job_id)
     storage = S3Storage()
-    tenant_id = job.project.owner.tenant_id
-    project_id = job.project.public_id
-    storage.delete_prefix(training_output_prefix(tenant_id, project_id, job.public_id))
-    storage.delete_prefix(training_mlflow_prefix(tenant_id, project_id, job.public_id))
+    prefix = training_prefix_for(job)
+    storage.delete_prefix(f"{prefix}/output/")
+    storage.delete_prefix(f"{prefix}/mlflow/")
     with transaction.atomic():
         job = TrainingJob.objects.select_for_update().get(pk=job.pk)
         job.outputs.all().delete()

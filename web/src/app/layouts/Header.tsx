@@ -18,7 +18,7 @@ import {
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import AdaptMLLogo from "@/assets/icons/AdaptML.png";
+import MLlifeLogo from "@/assets/icons/MLlife.png";
 import type { ThemeMode } from "@/app/theme/theme";
 import { routes } from "@/app/router/paths";
 import { useTheme } from "@/app/theme/useTheme";
@@ -102,10 +102,12 @@ export default function Header({
         onClick={() => navigate("/dashboard/projects")}
         className="hidden min-w-40 shrink-0 items-center gap-3 rounded-surface focus-visible:ring-2 focus-visible:ring-ring sm:flex xl:min-w-48"
       >
-        <img src={AdaptMLLogo} alt="" className="h-7 w-7" />
+        <img src={MLlifeLogo} alt="" className="h-7 w-7" />
         <span className="text-style-section-title font-semibold text-color-foreground">
-          {/* i18n-ignore: AdaptML is the product brand. */}
-          Adapt<span className="text-color-info italic">ML</span>
+          {/* i18n-ignore: MLlife is the product brand. */}
+          <span className="text-color-info">ML</span>
+          {/* i18n-ignore: MLlife is the product brand. */}
+          <span className="text-color-foreground italic">life</span>
         </span>
       </button>
 

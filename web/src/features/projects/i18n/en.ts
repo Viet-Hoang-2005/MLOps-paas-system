@@ -245,6 +245,7 @@ export const catalogEn = {
     support: "Support: {{types}}",
     selectFile: "Select a file from the tree to view or edit",
     explorer: "Explorer",
+    editFile: "Edit {{path}}",
     newFile: "New File",
     newFolder: "New Folder",
     uploadFiles: "Upload Files",

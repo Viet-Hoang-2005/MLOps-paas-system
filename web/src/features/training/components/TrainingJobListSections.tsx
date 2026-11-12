@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useMemo } from "react";
 import { Select, type SelectOption } from "@/shared/components/Select";
 
-export type TrainingStatusFilter = "pending" | "success" | "failed" | "all";
+export type TrainingStatusFilter = "editing" | "pending" | "success" | "failed" | "all";
 
 export function TrainingJobStatusFilter({
   value,
@@ -17,6 +17,7 @@ export function TrainingJobStatusFilter({
   const options = useMemo<SelectOption[]>(
     () => [
       { value: "all", label: t("statusFilter.all") },
+      { value: "editing", label: t("statusFilter.editing") },
       { value: "pending", label: t("statusFilter.pending") },
       { value: "success", label: t("statusFilter.success") },
       { value: "failed", label: t("statusFilter.failed") },

@@ -2,28 +2,17 @@
 
 ## 1. Training Lifecycle (Untrusted Sandbox)
 
-1. **Submission:** User submits a training job via `POST /api/training-jobs/`.
-2. **Snapshotting:** Control Plane snapshots source code and training dataset into immutable ZIP files in S3 under `users/{tenant}/models/{project}/training/jobs/{job}/input/`.
-3. **Capability Generation:** Control Plane persists the job with status `PENDING` and generates a signed, short-lived **Capability Token**.
-4. **Dispatch:** At `transaction.on_commit`, Celery dispatches the task:
-   - *Docker:* Runs `training-runner` container on the local network.
-   - *Argo:* Emits an event to Argo Events to launch a Kubeflow `PyTorchJob` on K3s with GPU tolerations (Karpenter auto-provisions GPU nodes).
-5. **Execution:**
-   - `training-runner` downloads snapshots via Presigned GET URLs using the Capability Token.
-   - Extracts into `/workspace/source` and `/workspace/input/train`.
-   - Installs dependencies from `/workspace/source/requirements.txt`.
-   - Spawns subprocess to run `ENTRY_POINT` (e.g. `train.py`).
-   - Streams stdout/stderr logs into Redis (`training_logs:{job_id}`) or Grafana Loki.
-   - Parses real-time metric lines: `METRIC_JSON {"epoch": 1, "loss": 0.25}`.
-6. **Output Bundling:** On success, packages `/workspace/model/`, metrics, parameters, and insights (`feature_importance.json`) into `training_output.zip`.
-7. **Upload & Callback:**
-   - Requests a Presigned PUT URL using its Capability Token and uploads to S3.
-   - Calls `POST /internal/webhooks/training-jobs/<id>/` with shared secret.
-   - Control Plane locks the job and transitions to `COMPLETED`; it does not register a version automatically. Reference CSV is frozen separately from training data; retries copy original snapshots into a new job.
+1. User creates an account-owned TrainingJob in editing, without a Project, edits unified Input and separate Environment/Secrets, and chooses CPU/GPU/framework/runtime from capabilities.
+2. POST /api/training-jobs/{id}/submit/ uses revision and run_key to prepare an immutable Input ZIP and submit the same job UUID exactly once. Preparation is fenced by submission_token; storage I/O stays outside transactions. Only final admission records submitted_at, reserves quota/resources, and queues execution on commit. Interrupted unsubmitted preparation returns to editing.
+3. Docker uses an asynchronous labeled helper and per-job volume; Kubernetes uses a trusted init container and emptyDir. Main training mounts Input read-only. Legacy jobs retain their original input_contract.
+4. Runner installs root requirements.txt, fetches one-use job runtime configuration, and runs Python in writable Work. SM_CHANNEL_TRAIN names unified Input, SM_MODEL_DIR the official model, SM_OUTPUT_DIR supported metadata, MLOPS_WORK_DIR temporary work. No mlops SDK. Stream sanitized logs and experiment metrics; Docker/Prometheus provide runtime resource snapshots separately.
+5. User process must succeed and model output pass path/link/type/count/size validation before packaging model.tar.gz and verifying upload. Trusted observation/reporting finalizes lifecycle; tenant stdout cannot authoritatively declare success. Missing model or failed upload fails the run.
+6. Successful verified jobs may be assigned to a new/existing owned Project with output_revision. Save preserves Model Preview and immutable model/input; no automatic build/register/deploy. Retry/clone create a new editing job from frozen Input and currently existing same-owner encrypted Secrets; revoked Secrets are never recovered from history.
+7. Project deletion stops active jobs, copies/checksums/checkpoints legacy training objects to tenant/job storage, then detaches and preserves jobs/logs/artifacts/quota before Project cleanup. Deleting an unsubmitted draft cleans only its own files/Secrets and never cancels a runtime.
 
 ## 2. Packaging & Build Lifecycle
 
-1. **Trigger:** User creates a Build from a revision-checked project Preview or completed TrainingJob. Project has one mutable Preview; Build copies all input assets into immutable build-scoped keys.
+1. **Trigger:** User creates a Build from a revision-checked project Preview or an assigned completed TrainingJob with available verified output. Project has one mutable Preview; Build copies all input assets into immutable build-scoped keys.
 2. **Analysis:** `model-packager` downloads model artifacts from S3, detects model flavor (`sklearn`, `xgboost`, `pytorch`, `tensorflow`, `keras`), and normalizes to MLflow PyFunc format (`MLmodel`).
 3. **Dockerfile Generation:** Automatically selects optimal base image:
    - Scikit-Learn / XGBoost $\rightarrow$ `machine-learning-serving` (FastAPI).
@@ -34,7 +23,7 @@
 5. **Log Streaming & Callback:** Streams logs and marks the Build `ready`; no automatic registration. Explicit `POST /api/builds/<build>/register/` creates one immutable version idempotently, retaining source/reference/advanced assets and actual requirements.
 6. **Deployment:** Only registered Builds deploy. Runtime names use deployment UUIDs. `ModelProject.active_deployment` changes only after readiness; a failed candidate leaves the old Running version serving. Stop old runtime after handoff and invalidate gateway cache.
 7. **Overview/Drift:** Read the Running snapshot, never latest/Preview fallback. Monitors have immutable reference copies; replacing Running disables old automatic monitors but retains history. Creating a new monitor is manual.
-8. **Deletion:** Disable the project first, stop jobs/runtimes, delete project-scoped images/objects/logs/cache, then hard-delete dependent DB rows. Failures stay `delete_failed` and retry; no shared-image or bucket deletion.
+8. **Deletion:** Disable the project first, stop jobs/runtimes, delete project-scoped images/objects/logs/cache, then hard-delete Project-owned DB rows. Training jobs/artifacts/logs/quota are preserved and detached after verified storage migration. Failures stay `delete_failed` and retry; no shared-image or bucket deletion.
 
 ## 3. Serving & Inference Lifecycle
 

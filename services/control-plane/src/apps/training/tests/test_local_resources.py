@@ -1,3 +1,4 @@
+from django.utils import timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -73,9 +74,9 @@ def test_outstanding_memory_subtracts_verified_running_usage(settings, monkeypat
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     user = get_user_model().objects.create_user("memory@example.com")
     project = ModelProject.objects.create(owner=user, name="memory")
-    current = TrainingJob.objects.create(project=project, name="queued", vcpu=1, memory_mb=1024)
-    other = TrainingJob.objects.create(project=project, name="running", vcpu=1, memory_mb=2048,
-                                       external_job_id="runtime-id")
+    current = TrainingJob.objects.create(project=project, vcpu=1, memory_mb=1024, max_runtime_seconds=3600, input_contract="legacy", status="pending")
+    other = TrainingJob.objects.create(project=project, vcpu=1, memory_mb=2048,
+                                       external_job_id="runtime-id", max_runtime_seconds=3600, input_contract="legacy", status="pending")
     snapshot = {"daemon_id": "daemon", "cpu_profiles": [{"id": "large", "vcpu": 4, "memory_mb": 4096}]}
     with transaction.atomic():
         local.reserve(current, snapshot)
@@ -96,7 +97,7 @@ def test_reservation_is_shared_and_released_only_explicitly(settings):
     first = get_user_model().objects.create_user("local-first@example.com")
     second = get_user_model().objects.create_user("local-second@example.com")
     jobs = [TrainingJob.objects.create(project=ModelProject.objects.create(owner=user, name=str(i)),
-                                      name="job", vcpu=2, memory_mb=2048) for i, user in enumerate((first, second))]
+                                       vcpu=2, memory_mb=2048, max_runtime_seconds=3600, input_contract="legacy", status="pending") for i, user in enumerate((first, second))]
     snapshot = {"daemon_id": "daemon", "cpu_profiles": [{"id": "large", "vcpu": 3, "memory_mb": 4096}]}
     with transaction.atomic():
         local.reserve(jobs[0], snapshot)
@@ -115,7 +116,7 @@ def test_dispatch_guard_rejects_low_memory_and_releases_lock(settings, monkeypat
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     user = get_user_model().objects.create_user("guard@example.com")
     job = TrainingJob.objects.create(project=ModelProject.objects.create(owner=user, name="guard"),
-                                     name="job", vcpu=2, memory_mb=2048)
+                                      vcpu=2, memory_mb=2048, max_runtime_seconds=3600, input_contract="legacy", status="pending")
     snapshot = {"daemon_id": "daemon", "status": "available", "total_memory_mb": 8192,
                 "cpu_profiles": [{"id": "large", "vcpu": 6, "memory_mb": 6144}]}
     with transaction.atomic():
@@ -153,7 +154,7 @@ def test_reconciliation_releases_reservation_only_after_confirmed_stop(settings)
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     user = get_user_model().objects.create_user("release@example.com")
     job = TrainingJob.objects.create(project=ModelProject.objects.create(owner=user, name="release"),
-                                     name="job", backend="docker", status="queued", vcpu=1, memory_mb=1024)
+                                      backend="docker", status="queued", vcpu=1, memory_mb=1024, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     snapshot = {"daemon_id": "daemon", "cpu_profiles": [{"id": "large", "vcpu": 2, "memory_mb": 2048}]}
     with transaction.atomic():
         local.reserve(job, snapshot)
@@ -176,7 +177,7 @@ def test_concurrent_reservations_share_a_postgres_pool(settings):
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     user = get_user_model().objects.create_user("concurrent@example.com")
     project = ModelProject.objects.create(owner=user, name="concurrent")
-    jobs = [TrainingJob.objects.create(project=project, name=str(i), vcpu=2, memory_mb=2048) for i in range(2)]
+    jobs = [TrainingJob.objects.create(project=project, vcpu=2, memory_mb=2048, max_runtime_seconds=3600, input_contract="legacy", status="pending") for i in range(2)]
     snapshot = {"daemon_id": "concurrent-daemon", "cpu_profiles": [{"id": "large", "vcpu": 2, "memory_mb": 2048}]}
     barrier = Barrier(2)
 

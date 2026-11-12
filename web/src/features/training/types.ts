@@ -2,6 +2,7 @@ import type { ResourceId } from "@/shared/types";
 import type { ModelFlavor } from "@/features/projects/types";
 
 export type TrainingJobStatus =
+  | "editing"
   | "pending"
   | "queued"
   | "uploading"
@@ -47,19 +48,22 @@ export interface TrainingJob {
   execution_deadline_at?: string | null;
   runtime_started_at?: string | null;
   id: ResourceId;
-  project_id: ResourceId;
+  project_id: ResourceId | null;
+  revision: number;
+  input_revision: number | null;
+  submitted_at: string | null;
+  cloned_from: ResourceId | null;
   output_revision: number;
-  name: string;
   model_flavor: ModelFlavor;
   model_version: string;
   entry_point: string;
   requirements_text: string;
   training_backend: "kubeflow" | "local";
   backend: "docker" | "argo" | "kubeflow" | "local";
-  vcpu: number;
-  memory: number;
-  memory_mb: number;
-  max_runtime_seconds: number;
+  vcpu: number | null;
+  memory: number | null;
+  memory_mb: number | null;
+  max_runtime_seconds: number | null;
   accelerator_type: TrainingAcceleratorType;
   accelerator_count: number;
   accelerator_model: TrainingAcceleratorModel;
@@ -111,7 +115,6 @@ export interface TrainingJobDeletionRequest {
 
 export interface TrainingJobFormValues {
   reference_path?: string;
-  name: string;
   model_version?: string;
   model_flavor: ModelFlavor;
   entry_point: string;
@@ -232,11 +235,14 @@ export interface TrainingOutputSummaryAsset {
 
 export interface TrainingJobModelOutputSummary {
   job_id: ResourceId;
-  project_id: ResourceId;
+  project_id: ResourceId | null;
   output_revision: number;
   model_flavor: ModelFlavor;
   entry_point: string;
   requirements_text: string;
+  build_requirements_text?: string | null;
+  label_mapping?: TrainingOutputSummaryAsset | null;
+  input_schema?: TrainingOutputSummaryAsset | null;
   model_artifact: TrainingOutputSummaryAsset | null;
   source_code: TrainingOutputSummaryAsset | null;
   reference_data: TrainingOutputSummaryAsset | null;
@@ -269,7 +275,6 @@ export interface MetricHistorySeries {
 
 export interface TrainingJobExperimentMetricsResponse {
   job_id: ResourceId;
-  name: string;
   status: TrainingJobStatus;
   model_flavor: ModelFlavor;
   started_at?: string | null;
@@ -282,7 +287,6 @@ export interface TrainingJobExperimentMetricsResponse {
 
 export interface TrainingRunComparison {
   job_id: ResourceId;
-  name: string;
   status: TrainingJobStatus;
   model_flavor: ModelFlavor;
   runtime_seconds: number;

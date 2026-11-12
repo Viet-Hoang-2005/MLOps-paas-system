@@ -1,3 +1,4 @@
+from django.utils import timezone
 import hashlib
 from unittest.mock import patch
 from django.contrib.auth import get_user_model
@@ -106,10 +107,9 @@ class MLflowCompatibilityTests(APITestCase):
         )
         self.job = TrainingJob.objects.create(
             project=self.project,
-            name="job-run-1",
             model_flavor="sklearn",
             status="running",
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
         self.token = issue_capability(self.job, "tracking")
 
     def test_mlflow_unauthenticated_rejected(self):
@@ -127,6 +127,7 @@ class MLflowCompatibilityTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.data
         self.assertEqual(data["run"]["info"]["run_id"], str(self.job.public_id))
+        self.assertEqual(data["run"]["info"]["run_name"], str(self.job.public_id))
         self.assertEqual(data["run"]["info"]["experiment_id"], str(self.job.project.public_id))
         self.assertTrue(TrainingJobTag.objects.filter(job=self.job, name="framework", value="pytorch").exists())
 
@@ -183,10 +184,9 @@ class MLflowCompatibilityTests(APITestCase):
         )
         other_job = TrainingJob.objects.create(
             project=other_project,
-            name="secret-job",
             model_flavor="sklearn",
             status="running",
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
 
         # Try logging to other_job using self.token (tenant-1234)
         response = self.client.post(
@@ -256,10 +256,9 @@ class MLflowCompatibilityTests(APITestCase):
     def test_training_jobs_compare_endpoint(self):
         job2 = TrainingJob.objects.create(
             project=self.project,
-            name="job-run-2",
             model_flavor="sklearn",
             status="completed",
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
         TrainingJobMetric.objects.create(job=self.job, name="accuracy", value=0.91, step=1)
         TrainingJobMetric.objects.create(job=job2, name="accuracy", value=0.96, step=1)
         TrainingJobParam.objects.create(job=self.job, name="lr", value="0.01")
@@ -392,7 +391,7 @@ class MLflowCompatibilityTests(APITestCase):
         User = get_user_model()
         attacker = User.objects.create_user("attacker@example.com", "password123", tenant_id="tenant-attacker")
         attacker_proj = ModelProject.objects.create(owner=attacker, name="attacker-proj")
-        attacker_job = TrainingJob.objects.create(project=attacker_proj, name="attacker-job", status="running")
+        attacker_job = TrainingJob.objects.create(project=attacker_proj, status="running", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
         attacker_token = issue_capability(attacker_job, "tracking")
 
         target_url = (
@@ -487,10 +486,9 @@ class MLflowCompatibilityTests(APITestCase):
         """
         job_b = TrainingJob.objects.create(
             project=self.project,
-            name="job-b-same-tenant",
             model_flavor="sklearn",
             status="running",
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
 
         headers = {"HTTP_AUTHORIZATION": f"Bearer {self.token}"}
 
@@ -573,10 +571,9 @@ class MLflowCompatibilityTests(APITestCase):
         )
         job_in_project2 = TrainingJob.objects.create(
             project=project2,
-            name="job-in-project2",
             model_flavor="sklearn",
             status="running",
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
 
         raw_key, prefix, key_hash = UserAPIKey.issue()
         api_key = UserAPIKey.objects.create(
@@ -1002,10 +999,9 @@ class MLflowCompatibilityTests(APITestCase):
         """
         job_2 = TrainingJob.objects.create(
             project=self.project,
-            name="job-run-2",
             model_flavor="sklearn",
             status="running",
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
 
         exp_artifact_path = (
             f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"

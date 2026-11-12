@@ -75,6 +75,8 @@ def run_project_cleanup(project):
     if project.deletion_state != "deleting":
         raise ValidationError({"project": "Project deletion is not active."})
     _stop_project_jobs(project)
+    from apps.training.services.storage_migration import migrate_project_storage
+    migrate_project_storage(project)
     return project_cleanup_backend().run(project, project_cleanup_manifest(project))
 
 
@@ -91,7 +93,8 @@ def _stop_project_jobs(project):
         result = training_backend(job.backend).cancel(job)
         if isinstance(result, dict) and not result.get("confirmed", False):
             raise ValidationError("Training cancellation has not completed; retry project cleanup.")
-        type(job).objects.filter(pk=job.pk).update(status="cancelled", completed_at=timezone.now())
+        type(job).objects.filter(pk=job.pk).update(status="cancelled", completed_at=timezone.now(),
+            execution_stop_requested=True, observation_status="cleanup_pending", next_execution_check_at=timezone.now())
     for run in DriftRun.objects.filter(monitor__version__project=project).exclude(
         status__in=("completed", "failed", "cancelled")
     ):
@@ -111,6 +114,13 @@ def delete_project_build_images(project):
 
 def finalize_project_deletion(project, *, storage=None):
     """Remove owned objects and DB aggregates, leaving unrelated projects untouched."""
+    if project.deletion_state != "deleting":
+        raise ValidationError({"project": "Project deletion is not active."})
+    # Cover cleanup tasks queued before the deletion guard was introduced.
+    if project.training_jobs.exclude(storage_layout="tenant").exists():
+        raise ValidationError({"project": "Project cleanup cannot delete legacy training job history."})
+    if project.training_jobs.exclude(status__in=("completed", "failed", "cancelled")).exists():
+        raise ValidationError({"project": "Training cancellation has not completed; retry project cleanup."})
     storage = storage or S3Storage()
     storage.delete_prefix(project_prefix(project.owner.tenant_id, project.public_id))
     with transaction.atomic():
@@ -125,14 +135,12 @@ def finalize_project_deletion(project, *, storage=None):
             project.public_id,
             *project.versions.values_list("public_id", flat=True),
             *project.builds.values_list("public_id", flat=True),
-            *project.training_jobs.values_list("public_id", flat=True),
             *Deployment.objects.filter(version__project=project).values_list("public_id", flat=True),
             *DriftRun.objects.filter(monitor__version__project=project).values_list("public_id", flat=True),
         ]
         redis = redis_client()
         keys = [
             *[f"build_logs:{value}" for value in project.builds.values_list("public_id", flat=True)],
-            *[f"training_logs:{value}" for value in project.training_jobs.values_list("public_id", flat=True)],
             *[
                 f"deployment_logs:{value}"
                 for value in Deployment.objects.filter(version__project=project).values_list("public_id", flat=True)
@@ -162,6 +170,8 @@ def finalize_project_deletion(project, *, storage=None):
         RegistryAlias.objects.filter(project=project).delete()
         Deployment.objects.filter(version__project=project).delete()
         EventOutbox.objects.filter(aggregate_id__in=aggregates).delete()
+        training_ids = project.training_jobs.values_list("public_id", flat=True)
+        LifecycleEvent.objects.filter(project=project, aggregate_type="training_job", aggregate_id__in=training_ids).update(project=None)
         LifecycleEvent.objects.filter(project=project).delete()
         record_transition(project, "deleted")
         project.delete()

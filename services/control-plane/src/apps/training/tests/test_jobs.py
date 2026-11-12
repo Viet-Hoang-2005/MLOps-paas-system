@@ -1,3 +1,5 @@
+from .test_job_drafts import studio as studio
+from django.utils import timezone
 import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
@@ -9,42 +11,16 @@ from apps.training.models import TrainingJob
 
 
 @pytest.mark.django_db
-def test_training_job_paths_are_project_scoped(monkeypatch):
-    user = get_user_model().objects.create_user("owner@example.com", "password123")
-    project = ModelProject.objects.create(owner=user, name="NIDS")
-    client = APIClient()
-    client.force_authenticate(user)
+def test_training_job_paths_are_job_scoped(studio):
+    job, storage, client, _ = studio
+    response = client.get(f"/api/training-jobs/{job.public_id}/")
+    assert response.status_code == 200 and "workspace_id" not in response.data
+    assert "name" not in response.data
+    assert job.project_id is None
+    assert f"/training/jobs/{job.public_id}/draft/" in job.entries.get().s3_uri
+    rejected = client.post("/api/training-jobs/", {"code_snapshot_uri": "s3://other/source.zip"}, format="json")
+    assert rejected.status_code == 400
 
-    response = client.post(
-        "/api/training-jobs/",
-        {
-            "project": str(project.public_id),
-            "name": "nightly",
-            "model_flavor": "xgboost",
-            "requirements_text": "xgboost==2.0.3",
-            "code_snapshot_uri": "s3://other-tenant/source.zip",
-            "data_snapshot_uri": "s3://other-tenant/train.csv",
-        },
-        format="json",
-    )
-
-    assert response.status_code == 201
-    job = TrainingJob.objects.get(public_id=response.data["id"])
-    prefix = f"users/{user.tenant_id}/models/{project.public_id}/training/jobs/{job.public_id}"
-    assert job.code_snapshot_uri.endswith(f"{prefix}/input/code/source.zip")
-    assert job.data_snapshot_uri.endswith(f"{prefix}/input/data/data.zip")
-    assert job.output_uri.endswith(f"{prefix}/output/model.tar.gz")
-    assert job.mlflow_artifact_uri.endswith(f"{prefix}/mlflow/artifacts/")
-    assert "other-tenant" not in job.code_snapshot_uri
-    assert "other-tenant" not in job.data_snapshot_uri
-
-    monkeypatch.setattr(
-        "apps.training.api.endpoints.output_download_url",
-        lambda selected_job: "https://s3.example/download",
-    )
-    download = client.get(f"/api/training-jobs/{job.public_id}/download/")
-    assert download.status_code == 200
-    assert download.data["download_url"] == "https://s3.example/download"
 
 
 @pytest.mark.django_db
@@ -71,40 +47,15 @@ def test_runtime_capabilities_only_expose_configured_accelerators(settings, monk
 
 
 @pytest.mark.django_db
-def test_training_creation_and_submission_are_disabled_during_platform_validation(settings):
-    user = get_user_model().objects.create_user("training-disabled@example.com", "password123")
-    project = ModelProject.objects.create(owner=user, name="NIDS")
-    job = TrainingJob.objects.create(
-        project=project,
-        name="queued-job",
-        model_flavor="xgboost",
-        code_snapshot_uri="s3://bucket/source.zip",
-        data_snapshot_uri="s3://bucket/train.csv",
-        output_uri="s3://bucket/model.tar.gz",
-    )
-    client = APIClient()
-    client.force_authenticate(user)
+def test_editing_is_available_while_submission_is_disabled(studio, settings):
+    job, _, client, _ = studio
     settings.TRAINING_ENABLED = False
+    assert client.get("/api/training-jobs/runtime-capabilities/").data["enabled"] is False
+    assert client.post("/api/training-jobs/", {}, format="json").status_code == 201
+    assert client.post(f"/api/training-jobs/{job.public_id}/submit/", {"revision": job.revision, "run_key": str(__import__("uuid").uuid4())}, format="json").status_code == 503
+    job.refresh_from_db()
+    assert job.status == "editing"
 
-    capabilities = client.get("/api/training-jobs/runtime-capabilities/")
-    create = client.post(
-        "/api/training-jobs/",
-        {"project": str(project.public_id), "name": "blocked", "model_flavor": "xgboost"},
-        format="json",
-    )
-    submit = client.post(f"/api/training-jobs/{job.public_id}/submit/")
-
-    assert capabilities.status_code == 200
-    assert capabilities.data == {
-        "enabled": False,
-        "backend": settings.TRAINING_BACKEND,
-        "cpu_profiles": [],
-        "runtime_options_seconds": [],
-        "accelerators": [],
-    }
-    assert create.status_code == 503
-    assert submit.status_code == 503
-    assert TrainingJob.objects.filter(public_id=job.public_id, status="pending").exists()
 
 
 @pytest.mark.django_db
@@ -115,13 +66,12 @@ def test_training_job_list_reports_model_lifecycle_status():
     def create_job(name, status="completed"):
         return TrainingJob.objects.create(
             project=project,
-            name=name,
             model_flavor="sklearn",
             code_snapshot_uri=f"s3://bucket/{name}/source.zip",
             data_snapshot_uri=f"s3://bucket/{name}/data.csv",
             output_uri=f"s3://bucket/{name}/model.tar.gz",
             status=status,
-        )
+         vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
 
     not_trained = create_job("failed", status="failed")
     trained = create_job("trained")
@@ -177,98 +127,32 @@ def test_training_job_list_reports_model_lifecycle_status():
 
 
 @pytest.mark.django_db
-def test_submit_job_requires_pending_status(monkeypatch):
-    user = get_user_model().objects.create_user("submit-status@example.com", "password123")
-    project = ModelProject.objects.create(owner=user, name="NIDS")
-    client = APIClient()
-    client.force_authenticate(user)
-    monkeypatch.setattr("apps.observability.services.outbox._publish_pending", lambda: None)
+def test_submit_job_is_idempotent_for_one_run_key(studio, monkeypatch):
+    import uuid
+    job, storage, client, _ = studio
+    monkeypatch.setattr("apps.training.services.drafts.S3Storage", lambda: storage)
+    payload = {"revision": job.revision, "run_key": str(uuid.uuid4())}
+    url = f"/api/training-jobs/{job.public_id}/submit/"
+    assert client.post(url, payload, format="json").status_code == 202
+    assert client.post(url, payload, format="json").status_code == 202
+    assert client.post(url, {**payload, "run_key": str(uuid.uuid4())}, format="json").status_code == 409
+    job.refresh_from_db()
+    assert job.status == "queued"
 
-    pending_job = TrainingJob.objects.create(
-        project=project,
-        name="pending-job",
-        model_flavor="sklearn",
-        code_snapshot_uri="s3://bucket/source.zip",
-        data_snapshot_uri="s3://bucket/train.csv",
-        output_uri="s3://bucket/model.tar.gz",
-        status="pending",
-    )
-    submit_res = client.post(f"/api/training-jobs/{pending_job.public_id}/submit/")
-    assert submit_res.status_code == 202
-    pending_job.refresh_from_db()
-    assert pending_job.status == "queued"
-
-    # Submitting already queued job fails with 409 Conflict
-    re_submit = client.post(f"/api/training-jobs/{pending_job.public_id}/submit/")
-    assert re_submit.status_code == 409
-    assert "Only pending jobs can be submitted" in re_submit.data["error"]["detail"]
-
-    # Submitting a failed job fails with 409 Conflict
-    failed_job = TrainingJob.objects.create(
-        project=project,
-        name="failed-job",
-        model_flavor="sklearn",
-        code_snapshot_uri="s3://bucket/source.zip",
-        data_snapshot_uri="s3://bucket/train.csv",
-        output_uri="s3://bucket/model.tar.gz",
-        status="failed",
-    )
-    failed_submit = client.post(f"/api/training-jobs/{failed_job.public_id}/submit/")
-    assert failed_submit.status_code == 409
-    assert "Only pending jobs can be submitted" in failed_submit.data["error"]["detail"]
-
-    # Submitting a cancelled job fails with 409 Conflict
-    cancelled_job = TrainingJob.objects.create(
-        project=project,
-        name="cancelled-job",
-        model_flavor="sklearn",
-        code_snapshot_uri="s3://bucket/source.zip",
-        data_snapshot_uri="s3://bucket/train.csv",
-        output_uri="s3://bucket/model.tar.gz",
-        status="cancelled",
-    )
-    cancelled_submit = client.post(f"/api/training-jobs/{cancelled_job.public_id}/submit/")
-    assert cancelled_submit.status_code == 409
-    assert "Only pending jobs can be submitted" in cancelled_submit.data["error"]["detail"]
 
 
 @pytest.mark.django_db
-def test_failed_job_retry_endpoint_creates_new_attempt(monkeypatch):
-    from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
-    from django.core.files.uploadedfile import SimpleUploadedFile
-
-    user = get_user_model().objects.create_user("retry-endpoint@example.com", "password123")
-    project = ModelProject.objects.create(owner=user, name="NIDS")
-    client = APIClient()
-    client.force_authenticate(user)
-    monkeypatch.setattr("apps.observability.services.outbox._publish_pending", lambda: None)
-
-    storage = MemoryStorage()
-    code_file = storage.put("orig/code.zip", SimpleUploadedFile("code.zip", b"code"), "application/zip")
-    data_file = storage.put("orig/data.zip", SimpleUploadedFile("data.zip", b"data"), "application/zip")
-
-    failed_job = TrainingJob.objects.create(
-        project=project,
-        name="failed-job",
-        model_flavor="sklearn",
-        code_snapshot_uri=code_file.uri,
-        data_snapshot_uri=data_file.uri,
-        output_uri="s3://bucket/model.tar.gz",
-        status="failed",
-    )
-
-    monkeypatch.setattr("apps.training.services.jobs.S3Storage", lambda: storage)
-    retry_res = client.post(f"/api/training-jobs/{failed_job.public_id}/retry/")
-    assert retry_res.status_code == 201
-
-    failed_job.refresh_from_db()
-    assert failed_job.status == "failed"
-
-    new_job = TrainingJob.objects.get(public_id=retry_res.data["id"])
-    assert new_job.pk != failed_job.pk
-    assert new_job.public_id != failed_job.public_id
-    assert new_job.retry_of == failed_job
-    assert new_job.status == "queued"
-    assert new_job.trigger_kind == "retry"
-
-
+def test_failed_job_retry_endpoint_creates_editing_job(studio, monkeypatch):
+    import uuid
+    from apps.training.services.drafts import submit_draft
+    job, storage, client, _ = studio
+    original = submit_draft(job, revision=job.revision, run_key=uuid.uuid4(), storage=storage)
+    TrainingJob.objects.filter(pk=job.pk).update(status="failed")
+    monkeypatch.setattr("apps.training.services.drafts.S3Storage", lambda: storage)
+    payload = {"creation_key": str(uuid.uuid4())}
+    url = f"/api/training-jobs/{job.public_id}/retry/"
+    response = client.post(url, payload, format="json")
+    assert response.status_code == 201
+    retry = TrainingJob.objects.get(public_id=response.data["id"])
+    assert retry.status == "editing" and retry.retry_of == original and retry.submitted_at is None
+    assert client.post(url, payload, format="json").data["id"] == response.data["id"]

@@ -247,67 +247,39 @@ def validate_workflow_evidently_task(context: ValidationContext) -> None:
 
 @pytest.mark.validate
 def validate_workflow_training_task(context: ValidationContext) -> None:
-    """Verify Training task: CPU/GPU conditional branching, Kubeflow PyTorchJob CRD, completion conditions."""
+    from ..trainer import patch_pod, trainjob
     execution = context.render("k8s/argo")
     template = find_resource(execution, "WorkflowTemplate", "mlops-paas-training-pipeline-template")
-    assert template, "WorkflowTemplate mlops-paas-training-pipeline-template must exist"
-
-    spec = template.get("spec") or {}
-    assert spec.get("serviceAccountName") == "argo-workflow-training-sa"
-    assert spec.get("entrypoint") == "training-pipeline"
-    assert spec.get("onExit") == "report-status"
-
-    templates = {t.get("name"): t for t in spec.get("templates") or []}
-    pipeline = templates.get("training-pipeline")
-    assert pipeline, "Training workflow must define 'training-pipeline' entrypoint"
-
-    # Verify CPU vs GPU conditional steps
-    steps = (pipeline.get("steps") or [[]])[0]
-    cpu_step = next((s for s in steps if s.get("name") == "run-cpu-pytorch-job"), None)
-    gpu_step = next((s for s in steps if s.get("name") == "run-gpu-pytorch-job"), None)
-    assert cpu_step, "Training pipeline must include 'run-cpu-pytorch-job' step"
-    assert gpu_step, "Training pipeline must include 'run-gpu-pytorch-job' step"
-    assert "!= 'gpu'" in cpu_step.get("when", "")
-    assert "== 'gpu'" in gpu_step.get("when", "")
-    gpu_arguments = {p["name"]: p.get("value") for p in gpu_step["arguments"]["parameters"]}
-    assert gpu_arguments["accelerator_model"] == "{{inputs.parameters.accelerator_model}}"
-    gpu_manifest = templates["gpu-pytorch-job"]["resource"]["manifest"]
-    assert all(value in gpu_manifest for value in ("g4dn.xlarge", "g4dn.2xlarge", "g5.xlarge", "g5.2xlarge"))
-    assert "invalid-gpu-model" in gpu_manifest
-    gpu_job = _safe_parse_embedded_manifest(gpu_manifest)
-    gpu_pod = gpu_job["spec"]["pytorchReplicaSpecs"]["Master"]["template"]["spec"]
-    assert gpu_pod["affinity"]["nodeAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"]["nodeSelectorTerms"][0]["matchExpressions"][0]["key"] == "node.kubernetes.io/instance-type"
-    resources = gpu_pod["containers"][0]["resources"]
-    assert resources["requests"]["nvidia.com/gpu"] == "placeholder"
-    assert resources["limits"]["nvidia.com/gpu"] == "placeholder"
-
+    spec = template["spec"]
+    assert spec["serviceAccountName"] == "argo-workflow-training-sa"
+    assert spec["entrypoint"] == "training-pipeline" and spec["onExit"] == "report-status"
+    templates = {t["name"]: t for t in spec["templates"]}
+    steps = templates["training-pipeline"]["steps"][0]
+    assert {s["name"] for s in steps} == {"run-cpu-train-job", "run-gpu-train-job"}
+    assert "!= 'gpu'" in steps[0]["when"] and "== 'gpu'" in steps[1]["when"]
+    assert templates["wait-training"]["container"]["command"] == ["python", "/ops/job_ops.py", "wait-training"]
+    for name in ("cpu-train-job", "gpu-train-job"):
+        resource = templates[name]["resource"]
+        assert resource["action"] == "create" and not resource["setOwnerReference"]
+        job = trainjob(name)
+        assert job["apiVersion"] == "trainer.kubeflow.org/v1alpha1" and job["kind"] == "TrainJob"
+        assert job["metadata"]["namespace"] == "mlops-paas-training"
+        assert job["spec"]["trainer"]["numNodes"] == 1
+        assert job["spec"]["activeDeadlineSeconds"] == 2760
+    for model, expected in (("t4", ["g4dn.xlarge", "g4dn.2xlarge"]), ("a10g", ["g5.xlarge", "g5.2xlarge"])):
+        job = trainjob("gpu-train-job", model)
+        pod = patch_pod(job)["spec"]
+        expression = pod["affinity"]["nodeAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"]["nodeSelectorTerms"][0]["matchExpressions"][0]
+        assert expression["key"] == "node.kubernetes.io/instance-type" and expression["values"] == expected
+        for mode in ("requests", "limits"):
+            assert str(job["spec"]["trainer"]["resourcesPerNode"][mode]["nvidia.com/gpu"]) == "1"
     sensor = find_resource(execution, "Sensor", "model-sensor")
     dependency = next(d for d in sensor["spec"]["dependencies"] if d["name"] == "train-dep")
-    expressions = dependency["filters"]["exprs"]
-    gpu_filter = next(item for item in expressions if "accelerator_count" in item["expr"])
+    gpu_filter = next(item for item in dependency["filters"]["exprs"] if "accelerator_count" in item["expr"])
     assert 'accelerator_count == 1' in gpu_filter["expr"]
-    assert 'accelerator_model == "t4"' in gpu_filter["expr"]
-    assert 'accelerator_model == "a10g"' in gpu_filter["expr"]
-
-    # Verify PyTorchJob CRD manifest
-    cpu_job_tmpl = templates.get("cpu-pytorch-job")
-    assert cpu_job_tmpl, "Training workflow must define 'cpu-pytorch-job' template"
-    cpu_res = cpu_job_tmpl.get("resource") or {}
-    assert cpu_res.get("action") == "create"
-    assert cpu_res.get("successCondition") == "status.replicaStatuses.Master.succeeded == 1"
-    assert cpu_res.get("failureCondition") == "status.replicaStatuses.Master.failed > 0"
-
-    raw_manifest = cpu_res.get("manifest", "")
-    job_manifest = _safe_parse_embedded_manifest(raw_manifest)
-    assert job_manifest.get("apiVersion") == "kubeflow.org/v1"
-    assert job_manifest.get("kind") == "PyTorchJob"
-    assert job_manifest.get("metadata", {}).get("namespace") == "mlops-paas-training"
-    assert job_manifest.get("spec", {}).get("runPolicy", {}).get("cleanPodPolicy") == "Running"
-
-    # Verify cancel template
-    cancel_tmpl = find_resource(execution, "WorkflowTemplate", "mlops-paas-training-cancel-template")
-    assert cancel_tmpl, "WorkflowTemplate mlops-paas-training-cancel-template must exist"
-    assert cancel_tmpl.get("spec", {}).get("serviceAccountName") == "argo-workflow-training-sa"
+    assert 'accelerator_model == "t4"' in gpu_filter["expr"] and 'accelerator_model == "a10g"' in gpu_filter["expr"]
+    cancel = find_resource(execution, "WorkflowTemplate", "mlops-paas-training-cancel-template")
+    assert cancel["spec"]["serviceAccountName"] == "argo-job-operations-sa"
 
 
 @pytest.mark.validate
@@ -392,12 +364,12 @@ def validate_workflow_rbac_isolation(context: ValidationContext) -> None:
     deploy_groups = {g for rule in deploy_role.get("rules", []) for g in rule.get("apiGroups", [])}
     assert deploy_groups.issubset({"", "apps"}), f"Deploy role exceeded scope: {deploy_groups}"
 
-    # 2. argo-training-job-role in mlops-paas-training: kubeflow.org + core pods/logs/events only
+    # 2. argo-training-job-role in mlops-paas-training: trainer.kubeflow.org + core pods/logs/events only
     training_role = find_resource(roles, "Role", "argo-training-job-role")
     assert training_role, "Role argo-training-job-role must exist"
     assert resource_namespace(training_role) == "mlops-paas-training"
     training_groups = {g for rule in training_role.get("rules", []) for g in rule.get("apiGroups", [])}
-    assert training_groups.issubset({"", "kubeflow.org"}), f"Training role exceeded scope: {training_groups}"
+    assert training_groups.issubset({"", "trainer.kubeflow.org"}), f"Training role exceeded scope: {training_groups}"
 
     # 3. argo-job-operations in mlops-paas-execution
     ops_role = find_resource(roles, "Role", "argo-job-operations")

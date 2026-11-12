@@ -4,6 +4,7 @@ import logging
 import re
 import tempfile
 import uuid
+from rest_framework.exceptions import ValidationError
 
 from django.conf import settings
 from django.http import StreamingHttpResponse
@@ -15,7 +16,7 @@ from rest_framework.views import APIView
 from apps.catalog.models import ModelProject
 from apps.training.models import TrainingJob, TrainingOutput
 from infrastructure.storage import S3Storage
-from infrastructure.storage.paths import training_mlflow_artifacts_prefix
+from apps.training.services.storage_scope import training_prefix_for
 from ..auth import (
     _is_job_active_for_mutation,
     _is_project_allowed_for_api_key,
@@ -25,6 +26,12 @@ from ..auth import (
 from .runs import _mlflow_artifact_uri
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_relative(path):
+    if path and ("\\" in path or any(part in {"", ".", ".."} for part in path.split("/")) or any(ord(c) < 32 for c in path)):
+        raise ValidationError("Unsafe artifact path.")
+    return path
 
 
 def _bucket_name() -> str:
@@ -64,6 +71,9 @@ def _parse_artifact_path(subpath: str):
        - users/<tenant>/models/<project>
     """
     clean = (subpath or "").strip().strip("/")
+    tenant_job = re.fullmatch(r"users/([^/]+)/training/jobs/([^/]+)(?:/(?:mlflow/)?artifacts)?(?:/(.*))?", clean)
+    if tenant_job:
+        return tenant_job.group(1), None, tenant_job.group(2), _safe_relative(tenant_job.group(3) or "")
 
     # 1. Job-scoped path
     m_job = re.match(
@@ -72,7 +82,7 @@ def _parse_artifact_path(subpath: str):
     )
     if m_job:
         tenant, project, job, rel = m_job.group(1), m_job.group(2), m_job.group(3), m_job.group(4)
-        return tenant, project, job, rel or ""
+        return tenant, project, job, _safe_relative(rel or "")
 
     # 2. Experiment-scoped path
     m_exp = re.match(
@@ -98,6 +108,7 @@ class MLflowArtifactsUploadUrlView(APIView):
 
         run_id = request.data.get("run_id")
         artifact_path = request.data.get("path", "").strip().lstrip("/")
+        _safe_relative(artifact_path)
         if not artifact_path:
             return Response({"error_code": "INVALID_PARAMETER_VALUE", "message": "Path is required"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -106,7 +117,7 @@ class MLflowArtifactsUploadUrlView(APIView):
             return err_job
 
         bucket = _bucket_name()
-        s3_key = f"{training_mlflow_artifacts_prefix(tenant_id, job.project.public_id, job.public_id)}{artifact_path}"
+        s3_key = f"{training_prefix_for(job)}/mlflow/artifacts/{artifact_path}"
         storage = S3Storage()
         upload_url = storage.presigned_put(f"s3://{bucket}/{s3_key}", expires_in=3600)
 
@@ -146,7 +157,7 @@ class MLflowArtifactsProxyView(APIView):
         effective_path = _combine_effective_path(subpath, query_path)
         path_tenant_id, path_project_id, path_job_id, rel_path = _parse_artifact_path(effective_path)
 
-        if not path_tenant_id or not path_project_id or not path_job_id:
+        if not path_tenant_id or not path_job_id:
             return Response(
                 {"error_code": "INVALID_PARAMETER_VALUE", "message": "Artifact upload requires a job-scoped path with a valid job ID."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -169,7 +180,7 @@ class MLflowArtifactsProxyView(APIView):
         elif path_job_id:
             try:
                 job_uuid = uuid.UUID(str(path_job_id))
-                job = TrainingJob.objects.filter(public_id=job_uuid, project__owner__tenant_id=auth_tenant_id).first()
+                job = TrainingJob.objects.filter(public_id=job_uuid, owner__tenant_id=auth_tenant_id).first()
             except (ValueError, TypeError):
                 pass
 
@@ -179,7 +190,7 @@ class MLflowArtifactsProxyView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        if path_project_id and str(job.project.public_id) != path_project_id:
+        if path_project_id and str(job.storage_project_id or "") != path_project_id:
             return Response(
                 {"error_code": "PERMISSION_DENIED", "message": "Artifact path does not belong to this project."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -206,7 +217,7 @@ class MLflowArtifactsProxyView(APIView):
             )
 
         content_type = request.content_type or "application/octet-stream"
-        s3_key = f"{training_mlflow_artifacts_prefix(auth_tenant_id, job.project.public_id, job.public_id)}{rel_path}"
+        s3_key = f"{training_prefix_for(job)}/mlflow/artifacts/{rel_path}"
 
         max_upload_size = getattr(settings, "MLFLOW_MAX_ARTIFACT_UPLOAD_SIZE_BYTES", 5 * 1024 * 1024 * 1024)
 
@@ -294,7 +305,7 @@ class MLflowArtifactsProxyView(APIView):
         effective_path = _combine_effective_path(subpath, query_path)
         path_tenant_id, path_project_id, path_job_id, rel_path = _parse_artifact_path(effective_path)
 
-        if not path_tenant_id or not path_project_id:
+        if not path_tenant_id or (not path_project_id and not path_job_id):
             return Response(
                 {"error_code": "INVALID_PARAMETER_VALUE", "message": "Artifact URI must use the project-scoped or job-scoped MLflow path."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -351,7 +362,7 @@ class MLflowArtifactsProxyView(APIView):
         elif path_job_id:
             try:
                 job_uuid = uuid.UUID(str(path_job_id))
-                job = TrainingJob.objects.filter(public_id=job_uuid, project__owner__tenant_id=auth_tenant_id).first()
+                job = TrainingJob.objects.filter(public_id=job_uuid, owner__tenant_id=auth_tenant_id).first()
             except (ValueError, TypeError):
                 pass
 
@@ -361,7 +372,7 @@ class MLflowArtifactsProxyView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        if path_project_id and str(job.project.public_id) != path_project_id:
+        if path_project_id and str(job.storage_project_id or "") != path_project_id:
             return Response(
                 {"error_code": "PERMISSION_DENIED", "message": "Artifact path does not belong to this project."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -383,7 +394,7 @@ class MLflowArtifactsProxyView(APIView):
 
         if exact_output or (not is_explicit_listing and "." in rel_path.split("/")[-1]):
             bucket = _bucket_name()
-            s3_key = f"{training_mlflow_artifacts_prefix(auth_tenant_id, job.project.public_id, job.public_id)}{rel_path}"
+            s3_key = f"{training_prefix_for(job)}/mlflow/artifacts/{rel_path}"
             s3_uri = f"s3://{bucket}/{s3_key}"
             storage = S3Storage()
 
@@ -496,7 +507,7 @@ class MLflowArtifactsProxyView(APIView):
         effective_path = _combine_effective_path(subpath, query_path)
         path_tenant_id, path_project_id, path_job_id, rel_path = _parse_artifact_path(effective_path)
 
-        if not path_tenant_id or not path_project_id or not path_job_id:
+        if not path_tenant_id or not path_job_id:
             return Response(
                 {"error_code": "INVALID_PARAMETER_VALUE", "message": "Artifact deletion requires a job-scoped path with a valid job ID."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -519,7 +530,7 @@ class MLflowArtifactsProxyView(APIView):
         elif path_job_id:
             try:
                 job_uuid = uuid.UUID(str(path_job_id))
-                job = TrainingJob.objects.filter(public_id=job_uuid, project__owner__tenant_id=auth_tenant_id).first()
+                job = TrainingJob.objects.filter(public_id=job_uuid, owner__tenant_id=auth_tenant_id).first()
             except (ValueError, TypeError):
                 pass
 
@@ -529,7 +540,7 @@ class MLflowArtifactsProxyView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        if path_project_id and str(job.project.public_id) != path_project_id:
+        if path_project_id and str(job.storage_project_id or "") != path_project_id:
             return Response(
                 {"error_code": "PERMISSION_DENIED", "message": "Artifact path does not belong to this project."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -553,7 +564,7 @@ class MLflowArtifactsProxyView(APIView):
         bucket = _bucket_name()
 
         if rel_path:
-            s3_key = f"{training_mlflow_artifacts_prefix(auth_tenant_id, job.project.public_id, job.public_id)}{rel_path}"
+            s3_key = f"{training_prefix_for(job)}/mlflow/artifacts/{rel_path}"
             try:
                 storage.delete(f"s3://{bucket}/{s3_key}")
             except Exception:
@@ -564,7 +575,7 @@ class MLflowArtifactsProxyView(APIView):
                 pass
             TrainingOutput.objects.filter(job=job, relative_path__startswith=f"artifacts/{rel_path}").delete()
         else:
-            s3_prefix = training_mlflow_artifacts_prefix(auth_tenant_id, job.project.public_id, job.public_id)
+            s3_prefix = training_prefix_for(job) + "/mlflow/artifacts/"
             try:
                 storage.delete_prefix(s3_prefix)
             except Exception:

@@ -17,13 +17,12 @@ def _job(email="owner@example.com"):
     project = ModelProject.objects.create(owner=user, name=f"project-{email}")
     job = TrainingJob.objects.create(
         project=project,
-        name="nightly",
         model_flavor="sklearn",
         code_snapshot_uri="pending",
         data_snapshot_uri="pending",
         output_uri="pending",
         status="running",
-    )
+     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     uris = expected_training_uris(job, settings.AWS_STORAGE_BUCKET_NAME)
     job.code_snapshot_uri = uris["code"]
     job.data_snapshot_uri = uris["data"]

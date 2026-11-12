@@ -59,3 +59,7 @@ replay or expired leases are denied. See docs/dev/p1-execution-recovery.md for r
 ## Configuration
 
 Secrets enter trusted services through environment/Secret resources. Tenant jobs receive explicit minimal values. Inspect `.env.example`, Compose, Kubernetes ConfigMaps/Secrets, workflow templates, and tests together before adding a variable.
+
+## Independent training
+
+Read [training-workspaces.md](training-workspaces.md) for account-owned drafts/jobs, optional Project links, immutable input_contract snapshots, read-only Input preparation, output-directory model export, one-use runtime configuration and resumable preservation during Project deletion. Assignment must not change runtime identity or storage namespace.

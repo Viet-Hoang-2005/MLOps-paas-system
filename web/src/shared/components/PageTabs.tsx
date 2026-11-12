@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
+import { cn } from "@/shared/lib/cn";
 
 export type PageTab = {
   label: string;
@@ -10,15 +11,17 @@ export type PageTab = {
   isActive?: boolean;
 };
 
-type PageTabsProps = {
+export type PageTabsProps = {
   tabs: PageTab[];
+  className?: string;
+  bordered?: boolean;
 };
 
-export function PageTabs({ tabs }: PageTabsProps) {
+export function PageTabs({ tabs, className, bordered = false }: PageTabsProps) {
   const { t } = useTranslation("common");
-  return (
+  const nav = (
     <nav
-      className="-mb-px w-full overflow-x-auto md:w-auto"
+      className={cn("-mb-px w-full overflow-x-auto md:w-auto", className)}
       aria-label={t("accessibility.pageSections")}
     >
       <div className="flex min-w-max items-center gap-2">
@@ -73,4 +76,10 @@ export function PageTabs({ tabs }: PageTabsProps) {
       </div>
     </nav>
   );
+
+  if (bordered) {
+    return <div className="border-b border-border">{nav}</div>;
+  }
+
+  return nav;
 }

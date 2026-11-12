@@ -1,3 +1,4 @@
+from django.utils import timezone
 import pytest
 from django.contrib.auth import get_user_model
 
@@ -32,12 +33,11 @@ def test_argo_training_backend_records_runtime_selectors():
     project = ModelProject.objects.create(owner=user, name="NIDS")
     job = TrainingJob.objects.create(
         project=project,
-        name="nightly",
         code_snapshot_uri="s3://bucket/code.zip",
         data_snapshot_uri="s3://bucket/train.csv",
         output_uri="s3://bucket/model.tar.gz",
         mlflow_artifact_uri="s3://bucket/mlflow/",
-    )
+     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="queued", submitted_at=timezone.now())
     scoped_uris = expected_training_uris(job, "bucket")
     job.code_snapshot_uri = scoped_uris["code"]
     job.data_snapshot_uri = scoped_uris["data"]
@@ -55,7 +55,7 @@ def test_argo_training_backend_records_runtime_selectors():
     assert job.tracking["runtime"] == {
         "backend": "argo",
         "namespace": "mlops-paas-training",
-        "pytorch_job_name": runtime_name,
+        "train_job_name": runtime_name,
         "workflow_selector": expected_selector,
         "pod_selector": expected_selector,
     }
@@ -74,12 +74,11 @@ def test_argo_cancel_uses_job_bound_callback_capability(settings):
     project = ModelProject.objects.create(owner=user, name="Cancel NIDS")
     job = TrainingJob.objects.create(
         project=project,
-        name="cancel-nightly",
         code_snapshot_uri="s3://bucket/code.zip",
         data_snapshot_uri="s3://bucket/train.csv",
         output_uri="s3://bucket/model.tar.gz",
         status="cancelling",
-    )
+     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     client = FakeArgoClient()
     settings.ARGO_CANCEL_TRAINING_WEBHOOK_URL = "http://argo-events/cancel-train"
     settings.CONTROL_PLANE_INTERNAL_URL = "http://control-plane:8000"
@@ -90,6 +89,8 @@ def test_argo_cancel_uses_job_bound_callback_capability(settings):
     assert result["dispatched"] is True
     assert payload["job_id"] == str(job.public_id)
     assert payload["job_name"] == f"training-{job.public_id}"
+    assert payload["tenant_id"] == job.owner.tenant_id
+    assert payload["project_id"] == str(project.public_id)
     assert "namespace" not in payload
     assert payload["control_plane_callback_url"].endswith(
         f"/internal/webhooks/training-jobs/{job.public_id}/cancellation/"
@@ -114,7 +115,7 @@ def test_argo_training_is_not_status_polled_without_the_watcher(settings, monkey
 
     owner = get_user_model().objects.create_user("argo-poll@example.com", "test-password")
     project = ModelProject.objects.create(owner=owner, name="argo-poll")
-    job = TrainingJob.objects.create(project=project, name="job", model_flavor="sklearn", backend="argo", status="running")
+    job = TrainingJob.objects.create(project=project, model_flavor="sklearn", backend="argo", status="running", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     monkeypatch.setattr("apps.training.tasks.training_backend", lambda _: backend)
     assert poll_training_job_status.run(str(job.public_id)) == "running"
     job.refresh_from_db()

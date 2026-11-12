@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.training.models import TrainingJobTag
-from infrastructure.storage.paths import training_mlflow_artifacts_prefix
+from apps.training.services.storage_scope import training_prefix_for
 from ..auth import (
     _is_job_active_for_mutation,
     _require_auth,
@@ -15,11 +15,7 @@ from ..auth import (
 
 
 def _mlflow_artifact_uri(job):
-    key = training_mlflow_artifacts_prefix(
-        job.project.owner.tenant_id,
-        job.project.public_id,
-        job.public_id,
-    ).rstrip("/")
+    key = training_prefix_for(job) + "/mlflow/artifacts"
     return f"mlflow-artifacts:/{key}"
 
 
@@ -51,7 +47,6 @@ class MLflowRunsCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        run_name = request.data.get("run_name") or "training-run"
         tags = request.data.get("tags") or []
         exp_id = request.data.get("experiment_id")
 
@@ -59,7 +54,7 @@ class MLflowRunsCreateView(APIView):
         if exp_id:
             try:
                 proj_uuid = uuid.UUID(str(exp_id))
-                if target_job.project.public_id != proj_uuid:
+                if (target_job.storage_project_id or target_job.public_id) != proj_uuid:
                     return Response(
                         {"error_code": "PERMISSION_DENIED", "message": "Capability token cannot create runs in another experiment."},
                         status=status.HTTP_403_FORBIDDEN,
@@ -85,8 +80,8 @@ class MLflowRunsCreateView(APIView):
                     "info": {
                         "run_id": str(target_job.public_id),
                         "run_uuid": str(target_job.public_id),
-                        "run_name": run_name or target_job.name,
-                        "experiment_id": str(target_job.project.public_id),
+                        "run_name": str(target_job.public_id),
+                        "experiment_id": str(target_job.storage_project_id or target_job.public_id),
                         "status": "RUNNING",
                         "start_time": int((target_job.started_at or timezone.now()).timestamp() * 1000),
                         "artifact_uri": artifact_uri,
@@ -184,8 +179,8 @@ class MLflowRunsGetView(APIView):
                     "info": {
                         "run_id": str(job.public_id),
                         "run_uuid": str(job.public_id),
-                        "run_name": job.name,
-                        "experiment_id": str(job.project.public_id),
+                        "run_name": str(job.public_id),
+                        "experiment_id": str(job.storage_project_id or job.public_id),
                         "status": mlflow_status,
                         "start_time": int((job.started_at or timezone.now()).timestamp() * 1000),
                         "end_time": end_time,

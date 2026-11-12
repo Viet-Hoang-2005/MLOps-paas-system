@@ -4,8 +4,8 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.auth.api.serializers import AvatarSerializer, TenantTokenSerializer, UserSerializer
-from apps.auth.models import UserAvatar
+from apps.auth.api.serializers import TenantTokenSerializer, UserSerializer
+from apps.auth.services.avatars import update_profile
 from apps.auth.services.cookies import set_refresh_token_cookie, verify_auth_security_headers
 from apps.auth.services.otp import read_token, send_otp, verify_otp
 from apps.auth.services.tokens import revoke_user_refresh_tokens
@@ -20,42 +20,12 @@ class ProfileEndpoint(APIView):
     def put(self, request):
         serializer = UserSerializer(request.user, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        if str(request.data.get("remove_avatar", "")).lower() == "true":
-            user.avatar = None
-            user.save(update_fields=["avatar"])
-        elif request.FILES.get("avatar"):
-            user.avatar = request.FILES["avatar"]
-            user.save(update_fields=["avatar"])
-            UserAvatar.objects.create(user=user, image=user.avatar.name)
+        upload = request.FILES.get("avatar")
+        if "avatar" in request.data and upload is None:
+            raise serializers.ValidationError({"avatar": "Upload an image file."})
+        update_profile(request.user, changes=serializer.validated_data, avatar=upload,
+                       remove=str(request.data.get("remove_avatar", "")).lower() == "true")
         return Response({"message": "Profile updated."})
-
-
-class AvatarHistoryEndpoint(APIView):
-    def get(self, request):
-        current = request.user.avatar.name if request.user.avatar else ""
-        avatars = AvatarSerializer(request.user.avatar_history.all(), many=True, context={"request": request}).data
-        return Response(
-            {
-                "avatars": [
-                    {
-                        "id": item["id"],
-                        "url": item["image"],
-                        "is_current": bool(current and str(item["image"]).endswith(current)),
-                        "created_at": item["created_at"],
-                    }
-                    for item in avatars
-                ]
-            }
-        )
-
-
-class AvatarSelectEndpoint(APIView):
-    def post(self, request, avatar_id):
-        avatar = request.user.avatar_history.get(public_id=avatar_id)
-        request.user.avatar = avatar.image.name
-        request.user.save(update_fields=["avatar"])
-        return Response({"message": "Avatar selected."})
 
 
 class AccountDeleteEndpoint(APIView):

@@ -224,6 +224,7 @@ export const projectsVi = {
     accepted: "Loại tệp được chấp nhận: .txt",
   },
   sourceEditor: {
+    editFile: "Chỉnh sửa {{path}}",
     downloadFailed: "Tải xuống thất bại",
     loadContentFailed: "Không thể tải nội dung {{path}}",
     loadListFailed: "Không thể tải danh sách {{title}}.",

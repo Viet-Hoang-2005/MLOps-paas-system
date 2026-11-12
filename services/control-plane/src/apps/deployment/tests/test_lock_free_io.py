@@ -1,13 +1,13 @@
 """Object-storage and runtime I/O never runs inside a transaction; stalled deletions are re-run."""
 
 import hashlib
+import uuid
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.utils import timezone
 
@@ -92,13 +92,12 @@ def completed_job(project, storage):
     code = storage.put("input/code.zip", b"code")
     job = TrainingJob.objects.create(
         project=project,
-        name="trained",
         model_flavor="xgboost",
         status="completed",
         entry_point="train.py",
         code_snapshot_uri=code.uri,
         data_snapshot_uri=code.uri,
-    )
+     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     for kind, name, payload in (
         ("model", "model.tar.gz", b"model"),
         ("source_code", "train.py", b"print(1)"),
@@ -212,80 +211,79 @@ def test_failure_after_commit_keeps_the_inputs_of_the_created_build(project, sto
 
 
 @pytest.fixture
-def job_storage(monkeypatch, storage):
-    monkeypatch.setattr(job_service, "S3Storage", lambda: storage)
-    monkeypatch.setattr(job_service.settings, "AWS_STORAGE_BUCKET_NAME", storage.bucket, raising=False)
+def job_storage(monkeypatch, storage, settings):
+    from apps.training.services import workspaces
+    settings.TRAINING_BACKEND = "argo"
+    settings.TRAINING_EXECUTION_WATCH_ENABLED = True
+    monkeypatch.setattr(workspaces, "S3Storage", lambda: storage)
+    monkeypatch.setattr(job_service, "_enqueue", Mock())
     return storage
 
 
-def job_data(**extra):
-    return {
-        "name": "fresh",
-        "model_flavor": "sklearn",
-        "entry_point": "train.py",
-        "requirements_text": "",
-        "source_zip": b"zip-bytes",
-        "training_data": SimpleUploadedFile("train.csv", b"a,b\n1,2\n"),
-        **extra,
-    }
+def editable_job(project, storage):
+    from apps.training.services import workspaces
+    job = job_service.create_job(owner=project.owner, validated_data={})
+    _, revision = workspaces.create_entry(job, revision=job.revision, path="train.py", kind="script",
+        payload=b"print(1)", storage=storage)
+    return workspaces.update_workspace(job, revision=revision, changes={"entry_point": "train.py",
+        "vcpu": 1, "memory_mb": 2048, "max_runtime_seconds": 900})
 
 
-def test_create_job_writes_snapshots_outside_any_transaction(project, job_storage):
-    job = job_service.create_job(project=project, validated_data=job_data())
+def submit(job, storage):
+    return job_service.submit_job(job, revision=job.revision, run_key=uuid.uuid4(), storage=storage)
+
+
+def test_submit_writes_snapshots_outside_any_transaction(project, job_storage):
+    job = editable_job(project, job_storage)
+    result = submit(job, job_storage)
     assert job_storage.inside_transaction == []
-    assert TrainingJob.objects.filter(pk=job.pk).exists()
-    assert len(job_storage.objects) == 2
+    assert result.pk == job.pk and result.submitted_at
+    assert len(job_storage.objects) == 3
 
 
-def test_create_job_for_a_deleting_project_stores_nothing(project, job_storage):
+def test_deleting_an_unrelated_project_does_not_prevent_a_draft(project, job_storage):
     ModelProject.objects.filter(pk=project.pk).update(deletion_state="deleting")
-    with pytest.raises(Conflict):
-        job_service.create_job(project=project, validated_data=job_data())
-    assert job_storage.objects == {} and not TrainingJob.objects.exists()
+    job = job_service.create_job(owner=project.owner, validated_data={})
+    assert job.project_id is None and job.status == "editing"
+    assert job_storage.objects == {}
 
 
-def test_create_job_cleans_up_when_the_project_starts_deleting_mid_upload(project, job_storage):
+def test_deleting_job_during_upload_discards_submission(project, job_storage):
+    job = editable_job(project, job_storage)
     original_put = job_storage.put
 
     def put_then_delete(key, file, content_type="application/octet-stream"):
         result = original_put(key, file, content_type)
-        ModelProject.objects.filter(pk=project.pk).update(deletion_state="deleting")
+        TrainingJob.objects.filter(pk=job.pk).update(deletion_requested_at=timezone.now())
         return result
 
     job_storage.put = put_then_delete
     with pytest.raises(Conflict):
-        job_service.create_job(project=project, validated_data=job_data())
-    assert not TrainingJob.objects.exists()
-    assert job_storage.deleted
+        submit(job, job_storage)
+    job.refresh_from_db()
+    assert job.submitted_at is None
+    assert job_storage.deleted and job_storage.inside_transaction == []
 
 
-def test_create_job_failure_leaves_no_row_and_cleans_the_prefix(project, job_storage):
-    def broken(*args, **kwargs):
-        raise RuntimeError("s3 down")
-
-    job_storage.put = broken
+def test_submit_storage_failure_preserves_draft_and_cleans_staging(project, job_storage):
+    job = editable_job(project, job_storage)
+    job_storage.put = Mock(side_effect=RuntimeError("s3 down"))
     with pytest.raises(RuntimeError):
-        job_service.create_job(project=project, validated_data=job_data())
-    assert not TrainingJob.objects.exists()
-    assert len(job_storage.deleted) == 1
+        submit(job, job_storage)
+    job.refresh_from_db()
+    assert job.status == "editing" and job.entries.count() == 1
+    assert len(job_storage.deleted) == 1 and job_storage.inside_transaction == []
 
 
-def test_retry_job_copies_inputs_outside_any_transaction(project, job_storage, monkeypatch):
-    monkeypatch.setattr(job_service, "submit_job", lambda job: job)
-    code = job_storage.put("input/code.zip", b"code")
-    failed = TrainingJob.objects.create(
-        project=project,
-        name="failed",
-        model_flavor="sklearn",
-        status="failed",
-        entry_point="train.py",
-        code_snapshot_uri=code.uri,
-        data_snapshot_uri=code.uri,
-    )
+def test_retry_job_copies_inputs_outside_any_transaction(project, job_storage):
+    job = submit(editable_job(project, job_storage), job_storage)
+    TrainingJob.objects.filter(pk=job.pk).update(status="failed")
+    job.refresh_from_db()
     job_storage.inside_transaction.clear()
-    retry = job_service.retry_job(failed, storage=job_storage)
+    retry = job_service.retry_job(job, storage=job_storage, creation_key=uuid.uuid4())
     assert job_storage.inside_transaction == []
-    assert retry.retry_of_id == failed.pk and TrainingJob.objects.filter(pk=retry.pk).exists()
+    assert retry.retry_of_id == job.pk and retry.status == "editing"
+    assert not retry.submitted_at and retry.project_id is None
 
 
 # ---- build deletion -----------------------------------------------------------------------------
@@ -380,17 +378,16 @@ def test_stalled_deletions_are_dispatched_again(project, dispatch):
     stale_project = ModelProject.objects.create(owner=other_owner, name="gone", deletion_state="deleting")
     age(ModelProject, stale_project.pk)
     job = TrainingJob.objects.create(
-        project=project, name="j", model_flavor="sklearn", status="cancelled", deletion_requested_at=timezone.now()
-    )
+        project=project, model_flavor="sklearn", status="cancelled", deletion_requested_at=timezone.now()
+    , vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     TrainingJob.objects.filter(pk=job.pk).update(deletion_requested_at=timezone.now() - timedelta(hours=1))
     errored = TrainingJob.objects.create(
         project=project,
-        name="e",
         model_flavor="sklearn",
         status="cancelled",
         deletion_requested_at=timezone.now() - timedelta(hours=1),
         deletion_error="blocked",
-    )
+     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
 
     assert tasks.reconcile_stalled_deletions() == 3
     dispatch.build.assert_called_once_with(str(stale.public_id))

@@ -38,7 +38,6 @@ class TrainingJobExperimentMetricsEndpoint(APIView):
         return Response(
             {
                 "job_id": str(job.public_id),
-                "name": job.name,
                 "status": job.status,
                 "model_flavor": job.model_flavor,
                 "started_at": job.started_at.isoformat() if job.started_at else None,
@@ -100,7 +99,6 @@ class TrainingJobsCompareEndpoint(APIView):
             runs.append(
                 {
                     "job_id": str(job.public_id),
-                    "name": job.name,
                     "status": job.status,
                     "model_flavor": job.model_flavor,
                     "runtime_seconds": job.runtime_seconds,

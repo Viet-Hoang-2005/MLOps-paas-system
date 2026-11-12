@@ -63,7 +63,7 @@ def reserve(job):
         return
     if not settings.TRAINING_EXECUTION_WATCH_ENABLED:
         raise ServiceUnavailable("Production training requires execution monitoring.")
-    if TrainingQuotaReservation.objects.filter(owner_id=job.project.owner_id, active=True).exists():
+    if TrainingQuotaReservation.objects.filter(owner_id=job.owner_id, active=True).exists():
         raise TrainingConcurrencyExceeded("Another training job is still active or being cleaned up.")
     now = timezone.now()
     deadline = now + timedelta(seconds=settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS)
@@ -71,14 +71,14 @@ def reserve(job):
     limit = limits()[resource]
     overlaps = _window_overlaps(now, deadline, job.max_runtime_seconds)
     for week, amount in overlaps.items():
-        used = TrainingQuotaWeek.objects.filter(reservation__owner_id=job.project.owner_id,
+        used = TrainingQuotaWeek.objects.filter(reservation__owner_id=job.owner_id,
             reservation__resource=resource, week_start=week).aggregate(
                 used=Sum("used_seconds"), reserved=Sum("reserved_seconds"))
         remaining = None if limit is None else max(0, limit - (used["used"] or 0) - (used["reserved"] or 0))
         if remaining is not None and amount > remaining:
             raise QuotaExceeded({"resource": resource, "required_seconds": amount,
                                  "remaining_seconds": remaining, "reset_at": (week + WEEK).isoformat()})
-    reservation = TrainingQuotaReservation.objects.create(owner_id=job.project.owner_id, job_id=job.public_id,
+    reservation = TrainingQuotaReservation.objects.create(owner_id=job.owner_id, job_id=job.public_id,
         resource=resource, submitted_at=now, dispatch_deadline_at=deadline, max_runtime_seconds=job.max_runtime_seconds)
     TrainingQuotaWeek.objects.bulk_create([TrainingQuotaWeek(reservation=reservation, week_start=week,
         reserved_seconds=amount) for week, amount in overlaps.items()])
@@ -90,7 +90,7 @@ def require_reservation(job):
         raise ServiceUnavailable("Training quota reservation is unavailable.")
 
 
-def update_observation(job, *, started_at=None, finished_at=None, stopped=False):
+def update_observation(job, *, started_at=None, finished_at=None, stopped=False, never_started=False):
     """Caller holds owner and job locks; only a confirmed stop releases reservation."""
     reservation = TrainingQuotaReservation.objects.select_for_update().filter(job_id=job.public_id, active=True).first()
     if not reservation:
@@ -109,7 +109,7 @@ def update_observation(job, *, started_at=None, finished_at=None, stopped=False)
         reservation.save(update_fields=["runtime_finished_at"])
     if not stopped:
         return True
-    if not reservation.started_at and job.external_job_id:
+    if not reservation.started_at and job.external_job_id and not never_started:
         return False  # Runtime creation was attempted but no trustworthy start is available.
     end = reservation.runtime_finished_at or finished_at or timezone.now()
     overlaps = _window_overlaps(reservation.started_at, reservation.started_at,

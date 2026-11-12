@@ -1,3 +1,4 @@
+from django.utils import timezone
 import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
@@ -20,8 +21,8 @@ GPU = "GPU-01234567-89ab-cdef-0123-456789abcdef"
 def job(db):
     owner = get_user_model().objects.create_user("runtime@example.com")
     project = ModelProject.objects.create(owner=owner, name="Runtime")
-    return TrainingJob.objects.create(project=project, name="Train", model_flavor="pytorch", status="running",
-                                      backend="docker", external_job_id="container-1", vcpu=2, memory_mb=4096)
+    return TrainingJob.objects.create(project=project, model_flavor="pytorch", status="running",
+                                      backend="docker", external_job_id="container-1", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
 
 
 @pytest.fixture(autouse=True)
@@ -75,7 +76,7 @@ def vector(value, **labels):
 
 def test_prometheus_scopes_all_metrics_to_owned_pod(job):
     job.backend, job.accelerator_type = "argo", "gpu"
-    labels = {"namespace": "mlops-paas-training", "pod": "owned", "container": "pytorch"}
+    labels = {"namespace": "mlops-paas-training", "pod": "owned", "container": "node"}
     gpu = {**labels, "UUID": GPU}
     client = Mock(enabled=True)
     client.query.side_effect = [vector(1, namespace=labels["namespace"], pod="owned"), vector(1, **labels),
@@ -91,7 +92,7 @@ def test_prometheus_scopes_all_metrics_to_owned_pod(job):
 
 def test_prometheus_rejects_ambiguous_gpu_and_keeps_cpu(job):
     job.backend, job.accelerator_type = "argo", "gpu"
-    labels = {"namespace": "mlops-paas-training", "pod": "owned", "container": "pytorch"}
+    labels = {"namespace": "mlops-paas-training", "pod": "owned", "container": "node"}
     client = Mock(enabled=True)
     client.query.side_effect = [vector(1, namespace=labels["namespace"], pod="owned"), vector(1, **labels),
                                 vector(100, **labels), vector(10, **{**labels, "UUID": GPU}) * 2]
@@ -109,7 +110,7 @@ def test_prometheus_stale_and_invalid_values():
 
 def test_prometheus_missing_reserved_memory_does_not_guess_total(job):
     job.backend, job.accelerator_type = "argo", "gpu"
-    labels = {"namespace": "mlops-paas-training", "pod": "owned", "container": "pytorch"}
+    labels = {"namespace": "mlops-paas-training", "pod": "owned", "container": "node"}
     gpu = {**labels, "UUID": GPU}
     client = Mock(enabled=True)
     client.query.side_effect = [vector(1, namespace=labels["namespace"], pod="owned"), vector(1, **labels),

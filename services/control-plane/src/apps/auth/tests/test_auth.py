@@ -1,4 +1,6 @@
 from urllib.parse import urlparse
+from io import BytesIO
+from PIL import Image
 
 import jwt
 import pytest
@@ -9,6 +11,12 @@ from django.test import override_settings
 from rest_framework.test import APIClient
 
 from apps.auth.services.oauth import _oauth_user, authenticate_github, authenticate_google
+
+
+def avatar_png():
+    output = BytesIO()
+    Image.new("RGB", (2, 2), "blue").save(output, format="PNG")
+    return output.getvalue()
 
 
 def browser_auth_headers(origin="http://localhost:5173"):
@@ -33,9 +41,9 @@ class FakeResponse:
 
 
 class GoogleOAuthClient:
-    def __init__(self, profile, avatar=b"avatar", tokeninfo=None, tokeninfo_error=None):
+    def __init__(self, profile, avatar=None, tokeninfo=None, tokeninfo_error=None):
         self.profile = profile
-        self.avatar = avatar
+        self.avatar = avatar if avatar is not None else avatar_png()
         self.tokeninfo = tokeninfo
         self.tokeninfo_error = tokeninfo_error
         self.urls = []
@@ -80,7 +88,7 @@ class GitHubOAuthClient:
             return FakeResponse(
                 payload={"data": {"viewer": {"avatarUrl": "https://avatars.githubusercontent.com/u/12345?size=512"}}}
             )
-        return FakeResponse(content=b"github-avatar")
+        return FakeResponse(content=avatar_png())
 
 
 @pytest.mark.django_db
@@ -357,8 +365,8 @@ def test_google_oauth_saves_provider_avatar_and_profile_exposes_provider():
 
     assert created is True
     assert user.auth_provider == "google"
-    assert user.avatar.name.endswith("oauth-google.png")
-    assert user.avatar_history.count() == 1
+    assert user.avatar.name.endswith(".png")
+    assert not hasattr(user, "avatar_history")
     assert any(url.endswith("=s512-c") for _, url, _ in client.urls)
 
     _, second_login_created = authenticate_google("google-token", http=client)
@@ -372,7 +380,7 @@ def test_google_oauth_saves_provider_avatar_and_profile_exposes_provider():
 
     assert response.status_code == 200
     assert response.data["auth_provider"] == "google"
-    assert urlparse(response.data["avatar"]).path.endswith("oauth-google.png")
+    assert urlparse(response.data["avatar"]).path.endswith(".png")
 
 
 @pytest.mark.django_db
@@ -423,7 +431,7 @@ def test_google_oauth_does_not_restore_a_removed_avatar():
 
 @pytest.mark.django_db
 def test_github_avatar_is_saved_only_when_oauth_creates_the_account():
-    client = GoogleOAuthClient({}, avatar=b"github-avatar")
+    client = GoogleOAuthClient({}, avatar=avatar_png())
 
     user, created = _oauth_user(
         "github-owner@example.com",
@@ -434,7 +442,7 @@ def test_github_avatar_is_saved_only_when_oauth_creates_the_account():
     )
 
     assert created is True
-    assert user.avatar.name.endswith("oauth-github.png")
+    assert user.avatar.name.endswith(".png")
     assert [url for _, url, _ in client.urls] == ["https://avatars.githubusercontent.com/u/12345"]
 
 
@@ -446,7 +454,7 @@ def test_github_oauth_requests_and_saves_a_512_pixel_avatar():
     user, created = authenticate_github("github-code", "http://localhost:5173/oauth/github/callback", http=client)
 
     assert created is True
-    assert user.avatar.name.endswith("oauth-github.png")
+    assert user.avatar.name.endswith(".png")
     graphql_request = next(request for request in client.requests if request[1] == "https://api.github.com/graphql")
     assert "avatarUrl(size: 512)" in graphql_request[2]["json"]["query"]
     assert any(url.endswith("?size=512") for _, url, _ in client.requests)

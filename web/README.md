@@ -1,6 +1,6 @@
-# AdaptML frontend
+# MLlife frontend
 
-The AdaptML frontend is a React 19, TypeScript, Vite, and Tailwind CSS v4 application for the MLOps PaaS control plane. It follows a feature-oriented architecture and keeps backend lifecycle state in React Query.
+The MLlife frontend is a React 19, TypeScript, Vite, and Tailwind CSS v4 application for the MLOps PaaS control plane. It follows a feature-oriented architecture and keeps backend lifecycle state in React Query.
 
 ## Local development
 
@@ -89,7 +89,7 @@ See [Frontend architecture](docs/frontend-architecture.md) and [Design system](d
 - Every interactive control needs a visible `focus-visible` state and a meaningful accessible name.
 - Support `light`, `dark`, and `system` themes. Theme preference is persisted locally.
 - Copy belongs to its feature i18n namespace. All ten namespaces have English and Vietnamese resources. The Header language dropdown replaces the standalone New model button; project creation remains in Model Project and the model-selector menu.
-- Language selection uses `adaptml.language` in localStorage, then the first supported browser language, then English. Switching updates UI and HTML `lang` without navigation, reload or clearing forms. Dates/numbers use `vi-VN`/`en-US`; browser timezone stays unchanged. Backend messages, logs, code, CSV, names and UUIDs are not translated.
+- Language selection uses `mllife.language` in localStorage, then the first supported browser language, then English. Switching updates UI and HTML `lang` without navigation, reload or clearing forms. Dates/numbers use `vi-VN`/`en-US`; browser timezone stays unchanged. Backend messages, logs, code, CSV, names and UUIDs are not translated.
 - `pnpm test:i18n` tests language selection/storage, registration, resource parity/interpolation/plurals and negative fixtures. `pnpm lint` checks both locale resources and hardcoded UI; the CI frontend entry runs these i18n checks alongside build/ESLint.
 
 ## Manual verification checklist

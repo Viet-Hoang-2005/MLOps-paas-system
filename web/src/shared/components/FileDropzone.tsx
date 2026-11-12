@@ -1,7 +1,7 @@
 import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
 import { UploadCloud, X } from "lucide-react";
-import { useRef, useState, type MouseEvent, type ChangeEvent } from "react";
+import { useRef, useState, type MouseEvent, type ChangeEvent, type DragEvent } from "react";
 
 export interface FileDropzoneProps {
   accept: string;
@@ -54,6 +54,16 @@ export function FileDropzone({
     onChange(file);
   };
 
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (disabled) return;
+    const file = event.dataTransfer.files.item(0);
+    if (!file) return;
+    setInternalHasFile(true);
+    onChange(file);
+  };
+
   return (
     <div
       role="button"
@@ -70,6 +80,8 @@ export function FileDropzone({
         if ((event.target as HTMLElement).closest("button")) return;
         inputRef.current?.click();
       }}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={handleDrop}
       onKeyDown={(event) => {
         if (disabled) return;
         if (event.key === "Enter" || event.key === " ") {

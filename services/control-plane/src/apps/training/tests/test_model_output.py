@@ -1,3 +1,4 @@
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 import pytest
@@ -14,7 +15,6 @@ def completed_training_job(db):
     project = ModelProject.objects.create(owner=user, name="Output Project")
     job = TrainingJob.objects.create(
         project=project,
-        name="output-job",
         model_flavor="xgboost",
         status="completed",
         entry_point="train.py",
@@ -22,7 +22,7 @@ def completed_training_job(db):
         data_snapshot_uri="s3://test-bucket/data.zip",
         output_uri="s3://test-bucket/model.tar.gz",
         output_revision=1,
-    )
+     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     TrainingOutput.objects.create(
         job=job,
         kind="model",

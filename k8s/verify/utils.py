@@ -41,7 +41,7 @@ PRODUCTION_NAMESPACES = {
     "headlamp",
     "karpenter",
     "keda",
-    "kubeflow",
+    "kubeflow-system",
     "kyverno",
     "monitoring",
     "mlops-logging",
@@ -91,6 +91,7 @@ EXTERNAL_SECRET_OWNERS = {
     "k8s/workloads/overlays/production/control-plane": {
         ("mlops-paas-core", "mlops-paas-control-plane-secret"),
         ("mlops-paas-core", "mlops-paas-celery-worker-secret"),
+        ("mlops-paas-core", "mlops-training-secret-key"),
     },
     "k8s/workloads/overlays/production/consumer": {("mlops-paas-core", "mlops-paas-consumer-secret")},
     "k8s/workloads/overlays/production/model-server": {
@@ -230,6 +231,15 @@ class ValidationContext:
         with self._lock:
             if path in self._kustomize_cache:
                 return self._kustomize_cache[path]
+        directory = self.render_root / path
+        if not any((directory / name).exists() for name in ("kustomization.yaml", "kustomization.yml", "Kustomization")):
+            resources = [resource for file in sorted(directory.glob("*.yaml"))
+                         for resource in yaml_documents(file.read_text(encoding="utf-8"))]
+            if not resources:
+                raise RenderError(f"Git directory source contains no manifests: {path}")
+            with self._lock:
+                self._kustomize_cache[path] = resources
+            return resources
         if shutil.which("kustomize"):
             command = ["kustomize", "build", "--enable-helm", path]
         elif shutil.which("kubectl"):
@@ -401,7 +411,8 @@ def prepared_context(repo_root: Path | None = None) -> Iterator[ValidationContex
         )
     with tempfile.TemporaryDirectory(prefix="mlops-gitops-") as temporary_directory:
         render_root = Path(temporary_directory)
-        shutil.copytree(source_root / "k8s", render_root / "k8s")
+        shutil.copytree(source_root / "k8s", render_root / "k8s",
+                        ignore=shutil.ignore_patterns(".pytest_cache", "__pycache__", ".ruff_cache"))
         yield ValidationContext(source_root=source_root, render_root=render_root)
 
 

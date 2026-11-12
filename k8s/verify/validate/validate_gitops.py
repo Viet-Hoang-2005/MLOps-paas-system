@@ -26,10 +26,10 @@ EXPECTED_SYNC_OPTIONS = {
 
 @pytest.mark.validate
 def validate_gitops_application_lifecycle_and_contracts(context: ValidationContext) -> None:
-    """Verify that root GitOps renders exactly 35 child Applications with required contracts."""
+    """Verify that root GitOps renders exactly 36 child Applications with required contracts."""
     applications = context.applications
-    assert len(applications) == 35, (
-        f"root GitOps must render exactly 35 child Applications, found {len(applications)}"
+    assert len(applications) == 36, (
+        f"root GitOps must render exactly 36 child Applications, found {len(applications)}"
     )
 
     errors: list[str] = []

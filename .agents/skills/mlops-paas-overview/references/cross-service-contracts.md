@@ -1,6 +1,6 @@
 # Cross-Service Contracts
 
-Training dispatch carries `accelerator_type`, `accelerator_count`, and `accelerator_model` from Control Plane to Argo. Only `(none, 0, empty)`, `(gpu, 1, t4)`, and `(gpu, 1, a10g)` are valid for Argo; the Sensor validates these before the workflow chooses model-bound instance types. Docker GPU jobs use the host's generic GPU and empty model.
+Training dispatch carries `accelerator_type`, `accelerator_count`, and `accelerator_model` from Control Plane to Argo. Only `(none, 0, empty)`, `(gpu, 1, t4)`, and `(gpu, 1, a10g)` are valid for Argo; the Sensor validates these before the workflow chooses model-bound instance types. Docker GPU jobs use a verified NVIDIA device UUID in local_gpu_id and an empty accelerator_model; never automatically switch devices.
 
 ## 1. Environment ID Invariants
 
@@ -9,12 +9,14 @@ Training dispatch carries `accelerator_type`, `accelerator_count`, and `accelera
 | **Model Packager** | `BUILD_ID`, `PROJECT_ID`, `TASK_TYPE`, `BUILD_ENGINE` |
 | **ML & DL Serving** | `PROJECT_ID`, `MODEL_VERSION_ID`, `MODEL_URI` |
 | **Evidently Drift** | `PROJECT_ID`, `MODEL_VERSION_ID`, `DRIFT_RUN_ID`, `TENANT_ID` |
-| **Training Runner** | `TRAINING_JOB_ID`, `PROJECT_ID`, `ENTRY_POINT`, `CAPABILITY_TOKEN` |
+| **Training Runner** | `TRAINING_JOB_ID`, `TENANT_ID`, `ENTRY_POINT`, purpose-scoped capabilities; `PROJECT_ID` is optional/legacy |
 
 > [!CAUTION]
 > Never introduce or fallback to the ambiguous legacy `MODEL_ID` variable.
 
 ## 2. Storage & S3 Layout
+
+A TrainingJob owns its draft and at most one execution under users/{tenant_id}/training/jobs/{job_uuid}/. Draft file keys are immutable draft/objects/{object_id}; frozen Input uses input/submissions/{submission_token}/code/source.zip (unified Input) and data/data.zip. Output is output/model.tar.gz with mlflow/artifacts/. The Project-scoped tree below remains the legacy layout; resolve through training_prefix_for and immutable storage_project_id until verified migration. Assignment never changes paths.
 
 Bucket: `mlops-paas-artifacts`
 
@@ -24,8 +26,8 @@ users/{tenant_id}/models/{project_uuid}/
 ├── data/                                  # Current mutable workspace dataset
 ├── training/jobs/{job_uuid}/
 │   ├── input/code/source.zip              # Immutable source snapshot
-│   ├── input/data/train.csv               # Immutable data snapshot
-│   ├── output/training_output.zip         # Packaged training artifacts bundle
+│   ├── input/data/data.zip               # Immutable data snapshot
+│   ├── output/model.tar.gz         # Packaged training artifacts bundle
 │   └── mlflow/                            # MLflow run artifacts
 ├── versions/{version_uuid}/artifacts/     # Immutable registered model artifacts
 └── drift/{monitor_uuid}/{run_uuid}/       # Evidently HTML/JSON/Summary reports

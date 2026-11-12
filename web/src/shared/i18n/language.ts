@@ -1,5 +1,5 @@
 export type Language = "en" | "vi";
-export const LANGUAGE_STORAGE_KEY = "adaptml.language";
+export const LANGUAGE_STORAGE_KEY = "mllife.language";
 export function normalizeLanguage(
   value: string | null | undefined,
 ): Language | null {

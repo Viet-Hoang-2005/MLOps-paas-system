@@ -20,13 +20,12 @@ def training_job(*, email="delete-training@example.com", status="completed"):
     project = ModelProject.objects.create(owner=owner, name=f"project-{email}")
     job = TrainingJob.objects.create(
         project=project,
-        name="training",
         model_flavor="sklearn",
         code_snapshot_uri="s3://bucket/code.zip",
         data_snapshot_uri="s3://bucket/data.csv",
         output_uri="s3://bucket/output.tar.gz",
         status=status,
-    )
+     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     return owner, job
 
 

@@ -5,6 +5,7 @@ namespace: mlops-paas-core
 resources:
 - ../../../base/control-plane
 - external-secrets.yaml
+- training-secret-key.yaml
 
 images:
 - name: mlops-paas-control-plane

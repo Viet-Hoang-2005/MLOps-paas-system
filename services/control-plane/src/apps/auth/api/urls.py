@@ -2,8 +2,6 @@ from django.urls import path
 
 from .account_endpoints import (
     AccountDeleteEndpoint,
-    AvatarHistoryEndpoint,
-    AvatarSelectEndpoint,
     PasswordChangeCompleteEndpoint,
     PasswordChangeRequestEndpoint,
     PasswordChangeVerifyEndpoint,
@@ -33,8 +31,6 @@ urlpatterns = [
     path("password-reset/complete/", PasswordResetCompleteEndpoint.as_view()),
     path("oauth/google/", GoogleOAuthEndpoint.as_view()),
     path("oauth/github/", GitHubOAuthEndpoint.as_view()),
-    path("profile/avatars/", AvatarHistoryEndpoint.as_view()),
-    path("profile/avatars/<uuid:avatar_id>/select/", AvatarSelectEndpoint.as_view()),
     path("profile/delete/", AccountDeleteEndpoint.as_view()),
     path("profile/password-otp/", PasswordChangeRequestEndpoint.as_view()),
     path("profile/password-otp/verify/", PasswordChangeVerifyEndpoint.as_view()),

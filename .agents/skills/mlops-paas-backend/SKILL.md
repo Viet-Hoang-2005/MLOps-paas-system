@@ -1,6 +1,6 @@
 ---
 name: mlops-paas-backend
-description: Implement, diagnose, or review Python backend services and their contracts: Control Plane, consumer, model-packager, model-server, ML/DL serving, Evidently, and training-runner. Use for API, database, task, callback, execution, storage, inference, drift, or backend test changes.
+description: "Implement, diagnose, or review Python backend services and their contracts: Control Plane, consumer, model-packager, model-server, ML/DL serving, Evidently, and training-runner. Use for API, database, task, callback, execution, storage, inference, drift, or backend test changes."
 ---
 
 # MLOps PaaS Backend
@@ -56,3 +56,7 @@ For Control Plane changes, also run Django checks and dry-run migration validati
 python manage.py check --settings=config.settings.test
 python manage.py makemigrations --check --dry-run --settings=config.settings.test
 ```
+
+## Job-owned training workspaces
+
+For Editing/submit/clone, nullable Project ownership, input contracts, assignment, Secrets, or Project deletion, read [training-workspaces.md](references/training-workspaces.md). Preserve account-owned job identity and snapshots; project assignment must not redefine storage or runtime identity.

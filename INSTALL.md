@@ -217,7 +217,7 @@ pip install -r scripts/requirements.txt
 Chạy script tự động sinh và đồng bộ các nhóm bí mật:
 ```bash
 # Đồng bộ toàn bộ các nhóm secret cấu hình sản xuất
-python scripts/create_and_push_secrets_to_aws.py --groups 0 --yes
+python scripts/create_and_push_secrets_to_aws.py --mode aws --groups 0 --auto --yes --non-interactive
 deactivate
 ```
 Script sẽ nạp các thông tin mật (DB passwords, Harbor credentials, JWT RS256 Private/Public Keys, Webhook secrets) vào 3 container:

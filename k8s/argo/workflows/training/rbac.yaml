@@ -10,9 +10,9 @@ metadata:
   name: argo-training-job-role
   namespace: mlops-paas-training
 rules:
-  - apiGroups: ["kubeflow.org"]
-    resources: ["pytorchjobs"]
-    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: ["trainer.kubeflow.org"]
+    resources: ["trainjobs"]
+    verbs: ["create", "get", "list", "watch"]
   - apiGroups: [""]
     resources: ["pods", "pods/log", "events"]
     verbs: ["get", "list", "watch"]

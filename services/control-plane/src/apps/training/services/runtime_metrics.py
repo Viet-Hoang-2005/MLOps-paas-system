@@ -93,7 +93,7 @@ def _vector(client, expression, *, pod=None, gpu=False):
         return None
     if pod and (labels.get("namespace") != "mlops-paas-training" or labels.get("pod") != pod):
         return None
-    if gpu and (labels.get("container") != "pytorch" or not labels.get("UUID")):
+    if gpu and (labels.get("container") != "node" or not labels.get("UUID")):
         return None
     number = _finite(value[1])
     return (number, labels) if number is not None else None
@@ -105,8 +105,9 @@ def _prometheus_snapshot(job, client=None):
         return None
     ns = "mlops-paas-training"
     scope = {"namespace": ns, "label_mlops_paas_io_training_job_id": str(job.public_id),
-             "label_mlops_paas_io_project_id": str(job.project.public_id),
-             "label_mlops_paas_io_tenant_id": str(job.project.owner.tenant_id)}
+             "label_mlops_paas_io_tenant_id": str(job.owner.tenant_id)}
+    if job.runtime_project_id:
+        scope["label_mlops_paas_io_project_id"] = job.runtime_project_id
     selector = ",".join(f"{k}={json.dumps(v)}" for k, v in scope.items())
     pods = client.query(f"max by (namespace,pod) (kube_pod_labels{{{selector}}})")
     if len(pods) != 1:
@@ -114,7 +115,7 @@ def _prometheus_snapshot(job, client=None):
     pod = pods[0].get("metric", {}).get("pod")
     if not pod or pods[0].get("metric", {}).get("namespace") != ns:
         return None
-    labels = f'namespace={json.dumps(ns)},pod={json.dumps(pod)},container="pytorch"'
+    labels = f'namespace={json.dumps(ns)},pod={json.dumps(pod)},container="node"'
     cgroup = f'{labels},job="kubelet",metrics_path="/metrics/cadvisor"'
     # Rate requires two scrapes; the freshness guard rejects stale cAdvisor/DCGM samples.
     cpu_base = f'container_cpu_usage_seconds_total{{{cgroup}}}'

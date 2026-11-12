@@ -1,7 +1,6 @@
 import { apiClient } from "@/shared/api/client";
 import type { MessageResponse } from "@/shared/types";
 import type {
-  AvatarHistoryResponse,
   PasswordChangeVerifyResponse,
   UpdateProfileAvatarRequest,
   UpdateProfileRequest,
@@ -28,18 +27,6 @@ export const updateProfileAvatar = async (
     })
   ).data;
 };
-
-export const listProfileAvatars = async (): Promise<AvatarHistoryResponse> =>
-  (await apiClient.get<AvatarHistoryResponse>("/auth/profile/avatars/")).data;
-
-export const selectProfileAvatar = async (
-  avatarId: string,
-): Promise<MessageResponse> =>
-  (
-    await apiClient.post<MessageResponse>(
-      `/auth/profile/avatars/${avatarId}/select/`,
-    )
-  ).data;
 
 export const deleteAccount = async (): Promise<MessageResponse> =>
   (await apiClient.delete<MessageResponse>("/auth/profile/delete/")).data;

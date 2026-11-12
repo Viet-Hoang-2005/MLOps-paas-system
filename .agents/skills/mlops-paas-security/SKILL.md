@@ -40,3 +40,7 @@ Never include passwords, tokens, private keys, real `.env` values, SSH credentia
   ```bash
   git diff --check
   ```
+
+## Training workspace security
+
+Training authorization follows immutable account/tenant ownership even without a Project. Read [capabilities-and-storage.md](references/capabilities-and-storage.md) for read-only Input, encrypted Secrets, job-scoped runtime configuration and storage preservation during Project deletion.

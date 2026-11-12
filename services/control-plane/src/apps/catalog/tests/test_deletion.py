@@ -1,3 +1,4 @@
+from django.utils import timezone
 from types import SimpleNamespace
 
 import pytest
@@ -17,6 +18,53 @@ class FakeStorage:
 
     def delete_prefix(self, prefix):
         self.prefixes.append(prefix)
+
+
+@pytest.mark.django_db
+def test_project_deletion_preserves_existing_training_jobs(monkeypatch):
+    from rest_framework.exceptions import ValidationError
+    from apps.catalog.services.deletion import request_project_deletion
+    from apps.training.models import TrainingJob
+
+    owner = get_user_model().objects.create_user("preserve-training@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Preserve training")
+    job = TrainingJob.objects.create(project=project, model_flavor="sklearn", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", status="pending")
+    storage = FakeStorage()
+
+    monkeypatch.setattr("apps.catalog.services.deletion._enqueue", lambda project: None)
+    request_project_deletion(project)
+    project.refresh_from_db()
+    assert project.deletion_state == "deleting"
+    with pytest.raises(ValidationError, match="training job history"):
+        finalize_project_deletion(project, storage=storage)
+    assert TrainingJob.objects.filter(pk=job.pk).exists()
+    assert storage.prefixes == []
+
+
+@pytest.mark.django_db
+def test_project_cleanup_retains_tenant_scoped_training_history(monkeypatch):
+    from apps.observability.models import LifecycleEvent
+    from apps.training.models import TrainingJob, TrainingOutput
+
+    owner = get_user_model().objects.create_user("detached-training@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Detach training", deletion_state="deleting", is_active=False)
+    job = TrainingJob.objects.create(project=project, model_flavor="sklearn",
+                                     status="completed", storage_layout="tenant", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
+    output = TrainingOutput.objects.create(job=job, kind="model", relative_path="model.tar.gz", s3_uri="s3://bucket/model")
+    event = LifecycleEvent.objects.create(project=project, aggregate_type="training_job", aggregate_id=job.public_id,
+                                          event_type="completed")
+    deleted_keys = []
+    monkeypatch.setattr("common.redis_client.redis_client", lambda: SimpleNamespace(delete=lambda *keys: deleted_keys.extend(keys)))
+    monkeypatch.setattr("apps.catalog.services.deletion.invalidate_model_server_cache", lambda *args: None)
+
+    finalize_project_deletion(project, storage=FakeStorage())
+    job.refresh_from_db()
+    event.refresh_from_db()
+    assert job.project_id is None
+    assert job.owner_id == owner.pk
+    assert TrainingOutput.objects.filter(pk=output.pk).exists()
+    assert event.project_id is None
+    assert f"training_logs:{job.public_id}" not in deleted_keys
 
 
 @pytest.mark.django_db

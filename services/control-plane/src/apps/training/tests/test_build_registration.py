@@ -1,3 +1,4 @@
+from django.utils import timezone
 from types import SimpleNamespace
 
 import pytest
@@ -39,14 +40,13 @@ def completed_job(email="training-build@example.com"):
     project = ModelProject.objects.create(owner=owner, name="NIDS")
     job = TrainingJob.objects.create(
         project=project,
-        name="training-v1",
         model_flavor="xgboost",
         requirements_text="xgboost==2.0.3",
         code_snapshot_uri="s3://bucket/source.zip",
         data_snapshot_uri="s3://bucket/reference.csv",
         output_uri="s3://bucket/model.tar.gz",
         status="completed",
-    )
+     vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
     TrainingOutput.objects.create(
         job=job,
         kind="model",

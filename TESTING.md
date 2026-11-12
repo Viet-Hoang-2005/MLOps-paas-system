@@ -284,7 +284,7 @@ ansible-playbook -i inventory/terraform.py site.yml --tags platform-training \
 ```
 
 Quy trình xác minh:
-1. Kubeflow Training Operator khởi chạy `PyTorchJob` trong namespace tạm thời `ansible-training-smoke`.
+1. Kubeflow Trainer v2 khởi chạy `TrainJob` trong namespace tạm thời `ansible-training-smoke`.
 2. Worker tải dữ liệu qua Presigned S3 URLs, thực thi huấn luyện và ghi log `METRIC_JSON`.
 3. Gói `training_output.zip` được đẩy lên S3 và gọi webhook callback về Control Plane.
 4. Sau khi hoàn thành, namespace tạm thời tự động bị dọn dẹp sạch sẽ và Karpenter thu hồi node nhàn rỗi.
@@ -313,3 +313,16 @@ Quy trình xác minh:
    - **Redpanda / Kafka Metrics:** Tốc độ tiêu thụ tin nhắn và độ trễ hàng đợi (Consumer Group Lag).
    - **K3s Infrastructure Metrics:** Tỷ lệ chiếm dụng CPU, RAM và GPU vRAM của toàn cụm.
 3. Kiểm tra **Grafana Loki**: Xác nhận log của các tác vụ huấn luyện và đóng gói được thu thập đầy đủ và có thể tra cứu nhanh chóng.
+
+
+### Job-owned training workspace
+
+A new job starts in `editing` with its own Input, environment, Secrets and revision. Run submits the same UUID once; retry/clone create another Editing UUID. No independent workspace API or saved-workspace dropdown remains.
+
+Run the Control Plane training and observability tests and `web` training tests. `scripts/verify_training_workspace.py` (inside the Control Plane service) checks a disposable CPU job on Docker: same-UUID submission replay, real read-only Input, writable Work/output, verified upload, idempotent clone into a new Editing UUID, draft deletion, Project assignment/deletion, and retained artifacts. It creates and cleans only its own test tenant. Set `TRAINING_SMOKE_GPU=true` when invoking the script for GPU smoke; it requires an available NVIDIA device/toolkit and checks that the runner sees exactly the selected device UUID.
+
+The edited initial training migrations require a fresh **local Control Plane application database**. Stop database writers before reset; preserve object storage, registry, tracking databases and other service volumes. This reset is a development-only operation, never a production upgrade procedure.
+
+### Single account avatar
+
+Auth tests cover image validation, replacement/removal, rollback cleanup, failed cleanup, first-account OAuth import, and removed history routes/table. test_avatars.py includes locking checks for disposable PostgreSQL; all storage calls are mocked. Header.avatar.test.tsx covers shared profile cache updates and avatar errors in the UI. The old identity initial migration no longer creates UserAvatar; the application database and S3 reset are performed by the user, not by this change. Check the fresh schema in an isolated test database, then migrate/restart local services after the user's reset.
