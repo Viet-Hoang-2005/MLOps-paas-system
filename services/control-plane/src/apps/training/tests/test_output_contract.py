@@ -126,7 +126,7 @@ def test_index_is_complete_idempotent_and_hides_system_files(output_job):
     keys = set(storage.objects)
     index_output(job, storage)
     assert set(storage.objects) == keys
-    assert not job.outputs.filter(relative_path__contains="_mlops").exists()
+    assert job.outputs.filter(metadata__group="_mlops").count() == 2
     assert not job.outputs.filter(s3_uri=job.output_uri).exists()
 
 
@@ -334,7 +334,65 @@ def test_concurrent_index_attempts_do_not_delete_winning_files(output_job, monke
     monkeypatch.setattr(storage, "upload_fileobj", competing_upload)
     index_output(job, storage)
     assert public_outputs(job).count() == 4
-    assert set(storage.objects) == {job.output_uri, *public_outputs(job).values_list("s3_uri", flat=True)}
+    assert set(storage.objects) == {job.output_uri, *job.outputs.values_list("s3_uri", flat=True)}
+
+
+def test_internal_files_are_indexed_but_never_downloadable_and_archive_is_deleted(
+    output_job, monkeypatch, django_capture_on_commit_callbacks
+):
+    from apps.training.services.output_finalization import cleanup_output_archive
+    from apps.training.services.outputs import verify_training_output
+    from unittest.mock import Mock
+
+    owner, job, storage = output_job
+    queued = Mock()
+    monkeypatch.setattr(cleanup_output_archive, "delay", queued)
+    monkeypatch.setattr("infrastructure.storage.S3Storage", lambda: storage)
+    with django_capture_on_commit_callbacks(execute=True):
+        publish(job, storage)
+    queued.assert_called_once_with(str(job.public_id))
+    internal = job.outputs.filter(metadata__group="_mlops")
+    assert internal.count() == 2
+    assert all("/output/internal/" in row.s3_uri for row in internal)
+    assert storage.objects[internal.get(relative_path="_mlops/stdout.txt").s3_uri] == b"internal logs"
+    client = APIClient()
+    client.force_authenticate(owner)
+    for row in internal:
+        assert client.get(f"/api/training-jobs/{job.public_id}/outputs/{row.public_id}/download/").status_code == 404
+    assert client.get(f"/api/training-jobs/{job.public_id}/outputs/download/", {"path": "_mlops"}).status_code == 404
+    assert len(client.get(f"/api/training-jobs/{job.public_id}/").data["outputs"]) == 4
+    from zipfile import ZipFile
+    response = client.get(f"/api/training-jobs/{job.public_id}/outputs/download/")
+    assert response.status_code == 200
+    with ZipFile(io.BytesIO(b"".join(response.streaming_content))) as bundle:
+        assert len(bundle.namelist()) == 4
+        assert not any("_mlops" in name or "model.tar.gz" in name for name in bundle.namelist())
+    cleanup_output_archive.run(str(job.public_id))
+    assert job.output_uri not in storage.objects
+    assert all(row.s3_uri in storage.objects for row in job.outputs.all())
+    # Worker restart between index commit and completion needs no original archive.
+    verify_training_output(job, storage)
+    cleanup_output_archive.run(str(job.public_id))
+    assert public_outputs(job).count() == 4
+
+
+def test_archive_cleanup_failure_keeps_index_and_can_retry(output_job, monkeypatch):
+    from apps.training.services.output_finalization import cleanup_output_archive
+    from unittest.mock import Mock
+
+    _, job, storage = output_job
+    publish(job, storage)
+    monkeypatch.setattr("infrastructure.storage.S3Storage", lambda: storage)
+    delete = storage.delete
+    monkeypatch.setattr(storage, "delete", Mock(side_effect=TimeoutError("temporary storage outage")))
+    with pytest.raises(TimeoutError):
+        cleanup_output_archive.run(str(job.public_id))
+    assert job.output_uri in storage.objects
+    assert public_outputs(job).count() == 4
+    assert cleanup_output_archive.max_retries is None
+    monkeypatch.setattr(storage, "delete", delete)
+    cleanup_output_archive.run(str(job.public_id))
+    assert job.output_uri not in storage.objects
 
 
 def test_uploads_all_six_slots_without_changing_preview_or_original_metadata(output_job):

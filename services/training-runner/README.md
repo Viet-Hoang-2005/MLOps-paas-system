@@ -5,6 +5,10 @@
 > before Completed. Model and six optional Advanced slots are selected manually
 > when assigning a Project. Old output descriptions below are superseded.
 
+The upload archive is temporary: Control Plane materializes Model, Metadata and
+private `_mlops` files separately on S3, then deletes `model.tar.gz` after the
+complete index commits. `_mlops` stays inaccessible through public APIs/downloads.
+
 # Training Runner — Thực Thi Huấn Luyện Mô Hình Học Máy (Training Execution Engine)
 
 ## Hợp đồng workspace mới

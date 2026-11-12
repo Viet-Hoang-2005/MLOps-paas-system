@@ -35,7 +35,11 @@ Apply additive training migrations, then update Control Plane/workers and runner
 
 ## Workspace downloads
 
-Output contract v2 is the only output contract. SM_MODEL_DIR holds raw models;
+Output contract v2 is the only output contract. SM_MODEL_DIR holds raw models.
+Archive retention: index _mlops files privately under output/internal/ alongside
+public Model/Metadata indexing. Enqueue cleanup_output_archive only after commit;
+it deletes the exact scoped archive with retry/backoff. Verified replay must not
+HEAD or reopen that archive. Never expose private rows by UUID, path or download-all.
 SM_OUTPUT_DIR holds original reports. The private package has model/, metadata/,
 _mlops/. Completion queues the registered output finalizer; only after complete
 verification/materialization may the job become Completed. Keep attempt-isolated

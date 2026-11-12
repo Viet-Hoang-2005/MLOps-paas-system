@@ -40,7 +40,18 @@ Only verified, indexed outputs become `completed`. Runtime accounting uses the
 runtime's finish timestamp, excluding indexing. Cancellation/deletion fences
 publication, and runtime cleanup follows the committed terminal result.
 
-The original archive is private. Public serializers and all downloads use only
+The archive is temporary transport. The indexer also materializes every `_mlops/`
+file (including the manifest) under the job's `output/internal/` prefix, with
+private TrainingOutput rows recording path, size and SHA-256. Those rows use
+group `_mlops`; they never pass `public_outputs()`.
+
+After the complete index commits, a separate Celery task deletes only the scoped
+`model.tar.gz`. Storage failures retry with backoff without failing the completed
+training result. Verification replay uses the committed index and does not HEAD
+or download the deleted archive. The runner still creates the archive for upload;
+it is no longer retained as the final S3 representation.
+
+Public serializers and all downloads use only
 indexed `Model/` and `Metadata/` entries. No archive row or `_mlops` row is
 published. MLflow artifact paths cannot address `_mlops` or escape their prefix.
 Output deletion removes the archive, materialized files and supplemental uploads;

@@ -7,6 +7,29 @@ from django.utils import timezone
 from apps.training.models import TrainingJob
 
 
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=None,
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
+def cleanup_output_archive(job_id):
+    from infrastructure.storage import S3Storage
+    from .storage_scope import validate_training_uri
+
+    job = TrainingJob.objects.filter(public_id=job_id).first()
+    if job is None or job.tracking.get("output_contract") != 2:
+        return
+    if not job.outputs.filter(metadata__group="_mlops", relative_path="_mlops/output_manifest.json").exists():
+        return
+    storage = S3Storage()
+    validate_training_uri(job, storage.bucket, "output", job.output_uri)
+    storage.delete(job.output_uri)
+
+
 def enqueue_output(job, finished_at=None):
     if job.status in {"completed", "failed", "cancelled", "cancelling"} or job.deletion_requested_at:
         return

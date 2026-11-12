@@ -1,4 +1,4 @@
-"""Publish only verified Model/Metadata files from the private v2 package."""
+"""Index public Model/Metadata and private system files from the temporary v2 package."""
 
 import hashlib
 import json
@@ -37,6 +37,7 @@ def public_outputs(job):
 
 def index_output(job, storage):
     if job.tracking.get("output_contract") == 2:
+        _queue_archive_cleanup(job)
         return
     validate_training_uri(job, storage.bucket, "output", job.output_uri)
     stream, _, _ = storage.open_stream(job.output_uri)
@@ -75,12 +76,12 @@ def index_output(job, storage):
                     if name == "_mlops/output_manifest.json":
                         if member.size > 16 * 1024**2:
                             raise ValueError("Manifest too large.")
-                        manifest = json.load(archive.extractfile(member))
-                    continue
                 suffix = PurePosixPath(name).suffix.lower()
                 if group == "model" and member.size == 0:
                     raise ValueError("Model files must not be empty.")
-                if suffix not in (MODEL_EXTENSIONS[job.model_flavor] if group == "model" else METADATA_EXTENSIONS):
+                if group != "_mlops" and suffix not in (
+                    MODEL_EXTENSIONS[job.model_flavor] if group == "model" else METADATA_EXTENSIONS
+                ):
                     raise ValueError("Unsupported output file format.")
                 if group == "metadata" and member.size > 100 * 1024**2:
                     raise ValueError("Metadata file exceeds 100 MiB.")
@@ -97,13 +98,21 @@ def index_output(job, storage):
                     if copied != member.size:
                         raise ValueError("Truncated output file.")
                     checksum = digest.hexdigest()
+                    if name == "_mlops/output_manifest.json":
+                        payload.seek(0)
+                        manifest = json.load(payload)
                     identifier = uuid.uuid5(job.public_id, name + ":" + checksum)
                     payload.seek(0)
                     content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
                     # Isolate concurrent attempts: a losing/cancelled task must not
                     # delete the immutable object a winning task has published.
                     stored = storage.upload_fileobj(
-                        payload, prefix + f"{identifier}/{attempt}", content_type, checksum=checksum, size_bytes=copied
+                        payload,
+                        (training_prefix_for(job) + "/output/internal/" if group == "_mlops" else prefix)
+                        + f"{identifier}/{attempt}",
+                        content_type,
+                        checksum=checksum,
+                        size_bytes=copied,
                     )
                     uploaded.append(stored.uri)
                     rows.append(
@@ -111,7 +120,8 @@ def index_output(job, storage):
                             public_id=identifier,
                             job=job,
                             kind="model" if group == "model" else "file",
-                            relative_path=("Model/" if group == "model" else "Metadata/") + "/".join(parts[1:]),
+                            relative_path={"model": "Model/", "metadata": "Metadata/", "_mlops": "_mlops/"}[group]
+                            + "/".join(parts[1:]),
                             s3_uri=stored.uri,
                             checksum=checksum,
                             size_bytes=copied,
@@ -119,7 +129,8 @@ def index_output(job, storage):
                             metadata={"contract": 2, "group": group},
                         )
                     )
-                    expected[name] = {"path": name, "group": group, "checksum": checksum, "size_bytes": copied}
+                    if group != "_mlops":
+                        expected[name] = {"path": name, "group": group, "checksum": checksum, "size_bytes": copied}
         if not manifest or manifest.get("version") != 2 or manifest.get("framework") != job.model_flavor:
             raise ValueError("Only Output contract v2 is supported.")
         declared = manifest.get("files")
@@ -130,7 +141,7 @@ def index_output(job, storage):
             or {v["path"]: v for v in declared} != expected
         ):
             raise ValueError("Output manifest does not match archive contents.")
-        if not any(row.kind == "model" for row in rows) or len(rows) > 20_000:
+        if not any(row.kind == "model" for row in rows) or len(expected) > 20_000:
             raise ValueError("Output requires at least one model and at most 20000 files.")
         with transaction.atomic():
             current = TrainingJob.objects.select_for_update().get(pk=job.pk)
@@ -145,6 +156,7 @@ def index_output(job, storage):
                 current.tracking = {**current.tracking, "output_contract": 2}
                 current.save(update_fields=["tracking", "updated_at"])
             job.tracking = current.tracking
+            _queue_archive_cleanup(current)
         for uri in uploaded:
             if not TrainingOutput.objects.filter(job=job, s3_uri=uri).exists():
                 storage.delete(uri)
@@ -154,3 +166,9 @@ def index_output(job, storage):
             if not TrainingOutput.objects.filter(job=job, s3_uri=uri).exists():
                 storage.delete(uri)
         raise
+
+
+def _queue_archive_cleanup(job):
+    from .output_finalization import cleanup_output_archive
+
+    transaction.on_commit(lambda: cleanup_output_archive.delay(str(job.public_id)))

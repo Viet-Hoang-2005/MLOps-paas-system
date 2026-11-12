@@ -27,9 +27,10 @@ def verify_training_output(job, storage=None):
 
     storage = storage or S3Storage(client_config=Config(connect_timeout=3, read_timeout=5, retries={"max_attempts": 0}))
     validate_training_uri(job, storage.bucket, "output", job.output_uri)
-    bucket, key = storage.parse_uri(job.output_uri)
-    if not storage.client.head_object(Bucket=bucket, Key=key).get("ContentLength"):
-        raise ValueError("Training output is empty.")
+    if job.tracking.get("output_contract") != 2:
+        bucket, key = storage.parse_uri(job.output_uri)
+        if not storage.client.head_object(Bucket=bucket, Key=key).get("ContentLength"):
+            raise ValueError("Training output is empty.")
     from .output_index import index_output
     index_output(job, storage)
 
