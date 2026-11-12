@@ -3,6 +3,7 @@ from django.db.models import Prefetch
 from django.db import DatabaseError
 from rest_framework import generics, status
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 
 from apps.deployment.models import Build
@@ -13,7 +14,6 @@ from apps.training.api.serializers import TrainingJobBuildRequestSerializer, Tra
 from apps.training.services.jobs import (
     cancel_job,
     create_job,
-    output_download_url,
     request_job_deletion,
     request_output_purge,
     retry_job,
@@ -113,9 +113,17 @@ class TrainingJobProjectEndpoint(APIView):
         from apps.training.services.project_assignment import assign_project
 
         job = job_for_user(request.user, job_id)
-        serializer = TrainingJobProjectRequestSerializer(data=request.data)
+        payload = {key: value for key, value in request.data.items() if key not in request.FILES}
+        import json
+        for field in ("new_project", "artifacts"):
+            if isinstance(payload.get(field), str):
+                try:
+                    payload[field] = json.loads(payload[field])
+                except ValueError:
+                    raise ValidationError({field: "Invalid JSON."}) from None
+        serializer = TrainingJobProjectRequestSerializer(data=payload)
         serializer.is_valid(raise_exception=True)
-        job = assign_project(job=job, actor=request.user, data=serializer.validated_data)
+        job = assign_project(job=job, actor=request.user, data=serializer.validated_data, files=request.FILES)
         return Response(TrainingJobSerializer(job).data)
 
 
@@ -167,12 +175,6 @@ class TrainingJobLogsEndpoint(APIView):
                 "error_message": job.error_message,
             }
         )
-
-
-class TrainingJobDownloadEndpoint(APIView):
-    def get(self, request, job_id):
-        job = job_for_user(request.user, job_id)
-        return Response({"download_url": output_download_url(job)})
 
 
 class TrainingJobInputEndpoint(APIView):
@@ -227,8 +229,6 @@ class TrainingJobModelOutputEndpoint(APIView):
             "output_revision": request.data.get("output_revision"),
             "source_code_file": request.FILES.get("source_code_file"),
             "reference_data_file": request.FILES.get("reference_data_file"),
-            "label_mapping_file": request.FILES.get("label_mapping_file"),
-            "input_schema_file": request.FILES.get("input_schema_file"),
             "remove_assets": request.data.get("remove_assets"),
         }
         if "build_requirements_text" in request.data:

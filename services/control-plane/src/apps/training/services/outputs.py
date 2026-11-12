@@ -27,9 +27,12 @@ def verify_training_output(job, storage=None):
 
     storage = storage or S3Storage(client_config=Config(connect_timeout=3, read_timeout=5, retries={"max_attempts": 0}))
     validate_training_uri(job, storage.bucket, "output", job.output_uri)
-    bucket, key = storage.parse_uri(job.output_uri)
-    if not storage.client.head_object(Bucket=bucket, Key=key).get("ContentLength"):
-        raise ValueError("Training output is empty.")
+    if job.tracking.get("output_contract") != 2:
+        bucket, key = storage.parse_uri(job.output_uri)
+        if not storage.client.head_object(Bucket=bucket, Key=key).get("ContentLength"):
+            raise ValueError("Training output is empty.")
+    from .output_index import index_output
+    index_output(job, storage)
 
 
 def serialize_output_asset(output: TrainingOutput, storage=None) -> dict[str, Any]:
@@ -58,39 +61,25 @@ def serialize_output_asset(output: TrainingOutput, storage=None) -> dict[str, An
 def get_model_output_summary(job: TrainingJob, storage=None) -> dict[str, Any]:
     storage = storage or S3Storage()
 
-    metrics = {}
-    params = {}
-    insights = {}
-    for m_out in job.outputs.filter(kind__in=("metric", "insight")):
-        if not m_out.s3_uri:
-            continue
-        try:
-            raw = storage.read(m_out.s3_uri)
-            val = json.loads(raw.decode("utf-8"))
-            if m_out.kind == "metric" and isinstance(val, dict):
-                metrics.update(val)
-            elif m_out.kind == "insight" and "param" in m_out.relative_path.lower() and isinstance(val, dict):
-                params.update(val)
-            elif m_out.kind == "insight":
-                if isinstance(val, dict):
-                    insights.update(val)
-                elif isinstance(val, list):
-                    insights[Path(m_out.relative_path).stem] = val
-        except Exception:
-            pass
-
-    if isinstance(job.tracking, dict):
-        if "metrics" in job.tracking and isinstance(job.tracking["metrics"], dict):
-            metrics = {**job.tracking["metrics"], **metrics}
-        if "params" in job.tracking and isinstance(job.tracking["params"], dict):
-            params = {**job.tracking["params"], **params}
-        if "insights" in job.tracking and isinstance(job.tracking["insights"], dict):
-            insights = {**job.tracking["insights"], **insights}
-
-    model_artifact = job.outputs.filter(kind="model").first()
-    source_code = job.outputs.filter(kind="source_code").first()
-    reference_data = job.outputs.filter(kind="reference_data").first()
-
+    from .output_index import public_outputs
+    selection = job.artifact_selection or {}
+    selected = {str(a.public_id): a for a in public_outputs(job)}
+    model_artifact = selected.get(selection.get("model_id"))
+    source_code = None if job.outputs_purged_at else job.outputs.filter(kind="source_code").first()
+    reference_data = None if job.outputs_purged_at else job.outputs.filter(kind="reference_data").first()
+    metrics, params, insights = {}, {}, {}
+    from .artifact_selection import validate_json
+    for role, identifier in selection.get("artifacts", {}).items():
+        asset = selected.get(identifier)
+        if asset is None:
+            raise Conflict("Selected metadata is no longer available.")
+        parsed = validate_json(storage.read(asset.s3_uri, max_bytes=1024**2 + 1), role)
+        if role == "metrics":
+            metrics = parsed
+        elif role == "params":
+            params = parsed
+        elif role in {"model_insights", "feature_importance"}:
+            insights[role] = parsed
     can_edit = (
         job.status == "completed"
         and not job.outputs_purged_at
@@ -106,8 +95,10 @@ def get_model_output_summary(job: TrainingJob, storage=None) -> dict[str, Any]:
         "entry_point": job.entry_point or "train.py",
         "requirements_text": job.requirements_text or "",
         "build_requirements_text": job.build_requirements_text,
-        "label_mapping": serialize_output_asset(job.outputs.filter(kind="label_mapping").first(), storage) if job.outputs.filter(kind="label_mapping").exists() else None,
-        "input_schema": serialize_output_asset(job.outputs.filter(kind="input_schema").first(), storage) if job.outputs.filter(kind="input_schema").exists() else None,
+        "selection": selection,
+        "available_outputs": [serialize_output_asset(a, storage) for a in public_outputs(job)],
+        "label_mapping": serialize_output_asset(selected[selection["artifacts"]["label_mapping"]], storage) if selection.get("artifacts", {}).get("label_mapping") in selected else None,
+        "input_schema": serialize_output_asset(selected[selection["artifacts"]["input_schema"]], storage) if selection.get("artifacts", {}).get("input_schema") in selected else None,
         "model_artifact": serialize_output_asset(model_artifact, storage) if model_artifact else None,
         "source_code": serialize_output_asset(source_code, storage) if source_code else None,
         "reference_data": serialize_output_asset(reference_data, storage) if reference_data else None,
@@ -236,32 +227,6 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
                     },
                 )
 
-            for kind in ("label_mapping", "input_schema"):
-                upload = data.get(kind + "_file")
-                if not upload and kind not in remove_assets_set:
-                    continue
-                old = job.outputs.filter(kind=kind).first()
-                if upload:
-                    if upload.size > 1024 * 1024:
-                        raise ValidationError({kind: "JSON file exceeds 1 MiB."})
-                    raw = upload.read(1024 * 1024 + 1)
-                    try:
-                        parsed = json.loads(raw.decode("utf-8"))
-                    except (ValueError, UnicodeError):
-                        raise ValidationError({kind: "Upload valid JSON."}) from None
-                    if not isinstance(parsed, dict if kind == "input_schema" else (dict, list)):
-                        raise ValidationError({kind: "Unsupported JSON structure."})
-                    name = kind + ".json"
-                    stored = storage.put(f"{out_prefix}supplemental/{kind}/{uuid.uuid4().hex}/{name}", raw, "application/json")
-                    new_uploaded_uris.append(stored.uri)
-                    if old:
-                        old_uris_to_delete.append(old.s3_uri)
-                        old.delete()
-                    TrainingOutput.objects.create(job=job, kind=kind, relative_path=name, s3_uri=stored.uri,
-                        checksum=stored.checksum, size_bytes=stored.size_bytes, content_type="application/json")
-                elif old:
-                    old_uris_to_delete.append(old.s3_uri)
-                    old.delete()
             if "build_requirements_text" in data:
                 requirements = data["build_requirements_text"]
                 if not isinstance(requirements, str) or len(requirements.encode()) > 64 * 1024:

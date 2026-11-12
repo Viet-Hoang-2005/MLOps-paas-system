@@ -53,8 +53,10 @@ export async function droppedEntries(event: DragEvent): Promise<{ path: string; 
   return result;
 }
 
-export function isReadableFile(path: string): boolean {
+export function isReadableFile(path: string, sizeBytes = 0): boolean {
   const p = path.toLowerCase();
+  if (/\.(png|jpe?g)$/.test(p)) return sizeBytes <= 10 * 1024 * 1024;
+  if (sizeBytes > 2 * 1024 * 1024) return false;
   return (
     p.endsWith(".py") ||
     p.endsWith(".csv") ||

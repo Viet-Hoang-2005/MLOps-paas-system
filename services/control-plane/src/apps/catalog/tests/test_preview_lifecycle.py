@@ -384,7 +384,9 @@ def test_training_build_provenance_survives_source_job_deletion(project):
         entry_point="train.py",
         code_snapshot_uri=code.uri,
      vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
-    TrainingOutput.objects.create(job=job, kind="model", relative_path="model.tar.gz", s3_uri=output.uri)
+    model = TrainingOutput.objects.create(job=job, kind="model", relative_path="Model/chosen.joblib", s3_uri=output.uri, metadata={"contract": 2, "group": "model"})
+    job.artifact_selection = {"model_id": str(model.public_id), "artifacts": {}}
+    job.save()
     TrainingOutput.objects.create(job=job, kind="source_code", relative_path="train.py", s3_uri=source_file.uri)
     TrainingOutput.objects.create(job=job, kind="reference_data", relative_path="reference.csv", s3_uri=ref_file.uri)
     build, _ = request_training_build(job=job, backend="docker", storage=storage)

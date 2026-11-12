@@ -83,16 +83,15 @@ giữ GPU không dùng. Dataset lớn vẫn có thể hết RAM; script đọc C
 
 ```text
 SM_MODEL_DIR/
-├── model.joblib          # XGBClassifier CPU, chỉ giữ cây đến best iteration
-├── label_mapping.json   # ví dụ {"0": "BENIGN", "1": "ATTACK"}
-├── input_schema.json    # JSON Schema: 52 trường number, x-feature-order giữ thứ tự
-└── training_report.json # confusion matrix, per-class, curves, cleaning/split
-
+  model.joblib
 SM_OUTPUT_DIR/
-├── metrics.json
-├── params.json
-├── model_insights.json
-└── feature_importance.json
+  label_mapping.json
+  input_schema.json
+  training_report.json
+  metrics.json
+  params.json
+  model_insights.json
+  feature_importance.json
 ```
 
 Xuất `model.joblib` thay vì Booster `.xgb` vì serving hiện tại cần `predict()`
@@ -107,10 +106,10 @@ Chất lượng test: accuracy, precision/recall/F1 macro/weighted, ROC-AUC khi 
 scikit-learn bỏ các thành phần không xác định; per-class report nêu rõ lớp nào
 bị thiếu giá trị. Feature importance là **gain**, không phải diễn giải nhân quả.
 
-`training_report.json` được giữ trong model archive vì runner hiện chỉ thu nhận
-phần insight chuẩn hóa, không giữ toàn bộ trường bổ sung của model_insights.
-Input schema và mapping là metadata; không tự cập nhật Model Preview/Project.
-Không tự thu thập Work làm artifact. Save/gán Project và Build vẫn theo UI.
+Original reports are preserved under Metadata. Output exposes Model/ and
+Metadata/ only; system logs and normalized metadata are private. Assign a Project
+by explicitly selecting model.joblib and optional JSONs for the six Advanced
+slots. No filename mapping or automatic Build. See [Output v2](../../../docs/dev/training-model-output.md).
 
 ## Chạy và kiểm thử ngoài nền tảng
 

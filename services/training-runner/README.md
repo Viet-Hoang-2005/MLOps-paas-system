@@ -1,3 +1,14 @@
+> Current Output contract: [Model/Metadata v2](../../docs/dev/training-model-output.md).
+> SM_MODEL_DIR accepts raw models only; mapping/schema/reports go to SM_OUTPUT_DIR.
+> The private model.tar.gz contains model/, metadata/, _mlops/. It is not a public
+> download or MLflow artifact. Control Plane indexes public files asynchronously
+> before Completed. Model and six optional Advanced slots are selected manually
+> when assigning a Project. Old output descriptions below are superseded.
+
+The upload archive is temporary: Control Plane materializes Model, Metadata and
+private `_mlops` files separately on S3, then deletes `model.tar.gz` after the
+complete index commits. `_mlops` stays inaccessible through public APIs/downloads.
+
 # Training Runner — Thực Thi Huấn Luyện Mô Hình Học Máy (Training Execution Engine)
 
 ## Hợp đồng workspace mới
@@ -114,9 +125,9 @@ Trong kiến trúc MLOps PaaS, Training Runner là thành phần trực tiếp t
    - Khi tiến trình người dùng kết thúc với mã thành công `0`:
      - Quét thư mục `/workspace/model/` để thu thập file trọng số mô hình.
      - Quét các file insight nếu người dùng có ghi ra (`model_insights.json`, `feature_importance.json`).
-     - Đóng gói toàn bộ model + metrics + metadata thành file ZIP `training_output.zip`.
+     - Đóng gói toàn bộ model + metrics + metadata thành file ZIP `model.tar.gz`.
 6. **Tải lên S3 & Callback Hoàn tất:**
-   - Dùng `CAPABILITY_TOKEN` gọi Control Plane xin Presigned URL để upload file `training_output.zip` lên S3.
+   - Dùng `CAPABILITY_TOKEN` gọi Control Plane xin Presigned URL để upload file `model.tar.gz` lên S3.
    - Gửi Webhook callback tới `/internal/webhooks/training-jobs/<id>/` thông báo tác vụ hoàn tất thành công (`COMPLETED`) kèm tóm tắt metrics.
 
 ---

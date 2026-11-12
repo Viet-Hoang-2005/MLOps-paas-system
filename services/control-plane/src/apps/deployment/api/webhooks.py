@@ -199,9 +199,9 @@ class BuildWebhookEndpoint(APIView):
                     build,
                     image_uri=image_uri,
                     image_digest=image_digest,
-                    metrics=_dict_payload(request.data.get("metrics_summary")),
-                    params=_dict_payload(request.data.get("params_summary")),
-                    insights=_dict_payload(request.data.get("insights_summary")),
+                    metrics=None if build.source_job_reference else _dict_payload(request.data.get("metrics_summary")),
+                    params=None if build.source_job_reference else _dict_payload(request.data.get("params_summary")),
+                    insights=None if build.source_job_reference else _dict_payload(request.data.get("insights_summary")),
                     requirements=request.data.get("requirements_snapshot")
                     if isinstance(request.data.get("requirements_snapshot"), str)
                     else None,

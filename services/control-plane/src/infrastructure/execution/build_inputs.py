@@ -8,7 +8,7 @@ def label_mapping_input(build, storage):
     asset = build.input_assets.filter(kind="label_mapping").exclude(s3_uri="").first()
     if asset is not None:
         uri = asset.s3_uri
-    elif build.version_id:
+    elif build.version_id and not build.source_job_id and not build.source_job_reference:
         asset = build.version.artifacts.filter(kind="label_mapping").exclude(uri="").first()
         uri = asset.uri if asset is not None else ""
     else:

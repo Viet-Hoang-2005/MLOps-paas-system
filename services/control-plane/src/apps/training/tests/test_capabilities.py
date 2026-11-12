@@ -112,7 +112,6 @@ def test_expired_capability_and_legacy_shared_secret_are_rejected():
 
 @pytest.mark.django_db
 def test_trusted_reporter_sets_terminal_status_once(monkeypatch):
-    monkeypatch.setattr("apps.training.api.webhooks.verify_training_output", lambda job: None)
     job = _job()
     token = issue_capability(job, "trusted_reporter")
     client = APIClient()
@@ -123,10 +122,10 @@ def test_trusted_reporter_sets_terminal_status_once(monkeypatch):
     }
 
     response = client.post(url, {"workflow_status": "Succeeded"}, format="json", **headers)
-    assert response.status_code == 200
+    assert response.status_code == 202
     job.refresh_from_db()
-    assert job.status == "completed"
-    assert TrainingOutput.objects.filter(job=job, relative_path="model.tar.gz").exists()
+    assert job.status == "uploading"
+    assert not TrainingOutput.objects.filter(job=job).exists()
 
     duplicate = client.post(url, {"workflow_status": "Succeeded"}, format="json", **headers)
     assert duplicate.status_code == 200
@@ -153,13 +152,19 @@ def test_trusted_reporter_cannot_overwrite_cancelled_job():
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("error,code,expected_status", [(ValueError("empty"), 200, "failed"), (TimeoutError("temporary"), 503, "running")])
-def test_trusted_completion_requires_output(monkeypatch, error, code, expected_status):
-    monkeypatch.setattr("apps.training.api.webhooks.verify_training_output", Mock(side_effect=error))
+@pytest.mark.parametrize("error,expected_status", [(ValueError("empty"), "failed"), (TimeoutError("temporary"), "uploading")])
+def test_trusted_completion_requires_output(monkeypatch, error, expected_status):
+    from apps.training.services.output_finalization import finalize_output
+    monkeypatch.setattr("apps.training.services.outputs.verify_training_output", Mock(side_effect=error))
     job = _job()
     token = issue_capability(job, "trusted_reporter")
     response = APIClient().post(f"/internal/webhooks/training-jobs/{job.public_id}/", {"workflow_status": "Succeeded"}, format="json", HTTP_AUTHORIZATION=f"Bearer {token}")
-    assert response.status_code == code
+    assert response.status_code == 202
+    if isinstance(error, TimeoutError):
+        with pytest.raises(RuntimeError, match="temporarily unavailable"):
+            finalize_output.run(str(job.public_id))
+    else:
+        finalize_output.run(str(job.public_id))
     job.refresh_from_db()
     assert job.status == expected_status
     assert not job.outputs.exists()

@@ -19,22 +19,22 @@ def test_secret_redaction_applies_to_captured_output_and_bundle(monkeypatch, run
     assert "synthetic-secret" not in text
     assert "line-one" not in text
     assert "line-two" not in text
-    (runner_workspace["MODEL_DIR"] / "model.bin").write_bytes(b"model")
+    (runner_workspace["MODEL_DIR"] / "model.pkl").write_bytes(b"model")
     runner.write_mlops_bundle(entry_point="train.py", model_version="", training_job_id="job", status="succeeded",
         stdout_text="synthetic-secret", stderr_text="line-one\nline-two")
     for filename in ("stdout.txt", "stderr.txt"):
-        content = (runner_workspace["MODEL_DIR"] / "_mlops" / filename).read_text()
+        content = (runner_workspace["WORK_DIR"] / "_mlops" / filename).read_text()
         assert "synthetic-secret" not in content
         assert "line-one" not in content
 
 
 def test_invalid_model_tree_is_rejected_before_metadata_or_tracking(monkeypatch, runner_workspace):
     validate = Mock(side_effect=RuntimeError("Unsafe model tree"))
-    monkeypatch.setattr(runner.execution, "validate_model_tree", validate)
+    monkeypatch.setattr("src.output_contract.collect", validate)
     tracking = Mock()
     monkeypatch.setattr(runner, "log_to_mlflow", tracking)
     with pytest.raises(RuntimeError, match="Unsafe model tree"):
         runner.write_mlops_bundle(entry_point="train.py", model_version="", training_job_id="job",
             status="succeeded", stdout_text="", stderr_text="")
-    assert not (runner_workspace["MODEL_DIR"] / "_mlops").exists()
+    assert not (runner_workspace["WORK_DIR"] / "_mlops").exists()
     tracking.assert_not_called()

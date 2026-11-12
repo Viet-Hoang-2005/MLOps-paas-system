@@ -110,7 +110,7 @@ def test_writes_mlops_bundle_and_manifest(runner_workspace):
         stderr_text="warning",
     )
 
-    mlops_dir = model_dir / "_mlops"
+    mlops_dir = runner_workspace["WORK_DIR"] / "_mlops"
     metrics = json.loads((mlops_dir / "metrics.json").read_text(encoding="utf-8"))
     assert metrics == {"accuracy": 0.99, "loss": 0.05, "precision": 0.8}
     insights = json.loads((mlops_dir / "model_insights.json").read_text(encoding="utf-8"))
@@ -168,7 +168,7 @@ def test_non_finite_metrics_never_reach_the_bundle(runner_workspace):
         stdout_text='METRIC_JSON {"val_loss": NaN, "val_acc": 0.8}',
         stderr_text="",
     )
-    mlops_dir = model_dir / "_mlops"
+    mlops_dir = runner_workspace["WORK_DIR"] / "_mlops"
     assert _strict_json(mlops_dir / "metrics.json") == {"accuracy": 0.9, "val_acc": 0.8}
     assert _strict_json(mlops_dir / "params.json") == {"lr": 0.1, "init": None}
     insights = _strict_json(mlops_dir / "model_insights.json")

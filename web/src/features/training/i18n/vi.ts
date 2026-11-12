@@ -1,5 +1,9 @@
 export const trainingVi = {
   studio: {
+    artifactSelection: {
+      model: "Model gốc", chooseModel: "Chọn model", label_mapping: "Ánh xạ nhãn", input_schema: "Lược đồ đầu vào", metrics: "Chỉ số", params: "Tham số", model_insights: "Thông tin mô hình", feature_importance: "Mức độ quan trọng đặc trưng",
+      none: "Không sử dụng", fromMetadata: "Chọn từ Metadata", upload: "Upload JSON mới", chooseMetadata: "Chọn file JSON", jsonLimit: "JSON · 1 MiB",
+    },
     saved: "Đã lưu tất cả thay đổi.",
     cancel: "Hủy",
     draftCount: "Bản nháp: {{count}}",
@@ -80,7 +84,7 @@ export const trainingVi = {
       "Input bị khóa sau khi gửi chạy. Nhân bản job để chỉnh sửa và chạy lại. Đóng trang không dừng huấn luyện.",
     resourcesUnavailable: "Không xác minh được tài nguyên chạy.",
     contract:
-      "Input chỉ đọc. Đọc file qua SM_CHANNEL_TRAIN, ghi dữ liệu tạm vào MLOPS_WORK_DIR, lưu model vào SM_MODEL_DIR và ghi metrics được hỗ trợ vào SM_OUTPUT_DIR.",
+      "Input chỉ đọc. Đọc file qua SM_CHANNEL_TRAIN, ghi dữ liệu tạm vào MLOPS_WORK_DIR, chỉ lưu model vào SM_MODEL_DIR; mapping, schema, metadata và báo cáo ghi vào SM_OUTPUT_DIR.",
     cpuProfile: "{{cpu}} vCPU / {{memory}} MiB",
     profiles: { small: "Nhỏ", medium: "Trung bình", large: "Lớn" },
     vram: "VRAM trống: {{free}} / {{total}} MiB (tại lần kiểm tra gần nhất)",

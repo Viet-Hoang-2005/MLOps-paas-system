@@ -131,13 +131,13 @@ class DockerTrainingAsyncTests(TestCase):
             "exit_code": 0,
         }
 
-        with patch("apps.training.tasks.training_backend", return_value=fake_backend):
-            result = poll_training_job_status(str(self.job.public_id))
+        from celery.exceptions import Retry
+        with patch("apps.training.tasks.training_backend", return_value=fake_backend), self.assertRaises(Retry):
+            poll_training_job_status(str(self.job.public_id))
 
-        self.assertEqual(result, "completed")
         self.job.refresh_from_db()
-        self.assertEqual(self.job.status, "completed")
-        self.assertTrue(self.job.outputs.filter(relative_path="model.tar.gz").exists())
+        self.assertEqual(self.job.status, "uploading")
+        self.assertFalse(self.job.outputs.exists())
 
     def test_poll_training_job_status_fails_job_on_nonzero_exit(self):
         self.job.status = "running"

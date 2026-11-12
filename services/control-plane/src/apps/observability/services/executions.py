@@ -222,6 +222,11 @@ def reconcile(kind, public_id, token=None):
 
 
 def _finish(row, kind, status, message="", finished_at=None):
+    if kind == "training" and status == "completed" and row.tracking.get("output_contract") != 2:
+        from apps.training.services.output_finalization import enqueue_output
+        enqueue_output(row, finished_at)
+        return
+
     if kind == "training":
         row.mark_finished(status)
         if finished_at:
@@ -229,8 +234,6 @@ def _finish(row, kind, status, message="", finished_at=None):
             started = row.runtime_started_at or row.started_at or finished_at
             row.runtime_seconds = max(0, int((finished_at - started).total_seconds()))
         row.save(update_fields=["status", "completed_at", "runtime_seconds"])
-        if status == "completed":
-            row.outputs.update_or_create(relative_path="model.tar.gz", defaults={"kind": "model", "s3_uri": row.output_uri, "content_type": "application/gzip"})
         from apps.observability.services.lifecycle import record_training_event
         record_training_event(job=row, event_type=status, message=(message or f"Training {status}.")[:1000])
     else:
@@ -264,8 +267,9 @@ def _store_runtime_metadata(current, kind, observation):
             fields.append("tracking")
         if current.status in TERMINAL and current.runtime_started_at and current.completed_at:
             end = finished or current.completed_at
+            current.completed_at = end
             current.runtime_seconds = max(0, int((end - current.runtime_started_at).total_seconds()))
-            fields.append("runtime_seconds")
+            fields.extend(["completed_at", "runtime_seconds"])
     if fields:
         current.save(update_fields=fields)
     return finished
@@ -273,8 +277,6 @@ def _store_runtime_metadata(current, kind, observation):
 
 def _completion_data(row, kind):
     if kind == "training":
-        from apps.training.services.outputs import verify_training_output
-        verify_training_output(row)
         return None
     from botocore.config import Config
     storage = S3Storage(client_config=Config(connect_timeout=3, read_timeout=5, retries={"max_attempts": 0}))
@@ -330,7 +332,9 @@ def apply_observation(kind, public_id, token, observation):
         now = timezone.now()
         dispatch_expired = bool(current.dispatch_deadline_at and (current.runtime_started_at or now) > current.dispatch_deadline_at)
         runtime_expired = bool(current.execution_deadline_at and now >= current.execution_deadline_at)
-        finished_in_time = bool(observed == "completed" and finished and current.execution_deadline_at and finished <= current.execution_deadline_at)
+        output_finished = parse_datetime(current.tracking.get("output_runtime_finished_at", "")) if kind == "training" and current.status == "uploading" else None
+        end = finished or output_finished
+        finished_in_time = bool(end and current.execution_deadline_at and end <= current.execution_deadline_at and (observed == "completed" or output_finished))
         if (dispatch_expired or (runtime_expired and not finished_in_time)) and current.status not in TERMINAL and current.status != "cancelling":
             _finish(current, kind, "failed", "Execution deadline exceeded.")
             current.execution_stop_requested = True
@@ -363,11 +367,15 @@ def apply_observation(kind, public_id, token, observation):
             current.execution_stop_requested = True
         elif observed in {"dispatched", "running"}:
             was_queued = current.status == "queued"
-            current.status = "running"
+            if current.status != "uploading":
+                current.status = "running"
             current.save(update_fields=["status", "started_at"])
             if kind == "training" and was_queued:
                 from apps.observability.services.lifecycle import record_training_event
                 record_training_event(job=current, event_type="started", message="Training workload dispatched.")
+        elif kind == "training" and current.status == "uploading" and observed in {"completed", "not_found"}:
+            from apps.training.services.output_finalization import enqueue_output
+            enqueue_output(current, finished)
         elif observed == "not_found" and not current.runtime_started_at and (row.backend if kind == "training" else row.monitor.backend) == "argo":
             current.status = "queued"
             current.save(update_fields=["status"])
@@ -384,8 +392,9 @@ def apply_observation(kind, public_id, token, observation):
             else:
                 status = "failed"
             _finish(current, kind, status, observation.get("error", "Runtime is missing." if observed == "not_found" else ""), finished_at=finished)
-            current.observation_status = "cleanup_pending"
-            current.execution_stop_requested = True
+            if current.status != "uploading":
+                current.observation_status = "cleanup_pending"
+                current.execution_stop_requested = True
         _release(current)
         return current.status
 

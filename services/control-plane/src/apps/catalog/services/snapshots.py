@@ -129,7 +129,14 @@ def running_attributes(project, version_id=None, storage=None):
         summary_sources["metrics"] = {key: "registered" for key in metrics}
         summary_sources["params"] = {key: "registered" for key in params}
         raw_insights = dict(version.insights_summary or {})
-        if raw_insights.get("kind") == "feature_importance":
+        if version.source_job_id or version.source_job_reference:
+            model_insights = raw_insights.get("model_insights")
+            feature_importance = raw_insights.get("feature_importance")
+            if model_insights:
+                summary_sources["model_insights"] = "registered"
+            if feature_importance:
+                summary_sources["feature_importance"] = "registered"
+        elif raw_insights.get("kind") == "feature_importance":
             feature_importance = raw_insights
             summary_sources["feature_importance"] = "registered"
         elif raw_insights:

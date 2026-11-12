@@ -19,8 +19,8 @@ The Training Runner (`services/training-runner/`) executes user-supplied trainin
    - Parses stdout/stderr for structured metric lines:
      `METRIC_JSON {"epoch": 1, "loss": 0.25, "accuracy": 0.94}`
    - Streams metric events and application logs to Redis (`training_logs:{job_id}`) or Grafana Loki.
-   - Logs hyperparameter metrics and artifacts to MLflow Tracking Server.
+   - Logs supported params/metrics through Control Plane MLflow endpoints; never uploads the output package through the artifact proxy.
 6. **Output Bundling & Callback:**
    - Collects trained model artifacts (`/workspace/model/`), metrics, parameters, and model insights (`feature_importance.json`, `coefficients.json`).
-   - Packages into `training_output.zip` and uploads to S3 using its Capability Token.
+   - Packages Output v2 into private `model.tar.gz` (`model/`, `metadata/`, `_mlops/`). Control Plane asynchronously verifies/materializes files before Completed.
    - Dispatches authenticated callback to `/internal/webhooks/training-jobs/<id>/` reporting `COMPLETED` or `FAILED`.

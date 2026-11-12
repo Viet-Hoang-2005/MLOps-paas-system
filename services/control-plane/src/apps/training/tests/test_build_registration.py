@@ -47,11 +47,12 @@ def completed_job(email="training-build@example.com"):
         output_uri="s3://bucket/model.tar.gz",
         status="completed",
      vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
-    TrainingOutput.objects.create(
+    model = TrainingOutput.objects.create(
         job=job,
         kind="model",
-        relative_path="model.tar.gz",
-        s3_uri=job.output_uri,
+        relative_path="Model/model.joblib",
+        metadata={"contract": 2, "group": "model"},
+        s3_uri="s3://bucket/selected-model.joblib",
         checksum="output-checksum",
         size_bytes=42,
         content_type="application/gzip",
@@ -65,6 +66,9 @@ def completed_job(email="training-build@example.com"):
         size_bytes=100,
         content_type="text/x-python",
     )
+    job.artifact_selection = {"model_id": str(model.public_id), "artifacts": {}}
+    job.tracking = {"output_contract": 2}
+    job.save(update_fields=["artifact_selection", "tracking"])
     return job
 
 

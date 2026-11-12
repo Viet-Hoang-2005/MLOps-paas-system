@@ -115,17 +115,6 @@ def test_finite_json_replaces_non_finite_numbers_everywhere():
     json.dumps(io.finite_json(value), allow_nan=False)
 
 
-def test_training_summaries_with_nan_become_strict_json(tmp_path):
-    mlops = tmp_path / "_mlops"
-    mlops.mkdir()
-    (mlops / "metrics.json").write_text('{"loss": NaN, "acc": 0.9, "grad": Infinity}', encoding="utf-8")
-    (mlops / "params.json").write_text('{"lr": 0.1}', encoding="utf-8")
-    (mlops / "model_insights.json").write_text('{"items": [{"value": -Infinity}]}', encoding="utf-8")
-    summaries, _ = tasks.read_training_summaries(tmp_path)
-    assert summaries["metrics_summary"] == {"loss": None, "acc": 0.9, "grad": None}
-    json.dumps(summaries, allow_nan=False)
-
-
 def test_callback_with_nan_is_sent_as_strict_json():
     """`requests` serializes with allow_nan=False, so a raw NaN made every delivery fail."""
     sent = []

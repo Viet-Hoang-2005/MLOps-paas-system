@@ -30,6 +30,8 @@ spec:
         value: ""
       - name: control_plane_webhook_url
       - name: label_mapping_download_url
+      - name: input_schema_download_url
+        default: ""
       - name: label_mapping_filename
   volumeClaimTemplates:
     - metadata:
@@ -71,6 +73,8 @@ spec:
           - name: output_upload_url
           - name: control_plane_webhook_url
           - name: label_mapping_download_url
+          - name: input_schema_download_url
+            default: ""
           - name: label_mapping_filename
       steps:
         - - name: prepare-package
@@ -91,6 +95,7 @@ spec:
                 - {name: output_upload_url, value: "{{inputs.parameters.output_upload_url}}"}
                 - {name: control_plane_webhook_url, value: "{{inputs.parameters.control_plane_webhook_url}}"}
                 - {name: label_mapping_download_url, value: "{{inputs.parameters.label_mapping_download_url}}"}
+                - {name: input_schema_download_url, value: "{{inputs.parameters.input_schema_download_url}}"}
                 - {name: label_mapping_filename, value: "{{inputs.parameters.label_mapping_filename}}"}
         - - name: build-image
             template: build-image
@@ -132,6 +137,7 @@ spec:
           - {name: output_upload_url}
           - {name: control_plane_webhook_url}
           - {name: label_mapping_download_url}
+          - {name: input_schema_download_url, default: ""}
           - {name: label_mapping_filename}
       container:
         image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:81965f1f52b90f1578765eaf99e15aba96f68a8a
@@ -173,6 +179,7 @@ spec:
           - {name: SOURCE_TYPE, value: "{{inputs.parameters.source_type}}"}
           - {name: SOURCE_DOWNLOAD_URL, value: "{{inputs.parameters.source_download_url}}"}
           - {name: LABEL_MAPPING_DOWNLOAD_URL, value: "{{inputs.parameters.label_mapping_download_url}}"}
+          - {name: INPUT_SCHEMA_DOWNLOAD_URL, value: "{{inputs.parameters.input_schema_download_url}}"}
           - {name: LABEL_MAPPING_FILENAME, value: "{{inputs.parameters.label_mapping_filename}}"}
           - {name: OUTPUT_UPLOAD_URL, value: "{{inputs.parameters.output_upload_url}}"}
           - {name: CONTROL_PLANE_WEBHOOK_URL, value: "{{inputs.parameters.control_plane_webhook_url}}"}

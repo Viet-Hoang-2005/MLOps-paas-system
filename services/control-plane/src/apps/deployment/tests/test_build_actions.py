@@ -242,9 +242,11 @@ def test_rebuild_copies_current_preview_into_new_build(project, status, monkeypa
 
 def test_rebuild_uses_original_completed_training_job(project, monkeypatch):
     job = TrainingJob.objects.create(project=project, model_flavor="xgboost", status="completed", vcpu=2, memory_mb=4096, max_runtime_seconds=3600, input_contract="legacy", submitted_at=timezone.now())
-    TrainingOutput.objects.create(
-        job=job, kind="model", relative_path="model.tar.gz", s3_uri="s3://test-bucket/trained.tar.gz"
+    model = TrainingOutput.objects.create(
+        job=job, kind="model", relative_path="Model/chosen.joblib", s3_uri="s3://test-bucket/chosen.joblib", metadata={"contract": 2, "group": "model"}
     )
+    job.artifact_selection = {"model_id": str(model.public_id), "artifacts": {}}
+    job.save()
     original = Build.objects.create(
         project=project, source_job=job, source_job_reference=job.public_id, flavor="xgboost", status="failed"
     )
@@ -253,7 +255,7 @@ def test_rebuild_uses_original_completed_training_job(project, monkeypatch):
     result = request_rebuild(original, backend="docker", storage=storage)
     assert result.pk != original.pk
     assert result.source_job_id == job.pk
-    assert storage.copies[0][0] == "s3://test-bucket/trained.tar.gz"
+    assert storage.copies[0][0] == "s3://test-bucket/chosen.joblib"
     job.delete()
     with pytest.raises(Conflict, match="deleted"):
         request_rebuild(original, backend="docker", storage=storage)

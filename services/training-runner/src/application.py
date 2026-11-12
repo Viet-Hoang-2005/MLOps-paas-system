@@ -405,17 +405,7 @@ def log_to_mlflow(
                     except Exception:
                         pass
 
-            if model_dir.exists():
-                try:
-                    mlflow.log_artifacts(str(model_dir), artifact_path="model")
-                except Exception as exc:
-                    runtime_log.event(
-                        logging.WARNING,
-                        "training_mlflow_artifacts_failed",
-                        "Could not log training artifacts to MLflow",
-                        reason=sanitize(str(exc)),
-                    )
-        log("Successfully logged training job parameters, metrics, and artifacts to MLflow")
+        log("Successfully logged training job parameters and metrics to MLflow")
     except Exception as exc:
         runtime_log.event(
             logging.WARNING,
@@ -443,10 +433,14 @@ def write_mlops_bundle(
     stderr_text = redact_training_output(stderr_text)
     # Validate before writing metadata or handing paths to MLflow, not only
     # when packaging the final archive.
-    execution.validate_model_tree(MODEL_DIR)
+    from src.output_contract import collect
+    collect(MODEL_DIR, "model", require_env("MODEL_FLAVOR"))
+    collect(OUTPUT_DIR, "metadata", require_env("MODEL_FLAVOR"))
     warnings: list[dict] = []
-    mlops_dir = MODEL_DIR / MLOPS_DIR_NAME
-    mlops_dir.mkdir(parents=True, exist_ok=True)
+    mlops_dir = WORK_DIR / MLOPS_DIR_NAME
+    if mlops_dir.exists():
+        raise RuntimeError("Reserved system output directory already exists.")
+    mlops_dir.mkdir(parents=True)
 
     metric_events, stdout_metrics = parse_metric_events(stdout_text, warnings)
     file_metrics_payload = read_json_object(OUTPUT_DIR / "metrics.json", "metrics", warnings)
@@ -792,7 +786,8 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
 
 
 def create_model_archive(archive_path: Path) -> None:
-    execution.create_model_archive(archive_path, MODEL_DIR, MLOPS_DIR_NAME, log)
+    from src.output_contract import package
+    package(archive_path, MODEL_DIR, OUTPUT_DIR, WORK_DIR / MLOPS_DIR_NAME, require_env("MODEL_FLAVOR"))
 
 
 def _run() -> None:
@@ -832,7 +827,7 @@ def _run() -> None:
     source_zip_path = WORKSPACE / "source.zip"
     data_download_path = WORKSPACE / "data_download"
     requirements_path = SOURCE_DIR / "requirements.txt"
-    model_archive_path = OUTPUT_DIR / "model.tar.gz"
+    model_archive_path = WORK_DIR / "model.tar.gz"
 
     download_presigned_url(source_uri, source_zip_path)
     download_presigned_url(training_data_uri, data_download_path)
@@ -913,7 +908,7 @@ def _run_workspace():
         stdout_text=redact_training_output(result.stdout or ""), stderr_text=redact_training_output(result.stderr or ""))
     if result.returncode:
         raise RuntimeError(f"Training entry point failed with exit code {result.returncode}")
-    archive = OUTPUT_DIR / "model.tar.gz"
+    archive = WORK_DIR / "model.tar.gz"
     create_model_archive(archive)
     upload_presigned_url(archive, request_output_upload_url(require_env("S3_OUTPUT_UPLOAD_URL"), require_env("S3_OUTPUT_UPLOAD_CAPABILITY")))
 

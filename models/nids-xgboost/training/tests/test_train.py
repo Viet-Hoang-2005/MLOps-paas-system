@@ -326,7 +326,7 @@ def test_cpu_training_export_and_outputs(workspace, monkeypatch, capsys, multicl
     assert model.callbacks is None
     assert set(model.predict(frame[names])) <= set(range(3 if multiclass else 2))
     assert len(list(model_dir.glob("*.joblib"))) == 1
-    schema = json.loads((model_dir / "input_schema.json").read_text())
+    schema = json.loads((root.parent / "output/input_schema.json").read_text())
     assert schema["required"] == schema["x-feature-order"] == names
     assert (
         set(schema["properties"]) == set(names)
@@ -334,7 +334,7 @@ def test_cpu_training_export_and_outputs(workspace, monkeypatch, capsys, multicl
     )
     metrics = json.loads((root.parent / "output/metrics.json").read_text())
     assert metrics["accuracy"] > 0.7
-    insights = json.loads((model_dir / "training_report.json").read_text())
+    insights = json.loads((root.parent / "output/training_report.json").read_text())
     assert (
         len(
             insights["learning_curves"][
@@ -393,7 +393,7 @@ def test_tracking_failure_still_writes_outputs(workspace, monkeypatch):
     monkeypatch.setattr(trainer, "Tracking", FailedTracking)
     trainer.main([])
     assert (root.parent / "model/model.joblib").is_file()
-    report = json.loads((root.parent / "model/training_report.json").read_text())
+    report = json.loads((root.parent / "output/training_report.json").read_text())
     assert report["tracking_warning"] == "tracking unavailable"
     assert (
         json.loads((root.parent / "output/metrics.json").read_text())["accuracy"] > 0.7

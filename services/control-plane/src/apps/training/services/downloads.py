@@ -13,7 +13,7 @@ from infrastructure.storage import S3Storage
 from .storage_scope import training_prefix_for, validate_training_uri
 from .workspaces import MAX_WORKSPACE_SNAPSHOT, safe_path
 
-MAX_OUTPUT_DOWNLOAD = 20 * 1024**3 + MAX_WORKSPACE_SNAPSHOT
+MAX_OUTPUT_DOWNLOAD = 20 * 1024**3 + 512 * 1024**2
 MAX_ENTRIES = 20_000
 CHUNK_SIZE = 1024 * 1024
 
@@ -137,7 +137,8 @@ def workspace_download(job, *, area, path=None, revision=None, storage=None):
     elif area == "output":
         if job.outputs_purged_at:
             raise Conflict("Training outputs have been purged.")
-        entries = list(job.outputs.all())
+        from .output_index import public_outputs
+        entries = list(public_outputs(job))
         files = {entry.relative_path: entry for entry in entries}
         prefix = training_prefix_for(job) + "/"
         limit = MAX_OUTPUT_DOWNLOAD

@@ -45,6 +45,7 @@ class TrainingJobSecret(models.Model):
 
 
 class TrainingJob(ExecutionWatch):
+    artifact_selection = models.JSONField(default=dict, blank=True)
     MODEL_FLAVORS = (
         ("sklearn", "Scikit-learn"),
         ("xgboost", "XGBoost"),

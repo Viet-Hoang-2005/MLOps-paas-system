@@ -227,12 +227,10 @@ def test_rejects_invalid_device_contract(settings, backend, kind, device_id):
 def test_create_persists_only_a_verified_local_gpu(settings, monkeypatch):
     from django.contrib.auth import get_user_model
     from rest_framework.test import APIClient
-    from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
 
     settings.TRAINING_BACKEND = "docker"
     settings.TRAINING_GPU_ENABLED = True
     settings.TRAINING_GPU_COUNTS = (1,)
-    monkeypatch.setattr("apps.training.services.jobs.S3Storage", MemoryStorage)
     check = Mock(return_value={"id": GPU})
     monkeypatch.setattr(local_gpu, "require_device", check)
     user = get_user_model().objects.create_user("gpu-create-test@example.com")

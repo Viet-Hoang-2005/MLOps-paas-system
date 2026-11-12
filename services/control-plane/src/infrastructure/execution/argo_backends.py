@@ -98,6 +98,7 @@ class ArgoBuildBackend(_ArgoBackend):
             "source_download_url": self.storage.presigned_get(source_uri, 14400),
             "label_mapping_download_url": label_mapping_url,
             "label_mapping_filename": label_mapping_filename,
+            "input_schema_download_url": self.storage.presigned_get(build.input_assets.get(kind="input_schema").s3_uri, 14400) if build.input_assets.filter(kind="input_schema").exists() else "",
             "output_upload_url": self.storage.presigned_put(package_uri, 14400),
             "control_plane_webhook_url": (
                 f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/builds/{build.public_id}/"
@@ -179,6 +180,7 @@ class ArgoTrainingBackend(_ArgoBackend):
                 ),
                 "output_upload_capability": output_upload_capability,
                 "entry_point": job.entry_point,
+                "model_flavor": job.model_flavor,
                 "model_version": "",
                 "requirements_text": job.requirements_text,
                 "control_plane_webhook_url": (

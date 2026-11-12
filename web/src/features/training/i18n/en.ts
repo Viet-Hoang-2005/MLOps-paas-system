@@ -1,5 +1,9 @@
 export const trainingEn = {
   studio: {
+    artifactSelection: {
+      model: "Raw Model Artifact", chooseModel: "Select a model", label_mapping: "Label mapping", input_schema: "Input schema", metrics: "Metrics", params: "Parameters", model_insights: "Model insights", feature_importance: "Feature importance",
+      none: "Not used", fromMetadata: "Select from Metadata", upload: "Upload new JSON", chooseMetadata: "Select a JSON file", jsonLimit: "JSON · 1 MiB",
+    },
     saved: "All changes saved.",
     draftCount: "Drafts: {{count}}",
     clone: "Clone and edit",
@@ -79,7 +83,7 @@ export const trainingEn = {
       "Input is locked after submission. Clone this job to edit and run again. Closing this page does not stop training.",
     resourcesUnavailable: "Unable to verify runtime resources.",
     contract:
-      "Input is read-only. Read files with SM_CHANNEL_TRAIN, write temporary data to MLOPS_WORK_DIR, save your model to SM_MODEL_DIR, and write supported metrics to SM_OUTPUT_DIR.",
+      "Input is read-only. Read files with SM_CHANNEL_TRAIN, write temporary data to MLOPS_WORK_DIR, save raw models only to SM_MODEL_DIR, and write mapping, schema, metadata and reports to SM_OUTPUT_DIR.",
     cpuProfile: "{{cpu}} vCPU / {{memory}} MiB",
     profiles: { small: "Small", medium: "Medium", large: "Large" },
     vram: "VRAM: {{free}} / {{total}} MiB free (at last check)",

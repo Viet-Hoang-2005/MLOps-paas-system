@@ -7,10 +7,9 @@ from rest_framework.views import APIView
 
 from apps.catalog.models import ModelProject
 from apps.observability.services.lifecycle import has_event, record_training_event
-from apps.training.models import TrainingJob, TrainingOutput
+from apps.training.models import TrainingJob
 from apps.training.services.capabilities import capability_for_token
 from apps.training.services.logs import append_training_log
-from apps.training.services.outputs import verify_training_output
 from apps.training.services.storage_scope import validate_training_uri
 from common.logging import record_transition
 from infrastructure.storage import S3Storage
@@ -42,15 +41,16 @@ class TrainingJobWebhookEndpoint(APIView):
         candidate = TrainingJob.objects.select_related("project__owner").filter(public_id=job_id).first()
         if candidate and candidate.status not in {"cancelling", "completed", "failed", "cancelled"} and not candidate.deletion_requested_at and (not candidate.project_id or candidate.project.deletion_state == "active"):
             capability = capability_for_token(job=candidate, purpose="trusted_reporter", token=_bearer_token(request))
-            if capability and not capability.consumed_at and _terminal_status(request.data.get("workflow_status")) == "completed":
-                try:
-                    verify_training_output(candidate)
-                except Exception as exc:
-                    from botocore.exceptions import ClientError
-                    missing = isinstance(exc, ValueError) or (isinstance(exc, ClientError) and exc.response["Error"]["Code"] in {"404", "NoSuchKey", "NotFound"})
-                    if not missing:
-                        return Response({"detail": "Training output verification is temporarily unavailable."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-                    output_error = "Training output is missing or empty."
+            if capability and candidate.submitted_at and not capability.consumed_at and _terminal_status(request.data.get("workflow_status")) == "completed":
+                from apps.training.services.output_finalization import enqueue_output
+                with transaction.atomic():
+                    current = TrainingJob.objects.select_for_update().get(pk=candidate.pk)
+                    if current.status not in {"completed", "failed", "cancelled", "cancelling"} and not current.deletion_requested_at:
+                        enqueue_output(current)
+                        capability.consumed_at = timezone.now()
+                        capability.save(update_fields=["consumed_at"])
+                        record_training_event(job=current, event_type="output_index_queued", message="Output verification queued.", idempotency_key=key)
+                return Response({"status": current.status}, status=status.HTTP_202_ACCEPTED)
         with transaction.atomic():
             if candidate:
                 ModelProject.objects.select_for_update().filter(pk=candidate.project_id).first()
@@ -91,11 +91,7 @@ class TrainingJobWebhookEndpoint(APIView):
                 return Response({"status": job.status, "ignored": True})
             if status_value == "completed":
                 job.mark_finished("completed")
-                TrainingOutput.objects.update_or_create(
-                    job=job,
-                    relative_path="model.tar.gz",
-                    defaults={"kind": "model", "s3_uri": job.output_uri},
-                )
+
             elif status_value == "failed":
                 job.mark_finished("failed")
                 job.error_message = output_error or "Training workflow failed."

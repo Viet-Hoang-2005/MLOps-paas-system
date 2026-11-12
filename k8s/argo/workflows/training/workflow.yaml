@@ -32,6 +32,7 @@ spec:
       - name: output_upload_url
       - name: output_upload_capability
       - name: entry_point
+      - name: model_flavor
       - name: model_version
       - name: control_plane_webhook_url
       - name: reporter_capability
@@ -80,6 +81,8 @@ spec:
             value: '{{inputs.parameters.output_upload_capability}}'
           - name: entry_point
             value: '{{inputs.parameters.entry_point}}'
+          - name: model_flavor
+            value: '{{inputs.parameters.model_flavor}}'
           - name: model_version
             value: '{{inputs.parameters.model_version}}'
           - name: requirements_text
@@ -133,6 +136,8 @@ spec:
             value: '{{inputs.parameters.output_upload_capability}}'
           - name: entry_point
             value: '{{inputs.parameters.entry_point}}'
+          - name: model_flavor
+            value: '{{inputs.parameters.model_flavor}}'
           - name: model_version
             value: '{{inputs.parameters.model_version}}'
           - name: requirements_text
@@ -179,6 +184,7 @@ spec:
       - name: output_upload_url
       - name: output_upload_capability
       - name: entry_point
+      - name: model_flavor
       - name: model_version
       - name: requirements_text
       - name: max_runtime_seconds
@@ -258,6 +264,8 @@ spec:
               value: {{=toJson(inputs.parameters.input_download_capability)}}
             - name: ENTRY_POINT
               value: {{=toJson(inputs.parameters.entry_point)}}
+            - name: MODEL_FLAVOR
+              value: {{=toJson(inputs.parameters.model_flavor)}}
             - name: MODEL_VERSION
               value: {{=toJson(inputs.parameters.model_version)}}
             - name: MLFLOW_TRACKING_URI
@@ -335,6 +343,7 @@ spec:
       - name: output_upload_url
       - name: output_upload_capability
       - name: entry_point
+      - name: model_flavor
       - name: model_version
       - name: requirements_text
       - name: max_runtime_seconds
@@ -416,6 +425,8 @@ spec:
               value: {{=toJson(inputs.parameters.input_download_capability)}}
             - name: ENTRY_POINT
               value: {{=toJson(inputs.parameters.entry_point)}}
+            - name: MODEL_FLAVOR
+              value: {{=toJson(inputs.parameters.model_flavor)}}
             - name: MODEL_VERSION
               value: {{=toJson(inputs.parameters.model_version)}}
             - name: MLFLOW_TRACKING_URI
