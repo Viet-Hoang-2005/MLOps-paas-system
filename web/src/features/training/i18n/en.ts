@@ -9,7 +9,7 @@ export const trainingEn = {
     actions: "Actions",
     view: "Open",
     delete: "Delete Training Job",
-    backToCurrent: "Back to current Workspace",
+    currentWorkspace: "Current workspace",
     openActive: "Open active Training Job",
     empty: "No training jobs yet",
     previous: "Previous",
@@ -34,8 +34,37 @@ export const trainingEn = {
       delete_failed: "Deletion failed",
     },
   },
+  assignment: {
+    sourceTitle: "Training Run Source",
+    sourceDescription:
+      "Select the completed training job run whose trained weights and outputs will be linked to a model project.",
+    projectTitle: "Target Model Project",
+    projectDescription:
+      "Assign this run to an existing model project or register a new project to host its deployment and metrics.",
+    artifactsTitle: "Model Artifacts & Metadata",
+    artifactsDescription:
+      "Select the primary model weights and link optional JSON artifacts for label mapping, schema validation, and evaluation metrics.",
+    codeDataTitle: "Code & Data",
+    codeDataDescription:
+      "Inspect supplemental inference code and baseline reference dataset provided for this run.",
+    requirementsTitle: "Requirements",
+    requirementsDescription:
+      "Configure Python dependencies (requirements.txt) required to build the model serving image.",
+    requirementsSelectLabel: "Requirements source",
+    requirementsNone: "Not used",
+    requirementsFromInput: "From Training Job Input",
+    requirementsUpload: "Upload new",
+    uploadRequirements: "Upload requirements.txt",
+    uploadRequirementsHint:
+      "Upload a requirements.txt file to auto-populate dependencies",
+  },
   studio: {
     artifactSelection: {
+      source_codeInput: "Select script Python from Input",
+      reference_dataInput: "Select data CSV from Input",
+      source_codeUpload: "Upload new Source code",
+      reference_dataUpload: "Upload new Reference data",
+
       model: "Raw Model Artifact",
       chooseModel: "Select a model",
       label_mapping: "Label mapping",

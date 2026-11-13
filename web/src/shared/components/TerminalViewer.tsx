@@ -165,9 +165,20 @@ export function TerminalViewer({
 }: TerminalViewerProps) {
   const { t } = useTranslation("common");
   const terminalRef = useRef<HTMLDivElement>(null);
+  const previousLogs = useRef<readonly string[]>([]);
 
   useEffect(() => {
-    if (terminalRef.current) {
+    const previous = previousLogs.current;
+    const changed =
+      logs.length !== previous.length ||
+      logs.some((line, index) => line !== previous[index]);
+    previousLogs.current = logs;
+    if (
+      changed &&
+      logs.length > 0 &&
+      logs.length >= previous.length &&
+      terminalRef.current
+    ) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [logs]);

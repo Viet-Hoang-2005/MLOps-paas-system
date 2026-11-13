@@ -1,4 +1,6 @@
 import uuid
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -8,6 +10,27 @@ from rest_framework.test import APIClient
 from apps.catalog.models import ModelProject
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
+
+
+def test_training_notification_targets_workspace_job_snapshot():
+    from apps.notifications.hooks import notify_training_result
+
+    job_id, workspace_id = uuid.uuid4(), uuid.uuid4()
+    job = SimpleNamespace(
+        public_id=job_id,
+        workspace=SimpleNamespace(public_id=workspace_id),
+        owner=object(),
+        status="completed",
+        project_id=None,
+    )
+    with patch("apps.notifications.hooks.create_notification") as create:
+        notify_training_result(job)
+    assert create.call_count == 1
+    values = create.call_args.kwargs
+    assert values["link"] == f"/dashboard/training/workspaces/{workspace_id}/job/{job_id}"
+    assert values["metadata"]["workspace_id"] == str(workspace_id)
+    assert values["metadata"]["job_id"] == str(job_id)
+    assert values["metadata"]["project_id"] is None
 
 
 @pytest.mark.django_db

@@ -1,3 +1,6 @@
+import { useQuery } from "@tanstack/react-query";
+import { getTrainingJob } from "@/features/training/api/trainingApi";
+import { trainingQueryKeys } from "@/features/training/queryKeys";
 import type { Build, ModelVersion } from "@/features/projects/types";
 import { Badge } from "@/shared/components/Badge";
 import { CardSummary } from "@/shared/components/Card";
@@ -42,6 +45,11 @@ export function InformationEvolutionPage({
 }: InformationEvolutionPageProps) {
   const { t, i18n } = useTranslation("evolution");
 
+  const sourceJob = useQuery({
+    queryKey: trainingQueryKeys.job(version.source_job_id ?? ""),
+    queryFn: () => getTrainingJob(version.source_job_id!),
+    enabled: Boolean(version.source_job_id),
+  });
   const isRunning = version.id === runningId;
 
   let statusText = t("workspace.registered");
@@ -170,10 +178,10 @@ export function InformationEvolutionPage({
           title={t("workspace.buildAndRegisterTitle")}
           description={t("workspace.buildAndRegisterDesc")}
           action={
-            version.source_job_id ? (
+            sourceJob.data ? (
               <Button asChild variant="secondary" size="sm">
                 <Link
-                  to={`/dashboard/training/jobs/${version.source_job_id}/overview`}
+                  to={`/dashboard/training/workspaces/${sourceJob.data.workspace_id}/job/${sourceJob.data.id}`}
                 >
                   {t("workspace.trainingJob")}
                 </Link>

@@ -48,27 +48,6 @@ const RunDeploymentPage = lazy(
 const TrainingModelPage = lazy(
   () => import("@/features/training/pages/TrainingModelPage"),
 );
-const TrainingJobDetailPage = lazy(
-  () => import("@/features/training/pages/TrainingJobDetailPage"),
-);
-const TrainingJobOverviewPage = lazy(
-  () => import("@/features/training/pages/TrainingJobOverviewPage"),
-);
-const TrainingJobLogsPage = lazy(
-  () => import("@/features/training/pages/TrainingJobLogsPage"),
-);
-const TrainingJobMetricsPage = lazy(
-  () => import("@/features/training/pages/TrainingJobMetricsPage"),
-);
-const TrainingJobArtifactsPage = lazy(
-  () => import("@/features/training/pages/TrainingJobArtifactsPage"),
-);
-const TrainingJobConfigPage = lazy(
-  () => import("@/features/training/pages/TrainingJobConfigPage"),
-);
-const NewTrainingWorkspacePage = lazy(
-  () => import("@/features/training/pages/NewTrainingWorkspacePage"),
-);
 const TrainingWorkspacePage = lazy(
   () => import("@/features/training/pages/TrainingWorkspacePage"),
 );
@@ -170,24 +149,18 @@ const router = createBrowserRouter(
           path="monitoring/:monitorId"
           element={<DriftMonitoringDetailPage />}
         />
-        <Route path="training/new" element={<NewTrainingWorkspacePage />} />
         <Route
           path="training/workspaces/:workspaceId"
           element={<TrainingWorkspacePage />}
         />
         <Route
-          path="training/workspaces/:workspaceId/jobs/:jobId"
+          path="training/workspaces/:workspaceId/job/:jobId"
           element={<TrainingWorkspacePage />}
         />
-        <Route path="training/jobs/:jobId" element={<TrainingJobDetailPage />}>
-          <Route index element={<Navigate to="overview" replace />} />
-          <Route path="overview" element={<TrainingJobOverviewPage />} />
-          <Route path="logs" element={<TrainingJobLogsPage />} />
-          <Route path="metrics" element={<TrainingJobMetricsPage />} />
-          <Route path="artifacts" element={<TrainingJobArtifactsPage />} />
-          <Route path="config" element={<TrainingJobConfigPage />} />
-          <Route path="project" element={<TrainingJobProjectPage />} />
-        </Route>
+        <Route
+          path="training/workspaces/:workspaceId/job/:jobId/project"
+          element={<TrainingJobProjectPage />}
+        />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="settings/profile" element={<ProfileSettingPage />} />
         <Route path="api-keys" element={<ApiTokensPage />} />

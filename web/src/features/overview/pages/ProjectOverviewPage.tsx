@@ -145,7 +145,7 @@ export default function ProjectOverviewPage() {
     }
     return (
       <div className="flex w-full flex-1 flex-col space-y-6">
-        <PageHeader title={t("pageTitle")} />
+        <PageHeader title={t("pageTitle")} actions={<ProjectPageSelect />} />
         <Placeholder
           title={t("pageTitle")}
           description={t("workflow.noProjectOverview")}
@@ -167,12 +167,21 @@ export default function ProjectOverviewPage() {
 
   if (project.isError && !model)
     return (
-      <p role="alert">
-        {getApiErrorMessage(project.error, t("workflow.failed"))}
-      </p>
+      <div className="space-y-6">
+        <PageHeader title={t("pageTitle")} actions={<ProjectPageSelect />} />
+        <p role="alert">
+          {getApiErrorMessage(project.error, t("workflow.failed"))}
+        </p>
+      </div>
     );
 
-  if (!model) return <p>{t("workflow.loading")}</p>;
+  if (!model)
+    return (
+      <div className="space-y-6">
+        <PageHeader title={t("pageTitle")} actions={<ProjectPageSelect />} />
+        <p role="status">{t("workflow.loading")}</p>
+      </div>
+    );
 
   const deletionState = model.deletion_state;
   const lifecycleStatus = model.lifecycle_status ?? "preview";
@@ -192,7 +201,7 @@ export default function ProjectOverviewPage() {
 
   return (
     <div className="flex w-full flex-1 flex-col space-y-6">
-      <PageHeader title={t("pageTitle")} />
+      <PageHeader title={t("pageTitle")} actions={<ProjectPageSelect />} />
       <section className="space-y-4 rounded-surface border border-border bg-surface p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
@@ -405,3 +414,4 @@ export default function ProjectOverviewPage() {
     </div>
   );
 }
+import { ProjectPageSelect } from "@/features/projects/components/ProjectPageSelect";

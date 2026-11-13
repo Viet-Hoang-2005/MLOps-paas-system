@@ -65,7 +65,9 @@ export const commonVi = {
     signedIn: "Đã đăng nhập",
   },
   statuses: {
-    registered: "đã đăng ký",
+    registered: "Đã đăng ký",
+    deleting: "Đang xóa",
+    delete_failed: "Xóa thất bại",
     loading: "Đang tải…",
     loadingPage: "Đang tải trang",
     empty: "Chưa có dữ liệu",

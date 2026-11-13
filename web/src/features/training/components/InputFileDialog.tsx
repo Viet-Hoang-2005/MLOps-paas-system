@@ -171,6 +171,21 @@ export function InputFileDialog({
             hasFile={Boolean(file)}
             onChange={(next) => {
               setFile(next);
+              if (next) {
+                setName(next.name);
+                const matchedKind = (
+                  Object.keys(extensions) as InputFileKind[]
+                ).find((k) => next.name.toLowerCase().endsWith(extensions[k]));
+                if (
+                  matchedKind &&
+                  !lockedRequirements &&
+                  (!existing || existing.kind === matchedKind) &&
+                  (matchedKind !== "requirements" ||
+                    (!hasRequirements && !existing))
+                ) {
+                  setKind(matchedKind);
+                }
+              }
               setError("");
             }}
             disabled={saving}

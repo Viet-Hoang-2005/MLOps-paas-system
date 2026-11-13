@@ -3,17 +3,52 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Eye, Trash2 } from "lucide-react";
+import { Eye, Trash2, ArrowLeft } from "lucide-react";
 import BaseDialog from "@/shared/components/BaseDialog";
 import { Table } from "@/shared/components/Table";
 import { Button } from "@/shared/components/Button";
+import { Badge } from "@/shared/components/Badge";
+import { Select } from "@/shared/components/Select";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { formatDateTime } from "@/shared/i18n/formatters";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { toast } from "@/shared/lib/toastStore";
 import { listWorkspaceJobs } from "@/features/training/api/jobWorkspaceApi";
 import { deleteTrainingJob } from "@/features/training/api/trainingApi";
-import type { TrainingJob } from "@/features/training/types";
+import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
+
+const JOB_STATUSES: TrainingJobStatus[] = [
+  "pending",
+  "queued",
+  "uploading",
+  "running",
+  "completed",
+  "failed",
+  "cancelling",
+  "cancelled",
+];
+
+const getJobStatusVariant = (
+  status: TrainingJobStatus,
+): "success" | "primary" | "info" | "warning" | "danger" | "neutral" => {
+  switch (status) {
+    case "completed":
+      return "success";
+    case "failed":
+      return "danger";
+    case "running":
+    case "uploading":
+      return "primary";
+    case "cancelling":
+    case "cancelled":
+      return "warning";
+    case "pending":
+    case "queued":
+      return "info";
+    default:
+      return "neutral";
+  }
+};
 
 export function TrainingJobDialog({
   workspaceId,
@@ -27,18 +62,29 @@ export function TrainingJobDialog({
   const { t, i18n } = useTranslation("training");
   const navigate = useNavigate();
   const client = useQueryClient();
-  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState("all");
   const [deleting, setDeleting] = useState<TrainingJob | null>(null);
   const [busy, setBusy] = useState(false);
   const query = useQuery({
-    queryKey: ["training", "workspace-jobs", workspaceId, page],
-    queryFn: () => listWorkspaceJobs(workspaceId, page),
+    queryKey: ["training", "workspace-jobs", workspaceId],
+    queryFn: () => listWorkspaceJobs(workspaceId),
     refetchInterval: 4000,
   });
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+  };
+
+  const filteredJobs = useMemo(() => {
+    const jobs = query.data?.training_jobs ?? [];
+    if (statusFilter === "all") return jobs;
+    return jobs.filter((job) => job.status === statusFilter);
+  }, [query.data?.training_jobs, statusFilter]);
+
   const open = useCallback(
     (id?: string) => {
       navigate(
-        `/dashboard/training/workspaces/${workspaceId}${id ? `/jobs/${id}` : ""}`,
+        `/dashboard/training/workspaces/${workspaceId}${id ? `/job/${id}` : ""}`,
       );
       onClose();
     },
@@ -50,9 +96,13 @@ export function TrainingJobDialog({
         accessorKey: "id",
         header: t("workspaceHistory.jobId"),
         cell: ({ row }) => (
-          <Button variant="ghost" onClick={() => open(row.original.id)}>
+          <button
+            type="button"
+            className="text-color-primary hover:underline"
+            onClick={() => open(row.original.id)}
+          >
             {row.original.id}
-          </Button>
+          </button>
         ),
       },
       {
@@ -63,7 +113,11 @@ export function TrainingJobDialog({
       {
         accessorKey: "status",
         header: t("workspaceHistory.status"),
-        cell: ({ row }) => t(`detail.statuses.${row.original.status}`),
+        cell: ({ row }) => (
+          <Badge variant={getJobStatusVariant(row.original.status)}>
+            {t(`detail.statuses.${row.original.status}`)}
+          </Badge>
+        ),
       },
       {
         id: "started",
@@ -82,14 +136,18 @@ export function TrainingJobDialog({
         cell: ({ row }) => (
           <div className="flex gap-2">
             <Button
-              variant="ghost"
+              size="icon"
+              variant="secondary"
+              border={false}
               aria-label={t("workspaceHistory.view")}
               onClick={() => open(row.original.id)}
             >
               <Eye className="h-4 w-4" />
             </Button>
             <Button
-              variant="ghost"
+              size="icon"
+              variant="secondary"
+              border={false}
               disabled={row.original.deletion_pending}
               aria-label={t("workspaceHistory.delete")}
               onClick={() => setDeleting(row.original)}
@@ -109,13 +167,30 @@ export function TrainingJobDialog({
       className="w-[min(96vw,80rem)]"
     >
       <div className="space-y-4">
-        <Button
-          variant="secondary"
-          disabled={!currentJobId}
-          onClick={() => open()}
-        >
-          {t("workspaceHistory.backToCurrent")}
-        </Button>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <Button
+            variant="primary"
+            disabled={!currentJobId}
+            icon={<ArrowLeft className="h-4 w-4" />}
+            onClick={() => open()}
+          >
+            {t("workspaceHistory.currentWorkspace")}
+          </Button>
+          <div className="w-full sm:w-60">
+            <Select
+              aria-label={t("workspaceHistory.status")}
+              value={statusFilter}
+              onChange={handleStatusFilterChange}
+              options={[
+                { value: "all", label: t("statusFilter.all") },
+                ...JOB_STATUSES.map((status) => ({
+                  value: status,
+                  label: t(`detail.statuses.${status}`),
+                })),
+              ]}
+            />
+          </div>
+        </div>
         {query.isError ? (
           <div role="alert">
             <p>{getApiErrorMessage(query.error, t("studio.failed"))}</p>
@@ -125,27 +200,14 @@ export function TrainingJobDialog({
           </div>
         ) : (
           <Table
-            data={query.data?.training_jobs ?? []}
+            data={filteredJobs}
             columns={columns}
             getRowId={(row) => row.id}
             loading={query.isLoading}
             emptyMessage={t("workspaceHistory.empty")}
+            pageSize={10}
           />
         )}
-        <div className="flex items-center justify-end gap-3">
-          <Button disabled={page === 1} onClick={() => setPage(page - 1)}>
-            {t("workspaceHistory.previous")}
-          </Button>
-          <span>{page}</span>
-          <Button
-            disabled={
-              !query.data || page * query.data.page_size >= query.data.count
-            }
-            onClick={() => setPage(page + 1)}
-          >
-            {t("workspaceHistory.next")}
-          </Button>
-        </div>
       </div>
       <ConfirmDialog
         open={Boolean(deleting)}

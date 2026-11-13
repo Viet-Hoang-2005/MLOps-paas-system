@@ -7,7 +7,15 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Activity, Clock, Cpu, HardDrive, Pause, Play } from "lucide-react";
+import {
+  Activity,
+  Clock,
+  Cpu,
+  HardDrive,
+  Pause,
+  Play,
+  RotateCcw,
+} from "lucide-react";
 import { Button } from "@/shared/components/Button";
 import { Badge } from "@/shared/components/Badge";
 import { PageHeader } from "@/shared/components/PageHeader";
@@ -42,11 +50,11 @@ import {
 } from "@/features/training/api/jobWorkspaceApi";
 import {
   WorkspaceEditor,
+  WorkspaceEditorLoading,
   type WorkspaceEditorHandle,
 } from "@/features/training/components/WorkspaceEditor";
 import { TrainingJobDialog } from "@/features/training/components/TrainingJobDialog";
 import { VariablesSecretDialog } from "@/features/training/components/VariablesDialog";
-import { TrainingProjectAssignment } from "@/features/training/components/TrainingProjectAssignment";
 import { trainingQueryKeys } from "@/features/training/queryKeys";
 import type {
   TrainingJob,
@@ -101,7 +109,7 @@ export default function TrainingWorkspacePage() {
 
 function TrainingTrainingWorkspace() {
   const { workspaceId = "", jobId = "" } = useParams();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation("training");
@@ -353,7 +361,7 @@ function TrainingTrainingWorkspace() {
       setSaveError("");
       allowNavigation.current = true;
       navigate(
-        "/dashboard/training/workspaces/" + workspaceId + "/jobs/" + job.id,
+        "/dashboard/training/workspaces/" + workspaceId + "/job/" + job.id,
       );
       await refresh();
       void queryClient.invalidateQueries({
@@ -692,15 +700,7 @@ function TrainingTrainingWorkspace() {
         onClick: () => void start(),
       };
 
-  const handleBack = () => {
-    if (params.get("step") === "project") {
-      const next = new URLSearchParams(params);
-      next.delete("step");
-      setParams(next);
-    } else {
-      navigate("/dashboard/training");
-    }
-  };
+  const handleBack = () => navigate("/dashboard/training");
 
   if (workspaceQuery.isError || jobQuery.isError)
     return (
@@ -722,7 +722,12 @@ function TrainingTrainingWorkspace() {
       </div>
     );
   if (!workspace || (jobId && !selectedJob))
-    return <p className="p-5 text-style-body">{t("studio.loading")}</p>;
+    return (
+      <section className="space-y-5">
+        <PageHeader title={t("studio.title")} back onBack={handleBack} />
+        <WorkspaceEditorLoading />
+      </section>
+    );
 
   return (
     <section className="space-y-5">
@@ -731,185 +736,163 @@ function TrainingTrainingWorkspace() {
         back
         onBack={handleBack}
         actions={
-          <Button variant="secondary" onClick={() => setHistoryOpen(true)}>
+          <Button
+            className="h-10"
+            variant="secondary"
+            icon={<RotateCcw className="h-4 w-4" />}
+            onClick={() => setHistoryOpen(true)}
+          >
             {t("workspaceHistory.open", { count: draft?.job_count ?? 0 })}
           </Button>
         }
       />
-      {params.get("step") === "project" &&
-      selectedJob?.status === "completed" &&
-      selectedJob.output_available ? (
-        <TrainingProjectAssignment
-          key={selectedJob.id}
-          job={selectedJob}
-          suggestedProject={params.get("project") ?? undefined}
-          onBack={() => {
-            const next = new URLSearchParams(params);
-            next.delete("step");
-            setParams(next);
-          }}
-          onSaved={(job) => {
-            void queryClient.invalidateQueries({ queryKey: ["models"] });
-            void queryClient.invalidateQueries({
-              queryKey: trainingQueryKeys.jobs(),
-            });
-            navigate(`/dashboard/training/jobs/${job.id}/overview`);
+      <div className="space-y-4 rounded-surface border border-border bg-surface p-4">
+        <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
+          <Select
+            label={t("studio.cpu")}
+            className="h-12 text-style-body"
+            value={selectedJob ? "snapshot" : (cpu?.id ?? "")}
+            disabled={locked}
+            onChange={(val) => setCpuId(val)}
+            options={cpuOptions}
+          />
+          <Select
+            label={t("studio.gpu")}
+            className="h-12 text-style-body"
+            value={selectedJob ? "snapshot" : gpu}
+            disabled={locked}
+            onChange={(val) => setGpu(val)}
+            options={gpuOptions}
+          />
+          <Select
+            label={t("studio.runtime")}
+            className="h-12 text-style-body"
+            value={String(selectedJob?.max_runtime_seconds ?? maxRuntime)}
+            disabled={locked}
+            onChange={(val) => setRuntime(Number(val))}
+            options={runtimeOptions}
+          />
+          <Select
+            label={t("studio.framework")}
+            className="h-12 text-style-body"
+            value={selectedJob?.model_flavor ?? flavor}
+            disabled={locked}
+            onChange={(val) => setFlavor(val as typeof flavor)}
+            options={frameworkOptions}
+          />
+        </div>
+        {capsQuery.isError && (
+          <p role="alert" className="text-style-caption text-color-danger">
+            {t("studio.resourcesUnavailable")}
+          </p>
+        )}
+      </div>
+      {selectedJob?.submitted_at && snapshotQuery.isError ? (
+        <Button onClick={() => void snapshotQuery.refetch()}>
+          {t("studio.reload")}
+        </Button>
+      ) : (
+        <WorkspaceEditor
+          key={`${selectedRun}:${reset}`}
+          ref={editor}
+          loading={Boolean(
+            selectedJob?.submitted_at && snapshotQuery.isLoading,
+          )}
+          workspace={workspace}
+          entries={
+            jobId ? (snapshotQuery.data?.entries ?? []) : workspace.entries
+          }
+          outputs={selectedJob?.outputs ?? []}
+          entryPoint={selectedJob?.entry_point ?? workspace.entry_point}
+          runId={jobId || undefined}
+          readOnly={!isDraft}
+          externallyBusy={busy}
+          onRefresh={refresh}
+          onDirty={setDirty}
+          onBusy={setEditorBusy}
+          onOpenEnvironment={() => setEnvironmentOpen(true)}
+          onDeleteOutputs={async () => {
+            if (selectedJob) {
+              await deleteTrainingOutputs(selectedJob.id);
+              await jobQuery.refetch();
+              await refresh();
+            }
           }}
         />
-      ) : (
-        <>
-          <div className="space-y-4 rounded-surface border border-border bg-surface p-4">
-            <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
-              <Select
-                label={t("studio.cpu")}
-                className="h-12 text-style-body"
-                value={selectedJob ? "snapshot" : (cpu?.id ?? "")}
-                disabled={locked}
-                onChange={(val) => setCpuId(val)}
-                options={cpuOptions}
-              />
-              <Select
-                label={t("studio.gpu")}
-                className="h-12 text-style-body"
-                value={selectedJob ? "snapshot" : gpu}
-                disabled={locked}
-                onChange={(val) => setGpu(val)}
-                options={gpuOptions}
-              />
-              <Select
-                label={t("studio.runtime")}
-                className="h-12 text-style-body"
-                value={String(selectedJob?.max_runtime_seconds ?? maxRuntime)}
-                disabled={locked}
-                onChange={(val) => setRuntime(Number(val))}
-                options={runtimeOptions}
-              />
-              <Select
-                label={t("studio.framework")}
-                className="h-12 text-style-body"
-                value={selectedJob?.model_flavor ?? flavor}
-                disabled={locked}
-                onChange={(val) => setFlavor(val as typeof flavor)}
-                options={frameworkOptions}
-              />
-            </div>
-            {hasActiveRun && (
-              <p className="text-style-caption text-color-warning">
-                {t("studio.locked")}
-              </p>
-            )}
-            {capsQuery.isError && (
-              <p role="alert" className="text-style-caption text-color-danger">
-                {t("studio.resourcesUnavailable")}
-              </p>
-            )}
-          </div>
-          {selectedJob?.submitted_at && snapshotQuery.isLoading ? (
-            <p>{t("studio.loading")}</p>
-          ) : selectedJob?.submitted_at && snapshotQuery.isError ? (
-            <Button onClick={() => void snapshotQuery.refetch()}>
-              {t("studio.reload")}
-            </Button>
-          ) : (
-            <WorkspaceEditor
-              key={`${selectedRun}:${reset}`}
-              ref={editor}
-              workspace={workspace}
-              entries={
-                jobId ? (snapshotQuery.data?.entries ?? []) : workspace.entries
-              }
-              outputs={selectedJob?.outputs ?? []}
-              entryPoint={selectedJob?.entry_point ?? workspace.entry_point}
-              runId={jobId || undefined}
-              readOnly={!isDraft}
-              externallyBusy={busy}
-              onRefresh={refresh}
-              onDirty={setDirty}
-              onBusy={setEditorBusy}
-              onOpenEnvironment={() => setEnvironmentOpen(true)}
-              onDeleteOutputs={async () => {
-                if (selectedJob) {
-                  await deleteTrainingOutputs(selectedJob.id);
-                  await jobQuery.refetch();
-                  await refresh();
-                }
-              }}
-            />
-          )}
-          {hasActiveRun && (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <CardSummary
-                label={t("studio.metrics.cpuUsage")}
-                value={cpuUsageValue}
-                helper={cpuUsageHelper}
-                tone={cpuUsageTone}
-                icon={<Cpu className="h-4 w-4" />}
-              />
-              <CardSummary
-                label={t("studio.metrics.ramUsage")}
-                value={ramUsageValue}
-                helper={ramUsageHelper}
-                tone={ramUsageTone}
-                icon={<HardDrive className="h-4 w-4" />}
-              />
-              <CardSummary
-                label={t("studio.metrics.gpuUsage")}
-                value={gpuUsageValue}
-                helper={gpuUsageHelper}
-                tone={gpuUsageTone}
-                icon={<Activity className="h-4 w-4" />}
-              />
-              <CardSummary
-                label={t("studio.metrics.runtimeProgress")}
-                value={runtimeProgressValue}
-                helper={runtimeProgressHelper}
-                tone={runtimeProgressTone}
-                icon={<Clock className="h-4 w-4" />}
-              />
-            </div>
-          )}
-          <div id="training-terminal" />
-          <TerminalViewer
-            title={t("studio.terminal")}
-            badge={statusBadge}
-            logs={logStream.logs}
-            bodyClassName="h-96 max-h-[45vh] min-h-72"
-            placeholder={t("studio.logPlaceholder")}
-            actionButtons={[runActionButton]}
-          />
-          {selectedJob?.error_message && (
-            <p role="alert" className="text-style-body text-color-danger">
-              {selectedJob.error_message}
-            </p>
-          )}
-          <div className="grid grid-cols-2 gap-4">
-            <Button
-              type="button"
-              variant="secondary"
-              fullWidth
-              onClick={() => navigate("/dashboard/training")}
-            >
-              {t("studio.close")}
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              fullWidth
-              disabled={
-                selectedJob?.status !== "completed" ||
-                !selectedJob.output_available
-              }
-              onClick={() => {
-                const next = new URLSearchParams(params);
-                next.set("step", "project");
-                setParams(next);
-              }}
-            >
-              {t("studio.next")}
-            </Button>
-          </div>
-        </>
       )}
+      {hasActiveRun && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <CardSummary
+            label={t("studio.metrics.cpuUsage")}
+            value={cpuUsageValue}
+            helper={cpuUsageHelper}
+            tone={cpuUsageTone}
+            icon={<Cpu className="h-4 w-4" />}
+          />
+          <CardSummary
+            label={t("studio.metrics.ramUsage")}
+            value={ramUsageValue}
+            helper={ramUsageHelper}
+            tone={ramUsageTone}
+            icon={<HardDrive className="h-4 w-4" />}
+          />
+          <CardSummary
+            label={t("studio.metrics.gpuUsage")}
+            value={gpuUsageValue}
+            helper={gpuUsageHelper}
+            tone={gpuUsageTone}
+            icon={<Activity className="h-4 w-4" />}
+          />
+          <CardSummary
+            label={t("studio.metrics.runtimeProgress")}
+            value={runtimeProgressValue}
+            helper={runtimeProgressHelper}
+            tone={runtimeProgressTone}
+            icon={<Clock className="h-4 w-4" />}
+          />
+        </div>
+      )}
+      <div id="training-terminal" />
+      <TerminalViewer
+        title={t("studio.terminal")}
+        badge={statusBadge}
+        logs={logStream.logs}
+        bodyClassName="h-96 max-h-[45vh] min-h-72"
+        placeholder={t("studio.logPlaceholder")}
+        actionButtons={[runActionButton]}
+      />
+      {selectedJob?.error_message && (
+        <p role="alert" className="text-style-body text-color-danger">
+          {selectedJob.error_message}
+        </p>
+      )}
+      <div className="grid grid-cols-2 gap-4">
+        <Button
+          type="button"
+          variant="secondary"
+          fullWidth
+          onClick={() => navigate("/dashboard/training")}
+        >
+          {t("studio.close")}
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          fullWidth
+          disabled={
+            selectedJob?.status !== "completed" ||
+            !selectedJob.output_available ||
+            selectedJob.deletion_pending
+          }
+          onClick={() =>
+            navigate(
+              `/dashboard/training/workspaces/${workspaceId}/job/${jobId}/project`,
+            )
+          }
+        >
+          {t("studio.next")}
+        </Button>
+      </div>
       {historyOpen && (
         <TrainingJobDialog
           workspaceId={workspaceId}
@@ -923,7 +906,7 @@ function TrainingTrainingWorkspace() {
             navigate(
               "/dashboard/training/workspaces/" +
                 workspaceId +
-                "/jobs/" +
+                "/job/" +
                 draft.active_job_id,
             )
           }

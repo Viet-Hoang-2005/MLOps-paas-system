@@ -27,9 +27,10 @@ def notify_training_result(job):
             level=level,
             title=title,
             message=message,
-            link=f"/dashboard/training/jobs/{job.public_id}/overview",
+            link=f"/dashboard/training/workspaces/{job.workspace.public_id}/job/{job.public_id}",
             metadata={
                 "job_id": str(job.public_id),
+                "workspace_id": str(job.workspace.public_id),
                 "status": job.status,
                 "project_id": str(job.project.public_id) if job.project_id else None,
             },

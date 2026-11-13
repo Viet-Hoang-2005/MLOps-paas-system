@@ -16,6 +16,7 @@ export interface SelectProps {
   id?: string;
   label?: ReactNode;
   hint?: ReactNode;
+  icon?: ReactNode;
   value: string;
   onChange: (value: string) => void;
   options: SelectOption[];
@@ -30,6 +31,7 @@ export function Select({
   id,
   label,
   hint,
+  icon,
   value,
   onChange,
   options,
@@ -69,6 +71,14 @@ export function Select({
         >
           <div className="flex min-w-0 flex-1 items-center justify-between gap-2.5">
             <div className="flex min-w-0 items-center gap-2">
+              {icon && (
+                <span
+                  className="pointer-events-none shrink-0 text-color-foreground-subtle"
+                  aria-hidden="true"
+                >
+                  {icon}
+                </span>
+              )}
               <span className="truncate text-style-body-strong">
                 {selectedOption?.label || placeholder}
               </span>

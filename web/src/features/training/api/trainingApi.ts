@@ -1,3 +1,4 @@
+import { isAxiosError } from "axios";
 import { apiClient } from "@/shared/api/client";
 import { controlPlaneURL } from "@/shared/api/config";
 import { fetchAllPages } from "@/shared/api/pagination";
@@ -187,3 +188,6 @@ export const compareTrainingRuns = async (
       import("@/features/training/types").TrainingRunsCompareResponse
     >(controlPlaneURL(`/training-jobs/compare/?job_ids=${jobIds.join(",")}`))
   ).data;
+
+export const isTrainingRevisionConflict = (error: unknown): boolean =>
+  isAxiosError(error) && error.response?.status === 409;

@@ -9,7 +9,7 @@ export const trainingVi = {
     actions: "Thao tác",
     view: "Mở",
     delete: "Xóa Training Job",
-    backToCurrent: "Quay lại Workspace hiện tại",
+    currentWorkspace: "Workspace hiện tại",
     openActive: "Mở Training Job đang hoạt động",
     empty: "Chưa có Training Job",
     previous: "Trước",
@@ -34,8 +34,37 @@ export const trainingVi = {
       delete_failed: "Xóa thất bại",
     },
   },
+  assignment: {
+    sourceTitle: "Nguồn lần chạy huấn luyện",
+    sourceDescription:
+      "Chọn lần chạy huấn luyện đã hoàn thành để sử dụng mô hình và các tệp đầu ra gán vào dự án.",
+    projectTitle: "Dự án mô hình đích",
+    projectDescription:
+      "Gán lần chạy này vào một dự án có sẵn hoặc đăng ký dự án mới để quản lý việc triển khai và theo dõi.",
+    artifactsTitle: "Tệp mô hình & Siêu dữ liệu",
+    artifactsDescription:
+      "Chọn tệp trọng số mô hình chính và liên kết các tệp JSON bổ trợ cho ánh xạ nhãn, schema và chỉ số đánh giá.",
+    codeDataTitle: "Mã nguồn & Dữ liệu",
+    codeDataDescription:
+      "Xem lại mã nguồn suy luận Python và tệp dữ liệu tham chiếu CSV được liên kết với lần chạy huấn luyện này.",
+    requirementsTitle: "Requirements",
+    requirementsDescription:
+      "Cấu hình danh sách thư viện Python (requirements.txt) phục vụ cho việc build image triển khai mô hình.",
+    requirementsSelectLabel: "Nguồn requirements",
+    requirementsNone: "Không sử dụng",
+    requirementsFromInput: "Chọn từ Input của Training job",
+    requirementsUpload: "Upload mới",
+    uploadRequirements: "Upload file requirements.txt",
+    uploadRequirementsHint:
+      "Tải lên file requirements.txt để tự động điền các thư viện phụ thuộc",
+  },
   studio: {
     artifactSelection: {
+      source_codeInput: "Chọn script Python từ Input",
+      reference_dataInput: "Chọn dữ liệu CSV từ Input",
+      source_codeUpload: "Upload mã nguồn mới",
+      reference_dataUpload: "Upload dữ liệu tham chiếu mới",
+
       model: "Model gốc",
       chooseModel: "Chọn model",
       label_mapping: "Ánh xạ nhãn",

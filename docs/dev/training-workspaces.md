@@ -8,8 +8,15 @@ an immutable Input archive and execution configuration. Neither entity has a nam
 
 - `/dashboard/training/workspaces/{workspaceId}` opens the current draft, even
   after it has produced jobs.
-- `/dashboard/training/workspaces/{workspaceId}/jobs/{jobId}` opens that job's
+- `/dashboard/training/workspaces/{workspaceId}/job/{jobId}` opens that job's
   read-only snapshot, logs, metrics and Output. The server validates membership.
+- Next opens `/dashboard/training/workspaces/{workspaceId}/job/{jobId}/project`
+  for explicit Project and artifact assignment. Back and successful Save return
+  to the selected job's snapshot. The assignment page supports direct URLs.
+- The old job detail tabs, `/dashboard/training/jobs/...`, plural browser
+  snapshot route and `?step=project` form are removed without redirects.
+- Training notifications include workspace/job UUIDs and open the snapshot;
+  notifications without both identities open the workspace list.
 - TrainingJobDialog lists paginated runs. Back to current Workspace only navigates;
   it never creates a workspace or restores an old snapshot.
 - Environment/Secrets stay in the Editor toolbar. Historical Secrets expose names

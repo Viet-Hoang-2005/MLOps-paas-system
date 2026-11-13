@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { Input, InputPassword } from "@/shared/components/Input";
 import { OTPInput } from "@/shared/components/OTPInput";
 import { PageHeader } from "@/shared/components/PageHeader";
+import { Select } from "@/shared/components/Select";
 import { formatDateTime } from "@/shared/i18n/formatters";
 import { toast } from "@/shared/lib/toastStore";
 import {
@@ -17,7 +18,6 @@ import {
   CalendarDays,
   Camera,
   Check,
-  ChevronDown,
   Copy,
   Edit3,
   FileText,
@@ -359,41 +359,26 @@ export default function ProfileSettingPage() {
                   }
                 />
                 {editingProfile ? (
-                  <label
-                    htmlFor="profile-pronouns"
-                    className="flex flex-col gap-2 text-style-body-strong text-color-foreground"
-                  >
-                    {t("pronouns")}
-                    <div className="relative">
-                      <Tags className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-color-muted-foreground" />
-                      <select
-                        id="profile-pronouns"
-                        value={formValues.pronouns}
-                        disabled={loading}
-                        onChange={(event) =>
-                          updateProfileField("pronouns", event.target.value)
-                        }
-                        className="h-14 w-full appearance-none rounded-control border border-border bg-surface pl-10 pr-10 text-style-body font-normal text-color-foreground outline-none transition-colors duration-200 hover:border-primary focus:border-primary disabled:bg-muted disabled:text-color-muted-foreground"
-                      >
-                        <option value="">
-                          {t("profilePage.pronounUnspecified")}
-                        </option>
-                        <option value="he/him">
-                          {t("profilePage.pronounHe")}
-                        </option>
-                        <option value="she/her">
-                          {t("profilePage.pronounShe")}
-                        </option>
-                        <option value="they/them">
-                          {t("profilePage.pronounThey")}
-                        </option>
-                        <option value="other">
-                          {t("profilePage.pronounOther")}
-                        </option>
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-color-muted-foreground" />
-                    </div>
-                  </label>
+                  <Select
+                    id="profile-pronouns"
+                    label={t("pronouns")}
+                    icon={
+                      <Tags className="h-4 w-4 text-color-muted-foreground" />
+                    }
+                    className="h-14"
+                    value={formValues.pronouns}
+                    disabled={loading}
+                    onChange={(value) =>
+                      updateProfileField("pronouns", value)
+                    }
+                    options={[
+                      { value: "", label: t("profilePage.pronounUnspecified") },
+                      { value: "he/him", label: t("profilePage.pronounHe") },
+                      { value: "she/her", label: t("profilePage.pronounShe") },
+                      { value: "they/them", label: t("profilePage.pronounThey") },
+                      { value: "other", label: t("profilePage.pronounOther") },
+                    ]}
+                  />
                 ) : (
                   <Input
                     id="profile-pronouns"
@@ -402,7 +387,17 @@ export default function ProfileSettingPage() {
                       <Tags className="h-4 w-4 text-color-muted-foreground" />
                     }
                     value={
-                      formValues.pronouns || t("profilePage.pronounUnspecified")
+                      formValues.pronouns
+                        ? formValues.pronouns === "he/him"
+                          ? t("profilePage.pronounHe")
+                          : formValues.pronouns === "she/her"
+                            ? t("profilePage.pronounShe")
+                            : formValues.pronouns === "they/them"
+                              ? t("profilePage.pronounThey")
+                              : formValues.pronouns === "other"
+                                ? t("profilePage.pronounOther")
+                                : formValues.pronouns
+                        : t("profilePage.pronounUnspecified")
                     }
                     disabled={loading}
                     readOnly

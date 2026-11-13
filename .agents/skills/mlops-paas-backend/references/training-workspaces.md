@@ -54,3 +54,5 @@ missing metadata. See docs/dev/training-model-output.md. Edit the original
 artifact_selection migration; the operator resets development DB/S3.
 
 GET /training-jobs/{job}/input/download/ and /outputs/download/ authorize the owning account before storage access and return attachments, accepting only an optional relative path. A file selection returns the exact bytes; a folder selection returns a ZIP rooted at that folder; no selection returns the entire area as a ZIP. Workspace Input downloads read draft objects with a revision check; job Input downloads always read the frozen ZIP, never mutable entries. Empty selections are unavailable. Keep safe-path/job-prefix/checksum validation and binary-safe streaming. Derived ZIPs use bounded temporary files, not persistent S3 objects; close streams on success/error and after the HTTP response.
+
+Training result notifications include workspace_id and job_id as public UUIDs; link to /dashboard/training/workspaces/{workspace}/job/{job}. Frontend job detail tabs are removed; job APIs remain used by Workspace snapshots and assignment.
