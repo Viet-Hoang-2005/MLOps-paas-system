@@ -1,6 +1,6 @@
 import { cn } from "@/shared/lib/cn";
+import { switchVariants } from "@/shared/lib/switchVariants";
 import { type VariantProps } from "class-variance-authority";
-import { switchVariants } from "./switchVariants";
 
 export interface SegmentedControlOption<T extends string | number> {
   value: T;
@@ -17,6 +17,7 @@ export interface SwitchProps<T extends string | number>
   className?: string;
   ariaLabel?: string;
   fullWidth?: boolean;
+  disabled?: boolean;
 }
 
 export function Switch<T extends string | number>({
@@ -27,6 +28,7 @@ export function Switch<T extends string | number>({
   ariaLabel,
   size = "md",
   fullWidth = false,
+  disabled = false,
   ...props
 }: SwitchProps<T>) {
   return (
@@ -54,6 +56,7 @@ export function Switch<T extends string | number>({
               type="button"
               role="tab"
               aria-selected={isSelected}
+              disabled={disabled}
               onClick={() => onChange(option.value)}
               className={cn(
                 switchVariants({ size, selected: isSelected }),
@@ -63,6 +66,7 @@ export function Switch<T extends string | number>({
                     ? "rounded-r-control -ml-px"
                     : "-ml-px",
                 fullWidth && "flex-1",
+                disabled && "cursor-not-allowed opacity-60 pointer-events-none",
               )}
             >
               {option.title}

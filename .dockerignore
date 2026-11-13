@@ -1,17 +1,92 @@
-# Python
-venv/
-.venv/
-__pycache__/
-*.pyc
-
-# Environment
-.env
-.aws/
-terraform.tfvars
-
-# Git & IDE
+# Version control
 .git/
 .gitignore
+
+# Dependencies & Environments
+node_modules/
+dist/
+venv/
+.venv/
+env/
+.pnpm-store/
+.cache/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Test, Coverage & CI artifacts
+tests/
+**/tests/
+**/test_*.py
+**/*_test.py
+.coverage
+coverage.xml
+coverage/
+htmlcov/
+test-results.xml
+eslint_report.json
+ruff_report.json
+trivy-report.json
+ci-*.json
+pr_comment.md
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+.aws/
+terraform.tfvars
+*.tfstate*
+*.pem
+*.key
+credentials.json
+
+# Databases & Local data
+*.db
+*.sqlite*
+data/
+models/
+mlruns/
+mlartifacts/
+
+# IDEs & Editors
 .vscode/
 .idea/
+.codex/
+.claude/
+.antigravity/
+*.swp
+*.swo
+*~
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Documentation
+README.md
+*.md
+
+# Dockerfiles
+Dockerfile*
+.dockerignore
+logs/
+
+# Documentation
+README.md
+*.md
+
+# Dockerfiles
+Dockerfile*
+.dockerignore
 *.log

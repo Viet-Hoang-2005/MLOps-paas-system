@@ -1,0 +1,37 @@
+# prometheus-rule.yaml: Cấu hình PrometheusRule cho hạ tầng cluster Kubernetes
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mlops-paas-cluster-infrastructure-rules
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+    # Hạ tầng Kubernetes Worker Nodes
+    - name: paas.infrastructure
+      rules:
+        # Cảnh báo khi RAM Worker Node vượt 85%
+        - alert: NodeHighMemoryUsage
+          expr: |
+            (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+            team: infrastructure
+          annotations:
+            summary: "Worker Node RAM > 85%"
+            description: "Node {{ $labels.instance }} is using {{ $value | humanize }}% RAM."
+
+        # Cảnh báo khi disk vượt 80%
+        - alert: NodeDiskAlmostFull
+          expr: |
+            (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 80
+          for: 10m
+          labels:
+            severity: warning
+            team: infrastructure
+          annotations:
+            summary: "Node Disk almost full (> 80%)"
+            description: "Node {{ $labels.instance }}: {{ $value | humanize }}% disk usage."

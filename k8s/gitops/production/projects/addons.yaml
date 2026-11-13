@@ -11,19 +11,37 @@ spec:
   description: Pinned upstream controllers, CRDs and drivers for the production K3s environment.
   sourceRepos:
     - https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
-    - https://github.com/kubeflow/trainer.git
+    - ghcr.io/kubeflow/charts
     - https://kubernetes-sigs.github.io/aws-ebs-csi-driver
     - https://charts.external-secrets.io
     - https://cloudnative-pg.github.io/charts
     - https://kedacore.github.io/charts
     - https://argoproj.github.io/argo-helm
     - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+    - https://grafana-community.github.io/helm-charts
     - https://kyverno.github.io/kyverno
     - public.ecr.aws/karpenter
     - registry.k8s.io/nfd/charts
     - https://helm.ngc.nvidia.com/nvidia
+    - ghcr.io/ot-container-kit/charts
+    - https://kubernetes-sigs.github.io/headlamp
   destinations:
-    - namespace: kubeflow
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+    - namespace: headlamp
+      server: https://kubernetes.default.svc
+    - namespace: mlops-logging
+      server: https://kubernetes.default.svc
+    - namespace: mlops-paas-execution
+      server: https://kubernetes.default.svc
+    - namespace: mlops-paas-serving
+      server: https://kubernetes.default.svc
+    - namespace: mlops-paas-training
+      server: https://kubernetes.default.svc
+    - namespace: mlops-paas-core
+      server: https://kubernetes.default.svc
+    - namespace: kubeflow-system
       server: https://kubernetes.default.svc
     - namespace: karpenter
       server: https://kubernetes.default.svc
@@ -34,6 +52,8 @@ spec:
     - namespace: external-secrets
       server: https://kubernetes.default.svc
     - namespace: cnpg-system
+      server: https://kubernetes.default.svc
+    - namespace: redis-operator
       server: https://kubernetes.default.svc
     - namespace: keda
       server: https://kubernetes.default.svc

@@ -3,9 +3,14 @@
 Run from the relevant directory:
 
 ```bash
-terraform fmt -check -recursive
-terraform init -backend=false
-terraform validate
+# Terraform AWS
+cd terraform/aws && terraform fmt -check -recursive && terraform init -backend=false && terraform validate
+
+# Terraform Cloudflare
+cd terraform/cloudflare && terraform fmt -check -recursive && terraform init -backend=false && terraform validate
+
+# Ansible
+cd ansible
 ansible-playbook --syntax-check <playbook>
 ansible-playbook --check --diff <playbook>
 ```

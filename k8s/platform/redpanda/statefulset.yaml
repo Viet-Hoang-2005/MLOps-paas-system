@@ -1,5 +1,3 @@
-# redpanda-statefulset.yaml: Redpanda StatefulSet và Service để triển khai Redpanda Kafka Broker trên K3s
----
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -7,17 +5,27 @@ metadata:
   annotations:
     description: "Redpanda StatefulSet for high-performance Kafka-compatible message broker"
   labels:
-    app: redpanda
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/instance: redpanda
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: message-broker
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
 spec:
-  serviceName: redpanda-service
+  serviceName: redpanda
   replicas: 1
   selector:
     matchLabels:
-      app: redpanda
+      app.kubernetes.io/name: redpanda
   template:
     metadata:
       labels:
-        app: redpanda
+        app.kubernetes.io/name: redpanda
+        app.kubernetes.io/instance: redpanda
+        app.kubernetes.io/part-of: mlops-paas
+        app.kubernetes.io/component: message-broker
+        app.kubernetes.io/managed-by: kustomize
+        mlops-paas.io/plane: platform
     spec:
       nodeSelector:
         workload-type: worker
@@ -37,13 +45,13 @@ spec:
         - --smp
         - "1"
         - --memory
-        - 1G
+        - 768M
         - --reserve-memory
         - 0M
         - --kafka-addr
         - PLAINTEXT://0.0.0.0:9092,OUTSIDE://0.0.0.0:19092
         - --advertise-kafka-addr
-        - PLAINTEXT://redpanda-0.redpanda-service.mlops-redpanda.svc.cluster.local:9092,OUTSIDE://localhost:19092
+        - PLAINTEXT://redpanda-0.redpanda.mlops-paas-data.svc.cluster.local:9092,OUTSIDE://localhost:19092
         ports:
         - containerPort: 9092
           name: kafka
@@ -52,13 +60,12 @@ spec:
         - containerPort: 9644
           name: admin
         resources:
-          # Ép xung tự bảo vệ: Không để Redpanda hút cạn RAM của Worker Node.
           limits:
-            memory: "2Gi"
+            memory: "1536Mi"
             cpu: "1000m"
           requests:
-            memory: "1Gi"
-            cpu: "200m"
+            memory: "768Mi"
+            cpu: "150m"
         volumeMounts:
         - name: redpanda-data
           mountPath: /var/lib/redpanda/data
@@ -70,24 +77,3 @@ spec:
       resources:
         requests:
           storage: 5Gi
-
-# Tạo Service để expose Redpanda Kafka Broker
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: redpanda-service
-spec:
-  ports:
-  - port: 9092
-    targetPort: 9092
-    name: kafka
-  - port: 19092
-    targetPort: 19092
-    name: kafka-ext
-  - port: 9644
-    targetPort: 9644
-    name: admin
-  clusterIP: None
-  selector:
-    app: redpanda

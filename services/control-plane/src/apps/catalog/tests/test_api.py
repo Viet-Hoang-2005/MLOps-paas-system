@@ -32,7 +32,7 @@ def test_duplicate_project_name_returns_conflict_with_clear_message():
     client = APIClient()
     client.force_authenticate(owner)
 
-    response = client.post("/api/models/", {"name": "NIDS", "access_mode": "public"}, format="json")
+    response = client.post("/api/models/training-projects/", {"name": "NIDS", "access_mode": "public"}, format="json")
 
     assert response.status_code == 409
     assert response.data == {
@@ -52,7 +52,7 @@ def test_inactive_project_with_same_name_does_not_block_new_project():
     client = APIClient()
     client.force_authenticate(owner)
 
-    response = client.post("/api/models/", {"name": "NIDS", "access_mode": "public"}, format="json")
+    response = client.post("/api/models/training-projects/", {"name": "NIDS", "access_mode": "public"}, format="json")
 
     assert response.status_code == 201
     assert ModelProject.objects.filter(owner=owner, name="NIDS", is_active=True).count() == 1
@@ -75,7 +75,10 @@ def test_project_list_returns_metadata_image_ready_and_deployed_lifecycle_status
         flavor="sklearn",
         status="ready",
     )
-    Deployment.objects.create(version=deployed_version, build=deployed_build, status="healthy")
+    deployed_project.active_deployment = Deployment.objects.create(
+        version=deployed_version, build=deployed_build, status="succeeded"
+    )
+    deployed_project.save(update_fields=["active_deployment"])
 
     client = APIClient()
     client.force_authenticate(owner)
@@ -84,9 +87,9 @@ def test_project_list_returns_metadata_image_ready_and_deployed_lifecycle_status
     assert response.status_code == 200
     statuses = {project["name"]: project["lifecycle_status"] for project in response.data["results"]}
     assert statuses == {
-        metadata_project.name: "metadata",
-        image_project.name: "image_ready",
-        deployed_project.name: "deployed",
+        metadata_project.name: "preview",
+        image_project.name: "registered",
+        deployed_project.name: "running",
     }
 
 
@@ -96,7 +99,9 @@ def test_project_list_returns_latest_active_endpoint_for_the_owner():
     project = ModelProject.objects.create(owner=owner, name="NIDS")
     version = ModelVersion.objects.create(project=project, version="1")
     build = Build.objects.create(project=project, version=version, flavor="xgboost", status="ready")
-    deployment = Deployment.objects.create(version=version, build=build, status="healthy")
+    deployment = Deployment.objects.create(version=version, build=build, status="succeeded")
+    project.active_deployment = deployment
+    project.save(update_fields=["active_deployment"])
     endpoint = Endpoint.objects.create(
         deployment=deployment,
         public_url="http://localhost:5002/tenant/models/project/version",
@@ -113,9 +118,180 @@ def test_project_list_returns_latest_active_endpoint_for_the_owner():
         "id": str(endpoint.public_id),
         "deployment_id": str(deployment.public_id),
         "version_id": str(version.public_id),
+        "version_number": version.version,
         "url": f"{endpoint.public_url}/predict",
         "health_url": f"{endpoint.public_url}/health",
-        "health_status": "healthy",
-        "deployment_status": "healthy",
+        "health_status": "unknown",
+        "deployment_status": "succeeded",
+        "registration_status": "unregistered",
         "last_checked_at": None,
     }
+
+
+@pytest.mark.django_db
+def test_running_attributes_and_label_mapping_with_json(monkeypatch):
+    from apps.registry.models import ModelArtifact
+
+    owner = get_user_model().objects.create_user("attr-owner@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="NIDS-Attr")
+    version = ModelVersion.objects.create(
+        project=project,
+        version="1",
+        metrics_summary={"accuracy": 0.985, "f1_score": 0.978},
+        params_summary={"n_estimators": 100, "max_depth": 5},
+        insights_summary={"kind": "feature_importance", "items": [{"name": "col1", "value": 0.42}]},
+    )
+    build = Build.objects.create(project=project, version=version, flavor="xgboost", status="ready")
+    deployment = Deployment.objects.create(version=version, build=build, status="succeeded")
+    project.active_deployment = deployment
+    project.save(update_fields=["active_deployment"])
+
+    mapping_bytes = b'{"0": "benign", "1": "attack"}'
+    ModelArtifact.objects.create(
+        version=version,
+        kind="label_mapping",
+        name="labels.json",
+        uri="s3://test-bucket/labels.json",
+        size_bytes=len(mapping_bytes),
+    )
+
+    class FakeStorage:
+        def parse_uri(self, uri):
+            return "test-bucket", "labels.json"
+
+        @property
+        def client(self):
+            class FakeClient:
+                def get_object(self, **kwargs):
+                    from io import BytesIO
+
+                    return {"Body": BytesIO(mapping_bytes)}
+
+            return FakeClient()
+
+    from apps.catalog.services import snapshots
+
+    monkeypatch.setattr(snapshots, "S3Storage", lambda: FakeStorage())
+
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    # Test running-attributes
+    res = client.get(f"/api/models/{project.public_id}/running-attributes/")
+    assert res.status_code == 200
+    assert res.data["metrics"] == {"accuracy": 0.985, "f1_score": 0.978}
+    assert res.data["params"] == {"n_estimators": 100, "max_depth": 5}
+    assert res.data["insights"]["kind"] == "feature_importance"
+    assert res.data["label_mapping"]["filename"] == "labels.json"
+    assert res.data["label_mapping"]["mapping"] == {"0": "benign", "1": "attack"}
+
+    # Test label-mapping standalone endpoint
+    res_lm = client.get(f"/api/models/{project.public_id}/label-mapping/")
+    assert res_lm.status_code == 200
+    assert res_lm.data["filename"] == "labels.json"
+    assert res_lm.data["mapping"] == {"0": "benign", "1": "attack"}
+
+
+@pytest.mark.django_db
+def test_running_snapshot_never_falls_back_to_registered_or_preview():
+    owner = get_user_model().objects.create_user("no-running@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Not deployed")
+    ModelVersion.objects.create(project=project, version="1")
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    assert client.get(f"/api/models/{project.public_id}/running-source/").status_code == 409
+    assert client.get(f"/api/models/{project.public_id}/running-attributes/").status_code == 409
+    assert client.get(f"/api/models/{project.public_id}/label-mapping/").status_code == 409
+    assert client.get(f"/api/models/{project.public_id}/preview/attributes/").status_code == 200
+    detail = client.get(f"/api/models/{project.public_id}/").data
+    assert detail["source_code"] is None
+    assert detail["reference_data"] is None
+
+
+@pytest.mark.django_db
+def test_unsuccessful_active_deployment_is_not_reported_as_running():
+    owner = get_user_model().objects.create_user("inactive-running@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Inactive deployment")
+    version = ModelVersion.objects.create(project=project, version="1")
+    build = Build.objects.create(project=project, version=version, status="ready")
+    project.active_deployment = Deployment.objects.create(version=version, build=build, status="failed")
+    project.save(update_fields=["active_deployment"])
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    detail = client.get(f"/api/models/{project.public_id}/").data
+    assert detail["lifecycle_status"] == "registered"
+    assert detail["active_endpoint"] is None
+    assert client.get(f"/api/models/{project.public_id}/running-attributes/").status_code == 409
+
+
+@pytest.mark.django_db
+def test_running_snapshot_rejects_other_versions():
+    owner = get_user_model().objects.create_user("running-owner@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Running")
+    active = ModelVersion.objects.create(project=project, version="1")
+    other = ModelVersion.objects.create(project=project, version="2")
+    build = Build.objects.create(project=project, version=active, status="ready")
+    project.active_deployment = Deployment.objects.create(version=active, build=build, status="succeeded")
+    project.save(update_fields=["active_deployment"])
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    base = f"/api/models/{project.public_id}/running-attributes/"
+    assert client.get(base, {"version_id": str(other.public_id)}).status_code == 409
+    assert client.get(base, {"version_id": str(uuid.uuid4())}).status_code == 404
+    assert client.get(base, {"version_id": "invalid"}).status_code == 404
+
+
+@pytest.mark.django_db
+def test_running_insights_keep_registered_and_supplemental_content():
+    from apps.registry.models import ModelArtifact
+
+    owner = get_user_model().objects.create_user("insights-owner@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Insights")
+    version = ModelVersion.objects.create(
+        project=project, version="1", insights_summary={"kind": "model_insights", "registered": True}
+    )
+    build = Build.objects.create(project=project, version=version, status="ready")
+    project.active_deployment = Deployment.objects.create(version=version, build=build, status="succeeded")
+    project.save(update_fields=["active_deployment"])
+    ModelArtifact.objects.create(
+        version=version,
+        kind="model_insights",
+        name="extra.json",
+        uri="",
+        metadata={"provenance": "supplemental_upload", "summary": {"supplemental": True}},
+    )
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    response = client.get(f"/api/models/{project.public_id}/running-attributes/")
+    assert response.status_code == 200
+    assert response.data["model_insights"] == {"kind": "model_insights", "registered": True}
+    assert response.data["supplemental_summaries"]["model_insights"] == {"supplemental": True}
+
+
+@pytest.mark.django_db
+def test_running_version_number_in_project_serializer():
+    owner = get_user_model().objects.create_user("running-v-owner@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Running Version Project")
+    v1 = ModelVersion.objects.create(project=project, version="1")
+    ModelVersion.objects.create(project=project, version="2")
+    build = Build.objects.create(project=project, version=v1, status="ready")
+    client = APIClient()
+    client.force_authenticate(owner)
+
+    # Registered but not running: latest is 2, running is None
+    res = client.get(f"/api/models/{project.public_id}/")
+    assert res.status_code == 200
+    assert res.data["latest_version_number"] == "2"
+    assert res.data["running_version_number"] is None
+
+    # Running v1: running is 1
+    project.active_deployment = Deployment.objects.create(version=v1, build=build, status="succeeded")
+    project.save(update_fields=["active_deployment"])
+
+    res = client.get(f"/api/models/{project.public_id}/")
+    assert res.status_code == 200
+    assert res.data["running_version_number"] == "1"

@@ -6,7 +6,11 @@ from apps.catalog.selectors import project_for_user
 from apps.registry.models import ModelVersion, RegistryAlias
 from apps.registry.selectors import version_for_user
 from apps.registry.services.routing import predict_alias, predict_version
-from apps.registry.services.versions import set_alias
+from apps.registry.services.versions import (
+    add_supplemental_artifacts,
+    get_version_reference_preview,
+    set_alias,
+)
 
 from .serializers import ModelVersionSerializer, RegistryAliasSerializer
 
@@ -82,3 +86,27 @@ class VersionSmokeTestEndpoint(APIView):
     def post(self, request, version_id):
         version = version_for_user(request.user, version_id)
         return Response(predict_version(version=version, payload=request.data))
+
+
+class ModelVersionSupplementalArtifactsEndpoint(APIView):
+    def post(self, request, version_id):
+        version = version_for_user(request.user, version_id)
+        updated = add_supplemental_artifacts(
+            version=version,
+            actor=request.user,
+            source_code_file=request.FILES.get("source_code_file"),
+            reference_data_file=request.FILES.get("reference_data_file"),
+            label_mapping_file=request.FILES.get("label_mapping_file"),
+            input_schema_file=request.FILES.get("input_schema_file"),
+            metrics_file=request.FILES.get("metrics_file"),
+            params_file=request.FILES.get("params_file"),
+            model_insights_file=request.FILES.get("model_insights_file"),
+            feature_importance_file=request.FILES.get("feature_importance_file"),
+        )
+        return Response(ModelVersionSerializer(updated).data)
+
+
+class ModelVersionReferencePreviewEndpoint(APIView):
+    def get(self, request, version_id):
+        version = version_for_user(request.user, version_id)
+        return Response(get_version_reference_preview(version))

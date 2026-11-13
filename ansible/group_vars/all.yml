@@ -23,38 +23,51 @@ enable_karpenter: true
 # Add-ons install upstream cluster capabilities; cluster Applications configure
 # their instances. Ansible only waits for the GitOps contract.
 core_addon_application_names:
+  - mlops-prod-addon-argocd
   - mlops-prod-addon-aws-ebs-csi
   - mlops-prod-addon-external-secrets
   - mlops-prod-addon-cloudnative-pg
+  - mlops-prod-addon-redis-operator
   - mlops-prod-addon-keda
   - mlops-prod-addon-argo-workflows
   - mlops-prod-addon-argo-events
   - mlops-prod-addon-monitoring
   - mlops-prod-addon-kyverno
+  - mlops-prod-addon-loki
+  - mlops-prod-addon-alloy
+  - mlops-prod-addon-headlamp
 core_cluster_application_names:
   - mlops-prod-cluster-namespaces
   - mlops-prod-cluster-storage
   - mlops-prod-cluster-secret-store
   - mlops-prod-cluster-image-verification
 core_addon_workloads:
+  - {namespace: argocd, release: argocd}
   - {namespace: kube-system, release: aws-ebs-csi-driver}
   - {namespace: external-secrets, release: external-secrets}
   - {namespace: cnpg-system, release: cloudnative-pg}
+  - {namespace: redis-operator, release: redis-operator}
   - {namespace: keda, release: keda}
   - {namespace: argo, release: argo-workflows}
   - {namespace: argo-events, release: argo-events}
   - {namespace: monitoring, release: monitoring}
   - {namespace: kyverno, release: kyverno}
+  - {namespace: mlops-logging, release: loki}
+  - {namespace: mlops-logging, release: alloy}
+  - {namespace: headlamp, release: headlamp}
 core_addon_crds:
   - externalsecrets.external-secrets.io
   - clusters.postgresql.cnpg.io
+  - redisreplications.redis.redis.opstreelabs.in
+  - redissentinels.redis.redis.opstreelabs.in
   - scaledobjects.keda.sh
   - workflows.argoproj.io
   - eventsources.argoproj.io
   - prometheuses.monitoring.coreos.com
   - clusterpolicies.kyverno.io
 training_addon_application_names:
-  - mlops-prod-addon-kubeflow-training
+  - mlops-prod-addon-kubeflow-trainer
+  - mlops-prod-addon-training-runtimes
   - mlops-prod-addon-karpenter-crds
   - mlops-prod-addon-karpenter
   - mlops-prod-addon-node-feature-discovery

@@ -9,7 +9,7 @@ export interface ThemeContextValue {
   setMode: (mode: ThemeMode) => void;
 }
 
-export const THEME_STORAGE_KEY = "adaptml.theme";
+export const THEME_STORAGE_KEY = "mllife.theme";
 export const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export const getSystemTheme = (): ResolvedTheme =>

@@ -6,8 +6,11 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-40"
   labels:
+    app.kubernetes.io/name: argo-events
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: argo-events
     mlops-paas.io/plane: addon
-    mlops-paas.io/component: argo-events
 spec:
   project: mlops-addons
   info:
@@ -29,6 +32,13 @@ spec:
         controller:
           nodeSelector:
             workload-type: worker
+          resources:
+            requests:
+              cpu: 30m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: argo-events

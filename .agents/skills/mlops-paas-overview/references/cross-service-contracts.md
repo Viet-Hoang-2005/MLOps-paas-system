@@ -1,43 +1,57 @@
-# Cross-service contracts
+# Cross-Service Contracts
 
-## Environment ID contracts
+Training dispatch carries `accelerator_type`, `accelerator_count`, and `accelerator_model` from Control Plane to Argo. Only `(none, 0, empty)`, `(gpu, 1, t4)`, and `(gpu, 1, a10g)` are valid for Argo; the Sensor validates these before the workflow chooses model-bound instance types. Docker GPU jobs use a verified NVIDIA device UUID in local_gpu_id and an empty accelerator_model; never automatically switch devices.
 
-| Runtime | Required identity |
+## 1. Environment ID Invariants
+
+| Runtime / Worker | Required Identity Variables |
 | --- | --- |
-| Model packager | `BUILD_ID` plus explicit project/image context |
-| ML/DL serving | `PROJECT_ID`, `MODEL_VERSION_ID` |
-| Evidently | `PROJECT_ID`, `MODEL_VERSION_ID`, `DRIFT_RUN_ID`, tenant context |
-| Training runner | `TRAINING_JOB_ID` |
+| **Model Packager** | `BUILD_ID`, `PROJECT_ID`, `TASK_TYPE`, `BUILD_ENGINE` |
+| **ML & DL Serving** | `PROJECT_ID`, `MODEL_VERSION_ID`, `MODEL_URI` |
+| **Evidently Drift** | `PROJECT_ID`, `MODEL_VERSION_ID`, `DRIFT_RUN_ID`, `TENANT_ID` |
+| **Training Runner** | `TRAINING_JOB_ID`, `TENANT_ID`, `ENTRY_POINT`, purpose-scoped capabilities; `PROJECT_ID` is optional/legacy |
 
-Never reintroduce `MODEL_ID`; it ambiguously represented different resources.
+> [!CAUTION]
+> Never introduce or fallback to the ambiguous legacy `MODEL_ID` variable.
 
-## S3 layout
+## 2. Storage & S3 Layout
+
+A TrainingJob owns its draft and at most one execution under users/{tenant_id}/training/jobs/{job_uuid}/. Draft file keys are immutable draft/objects/{object_id}; frozen Input uses input/submissions/{submission_token}/code/source.zip (unified Input) and data/data.zip. Output is output/model.tar.gz with mlflow/artifacts/. The Project-scoped tree below remains the legacy layout; resolve through training_prefix_for and immutable storage_project_id until verified migration. Assignment never changes paths.
+
+Bucket: `mlops-paas-artifacts`
 
 ```text
-users/{tenant}/models/{project}/code
-users/{tenant}/models/{project}/data
-users/{tenant}/models/{project}/builds/{build}/inputs
-users/{tenant}/models/{project}/training/jobs/{job}/input
-users/{tenant}/models/{project}/training/jobs/{job}/output
-users/{tenant}/models/{project}/training/jobs/{job}/mlflow
-users/{tenant}/models/{project}/versions/{version}
-users/{tenant}/models/{project}/drift/{monitor}/{run}
+users/{tenant_id}/models/{project_uuid}/
+├── code/                                  # Current mutable workspace code
+├── data/                                  # Current mutable workspace dataset
+├── training/jobs/{job_uuid}/
+│   ├── input/code/source.zip              # Immutable source snapshot
+│   ├── input/data/data.zip               # Immutable data snapshot
+│   ├── output/model.tar.gz         # Packaged training artifacts bundle
+│   └── mlflow/                            # MLflow run artifacts
+├── versions/{version_uuid}/artifacts/     # Immutable registered model artifacts
+└── drift/{monitor_uuid}/{run_uuid}/       # Evidently HTML/JSON/Summary reports
 ```
 
-Presigned URLs must be scoped to one object/prefix operation and expire quickly.
+- All S3 uploads and downloads in runner jobs must use single-object scoped Presigned URLs with short expiration periods (e.g. 900 seconds).
 
-## Image contract
+## 3. Container Image Naming Contract
 
-- Local repository: `image-{project_uuid}`.
-- Production repository: `{registry}/user-images/image-{project_uuid}`.
-- Build tag: `build-{build_uuid}`.
-- Human version tag: `v{version_number}`.
-- Immutable identity: Docker image ID locally; registry manifest digest in production.
+- **Local Docker:** `image-{project_uuid}:build-{build_uuid}`
+- **Production Harbor:** `{HARBOR_REGISTRY_URL}/user-images/image-{project_uuid}:build-{build_uuid}`
+- **Registered Version Tag:** `image-{project_uuid}:v{version_number}`
+- **Immutable Digest:** Stored in database as registry digest (`sha256:...`) upon registration.
 
-## Callback contract
+## 4. Webhook Callback Contract
 
-Callbacks bind the resource UUID in the path, authenticate the reporter, and use idempotency to tolerate retries. Common callbacks cover builds, deployments/deletion, training, cancellation, and drift runs. Never trust a tenant workload to assign its own terminal lifecycle state.
+1. **Path-bound UUID:** The target resource UUID must appear in the callback path (e.g. `/internal/webhooks/training-jobs/<uuid:job_id>/`).
+2. **Authentication:** Authenticate via `Authorization: Bearer <CONTROL_PLANE_WEBHOOK_SECRET>`.
+3. **Idempotency:** Include `Idempotency-Key` in request headers. Handlers use `select_for_update()` to ensure safe transitions.
+4. **No State Resurrection:** Callbacks arriving after a resource has been `CANCELLED` or is `DELETING` must be treated as a no-op (return HTTP 200) and must never revive terminal states.
 
-## Automatic drift signal contract
+## 5. Telemetry & Ingestion Contract
 
-Consumer writes `mlops_inference_events` and successful `mlops_production_data` samples in one PostgreSQL transaction. It writes a deterministic automatic-drift signal into its outbox in that same transaction, but only for production-data samples. A supervised dispatcher thread in every Consumer replica uses `CONTROL_PLANE_AUTOMATIC_DRIFT_WEBHOOK_URL` to deliver only `model_version_id` to the authenticated Control Plane internal endpoint. PostgreSQL leases coordinate replicas. The Control Plane owns monitor lookup, durable threshold watermark, `DriftRun` idempotency, and execution dispatch; Consumer must not read monitor tables or keep trigger state in memory.
+- **Model Server:** Asynchronously emits inference telemetry to Redpanda Kafka topic `mlops_paas_production_data`. Kafka producer errors must be observable in logs and metrics, but must never cause the client inference request to fail.
+- **Consumer:** Consumes Kafka records, normalizes UTC timestamps, flattens `features` JSONB, and bulk-inserts into `control_plane.production_predictionrecord` with `ON CONFLICT (id) DO NOTHING`.
+- **Transactional Outbox:** In the same transaction as the production record insert, writes an automatic drift signal into `control_plane.observability_eventoutbox`.
+- **Drift Dispatcher Thread:** Leases pending signals (`lease_seconds=60`) and dispatches HTTP POST requests to `CONTROL_PLANE_AUTOMATIC_DRIFT_WEBHOOK_URL` with exponential backoff without blocking the Kafka ingestion thread.

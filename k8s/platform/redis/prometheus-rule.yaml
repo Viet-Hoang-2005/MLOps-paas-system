@@ -1,0 +1,62 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mlops-paas-redis-rules
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: redis-queue-ha
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: queue
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
+    release: monitoring
+spec:
+  groups:
+    - name: paas.redis-platform
+      rules:
+        - alert: RedisQueueHAReplicasUnavailable
+          expr: kube_statefulset_status_replicas_ready{namespace="mlops-paas-data",statefulset="redis-queue-ha"} < 2 or kube_statefulset_status_replicas_ready{namespace="mlops-paas-data",statefulset="redis-queue-ha-sentinel"} < 3
+          for: 3m
+          labels:
+            severity: critical
+            team: infrastructure
+          annotations:
+            summary: "Redis Queue HA has unavailable Redis or Sentinel replicas"
+            description: "Check the two Redis Queue and three Sentinel Pods and their node placement."
+        - alert: RedisCacheUnavailable
+          expr: kube_statefulset_status_replicas_ready{namespace="mlops-paas-data",statefulset="redis-cache"} < 1
+          for: 3m
+          labels:
+            severity: warning
+            team: infrastructure
+          annotations:
+            summary: "Redis Cache replica is unavailable"
+            description: "Check the standalone Redis Cache Pod in mlops-paas-data."
+        - alert: RedisReplicaLinkDown
+          expr: redis_master_link_up{namespace="mlops-paas-data"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            team: infrastructure
+          annotations:
+            summary: "Redis replica lost its master link"
+            description: "Inspect Sentinel election and Redis replication before accepting more writes."
+        - alert: RedisHAMemoryHigh
+          expr: redis_memory_used_bytes{namespace="mlops-paas-data"} / clamp_min(redis_memory_max_bytes{namespace="mlops-paas-data"}, 1) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            team: infrastructure
+          annotations:
+            summary: "Redis memory usage exceeds 85% of maxmemory"
+            description: "Investigate queue depth and key retention before Redis rejects writes."
+        - alert: RedisHAPVCAlmostFull
+          expr: kubelet_volume_stats_used_bytes{namespace="mlops-paas-data"} / clamp_min(kubelet_volume_stats_capacity_bytes{namespace="mlops-paas-data"}, 1) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            team: infrastructure
+          annotations:
+            summary: "Redis HA PVC exceeds 80% usage"
+            description: "AOF storage is approaching the 5 GiB volume limit."
+

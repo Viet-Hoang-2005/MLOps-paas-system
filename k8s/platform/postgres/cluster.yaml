@@ -6,10 +6,25 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: mlops-paas-postgres
+  name: postgresql
   annotations:
-    description: "CloudNativePG cluster for MLflow metadata and PaaS baseline data storage"
+    description: "CloudNativePG cluster for MLops data and training metadata storage"
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/instance: postgresql
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
 spec:
+  inheritedMetadata:
+    labels:
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/instance: postgresql
+      app.kubernetes.io/part-of: mlops-paas
+      app.kubernetes.io/component: database
+      app.kubernetes.io/managed-by: kustomize
+      mlops-paas.io/plane: platform
   # Chạy 2 instances để đảm bảo tính sẵn sàng cao (High Availability)
   # Node 1: Primary (RW), Node 2: Standby (RO)
   instances: 2
@@ -22,10 +37,9 @@ spec:
       database: mlops_paas_db
       owner: postgres
       secret:
-        name: postgres-bootstrap-secret
+        name: postgresql-bootstrap-secret
       postInitApplicationSQL:
         - "CREATE SCHEMA IF NOT EXISTS control_plane;"
-        - "CREATE SCHEMA IF NOT EXISTS mlflow;"
 
   # Cấu hình Storage cho mỗi instance
   storage:
@@ -37,10 +51,10 @@ spec:
     nodeSelector:
       workload-type: worker
     enablePodAntiAffinity: true
-    podAntiAffinityType: preferred
+    podAntiAffinityType: required
     topologyKey: kubernetes.io/hostname
 
-  # Tuning PostgreSQL parameters cho MLflow workload
+  # Tuning PostgreSQL parameters
   postgresql:
     parameters:
       shared_buffers: "256MB"
@@ -51,8 +65,8 @@ spec:
 
   resources:
     requests:
-      cpu: "250m"
-      memory: "512Mi"
+      cpu: "150m"
+      memory: "384Mi"
     limits:
-      cpu: "1"
+      cpu: "800m"
       memory: "1Gi"

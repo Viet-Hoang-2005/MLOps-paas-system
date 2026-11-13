@@ -1,30 +1,29 @@
+import { formatDateTime } from "@/shared/i18n/formatters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Eye, Rocket, Trash2 } from "lucide-react";
+import { Eye, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
+import { listModelProjects } from "@/shared/api/catalogApi";
 import {
   deleteTrainingJob,
-  getTrainingUsage,
   listTrainingJobs,
+  retryTrainingJob,
 } from "@/features/training/api/trainingApi";
-import {
-  TrainingJobStatusFilter,
-  type TrainingStatusFilter,
-} from "@/features/training/components/TrainingJobListSections";
+import { Select, type SelectOption } from "@/shared/components/Select";
 import { trainingQueryKeys } from "@/features/training/queryKeys";
+import { getTrainingStartError } from "@/features/training/api/quotaErrors";
 import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
-import { useModelSelection } from "@/features/catalog/hooks/useModelSelection";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { formatDuration } from "@/shared/lib/formatDuration";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { DataTable } from "@/shared/components/DataTable";
+import { Callout } from "@/shared/components/Callout";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageHeader } from "@/shared/components/PageHeader";
-import { toast } from "@/shared/components/toastStore";
+import { Table } from "@/shared/components/Table";
+import { toast } from "@/shared/lib/toastStore";
 
 const ACTIVE_STATUSES: TrainingJobStatus[] = [
   "pending",
@@ -34,45 +33,28 @@ const ACTIVE_STATUSES: TrainingJobStatus[] = [
   "cancelling",
 ];
 
-type TrainingSummaryStatus = "pending" | "success" | "failed";
-
-const summaryStatusForJob = (job: TrainingJob): TrainingSummaryStatus => {
-  const status = displayStatus(job);
-  return status === "success" || status === "failed" ? status : "pending";
-};
-
-const elapsedForJob = (job: TrainingJob) => {
-  if (job.runtime_seconds) return job.runtime_seconds;
-  if (job.started_at && ACTIVE_STATUSES.includes(job.status)) {
-    return Math.max(
-      Math.floor((Date.now() - new Date(job.started_at).getTime()) / 1000),
-      0,
-    );
-  }
-  return 0;
-};
-
-const displayStatus = (job: TrainingJob) => {
-  if (job.deletion_pending) return "deleting";
-  if (job.status === "completed") return "success";
-  if (job.status === "failed" || job.status === "cancelled") return "failed";
-  return "pending";
-};
-
 export default function TrainingModelPage() {
-  const { t } = useTranslation("training");
+  const { t, i18n } = useTranslation("training");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { selectedModel } = useModelSelection();
-  const [statusFilter, setStatusFilter] = useState<TrainingStatusFilter>("all");
+  const [projectFilter, setProjectFilter] = useState("all");
+  const { data: projects } = useQuery({
+    queryKey: ["training", "projects"],
+    queryFn: listModelProjects,
+  });
+  const [statusFilter, setStatusFilter] = useState("all");
   const [jobToDelete, setJobToDelete] = useState<TrainingJob | null>(null);
+  const [jobToRetry, setJobToRetry] = useState<TrainingJob | null>(null);
+  const retryKeys = useRef(new Map<string, string>());
   const pendingDeletionIds = useRef<Set<string>>(new Set());
 
   const {
     data,
     error: jobsError,
     isError,
+    isFetching,
     isLoading,
+    refetch,
   } = useQuery({
     queryKey: trainingQueryKeys.jobs(),
     queryFn: () => listTrainingJobs(),
@@ -81,60 +63,77 @@ export default function TrainingModelPage() {
       return jobs.some(
         (job) =>
           (job.deletion_pending && !job.deletion_error) ||
+          job.observation_status === "cleanup_pending" ||
           ACTIVE_STATUSES.includes(job.status),
       )
         ? 4000
         : false;
     },
   });
-  const { data: usage, isLoading: isUsageLoading } = useQuery({
-    queryKey: trainingQueryKeys.usage(),
-    queryFn: getTrainingUsage,
-    refetchInterval: 15000,
-  });
 
   const allTrainingJobs = useMemo(
     () => data?.training_jobs ?? [],
     [data?.training_jobs],
   );
-  const selectedModelTrainingJobs = useMemo(
-    () =>
-      selectedModel
-        ? allTrainingJobs.filter((job) => job.project_id === selectedModel.id)
-        : [],
-    [allTrainingJobs, selectedModel],
+
+  const projectOptions = useMemo<SelectOption[]>(() => {
+    const options: SelectOption[] = [
+      { value: "all", label: t("studio.allProjects") },
+      { value: "unassigned", label: t("studio.unassigned") },
+    ];
+    if (projects?.models) {
+      for (const project of projects.models) {
+        options.push({ value: project.id, label: project.name });
+      }
+    }
+    return options;
+  }, [projects, t]);
+
+  const statusOptions = useMemo<SelectOption[]>(
+    () => [
+      { value: "all", label: t("statusFilter.all") },
+      { value: "editing", label: t("detail.statuses.editing", "Editing") },
+      { value: "running", label: t("detail.statuses.running", "Running") },
+      {
+        value: "uploading",
+        label: t("detail.statuses.uploading", "Uploading"),
+      },
+      {
+        value: "cancelling",
+        label: t("detail.statuses.cancelling", "Cancelling"),
+      },
+      {
+        value: "completed",
+        label: t("detail.statuses.completed", "Completed"),
+      },
+      { value: "failed", label: t("detail.statuses.failed", "Failed") },
+      {
+        value: "cancelled",
+        label: t("detail.statuses.cancelled", "Cancelled"),
+      },
+      { value: "pending", label: t("detail.statuses.pending", "Pending") },
+      { value: "queued", label: t("detail.statuses.queued", "Queued") },
+    ],
+    [t],
   );
+
   const trainingJobs = useMemo(
     () =>
-      selectedModelTrainingJobs.filter((job) => {
-        const status = displayStatus(job);
-        return (
-          statusFilter === "all" ||
-          (status === "deleting" ? "pending" : status) === statusFilter
-        );
+      allTrainingJobs.filter((job) => {
+        if (projectFilter === "unassigned") {
+          if (job.project_id) return false;
+        } else if (projectFilter !== "all") {
+          if (job.project_id !== projectFilter) return false;
+        }
+
+        if (statusFilter !== "all") {
+          if (job.status !== statusFilter) return false;
+        }
+
+        return true;
       }),
-    [selectedModelTrainingJobs, statusFilter],
+    [allTrainingJobs, projectFilter, statusFilter],
   );
-  const trainingStatusSummary = useMemo(() => {
-    const total = selectedModelTrainingJobs.length;
-    const counts: Record<TrainingSummaryStatus, number> = {
-      pending: 0,
-      success: 0,
-      failed: 0,
-    };
-
-    selectedModelTrainingJobs.forEach((job) => {
-      counts[summaryStatusForJob(job)] += 1;
-    });
-
-    return (
-      Object.entries(counts) as Array<[TrainingSummaryStatus, number]>
-    ).map(([status, count]) => ({
-      status,
-      count,
-      percentage: total ? (count / total) * 100 : 0,
-    }));
-  }, [selectedModelTrainingJobs]);
 
   useEffect(() => {
     if (!pendingDeletionIds.current.size) return;
@@ -185,100 +184,109 @@ export default function TrainingModelPage() {
     },
   });
 
+  const retryMutation = useMutation({
+    mutationFn: (job: TrainingJob) => {
+      const key = retryKeys.current.get(job.id) ?? crypto.randomUUID();
+      retryKeys.current.set(job.id, key);
+      return retryTrainingJob(job.id, key);
+    },
+    onSuccess: (newJob, sourceJob) => {
+      setJobToRetry(null);
+      toast.success(t("studio.draftCreated"));
+      void queryClient.invalidateQueries({
+        queryKey: trainingQueryKeys.jobs(),
+      });
+      navigate(
+        `/dashboard/training/${newJob.id}/workspace${
+          sourceJob.project_id ? `?project=${sourceJob.project_id}` : ""
+        }`,
+      );
+    },
+    onError: (error) => {
+      toast.error(getTrainingStartError(error, t, i18n.language));
+    },
+  });
+
   const columns = useMemo<ColumnDef<TrainingJob>[]>(
     () => [
       {
-        accessorKey: "started_at",
-        header: t("table.trainingAt"),
+        accessorKey: "id",
+        header: t("table.jobId", "Training job ID"),
         cell: ({ row }) => (
           <button
             type="button"
-            className="text-left font-medium hover:text-color-primary transition-colors focus:outline-none"
+            className="break-all text-left font-medium hover:text-color-primary focus:outline-none"
             onClick={() =>
-              navigate(
-                `/dashboard/model-training/jobs/${row.original.id}/details/overview`,
-              )
+              navigate(`/dashboard/training/${row.original.id}/workspace`)
             }
           >
-            {row.original.started_at
-              ? new Date(row.original.started_at).toLocaleString()
-              : "—"}
+            {row.original.id}
           </button>
         ),
       },
       {
-        accessorKey: "model_flavor",
-        header: t("table.flavor"),
+        accessorKey: "created_at",
+        header: t("table.createAt", "Create at"),
         cell: ({ row }) => (
-          <Badge variant="neutral">
-            {t(`table.flavors.${row.original.model_flavor}`)}
-          </Badge>
+          <span className="text-left font-medium">
+            {row.original.created_at
+              ? formatDateTime(row.original.created_at, i18n.language)
+              : "—"}
+          </span>
         ),
       },
       {
-        accessorKey: "model_status",
-        header: t("table.modelStatus"),
+        accessorKey: "project_id",
+        header: t("studio.project", "Model Project"),
+        cell: ({ row }) =>
+          projects?.models.find(
+            (project) => project.id === row.original.project_id,
+          )?.name ?? t("studio.unassigned", "Unassigned"),
+      },
+      {
+        accessorKey: "status",
+        header: t("table.status", "Training status"),
         cell: ({ row }) => {
-          const modelStatus = row.original.model_status ?? "none";
+          const job = row.original;
+          if (job.deletion_pending) {
+            return (
+              <Badge variant="warning">
+                {t("table.deleting", "Deleting…")}
+              </Badge>
+            );
+          }
+          const status = job.status;
           const variant =
-            modelStatus === "deployed"
+            status === "completed"
               ? "success"
-              : modelStatus === "built"
+              : status === "running" || status === "uploading"
                 ? "primary"
-                : modelStatus === "trained"
-                  ? "warning"
-                  : "neutral";
+                : status === "failed"
+                  ? "danger"
+                  : status === "cancelling" || status === "cancelled"
+                    ? "warning"
+                    : "neutral";
           return (
             <Badge variant={variant}>
-              {t(`table.modelStatuses.${modelStatus}`)}
+              {t(`detail.statuses.${status}`, status)}
             </Badge>
           );
         },
       },
       {
-        id: "accelerators",
-        header: t("table.accelerators"),
-        enableSorting: false,
-        cell: ({ row }) => {
-          const job = row.original;
-          const memoryGb = (job.memory_mb / 1024).toFixed(
-            job.memory_mb % 1024 === 0 ? 0 : 1,
-          );
-          const gpu =
-            job.accelerator_type === "gpu" && job.accelerator_count > 0
-              ? ` · GPU ×${job.accelerator_count}`
-              : "";
-          return `${job.vcpu} vCPU · ${memoryGb} GB${gpu}`;
-        },
-      },
-      {
-        id: "runtime",
-        header: t("table.runtime"),
-        accessorFn: elapsedForJob,
-        cell: ({ row }) => formatDuration(elapsedForJob(row.original)),
-      },
-      {
-        id: "status",
-        header: t("table.status"),
-        accessorFn: displayStatus,
-        cell: ({ row }) => {
-          const status = displayStatus(row.original);
-          const variant =
-            status === "success"
-              ? "success"
-              : status === "failed"
-                ? "danger"
-                : status === "deleting"
-                  ? "warning"
-                  : "neutral";
-          return (
-            <Badge variant={variant}>{t(`table.statuses.${status}`)}</Badge>
-          );
-        },
+        accessorKey: "started_at",
+        header: t("table.trainingAt", "Training at"),
+        cell: ({ row }) => (
+          <span className="text-left font-medium">
+            {row.original.started_at
+              ? formatDateTime(row.original.started_at, i18n.language)
+              : "—"}
+          </span>
+        ),
       },
       {
         id: "actions",
-        header: t("table.actions"),
+        header: t("table.actions", "Action"),
         enableSorting: false,
         cell: ({ row }) => {
           const job = row.original;
@@ -290,21 +298,28 @@ export default function TrainingModelPage() {
               <Button
                 size="icon"
                 variant="ghost"
-                aria-label={t("training:table.view")}
-                title={t("training:table.view")}
+                aria-label={t("table.view", "View")}
+                title={t("table.view", "View")}
                 icon={<Eye className="h-4 w-4" />}
                 disabled={deleting}
                 onClick={() =>
-                  navigate(
-                    `/dashboard/model-training/jobs/${job.id}/details/overview`,
-                  )
+                  navigate(`/dashboard/training/${job.id}/workspace`)
                 }
               />
               <Button
                 size="icon"
                 variant="ghost"
-                aria-label={t("training:table.delete")}
-                title={t("training:table.delete")}
+                aria-label={t("retryJob", "Retry job")}
+                title={t("retryJob", "Retry job")}
+                icon={<RotateCcw className="h-4 w-4" />}
+                disabled={deleting || retryMutation.isPending}
+                onClick={() => setJobToRetry(job)}
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label={t("table.delete", "Delete")}
+                title={t("table.delete", "Delete")}
                 icon={<Trash2 className="h-4 w-4" />}
                 className="text-color-danger hover:text-color-danger-hover active:text-color-danger-active"
                 disabled={deleting}
@@ -315,128 +330,73 @@ export default function TrainingModelPage() {
         },
       },
     ],
-    [navigate, t],
+    [navigate, retryMutation.isPending, t, i18n.language, projects],
   );
 
   return (
     <section className="flex w-full flex-1 flex-col space-y-6">
       <PageHeader title={t("title")} />
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-surface border border-border bg-surface p-5 shadow-sm md:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <p className="text-style-overline uppercase text-color-muted-foreground">
-                {t("quota")}
-              </p>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-style-page-title font-semibold text-color-foreground">
-                  {isUsageLoading
-                    ? "..."
-                    : formatDuration(usage?.monthly_runtime_seconds)}
-                </span>
-                <span className="text-style-body-strong text-color-muted-foreground">
-                  {t("used", {
-                    duration: formatDuration(
-                      usage?.monthly_quota_seconds || 43200,
-                    ),
-                  })}
-                </span>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-style-overline uppercase text-color-muted-foreground">
-                {t("remaining")}
-              </p>
-              <p className="mt-1 text-style-heading font-semibold text-color-success">
-                {isUsageLoading
-                  ? "..."
-                  : formatDuration(usage?.remaining_seconds)}
-              </p>
-            </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-full sm:w-60">
+            <Select
+              className="h-10 text-style-body"
+              value={projectFilter}
+              onChange={(val) => setProjectFilter(val)}
+              options={projectOptions}
+              aria-label={t("studio.project")}
+            />
           </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full bg-success transition-all duration-500 ease-out"
-              style={{
-                width: `${Math.min(
-                  100,
-                  ((usage?.monthly_runtime_seconds || 0) /
-                    (usage?.monthly_quota_seconds || 1)) *
-                    100,
-                )}%`,
-              }}
+          <div className="w-full sm:w-60">
+            <Select
+              className="h-10 text-style-body"
+              value={statusFilter}
+              onChange={(val) => setStatusFilter(val)}
+              options={statusOptions}
+              placeholder={t("statusFilter.placeholder")}
+              aria-label={t("statusFilter.label")}
             />
           </div>
         </div>
-
-        <div className="rounded-surface border border-border bg-surface p-5 shadow-sm">
-          <p className="flex items-center gap-2 text-style-overline uppercase text-color-muted-foreground">
-            {t("totalJobs")}
-          </p>
-          <span className="mt-3 text-style-page-title font-semibold text-color-foreground">
-            {selectedModelTrainingJobs.length}
-          </span>
-          <div
-            className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-muted"
-            aria-label={t("statusDistribution.label")}
-            role="img"
-          >
-            {trainingStatusSummary.some(({ count }) => count > 0) ? (
-              trainingStatusSummary.map(({ status, percentage }) => (
-                <span
-                  key={status}
-                  tabIndex={0}
-                  title={t("statusDistribution.tooltip", {
-                    status: t(`table.statuses.${status}`),
-                    percentage: percentage.toFixed(1),
-                  })}
-                  aria-label={t("statusDistribution.tooltip", {
-                    status: t(`table.statuses.${status}`),
-                    percentage: percentage.toFixed(1),
-                  })}
-                  className={
-                    status === "success"
-                      ? "h-full bg-success outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      : status === "failed"
-                        ? "h-full bg-danger outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        : "h-full bg-primary outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  }
-                  style={{ width: `${percentage}%` }}
-                />
-              ))
-            ) : (
-              <span
-                className="h-full w-full"
-                title={t("statusDistribution.empty")}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <TrainingJobStatusFilter
-          value={statusFilter}
-          onChange={setStatusFilter}
-        />
         <Button
           size="md"
-          icon={<Rocket className="h-4 w-4" />}
-          onClick={() => navigate("/dashboard/model-training/create/metadata")}
+          icon={<Plus className="h-4 w-4" />}
+          onClick={() =>
+            navigate(
+              `/dashboard/training/new${
+                projectFilter &&
+                projectFilter !== "all" &&
+                projectFilter !== "unassigned"
+                  ? `?project=${projectFilter}`
+                  : ""
+              }`,
+            )
+          }
         >
           {t("newJob")}
         </Button>
       </div>
 
-      {isError ? (
-        <div className="rounded-surface border border-danger/20 bg-danger-subtle p-5">
-          <p className="text-style-body text-color-danger">
-            {getApiErrorMessage(jobsError, t("checkApi"))}
-          </p>
-        </div>
-      ) : (
-        <DataTable
+      {isError && (
+        <Callout
+          variant="danger"
+          role="alert"
+          description={`${data ? `${t("staleData")} ` : ""}${getApiErrorMessage(jobsError, t("checkApi"))}`}
+          action={
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={isFetching}
+              onClick={() => void refetch()}
+            >
+              {t("retryLoad")}
+            </Button>
+          }
+        />
+      )}
+      {!(isError && !data) && (
+        <Table
           data={trainingJobs}
           columns={columns}
           getRowId={(job) => job.id}
@@ -445,16 +405,28 @@ export default function TrainingModelPage() {
         />
       )}
 
-      <ConfirmModal
+      <ConfirmDialog
         open={Boolean(jobToDelete)}
         title={t("delete.title")}
-        description={t("delete.description", { job: jobToDelete?.name ?? "" })}
+        description={t("delete.description", { job: jobToDelete?.id ?? "" })}
         confirmText={t("delete.confirm")}
         tone="danger"
         loading={deleteMutation.isPending}
         onCancel={() => setJobToDelete(null)}
         onConfirm={() => {
           if (jobToDelete) deleteMutation.mutate(jobToDelete);
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(jobToRetry)}
+        title={t("retryTitle")}
+        description={t("retryDescription", { job: jobToRetry?.id ?? "" })}
+        confirmText={t("retryJob")}
+        tone="default"
+        loading={retryMutation.isPending}
+        onCancel={() => setJobToRetry(null)}
+        onConfirm={() => {
+          if (jobToRetry) retryMutation.mutate(jobToRetry);
         }}
       />
     </section>

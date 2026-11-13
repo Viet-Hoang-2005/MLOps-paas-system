@@ -5,19 +5,34 @@ from django.db import transaction
 from django.utils import timezone
 
 from common.logging import record_transition
-from infrastructure.execution import drift_backend
+from infrastructure.execution import drift_backend, polls_runtime_status
 from infrastructure.storage import S3Storage
+
+# "skipped" is final: the run ended without a result because of too few samples.
+TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled", "skipped"})
 
 
 @shared_task(
-    bind=True, autoretry_for=(ConnectionError, TimeoutError), retry_backoff=True, retry_jitter=True, max_retries=5
+    bind=True,
+    autoretry_for=(ConnectionError, TimeoutError),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=5,
+    soft_time_limit=50,
+    time_limit=55,
 )
 def execute_drift_run(self, run_id):
+    from django.conf import settings
+
+    if settings.DRIFT_EXECUTION_WATCH_ENABLED:
+        from apps.observability.services.executions import reconcile
+
+        return reconcile("drift", run_id)
     from .models import DriftRun
 
     with transaction.atomic():
         run = (
-            DriftRun.objects.select_for_update()
+            DriftRun.objects.select_for_update(of=("self",))
             .select_related(
                 "monitor",
                 "monitor__version",
@@ -27,7 +42,7 @@ def execute_drift_run(self, run_id):
             )
             .get(public_id=run_id)
         )
-        if run.status in {"completed", "cancelled"}:
+        if run.status in {"completed", "cancelled", "failed"} or run.monitor.version.project.deletion_state != "active":
             return run.status
         run.status = "running"
         run.started_at = run.started_at or timezone.now()
@@ -50,7 +65,7 @@ def execute_drift_run(self, run_id):
         raise
     if isinstance(result, dict) and result.get("dispatched"):
         record_transition(run, "running", phase="dispatched")
-        if hasattr(drift_backend(run.monitor.backend), "poll"):
+        if polls_runtime_status(drift_backend(run.monitor.backend)):
             poll_drift_run_status.apply_async(args=[str(run.public_id)], countdown=5)
         return "running"
 
@@ -78,13 +93,17 @@ def execute_drift_run(self, run_id):
         run.save(update_fields=["status", "completed_at", "error_message", "summary", "drift_score", "has_drift"])
         if not already_completed:
             record_transition(run, "completed")
-        if run.has_drift:
-            transaction.on_commit(lambda: handle_drift_detected.delay(str(run.public_id)))
     return "completed"
 
 
-@shared_task(bind=True, max_retries=120)
+@shared_task(bind=True, max_retries=120, soft_time_limit=50, time_limit=55)
 def poll_drift_run_status(self, run_id):
+    from django.conf import settings
+
+    if settings.DRIFT_EXECUTION_WATCH_ENABLED:
+        from apps.observability.services.executions import reconcile
+
+        return reconcile("drift", run_id)
     from .models import DriftRun
 
     try:
@@ -92,11 +111,11 @@ def poll_drift_run_status(self, run_id):
     except DriftRun.DoesNotExist:
         return "not_found"
 
-    if run.status in {"completed", "failed", "cancelled"}:
+    if run.status in TERMINAL_RUN_STATUSES:
         return run.status
 
     backend = drift_backend(run.monitor.backend)
-    if not hasattr(backend, "poll"):
+    if not polls_runtime_status(backend):
         return run.status
 
     result = backend.poll(run)
@@ -108,7 +127,7 @@ def poll_drift_run_status(self, run_id):
     if current_status == "completed":
         with transaction.atomic():
             run = DriftRun.objects.select_for_update().get(pk=run.pk)
-            if run.status in {"completed", "failed", "cancelled"}:
+            if run.status in TERMINAL_RUN_STATUSES:
                 return run.status
             if not run.summary and run.summary_uri:
                 try:
@@ -126,15 +145,13 @@ def poll_drift_run_status(self, run_id):
             run.error_message = ""
             run.save(update_fields=["status", "completed_at", "error_message", "summary", "drift_score", "has_drift"])
             record_transition(run, "completed")
-            if run.has_drift:
-                transaction.on_commit(lambda: handle_drift_detected.delay(str(run.public_id)))
         return "completed"
 
     if current_status == "failed":
         error_msg = result.get("error") or f"Drift analysis failed with exit code {result.get('exit_code')}"
         with transaction.atomic():
             run = DriftRun.objects.select_for_update().get(pk=run.pk)
-            if run.status in {"completed", "cancelled"}:
+            if run.status in {"completed", "cancelled", "skipped"}:
                 return run.status
             run.status = "failed"
             run.error_message = error_msg[:12000]
@@ -146,7 +163,7 @@ def poll_drift_run_status(self, run_id):
     if current_status in {"not_found", "error"}:
         with transaction.atomic():
             run = DriftRun.objects.select_for_update().get(pk=run.pk)
-            if run.status in {"completed", "cancelled"}:
+            if run.status in {"completed", "cancelled", "skipped"}:
                 return run.status
             run.status = "failed"
             run.error_message = f"Drift container error: {result.get('error') or 'Container not found'}"
@@ -158,53 +175,15 @@ def poll_drift_run_status(self, run_id):
     return run.status
 
 
-@shared_task(bind=True)
-def handle_drift_detected(self, run_id):
-    """Entry point hook for Continuous Training (CT) and Degradation-Aware Diagnosis.
-
-    Triggered when a DriftRun records has_drift = True.
-    Coordinates evidence aggregation and prepares the workload for the
-    Multi-Evidence Diagnosis Engine and Retraining Decision Policy.
-    """
-    import logging
+@shared_task(bind=True, soft_time_limit=30, time_limit=35)
+def cancel_drift_run(self, run_id):
+    from infrastructure.execution import drift_backend
 
     from .models import DriftRun
 
-    logger = logging.getLogger("apps.drift.tasks")
     try:
-        run = DriftRun.objects.select_related(
-            "monitor",
-            "monitor__version",
-            "monitor__version__project",
-        ).get(public_id=run_id)
-    except DriftRun.DoesNotExist:
-        logger.warning(f"handle_drift_detected: DriftRun {run_id} not found.")
-        return "not_found"
-
-    version = run.monitor.version
-    project = version.project
-    drift_score = run.drift_score
-    summary = run.summary or {}
-
-    logger.info(
-        f"[CONTINUOUS_TRAINING_HOOK] Drift detected for project '{project.name}' "
-        f"(version '{version.version}', public_id={version.public_id}). "
-        f"Drift Score: {drift_score}. Ready for Degradation-Aware CT Engine."
-    )
-
-    evidence_payload = {
-        "drift_run_id": str(run.public_id),
-        "model_version_id": str(version.public_id),
-        "project_id": str(project.public_id),
-        "drift_score": drift_score,
-        "has_drift": True,
-        "summary": summary,
-        "triggered_at": timezone.now().isoformat(),
-    }
-
-    return {
-        "status": "drift_handled",
-        "model_version_id": str(version.public_id),
-        "drift_score": drift_score,
-        "evidence": evidence_payload,
-    }
+        run = DriftRun.objects.select_related("monitor").get(public_id=run_id)
+        drift_backend(run.monitor.backend).cancel(run)
+    except Exception:
+        pass
+    return "cancelled"

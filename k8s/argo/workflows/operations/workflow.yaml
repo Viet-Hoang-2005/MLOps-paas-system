@@ -1,0 +1,112 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: mlops-paas-job-tombstone-template
+  namespace: mlops-paas-execution
+spec:
+  serviceAccountName: argo-workflow-basic-sa
+  entrypoint: stopped
+  ttlStrategy:
+    secondsAfterCompletion: 300
+  podGC:
+    strategy: OnPodCompletion
+  podMetadata:
+    labels:
+      app.kubernetes.io/name: mlops-paas-job-operations
+      app.kubernetes.io/part-of: mlops-paas
+      app.kubernetes.io/component: operations
+      mlops-paas.io/domain: operations
+      app.kubernetes.io/managed-by: argo-workflows
+  templates:
+    - name: stopped
+      container:
+        image: python:3.10-slim@sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2
+        command: ["true"]
+        resources:
+          requests:
+            cpu: 20m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: mlops-paas-job-submit-template
+  namespace: mlops-paas-execution
+spec:
+  serviceAccountName: argo-job-operations-sa
+  entrypoint: submit
+  activeDeadlineSeconds: 240
+  ttlStrategy:
+    secondsAfterCompletion: 300
+  podGC:
+    strategy: OnPodCompletion
+  podMetadata:
+    labels:
+      app.kubernetes.io/name: mlops-paas-job-operations
+      app.kubernetes.io/part-of: mlops-paas
+      app.kubernetes.io/component: operations
+      mlops-paas.io/domain: operations
+      app.kubernetes.io/managed-by: argo-workflows
+  templates:
+    - name: submit
+      retryStrategy:
+        limit: "3"
+        retryPolicy: Always
+        backoff: {duration: "2s", factor: "2", maxDuration: "30s"}
+      container:
+        image: python:3.10-slim@sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2
+        command: [python, /ops/job_ops.py, submit]
+        env:
+          - {name: EXECUTION_KIND, value: "{{workflow.parameters.execution_kind}}"}
+          - {name: EXECUTION_PAYLOAD, value: "{{workflow.parameters.execution_payload}}"}
+        resources:
+          requests: {cpu: 50m, memory: 64Mi}
+          limits: {cpu: 250m, memory: 128Mi}
+        volumeMounts:
+          - {name: operations, mountPath: /ops, readOnly: true}
+  volumes:
+    - name: operations
+      configMap: {name: argo-job-operations}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: mlops-paas-job-reconcile-template
+  namespace: mlops-paas-execution
+spec:
+  serviceAccountName: argo-job-operations-sa
+  entrypoint: reconcile
+  activeDeadlineSeconds: 240
+  ttlStrategy:
+    secondsAfterCompletion: 300
+  podGC:
+    strategy: OnPodCompletion
+  podMetadata:
+    labels:
+      app.kubernetes.io/name: mlops-paas-job-operations
+      app.kubernetes.io/part-of: mlops-paas
+      app.kubernetes.io/component: operations
+      mlops-paas.io/domain: operations
+      app.kubernetes.io/managed-by: argo-workflows
+  templates:
+    - name: reconcile
+      retryStrategy:
+        limit: "3"
+        retryPolicy: Always
+        backoff: {duration: "2s", factor: "2", maxDuration: "30s"}
+      container:
+        image: python:3.10-slim@sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2
+        command: [python, /ops/job_ops.py, reconcile]
+        env:
+          - {name: EXECUTION_PAYLOAD, value: "{{workflow.parameters.execution_payload}}"}
+        resources:
+          requests: {cpu: 50m, memory: 64Mi}
+          limits: {cpu: 250m, memory: 128Mi}
+        volumeMounts:
+          - {name: operations, mountPath: /ops, readOnly: true}
+  volumes:
+    - name: operations
+      configMap: {name: argo-job-operations}

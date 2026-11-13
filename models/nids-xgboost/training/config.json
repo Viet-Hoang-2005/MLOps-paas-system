@@ -1,0 +1,17 @@
+{
+  "train_csv": "data/train.csv",
+  "feature_schema": "feature_schema.json",
+  "classification_mode": "binary",
+  "label_column": "Label",
+  "seed": 42,
+  "validation_fraction": 0.15,
+  "test_fraction": 0.15,
+  "device": "auto",
+  "max_threads": null,
+  "n_estimators": 500,
+  "early_stopping_rounds": 30,
+  "max_depth": 6,
+  "learning_rate": 0.1,
+  "subsample": 0.8,
+  "colsample_bytree": 0.8
+}

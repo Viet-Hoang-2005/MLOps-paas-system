@@ -1,0 +1,48 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-postgresql
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/instance: postgresql
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: postgresql
+  policyTypes:
+    - Ingress
+  ingress:
+    # Nội bộ các Pod Postgres đồng bộ Replication (cùng namespace)
+    - from:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: postgresql
+    # CloudNativePG Operator quản lý cluster
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+    # Core platform workloads và Execution analytical workloads (Evidently) truy cập DB (cổng 5432)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-paas-core
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-paas-execution
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Prometheus cào metrics (cổng 9187)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9187
+

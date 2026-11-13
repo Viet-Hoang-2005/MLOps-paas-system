@@ -1,13 +1,15 @@
 from django.conf import settings
 from rest_framework import generics, status
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.drift.selectors import monitor_for_user, monitors_for_user, run_for_user
 from apps.drift.services.logs import drift_run_logs
+from apps.drift.services.monitors import get_monitor_reference_preview, reference_download_url
+from apps.drift.services.reports import get_drift_report_data, report_uri_for_run
 from apps.drift.services.runs import request_run
 from common.api.exceptions import Conflict
+from infrastructure.runtime_logs import runtime_log_page
 from infrastructure.storage import S3Storage
 
 from .serializers import DriftMonitorSerializer, DriftRunSerializer
@@ -20,7 +22,12 @@ class DriftMonitorListCreateEndpoint(generics.ListCreateAPIView):
         return monitors_for_user(self.request.user).prefetch_related("runs")
 
     def perform_create(self, serializer):
-        serializer.save(backend=settings.DRIFT_BACKEND)
+        from apps.drift.services.monitors import create_monitor
+
+        serializer.instance = create_monitor(
+            data=serializer.validated_data,
+            backend=settings.DRIFT_BACKEND,
+        )
 
 
 class DriftMonitorDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
@@ -39,22 +46,26 @@ class DriftRunEndpoint(APIView):
         return Response(DriftRunSerializer(run).data, status=status.HTTP_202_ACCEPTED)
 
 
+class DriftMonitorReferenceURLEndpoint(APIView):
+    def get(self, request, monitor_id):
+        monitor = monitor_for_user(request.user, monitor_id)
+        return Response({"url": reference_download_url(monitor)})
+
+
+class DriftMonitorReferencePreviewEndpoint(APIView):
+    def get(self, request, monitor_id):
+        monitor = monitor_for_user(request.user, monitor_id)
+        return Response(get_monitor_reference_preview(monitor))
+
+
 class DriftRunLogsEndpoint(APIView):
     def get(self, request, run_id):
-        try:
-            offset = int(request.query_params.get("offset", "0"))
-        except (TypeError, ValueError) as exc:
-            raise ValidationError({"offset": "Must be a non-negative integer."}) from exc
-        if offset < 0:
-            raise ValidationError({"offset": "Must be a non-negative integer."})
-
         run = run_for_user(request.user, run_id)
-        logs, next_offset = drift_run_logs(run, offset)
+        page = runtime_log_page(request, run, "drift", drift_run_logs)
         return Response(
             {
                 "run_id": str(run.public_id),
-                "logs": logs,
-                "next_offset": next_offset,
+                **page,
                 "status": run.status,
                 "error_message": run.error_message,
             }
@@ -66,6 +77,43 @@ class DriftRunReportURLEndpoint(APIView):
         run = run_for_user(request.user, run_id)
         if run.status != "completed":
             raise Conflict("The drift report is not available until the run has completed.")
-        if not run.report_html_uri:
+        report_uri = report_uri_for_run(run, "report_html_uri")
+        if not report_uri:
             raise Conflict("The completed drift run does not have an HTML report.")
-        return Response({"url": S3Storage().presigned_get(run.report_html_uri, 900)})
+        return Response({"url": S3Storage().presigned_get(report_uri, 900)})
+
+
+class DriftRunReportDataEndpoint(APIView):
+    def get(self, request, run_id):
+        run = run_for_user(request.user, run_id)
+        if run.status != "completed":
+            raise Conflict("The drift report is not available until the run has completed.")
+        return Response(get_drift_report_data(run))
+
+
+class DriftRunDetailEndpoint(APIView):
+    def delete(self, request, run_id):
+        run = run_for_user(request.user, run_id)
+        run.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DriftRunCancelEndpoint(APIView):
+    def post(self, request, run_id):
+        from apps.drift.services.runs import request_cancel
+
+        run = run_for_user(request.user, run_id)
+        run = request_cancel(run)
+        return Response(DriftRunSerializer(run).data, status=status.HTTP_200_OK)
+
+
+class DriftMonitorCancelEndpoint(APIView):
+    def post(self, request, monitor_id):
+        from apps.drift.services.runs import request_cancel
+
+        monitor = monitor_for_user(request.user, monitor_id)
+        active_run = monitor.runs.filter(status__in=["pending", "queued", "running"]).order_by("-created_at").first()
+        if not active_run:
+            raise Conflict("No active run found for this monitor.")
+        active_run = request_cancel(active_run)
+        return Response(DriftRunSerializer(active_run).data, status=status.HTTP_200_OK)

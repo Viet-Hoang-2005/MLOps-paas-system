@@ -2,14 +2,12 @@ from django.urls import path
 
 from .account_endpoints import (
     AccountDeleteEndpoint,
-    AvatarHistoryEndpoint,
-    AvatarSelectEndpoint,
     PasswordChangeCompleteEndpoint,
     PasswordChangeRequestEndpoint,
     PasswordChangeVerifyEndpoint,
     ProfileEndpoint,
 )
-from .endpoints import JWKSEndpoint, RegisterEndpoint, refresh_endpoint, token_endpoint
+from .endpoints import JWKSEndpoint, logout_endpoint, refresh_endpoint, token_endpoint
 from .oauth_endpoints import GitHubOAuthEndpoint, GoogleOAuthEndpoint
 from .registration_endpoints import (
     CompleteRegistrationEndpoint,
@@ -23,7 +21,7 @@ from .registration_endpoints import (
 urlpatterns = [
     path("token/", token_endpoint, name="token"),
     path("token/refresh/", refresh_endpoint, name="token-refresh"),
-    path("register/", RegisterEndpoint.as_view(), name="register"),
+    path("logout/", logout_endpoint, name="logout"),
     path("profile/", ProfileEndpoint.as_view(), name="profile"),
     path("register/request-otp/", RegistrationOTPRequestEndpoint.as_view()),
     path("register/verify-otp/", RegistrationOTPVerifyEndpoint.as_view()),
@@ -33,8 +31,6 @@ urlpatterns = [
     path("password-reset/complete/", PasswordResetCompleteEndpoint.as_view()),
     path("oauth/google/", GoogleOAuthEndpoint.as_view()),
     path("oauth/github/", GitHubOAuthEndpoint.as_view()),
-    path("profile/avatars/", AvatarHistoryEndpoint.as_view()),
-    path("profile/avatars/<uuid:avatar_id>/select/", AvatarSelectEndpoint.as_view()),
     path("profile/delete/", AccountDeleteEndpoint.as_view()),
     path("profile/password-otp/", PasswordChangeRequestEndpoint.as_view()),
     path("profile/password-otp/verify/", PasswordChangeVerifyEndpoint.as_view()),

@@ -39,14 +39,14 @@ def test_kubelet_health_request_is_not_redirected_before_host_validation():
 
 
 @override_settings(
-    ALLOWED_HOSTS=["mlops-paas-control-plane.mlops-control-plane.svc.cluster.local"],
+    ALLOWED_HOSTS=["mlops-paas-control-plane.mlops-paas-core.svc.cluster.local"],
     SECURE_SSL_REDIRECT=True,
     SECURE_REDIRECT_EXEMPT=[r"^api/auth/\.well-known/jwks\.json$"],
 )
 def test_in_cluster_jwks_request_is_not_redirected():
     # The model gateway verifies user JWTs with keys fetched over in-cluster HTTP.
     factory = RequestFactory()
-    host = "mlops-paas-control-plane.mlops-control-plane.svc.cluster.local:8000"
+    host = "mlops-paas-control-plane.mlops-paas-core.svc.cluster.local:8000"
     middleware = SecurityMiddleware(CommonMiddleware(lambda _request: HttpResponse(status=200)))
 
     assert middleware(factory.get("/api/auth/.well-known/jwks.json", HTTP_HOST=host)).status_code == 200

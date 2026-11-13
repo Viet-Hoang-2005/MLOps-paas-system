@@ -1,0 +1,30 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: mlops-paas-consumer-scaler
+  labels:
+    app.kubernetes.io/name: mlops-paas-consumer
+    app.kubernetes.io/instance: mlops-paas-consumer
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: streaming
+spec:
+  scaleTargetRef:
+    name: mlops-paas-consumer
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers:
+    - type: kafka
+      metadata:
+        # Địa chỉ Redpanda Service bên trong K3s
+        bootstrapServers: redpanda.mlops-paas-data.svc.cluster.local:9092
+        # Tên Topic cần giám sát
+        topic: mlops_paas_production_data
+        consumerGroup: paas-db-writer-group
+        # Ngưỡng kích hoạt: Cứ mỗi 2000 tin nhắn bị trễ (lag) thì tạo thêm 1 Pod
+        lagThreshold: "2000"
+        offsetResetPolicy: earliest

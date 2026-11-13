@@ -1,0 +1,126 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-prod-addon-loki
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-15"
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: loki
+    mlops-paas.io/plane: addon
+spec:
+  project: mlops-addons
+  info:
+    - { name: Owner, value: Platform Engineering }
+    - {
+        name: Source,
+        value: "grafana-community.github.io/helm-charts/loki@18.13.1",
+      }
+    - {
+        name: Runbook,
+        value: "https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#runtime-logs",
+      }
+  source:
+    repoURL: https://grafana-community.github.io/helm-charts
+    chart: loki
+    targetRevision: 18.13.1
+    helm:
+      releaseName: loki
+      values: |
+        deploymentMode: Monolithic
+        fullnameOverride: loki
+        loki:
+          auth_enabled: false
+          commonConfig:
+            replication_factor: 1
+          schemaConfig:
+            configs:
+              - from: "2024-04-01"
+                store: tsdb
+                object_store: s3
+                schema: v13
+                index: {prefix: index_, period: 24h}
+          storage:
+            type: s3
+            bucketNames:
+              chunks: mlops-paas-logs
+              ruler: mlops-paas-logs
+              admin: mlops-paas-logs
+            s3:
+              region: ap-southeast-1
+          limits_config:
+            retention_period: 168h
+            allow_structured_metadata: true
+            max_query_length: 168h
+            max_entries_limit_per_query: 5000
+          compactor:
+            retention_enabled: true
+            delete_request_store: s3
+            working_directory: /var/loki/retention
+        singleBinary:
+          replicas: 1
+          sidecar: false
+          nodeSelector: {workload-type: worker}
+          persistence:
+            enabled: true
+            storageClass: ebs-gp3
+            size: 10Gi
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: 1000m, memory: 1Gi}
+        read: {replicas: 0}
+        write: {replicas: 0}
+        backend: {replicas: 0}
+        gateway: {enabled: false}
+        lokiCanary: {enabled: false}
+        test: {enabled: false}
+        chunksCache: {enabled: false}
+        resultsCache: {enabled: false}
+        networkPolicy:
+          enabled: true
+          ingress:
+            namespaceSelector:
+              matchExpressions:
+                - key: kubernetes.io/metadata.name
+                  operator: In
+                  values: [mlops-logging, mlops-paas-core, monitoring]
+          metrics:
+            namespaceSelector:
+              matchLabels: {kubernetes.io/metadata.name: monitoring}
+          externalStorage:
+            ports: [443, 80]
+            cidrs: [0.0.0.0/0]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mlops-logging
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      name: loki
+      namespace: mlops-logging
+      jsonPointers:
+        - /spec/persistentVolumeClaimRetentionPolicy
+        - /spec/podManagementPolicy
+        - /spec/revisionHistoryLimit
+        - /spec/template/spec/dnsPolicy
+        - /spec/template/spec/restartPolicy
+        - /spec/template/spec/schedulerName
+        - /spec/template/spec/serviceAccount
+        - /spec/template/spec/terminationGracePeriodSeconds
+        - /spec/template/spec/containers/0/imagePullPolicy
+        - /spec/template/spec/containers/0/terminationMessagePath
+        - /spec/template/spec/containers/0/terminationMessagePolicy
+        - /spec/template/spec/containers/0/resources/limits/cpu
+        - /spec/template/spec/containers/0/livenessProbe/scheme
+        - /spec/template/spec/containers/0/readinessProbe/scheme
+        - /spec/template/spec/containers/0/env/0/valueFrom/fieldRef/apiVersion
+        - /spec/template/spec/volumes/1/configMap/defaultMode
+        - /spec/template/spec/volumes/2/configMap/defaultMode
+        - /spec/updateStrategy/type
+        - /spec/volumeClaimTemplates/0/apiVersion
+        - /spec/volumeClaimTemplates/0/kind
+        - /spec/volumeClaimTemplates/0/spec/volumeMode
+        - /spec/volumeClaimTemplates/0/status

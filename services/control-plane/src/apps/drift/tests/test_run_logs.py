@@ -30,7 +30,7 @@ def test_drift_run_logs_are_streamed_only_to_run_owner(monkeypatch):
     )
     monitor = DriftMonitor.objects.create(version=version, reference_asset=asset, name="default")
     run = DriftRun.objects.create(monitor=monitor, idempotency_key="drift-log-test", status="running")
-    monkeypatch.setattr(log_service.Redis, "from_url", lambda _url: FakeRedis())
+    monkeypatch.setattr(log_service, "redis_client", lambda: FakeRedis())
     client = APIClient()
     client.force_authenticate(other)
 

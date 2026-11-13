@@ -1,0 +1,21 @@
+import django.db.models.deletion
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    dependencies = [("training", "0013_trainingjob_storage_ownership")]
+    operations = [
+        migrations.AlterField(model_name="trainingjobcapability", name="purpose", field=models.CharField(choices=[("input_download", "Input download"), ("output_upload", "Output upload"), ("trusted_reporter", "Trusted reporter"), ("cancel_reporter", "Cancellation reporter"), ("tracking", "Tracking reporter"), ("runtime_config", "Runtime configuration")], max_length=40)),
+        migrations.AddField(model_name="trainingjob", name="input_contract", field=models.CharField(choices=[("legacy", "Legacy"), ("workspace", "Workspace")], default="workspace", max_length=16)),
+        migrations.AddField(model_name="trainingjob", name="input_revision", field=models.PositiveIntegerField(blank=True, null=True)),
+        migrations.AddField(model_name="trainingjob", name="environment", field=models.JSONField(blank=True, default=dict)),
+        migrations.AddField(model_name="trainingjob", name="revision", field=models.PositiveIntegerField(default=1)),
+        migrations.AddField(model_name="trainingjob", name="submission_token", field=models.UUIDField(blank=True, editable=False, null=True)),
+        migrations.AddField(model_name="trainingjob", name="creation_key", field=models.UUIDField(blank=True, editable=False, null=True, unique=True)),
+        migrations.AddField(model_name="trainingjob", name="preparation_started_at", field=models.DateTimeField(blank=True, editable=False, null=True)),
+        migrations.AddField(model_name="trainingjob", name="submitted_at", field=models.DateTimeField(blank=True, editable=False, null=True)),
+        migrations.AddField(model_name="trainingjob", name="cloned_from", field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name="clones", to="training.trainingjob")),
+        migrations.AddField(model_name="trainingjob", name="run_key", field=models.UUIDField(blank=True, editable=False, null=True, unique=True)),
+        migrations.AddField(model_name="trainingjob", name="environment_snapshot", field=models.JSONField(blank=True, default=dict)),
+        migrations.AddField(model_name="trainingjob", name="secret_snapshot", field=models.JSONField(blank=True, default=dict, editable=False)),
+    ]

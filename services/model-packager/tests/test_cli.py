@@ -1,6 +1,7 @@
 import io
 import json
 import logging
+import pickle
 import subprocess
 import tarfile
 import zipfile
@@ -32,9 +33,7 @@ class StreamResponse:
 
 
 def test_presigned_download_and_upload(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        cli.requests, "get", lambda *a, **k: StreamResponse([b"a", b"b"])
-    )
+    monkeypatch.setattr(cli.requests, "get", lambda *a, **k: StreamResponse([b"a", b"b"]))
     destination = tmp_path / "artifact.bin"
     cli.download_presigned_file("http://get", destination)
     assert destination.read_bytes() == b"ab"
@@ -87,54 +86,21 @@ def test_safe_extract_tar_rejects_links(tmp_path):
         cli.safe_extract_tar(archive, tmp_path / "out")
 
 
-def test_find_model_and_mapping_files(tmp_path):
-    (tmp_path / "z.joblib").write_text("z")
-    (tmp_path / "model.pkl").write_text("preferred")
-    (tmp_path / "label_classes.json").write_text("[]")
-    assert cli.find_supported_model_file(tmp_path).name == "model.pkl"
-    assert cli.find_label_mapping_file(tmp_path).name == "label_classes.json"
-    empty = tmp_path / "empty"
-    empty.mkdir()
-    with pytest.raises(ValueError, match="no .pkl"):
-        cli.find_supported_model_file(empty)
-
-
-def test_find_model_files_pytorch_and_flavor_resolution(tmp_path):
-    torch_dir = tmp_path / "torch_dir"
-    torch_dir.mkdir()
-    (torch_dir / "preprocessor.pkl").write_text("scaler")
-    (torch_dir / "baf_model.pt").write_text("torch_weights")
-    (torch_dir / "model.pt").write_text("torch_preferred")
-
-    assert cli.find_supported_model_file(torch_dir, flavor="pytorch").name == "model.pt"
-
-    (torch_dir / "model.pt").unlink()
-    assert (
-        cli.find_supported_model_file(torch_dir, flavor="pytorch").name
-        == "baf_model.pt"
-    )
-    assert (
-        cli.find_supported_model_file(torch_dir, flavor="sklearn").name
-        == "preprocessor.pkl"
-    )
-
-    (torch_dir / "baf_model.pt").unlink()
-    with pytest.raises(ValueError, match="no .pt, .pth file was found for pytorch"):
-        cli.find_supported_model_file(torch_dir, flavor="pytorch")
-
-
 def test_webhook_headers_and_post(monkeypatch):
+    monkeypatch.setattr("src.io.time.sleep", Mock())
     monkeypatch.setenv("CONTROL_PLANE_WEBHOOK_SECRET", "secret")
     assert cli.webhook_headers() == {"X-Control-Plane-Secret": "secret"}
     post = Mock(return_value=SimpleNamespace(status_code=200, text=""))
     monkeypatch.setattr(cli.requests, "post", post)
     cli.post_webhook("http://callback", {"status": "success"})
-    assert post.call_args.kwargs["headers"] == {"X-Control-Plane-Secret": "secret"}
+    assert post.call_args.kwargs["headers"]["X-Control-Plane-Secret"] == "secret"
+    assert post.call_args.kwargs["headers"]["Idempotency-Key"].startswith("build-")
     post.return_value = SimpleNamespace(status_code=500, text="bad")
-    with pytest.raises(RuntimeError, match="HTTP 500"):
+    with pytest.raises(RuntimeError, match="could not be delivered"):
         cli.post_webhook("http://callback", {})
     post.reset_mock()
-    cli.post_webhook("", {})
+    with pytest.raises(RuntimeError, match="URL is required"):
+        cli.post_webhook("", {})
     post.assert_not_called()
 
 
@@ -177,9 +143,7 @@ def test_docker_builders(monkeypatch, tmp_path, builder, base_fragment):
     assert base_fragment in (tmp_path / "Dockerfile").read_text()
     client.login.assert_called_once()
     client.images.push.assert_called_once()
-    assert client.api.build.call_args.kwargs["tag"] == (
-        "registry.example/models/image-project-uuid:build-build-uuid"
-    )
+    assert client.api.build.call_args.kwargs["tag"] == ("registry.example/models/image-project-uuid:build-build-uuid")
 
 
 def test_docker_builder_raises_build_error(monkeypatch, tmp_path):
@@ -192,15 +156,11 @@ def test_docker_builder_raises_build_error(monkeypatch, tmp_path):
 
 def test_parse_conda_pip_requirements(tmp_path):
     conda = tmp_path / "conda.yaml"
-    conda.write_text(
-        "dependencies:\n  - python=3.10\n  - pip:\n      - numpy==1\n      - pandas\n"
-    )
+    conda.write_text("dependencies:\n  - python=3.10\n  - pip:\n      - numpy==1\n      - pandas\n")
     assert cli.parse_conda_pip_requirements(conda) == ["numpy==1", "pandas"]
 
 
-def configure_build(
-    monkeypatch, tmp_path, flavor="sklearn", source_type="manual_upload"
-):
+def configure_build(monkeypatch, tmp_path, flavor="sklearn", source_type="manual_upload"):
     monkeypatch.setenv("FLAVOR", flavor)
     monkeypatch.setenv("SOURCE_TYPE", source_type)
     monkeypatch.setenv("SOURCE_DOWNLOAD_URL", "http://source")
@@ -211,38 +171,28 @@ def configure_build(
         monkeypatch.setenv("SOURCE_ARTIFACT_NAME", "model.pkl")
 
 
+# Artifacts are scanned with an allowlist and unparseable bytes are rejected, so fakes must be real pickles.
+ARTIFACT_BYTES = pickle.dumps({"weights": [1.0, 2.0]})
+VALID_MLMODEL = """\
+flavors:
+  python_function:
+    loader_module: mlflow.sklearn
+"""
+
+
 def stub_package_helpers(monkeypatch):
     def download(url, path):
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(b"artifact")
+        path.write_bytes(ARTIFACT_BYTES)
 
     def save(model, flavor, package_dir, requirements):
         package_dir.mkdir(parents=True, exist_ok=True)
-        (package_dir / "MLmodel").write_text("metadata")
+        (package_dir / "MLmodel").write_text(VALID_MLMODEL)
 
     monkeypatch.setattr(cli, "download_presigned_file", download)
     monkeypatch.setattr(cli, "upload_presigned_file", Mock())
     monkeypatch.setattr(cli, "load_model", lambda *a: "model")
     monkeypatch.setattr(cli, "save_mlflow_model", save)
-
-
-def test_read_training_summaries_from_mlops_bundle(tmp_path):
-    mlops_dir = tmp_path / "nested" / "_mlops"
-    mlops_dir.mkdir(parents=True)
-    (mlops_dir / "metrics.json").write_text(
-        json.dumps({"accuracy": 0.97}), encoding="utf-8"
-    )
-    (mlops_dir / "params.json").write_text(json.dumps({"epochs": 10}), encoding="utf-8")
-    (mlops_dir / "model_insights.json").write_text("not-json", encoding="utf-8")
-
-    summaries, discovered = cli.read_training_summaries(tmp_path)
-
-    assert discovered == mlops_dir
-    assert summaries == {
-        "metrics_summary": {"accuracy": 0.97},
-        "params_summary": {"epochs": 10},
-        "insights_summary": {},
-    }
 
 
 @pytest.mark.parametrize(
@@ -271,7 +221,7 @@ def test_run_build_task_includes_uploaded_label_mapping(monkeypatch, tmp_path):
 
     cli.run_build_task("version", "http://callback")
 
-    assert (tmp_path / "model" / "label_classes_v1.json").read_bytes() == b"artifact"
+    assert (tmp_path / "model" / "label_classes_v1.json").read_bytes() == ARTIFACT_BYTES
     with zipfile.ZipFile(tmp_path / "model-package.zip") as archive:
         assert "model/label_classes_v1.json" in archive.namelist()
 
@@ -291,30 +241,28 @@ def test_run_build_task_docker_posts_callback(monkeypatch, tmp_path):
 
 def test_run_build_task_training_job_pytorch(monkeypatch, tmp_path):
     configure_build(monkeypatch, tmp_path, flavor="pytorch", source_type="training_job")
+    monkeypatch.setenv("SOURCE_ARTIFACT_NAME", "selected.pt")
     monkeypatch.setenv("BUILD_ENGINE", "kaniko")
     stub_package_helpers(monkeypatch)
-
-    def fake_download(url, dest):
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        with tarfile.open(dest, "w:gz") as tar:
-            model_file = tmp_path / "scratch_baf.pt"
-            model_file.write_bytes(b"baf_torch_weights")
-            tar.add(model_file, arcname="baf_model.pt")
-            req_file = tmp_path / "scratch_req.txt"
-            req_file.write_text("torch>=2.0.0\n")
-            tar.add(req_file, arcname="requirements.txt")
-
-    monkeypatch.setattr(cli, "download_presigned_file", fake_download)
+    load = Mock(return_value="model")
+    monkeypatch.setattr(cli, "load_model", load)
+    (tmp_path / "other.pt").write_bytes(ARTIFACT_BYTES)
+    (tmp_path / "label_mapping.json").write_text('{"0":"ignored"}')
+    private = tmp_path / "_mlops"
+    private.mkdir()
+    (private / "metrics.json").write_text('{"ignored":1}')
     cli.run_build_task("pytorch-baf-build", "http://callback")
-
+    load.assert_called_once_with(tmp_path / "selected.pt", "pytorch")
     dockerfile = (tmp_path / "Dockerfile").read_text()
     assert "deep-learning-serving" in dockerfile
-    assert "torch>=2.0.0" in (tmp_path / "requirements.txt").read_text()
     payload = json.loads((tmp_path / "webhook_payload.json").read_text())
     assert payload["status"] == "success"
     assert payload["build_id"] == "pytorch-baf-build"
     assert payload["package_manifest"]["flavor"] == "pytorch"
-    assert payload["package_manifest"]["source_artifact"] == "baf_model.pt"
+    assert payload["package_manifest"]["source_artifact"] == "selected.pt"
+    assert "metrics_summary" not in payload
+    with zipfile.ZipFile(tmp_path / "model-package.zip") as archive:
+        assert not any("_mlops" in name or "label_mapping" in name or "other.pt" in name for name in archive.namelist())
 
 
 def test_run_build_task_validates_environment(monkeypatch):
@@ -354,7 +302,7 @@ def configure_zip_task(monkeypatch, tmp_path, kaniko=False):
 
     def download(url, destination):
         with zipfile.ZipFile(destination, "w") as archive:
-            archive.writestr("model/MLmodel", "metadata")
+            archive.writestr("model/MLmodel", VALID_MLMODEL)
             archive.writestr("model/requirements.txt", "numpy==1.26.4\n")
 
     monkeypatch.setattr(cli, "download_presigned_file", download)
@@ -455,6 +403,12 @@ def test_main_dispatch_and_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "run_notify_task", Mock(side_effect=RuntimeError("bad")))
     webhook = Mock()
     monkeypatch.setattr(cli, "post_webhook", webhook)
+    monkeypatch.delenv("CONTROL_PLANE_WEBHOOK_SECRET", raising=False)
+    with pytest.raises(SystemExit):
+        cli.main()
+    # A step without the callback secret leaves failure reporting to the workflow exit handler.
+    webhook.assert_not_called()
+    monkeypatch.setenv("CONTROL_PLANE_WEBHOOK_SECRET", "fixture-secret")
     with pytest.raises(SystemExit):
         cli.main()
     assert webhook.call_args.args[1]["status"] == "error"

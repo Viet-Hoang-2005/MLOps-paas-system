@@ -24,10 +24,10 @@ class BuildImageCleaner:
             return "no-image-reference"
         if build.backend == "argo":
             harbor = self.harbor or HarborClient()
-            return harbor.delete_artifact(build.image_uri)
+            return harbor.delete_build_image(build.image_uri)
         docker_client = self.docker or DockerClient()
         try:
-            docker_client.client.images.remove(build.image_uri, force=True, noprune=False)
+            docker_client.client.images.remove(build.image_uri, force=False, noprune=False)
         except docker.errors.NotFound:
             return "already-absent"
         return "deleted"

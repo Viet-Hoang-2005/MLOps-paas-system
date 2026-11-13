@@ -2,6 +2,7 @@ import hashlib
 from dataclasses import dataclass
 
 import boto3
+from botocore.config import Config
 from django.conf import settings
 
 
@@ -12,11 +13,16 @@ class StoredObject:
     checksum: str
     size_bytes: int
     content_type: str
+    etag: str = ""
 
 
 class S3Storage:
-    def __init__(self, client=None, bucket=None):
-        kwargs = {"region_name": settings.AWS_S3_REGION_NAME}
+    def __init__(self, client=None, bucket=None, client_config=None):
+        # SigV4 signs Content-Length, which bounds what a presigned PUT can upload.
+        config = Config(signature_version="s3v4")
+        if client_config is not None:
+            config = config.merge(client_config)
+        kwargs = {"region_name": settings.AWS_S3_REGION_NAME, "config": config}
         if settings.AWS_S3_ENDPOINT_URL:
             kwargs["endpoint_url"] = settings.AWS_S3_ENDPOINT_URL
         self.client = client or boto3.client("s3", **kwargs)
@@ -32,9 +38,77 @@ class S3Storage:
         )
         return StoredObject(key, f"s3://{self.bucket}/{key}", checksum, len(payload), content_type)
 
+    def upload_fileobj(
+        self,
+        fileobj,
+        key: str,
+        content_type: str = "application/octet-stream",
+        checksum: str = "",
+        size_bytes: int = 0,
+    ) -> StoredObject:
+        extra_args = {"ContentType": content_type}
+        if checksum:
+            extra_args["Metadata"] = {"sha256": checksum}
+        self.client.upload_fileobj(
+            Fileobj=fileobj,
+            Bucket=self.bucket,
+            Key=key,
+            ExtraArgs=extra_args,
+        )
+        return StoredObject(
+            key=key,
+            uri=f"s3://{self.bucket}/{key}",
+            checksum=checksum,
+            size_bytes=size_bytes,
+            content_type=content_type,
+        )
+
+    def open_stream(self, uri: str):
+        bucket, key = self.parse_uri(uri)
+        response = self.client.get_object(Bucket=bucket, Key=key)
+        return response["Body"], response.get("ContentLength"), response.get("ContentType", "application/octet-stream")
+
     def download_file(self, uri, destination):
         bucket, key = self.parse_uri(uri)
         self.client.download_file(bucket, key, str(destination))
+
+    def read(self, uri, max_bytes=4 * 1024 * 1024):
+        bucket, key = self.parse_uri(uri)
+        body = self.client.get_object(Bucket=bucket, Key=key)["Body"]
+        try:
+            value = body.read(max_bytes + 1)
+        finally:
+            body.close()
+        if len(value) > max_bytes:
+            raise ValueError("Object exceeds the allowed read size.")
+        return value
+
+    def compute_sha256(self, uri: str) -> str:
+        bucket, key = self.parse_uri(uri)
+        response = self.client.get_object(Bucket=bucket, Key=key)
+        hasher = hashlib.sha256()
+        body = response["Body"]
+        try:
+            while chunk := body.read(1024 * 1024):
+                hasher.update(chunk)
+        finally:
+            body.close()
+        return hasher.hexdigest()
+
+    def head(self, uri: str) -> StoredObject:
+        bucket, key = self.parse_uri(uri)
+        response = self.client.head_object(Bucket=bucket, Key=key)
+        metadata = response.get("Metadata", {})
+        etag = response.get("ETag", "").strip('"')
+        checksum = metadata.get("sha256") or etag
+        return StoredObject(
+            key=key,
+            uri=uri,
+            checksum=checksum,
+            size_bytes=response.get("ContentLength", 0),
+            content_type=response.get("ContentType", "application/octet-stream"),
+            etag=response.get("ETag", ""),
+        )
 
     def presigned_get(self, uri, expires_in=900):
         bucket, key = self.parse_uri(uri)
@@ -42,11 +116,13 @@ class S3Storage:
             "get_object", Params={"Bucket": bucket, "Key": key}, ExpiresIn=expires_in
         )
 
-    def presigned_put(self, uri, expires_in=900, content_type=None):
+    def presigned_put(self, uri, expires_in=900, content_type=None, size_bytes=None):
         bucket, key = self.parse_uri(uri)
         params = {"Bucket": bucket, "Key": key}
         if content_type:
             params["ContentType"] = content_type
+        if size_bytes is not None:
+            params["ContentLength"] = size_bytes
         return self.client.generate_presigned_url("put_object", Params=params, ExpiresIn=expires_in)
 
     def delete_prefix(self, prefix):
@@ -60,21 +136,61 @@ class S3Storage:
         bucket, key = self.parse_uri(uri)
         self.client.delete_object(Bucket=bucket, Key=key)
 
-    def copy(self, source_uri, destination_key):
+    def copy(self, source_uri, destination_key, checksum=None, content_type=None, size_bytes=None, expected_etag=None):
         source_bucket, source_key = self.parse_uri(source_uri)
+        if not checksum or not content_type or size_bytes is None:
+            source_head = self.head(source_uri)
+            checksum = checksum or source_head.checksum
+            content_type = content_type or source_head.content_type
+            size_bytes = size_bytes if size_bytes is not None else source_head.size_bytes
+
+        options = {"CopySourceIfMatch": expected_etag} if expected_etag else {}
+        if size_bytes > 5 * 1024**3:
+            upload = self.client.create_multipart_upload(
+                Bucket=self.bucket, Key=destination_key, Metadata={"sha256": checksum}, ContentType=content_type
+            )
+            upload_id = upload["UploadId"]
+            try:
+                parts = []
+                chunk_size = 128 * 1024**2
+                for index, start in enumerate(range(0, size_bytes, chunk_size), start=1):
+                    copied = self.client.upload_part_copy(
+                        Bucket=self.bucket,
+                        Key=destination_key,
+                        UploadId=upload_id,
+                        PartNumber=index,
+                        CopySource={"Bucket": source_bucket, "Key": source_key},
+                        CopySourceRange=f"bytes={start}-{min(size_bytes - 1, start + chunk_size - 1)}",
+                        **options,
+                    )
+                    parts.append({"PartNumber": index, "ETag": copied["CopyPartResult"]["ETag"]})
+                self.client.complete_multipart_upload(
+                    Bucket=self.bucket, Key=destination_key, UploadId=upload_id, MultipartUpload={"Parts": parts}
+                )
+            except Exception:
+                try:
+                    self.client.abort_multipart_upload(Bucket=self.bucket, Key=destination_key, UploadId=upload_id)
+                except Exception:
+                    pass
+                raise
+            return StoredObject(
+                destination_key, f"s3://{self.bucket}/{destination_key}", checksum, size_bytes, content_type
+            )
         self.client.copy_object(
             Bucket=self.bucket,
             Key=destination_key,
             CopySource={"Bucket": source_bucket, "Key": source_key},
+            Metadata={"sha256": checksum},
+            MetadataDirective="REPLACE",
+            ContentType=content_type,
+            **options,
         )
-        response = self.client.head_object(Bucket=self.bucket, Key=destination_key)
-        metadata = response.get("Metadata", {})
         return StoredObject(
             destination_key,
             f"s3://{self.bucket}/{destination_key}",
-            metadata.get("sha256", ""),
-            response.get("ContentLength", 0),
-            response.get("ContentType", "application/octet-stream"),
+            checksum,
+            size_bytes,
+            content_type,
         )
 
     @staticmethod

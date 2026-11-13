@@ -2,13 +2,17 @@ import uuid
 
 from django.db import models
 
+from common.execution_watch import ExecutionWatch
+
 
 class DriftMonitor(models.Model):
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     version = models.ForeignKey("registry.ModelVersion", on_delete=models.CASCADE, related_name="drift_monitors")
     reference_asset = models.ForeignKey(
-        "catalog.WorkspaceAsset", on_delete=models.PROTECT, related_name="drift_monitors"
+        "catalog.WorkspaceAsset", on_delete=models.PROTECT, related_name="drift_monitors", null=True, blank=True
     )
+    reference_uri = models.CharField(max_length=1024, blank=True)
+    reference_name = models.CharField(max_length=255, blank=True)
     reference_snapshot = models.ForeignKey(
         "ct.DatasetSnapshot", on_delete=models.SET_NULL, related_name="drift_monitors", null=True, blank=True
     )
@@ -29,9 +33,10 @@ class DriftMonitor(models.Model):
         return f"{self.version}: {self.name}"
 
 
-class DriftRun(models.Model):
+class DriftRun(ExecutionWatch):
     STATUSES = tuple(
-        (value, value.title()) for value in ("pending", "queued", "running", "completed", "failed", "cancelled")
+        (value, value.title())
+        for value in ("pending", "queued", "running", "completed", "failed", "cancelled", "skipped")
     )
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     monitor = models.ForeignKey(DriftMonitor, on_delete=models.CASCADE, related_name="runs")

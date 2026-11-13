@@ -1,0 +1,28 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mlops-paas-consumer-rules
+  labels:
+    app.kubernetes.io/name: mlops-paas-consumer
+    app.kubernetes.io/instance: mlops-paas-consumer
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: streaming
+    release: monitoring
+spec:
+  groups:
+    - name: paas.consumer
+      rules:
+        # Cảnh báo khi Consumer pod không còn chạy
+        - alert: ConsumerPodsUnavailable
+          expr: kube_deployment_status_replicas_available{namespace="mlops-paas-core", deployment="mlops-paas-consumer"} < 1
+          for: 1m
+          labels:
+            severity: critical
+            team: mlops
+          annotations:
+            summary: "Consumer Pods unavailable"
+            description: "The mlops-paas-consumer deployment has 0 available replicas!"
+

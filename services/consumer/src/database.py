@@ -1,6 +1,7 @@
 """Consumer persistence for Django-owned production and outbox tables."""
 
 import json
+import math
 import os
 import re
 import time
@@ -10,6 +11,7 @@ from urllib.parse import quote_plus
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import DataError, IntegrityError, InterfaceError, OperationalError
 from sqlalchemy.pool import QueuePool
 from src.logging_utils import Summary, get_logger, log_event
 
@@ -84,9 +86,7 @@ def init_db():
             },
         ).one()
     if not all(tables):
-        raise RuntimeError(
-            "Control Plane migrations have not created production/outbox tables yet."
-        )
+        raise RuntimeError("Control Plane migrations have not created production/outbox tables yet.")
     log_event(
         logger,
         "INFO",
@@ -95,26 +95,63 @@ def init_db():
     )
 
 
+class PermanentWriteError(Exception):
+    """The data itself cannot be stored; retrying the same rows will never work."""
+
+
+class TransientWriteError(Exception):
+    """The database is unavailable; the rows may be fine and must be retried."""
+
+
+def _clean_json(value):
+    """Make a JSON value storable in PostgreSQL jsonb.
+
+    jsonb rejects NaN/Infinity and the NUL character, and one such value in a
+    batch of events would otherwise fail every other event written with it.
+    """
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, str):
+        return value.replace("\x00", "")
+    if isinstance(value, dict):
+        return {_clean_json(str(key)): _clean_json(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_clean_json(item) for item in value]
+    return value
+
+
+def _clean_text(value) -> str:
+    return str(value).replace("\x00", "")
+
+
+def _finite_or_none(value):
+    if value is None or pd.isna(value):
+        return None
+    try:
+        return value if math.isfinite(float(value)) else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _records(frame: pd.DataFrame) -> list[dict]:
     records = []
     for row in frame.to_dict("records"):
-        if (
-            not row.get("public_id")
-            or not row.get("project_id")
-            or not row.get("model_version_id")
-        ):
+        if not row.get("public_id") or not row.get("project_id") or not row.get("model_version_id"):
             continue
+        obs_at = row.get("observed_at")
+        if pd.isna(obs_at):
+            obs_at = None
         records.append(
             {
                 "public_id": str(row["public_id"]),
                 "project_id": str(row["project_id"]),
                 "model_version_id": str(row["model_version_id"]),
-                "observed_at": row.get("observed_at"),
-                "features": json.dumps(row.get("features") or {}),
-                "prediction": "" if row.get("prediction") is None else str(row["prediction"]),
-                "confidence": row.get("confidence"),
-                "latency_ms": row.get("latency_ms"),
-                "request_id": str(row.get("request_id") or ""),
+                "observed_at": obs_at,
+                "features": json.dumps(_clean_json(row.get("features") or {}), allow_nan=False),
+                "prediction": "" if row.get("prediction") is None else _clean_text(row["prediction"]),
+                "confidence": _finite_or_none(row.get("confidence")),
+                "latency_ms": _finite_or_none(row.get("latency_ms")),
+                "request_id": _clean_text(row.get("request_id") or ""),
             }
         )
     return records
@@ -154,9 +191,7 @@ def _signals(signals: list[dict[str, str]]) -> list[dict]:
             "public_id": str(uuid.uuid4()),
             "idempotency_key": signal["idempotency_key"],
             "model_version_id": signal["model_version_id"],
-            "payload": '{"model_version_id": "'
-            + signal["model_version_id"].replace('"', "")
-            + '"}',
+            "payload": '{"model_version_id": "' + signal["model_version_id"].replace('"', "") + '"}',
         }
         for signal in signals
     ]
@@ -169,9 +204,7 @@ def save_prediction_records_and_automatic_drift_signals(
     started = time.perf_counter()
     if engine_rw is None:
         persistence_summary.record(success=False)
-        persistence_summary.failure(
-            "write", "Database engine unavailable for persistence"
-        )
+        persistence_summary.failure("write", "Database engine unavailable for persistence")
         return False
     try:
         records = _records(predictions)
@@ -182,13 +215,7 @@ def save_prediction_records_and_automatic_drift_signals(
                     result = conn.execute(PREDICTION_INSERT, record)
                     if result.rowcount:
                         inserted_versions.add(record["model_version_id"])
-            outbox_rows = _signals(
-                [
-                    signal
-                    for signal in signals
-                    if signal["model_version_id"] in inserted_versions
-                ]
-            )
+            outbox_rows = _signals([signal for signal in signals if signal["model_version_id"] in inserted_versions])
             if outbox_rows:
                 conn.execute(OUTBOX_INSERT, outbox_rows)
         persistence_summary.record(
@@ -200,14 +227,16 @@ def save_prediction_records_and_automatic_drift_signals(
         persistence_summary.recovery("write")
         return True
     except Exception as exc:
-        persistence_summary.record(
-            success=False, duration_ms=(time.perf_counter() - started) * 1000
-        )
+        persistence_summary.record(success=False, duration_ms=(time.perf_counter() - started) * 1000)
         persistence_summary.failure(
             "write",
             "Prediction and automatic-drift transaction failed",
             error_type=type(exc).__name__,
         )
+        if isinstance(exc, (DataError, IntegrityError, ValueError, TypeError)):
+            raise PermanentWriteError(type(exc).__name__) from None
+        if isinstance(exc, (OperationalError, InterfaceError)):
+            raise TransientWriteError(type(exc).__name__) from None
         return False
 
 
@@ -232,10 +261,7 @@ def claim_automatic_drift_signals(limit: int, lease_seconds: int) -> list[dict]:
         """),
             {"limit": limit, "lease_seconds": lease_seconds},
         ).mappings()
-        return [
-            dict(row) | {"model_version_id": dict(row)["payload"]["model_version_id"]}
-            for row in rows
-        ]
+        return [dict(row) | {"model_version_id": dict(row)["payload"]["model_version_id"]} for row in rows]
 
 
 def mark_automatic_drift_signal_published(event_id: int) -> None:
@@ -250,9 +276,7 @@ def mark_automatic_drift_signal_published(event_id: int) -> None:
         )
 
 
-def reschedule_automatic_drift_signal(
-    event_id: int, attempts: int, error: str, delay_seconds: int
-) -> None:
+def reschedule_automatic_drift_signal(event_id: int, attempts: int, error: str, delay_seconds: int) -> None:
     if engine_rw is None:
         return
     with engine_rw.begin() as conn:

@@ -1,2 +1,0 @@
-# Runtime dependency for the GitOps validator suite.
-PyYAML==6.0.2

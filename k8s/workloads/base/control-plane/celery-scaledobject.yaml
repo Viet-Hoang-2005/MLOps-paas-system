@@ -1,0 +1,56 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: mlops-paas-celery-redis-auth
+  labels:
+    app.kubernetes.io/name: mlops-paas-celery-worker
+    app.kubernetes.io/instance: mlops-paas-celery-worker
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: control-plane
+spec:
+  secretTargetRef:
+    - parameter: password
+      name: mlops-paas-celery-worker-secret
+      key: REDIS_PASSWORD
+    - parameter: sentinelPassword
+      name: mlops-paas-celery-worker-secret
+      key: REDIS_SENTINEL_PASSWORD
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: mlops-paas-celery-worker-scaler
+  labels:
+    app.kubernetes.io/name: mlops-paas-celery-worker
+    app.kubernetes.io/instance: mlops-paas-celery-worker
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: control-plane
+spec:
+  scaleTargetRef:
+    name: mlops-paas-celery-worker
+  minReplicaCount: 2
+  maxReplicaCount: 5
+  pollingInterval: 15
+  cooldownPeriod: 180
+  triggers:
+    - type: redis-sentinel
+      metadata:
+        hosts: redis-queue-ha-sentinel-0.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-1.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-2.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
+        addresses: redis-queue-ha-sentinel-0.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-1.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-2.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
+        sentinelMaster: redis-queue-master
+        listName: celery
+        listLength: "10"
+        databaseIndex: "0"
+      authenticationRef:
+        name: mlops-paas-celery-redis-auth
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "80"
+

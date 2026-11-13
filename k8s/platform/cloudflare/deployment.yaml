@@ -4,20 +4,30 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cloudflared
-  namespace: cloudflare
+  namespace: mlops-paas-routing
   annotations:
     description: "Cloudflare Tunnel to securely expose the K3s Traefik Ingress to the public internet"
   labels:
-    app: cloudflared
+    app.kubernetes.io/name: cloudflared
+    app.kubernetes.io/instance: cloudflared
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: tunnel
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: cloudflared
+      app.kubernetes.io/name: cloudflared
   template:
     metadata:
       labels:
-        app: cloudflared
+        app.kubernetes.io/name: cloudflared
+        app.kubernetes.io/instance: cloudflared
+        app.kubernetes.io/part-of: mlops-paas
+        app.kubernetes.io/component: tunnel
+        app.kubernetes.io/managed-by: kustomize
+        mlops-paas.io/plane: platform
     spec:
       nodeSelector:
         workload-type: worker
@@ -28,7 +38,7 @@ spec:
               podAffinityTerm:
                 labelSelector:
                   matchExpressions:
-                    - key: app
+                    - key: app.kubernetes.io/name
                       operator: In
                       values:
                         - cloudflared
@@ -47,14 +57,14 @@ spec:
             - name: TUNNEL_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: tunnel-token
+                  name: cloudflared-tunnel-token
                   key: token
           
           # Cấu hình tài nguyên cho Cloudflared
           resources:
             requests:
-              cpu: 50m
+              cpu: 30m
               memory: 64Mi
             limits:
-              cpu: 200m
+              cpu: 150m
               memory: 128Mi

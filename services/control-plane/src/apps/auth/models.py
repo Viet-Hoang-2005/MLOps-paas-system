@@ -7,16 +7,35 @@ from django.utils import timezone
 
 
 def avatar_path(instance, filename):
-    user = getattr(instance, "user", instance)
-    return f"users/{user.tenant_id}/avatar/{filename}"
+    return f"users/{instance.tenant_id}/avatar/{filename}"
 
 
 class CustomUserManager(BaseUserManager):
+    @classmethod
+    def normalize_email(cls, email):
+        email = super().normalize_email(email)
+        return email.strip().lower() if email else ""
+
+    def get_by_natural_key(self, username):
+        clean_email = str(username).strip().lower()
+        try:
+            return self.get(**{f"{self.model.USERNAME_FIELD}__iexact": clean_email})
+        except self.model.MultipleObjectsReturned:
+            user = (
+                self.filter(**{f"{self.model.USERNAME_FIELD}__iexact": clean_email})
+                .order_by("-is_active", "-date_joined")
+                .first()
+            )
+            if user:
+                return user
+            raise self.model.DoesNotExist
+
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError("Email is required")
         extra_fields.pop("tenant_id", None)
-        user: Any = self.model(email=self.normalize_email(email), **extra_fields)
+        clean_email = self.normalize_email(email)
+        user: Any = self.model(email=clean_email, **extra_fields)
         user.set_password(password) if password else user.set_unusable_password()
         user.save(using=self._db)
         return user
@@ -48,7 +67,14 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
+    def clean(self):
+        super().clean()
+        if self.email:
+            self.email = self.email.strip().lower()
+
     def save(self, *args, **kwargs):
+        if self.email:
+            self.email = self.email.strip().lower()
         if not self.public_id:
             self.public_id = uuid.uuid4()
         self.tenant_id = f"T-{self.public_id}"
@@ -58,16 +84,3 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         self.is_active = False
         self.deleted_at = timezone.now()
         self.save(update_fields=["is_active", "deleted_at"])
-
-
-class UserAvatar(models.Model):
-    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="avatar_history")
-    image = models.ImageField(upload_to=avatar_path, max_length=1024)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"Avatar {self.public_id} for {self.user.email}"

@@ -12,13 +12,7 @@ spec:
   sourceRepos:
     - https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
   destinations:
-    - namespace: mlops-control-plane
-      server: https://kubernetes.default.svc
-    - namespace: mlops-consumer
-      server: https://kubernetes.default.svc
-    - namespace: mlops-model-server
-      server: https://kubernetes.default.svc
-    - namespace: mlops-web
+    - namespace: mlops-paas-core
       server: https://kubernetes.default.svc
   namespaceResourceWhitelist:
     - group: ""
@@ -29,10 +23,20 @@ spec:
       kind: Deployment
     - group: autoscaling
       kind: HorizontalPodAutoscaler
+    - group: batch
+      kind: Job
+    - group: policy
+      kind: PodDisruptionBudget
     - group: keda.sh
       kind: ScaledObject
+    - group: keda.sh
+      kind: TriggerAuthentication
     - group: external-secrets.io
       kind: ExternalSecret
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: monitoring.coreos.com
+      kind: ServiceMonitor
   orphanedResources:
     warn: true
     ignore:

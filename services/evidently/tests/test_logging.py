@@ -10,9 +10,7 @@ from src.logging_utils import RuntimeLog
 
 @pytest.fixture(autouse=True)
 def isolated_runtime(monkeypatch):
-    monkeypatch.setattr(
-        main, "runtime_log", RuntimeLog(logging.Logger("drift-log-test"))
-    )
+    monkeypatch.setattr(main, "runtime_log", RuntimeLog(logging.Logger("drift-log-test")))
     monkeypatch.setattr(main, "configure", Mock())
 
 
@@ -57,9 +55,7 @@ def test_redis_handler_sanitizes_and_reports_delivery_failure(monkeypatch, capsy
 
 
 @pytest.mark.parametrize("result", [0, 1])
-def test_execution_events_reflect_local_return_value_and_reset_context(
-    monkeypatch, result
-):
+def test_execution_events_reflect_local_return_value_and_reset_context(monkeypatch, result):
     runtime = Mock()
     monkeypatch.setattr(main, "runtime_log", runtime)
     monkeypatch.setattr(main, "setup_logger", Mock())
@@ -112,9 +108,7 @@ def test_summary_is_one_compact_event_and_report_payload_unchanged(monkeypatch, 
     reference = pd.DataFrame({"x": [1, 2], "missing": [3, 4]})
     production = pd.DataFrame({"x": [2, 3]})
     summary = main.run_drift_analysis(reference, production, main.ColumnMapping())
-    events = [
-        record for record in caplog.records if record.event == "drift_analysis_summary"
-    ]
+    events = [record for record in caplog.records if record.event == "drift_analysis_summary"]
     assert len(events) == 1
     assert events[0].drift_detected is True
     assert events[0].features_count == 2
@@ -128,9 +122,7 @@ def test_failed_callback_omits_response_body_without_changing_payload(monkeypatc
     runtime = Mock()
     monkeypatch.setattr(main, "runtime_log", runtime)
     session = Mock()
-    session.post.return_value = Mock(
-        status_code=500, text="private callback response body"
-    )
+    session.post.return_value = Mock(status_code=500, text="private callback response body")
     monkeypatch.setattr(main.requests, "Session", Mock(return_value=session))
     summary = {"dataset_drift": True}
     main.trigger_django_webhook(summary)
@@ -148,15 +140,11 @@ def test_failed_upload_counts_delivery_without_claiming_success(monkeypatch, tmp
     monkeypatch.setattr(main, "REPORT_JSON_UPLOAD_URL", "https://storage.test/report")
     monkeypatch.setattr(main, "SUMMARY_JSON_UPLOAD_URL", "https://storage.test/summary")
     report = Mock()
-    report.save_html.side_effect = lambda path: main.Path(path).write_text(
-        "report", encoding="utf-8"
-    )
+    report.save_html.side_effect = lambda path: main.Path(path).write_text("report", encoding="utf-8")
     monkeypatch.setattr(main.requests, "put", Mock(side_effect=RuntimeError("offline")))
     artifacts = main.save_drift_report(report, {}, {})
     assert "local_html_path" in artifacts
-    runtime.detail.assert_called_once_with(
-        "Drift report upload attempts finished: 0/3 files uploaded."
-    )
+    runtime.detail.assert_called_once_with("Drift report upload attempts finished: 0/3 files uploaded.")
     assert len(runtime.event.call_args_list) == 4
 
 
@@ -166,9 +154,7 @@ def test_skipped_execution_does_not_claim_success(monkeypatch):
     monkeypatch.setattr(main, "setup_logger", Mock())
     monkeypatch.setattr(main, "validate_runtime_config", Mock())
     monkeypatch.setattr(main, "MIN_SAMPLES", 2)
-    monkeypatch.setattr(
-        main, "load_production_data", Mock(return_value=pd.DataFrame({"x": [1]}))
-    )
+    monkeypatch.setattr(main, "load_production_data", Mock(return_value=pd.DataFrame({"x": [1]})))
     assert main.main() == 0
     events = [call.args[1] for call in runtime.event.call_args_list]
     assert events == [
@@ -183,13 +169,9 @@ def test_handled_execution_failure_has_one_error_diagnosis(monkeypatch):
     monkeypatch.setattr(main, "runtime_log", runtime)
     monkeypatch.setattr(main, "setup_logger", Mock())
     monkeypatch.setattr(main, "validate_runtime_config", Mock())
-    monkeypatch.setattr(
-        main, "load_production_data", Mock(side_effect=RuntimeError("offline"))
-    )
+    monkeypatch.setattr(main, "load_production_data", Mock(side_effect=RuntimeError("offline")))
     assert main.main() == 1
-    errors = [
-        call for call in runtime.event.call_args_list if call.args[0] == logging.ERROR
-    ]
+    errors = [call for call in runtime.event.call_args_list if call.args[0] == logging.ERROR]
     assert len(errors) == 1
     assert errors[0].args[1] == "drift_production_data_failed"
     assert errors[0].kwargs["exc_info"] is True
@@ -198,9 +180,7 @@ def test_handled_execution_failure_has_one_error_diagnosis(monkeypatch):
 
 
 def test_reference_download_error_omits_arbitrary_response_body(monkeypatch):
-    monkeypatch.setattr(
-        main, "REFERENCE_DATA_URL", "https://storage.test/reference.csv"
-    )
+    monkeypatch.setattr(main, "REFERENCE_DATA_URL", "https://storage.test/reference.csv")
     monkeypatch.setattr(
         main.requests,
         "get",

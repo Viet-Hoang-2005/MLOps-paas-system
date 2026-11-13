@@ -1,26 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import {
   completePasswordChange,
   deleteAccount,
   getProfile,
-  listProfileAvatars,
   requestPasswordChangeOTP,
-  selectProfileAvatar,
   updateProfile,
   updateProfileAvatar,
   verifyPasswordChangeOTP,
 } from "@/features/settings/api/profileApi";
-import { getApiErrorMessage } from "@/shared/api/errors";
 import { settingsQueryKeys } from "@/features/settings/queryKeys";
-import { toast } from "@/shared/components/toastStore";
 import type {
   PasswordModalStep,
   ProfileFormValues,
   UpdateProfileRequest,
   UserProfile,
 } from "@/features/settings/types";
-import { useAuth } from "@/features/auth/hooks/useAuth";
+import { getApiErrorMessage } from "@/shared/api/errors";
+import { toast } from "@/shared/lib/toastStore";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export const emptyProfileForm: ProfileFormValues = {
@@ -62,10 +60,6 @@ export function useProfileSettings() {
   const profileQuery = useQuery({
     queryKey: settingsQueryKeys.profile(),
     queryFn: getProfile,
-  });
-  const avatarHistoryQuery = useQuery({
-    queryKey: settingsQueryKeys.avatars(),
-    queryFn: listProfileAvatars,
   });
 
   const profile = profileQuery.data ?? null;
@@ -115,14 +109,9 @@ export function useProfileSettings() {
   const updateAvatarMutation = useMutation({
     mutationFn: updateProfileAvatar,
     onSuccess: async (_response, variables) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: settingsQueryKeys.profile(),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: settingsQueryKeys.avatars(),
-        }),
-      ]);
+      await queryClient.invalidateQueries({
+        queryKey: settingsQueryKeys.profile(),
+      });
       toast.success(
         variables.remove_avatar
           ? t("profilePage.avatarRemoved")
@@ -132,26 +121,6 @@ export function useProfileSettings() {
     onError: (error) => {
       toast.error(
         getApiErrorMessage(error, t("profilePage.avatarUpdateFailed")),
-      );
-    },
-  });
-
-  const selectAvatarMutation = useMutation({
-    mutationFn: selectProfileAvatar,
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: settingsQueryKeys.profile(),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: settingsQueryKeys.avatars(),
-        }),
-      ]);
-      toast.success(t("profilePage.avatarSelected"));
-    },
-    onError: (error) => {
-      toast.error(
-        getApiErrorMessage(error, t("profilePage.avatarSelectFailed")),
       );
     },
   });
@@ -177,7 +146,7 @@ export function useProfileSettings() {
     setEditingProfile(editing);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     updateProfileMutation.mutate({
       full_name: formValues.fullName,
       description: formValues.description,
@@ -199,10 +168,6 @@ export function useProfileSettings() {
 
   const handleRemoveAvatar = async () => {
     await updateAvatarMutation.mutateAsync({ remove_avatar: true });
-  };
-
-  const handleSelectAvatar = async (avatarId: string) => {
-    await selectAvatarMutation.mutateAsync(avatarId);
   };
 
   const openPasswordOTPModal = async () => {
@@ -285,14 +250,11 @@ export function useProfileSettings() {
 
   return {
     profile,
-    avatarHistory: avatarHistoryQuery.data?.avatars ?? [],
     formValues,
     editingProfile,
     loading: profileQuery.isLoading,
     saving: updateProfileMutation.isPending,
     avatarSaving: updateAvatarMutation.isPending,
-    avatarHistoryLoading: avatarHistoryQuery.isLoading,
-    selectingAvatar: selectAvatarMutation.isPending,
     profileChanged,
     passwordModalStep,
     otpCode,
@@ -314,7 +276,6 @@ export function useProfileSettings() {
     handleCancelEdit,
     handleUpdateAvatar,
     handleRemoveAvatar,
-    handleSelectAvatar,
     openPasswordOTPModal,
     handleVerifyPasswordOTP,
     handleCompletePasswordChange,

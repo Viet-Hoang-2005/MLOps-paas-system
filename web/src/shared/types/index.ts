@@ -27,11 +27,14 @@ export type RuntimeStatus =
   | "cancelled"
   | "unhealthy"
   | "stopped"
-  | string;
+  | (string & {});
 
 export interface RuntimeLogBatch {
   logs: string[];
   nextOffset: number;
+  nextCursor?: string;
+  hasMore: boolean;
+  logError?: string;
   status: RuntimeStatus;
   error: string;
 }

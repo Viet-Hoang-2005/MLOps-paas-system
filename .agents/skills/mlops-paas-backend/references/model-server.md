@@ -1,14 +1,23 @@
-# Model server
+# Model Server
 
-model-server is the trusted inference gateway; version workers are not auth gateways.
+Production metrics: the Uvicorn parent creates a fresh process-metric directory before importing the app/spawning workers. `/metrics` builds a fresh MultiProcessCollector registry per scrape, aggregating counters/histograms across workers in this pod. Worker restarts must not clear files; parent restarts reset counters. Each production Pod has its own emptyDir. CPU/RAM comes from cAdvisor joined to explicit kube-state-metrics Pod identity labels (tenant/project/version/deployment); never Docker-style labels on Kubernetes. Existing runtimes need redeployment to receive these Pod labels. Local Web realtime still uses Docker SDK and the short-lived Redis request counter.
 
-- Resolve model/version, tenant ownership, access mode, deployment, and endpoint from PostgreSQL/registry cache.
-- Authenticate public access, API keys, or JWT/JWKS as required.
-- Route only to the worker for the requested `MODEL_VERSION_ID`.
-- Proxy predict/health responses and preserve status/error semantics.
-- Publish a production event only after successful inference.
-- Event payload includes UUID, tenant, project, version, features, prediction, and optional confidence/engine.
-- Producer failure must be observable but must not turn a successful prediction into an inference failure.
-- Initialize Redis/Kafka clients in lifespan/factories, not at import time.
+The Model Server (`services/model-server/`) is the centralized, trusted inference gateway. Worker runtimes (`machine-learning-serving`, `deep-learning-serving`) reside in protected internal networks and do not implement authentication.
 
-Worker URLs differ between Docker and Kubernetes; missing runtime/deployment is a service-unavailable condition.
+## Core Responsibilities
+
+1. **Central Ingress:** Single entrypoint for client prediction traffic via `POST /models/{version_id}/predict` and `GET /models/{version_id}/health`.
+2. **Multi-Modal Authentication:**
+   - Evaluates model project access mode (`public`, `protected`, `private`).
+   - Verifies Bearer JWTs (`RS256`) against Control Plane's JWKS endpoint (`/api/auth/.well-known/jwks.json`), caching public keys in Redis.
+   - Accepts only `token_type=access`, issuer `django-control-plane`, audience `mlops-paas`; requires `exp`, `iat`, `jti`, `user_id`, `tenant_id`, `token_type`, `iss`, `aud`. Refresh or other token types return 401 irrespective of blacklist state. Access JWTs remain stateless and valid until expiry; this does not add immediate logout revocation.
+   - Validates machine-to-machine Project API Keys (`X-API-Key`) hashed with SHA-256 against Redis cache or PostgreSQL.
+3. **Dynamic Multi-Environment Routing:**
+   - *Docker Compose:* Resolves internal container URLs (e.g. `http://machine-learning-serving:5001/predict`).
+   - *Kubernetes K3s:* Resolves CoreDNS FQDNs in namespace `mlops-model-runtimes` (e.g. `http://<deployment>.<namespace>.svc.cluster.local:5000/predict`).
+4. **Asynchronous Production Telemetry:**
+   - Proxies input features to the target worker using `httpx.AsyncClient`.
+   - Returns prediction results to the client immediately.
+   - Emits an inference telemetry event to Redpanda Kafka topic `mlops_paas_production_data` in `BackgroundTasks`.
+   - Kafka producer failure is logged and recorded in Prometheus metrics, but must NEVER fail the client's inference response.
+5. **Observability:** Exposes Prometheus metrics (request counters, latency histograms categorized by tenant, project, and status).

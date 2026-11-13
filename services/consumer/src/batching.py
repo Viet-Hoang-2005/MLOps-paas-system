@@ -1,5 +1,7 @@
 """Pure batch transformations for persisted inference events."""
 
+import uuid
+
 import pandas as pd
 from src.models import KafkaRecord
 
@@ -16,15 +18,34 @@ PREDICTION_RECORD_COLUMNS = (
 )
 
 
+def _is_valid_uuid(val) -> bool:
+    if not val:
+        return False
+    try:
+        uuid.UUID(str(val))
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
 def is_production_sample(payload: dict) -> bool:
     """Return whether an inference event can enter the CT candidate dataset."""
+    if not isinstance(payload, dict):
+        return False
     event_id = payload.get("id") or payload.get("prediction_id")
     status_code = payload.get("status_code", 200)
     try:
         successful = 200 <= int(status_code) < 300
     except (TypeError, ValueError):
         successful = False
-    return bool(event_id and isinstance(payload.get("features"), dict) and successful)
+    return bool(
+        event_id
+        and _is_valid_uuid(event_id)
+        and _is_valid_uuid(payload.get("project_id"))
+        and _is_valid_uuid(payload.get("model_version_id"))
+        and isinstance(payload.get("features"), dict)
+        and successful
+    )
 
 
 def build_prediction_records_dataframe(records: list[KafkaRecord]) -> pd.DataFrame:
@@ -64,8 +85,7 @@ def build_automatic_drift_signals(
     model_version_ids = {
         str(record.payload["model_version_id"])
         for record in records
-        if is_production_sample(record.payload)
-        and record.payload.get("model_version_id")
+        if is_production_sample(record.payload) and record.payload.get("model_version_id")
     }
     batch_key = f"{first.topic}:{first.partition}:{first.offset}:{last.offset}"
     return [

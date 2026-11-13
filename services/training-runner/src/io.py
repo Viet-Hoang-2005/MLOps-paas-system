@@ -1,7 +1,45 @@
 """Presigned object transfer, archive extraction, and dependency installation."""
 
+import os
 import zipfile
+from pathlib import Path
 from urllib.parse import urlparse
+
+ALLOWED_PIP_ENV_VARS = frozenset({"PATH", "HOME", "LANG", "LC_ALL", "TZ", "TMPDIR", "TEMP", "TMP", "PYTHONPATH"})
+
+
+def get_isolated_pip_env(base_env: dict | None = None) -> dict[str, str]:
+    source = os.environ if base_env is None else base_env
+    return {k: v for k, v in source.items() if k in ALLOWED_PIP_ENV_VARS}
+
+
+def validate_safe_requirements(requirements_path: Path) -> None:
+    if not requirements_path.exists():
+        return
+    text = requirements_path.read_text(encoding="utf-8")
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        lower_line = line.lower()
+        if any(
+            lower_line.startswith(opt)
+            for opt in (
+                "-e",
+                "--editable",
+                "--extra-index-url",
+                "--index-url",
+                "--find-links",
+                "--trusted-host",
+            )
+        ):
+            raise RuntimeError(f"Disallowed pip option in requirements.txt: '{line}'")
+        if any(scheme in lower_line for scheme in ("git+", "http://", "https://", "ftp://", "file://")):
+            raise RuntimeError(f"Remote URL and VCS dependencies are disallowed in requirements.txt: '{line}'")
+        if line.startswith((".", "/", "\\")) or ".." in line:
+            raise RuntimeError(f"Local path references are disallowed in requirements.txt: '{line}'")
+        if any(char in line for char in (";", "&", "|", "`", "$")):
+            raise RuntimeError(f"Disallowed shell characters in requirements.txt: '{line}'")
 
 
 def validate_presigned_url(uri: str) -> None:
@@ -24,11 +62,9 @@ def upload_presigned_url(source, uri, requests_module, log):
     validate_presigned_url(uri)
     log(f"Uploading {source} via presigned PUT URL")
     with open(source, "rb") as handle:
-        response = requests_module.put(uri, data=handle, timeout=300)
+        response = requests_module.put(uri, data=handle, headers={"Content-Type": "application/gzip"}, timeout=300)
     if response.status_code not in (200, 201, 204):
-        raise RuntimeError(
-            f"Presigned PUT upload failed with HTTP status {response.status_code}"
-        )
+        raise RuntimeError(f"Presigned PUT upload failed with HTTP status {response.status_code}")
 
 
 def request_output_upload_url(endpoint, capability, requests_module):
@@ -41,35 +77,72 @@ def request_output_upload_url(endpoint, capability, requests_module):
         timeout=30,
     )
     if response.status_code != 200:
-        raise RuntimeError(
-            f"Output upload URL request failed with HTTP status {response.status_code}."
-        )
+        raise RuntimeError(f"Output upload URL request failed with HTTP status {response.status_code}.")
     upload_url = str(response.json().get("upload_url", "")).strip()
     validate_presigned_url(upload_url)
     return upload_url
 
 
-def safe_extract_zip(zip_path, destination):
+MAX_EXTRACT_FILES = 20_000
+MAX_EXTRACT_BYTES = 4 * 1024**3
+# A single huge member that shrinks this much is a decompression bomb, not data.
+MAX_COMPRESSION_RATIO = 500
+RATIO_CHECK_MIN_BYTES = 100 * 1024**2
+
+
+def safe_extract_zip(
+    zip_path,
+    destination,
+    *,
+    max_files=MAX_EXTRACT_FILES,
+    max_uncompressed_bytes=MAX_EXTRACT_BYTES,
+):
+    """Extract a zip after checking paths, symlinks, entry count and expanded size.
+
+    The limits use the sizes declared in the central directory; ``zipfile`` stops
+    reading each member at its declared size, so a forged header cannot expand
+    past what was checked here.
+    """
     destination.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_path) as archive:
+        members = archive.infolist()
+        if len(members) > max_files:
+            raise RuntimeError(f"Zip contains too many entries ({len(members)} > {max_files}).")
+        if sum(member.file_size for member in members) > max_uncompressed_bytes:
+            raise RuntimeError(f"Zip expands beyond the {max_uncompressed_bytes} byte limit.")
         destination_root = destination.resolve()
-        for member in archive.infolist():
+        for member in members:
             member_path = (destination / member.filename).resolve()
             is_symlink = (member.external_attr >> 16) & 0o170000 == 0o120000
             if not member_path.is_relative_to(destination_root) or is_symlink:
                 raise RuntimeError("Source zip contains an unsafe path.")
+            if (
+                member.file_size >= RATIO_CHECK_MIN_BYTES
+                and member.file_size > max(member.compress_size, 1) * MAX_COMPRESSION_RATIO
+            ):
+                raise RuntimeError(f"Zip member {member.filename} looks like a decompression bomb.")
         archive.extractall(destination)
 
 
 def install_requirements(
-    requirements_path, *, subprocess_module, python_executable, source_dir, detail, log
+    requirements_path,
+    *,
+    subprocess_module,
+    python_executable,
+    source_dir,
+    detail,
+    log,
+    env=None,
 ):
     if not requirements_path.exists():
         return
+    validate_safe_requirements(requirements_path)
     log("Installing requirements.txt")
+    clean_env = get_isolated_pip_env(env)
     result = subprocess_module.run(
         [python_executable, "-m", "pip", "install", "-r", str(requirements_path)],
         cwd=str(source_dir),
+        env=clean_env,
         capture_output=True,
         text=True,
         check=False,
@@ -79,6 +152,4 @@ def install_requirements(
     for line in (result.stderr or "").splitlines():
         detail(line)
     if result.returncode != 0:
-        raise RuntimeError(
-            f"pip install -r requirements.txt failed with exit code {result.returncode}"
-        )
+        raise RuntimeError(f"pip install -r requirements.txt failed with exit code {result.returncode}")

@@ -1,5 +1,7 @@
 from types import SimpleNamespace
+from unittest.mock import Mock
 
+import docker.errors
 import pytest
 from django.contrib.auth import get_user_model
 
@@ -9,31 +11,38 @@ from apps.registry.models import ModelVersion
 from infrastructure.execution.docker_backends import DockerDeploymentBackend
 
 
-class HealthyResponse:
-    @staticmethod
-    def json():
-        return {"status": "healthy", "model_loaded": True}
-
-
 class HealthyHttpClient:
+    def __init__(self, version):
+        self.version = version
+
     def request(self, method, url):
         assert method == "GET"
         assert url.endswith(":5001/health")
-        return HealthyResponse()
+        return SimpleNamespace(
+            json=lambda: {
+                "status": "healthy",
+                "model_loaded": True,
+                "project_id": str(self.version.project.public_id),
+                "model_version_id": str(self.version.public_id),
+            }
+        )
 
 
 class RecordingDockerClient:
     def __init__(self):
         self.kwargs = None
+        self.client = Mock()
+        self.client.containers.get.side_effect = docker.errors.NotFound("absent")
 
     def run(self, **kwargs):
         self.kwargs = kwargs
-        return SimpleNamespace(id="runtime-container-id")
+        return SimpleNamespace(id="runtime-container-id", attrs={"State": {"Status": "running"}}, reload=lambda: None)
 
 
 @pytest.mark.django_db
-def test_local_deployment_uses_embedded_model_artifact_and_becomes_healthy(monkeypatch):
+def test_local_deployment_uses_embedded_model_artifact_without_waiting(monkeypatch):
     monkeypatch.setenv("LOG_SUMMARY_INTERVAL_SECONDS", "15")
+    monkeypatch.setenv("LOG_FORMAT", "console")
     owner = get_user_model().objects.create_user("runtime-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="runtime model")
     version = ModelVersion.objects.create(project=project, version="1", flavor="xgboost")
@@ -48,9 +57,10 @@ def test_local_deployment_uses_embedded_model_artifact_and_becomes_healthy(monke
     deployment = Deployment.objects.create(version=version, build=build, status="deploying")
     docker = RecordingDockerClient()
 
-    endpoint = DockerDeploymentBackend(docker_client=docker, http=HealthyHttpClient()).deploy(deployment)
+    endpoint = DockerDeploymentBackend(docker_client=docker, http=HealthyHttpClient(version)).deploy(deployment)
 
     assert docker.kwargs["environment"] == {
+        "LOG_FORMAT": "console",
         "PROJECT_ID": str(project.public_id),
         "MODEL_VERSION_ID": str(version.public_id),
         "MODEL_VERSION": "1",
@@ -59,8 +69,9 @@ def test_local_deployment_uses_embedded_model_artifact_and_becomes_healthy(monke
         "LOG_SUMMARY_INTERVAL_SECONDS": "15",
     }
     assert docker.kwargs["image"] == "sha256:local-image-id"
-    assert endpoint.internal_url == f"http://deploy-{build.public_id}:5001"
-    assert endpoint.health_status == "healthy"
+    assert endpoint.internal_url == f"http://deploy-{deployment.public_id}:5001"
+    assert endpoint.health_status == "unknown"
+    assert deployment.execution_deadline_at is not None
 
 
 def test_health_requires_healthy_payload_status():
@@ -70,7 +81,10 @@ def test_health_requires_healthy_payload_status():
             return SimpleNamespace(json=lambda: {"status": "unhealthy", "model_loaded": True})
 
     endpoint = SimpleNamespace(internal_url="http://worker:5001")
-    deployment = SimpleNamespace(endpoint=endpoint)
+    deployment = SimpleNamespace(
+        endpoint=endpoint,
+        version=SimpleNamespace(flavor="xgboost", public_id="v", project=SimpleNamespace(public_id="p")),
+    )
 
     healthy, payload = DockerDeploymentBackend(
         docker_client=SimpleNamespace(),

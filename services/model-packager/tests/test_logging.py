@@ -9,9 +9,7 @@ from src.logging_utils import RuntimeLog
 
 @pytest.fixture(autouse=True)
 def isolated_runtime(monkeypatch):
-    monkeypatch.setattr(
-        cli, "runtime_log", RuntimeLog(logging.Logger("build-log-test"))
-    )
+    monkeypatch.setattr(cli, "runtime_log", RuntimeLog(logging.Logger("build-log-test")))
     monkeypatch.setattr(cli, "configure", Mock())
 
 
@@ -58,9 +56,7 @@ def test_failed_redis_setup_retains_info_fallback(monkeypatch, caplog):
     logger = logging.Logger("build-fallback-test", logging.DEBUG)
     logger.addHandler(caplog.handler)
     monkeypatch.setattr(cli, "logger", logger)
-    monkeypatch.setattr(
-        cli.redis, "from_url", Mock(side_effect=RuntimeError("offline"))
-    )
+    monkeypatch.setattr(cli.redis, "from_url", Mock(side_effect=RuntimeError("offline")))
     cli.setup_logger("build-test")
     cli.runtime_log.detail("build step")
     assert caplog.records[-1].levelno == logging.INFO
@@ -77,14 +73,11 @@ def test_execution_events_and_failure_marker(monkeypatch, failed, capsys):
     monkeypatch.setattr(
         cli,
         "run_build_task",
-        Mock(
-            side_effect=RuntimeError("Authorization: Bearer fixture-failure")
-            if failed
-            else None
-        ),
+        Mock(side_effect=RuntimeError("Authorization: Bearer fixture-failure") if failed else None),
     )
     callback = Mock()
     monkeypatch.setattr(cli, "post_webhook", callback)
+    monkeypatch.setenv("CONTROL_PLANE_WEBHOOK_SECRET", "fixture-secret")
     token = object()
     monkeypatch.setattr(cli, "bind_context", Mock(return_value=token))
     reset = Mock()
@@ -130,22 +123,16 @@ def test_kaniko_completion_names_the_local_stage(monkeypatch, task_type, event):
     assert "build_execution_succeeded" not in str(runtime.event.call_args_list)
 
 
-def test_notify_marker_emitted_once_without_container_duplicate(
-    monkeypatch, tmp_path, capsys, caplog
-):
+def test_notify_marker_emitted_once_without_container_duplicate(monkeypatch, tmp_path, capsys, caplog):
     logger = logging.Logger("build-protocol-test", logging.DEBUG)
     logger.addHandler(caplog.handler)
     writer = Mock(return_value=True)
     monkeypatch.setattr(cli, "runtime_log", RuntimeLog(logger, writer=writer))
-    (tmp_path / "webhook_payload.json").write_text(
-        '{"build_id":"build-test"}', encoding="utf-8"
-    )
+    (tmp_path / "webhook_payload.json").write_text('{"build_id":"build-test"}', encoding="utf-8")
     monkeypatch.setattr(cli, "post_webhook", Mock())
     cli.run_notify_task(str(tmp_path), "https://callback.test")
     assert capsys.readouterr().out == "NOTIFY_EOF_SUCCESS\n"
-    assert (
-        sum(call.args[0] == "NOTIFY_EOF_SUCCESS" for call in writer.call_args_list) == 1
-    )
+    assert sum(call.args[0] == "NOTIFY_EOF_SUCCESS" for call in writer.call_args_list) == 1
     assert "NOTIFY_EOF_SUCCESS" not in caplog.text
 
 
@@ -156,17 +143,16 @@ def test_docker_details_are_sanitized_debug(monkeypatch, tmp_path, caplog):
     monkeypatch.setattr(cli, "runtime_log", RuntimeLog(logger, writer=writer))
     monkeypatch.delenv("HARBOR_REGISTRY_URL", raising=False)
     client = Mock()
-    client.api.build.return_value = [
-        {"stream": "Downloading https://storage.test/a?X-Amz-Signature=fixture-build\n"}
-    ]
+    client.api.build.return_value = [{"stream": "Downloading https://storage.test/a?X-Amz-Signature=fixture-build\n"}]
     monkeypatch.setattr(cli.docker, "from_env", Mock(return_value=client))
     cli.build_custom_image(tmp_path, "build-test", "tenant-test", "")
     assert "fixture-build" not in caplog.text
     assert "fixture-build" not in str(writer.call_args_list)
-    assert all(record.levelno == logging.DEBUG for record in caplog.records)
+    assert all(record.levelno == logging.INFO for record in caplog.records)
 
 
 def test_webhook_error_omits_arbitrary_response_body(monkeypatch):
+    monkeypatch.setattr("src.io.time.sleep", Mock())
     monkeypatch.setattr(
         cli.requests,
         "post",
@@ -174,4 +160,4 @@ def test_webhook_error_omits_arbitrary_response_body(monkeypatch):
     )
     with pytest.raises(RuntimeError) as error:
         cli.post_webhook("https://callback.test/build", {})
-    assert str(error.value) == "Build webhook failed with HTTP 500"
+    assert str(error.value) == "Build result callback could not be delivered."

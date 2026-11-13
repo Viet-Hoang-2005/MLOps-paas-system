@@ -7,6 +7,9 @@ interface RuntimeLogDTO {
   next_offset: number;
   status: string;
   error_message: string;
+  next_cursor?: string;
+  has_more?: boolean;
+  log_error?: string;
 }
 
 const runtimeLogPath = (source: RuntimeLogSource) => {
@@ -19,16 +22,22 @@ const runtimeLogPath = (source: RuntimeLogSource) => {
 export const getRuntimeLogs = async (
   source: RuntimeLogSource,
   offset: number,
+  cursor?: string,
+  signal?: AbortSignal,
 ): Promise<RuntimeLogBatch> => {
   const { data } = await apiClient.get<RuntimeLogDTO>(
     controlPlaneURL(runtimeLogPath(source)),
     {
-      params: { offset },
+      params: { offset, cursor },
+      signal,
     },
   );
   return {
     logs: data.logs ?? [],
     nextOffset: data.next_offset ?? offset,
+    nextCursor: data.next_cursor,
+    hasMore: data.has_more ?? false,
+    logError: data.log_error,
     status: data.status,
     error: data.error_message ?? "",
   };

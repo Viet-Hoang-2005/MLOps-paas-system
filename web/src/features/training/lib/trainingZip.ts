@@ -69,7 +69,7 @@ export const buildStoredZip = (
     return current;
   }, {});
   const zipped = zipSync(zipInput, { level: 0 });
-  return new File([zipped.buffer as ArrayBuffer], filename, {
+  return new File([zipped.buffer], filename, {
     type: "application/zip",
   });
 };
@@ -90,7 +90,7 @@ export const rebuildZipWithEditedEntry = async (
 
   unzipped[match] = strToU8(text);
   const zipped = zipSync(unzipped, { level: 0 });
-  return new File([zipped.buffer as ArrayBuffer], file.name || "source.zip", {
+  return new File([zipped.buffer], file.name || "source.zip", {
     type: "application/zip",
   });
 };

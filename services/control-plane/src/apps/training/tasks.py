@@ -1,28 +1,44 @@
 from celery import shared_task
 from django.db import transaction
 
+from apps.training.services.storage_scope import training_prefix_for
 from common.logging import record_transition
-from infrastructure.execution import training_backend
+from infrastructure.execution import polls_runtime_status, training_backend
 from infrastructure.storage import S3Storage
-from infrastructure.storage.paths import (
-    training_job_prefix,
-    training_mlflow_prefix,
-    training_output_prefix,
-)
 
 
 @shared_task(
-    bind=True, autoretry_for=(ConnectionError, TimeoutError), retry_backoff=True, retry_jitter=True, max_retries=5
+    bind=True,
+    autoretry_for=(ConnectionError, TimeoutError),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=5,
+    soft_time_limit=50,
+    time_limit=55,
 )
 def execute_training_job(self, job_id):
+    from django.conf import settings
+
+    if settings.TRAINING_EXECUTION_WATCH_ENABLED:
+        from apps.observability.services.executions import reconcile
+
+        return reconcile("training", job_id)
     from apps.observability.services.lifecycle import record_training_event
 
     from .models import TrainingJob
     from .services.logs import append_training_log
 
     with transaction.atomic():
-        job = TrainingJob.objects.select_for_update().select_related("project", "project__owner").get(public_id=job_id)
-        if job.status != "queued" or job.deletion_requested_at:
+        job = (
+            TrainingJob.objects.select_for_update(of=("self",))
+            .select_related("project", "project__owner")
+            .get(public_id=job_id)
+        )
+        if (
+            job.status != "queued"
+            or job.deletion_requested_at
+            or (job.project_id and job.project.deletion_state != "active")
+        ):
             return job.status
         job.mark_started()
         job.celery_task_id = self.request.id or job.celery_task_id
@@ -32,7 +48,11 @@ def execute_training_job(self, job_id):
         record_transition(job, "running")
     append_training_log(job.public_id, "[SYSTEM] Training execution started.")
     with transaction.atomic():
-        job = TrainingJob.objects.select_for_update().select_related("project", "project__owner").get(pk=job.pk)
+        job = (
+            TrainingJob.objects.select_for_update(of=("self",))
+            .select_related("project", "project__owner")
+            .get(pk=job.pk)
+        )
         if job.status in {"cancelling", "cancelled"} or job.deletion_requested_at:
             should_confirm = job.status == "cancelling"
         else:
@@ -67,33 +87,25 @@ def execute_training_job(self, job_id):
     if isinstance(result, dict) and result.get("dispatched"):
         record_transition(job, "running", phase="dispatched")
         append_training_log(job.public_id, f"[SYSTEM] Training workload dispatched ({job.backend}).")
-        if hasattr(training_backend(job.backend), "poll"):
+        if polls_runtime_status(training_backend(job.backend)):
             poll_training_job_status.apply_async(args=[str(job.public_id)], countdown=3)
         else:
             append_training_log(job.public_id, "[SYSTEM] Waiting for trusted callback.")
         return "running"
-    with transaction.atomic():
-        job = TrainingJob.objects.select_for_update().get(pk=job.pk)
-        if job.status in {"cancelling", "cancelled"} or job.deletion_requested_at:
-            append_training_log(job.public_id, "[SYSTEM] Ignoring completion after cancellation.")
-            return job.status
-        job.mark_finished("completed")
-        job.tracking = {**job.tracking, "logs_tail": str(result)[-6000:]}
-        job.save(update_fields=["status", "completed_at", "runtime_seconds", "tracking", "updated_at"])
-        job.outputs.update_or_create(
-            relative_path="model.tar.gz",
-            defaults={"kind": "model", "s3_uri": job.output_uri, "content_type": "application/gzip"},
-        )
-        record_training_event(job=job, event_type="completed", message="Training execution completed.")
-        record_transition(job, "completed")
-    for line in str(result).splitlines()[-500:]:
-        append_training_log(job.public_id, line)
-    append_training_log(job.public_id, "[SYSTEM] Training completed successfully.")
-    return "completed"
+    from .services.output_finalization import enqueue_output
+
+    enqueue_output(job)
+    return "uploading"
 
 
-@shared_task(bind=True, max_retries=7200)
+@shared_task(bind=True, max_retries=7200, soft_time_limit=50, time_limit=55)
 def poll_training_job_status(self, job_id):
+    from django.conf import settings
+
+    if settings.TRAINING_EXECUTION_WATCH_ENABLED:
+        from apps.observability.services.executions import reconcile
+
+        return reconcile("training", job_id)
     from apps.observability.services.lifecycle import record_training_event
 
     from .models import TrainingJob
@@ -108,7 +120,7 @@ def poll_training_job_status(self, job_id):
         return job.status
 
     backend = training_backend(job.backend)
-    if not hasattr(backend, "poll"):
+    if not polls_runtime_status(backend):
         return job.status
 
     result = backend.poll(job)
@@ -118,24 +130,10 @@ def poll_training_job_status(self, job_id):
         raise self.retry(countdown=5)
 
     if current_status == "completed":
-        logs = result.get("logs", "")
-        with transaction.atomic():
-            job = TrainingJob.objects.select_for_update().get(pk=job.pk)
-            if job.status in {"cancelling", "cancelled"} or job.deletion_requested_at:
-                return job.status
-            job.mark_finished("completed")
-            job.tracking = {**job.tracking, "logs_tail": logs[-6000:]}
-            job.save(update_fields=["status", "completed_at", "runtime_seconds", "tracking", "updated_at"])
-            job.outputs.update_or_create(
-                relative_path="model.tar.gz",
-                defaults={"kind": "model", "s3_uri": job.output_uri, "content_type": "application/gzip"},
-            )
-            record_training_event(job=job, event_type="completed", message="Training execution completed.")
-            record_transition(job, "completed")
-        for line in logs.splitlines()[-500:]:
-            append_training_log(job.public_id, line)
-        append_training_log(job.public_id, "[SYSTEM] Training completed successfully.")
-        return "completed"
+        from .services.output_finalization import enqueue_output
+
+        enqueue_output(job)
+        raise self.retry(countdown=5)
 
     if current_status == "failed":
         logs = result.get("logs", "")
@@ -178,8 +176,16 @@ def poll_training_job_status(self, job_id):
     retry_backoff=True,
     retry_jitter=True,
     max_retries=5,
+    soft_time_limit=50,
+    time_limit=55,
 )
 def cancel_training_job(self, job_id):
+    from django.conf import settings
+
+    if settings.TRAINING_EXECUTION_WATCH_ENABLED:
+        from apps.observability.services.executions import reconcile
+
+        return reconcile("training", job_id)
     from .models import TrainingJob
     from .services.logs import append_training_log
 
@@ -252,6 +258,7 @@ def confirm_training_cancellation(job_id):
     retry_backoff=True,
     retry_jitter=True,
     max_retries=5,
+    reject_on_worker_lost=True,
 )
 def delete_training_job(self, job_id):
     from apps.deployment.models import Build
@@ -272,6 +279,10 @@ def delete_training_job(self, job_id):
         return "retained"
     if job.status in {"pending", "queued", "uploading", "running", "cancelling"}:
         return "waiting-for-cancellation"
+    from django.conf import settings
+
+    if settings.TRAINING_EXECUTION_WATCH_ENABLED and job.observation_status == "cleanup_pending":
+        return "waiting-for-runtime-cleanup"
     if job.builds.filter(status__in=("pending", "queued", "building")).exists():
         TrainingJob.objects.filter(pk=job.pk).update(
             deletion_error="A model build is still using this training output."
@@ -287,9 +298,7 @@ def delete_training_job(self, job_id):
         Build.objects.filter(public_id__in=disposable_builds).delete()
 
         storage = S3Storage()
-        storage.delete_prefix(
-            f"{training_job_prefix(job.project.owner.tenant_id, job.project.public_id, job.public_id)}/"
-        )
+        storage.delete_prefix(f"{training_prefix_for(job)}/")
         delete_training_logs(job.public_id)
         job.delete()
         record_transition(job, "deleted")
@@ -305,6 +314,7 @@ def delete_training_job(self, job_id):
     retry_backoff=True,
     retry_jitter=True,
     max_retries=5,
+    reject_on_worker_lost=True,
 )
 def purge_training_job_outputs(self, job_id):
     from apps.observability.services.lifecycle import record_training_event
@@ -313,10 +323,9 @@ def purge_training_job_outputs(self, job_id):
 
     job = TrainingJob.objects.select_related("project", "project__owner").get(public_id=job_id)
     storage = S3Storage()
-    tenant_id = job.project.owner.tenant_id
-    project_id = job.project.public_id
-    storage.delete_prefix(training_output_prefix(tenant_id, project_id, job.public_id))
-    storage.delete_prefix(training_mlflow_prefix(tenant_id, project_id, job.public_id))
+    prefix = training_prefix_for(job)
+    storage.delete_prefix(f"{prefix}/output/")
+    storage.delete_prefix(f"{prefix}/mlflow/")
     with transaction.atomic():
         job = TrainingJob.objects.select_for_update().get(pk=job.pk)
         job.outputs.all().delete()
@@ -327,3 +336,6 @@ def purge_training_job_outputs(self, job_id):
         )
         record_transition(job, job.status, phase="outputs_purged")
     return "purged"
+
+
+from .services.output_finalization import finalize_output  # noqa: F401,E402 - Celery task registration

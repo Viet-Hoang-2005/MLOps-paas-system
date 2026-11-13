@@ -3,19 +3,36 @@ from django.urls import include, path
 
 from apps.catalog.api.webhooks import ProjectDeletionWebhookEndpoint
 from apps.deployment.api.urls import build_patterns, deployment_patterns, endpoint_patterns
-from apps.deployment.api.webhooks import BuildWebhookEndpoint
+from apps.deployment.api.webhooks import BuildWebhookEndpoint, DeploymentWebhookEndpoint
 from apps.drift.api.webhooks import AutomaticDriftWebhookEndpoint, DriftRunWebhookEndpoint
+from apps.mlflow.views import (
+    MLflowArtifactsMultipartFallbackView,
+    MLflowArtifactsProxyView,
+)
+from apps.notifications.api.webhooks import AlertWebhookEndpoint
 from apps.observability.api.endpoints import ProductionDataEndpoint
+from apps.observability.api.executions import ExecutionObservationEndpoint
 from apps.training.api.webhooks import (
     TrainingCancellationWebhookEndpoint,
+    TrainingInputDownloadURLEndpoint,
     TrainingJobWebhookEndpoint,
     TrainingOutputUploadURLEndpoint,
+    TrainingRuntimeConfigEndpoint,
 )
 
 urlpatterns = [
+    path("internal/executions/<str:kind>/<uuid:public_id>/observations/", ExecutionObservationEndpoint.as_view()),
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.auth.api.urls")),
     path("api/api-keys/", include("apps.access.api.urls")),
+    path("api/2.0/mlflow/", include("apps.mlflow.urls")),
+    # MLflow Root Artifact Proxy routes (for root or non-prefixed tracking URIs)
+    path("api/2.0/mlflow-artifacts/artifacts/<path:subpath>", MLflowArtifactsProxyView.as_view()),
+    path("api/2.0/mlflow-artifacts/artifacts", MLflowArtifactsProxyView.as_view()),
+    path("mlflow-artifacts/artifacts/<path:subpath>", MLflowArtifactsProxyView.as_view()),
+    path("mlflow-artifacts/artifacts", MLflowArtifactsProxyView.as_view()),
+    path("api/2.0/mlflow-artifacts/mpu/<path:subpath>", MLflowArtifactsMultipartFallbackView.as_view()),
+    path("mlflow-artifacts/mpu/<path:subpath>", MLflowArtifactsMultipartFallbackView.as_view()),
     path(
         "api/models/<uuid:project_id>/production-data/",
         ProductionDataEndpoint.as_view(),
@@ -31,6 +48,7 @@ urlpatterns = [
     path("api/observability/", include("apps.observability.api.model_urls")),
     path("health/", include("apps.observability.api.urls")),
     path("internal/webhooks/builds/<uuid:build_id>/", BuildWebhookEndpoint.as_view()),
+    path("internal/webhooks/deployments/<uuid:deployment_id>/", DeploymentWebhookEndpoint.as_view()),
     path("internal/webhooks/project-deletions/<uuid:project_id>/", ProjectDeletionWebhookEndpoint.as_view()),
     path("internal/webhooks/training-jobs/<uuid:job_id>/", TrainingJobWebhookEndpoint.as_view()),
     path(
@@ -38,6 +56,10 @@ urlpatterns = [
         TrainingCancellationWebhookEndpoint.as_view(),
     ),
     path("internal/training-jobs/<uuid:job_id>/output-upload-url/", TrainingOutputUploadURLEndpoint.as_view()),
+    path("internal/training-jobs/<uuid:job_id>/input-download-urls/", TrainingInputDownloadURLEndpoint.as_view()),
+    path("internal/training-jobs/<uuid:job_id>/runtime-config/", TrainingRuntimeConfigEndpoint.as_view()),
+    path("api/notifications/", include("apps.notifications.api.urls")),
     path("internal/webhooks/drift-runs/<uuid:run_id>/", DriftRunWebhookEndpoint.as_view()),
     path("internal/webhooks/automatic-drift/", AutomaticDriftWebhookEndpoint.as_view()),
+    path("internal/webhooks/alerts/", AlertWebhookEndpoint.as_view()),
 ]

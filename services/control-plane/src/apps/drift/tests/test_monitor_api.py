@@ -87,11 +87,9 @@ def test_existing_monitor_can_be_updated_without_conflicting_with_itself():
     client = APIClient()
     client.force_authenticate(owner)
 
-    response = client.put(
+    response = client.patch(
         f"/api/drift-monitors/{monitor.public_id}/",
         {
-            "version": str(version.public_id),
-            "reference_asset": str(asset.public_id),
             "name": "default",
             "trigger_threshold": 5000,
             "is_active": True,

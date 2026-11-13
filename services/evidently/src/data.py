@@ -9,16 +9,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 
-def load_reference_data(
-    reference_url, model_version_id, temp_root, requests_module, pandas_module, detail
-):
+def load_reference_data(reference_url, model_version_id, temp_root, requests_module, pandas_module, detail):
     if not reference_url:
         raise ValueError("REFERENCE_DATA_URL is not provided")
 
-    is_csv = urlparse(reference_url).path.lower().endswith(".csv")
-    local_filename = str(
-        temp_root / f"reference_{model_version_id}.{'csv' if is_csv else 'parquet'}"
-    )
+    local_filename = str(temp_root / f"reference_{model_version_id}.csv")
     if reference_url.startswith("http"):
         detail("[2/4] Downloading reference data from presigned URL...")
         response = requests_module.get(reference_url)
@@ -29,11 +24,7 @@ def load_reference_data(
     else:
         local_filename = reference_url
 
-    frame = (
-        pandas_module.read_csv(local_filename)
-        if local_filename.endswith(".csv")
-        else pandas_module.read_parquet(local_filename)
-    )
+    frame = pandas_module.read_csv(local_filename)
     detail(f"-> Reference data loaded: {len(frame)} rows")
     return frame
 
@@ -49,17 +40,39 @@ def load_production_data(
     pandas_module,
     detail,
     db_schema="control_plane",
+    tenant_id=None,
+    project_id=None,
 ):
     detail(f"[1/4] Fetching Production Logs for Model Version ID: {model_version_id}")
     engine = create_engine(connection_url)
     if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", db_schema):
         raise ValueError("DB_SCHEMA must be a simple PostgreSQL identifier")
+
+    where_clauses = ["version.public_id = CAST(:model_version_id AS uuid)"]
+    params = {"model_version_id": str(model_version_id), "lim": max_samples}
+
+    joins = [f'INNER JOIN "{db_schema}"."registry_modelversion" AS version ON version.id = record.model_version_id']
+
+    if project_id or tenant_id:
+        joins.append(f'INNER JOIN "{db_schema}"."catalog_modelproject" AS project ON project.id = version.project_id')
+    if project_id:
+        where_clauses.append("project.public_id = CAST(:project_id AS uuid)")
+        params["project_id"] = str(project_id)
+    if tenant_id:
+        joins.append(
+            f'INNER JOIN "{db_schema}"."identity_customuser" AS owner_user ON owner_user.id = project.owner_id'
+        )
+        where_clauses.append("owner_user.tenant_id = :tenant_id")
+        params["tenant_id"] = str(tenant_id)
+
+    joins_sql = "\n        ".join(joins)
+    where_sql = " AND ".join(where_clauses)
+
     query = sql_text(f"""
         SELECT record.features, record.prediction
         FROM "{db_schema}"."production_predictionrecord" AS record
-        INNER JOIN "{db_schema}"."registry_modelversion" AS version
-            ON version.id = record.model_version_id
-        WHERE version.public_id = CAST(:model_version_id AS uuid)
+        {joins_sql}
+        WHERE {where_sql}
         ORDER BY record.observed_at DESC
         LIMIT :lim
     """)
@@ -67,12 +80,10 @@ def load_production_data(
         raw_frame = pandas_module.read_sql(
             query,
             connection,
-            params={"model_version_id": str(model_version_id), "lim": max_samples},
+            params=params,
         )
     if len(raw_frame) < min_samples:
-        detail(
-            f"Skipping Drift Analysis: Not enough production samples ({len(raw_frame)} < {min_samples})"
-        )
+        detail(f"Skipping Drift Analysis: Not enough production samples ({len(raw_frame)} < {min_samples})")
         return pandas_module.DataFrame()
     if "features" not in raw_frame.columns:
         return pandas_module.DataFrame()
@@ -83,9 +94,7 @@ def load_production_data(
     production_frame = pandas_module.json_normalize(features)
     if "prediction" in raw_frame.columns:
         production_frame["prediction"] = raw_frame["prediction"].values
-    detail(
-        f"-> Production data loaded and JSON normalized: {len(production_frame)} rows"
-    )
+    detail(f"-> Production data loaded and JSON normalized: {len(production_frame)} rows")
     return production_frame
 
 
@@ -98,6 +107,9 @@ def safe_extract_zip(zip_path, destination):
             resolved = (destination_path / member.filename).resolve()
             if not resolved.is_relative_to(destination_root):
                 raise ValueError("Model archive contains an unsafe path.")
+            is_symlink = (member.external_attr >> 16) & 0o170000 == 0o120000
+            if is_symlink:
+                raise ValueError("Model archive contains symbolic links, which are not allowed.")
         archive.extractall(destination_path)
 
 

@@ -6,8 +6,11 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
   labels:
+    app.kubernetes.io/name: harbor
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: harbor
     mlops-paas.io/plane: platform
-    mlops-paas.io/component: harbor
 spec:
   project: mlops-platform
   info:
@@ -23,12 +26,12 @@ spec:
     path: k8s/platform/harbor
   destination:
     server: https://kubernetes.default.svc
-    namespace: harbor
+    namespace: mlops-paas-harbor
   ignoreDifferences:
     - group: apps
       kind: StatefulSet
-      name: mlops-paas-harbor-database
-      namespace: harbor
+      name: harbor-database
+      namespace: mlops-paas-harbor
       jsonPointers:
         - /spec/persistentVolumeClaimRetentionPolicy
         - /spec/podManagementPolicy
@@ -56,8 +59,8 @@ spec:
         - /spec/volumeClaimTemplates/0/status
     - group: apps
       kind: StatefulSet
-      name: mlops-paas-harbor-redis
-      namespace: harbor
+      name: harbor-redis
+      namespace: mlops-paas-harbor
       jsonPointers:
         - /spec/persistentVolumeClaimRetentionPolicy
         - /spec/podManagementPolicy
@@ -83,48 +86,48 @@ spec:
         - /spec/volumeClaimTemplates/0/status
     # The chart regenerates these secrets on every render; keep the first values to avoid restart loops.
     - kind: Secret
-      name: mlops-paas-harbor-core
-      namespace: harbor
+      name: harbor-core
+      namespace: mlops-paas-harbor
       jsonPointers:
         - /data
     - kind: Secret
-      name: mlops-paas-harbor-jobservice
-      namespace: harbor
+      name: harbor-jobservice
+      namespace: mlops-paas-harbor
       jsonPointers:
         - /data
     - kind: Secret
-      name: mlops-paas-harbor-registry
-      namespace: harbor
+      name: harbor-registry
+      namespace: mlops-paas-harbor
       jsonPointers:
         - /data
     - kind: Secret
-      name: mlops-paas-harbor-registry-htpasswd
-      namespace: harbor
+      name: harbor-registry-htpasswd
+      namespace: mlops-paas-harbor
       jsonPointers:
         - /data
     - kind: Secret
-      name: mlops-paas-harbor-registryctl
-      namespace: harbor
+      name: harbor-registryctl
+      namespace: mlops-paas-harbor
       jsonPointers:
         - /data
     - group: apps
       kind: Deployment
-      name: mlops-paas-harbor-core
-      namespace: harbor
+      name: harbor-core
+      namespace: mlops-paas-harbor
       jsonPointers:
         - /spec/template/metadata/annotations/checksum~1secret
         - /spec/template/metadata/annotations/checksum~1secret-jobservice
     - group: apps
       kind: Deployment
-      name: mlops-paas-harbor-jobservice
-      namespace: harbor
+      name: harbor-jobservice
+      namespace: mlops-paas-harbor
       jsonPointers:
         - /spec/template/metadata/annotations/checksum~1secret
         - /spec/template/metadata/annotations/checksum~1secret-core
     - group: apps
       kind: Deployment
-      name: mlops-paas-harbor-registry
-      namespace: harbor
+      name: harbor-registry
+      namespace: mlops-paas-harbor
       jsonPointers:
         - /spec/template/metadata/annotations/checksum~1secret
         - /spec/template/metadata/annotations/checksum~1secret-core

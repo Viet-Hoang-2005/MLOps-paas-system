@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlops-paas-consumer-config
+  labels:
+    app.kubernetes.io/name: mlops-paas-consumer
+    app.kubernetes.io/instance: mlops-paas-consumer
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: streaming
+data:
+  LOG_FORMAT: "console"
+  LOG_SUMMARY_INTERVAL_SECONDS: "60"
+  KAFKA_TOPIC: "mlops_paas_production_data"
+  KAFKA_DLQ_TOPIC: "mlops_paas_production_data.dlq"
+  KAFKA_TOPIC_RETRY_SECONDS: "5"
+  KAFKA_BATCH_SIZE: "500"
+  KAFKA_DB_RETRY_INITIAL_SECONDS: "5"
+  KAFKA_DB_RETRY_MAX_SECONDS: "60"
+  CONTROL_PLANE_AUTOMATIC_DRIFT_WEBHOOK_URL: "http://mlops-paas-control-plane.mlops-paas-core.svc.cluster.local:8000/internal/webhooks/automatic-drift/"
+  AUTOMATIC_DRIFT_OUTBOX_POLL_SECONDS: "5"
+  AUTOMATIC_DRIFT_OUTBOX_BATCH_SIZE: "50"
+  AUTOMATIC_DRIFT_OUTBOX_LEASE_SECONDS: "60"
+  AUTOMATIC_DRIFT_OUTBOX_RETRY_INITIAL_SECONDS: "5"
+  AUTOMATIC_DRIFT_OUTBOX_RETRY_MAX_SECONDS: "300"
+  AUTOMATIC_DRIFT_OUTBOX_REQUEST_TIMEOUT_SECONDS: "10"
+  REDPANDA_BROKERS: "redpanda.mlops-paas-data.svc.cluster.local:9092"
+  GITHUB_REPO: "Viet-Hoang-2005/MLOps-paas-system"
+  DB_HOST_RW: "postgresql-rw.mlops-paas-data.svc.cluster.local"
+  DB_HOST_RO: "postgresql-ro.mlops-paas-data.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "mlops_paas_db"
+  DB_SCHEMA: "control_plane"

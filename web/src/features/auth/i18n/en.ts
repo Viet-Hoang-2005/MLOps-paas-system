@@ -1,4 +1,9 @@
 export const authEn = {
+  session: {
+    unavailableTitle: "Unable to verify your session",
+    unavailableDescription:
+      "The server is unavailable or your connection was interrupted. Please try again.",
+  },
   login: {
     title: "Welcome back",
     description: "Sign in to your account to continue",
@@ -24,6 +29,8 @@ export const authEn = {
     githubSuccess: "Signed in with GitHub.",
     githubFailed: "GitHub login failed. Please try again.",
     logoutSuccess: "Signed out successfully.",
+    logoutServerFailed:
+      "Signed out on this device, but the server could not revoke the session. It may be restored if you reload.",
   },
   signup: {
     title: "Create an account",

@@ -130,9 +130,7 @@ class LoggingTests(unittest.TestCase):
             summary.failure("new-server", "Server failed", level="ERROR")
             self.assertIn("Server failed", self.output.getvalue())
             before = self.output.getvalue().count("Server failed")
-            with patch(
-                "src.logging_utils.time.monotonic", return_value=time.monotonic() + 120
-            ):
+            with patch("src.logging_utils.time.monotonic", return_value=time.monotonic() + 120):
                 summary.failure("another-server", "Server failed", level="ERROR")
             self.assertEqual(self.output.getvalue().count("Server failed"), before + 1)
             self.assertLessEqual(len(summary.last_error), 66)

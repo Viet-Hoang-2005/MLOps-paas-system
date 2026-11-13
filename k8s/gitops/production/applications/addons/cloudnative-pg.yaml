@@ -6,8 +6,11 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-40"
   labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: cloudnative-pg
     mlops-paas.io/plane: addon
-    mlops-paas.io/component: cloudnative-pg
 spec:
   project: mlops-addons
   info:
@@ -26,6 +29,13 @@ spec:
       values: |
         nodeSelector:
           workload-type: worker
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: cnpg-system

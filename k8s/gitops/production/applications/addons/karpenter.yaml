@@ -6,10 +6,11 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-24"
   labels:
+    app.kubernetes.io/name: karpenter
     app.kubernetes.io/part-of: mlops-paas
-    mlops-paas.io/environment: production
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: karpenter
     mlops-paas.io/plane: addon
-    mlops-paas.io/component: karpenter
 spec:
   project: mlops-addons
   info:
@@ -29,6 +30,13 @@ spec:
         replicas: 1
         nodeSelector:
           workload-type: worker
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
         settings:
           clusterName: mlops-paas-cluster
           clusterEndpoint: https://k3s-api.internal.mlops-nids-nt114.id.vn:6443
@@ -36,14 +44,3 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: karpenter
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-      allowEmpty: false
-    syncOptions:
-      - ApplyOutOfSyncOnly=true
-      - ServerSideApply=true
-      - RespectIgnoreDifferences=true
-      - PruneLast=true
-      - FailOnSharedResource=true

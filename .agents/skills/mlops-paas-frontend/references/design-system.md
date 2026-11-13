@@ -32,9 +32,9 @@
   icon buttons, `control` (12 px) for form controls and buttons, `overlay`
   (16 px) for dialogs/drawers/Auth cards, and `full` for pills and circles.
   Do not use Tailwind size-based or arbitrary radius utilities.
-- `pnpm lint` runs `scripts/check-colors.mjs`. A genuine technical exception
+- `pnpm test:quality` runs color token checks (`test/quality/colors.test.ts`). A genuine technical exception
   needs a narrow `color-ignore: reason` comment.
-- `pnpm lint` also runs `scripts/check-radii.mjs`. A genuine graphical
+- `pnpm test:quality` also runs radius checks (`test/quality/radii.test.ts`). A genuine graphical
   exception needs a narrow `radius-ignore: reason` comment.
 - Use the semantic typography roles exported from `tokens.css` with the
   `text-style-*` prefix: `display`, `page-title`, `section-title`, `heading`,
@@ -50,8 +50,8 @@
   terminal output, code, UUIDs, URIs, paths, commands, and technical IDs.
   User-readable text must be at least 12 px.
 - Do not use Tailwind's raw text-size, line-height, or tracking scale, arbitrary
-  typography values, or weights 800/900. `pnpm lint` runs
-  `scripts/check-typography.mjs`; third-party numeric APIs require a narrow
+  typography values, or weights 800/900. `pnpm test:quality` runs
+  typography checks (`test/quality/typography.test.ts`); third-party numeric APIs require a narrow
   `typography-ignore: reason` comment.
 
 Before introducing a new primitive, inspect `shared/components` and extend the

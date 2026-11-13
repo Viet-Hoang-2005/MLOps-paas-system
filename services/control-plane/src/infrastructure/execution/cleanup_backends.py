@@ -16,7 +16,7 @@ class DockerProjectCleanupBackend:
     def run(self, project, manifest):
         client = self.docker.client
         removed = {"containers": [], "images": []}
-        for name in manifest["container_names"]:
+        for name in [*manifest["container_names"], *manifest.get("job_container_names", [])]:
             _validate_container_name(name)
             try:
                 client.containers.get(name).remove(force=True)
@@ -64,8 +64,10 @@ def project_cleanup_backend():
 
 
 def _validate_container_name(name):
-    if not str(name).startswith("deploy-") or any(char.isspace() for char in str(name)):
-        raise ValueError("Project cleanup can only remove deployment containers named deploy-<BUILD_ID>.")
+    if not str(name).startswith(("deploy-", "build-", "training-", "drift-")) or any(
+        char.isspace() for char in str(name)
+    ):
+        raise ValueError("Project cleanup can only remove its known runtime/job containers.")
 
 
 def _validate_project_image(project, image_uri):

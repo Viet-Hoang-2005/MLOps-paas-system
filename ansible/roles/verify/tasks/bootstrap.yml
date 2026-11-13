@@ -1,0 +1,144 @@
+---
+# Phase 1: K3s Bootstrap, Runtime & Core Networking Verification
+# --- Node & Runtime ---
+- name: Read all K3s nodes
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_k3s_nodes
+  tags: [verify, verify-bootstrap, verify-nodes]
+
+- name: Wait for every expected K3s node to be Ready
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    name: "{{ item }}"
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    wait: true
+    wait_timeout: "{{ verify_wait_timeout | default(300) }}"
+    wait_condition:
+      type: Ready
+      status: "True"
+  loop: "{{ groups['master'] + groups['workers'] }}"
+  tags: [verify, verify-bootstrap, verify-nodes]
+
+- name: Require every expected node and pinned K3s version
+  ansible.builtin.assert:
+    that:
+      - item in (verified_k3s_nodes.resources | map(attribute='metadata.name') | list)
+      - >-
+        (verified_k3s_nodes.resources |
+        selectattr('metadata.name', 'equalto', item) |
+        map(attribute='status.nodeInfo.kubeletVersion') |
+        first) == k3s_version
+    fail_msg: "Node {{ item }} is either missing or running an unexpected K3s version."
+  loop: "{{ groups['master'] + groups['workers'] }}"
+  tags: [verify, verify-bootstrap, verify-nodes]
+
+- name: Verify the control-plane taint
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    name: "{{ groups['master'][0] }}"
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_control_plane_taint
+  failed_when: >-
+    verified_control_plane_taint.resources | length != 1 or
+    'NoSchedule' not in
+    (verified_control_plane_taint.resources[0].spec.taints | default([]) |
+    selectattr('key', 'equalto', 'node-role.kubernetes.io/control-plane') |
+    map(attribute='effect') | list)
+  tags: [verify, verify-bootstrap, verify-nodes]
+
+# --- Core Networking, Ingress & DNS ---
+- name: Wait for Traefik to receive the trusted proxy configuration
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: traefik
+    namespace: kube-system
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: traefik_deployment_arguments
+  until: >-
+    traefik_deployment_arguments.resources | length == 1 and
+    ('--entryPoints.web.forwardedHeaders.trustedIPs=' ~
+    (traefik_forwarded_headers_trusted_ips | join(','))) in
+    (traefik_deployment_arguments.resources[0].spec.template.spec.containers[0].args | default([]))
+  retries: 48
+  delay: 5
+  changed_when: false
+  tags: [verify, verify-bootstrap, verify-network]
+
+- name: Wait for Traefik to finish reconciling the runtime configuration
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: traefik
+    namespace: kube-system
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    wait: true
+    wait_timeout: 180
+  tags: [verify, verify-bootstrap, verify-network]
+
+- name: Verify core Kubernetes components
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: kube-system
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+    label_selectors:
+      - "{{ item }}"
+  register: verified_core_kubernetes_pods
+  until:
+    - verified_core_kubernetes_pods.resources | length > 0
+    - >-
+      (verified_core_kubernetes_pods.resources |
+      json_query("[?status.conditions[?type=='Ready' && status=='True']]") |
+      length) == verified_core_kubernetes_pods.resources | length
+  retries: 60
+  delay: 5
+  loop:
+    - k8s-app=kube-dns
+    - app.kubernetes.io/name=traefik
+  tags: [verify, verify-bootstrap, verify-network]
+
+- name: Verify Traefik ping on each static worker
+  ansible.builtin.uri:
+    url: "http://{{ hostvars[item].private_ip }}/ping"
+    status_code: 200
+    return_content: false
+  loop: "{{ groups['workers'] }}"
+  when:
+    - groups['workers'] is defined
+    - groups['workers'] | length > 0
+    - hostvars[item].private_ip is defined
+  tags: [verify, verify-bootstrap, verify-network]
+
+- name: Read ALB target health from the WSL control host
+  delegate_to: localhost
+  become: false
+  ansible.builtin.command: >-
+    aws elbv2 describe-target-health
+    --region {{ aws_region }}
+    --target-group-arn {{ terraform_alb_target_group_arn }}
+    --query TargetHealthDescriptions[].TargetHealth.State
+    --output json
+  register: alb_target_health_raw
+  changed_when: false
+  when:
+    - (verify_alb_enabled | default(true) | bool)
+    - (terraform_alb_target_group_arn | default('') | length > 0)
+  tags: [verify, verify-bootstrap, verify-network]
+
+- name: Require every ALB target to be healthy
+  ansible.builtin.assert:
+    that:
+      - alb_target_health_raw.stdout | from_json | length == k3s_expected_worker_count | int
+      - (alb_target_health_raw.stdout | from_json | unique) == ['healthy']
+    fail_msg: The ALB target group does not contain only healthy static workers.
+  when:
+    - (verify_alb_enabled | default(true) | bool)
+    - (terraform_alb_target_group_arn | default('') | length > 0)
+  tags: [verify, verify-bootstrap, verify-network]
+

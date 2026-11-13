@@ -1,0 +1,69 @@
+import { Clipboard, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Button } from "@/shared/components/Button";
+import { Callout } from "@/shared/components/Callout";
+import { useTranslation } from "react-i18next";
+
+interface ApiKeyDialogProps {
+  title: string;
+  description: string;
+  apiKey: string;
+  onClose: () => void;
+  onCopy: () => void;
+}
+
+export function ApiKeyDialog({
+  title,
+  description,
+  apiKey,
+  onClose,
+  onCopy,
+}: ApiKeyDialogProps) {
+  const { t } = useTranslation("settings");
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay px-4">
+      <div className="w-full max-w-xl rounded-surface border border-border bg-surface shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 className="text-style-heading font-bold text-color-foreground">
+            {title}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-surface text-color-muted-foreground hover:bg-muted hover:text-color-foreground"
+            aria-label={t("avatarDialog.close")}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="px-5 py-5">
+          <Callout variant="warning" description={description} />
+          <div className="mt-4 rounded-surface border border-border bg-muted p-3">
+            <p className="mb-2 text-style-overline uppercase text-color-muted-foreground">
+              {t("apiDialog.label")}
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="min-w-0 flex-1 break-all rounded-compact bg-surface px-3 py-2 text-style-body-lg text-color-foreground">
+                {apiKey}
+              </code>
+              <Button
+                size="icon"
+                variant="secondary"
+                onClick={onCopy}
+                icon={<Clipboard className="h-4 w-4" />}
+                title={t("apiDialog.copy")}
+                aria-label={t("apiDialog.copy")}
+              ></Button>
+            </div>
+          </div>
+          <div className="mt-6 flex justify-end">
+            <Button onClick={onClose}>{t("apiDialog.done")}</Button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}

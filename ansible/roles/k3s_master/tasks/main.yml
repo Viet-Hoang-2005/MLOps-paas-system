@@ -94,6 +94,15 @@
     group: root
     mode: "0600"
 
+- name: Render the Traefik ping IngressRoute for health checks
+  become: true
+  ansible.builtin.template:
+    src: traefik-ping-ingressroute.yaml.j2
+    dest: /var/lib/rancher/k3s/server/manifests/traefik-ping-ingressroute.yaml
+    owner: root
+    group: root
+    mode: "0600"
+
 
 - name: Wait for the K3s node token
   become: true

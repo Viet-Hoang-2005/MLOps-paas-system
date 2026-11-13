@@ -2,8 +2,8 @@ import docker
 
 
 class DockerClient:
-    def __init__(self, client=None):
-        self.client = client or docker.from_env()
+    def __init__(self, client=None, timeout=60):
+        self.client = client or docker.from_env(timeout=timeout)
 
     def run(self, **kwargs):
         kwargs.setdefault("detach", True)

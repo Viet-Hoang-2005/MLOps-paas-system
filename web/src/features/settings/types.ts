@@ -12,17 +12,6 @@ export interface UserProfile {
   date_joined: string;
 }
 
-export interface AvatarRecord {
-  id: string;
-  url: string;
-  is_current: boolean;
-  created_at: string;
-}
-
-export interface AvatarHistoryResponse {
-  avatars: AvatarRecord[];
-}
-
 export interface UpdateProfileRequest {
   full_name: string;
   description: string;
@@ -42,40 +31,6 @@ export interface PasswordChangeVerifyResponse {
   password_change_token: string;
 }
 
-export interface CreateAPIKeyRequest {
-  name: string;
-  description: string;
-  scope: string;
-  allowed_models: string[];
-}
-
-export interface CreatedAPIKeyResponse {
-  message: string;
-  api_key: string;
-  key_prefix: string;
-  id: string;
-  name: string;
-  description: string;
-  scope: string;
-  allowed_models: string[];
-  created_at?: string;
-}
-
-export interface APIKeyRecord {
-  id: string;
-  name: string;
-  description: string;
-  scope: string;
-  allowed_models: string[];
-  key_prefix: string;
-  created_at: string;
-}
-
-export interface APIKeyListResponse {
-  tenant_id: string;
-  api_keys: APIKeyRecord[];
-}
-
 export interface ProfileFormValues {
   fullName: string;
   description: string;
@@ -86,11 +41,3 @@ export interface ProfileFormValues {
 }
 
 export type PasswordModalStep = "closed" | "otp" | "password";
-export type KeyModalMode = "create" | "edit";
-
-export interface APIKeyFormValues {
-  name: string;
-  description: string;
-}
-
-export type APIKeyActionTarget = APIKeyRecord | null;

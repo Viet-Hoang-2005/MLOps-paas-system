@@ -70,3 +70,6 @@ class LifecycleEvent(models.Model):
             models.Index(fields=["project", "created_at"], name="lifecycle_project_created_idx"),
             models.Index(fields=["aggregate_type", "aggregate_id", "created_at"], name="life_aggregate_created_idx"),
         ]
+
+    def __str__(self):
+        return f"{self.event_type} ({self.public_id})"

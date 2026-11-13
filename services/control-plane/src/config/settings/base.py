@@ -1,10 +1,11 @@
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
 
-from common.env import env, env_identifier, env_int, env_list
+from common.env import env, env_bool, env_identifier, env_int, env_list
 
 SERVICE_ROOT = Path(__file__).resolve().parents[3]
 BASE_DIR = SERVICE_ROOT / "src"
@@ -14,7 +15,6 @@ DEBUG = False
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,control-plane")
 
 INSTALLED_APPS = [
-    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -26,17 +26,18 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "storages",
-    "channels",
     "apps.auth.apps.AuthConfig",
     "apps.access.apps.AccessConfig",
     "apps.catalog.apps.CatalogConfig",
     "apps.registry.apps.RegistryConfig",
     "apps.training.apps.TrainingConfig",
+    "apps.mlflow.apps.MLflowConfig",
     "apps.deployment.apps.DeploymentConfig",
     "apps.drift.apps.DriftConfig",
     "apps.observability.apps.ObservabilityConfig",
     "apps.production.apps.ProductionConfig",
     "apps.ct.apps.ContinuousTrainingConfig",
+    "apps.notifications.apps.NotificationsConfig",
 ]
 
 MIDDLEWARE = [
@@ -88,7 +89,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 LANGUAGE_CODE = "en-us"
@@ -99,15 +99,31 @@ USE_TZ = True
 JWT_PRIVATE_KEY = env("JWT_PRIVATE_KEY", "").replace("\\n", "\n")
 JWT_PUBLIC_KEY = env("JWT_PUBLIC_KEY", "").replace("\\n", "\n")
 JWT_ALGORITHM = "RS256" if JWT_PRIVATE_KEY and JWT_PUBLIC_KEY else "HS256"
+PASSWORD_RESET_THROTTLE_RATE = env("PASSWORD_RESET_THROTTLE_RATE", "10/minute")
+REGISTRATION_THROTTLE_RATE = env("REGISTRATION_THROTTLE_RATE", "10/minute")
+PASSWORD_CHANGE_THROTTLE_RATE = env("PASSWORD_CHANGE_THROTTLE_RATE", "10/minute")
+LOGIN_IP_THROTTLE_RATE = env("LOGIN_IP_THROTTLE_RATE", "30/minute")
+LOGIN_ACCOUNT_THROTTLE_RATE = env("LOGIN_ACCOUNT_THROTTLE_RATE", "10/minute")
+# Reverse proxies in front of the app that append to X-Forwarded-For. 0 trusts
+# only the socket address, so the header can never choose the throttle key.
+TRUSTED_PROXY_COUNT = env_int("TRUSTED_PROXY_COUNT", 0)
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_PAGINATION_CLASS": "common.api.pagination.DefaultPagination",
     "EXCEPTION_HANDLER": "common.api.exceptions.exception_handler",
+    "NUM_PROXIES": TRUSTED_PROXY_COUNT,
+    "DEFAULT_THROTTLE_RATES": {
+        "password_reset": PASSWORD_RESET_THROTTLE_RATE,
+        "registration": REGISTRATION_THROTTLE_RATE,
+        "password_change": PASSWORD_CHANGE_THROTTLE_RATE,
+        "login_ip": LOGIN_IP_THROTTLE_RATE,
+        "login_account": LOGIN_ACCOUNT_THROTTLE_RATE,
+    },
 }
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "ALGORITHM": JWT_ALGORITHM,
@@ -117,31 +133,194 @@ SIMPLE_JWT = {
     "ISSUER": "django-control-plane",
 }
 
+CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
-CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key")
+CORS_EXPOSE_HEADERS = ["Content-Disposition"]
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key", "x-requested-with")
+
+AUTH_COOKIE_NAME = "refresh_token"
+AUTH_COOKIE_SECURE = env_bool("AUTH_COOKIE_SECURE", False)
+AUTH_COOKIE_SAMESITE = env("AUTH_COOKIE_SAMESITE", "Lax")
+AUTH_COOKIE_PATH = env("AUTH_COOKIE_PATH", "/api/auth/")
 STATIC_URL = "/static/"
 STATIC_ROOT = SERVICE_ROOT / "staticfiles"
 
-REDIS_URL = env("REDIS_URL", "redis://redis:6379/1")
+REDIS_PASSWORD = env("REDIS_PASSWORD", "")
+
+
+def _inject_redis_password(url: str, password: str) -> str:
+    if not url or not password:
+        return url
+    parsed = urlsplit(url)
+    if parsed.password:
+        return url
+    username = parsed.username or ""
+    auth = f"{username}:{quote(password, safe='')}@"
+    host_port = parsed.netloc.split("@")[-1]
+    return urlunsplit((parsed.scheme, f"{auth}{host_port}", parsed.path, parsed.query, parsed.fragment))
+
+
+def _derive_redis_url(base_url: str, db: int) -> str:
+    parsed = urlsplit(base_url)
+    return urlunsplit((parsed.scheme, parsed.netloc, f"/{db}", parsed.query, parsed.fragment))
+
+
+REDIS_URL = _inject_redis_password(env("REDIS_URL", "redis://redis-cache:6379/0"), REDIS_PASSWORD)
+REDIS_CONNECTION_MODE = env("REDIS_CONNECTION_MODE", "direct")
+if REDIS_CONNECTION_MODE not in {"direct", "sentinel"}:
+    raise ImproperlyConfigured("REDIS_CONNECTION_MODE must be direct or sentinel")
+
+CELERY_CONNECTION_MODE = env("CELERY_CONNECTION_MODE", REDIS_CONNECTION_MODE)
+if CELERY_CONNECTION_MODE not in {"direct", "sentinel"}:
+    raise ImproperlyConfigured("CELERY_CONNECTION_MODE must be direct or sentinel")
+
+LOKI_URL = str(env("LOKI_URL", "")).rstrip("/")
 REDPANDA_BROKERS = env("REDPANDA_BROKERS", "redpanda:9092")
-CACHES = {"default": {"BACKEND": "django_redis.cache.RedisCache", "LOCATION": REDIS_URL}}
-CHANNEL_LAYERS = {"default": {"BACKEND": "channels_redis.core.RedisChannelLayer", "CONFIG": {"hosts": [REDIS_URL]}}}
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://redis:6379/3")
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", "redis://redis:6379/4")
+
+# 1. Redis Cache Configuration (DB 0)
+if REDIS_CONNECTION_MODE == "sentinel":
+    REDIS_SENTINEL_PASSWORD = env("REDIS_SENTINEL_PASSWORD", "")
+    REDIS_SENTINEL_MASTER_NAME = env("REDIS_SENTINEL_MASTER_NAME", "redis-cache-master")
+    REDIS_SENTINELS = []
+    for address in env("REDIS_SENTINEL_HOSTS", "").split(","):
+        if address.strip():
+            host, _, port = address.strip().partition(":")
+            REDIS_SENTINELS.append((host, int(port or "26379")))
+    if not all((REDIS_PASSWORD, REDIS_SENTINEL_PASSWORD, REDIS_SENTINEL_MASTER_NAME)) or len(REDIS_SENTINELS) < 3:
+        raise ImproperlyConfigured("Redis Sentinel requires three hosts, master name and both credentials")
+    sentinel_kwargs = {"password": REDIS_SENTINEL_PASSWORD, "socket_timeout": 2}
+    DJANGO_REDIS_CONNECTION_FACTORY = "django_redis.pool.SentinelConnectionFactory"
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": f"redis://{REDIS_SENTINEL_MASTER_NAME}/0",
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.SentinelClient",
+                "SENTINELS": REDIS_SENTINELS,
+                "SENTINEL_KWARGS": sentinel_kwargs,
+                "PASSWORD": REDIS_PASSWORD,
+            },
+        }
+    }
+else:
+    CACHES = {"default": {"BACKEND": "django_redis.cache.RedisCache", "LOCATION": REDIS_URL}}
+
+# 2. Celery Queue Configuration (DB 0)
+if CELERY_CONNECTION_MODE == "sentinel":
+    CELERY_SENTINEL_PASSWORD = env("CELERY_SENTINEL_PASSWORD", env("REDIS_SENTINEL_PASSWORD", ""))
+    CELERY_SENTINEL_MASTER_NAME = env("CELERY_SENTINEL_MASTER_NAME", "redis-queue-master")
+    CELERY_SENTINELS = []
+    raw_celery_hosts = env("CELERY_SENTINEL_HOSTS", env("REDIS_SENTINEL_HOSTS", ""))
+    for address in raw_celery_hosts.split(","):
+        if address.strip():
+            host, _, port = address.strip().partition(":")
+            CELERY_SENTINELS.append((host, int(port or "26379")))
+    if not all((REDIS_PASSWORD, CELERY_SENTINEL_PASSWORD, CELERY_SENTINEL_MASTER_NAME)) or len(CELERY_SENTINELS) < 3:
+        raise ImproperlyConfigured("Celery Sentinel requires three hosts, master name and both credentials")
+    celery_sentinel_kwargs = {"password": CELERY_SENTINEL_PASSWORD, "socket_timeout": 2}
+
+    def _celery_sentinel_urls(db: int = 0) -> str:
+        return ";".join(
+            f"sentinel://:{quote(REDIS_PASSWORD, safe='')}@{host}:{port}/{db}" for host, port in CELERY_SENTINELS
+        )
+
+    CELERY_BROKER_URL = _celery_sentinel_urls(0)
+    CELERY_RESULT_BACKEND = _celery_sentinel_urls(0)
+    CELERY_BROKER_TRANSPORT_OPTIONS = {
+        "master_name": CELERY_SENTINEL_MASTER_NAME,
+        "sentinel_kwargs": celery_sentinel_kwargs,
+    }
+    CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
+        "master_name": CELERY_SENTINEL_MASTER_NAME,
+        "sentinel_kwargs": celery_sentinel_kwargs,
+    }
+else:
+    default_queue_url = _inject_redis_password("redis://redis-queue:6379/0", REDIS_PASSWORD)
+    CELERY_BROKER_URL = _inject_redis_password(
+        env("CELERY_BROKER_URL", default_queue_url),
+        REDIS_PASSWORD,
+    )
+    CELERY_RESULT_BACKEND = _inject_redis_password(
+        env("CELERY_RESULT_BACKEND", default_queue_url),
+        REDIS_PASSWORD,
+    )
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = env_int("CELERY_TASK_TIME_LIMIT", 43200)
 CELERY_TASK_SOFT_TIME_LIMIT = env_int("CELERY_TASK_SOFT_TIME_LIMIT", 42600)
 CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+RUNTIME_HEALTH_INTERVAL_SECONDS = 15
+RUNTIME_HEALTH_STALE_SECONDS = 45
+CELERY_TASK_DEFAULT_QUEUE = "celery"
+LOCAL_DEPLOYMENT_WATCH_ENABLED = env_bool("LOCAL_DEPLOYMENT_WATCH_ENABLED", False)
+LOCAL_EXECUTION_POLL_SECONDS = 5
+LOCAL_BUILD_TIMEOUT_SECONDS = env_int("LOCAL_BUILD_TIMEOUT_SECONDS", 43200)
+LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS = env_int("LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS", 90)
+LOCAL_BUILD_CALLBACK_GRACE_SECONDS = 30
+CELERY_TASK_ROUTES = {
+    "apps.deployment.health_tasks.scan_runtime_health": {"queue": "runtime-health"},
+    "apps.deployment.health_tasks.probe_runtime_health": {"queue": "runtime-health"},
+}
+STOP_RECONCILE_INTERVAL_SECONDS = env_int("STOP_RECONCILE_INTERVAL_SECONDS", 120)
+STOP_RECONCILE_GRACE_SECONDS = env_int("STOP_RECONCILE_GRACE_SECONDS", 600)
+STOP_RECONCILE_BATCH_SIZE = env_int("STOP_RECONCILE_BATCH_SIZE", 50)
+DELETION_RECONCILE_INTERVAL_SECONDS = env_int("DELETION_RECONCILE_INTERVAL_SECONDS", 120)
+DELETION_RECONCILE_GRACE_SECONDS = env_int("DELETION_RECONCILE_GRACE_SECONDS", 600)
+DELETION_RECONCILE_BATCH_SIZE = env_int("DELETION_RECONCILE_BATCH_SIZE", 20)
+CELERY_BEAT_SCHEDULE = {
+    "runtime-health-scan": {
+        "task": "apps.deployment.health_tasks.scan_runtime_health",
+        "schedule": RUNTIME_HEALTH_INTERVAL_SECONDS,
+        "options": {"queue": "runtime-health", "expires": 15},
+    },
+    "stopped-deployment-reconcile": {
+        "task": "apps.deployment.tasks.reconcile_stopped_deployments",
+        "schedule": STOP_RECONCILE_INTERVAL_SECONDS,
+        "options": {"queue": "celery", "expires": 60},
+    },
+    "stalled-deletion-reconcile": {
+        "task": "apps.deployment.tasks.reconcile_stalled_deletions",
+        "schedule": DELETION_RECONCILE_INTERVAL_SECONDS,
+        "options": {"queue": "celery", "expires": 120},
+    },
+}
+if LOCAL_DEPLOYMENT_WATCH_ENABLED:
+    CELERY_BEAT_SCHEDULE["local-execution-scan"] = {
+        "task": "apps.deployment.execution_tasks.scan_local_executions",
+        "schedule": LOCAL_EXECUTION_POLL_SECONDS,
+        "options": {"queue": "celery", "expires": 10},
+    }
 CONTROL_PLANE_WEBHOOK_SECRET = env("CONTROL_PLANE_WEBHOOK_SECRET", "local-webhook-secret")
 ARGO_EVENTS_WEBHOOK_TOKEN = env("ARGO_EVENTS_WEBHOOK_TOKEN", "")
 CONTROL_PLANE_INTERNAL_URL = str(env("CONTROL_PLANE_INTERNAL_URL", "http://control-plane:8000")).rstrip("/")
 TRAINING_PRESIGNED_URL_TTL_SECONDS = env_int("TRAINING_PRESIGNED_URL_TTL_SECONDS", 900)
 TRAINING_CAPABILITY_GRACE_SECONDS = env_int("TRAINING_CAPABILITY_GRACE_SECONDS", 900)
-TRAINING_CAPABILITY_MAX_TTL_SECONDS = env_int("TRAINING_CAPABILITY_MAX_TTL_SECONDS", 7200)
+TRAINING_MAX_RUNTIME_SECONDS = env_int("TRAINING_MAX_RUNTIME_SECONDS", 86400)
+TRAINING_CAPABILITY_MAX_TTL_SECONDS = env_int("TRAINING_CAPABILITY_MAX_TTL_SECONDS", 0)
+TRAINING_SECRET_ENCRYPTION_KEY = env("TRAINING_SECRET_ENCRYPTION_KEY", "")
+TRAINING_CPU_MEDIUM_WEEKLY_SECONDS = env_int("TRAINING_CPU_MEDIUM_WEEKLY_SECONDS", 172800)
+TRAINING_CPU_LARGE_WEEKLY_SECONDS = env_int("TRAINING_CPU_LARGE_WEEKLY_SECONDS", 86400)
+TRAINING_GPU_T4_WEEKLY_SECONDS = env_int("TRAINING_GPU_T4_WEEKLY_SECONDS", 86400)
+TRAINING_GPU_A10G_WEEKLY_SECONDS = env_int("TRAINING_GPU_A10G_WEEKLY_SECONDS", 43200)
+DRIFT_EXECUTION_WATCH_ENABLED = env_bool("DRIFT_EXECUTION_WATCH_ENABLED", False)
+TRAINING_EXECUTION_WATCH_ENABLED = env_bool("TRAINING_EXECUTION_WATCH_ENABLED", False)
+EXECUTION_DISPATCH_TIMEOUT_SECONDS = env_int("EXECUTION_DISPATCH_TIMEOUT_SECONDS", 1800)
+EXECUTION_CHECK_LEASE_SECONDS = env_int("EXECUTION_CHECK_LEASE_SECONDS", 300)
+EXECUTION_OBSERVATION_TOKEN_TTL_SECONDS = env_int(
+    "EXECUTION_OBSERVATION_TOKEN_TTL_SECONDS", EXECUTION_CHECK_LEASE_SECONDS
+)
+DRIFT_MAX_RUNTIME_SECONDS = env_int("DRIFT_MAX_RUNTIME_SECONDS", 3600)
+ARGO_RECONCILE_WEBHOOK_URL = env("ARGO_RECONCILE_WEBHOOK_URL", "")
+if DRIFT_EXECUTION_WATCH_ENABLED or TRAINING_EXECUTION_WATCH_ENABLED:
+    CELERY_BEAT_SCHEDULE["job-execution-scan"] = {
+        "task": "apps.observability.tasks.scan_job_executions",
+        "schedule": 15,
+        "options": {"queue": "celery", "expires": 15},
+    }
 MODEL_SERVER_PUBLIC_URL = str(env("MODEL_SERVER_PUBLIC_URL", "http://localhost:5002")).rstrip("/")
 MODEL_SERVER_INTERNAL_URL = str(env("MODEL_SERVER_INTERNAL_URL", "http://traefik:5000")).rstrip("/")
-MODEL_RUNTIME_NAMESPACE = str(env("MODEL_RUNTIME_NAMESPACE", "mlops-model-runtimes")).strip()
+MODEL_RUNTIME_NAMESPACE = str(env("MODEL_RUNTIME_NAMESPACE", "mlops-paas-serving")).strip()
 DOCKER_NETWORK_NAME = env("DOCKER_NETWORK_NAME", "mlops_paas_network")
 EXECUTION_BACKEND = str(env("EXECUTION_BACKEND", "docker")).strip().lower()
 if EXECUTION_BACKEND not in {"docker", "argo"}:
@@ -159,6 +338,18 @@ def execution_backend_override(name):
 BUILD_BACKEND = execution_backend_override("BUILD_BACKEND")
 DEPLOYMENT_BACKEND = execution_backend_override("DEPLOYMENT_BACKEND")
 TRAINING_BACKEND = execution_backend_override("TRAINING_BACKEND")
+if TRAINING_MAX_RUNTIME_SECONDS <= 0 or (TRAINING_BACKEND == "argo" and TRAINING_MAX_RUNTIME_SECONDS > 86400):
+    raise ImproperlyConfigured("TRAINING_MAX_RUNTIME_SECONDS must be positive and no more than 86400 for Argo.")
+if any(
+    value < 0
+    for value in (
+        TRAINING_CPU_MEDIUM_WEEKLY_SECONDS,
+        TRAINING_CPU_LARGE_WEEKLY_SECONDS,
+        TRAINING_GPU_T4_WEEKLY_SECONDS,
+        TRAINING_GPU_A10G_WEEKLY_SECONDS,
+    )
+):
+    raise ImproperlyConfigured("Training weekly quotas must not be negative.")
 DRIFT_BACKEND = execution_backend_override("DRIFT_BACKEND")
 TRAINING_ENABLED = str(env("TRAINING_ENABLED", "true")).lower() in {
     "1",
@@ -166,7 +357,7 @@ TRAINING_ENABLED = str(env("TRAINING_ENABLED", "true")).lower() in {
     "yes",
     "on",
 }
-TRAINING_GPU_ENABLED = str(env("TRAINING_GPU_ENABLED", "true" if TRAINING_BACKEND == "argo" else "false")).lower() in {
+TRAINING_GPU_ENABLED = str(env("TRAINING_GPU_ENABLED", "true")).lower() in {
     "1",
     "true",
     "yes",
@@ -176,13 +367,13 @@ TRAINING_GPU_COUNTS = tuple(
     int(value) for value in env_list("TRAINING_GPU_COUNTS", "1") if value.strip().isdigit() and int(value) > 0
 )
 ARGO_BUILD_WEBHOOK_URL = env("ARGO_BUILD_WEBHOOK_URL", "")
+ARGO_CANCEL_BUILD_WEBHOOK_URL = env("ARGO_CANCEL_BUILD_WEBHOOK_URL", "")
 ARGO_TRAINING_WEBHOOK_URL = env("ARGO_TRAINING_WEBHOOK_URL", "")
 ARGO_CANCEL_TRAINING_WEBHOOK_URL = env("ARGO_CANCEL_TRAINING_WEBHOOK_URL", "")
 ARGO_DRIFT_WEBHOOK_URL = env("ARGO_DRIFT_WEBHOOK_URL", "")
 ARGO_DEPLOY_WEBHOOK_URL = env("ARGO_DEPLOY_WEBHOOK_URL", "")
 ARGO_DELETE_WEBHOOK_URL = env("ARGO_DELETE_WEBHOOK_URL", "")
-MLFLOW_TRACKING_URI = env("MLFLOW_TRACKING_URI", "http://mlflow:5000")
-MLFLOW_UI_URL = str(env("MLFLOW_UI_URL", "http://localhost:5003")).rstrip("/")
+MLFLOW_TRACKING_URI = env("MLFLOW_TRACKING_URI", "")
 PROMETHEUS_INTERNAL_URL = str(env("PROMETHEUS_INTERNAL_URL", "")).rstrip("/")
 
 AWS_STORAGE_BUCKET_NAME = env("AWS_BUCKET_NAME", "mlops-paas-artifacts")
@@ -215,3 +406,7 @@ GITHUB_OAUTH_REDIRECT_URI = env("GITHUB_OAUTH_REDIRECT_URI", "http://localhost:5
 LOGGING_CONFIG = "common.logging.configure_logging"
 LOGGING = {"version": 1}
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+
+# MLflow Artifact Limits (default: 5 GiB)
+MLFLOW_MAX_ARTIFACT_UPLOAD_SIZE_BYTES = env_int("MLFLOW_MAX_ARTIFACT_UPLOAD_SIZE_BYTES", 5 * 1024 * 1024 * 1024)
+MLFLOW_MAX_ARTIFACT_DOWNLOAD_SIZE_BYTES = env_int("MLFLOW_MAX_ARTIFACT_DOWNLOAD_SIZE_BYTES", 5 * 1024 * 1024 * 1024)

@@ -1,3 +1,4 @@
+import requests
 from rest_framework.exceptions import NotFound, ValidationError
 
 from apps.deployment.models import Endpoint
@@ -16,19 +17,28 @@ def predict_version(*, version, payload, http=None):
     endpoint = (
         Endpoint.objects.filter(
             deployment__version=version,
-            deployment__status="healthy",
-            health_status="healthy",
+            deployment__active_projects=version.project,
+            deployment__status="succeeded",
+            deployment__version__project__is_active=True,
+            deployment__version__project__deletion_state="active",
         )
         .order_by("-created_at")
         .first()
     )
     if not endpoint:
-        raise ValidationError({"version": "The model version has no healthy endpoint."})
-    response = (http or HttpClient(timeout=(3.05, 60))).request(
-        "POST",
-        f"{endpoint.internal_url}/predict",
-        json=payload,
-    )
+        raise ValidationError({"version": "The model version has no Running succeeded deployment."})
+    try:
+        response = (http or HttpClient(timeout=(3.05, 60))).request(
+            "POST",
+            f"{endpoint.internal_url}/predict",
+            json=payload,
+        )
+    except requests.RequestException as exc:
+        from rest_framework.exceptions import APIException
+
+        error = APIException("The model runtime is unavailable.")
+        error.status_code = 503
+        raise error from exc
     body = response.json()
     return {
         "success": True,

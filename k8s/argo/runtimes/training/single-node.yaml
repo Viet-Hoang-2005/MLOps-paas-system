@@ -1,0 +1,108 @@
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: ClusterTrainingRuntime
+metadata:
+  name: mlops-paas-single-node
+  labels:
+    app.kubernetes.io/name: mlops-paas-training-runtime
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: training
+    mlops-paas.io/plane: execution
+spec:
+  mlPolicy:
+    numNodes: 1
+  template:
+    spec:
+      failurePolicy:
+        maxRestarts: 0
+      replicatedJobs:
+      - name: node
+        replicas: 1
+        template:
+          metadata:
+            labels:
+              trainer.kubeflow.org/trainjob-ancestor-step: trainer
+          spec:
+            parallelism: 1
+            completions: 1
+            backoffLimit: 0
+            template:
+              metadata:
+                labels:
+                  app.kubernetes.io/name: mlops-paas-training-runner
+                  app.kubernetes.io/component: training
+                  mlops-paas.io/domain: training
+              spec:
+                automountServiceAccountToken: false
+                imagePullSecrets:
+                - name: harbor-registry-pull-secret
+                securityContext:
+                  runAsUser: 10001
+                  runAsGroup: 10001
+                  runAsNonRoot: true
+                  fsGroup: 10001
+                  seccompProfile:
+                    type: RuntimeDefault
+                volumes:
+                - name: training-input
+                  emptyDir:
+                    sizeLimit: 512Mi
+                - name: training-work
+                  emptyDir: {}
+                - name: training-output
+                  emptyDir: {}
+                - name: training-model
+                  emptyDir: {}
+                initContainers:
+                - name: prepare-input
+                  image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:81965f1f52b90f1578765eaf99e15aba96f68a8a
+                  command:
+                  - python
+                  - -m
+                  - src.prepare
+                  resources:
+                    requests:
+                      cpu: 100m
+                      memory: 128Mi
+                    limits:
+                      cpu: 250m
+                      memory: 256Mi
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop:
+                      - ALL
+                  volumeMounts:
+                  - name: training-input
+                    mountPath: /prepared
+                containers:
+                - name: node
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop:
+                      - ALL
+                  volumeMounts:
+                  - name: training-input
+                    mountPath: /prepared
+                    readOnly: true
+                  - name: training-work
+                    mountPath: /workspace/work
+                  - name: training-model
+                    mountPath: /workspace/model
+                  - name: training-output
+                    mountPath: /workspace/output
+                  image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:81965f1f52b90f1578765eaf99e15aba96f68a8a
+                  env:
+                  - name: PREPARED_INPUT_DIR
+                    value: /prepared/input
+                  - name: LOG_FORMAT
+                    value: console
+                  - name: LOG_STORAGE_BACKEND
+                    value: loki
+                  - name: LOG_SUMMARY_INTERVAL_SECONDS
+                    value: '60'
+                  command:
+                  - python
+                  - -m
+                  - src.main
+                restartPolicy: Never

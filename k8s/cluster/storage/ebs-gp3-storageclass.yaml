@@ -4,6 +4,13 @@ metadata:
   name: ebs-gp3
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
+  labels:
+    app.kubernetes.io/name: ebs-gp3
+    app.kubernetes.io/instance: ebs-gp3
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: storage-class
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: cluster
 provisioner: ebs.csi.aws.com
 parameters:
   type: gp3

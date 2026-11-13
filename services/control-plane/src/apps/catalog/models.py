@@ -20,6 +20,9 @@ class ModelProject(models.Model):
     description = models.TextField(blank=True)
     access_mode = models.CharField(max_length=20, choices=ACCESS_MODES, default="private")
     next_version_number = models.PositiveIntegerField(default=1)
+    active_deployment = models.ForeignKey(
+        "deployment.Deployment", on_delete=models.SET_NULL, null=True, blank=True, related_name="active_projects"
+    )
     is_active = models.BooleanField(default=True)
     deletion_state = models.CharField(max_length=20, choices=DELETION_STATES, default="active")
     deletion_error = models.TextField(blank=True)
@@ -30,7 +33,7 @@ class ModelProject(models.Model):
 
     class Meta:
         ordering = ["-updated_at"]
-        # Deleted projects keep their row for audit, so only active projects reserve a name.
+        # Cleanup can be retried while inactive; finalization removes the row.
         constraints = [
             models.UniqueConstraint(
                 fields=["owner", "name"], condition=Q(is_active=True), name="project_owner_active_name_unique"
@@ -64,3 +67,47 @@ class WorkspaceAsset(models.Model):
 
     def __str__(self):
         return f"{self.project.name}/{self.kind}/{self.relative_path}"
+
+
+class ModelPreview(models.Model):
+    """The single editable input draft; builds and versions never read it after snapshotting."""
+
+    project = models.OneToOneField(ModelProject, on_delete=models.CASCADE, related_name="preview")
+    flavor = models.CharField(max_length=80, blank=True)
+    artifact_format = models.CharField(max_length=20, default="raw")
+    requirements_text = models.TextField(blank=True)
+    revision = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Preview {self.project.public_id} r{self.revision}"
+
+
+class PreviewAsset(models.Model):
+    KINDS = tuple(
+        (kind, kind.replace("_", " ").title())
+        for kind in (
+            "source_artifact",
+            "source_code",
+            "reference_data",
+            "label_mapping",
+            "metrics",
+            "params",
+            "model_insights",
+            "feature_importance",
+            "input_schema",
+        )
+    )
+    preview = models.ForeignKey(ModelPreview, on_delete=models.CASCADE, related_name="assets")
+    kind = models.CharField(max_length=40, choices=KINDS)
+    name = models.CharField(max_length=255)
+    s3_uri = models.CharField(max_length=1024)
+    checksum = models.CharField(max_length=128, blank=True)
+    size_bytes = models.PositiveBigIntegerField(default=0)
+    content_type = models.CharField(max_length=160, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["preview", "kind"], name="preview_asset_kind_unique")]
+
+    def __str__(self):
+        return f"{self.preview_id}/{self.kind}"

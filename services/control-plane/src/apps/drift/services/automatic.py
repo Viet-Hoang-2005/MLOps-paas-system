@@ -22,7 +22,12 @@ def request_automatic_drift_runs(model_version_id: str) -> int:
     with transaction.atomic():
         monitors = list(
             DriftMonitor.objects.select_for_update()
-            .filter(version__public_id=model_version_id, is_active=True)
+            .filter(
+                version__public_id=model_version_id,
+                is_active=True,
+                version__project__active_deployment__version__public_id=model_version_id,
+                version__project__deletion_state="active",
+            )
             .order_by("pk")
         )
         if not monitors:

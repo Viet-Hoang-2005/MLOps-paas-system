@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -9,6 +10,7 @@ import threading
 import time
 from contextvars import copy_context
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 
 import mlflow
@@ -29,6 +31,27 @@ SOURCE_DIR = WORKSPACE / "source"
 INPUT_TRAIN_DIR = WORKSPACE / "input" / "train"
 MODEL_DIR = WORKSPACE / "model"
 OUTPUT_DIR = WORKSPACE / "output"
+WORK_DIR = WORKSPACE / "work"
+RUNTIME_ENV = {}
+SECRET_VALUES = []
+
+
+@lru_cache(maxsize=1)
+def _secret_pattern(values):
+    fragments = {fragment for value in values for fragment in [value, *value.splitlines()] if fragment}
+    return (
+        re.compile("|".join(re.escape(value) for value in sorted(fragments, key=len, reverse=True)))
+        if fragments
+        else None
+    )
+
+
+def redact_training_output(text):
+    """Scrub both streamed and captured output before logs or artifacts use it."""
+    pattern = _secret_pattern(tuple(SECRET_VALUES))
+    return pattern.sub(lambda match: "[REDACTED]", text) if pattern else text
+
+
 MLOPS_DIR_NAME = "_mlops"
 RUNNER_VERSION = "mlops-metadata-bundle-v1"
 MODEL_FILE_EXTENSIONS = {".pkl", ".joblib", ".xgb"}
@@ -47,6 +70,8 @@ logger = get_logger("training-runner")
 
 
 def log_to_redis(message: str) -> bool:
+    if os.environ.get("LOG_STORAGE_BACKEND", "").strip().lower() == "loki":
+        return False
     job_id = os.environ.get("TRAINING_JOB_ID", "").strip()
     redis_url = os.environ.get("REDIS_URL", "").strip()
     if not job_id or not redis_url:
@@ -69,7 +94,7 @@ def log(message: str) -> None:
 
 
 def metric_log(payload: dict) -> None:
-    runtime_log.protocol(f"METRIC_JSON {json.dumps(payload, separators=(',', ':'))}")
+    runtime_log.protocol(f"METRIC_JSON {json.dumps(safe_json_value(payload), separators=(',', ':'), allow_nan=False)}")
 
 
 def warn(warnings: list[dict], code: str, message: str, **extra) -> None:
@@ -80,8 +105,10 @@ def warn(warnings: list[dict], code: str, message: str, **extra) -> None:
 
 def write_json(path: Path, payload) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    # allow_nan=False after normalizing: a stray NaN must fail here, never reach a strict JSON consumer.
     path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+        json.dumps(safe_json_value(payload), indent=2, sort_keys=True, default=str, allow_nan=False),
+        encoding="utf-8",
     )
 
 
@@ -93,18 +120,34 @@ def is_number(value) -> bool:
     return metadata.is_number(value)
 
 
-def parse_metric_events(
-    stdout_text: str, warnings: list[dict]
-) -> tuple[list[dict], dict]:
+def _warn_non_finite(warnings: list[dict], payload, source: str, **extra) -> None:
+    count = metadata.count_non_finite(payload)
+    if count:
+        warn(
+            warnings,
+            "non_finite_value_ignored",
+            "NaN or Infinity values are not valid JSON and were dropped.",
+            source=source,
+            count=count,
+            **extra,
+        )
+
+
+def parse_metric_events(stdout_text: str, warnings: list[dict]) -> tuple[list[dict], dict]:
     events: list[dict] = []
     metrics: dict = {}
 
     for line_number, line in enumerate(stdout_text.splitlines(), start=1):
         stripped = line.strip()
-        if not stripped.startswith("METRIC_JSON:"):
+        matched_prefix = None
+        for prefix in ("METRIC_JSON:", "METRIC_JSON "):
+            if stripped.startswith(prefix):
+                matched_prefix = prefix
+                break
+        if not matched_prefix:
             continue
 
-        raw_payload = stripped.split("METRIC_JSON:", 1)[1].strip()
+        raw_payload = stripped[len(matched_prefix) :].strip()
         try:
             payload = json.loads(raw_payload)
         except json.JSONDecodeError as exc:
@@ -126,6 +169,7 @@ def parse_metric_events(
             )
             continue
 
+        _warn_non_finite(warnings, payload, "METRIC_JSON", line_number=line_number)
         normalized_payload = safe_json_value(payload)
         events.append({"line_number": line_number, "payload": normalized_payload})
         for key, value in normalized_payload.items():
@@ -155,6 +199,7 @@ def read_json_object(path: Path, label: str, warnings: list[dict]) -> dict:
             f"{label}.json must contain a JSON object.",
         )
         return {}
+    _warn_non_finite(warnings, payload, f"{label}.json")
     return safe_json_value(payload)
 
 
@@ -185,15 +230,10 @@ def normalize_model_insights(payload: dict, default_kind: str = "") -> dict:
         coefficients = payload.get("coefficients")
         if isinstance(feature_importance, dict):
             kind = "feature_importance"
-            raw_items = [
-                {"name": name, "value": value}
-                for name, value in feature_importance.items()
-            ]
+            raw_items = [{"name": name, "value": value} for name, value in feature_importance.items()]
         elif isinstance(coefficients, dict):
             kind = "coefficients"
-            raw_items = [
-                {"name": name, "value": value} for name, value in coefficients.items()
-            ]
+            raw_items = [{"name": name, "value": value} for name, value in coefficients.items()]
         else:
             raw_items = []
 
@@ -217,9 +257,7 @@ def normalize_model_insights(payload: dict, default_kind: str = "") -> dict:
             normalized["class_name"] = str(class_name)
         items.append(normalized)
 
-    items = sorted(items, key=lambda entry: entry["abs_value"], reverse=True)[
-        :MAX_MODEL_INSIGHT_ITEMS
-    ]
+    items = sorted(items, key=lambda entry: entry["abs_value"], reverse=True)[:MAX_MODEL_INSIGHT_ITEMS]
     for rank, item in enumerate(items, start=1):
         item["rank"] = rank
 
@@ -330,20 +368,20 @@ def log_to_mlflow(
         if not exp_name:
             exp_name = f"tenant-{tenant_id}" if tenant_id else "default-tenant"
         artifact_root = os.environ.get("MLFLOW_ARTIFACT_ROOT", "").strip()
-        if not artifact_root:
-            raise RuntimeError(
-                "MLFLOW_ARTIFACT_ROOT is required for job-scoped MLflow artifacts"
-            )
-        artifact_proxy_root = mlflow_proxy_artifact_uri(artifact_root)
+        artifact_proxy_root = mlflow_proxy_artifact_uri(artifact_root) if artifact_root else None
         try:
             exp = mlflow.get_experiment_by_name(exp_name)
             if not exp:
-                mlflow.create_experiment(
-                    exp_name, artifact_location=artifact_proxy_root
-                )
+                if artifact_proxy_root:
+                    mlflow.create_experiment(exp_name, artifact_location=artifact_proxy_root)
+                else:
+                    mlflow.create_experiment(exp_name)
         except Exception:
             pass
-        mlflow.set_experiment(exp_name)
+        try:
+            mlflow.set_experiment(exp_name)
+        except Exception:
+            pass
 
         run_name = f"job-{training_job_id}" if training_job_id else "training-job"
         with mlflow.start_run(run_name=run_name):
@@ -372,19 +410,7 @@ def log_to_mlflow(
                     except Exception:
                         pass
 
-            if model_dir.exists():
-                try:
-                    mlflow.log_artifacts(str(model_dir), artifact_path="model")
-                except Exception as exc:
-                    runtime_log.event(
-                        logging.WARNING,
-                        "training_mlflow_artifacts_failed",
-                        "Could not log training artifacts to MLflow",
-                        reason=sanitize(str(exc)),
-                    )
-        log(
-            "Successfully logged training job parameters, metrics, and artifacts to MLflow"
-        )
+        log("Successfully logged training job parameters and metrics to MLflow")
     except Exception as exc:
         runtime_log.event(
             logging.WARNING,
@@ -408,14 +434,22 @@ def write_mlops_bundle(
     stdout_text: str,
     stderr_text: str,
 ) -> None:
+    stdout_text = redact_training_output(stdout_text)
+    stderr_text = redact_training_output(stderr_text)
+    # Validate before writing metadata or handing paths to MLflow, not only
+    # when packaging the final archive.
+    from src.output_contract import collect
+
+    collect(MODEL_DIR, "model", require_env("MODEL_FLAVOR"))
+    collect(OUTPUT_DIR, "metadata", require_env("MODEL_FLAVOR"))
     warnings: list[dict] = []
-    mlops_dir = MODEL_DIR / MLOPS_DIR_NAME
-    mlops_dir.mkdir(parents=True, exist_ok=True)
+    mlops_dir = WORK_DIR / MLOPS_DIR_NAME
+    if mlops_dir.exists():
+        raise RuntimeError("Reserved system output directory already exists.")
+    mlops_dir.mkdir(parents=True)
 
     metric_events, stdout_metrics = parse_metric_events(stdout_text, warnings)
-    file_metrics_payload = read_json_object(
-        OUTPUT_DIR / "metrics.json", "metrics", warnings
-    )
+    file_metrics_payload = read_json_object(OUTPUT_DIR / "metrics.json", "metrics", warnings)
     params_payload = read_json_object(OUTPUT_DIR / "params.json", "params", warnings)
     metrics = {
         **stdout_metrics,
@@ -521,9 +555,7 @@ def _read_cgroup_cpu_limit() -> float:
     cpu_max = Path("/sys/fs/cgroup/cpu.max")
     if cpu_max.exists():
         try:
-            quota_raw, period_raw = (
-                cpu_max.read_text(encoding="utf-8").strip().split(maxsplit=1)
-            )
+            quota_raw, period_raw = cpu_max.read_text(encoding="utf-8").strip().split(maxsplit=1)
             if quota_raw != "max":
                 quota = int(quota_raw)
                 period = int(period_raw)
@@ -620,15 +652,11 @@ def _read_gpu_metrics() -> dict:
         "gpu_percent": round(gpu_percent, 2),
         "gpu_memory_used_mb": round(memory_used, 2),
         "gpu_memory_total_mb": round(memory_total, 2),
-        "gpu_memory_percent": round((memory_used / memory_total) * 100, 2)
-        if memory_total
-        else None,
+        "gpu_memory_percent": round((memory_used / memory_total) * 100, 2) if memory_total else None,
     }
 
 
-def start_metric_emitter(
-    stop_event: threading.Event, interval_seconds: int = 5
-) -> threading.Thread:
+def start_metric_emitter(stop_event: threading.Event, interval_seconds: int = 5) -> threading.Thread:
     def emit_loop() -> None:
         cpu_limit = _read_cgroup_cpu_limit()
         previous_usage = _read_cgroup_cpu_usage_seconds()
@@ -638,18 +666,9 @@ def start_metric_emitter(
             now = time.monotonic()
             current_usage = _read_cgroup_cpu_usage_seconds()
             cpu_percent = None
-            if (
-                previous_usage is not None
-                and current_usage is not None
-                and now > previous_time
-            ):
+            if previous_usage is not None and current_usage is not None and now > previous_time:
                 cpu_percent = round(
-                    (
-                        (current_usage - previous_usage)
-                        / (now - previous_time)
-                        / cpu_limit
-                    )
-                    * 100,
+                    ((current_usage - previous_usage) / (now - previous_time) / cpu_limit) * 100,
                     2,
                 )
                 cpu_percent = max(0.0, min(cpu_percent, 100.0))
@@ -692,7 +711,16 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
 
     env = {
         name: os.environ[name]
-        for name in ("HOME", "LANG", "LC_ALL", "PATH", "PYTHONPATH", "TZ")
+        for name in (
+            "HOME",
+            "LANG",
+            "LC_ALL",
+            "PATH",
+            "PYTHONPATH",
+            "TZ",
+            "MLFLOW_TRACKING_URI",
+            "MLFLOW_TRACKING_TOKEN",
+        )
         if os.environ.get(name)
     }
     env.update(
@@ -703,10 +731,19 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
             "MODEL_VERSION": model_version,
         }
     )
+    env.update(RUNTIME_ENV)
+    workspace_contract = os.environ.get("INPUT_CONTRACT") == "workspace"
+    if workspace_contract:
+        env.update(
+            MLOPS_WORK_DIR=str(WORK_DIR),
+            HOME=str(WORK_DIR / "home"),
+            TMPDIR=str(WORK_DIR / "tmp"),
+            PYTHONDONTWRITEBYTECODE="1",
+            PYTHONPATH=str(SOURCE_DIR) + os.pathsep + env.get("PYTHONPATH", ""),
+        )
 
     log(f"Running training entry point: {entry_point}")
     stop_metrics = threading.Event()
-    start_metric_emitter(stop_metrics)
     stdout_lines: list[str] = []
     stderr_lines: list[str] = []
 
@@ -715,6 +752,7 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
             return
         for line in iter(stream.readline, ""):
             # Keep parser/bundle input verbatim; sanitize only the display copy.
+            line = redact_training_output(line)
             lines.append(line)
             message = line.rstrip("\n")
             if protocol and is_metric_protocol_line(message):
@@ -725,7 +763,7 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
     try:
         process = subprocess.Popen(
             [sys.executable, str(entry_point_path)],
-            cwd=str(SOURCE_DIR),
+            cwd=str(WORK_DIR if workspace_contract else SOURCE_DIR),
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -752,18 +790,32 @@ def run_training(entry_point: str, model_version: str) -> subprocess.CompletedPr
     return subprocess.CompletedProcess(
         args=[sys.executable, str(entry_point_path)],
         returncode=process.returncode,
-        stdout="".join(stdout_lines),
-        stderr="".join(stderr_lines),
+        stdout=redact_training_output("".join(stdout_lines)),
+        stderr=redact_training_output("".join(stderr_lines)),
     )
 
 
 def create_model_archive(archive_path: Path) -> None:
-    execution.create_model_archive(archive_path, MODEL_DIR, MLOPS_DIR_NAME, log)
+    from src.output_contract import package
+
+    package(archive_path, MODEL_DIR, OUTPUT_DIR, WORK_DIR / MLOPS_DIR_NAME, require_env("MODEL_FLAVOR"))
 
 
 def _run() -> None:
+    if os.environ.get("INPUT_CONTRACT") == "workspace":
+        return _run_workspace()
     source_uri = require_env("S3_SOURCE_URI")
     training_data_uri = require_env("S3_TRAINING_DATA_URI")
+    input_endpoint = os.environ.get("S3_INPUT_DOWNLOAD_URL", "")
+    if input_endpoint:
+        response = requests.post(
+            input_endpoint,
+            headers={"Authorization": f"Bearer {require_env('S3_INPUT_DOWNLOAD_CAPABILITY')}"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        urls = response.json()
+        source_uri, training_data_uri = urls["source_url"], urls["data_url"]
     output_upload_endpoint = require_env("S3_OUTPUT_UPLOAD_URL")
     output_upload_capability = require_env("S3_OUTPUT_UPLOAD_CAPABILITY")
     entry_point = os.environ.get("ENTRY_POINT", "train.py").strip() or "train.py"
@@ -772,32 +824,43 @@ def _run() -> None:
     requirements_uri = os.environ.get("S3_REQUIREMENTS_URI", "").strip()
 
     log("Preparing workspace")
-    if WORKSPACE.exists():
-        shutil.rmtree(WORKSPACE)
+    WORKSPACE.mkdir(parents=True, exist_ok=True)
+    for path in WORKSPACE.iterdir():
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
     SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     INPUT_TRAIN_DIR.mkdir(parents=True, exist_ok=True)
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     source_zip_path = WORKSPACE / "source.zip"
-    train_csv_path = INPUT_TRAIN_DIR / "train.csv"
+    data_download_path = WORKSPACE / "data_download"
     requirements_path = SOURCE_DIR / "requirements.txt"
-    model_archive_path = OUTPUT_DIR / "model.tar.gz"
+    model_archive_path = WORK_DIR / "model.tar.gz"
 
     download_presigned_url(source_uri, source_zip_path)
-    download_presigned_url(training_data_uri, train_csv_path)
+    download_presigned_url(training_data_uri, data_download_path)
     if requirements_uri:
         download_presigned_url(requirements_uri, requirements_path)
 
     log("Extracting source zip")
     safe_extract_zip(source_zip_path, SOURCE_DIR)
 
+    log("Extracting training data")
+    import zipfile
+
+    if zipfile.is_zipfile(data_download_path):
+        safe_extract_zip(data_download_path, INPUT_TRAIN_DIR)
+    else:
+        train_csv_path = INPUT_TRAIN_DIR / "train.csv"
+        shutil.copy(data_download_path, train_csv_path)
+
     requirements_text = os.environ.get("REQUIREMENTS_TEXT", "").strip()
     if requirements_text:
         try:
-            decoded = base64.b64decode(requirements_text.encode("utf-8")).decode(
-                "utf-8"
-            )
+            decoded = base64.b64decode(requirements_text.encode("utf-8")).decode("utf-8")
             if any(c.isalpha() for c in decoded):
                 requirements_text = decoded
         except Exception:
@@ -819,13 +882,62 @@ def _run() -> None:
         stderr_text=result.stderr or "",
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"Training entry point failed with exit code {result.returncode}"
-        )
+        raise RuntimeError(f"Training entry point failed with exit code {result.returncode}")
     create_model_archive(model_archive_path)
     upload_presigned_url(
         model_archive_path,
         request_output_upload_url(output_upload_endpoint, output_upload_capability),
+    )
+
+
+def _run_workspace():
+    global SOURCE_DIR, INPUT_TRAIN_DIR, RUNTIME_ENV, SECRET_VALUES
+    input_root = Path(require_env("PREPARED_INPUT_DIR"))
+    # This verifies the actual mount, not file permissions that the user can undo.
+    if not hasattr(os, "statvfs") or not os.statvfs(input_root).f_flag & os.ST_RDONLY:
+        raise RuntimeError("Workspace Input must be mounted read-only.")
+    SOURCE_DIR = INPUT_TRAIN_DIR = input_root
+    for directory in (MODEL_DIR, OUTPUT_DIR, WORK_DIR, WORK_DIR / "home", WORK_DIR / "tmp"):
+        directory.mkdir(parents=True, exist_ok=True)
+    entry = require_env("ENTRY_POINT")
+    entry_path = (input_root / entry).resolve()
+    if (
+        not entry_path.is_relative_to(input_root.resolve())
+        or not entry_path.is_file()
+        or entry_path.suffix.lower() != ".py"
+    ):
+        raise RuntimeError("Invalid workspace entry point.")
+    # Dependency build code never receives the user's secret/environment snapshot.
+    os.environ["HOME"] = str(WORK_DIR / "home")
+    os.environ["TMPDIR"] = str(WORK_DIR / "tmp")
+    install_requirements(input_root / "requirements.txt")
+    response = requests.post(
+        require_env("RUNTIME_CONFIG_URL"),
+        headers={"Authorization": "Bearer " + require_env("RUNTIME_CONFIG_CAPABILITY")},
+        timeout=30,
+    )
+    response.raise_for_status()
+    configuration = response.json()
+    RUNTIME_ENV = configuration["environment"]
+    SECRET_VALUES = sorted(
+        [RUNTIME_ENV[name] for name in configuration["secret_names"] if RUNTIME_ENV.get(name)], key=len, reverse=True
+    )
+    result = run_training(entry, "")
+    write_mlops_bundle(
+        entry_point=entry,
+        model_version="",
+        training_job_id=require_env("TRAINING_JOB_ID"),
+        status="succeeded" if result.returncode == 0 else "failed",
+        stdout_text=redact_training_output(result.stdout or ""),
+        stderr_text=redact_training_output(result.stderr or ""),
+    )
+    if result.returncode:
+        raise RuntimeError(f"Training entry point failed with exit code {result.returncode}")
+    archive = WORK_DIR / "model.tar.gz"
+    create_model_archive(archive)
+    upload_presigned_url(
+        archive,
+        request_output_upload_url(require_env("S3_OUTPUT_UPLOAD_URL"), require_env("S3_OUTPUT_UPLOAD_CAPABILITY")),
     )
 
 

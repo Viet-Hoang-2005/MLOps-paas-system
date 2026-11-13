@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
-import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { NavLink } from "react-router-dom";
+import { cn } from "@/shared/lib/cn";
 
 export type PageTab = {
   label: string;
@@ -10,15 +11,17 @@ export type PageTab = {
   isActive?: boolean;
 };
 
-type PageTabsProps = {
+export type PageTabsProps = {
   tabs: PageTab[];
+  className?: string;
+  bordered?: boolean;
 };
 
-export function PageTabs({ tabs }: PageTabsProps) {
+export function PageTabs({ tabs, className, bordered = false }: PageTabsProps) {
   const { t } = useTranslation("common");
-  return (
+  const nav = (
     <nav
-      className="-mb-px w-full overflow-x-auto md:w-auto"
+      className={cn("-mb-px w-full overflow-x-auto md:w-auto", className)}
       aria-label={t("accessibility.pageSections")}
     >
       <div className="flex min-w-max items-center gap-2">
@@ -31,6 +34,10 @@ export function PageTabs({ tabs }: PageTabsProps) {
               <NavLink
                 key={key}
                 to={tab.to}
+                onClick={(e) => {
+                  (e.currentTarget as HTMLElement).blur();
+                  tab.onClick?.();
+                }}
                 className={({ isActive }) =>
                   [
                     "inline-flex h-10 items-center gap-2 border-b-2 px-3 text-style-body-strong transition-colors focus-visible:ring-2 focus-visible:ring-ring",
@@ -40,7 +47,7 @@ export function PageTabs({ tabs }: PageTabsProps) {
                   ].join(" ")
                 }
               >
-                {Icon && <Icon className="h-4 w-4 shrink-0" />}
+                {Icon && <Icon className="h-4 w-4 shrink-0 -translate-y-0.5" />}
                 <span className="whitespace-nowrap">{tab.label}</span>
               </NavLink>
             );
@@ -50,7 +57,10 @@ export function PageTabs({ tabs }: PageTabsProps) {
             <button
               key={key}
               type="button"
-              onClick={tab.onClick}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                tab.onClick?.();
+              }}
               className={[
                 "inline-flex h-10 items-center gap-2 border-b-2 px-3 text-style-body-strong transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                 tab.isActive
@@ -58,7 +68,7 @@ export function PageTabs({ tabs }: PageTabsProps) {
                   : "border-transparent text-color-muted-foreground hover:border-border hover:text-color-foreground",
               ].join(" ")}
             >
-              {Icon && <Icon className="h-4 w-4 shrink-0" />}
+              {Icon && <Icon className="h-4 w-4 shrink-0 -translate-y-0.5" />}
               <span className="whitespace-nowrap">{tab.label}</span>
             </button>
           );
@@ -66,4 +76,10 @@ export function PageTabs({ tabs }: PageTabsProps) {
       </div>
     </nav>
   );
+
+  if (bordered) {
+    return <div className="border-b border-border">{nav}</div>;
+  }
+
+  return nav;
 }

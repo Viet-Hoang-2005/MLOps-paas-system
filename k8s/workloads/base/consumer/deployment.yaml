@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlops-paas-consumer
+  annotations:
+    description: "Kafka Consumer to process network traffic data in batches and store predictions"
+  labels:
+    app.kubernetes.io/name: mlops-paas-consumer
+    app.kubernetes.io/instance: mlops-paas-consumer
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: streaming
+spec:
+  # Consumer chỉ cần 1 replica (dùng kafka group consumer) là đủ để dọn dẹp
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mlops-paas-consumer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mlops-paas-consumer
+        app.kubernetes.io/instance: mlops-paas-consumer
+        app.kubernetes.io/part-of: mlops-paas
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/managed-by: kustomize
+        mlops-paas.io/plane: workload
+        mlops-paas.io/domain: streaming
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      nodeSelector:
+        workload-type: worker
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - mlops-paas-consumer
+                topologyKey: "kubernetes.io/hostname"
+      initContainers:
+        - name: init-kafka-topic
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          image: docker.redpanda.com/redpandadata/redpanda:v23.3.21
+          command: ["/bin/sh", "-c"]
+          args: ["rpk topic create mlops_paas_production_data mlops_paas_production_data.dlq --brokers redpanda.mlops-paas-data.svc.cluster.local:9092 || true"]
+          env:
+            - name: HOME
+              value: /tmp
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      containers:
+        - name: consumer
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          image: mlops-paas-consumer
+          imagePullPolicy: Always
+          command: ["python", "-m", "src.main"]
+          envFrom:
+            - configMapRef:
+                name: mlops-paas-consumer-config
+          env:
+            - name: CONTROL_PLANE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-paas-consumer-secret
+                  key: CONTROL_PLANE_WEBHOOK_SECRET
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-paas-consumer-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-paas-consumer-secret
+                  key: DB_PASSWORD
+          # Cấu hình tài nguyên cho Consumer
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

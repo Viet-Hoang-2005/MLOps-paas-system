@@ -1,6 +1,9 @@
+import json
 from unittest.mock import Mock
 
 import pandas as pd
+import pytest
+from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 from src import database
 
 
@@ -89,31 +92,30 @@ def test_prediction_and_webhook_outbox_share_transaction(monkeypatch):
     assert database.save_prediction_records_and_automatic_drift_signals(frame, signals)
     assert connection.execute.call_count == 2
     prediction_sql = str(connection.execute.call_args_list[0].args[0])
-    assert (
-        "INNER JOIN" in prediction_sql
-        and "ON CONFLICT (public_id) DO NOTHING" in prediction_sql
-    )
+    assert "INNER JOIN" in prediction_sql and "ON CONFLICT (public_id) DO NOTHING" in prediction_sql
     outbox_sql = str(connection.execute.call_args_list[1].args[0])
     assert "'webhook'" in outbox_sql and "'automatic_drift'" in outbox_sql
 
 
 def test_records_preserve_zero_prediction():
-    frame = pd.DataFrame([
-        {
-            "public_id": "00000000-0000-0000-0000-000000000001",
-            "project_id": "00000000-0000-0000-0000-000000000002",
-            "model_version_id": "00000000-0000-0000-0000-000000000003",
-            "features": {"x": 1},
-            "prediction": 0,
-        },
-        {
-            "public_id": "00000000-0000-0000-0000-000000000004",
-            "project_id": "00000000-0000-0000-0000-000000000002",
-            "model_version_id": "00000000-0000-0000-0000-000000000003",
-            "features": {"x": 2},
-            "prediction": 1,
-        },
-    ])
+    frame = pd.DataFrame(
+        [
+            {
+                "public_id": "00000000-0000-0000-0000-000000000001",
+                "project_id": "00000000-0000-0000-0000-000000000002",
+                "model_version_id": "00000000-0000-0000-0000-000000000003",
+                "features": {"x": 1},
+                "prediction": 0,
+            },
+            {
+                "public_id": "00000000-0000-0000-0000-000000000004",
+                "project_id": "00000000-0000-0000-0000-000000000002",
+                "model_version_id": "00000000-0000-0000-0000-000000000003",
+                "features": {"x": 2},
+                "prediction": 1,
+            },
+        ]
+    )
 
     assert [record["prediction"] for record in database._records(frame)] == ["0", "1"]
 
@@ -132,3 +134,92 @@ def test_webhook_claim_uses_kind_destination_and_skip_locked(monkeypatch):
     assert "delivery_kind = 'webhook'" in statement
     assert "destination = 'automatic_drift'" in statement
     assert "FOR UPDATE SKIP LOCKED" in statement
+
+
+def test_records_converts_nat_and_nan_to_none():
+    frame = pd.DataFrame(
+        [
+            {
+                "public_id": "00000000-0000-0000-0000-000000000001",
+                "project_id": "00000000-0000-0000-0000-000000000002",
+                "model_version_id": "00000000-0000-0000-0000-000000000003",
+                "observed_at": pd.NaT,
+                "confidence": float("nan"),
+                "latency_ms": float("nan"),
+            }
+        ]
+    )
+    records = database._records(frame)
+    assert len(records) == 1
+    assert records[0]["observed_at"] is None
+    assert records[0]["confidence"] is None
+    assert records[0]["latency_ms"] is None
+
+
+GOOD_ROW = {
+    "public_id": "00000000-0000-0000-0000-000000000001",
+    "project_id": "00000000-0000-0000-0000-000000000002",
+    "model_version_id": "00000000-0000-0000-0000-000000000003",
+    "observed_at": "2026-01-01T00:00:00Z",
+    "features": {"x": 1},
+    "prediction": "safe",
+    "confidence": 80.0,
+    "latency_ms": 1.0,
+    "request_id": "request-1",
+}
+
+
+def test_records_make_hostile_values_storable_in_jsonb():
+    frame = pd.DataFrame(
+        [
+            GOOD_ROW
+            | {
+                "features": {
+                    "nan": float("nan"),
+                    "inf": float("inf"),
+                    "s\x00key": "a\x00b",
+                    "nested": [float("-inf"), {"k": "v\x00"}],
+                },
+                "prediction": "sa\x00fe",
+                "confidence": float("inf"),
+                "latency_ms": float("nan"),
+                "request_id": "r\x00id",
+            }
+        ]
+    )
+
+    (record,) = database._records(frame)
+
+    assert json.loads(record["features"]) == {"nan": None, "inf": None, "skey": "ab", "nested": [None, {"k": "v"}]}
+    assert "NaN" not in record["features"] and "Infinity" not in record["features"]
+    assert "\x00" not in record["features"]
+    assert record["prediction"] == "safe" and record["request_id"] == "rid"
+    assert record["confidence"] is None and record["latency_ms"] is None
+
+
+@pytest.mark.parametrize(
+    "error,expected",
+    [
+        (DataError("stmt", {}, Exception("invalid json")), database.PermanentWriteError),
+        (OperationalError("stmt", {}, Exception("connection refused")), database.TransientWriteError),
+    ],
+)
+def test_write_failures_are_classified_by_whether_a_retry_can_help(monkeypatch, error, expected):
+    connection = Mock()
+    connection.execute.side_effect = error
+    engine = Mock()
+    engine.begin.return_value = Context(connection)
+    monkeypatch.setattr(database, "engine_rw", engine)
+
+    with pytest.raises(expected):
+        database.save_prediction_records_and_automatic_drift_signals(pd.DataFrame([GOOD_ROW]), [])
+
+
+def test_other_write_failures_still_report_false(monkeypatch):
+    connection = Mock()
+    connection.execute.side_effect = ProgrammingError("stmt", {}, Exception("missing column"))
+    engine = Mock()
+    engine.begin.return_value = Context(connection)
+    monkeypatch.setattr(database, "engine_rw", engine)
+
+    assert database.save_prediction_records_and_automatic_drift_signals(pd.DataFrame([GOOD_ROW]), []) is False

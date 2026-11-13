@@ -42,13 +42,9 @@ def test_load_model_dispatch(monkeypatch, tmp_path, flavor, suffix, loader_name)
         booster = Mock()
         monkeypatch.setattr(core, "xgb", SimpleNamespace(Booster=lambda: booster))
     elif loader_name == "torch":
-        monkeypatch.setattr(
-            core, "torch", SimpleNamespace(load=lambda *a, **k: "model")
-        )
+        monkeypatch.setattr(core, "torch", SimpleNamespace(load=lambda *a, **k: "model"))
     else:
-        fake_tf = SimpleNamespace(
-            keras=SimpleNamespace(models=SimpleNamespace(load_model=lambda _: "model"))
-        )
+        fake_tf = SimpleNamespace(keras=SimpleNamespace(models=SimpleNamespace(load_model=lambda _: "model")))
         monkeypatch.setattr(core, "tf", fake_tf)
     result = core.load_model(path, flavor)
     assert result == "model" or loader_name == "xgb"

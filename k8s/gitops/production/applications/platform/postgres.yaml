@@ -6,8 +6,11 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-10"
   labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: postgres
     mlops-paas.io/plane: platform
-    mlops-paas.io/component: postgres
 spec:
   project: mlops-platform
   info:
@@ -23,7 +26,7 @@ spec:
     path: k8s/platform/postgres
   destination:
     server: https://kubernetes.default.svc
-    namespace: mlops-postgres
+    namespace: mlops-paas-data
   # ESO remoteRef defaults are declared in the manifests instead of ignored here:
   # RespectIgnoreDifferences copies live values of ignored paths into the target,
   # and for a .spec.data[] path that replaces the whole array, dropping new keys.
@@ -34,8 +37,8 @@ spec:
         - /metadata/annotations/force-sync
     - group: postgresql.cnpg.io
       kind: Cluster
-      name: mlops-paas-postgres
-      namespace: mlops-postgres
+      name: postgresql
+      namespace: mlops-paas-data
       jsonPointers:
         - /spec/bootstrap/initdb/encoding
         - /spec/bootstrap/initdb/localeCType

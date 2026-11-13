@@ -1,7 +1,7 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
-import { Button } from "./Button";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "./Button";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
@@ -15,7 +15,7 @@ function ErrorFallback() {
   const { t } = useTranslation("common");
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-6 text-center text-color-foreground">
-      <section className="max-w-md rounded-surface border border-border bg-surface p-8 shadow-[var(--shadow-overlay)]">
+      <section className="max-w-md rounded-surface border border-border bg-surface p-8 shadow-(--shadow-overlay)">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-surface bg-danger-subtle text-color-danger">
           <AlertTriangle className="h-6 w-6" />
         </span>

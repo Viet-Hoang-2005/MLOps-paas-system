@@ -1,13 +1,17 @@
 # Consumer
 
-The consumer reads successful inference events from Redpanda and writes production observations to PostgreSQL.
+The Consumer (`services/consumer/`) is a high-throughput background worker executing between Redpanda Kafka and PostgreSQL.
 
-- Parse and normalize event timestamps to UTC.
-- Preserve nested feature/prediction JSON as JSONB; do not double encode.
-- Group/count by model identity and read active drift thresholds.
-- Empty, malformed, unknown-model, or unconfigured-threshold batches fail safely.
-- Webhook failures are observable but do not corrupt committed data.
-- Commit Kafka offsets only after durable database persistence succeeds.
-- Flush on full batch, idle timeout, and final shutdown.
+## Core Responsibilities
 
-Tests use fake consumers, engines, frames, HTTP clients, and errors; never require a real broker or database.
+1. **Kafka Telemetry Ingestion:** Continuously subscribes to topic `mlops_paas_production_data`.
+2. **Micro-Batching:** Accumulates records per Kafka partition and bulk-inserts into PostgreSQL when reaching `KAFKA_BATCH_SIZE` or exceeding idle timeout.
+3. **Schema Ownership & Zero DDL:** Consumer never executes DDL (`CREATE TABLE`). It expects Control Plane migrations to create `control_plane.production_predictionrecord` and `control_plane.observability_eventoutbox`.
+4. **Flexible Storage:** Parses UTC timestamps, flattens/validates payload, and persists nested features as `JSONB` with prediction results as `TEXT`.
+5. **Transactional Outbox for Automatic Drift:** In the exact same database transaction as the production record insert, inserts a deterministic signal into `control_plane.observability_eventoutbox`.
+6. **Non-Blocking Dispatcher Thread:** A dedicated background thread (`automatic-drift-outbox`) leases pending outbox signals (`lease_seconds=60`) and dispatches HTTP POST requests to `CONTROL_PLANE_AUTOMATIC_DRIFT_WEBHOOK_URL` with exponential backoff. Network or Control Plane latency never blocks the main Kafka polling loop.
+7. **At-Least-Once Delivery & Idempotent Replay:**
+   - Synchronously commits Kafka offsets (`consumer.commit(asynchronous=False)`) ONLY AFTER the PostgreSQL transaction succeeds.
+   - Bulk inserts use `ON CONFLICT (id) DO NOTHING` to eliminate duplicates during replay after crashes.
+8. **Partition-Level Error Isolation:** If a database error or offset commit fails, Consumer pauses only the affected partition and applies backoff retries (`KAFKA_DB_RETRY_INITIAL_SECONDS` to `KAFKA_DB_RETRY_MAX_SECONDS`); unaffected partitions continue processing.
+9. **Dead-Letter Topic:** Records the consumer cannot store are parked in `KAFKA_DLQ_TOPIC` (default `<KAFKA_TOPIC>.dlq`; empty disables it) with `x-source-*` and `x-failure-reason` headers, never silently dropped. A malformed record is committed only after it is parked and only when the partition has no unsaved batch before it. After `KAFKA_DB_RETRY_MAX_ATTEMPTS` failed writes the batch is parked and the partition resumes; if parking fails the batch stays retained and retried. Replay by re-producing the DLQ values to the main topic.

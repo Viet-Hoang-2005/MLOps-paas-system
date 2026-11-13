@@ -1,4 +1,5 @@
 import { apiClient, refreshAccessToken } from "@/shared/api/client";
+import { runWithRefreshLock } from "@/shared/api/authCoordination";
 import type {
   AuthResponse,
   CompleteRegistrationRequest,
@@ -11,6 +12,13 @@ import type {
 } from "@/features/auth/types";
 
 export const refreshSession = refreshAccessToken;
+
+export const logoutSession = async (): Promise<{ message: string }> => {
+  return runWithRefreshLock(
+    async () =>
+      (await apiClient.post<{ message: string }>("/auth/logout/", {})).data,
+  );
+};
 
 export const loginBaseAuth = async (
   credentials: LoginCredentials,

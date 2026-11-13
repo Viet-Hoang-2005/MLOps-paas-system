@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
@@ -17,6 +18,78 @@ class FakeStorage:
 
     def delete_prefix(self, prefix):
         self.prefixes.append(prefix)
+
+
+@pytest.mark.django_db
+def test_project_deletion_preserves_existing_training_jobs(monkeypatch):
+    from rest_framework.exceptions import ValidationError
+
+    from apps.catalog.services.deletion import request_project_deletion
+    from apps.training.models import TrainingJob
+
+    owner = get_user_model().objects.create_user("preserve-training@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="Preserve training")
+    job = TrainingJob.objects.create(
+        project=project,
+        model_flavor="sklearn",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        status="pending",
+    )
+    storage = FakeStorage()
+
+    monkeypatch.setattr("apps.catalog.services.deletion._enqueue", lambda project: None)
+    request_project_deletion(project)
+    project.refresh_from_db()
+    assert project.deletion_state == "deleting"
+    with pytest.raises(ValidationError, match="training job history"):
+        finalize_project_deletion(project, storage=storage)
+    assert TrainingJob.objects.filter(pk=job.pk).exists()
+    assert storage.prefixes == []
+
+
+@pytest.mark.django_db
+def test_project_cleanup_retains_tenant_scoped_training_history(monkeypatch):
+    from apps.observability.models import LifecycleEvent
+    from apps.training.models import TrainingJob, TrainingOutput
+
+    owner = get_user_model().objects.create_user("detached-training@example.com", "password123")
+    project = ModelProject.objects.create(
+        owner=owner, name="Detach training", deletion_state="deleting", is_active=False
+    )
+    job = TrainingJob.objects.create(
+        project=project,
+        model_flavor="sklearn",
+        status="completed",
+        storage_layout="tenant",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
+    )
+    output = TrainingOutput.objects.create(
+        job=job, kind="model", relative_path="model.tar.gz", s3_uri="s3://bucket/model"
+    )
+    event = LifecycleEvent.objects.create(
+        project=project, aggregate_type="training_job", aggregate_id=job.public_id, event_type="completed"
+    )
+    deleted_keys = []
+    monkeypatch.setattr(
+        "common.redis_client.redis_client", lambda: SimpleNamespace(delete=lambda *keys: deleted_keys.extend(keys))
+    )
+    monkeypatch.setattr("apps.catalog.services.deletion.invalidate_model_server_cache", lambda *args: None)
+
+    finalize_project_deletion(project, storage=FakeStorage())
+    job.refresh_from_db()
+    event.refresh_from_db()
+    assert job.project_id is None
+    assert job.owner_id == owner.pk
+    assert TrainingOutput.objects.filter(pk=output.pk).exists()
+    assert event.project_id is None
+    assert f"training_logs:{job.public_id}" not in deleted_keys
 
 
 @pytest.mark.django_db
@@ -76,7 +149,9 @@ def test_cleanup_manifest_includes_all_project_build_images_and_runtime_names():
 
 
 @pytest.mark.django_db
-def test_finalization_deletes_project_s3_prefix_and_archives_database_rows():
+def test_finalization_deletes_project_s3_prefix_and_database_rows(monkeypatch):
+    monkeypatch.setattr("common.redis_client.redis_client", lambda: SimpleNamespace(delete=lambda *keys: None))
+    monkeypatch.setattr("apps.catalog.services.deletion.invalidate_model_server_cache", lambda *args: None)
     owner = get_user_model().objects.create_user("finalize-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="Finalize me", deletion_state="deleting", is_active=False)
     version = ModelVersion.objects.create(project=project, version="1")
@@ -87,7 +162,7 @@ def test_finalization_deletes_project_s3_prefix_and_archives_database_rows():
         status="ready",
         image_uri=f"image-{project.public_id}:v1",
     )
-    deployment = Deployment.objects.create(version=version, build=build, status="healthy")
+    deployment = Deployment.objects.create(version=version, build=build, status="succeeded")
     endpoint = Endpoint.objects.create(
         deployment=deployment,
         public_url="http://example.test",
@@ -95,22 +170,17 @@ def test_finalization_deletes_project_s3_prefix_and_archives_database_rows():
     )
     storage = FakeStorage()
 
-    result = finalize_project_deletion(project, storage=storage)
-    deployment.refresh_from_db()
-    endpoint.refresh_from_db()
-
-    assert result.deletion_state == "deleted"
-    assert result.deleted_at is not None
-    assert "#deleted-" in result.name
-    assert storage.prefixes == [f"users/{owner.tenant_id}/models/{project.public_id}"]
-    assert deployment.status == "stopped"
-    assert endpoint.health_status == "stopped"
-    assert ModelVersion.objects.filter(pk=version.pk).exists()  # audit/history is retained.
+    project_id, project_pk = project.public_id, project.pk
+    finalize_project_deletion(project, storage=storage)
+    assert storage.prefixes == [f"users/{owner.tenant_id}/models/{project_id}"]
+    assert not ModelProject.objects.filter(pk=project_pk).exists()
+    assert not Deployment.objects.filter(pk=deployment.pk).exists()
+    assert not Endpoint.objects.filter(pk=endpoint.pk).exists()
+    assert not ModelVersion.objects.filter(pk=version.pk).exists()
 
     # Verifies the original name is immediately reusable for new projects.
     recreated = ModelProject.objects.create(owner=owner, name="Finalize me")
-    assert recreated.pk != project.pk
-
+    assert recreated.pk != project_pk
 
 
 def test_local_cleanup_uses_docker_sdk_without_a_model_cleaner_container():
@@ -139,3 +209,33 @@ def test_local_cleanup_uses_docker_sdk_without_a_model_cleaner_container():
         ("container", "deploy-build-1", True),
         ("image", image_uri, True, False),
     ]
+
+
+@pytest.mark.django_db
+def test_failed_finalization_can_retry_without_affecting_other_project(monkeypatch):
+    from apps.catalog.services.deletion import request_project_deletion
+    from apps.catalog.tasks import execute_project_deletion
+
+    owner = get_user_model().objects.create_user("retry-cleanup@example.test", "test-password")
+    project = ModelProject.objects.create(owner=owner, name="Remove", deletion_state="deleting", is_active=False)
+    other = ModelProject.objects.create(owner=owner, name="Keep")
+    cleanup = "apps.catalog.services.deletion."
+    monkeypatch.setattr(cleanup + "run_project_cleanup", lambda project: {"dispatched": False})
+    original = finalize_project_deletion
+
+    def fail(project):
+        raise RuntimeError("Storage cleanup unavailable")
+
+    monkeypatch.setattr(cleanup + "finalize_project_deletion", fail)
+    with pytest.raises(RuntimeError):
+        execute_project_deletion(str(project.public_id))
+    project.refresh_from_db()
+    assert project.deletion_state == "delete_failed"
+    monkeypatch.setattr("apps.catalog.tasks.execute_project_deletion.delay", lambda id: SimpleNamespace(id="retry"))
+    request_project_deletion(project)
+    monkeypatch.setattr(cleanup + "finalize_project_deletion", lambda project: original(project, storage=FakeStorage()))
+    monkeypatch.setattr("common.redis_client.redis_client", lambda: SimpleNamespace(delete=lambda *keys: None))
+    monkeypatch.setattr(cleanup + "invalidate_model_server_cache", lambda *args: None)
+    assert execute_project_deletion(str(project.public_id)) == "deleted"
+    assert ModelProject.objects.filter(pk=other.pk).exists()
+    assert execute_project_deletion(str(project.public_id)) == "deleted"

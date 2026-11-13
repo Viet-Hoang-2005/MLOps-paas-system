@@ -5,13 +5,19 @@ resources:
   - aws-ebs-csi.yaml
   - external-secrets.yaml
   - cloudnative-pg.yaml
+  - redis-operator.yaml
   - keda.yaml
   - argo-workflows.yaml
   - argo-events.yaml
+  - argocd.yaml
   - monitoring.yaml
+  - loki.yaml
+  - alloy.yaml
   - kyverno.yaml
   - karpenter-crds.yaml
   - karpenter.yaml
-  - kubeflow-training.yaml
+  - kubeflow-trainer.yaml
+  - training-runtimes.yaml
   - node-feature-discovery.yaml
   - gpu-operator.yaml
+  - headlamp.yaml

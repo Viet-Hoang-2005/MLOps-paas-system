@@ -3,8 +3,10 @@ from django.urls import path
 from .endpoints import (
     BuildCancelEndpoint,
     BuildDetailEndpoint,
-    BuildListCreateEndpoint,
+    BuildListEndpoint,
     BuildLogsEndpoint,
+    BuildRebuildEndpoint,
+    BuildRegisterEndpoint,
     DeploymentDetailEndpoint,
     DeploymentListCreateEndpoint,
     DeploymentLogsEndpoint,
@@ -14,10 +16,12 @@ from .endpoints import (
 )
 
 build_patterns = [
-    path("", BuildListCreateEndpoint.as_view(), name="build-list"),
+    path("", BuildListEndpoint.as_view(), name="build-list"),
     path("<uuid:build_id>/", BuildDetailEndpoint.as_view(), name="build-detail"),
     path("<uuid:build_id>/cancel/", BuildCancelEndpoint.as_view(), name="build-cancel"),
     path("<uuid:build_id>/logs/", BuildLogsEndpoint.as_view(), name="build-logs"),
+    path("<uuid:build_id>/register/", BuildRegisterEndpoint.as_view(), name="build-register"),
+    path("<uuid:build_id>/rebuild/", BuildRebuildEndpoint.as_view(), name="build-rebuild"),
 ]
 deployment_patterns = [
     path("", DeploymentListCreateEndpoint.as_view(), name="deployment-list"),

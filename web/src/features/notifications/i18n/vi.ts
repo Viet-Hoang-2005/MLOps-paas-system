@@ -1,0 +1,57 @@
+export const notificationsVi = {
+  title: "Thông báo",
+  pageSubtitle:
+    "Theo dõi trạng thái tiến trình huấn luyện, đóng gói, triển khai và cảnh báo hệ thống.",
+  searchPlaceholder: "Tìm kiếm thông báo...",
+  actions: {
+    markAllAsRead: "Đánh dấu tất cả đã đọc",
+    markAsRead: "Đánh dấu đã đọc",
+    alreadyRead: "Đã đọc",
+    delete: "Xóa thông báo",
+    viewAll: "Xem tất cả thông báo",
+    viewDetails: "Xem chi tiết",
+    refresh: "Làm mới",
+  },
+  readStatus: {
+    all: "Tất cả",
+    unread: "Chưa đọc",
+    read: "Đã đọc",
+  },
+  filters: {
+    all: "Tất cả",
+    project: "Mô hình",
+    training: "Huấn luyện",
+    build: "Đóng gói",
+    deployment: "Triển khai",
+    drift: "Data Drift",
+    alert: "Cảnh báo",
+  },
+  types: {
+    training: "Huấn luyện",
+    build: "Đóng gói",
+    deployment: "Triển khai",
+    drift: "Data Drift",
+    alert: "Cảnh báo",
+    system: "Hệ thống",
+    project: "Mô hình",
+  },
+  levels: {
+    info: "Thông tin",
+    success: "Thành công",
+    warning: "Cảnh báo",
+    error: "Lỗi",
+  },
+  status: {
+    unread: "Chưa đọc",
+    unreadCount: "chưa đọc",
+    loading: "Đang tải thông báo...",
+    emptyTitle: "Không có thông báo nào",
+    emptyDescription: "Bạn đã cập nhật tất cả các thông báo mới nhất.",
+    emptyFiltered: "Không tìm thấy thông báo nào phù hợp với bộ lọc.",
+  },
+  pagination: {
+    prev: "Trang trước",
+    next: "Trang sau",
+    showing: "Hiển thị {{count}} thông báo",
+  },
+} as const;

@@ -6,8 +6,10 @@ import httpx
 import jwt
 import pytest
 from fastapi import BackgroundTasks, HTTPException
+
 from src import api as index
 from src import database
+from src.routing import serving_engine_for_flavor
 
 
 class FakeResponse:
@@ -96,14 +98,10 @@ async def test_access_public_and_api_key(monkeypatch):
     version = str(uuid.uuid4())
     record = {"tenant_id": "t", "access_mode": "public", "project_pk": 1}
     monkeypatch.setattr(index, "get_model_version_record", lambda *a, **k: record)
-    assert (await index.verify_model_access(version, None, None))[
-        "auth_type"
-    ] == "public"
+    assert (await index.verify_model_access(version, None, None))["auth_type"] == "public"
     record["access_mode"] = "private"
     monkeypatch.setattr(index, "verify_project_api_key", lambda *_: {"tenant_id": "t"})
-    assert (await index.verify_model_access(version, "key", None))[
-        "auth_type"
-    ] == "api_key"
+    assert (await index.verify_model_access(version, "key", None))["auth_type"] == "api_key"
 
 
 @pytest.mark.asyncio
@@ -115,9 +113,7 @@ async def test_access_api_key_invalid_and_cross_tenant(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         await index.verify_model_access(version, "bad", None)
     assert exc.value.status_code == 401
-    monkeypatch.setattr(
-        index, "verify_project_api_key", lambda *_: {"tenant_id": "other"}
-    )
+    monkeypatch.setattr(index, "verify_project_api_key", lambda *_: {"tenant_id": "other"})
     with pytest.raises(HTTPException) as exc:
         await index.verify_model_access(version, "key", None)
     assert exc.value.status_code == 403
@@ -133,11 +129,9 @@ async def test_access_jwt_success_missing_and_tenant_mismatch(monkeypatch):
     assert exc.value.status_code == 401
     monkeypatch.setattr(index.jwt, "get_unverified_header", lambda token: {"kid": "k"})
     monkeypatch.setattr(index, "get_public_key", AsyncMock(return_value="public"))
-    monkeypatch.setattr(index.jwt, "decode", lambda *a, **k: {"tenant_id": "t"})
-    assert (await index.verify_model_access(version, None, "Bearer token"))[
-        "auth_type"
-    ] == "jwt"
-    monkeypatch.setattr(index.jwt, "decode", lambda *a, **k: {"tenant_id": "other"})
+    monkeypatch.setattr(index.jwt, "decode", lambda *a, **k: {"tenant_id": "t", "token_type": "access"})
+    assert (await index.verify_model_access(version, None, "Bearer token"))["auth_type"] == "jwt"
+    monkeypatch.setattr(index.jwt, "decode", lambda *a, **k: {"tenant_id": "other", "token_type": "access"})
     with pytest.raises(HTTPException) as exc:
         await index.verify_model_access(version, None, "Bearer token")
     assert exc.value.status_code == 403
@@ -154,15 +148,11 @@ async def test_access_jwt_missing_kid_expired_and_invalid(monkeypatch):
     assert exc.value.status_code == 401
     monkeypatch.setattr(index.jwt, "get_unverified_header", lambda token: {"kid": "k"})
     monkeypatch.setattr(index, "get_public_key", AsyncMock(return_value="public"))
-    monkeypatch.setattr(
-        index.jwt, "decode", Mock(side_effect=jwt.ExpiredSignatureError())
-    )
+    monkeypatch.setattr(index.jwt, "decode", Mock(side_effect=jwt.ExpiredSignatureError()))
     with pytest.raises(HTTPException) as exc:
         await index.verify_model_access(version, None, "Bearer token")
     assert exc.value.status_code == 401
-    monkeypatch.setattr(
-        index.jwt, "decode", Mock(side_effect=jwt.InvalidTokenError("bad"))
-    )
+    monkeypatch.setattr(index.jwt, "decode", Mock(side_effect=jwt.InvalidTokenError("bad")))
     with pytest.raises(HTTPException) as exc:
         await index.verify_model_access(version, None, "Bearer token")
     assert exc.value.status_code == 401
@@ -171,30 +161,34 @@ async def test_access_jwt_missing_kid_expired_and_invalid(monkeypatch):
 def test_resolve_worker_url_local_and_kubernetes(monkeypatch):
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
     assert (
-        index.resolve_worker_url({"flavor": "xgboost"}, "/predict")
-        == "http://machine-learning-serving:5001/predict"
+        index.resolve_worker_url(
+            {"flavor": "xgboost", "deployment_status": "succeeded", "endpoint_container_name": "worker"}, "/predict"
+        )
+        == "http://worker:5001/predict"
     )
     assert (
-        index.resolve_worker_url({"flavor": "pytorch"}, "/health")
-        == "http://deep-learning-serving:5002/health"
+        index.resolve_worker_url(
+            {"flavor": "pytorch", "deployment_status": "succeeded", "endpoint_container_name": "worker"}, "/health"
+        )
+        == "http://worker:5002/health"
     )
     monkeypatch.setenv("KUBERNETES_SERVICE_HOST", "yes")
     assert (
         index.resolve_worker_url(
-            {"flavor": "tensorflow", "endpoint_container_name": "worker"}, "/predict"
+            {"flavor": "tensorflow", "deployment_status": "succeeded", "endpoint_container_name": "worker"}, "/predict"
         )
-        == "http://worker-svc.mlops-model-runtimes.svc.cluster.local:5002/predict"
+        == "http://worker-svc.mlops-paas-serving.svc.cluster.local:5002/predict"
     )
     with pytest.raises(HTTPException) as exc:
         index.resolve_worker_url({"flavor": "sklearn"}, "/predict")
-    assert exc.value.status_code == 503
+    assert exc.value.status_code == 409
 
 
 def test_serving_engine_is_derived_from_version_flavor():
-    assert index.serving_engine_for_flavor("pytorch") == "dl"
-    assert index.serving_engine_for_flavor("TensorFlow") == "dl"
-    assert index.serving_engine_for_flavor("xgboost") == "ml"
-    assert index.serving_engine_for_flavor(None) == "ml"
+    assert serving_engine_for_flavor("pytorch") == "dl"
+    assert serving_engine_for_flavor("TensorFlow") == "dl"
+    assert serving_engine_for_flavor("xgboost") == "ml"
+    assert serving_engine_for_flavor(None) == "ml"
 
 
 def test_send_to_redpanda_payload_and_failure(monkeypatch):
@@ -227,25 +221,15 @@ def test_send_to_redpanda_payload_and_failure(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_health_proxy_success_and_failure(monkeypatch):
-    token = {"model_record": {"flavor": "sklearn", "endpoint_container_name": "worker"}}
+    token = {
+        "model_record": {"flavor": "sklearn", "deployment_status": "succeeded", "endpoint_container_name": "worker"}
+    }
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
-    monkeypatch.setattr(
-        index.httpx,
-        "AsyncClient",
-        lambda **kw: FakeAsyncClient(get=FakeResponse(payload={"status": "healthy"})),
-    )
+    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(get=FakeResponse(payload={"status": "healthy"})))
     assert (await index.model_health("v", token))["status"] == "healthy"
-    monkeypatch.setattr(
-        index.httpx,
-        "AsyncClient",
-        lambda **kw: FakeAsyncClient(get=FakeResponse(500, text="bad")),
-    )
+    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(get=FakeResponse(500, text="bad")))
     assert (await index.model_health("v", token)).status_code == 500
-    monkeypatch.setattr(
-        index.httpx,
-        "AsyncClient",
-        lambda **kw: FakeAsyncClient(get=RuntimeError("down")),
-    )
+    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(get=RuntimeError("down")))
     assert (await index.model_health("v", token)).status_code == 503
 
 
@@ -257,12 +241,13 @@ async def test_predict_proxy_success_and_background_event(monkeypatch):
         "tenant_id": "t",
         "flavor": "xgboost",
         "endpoint_container_name": "worker",
+        "deployment_status": "succeeded",
     }
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
     monkeypatch.setattr(
-        index.httpx,
-        "AsyncClient",
-        lambda **kw: FakeAsyncClient(
+        index,
+        "worker_client",
+        FakeAsyncClient(
             post=FakeResponse(
                 payload={
                     "prediction": "attack",
@@ -295,13 +280,10 @@ async def test_predict_upstream_and_network_errors(monkeypatch):
         "tenant_id": "t",
         "flavor": "xgboost",
         "endpoint_container_name": "worker",
+        "deployment_status": "succeeded",
     }
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
-    monkeypatch.setattr(
-        index.httpx,
-        "AsyncClient",
-        lambda **kw: FakeAsyncClient(post=FakeResponse(422, {"detail": "bad"})),
-    )
+    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(post=FakeResponse(422, {"detail": "bad"})))
     response = await index.predict(
         "v",
         Mock(),
@@ -311,9 +293,7 @@ async def test_predict_upstream_and_network_errors(monkeypatch):
     )
     assert response.status_code == 422
     request_error = httpx.RequestError("down", request=Mock())
-    monkeypatch.setattr(
-        index.httpx, "AsyncClient", lambda **kw: FakeAsyncClient(post=request_error)
-    )
+    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(post=request_error))
     with pytest.raises(HTTPException) as exc:
         await index.predict(
             "v",
@@ -351,16 +331,14 @@ async def test_predict_network_error_evicts_cache_and_returns_409_if_stopped(
         "tenant_id": "t",
         "flavor": "sklearn",
         "endpoint_container_name": "worker-stopped",
-        "deployment_status": "healthy",
+        "deployment_status": "succeeded",
     }
     monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
     fake_redis = Mock()
     monkeypatch.setattr(index, "redis_client", fake_redis)
 
     request_error = httpx.RequestError("Connection refused", request=Mock())
-    monkeypatch.setattr(
-        index.httpx, "AsyncClient", lambda **kw: FakeAsyncClient(post=request_error)
-    )
+    monkeypatch.setattr(index, "worker_client", FakeAsyncClient(post=request_error))
 
     stopped_db_record = {
         "id": "v-stopped",
@@ -370,9 +348,7 @@ async def test_predict_network_error_evicts_cache_and_returns_409_if_stopped(
         "endpoint_container_name": None,
         "deployment_status": "stopped",
     }
-    monkeypatch.setattr(
-        index, "_fetch_model_version_from_db", lambda vid: stopped_db_record
-    )
+    monkeypatch.setattr(index, "_fetch_model_version_from_db", lambda vid: stopped_db_record)
 
     with pytest.raises(HTTPException) as exc:
         await index.predict(
@@ -398,3 +374,144 @@ def test_resolve_worker_url_rejects_stopped_deployment(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         index.resolve_worker_url(stopped_record, "/predict")
     assert exc.value.status_code == 409
+
+
+@pytest.mark.parametrize("status", [None, "pending", "deploying", "failed", "stopped", "unconfirmed", "healthy"])
+def test_only_succeeded_runtime_can_be_resolved_without_fallback(monkeypatch, status):
+    monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
+    record = {"deployment_status": status, "flavor": "xgboost", "endpoint_container_name": "runtime"}
+    with pytest.raises(HTTPException) as error:
+        index.resolve_worker_url(record, "/predict")
+    assert error.value.status_code == 409
+
+
+def test_runtime_health_is_not_a_routing_or_version_selection_gate(monkeypatch):
+    monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
+    record = {
+        "deployment_status": "succeeded",
+        "health_status": "unhealthy",
+        "flavor": "xgboost",
+        "endpoint_container_name": "runtime",
+    }
+    assert index.resolve_worker_url(record, "/predict") == "http://runtime:5001/predict"
+
+
+def test_publish_inference_event_handles_numpy_scalars_and_arrays():
+    import numpy as np
+
+    from src.events import publish_inference_event
+
+    producer = Mock()
+    summary = Mock()
+
+    features = {"x": np.float64(1.23), "arr": np.array([1, 2, 3])}
+    prediction = np.int64(42)
+    confidence = np.float32(0.95)
+
+    publish_inference_event(
+        producer,
+        summary,
+        topic="test-topic",
+        tenant_id="t-1",
+        project_id="p-1",
+        model_version_id="v-1",
+        features=features,
+        prediction=prediction,
+        confidence=confidence,
+    )
+
+    summary.failure.assert_not_called()
+    summary.recovery.assert_called_once_with("publish")
+    producer.produce.assert_called_once()
+
+    call_kwargs = producer.produce.call_args.kwargs
+    assert call_kwargs["topic"] == "test-topic"
+    deserialized = json.loads(call_kwargs["value"].decode("utf-8"))
+    assert deserialized["prediction"] == 42
+    assert deserialized["confidence"] == pytest.approx(0.95)
+    assert deserialized["features"]["x"] == pytest.approx(1.23)
+    assert deserialized["features"]["arr"] == [1, 2, 3]
+
+
+def test_parse_worker_prediction_normalizes_numpy_and_tensors():
+    import numpy as np
+
+    from src.inference import parse_worker_prediction
+
+    data = {
+        "prediction": np.array([np.int64(1), np.int64(2)]),
+        "confidence": np.float32(0.88),
+    }
+    pred, conf, engine = parse_worker_prediction(data, "sklearn")
+    assert pred == [1, 2]
+    assert isinstance(pred[0], int)
+    assert conf == pytest.approx(0.88)
+    assert isinstance(conf, float)
+
+
+class RecordingAsyncClient(FakeAsyncClient):
+    """Remembers how the worker was called, to assert the wire contract."""
+
+    calls: list = []
+
+    async def get(self, url, **kwargs):
+        self.calls.append(("GET", url, kwargs))
+        return await super().get(url, **kwargs)
+
+    async def post(self, url, **kwargs):
+        self.calls.append(("POST", url, kwargs))
+        return await super().post(url, **kwargs)
+
+
+def _record(flavor):
+    return {
+        "id": "version",
+        "project_id": "project",
+        "tenant_id": "t",
+        "flavor": flavor,
+        "endpoint_container_name": "worker",
+        "deployment_status": "succeeded",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "flavor,port,expected_body",
+    [
+        ("xgboost", 5001, {"features": {"x": 1}, "model_version_id": "version"}),
+        # BentoML wraps arguments by parameter name; a flat body is rejected with 400.
+        ("pytorch", 5002, {"payload": {"features": {"x": 1}, "model_version_id": "version"}}),
+        ("keras", 5002, {"payload": {"features": {"x": 1}, "model_version_id": "version"}}),
+    ],
+)
+async def test_predict_sends_the_body_shape_each_runtime_expects(monkeypatch, flavor, port, expected_body):
+    RecordingAsyncClient.calls = []
+    monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
+    monkeypatch.setattr(
+        index,
+        "worker_client",
+        RecordingAsyncClient(post=FakeResponse(payload={"prediction": "ok", "confidence": None})),
+    )
+    await index.predict(
+        "v", Mock(), index.InferenceRequest(features={"x": 1}), BackgroundTasks(), {"model_record": _record(flavor)}
+    )
+
+    method, url, kwargs = RecordingAsyncClient.calls[0]
+    assert (method, url) == ("POST", f"http://worker:{port}/predict")
+    assert kwargs["json"] == expected_body
+
+
+@pytest.mark.asyncio
+async def test_health_uses_post_for_deep_learning_runtimes_and_get_for_ml(monkeypatch):
+    monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
+    healthy = FakeResponse(payload={"status": "healthy"})
+
+    RecordingAsyncClient.calls = []
+    monkeypatch.setattr(index, "worker_client", RecordingAsyncClient(get=healthy, post=healthy))
+    assert (await index.model_health("v", {"model_record": _record("pytorch")}))["status"] == "healthy"
+    assert RecordingAsyncClient.calls[0][:2] == ("POST", "http://worker:5002/health")
+    assert RecordingAsyncClient.calls[0][2]["json"] == {}
+
+    RecordingAsyncClient.calls = []
+    assert (await index.model_health("v", {"model_record": _record("sklearn")}))["status"] == "healthy"
+    assert RecordingAsyncClient.calls[0][:2] == ("GET", "http://worker:5001/health")

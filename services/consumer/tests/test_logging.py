@@ -28,9 +28,7 @@ def test_webhook_outbox_retries_without_logging_response_payload(monkeypatch):
         "claim_automatic_drift_signals",
         lambda *_: [{"id": 1, "attempts": 2, "model_version_id": "version"}],
     )
-    monkeypatch.setattr(
-        drift_outbox, "deliver", Mock(return_value=(False, "private response-payload"))
-    )
+    monkeypatch.setattr(drift_outbox, "deliver", Mock(return_value=(False, "private response-payload")))
     monkeypatch.setattr(drift_outbox, "reschedule_automatic_drift_signal", Mock())
 
     assert drift_outbox.drain_once() == 0

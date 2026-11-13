@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/shared/i18n/formatters";
 import type { TrainingJobEvent } from "@/features/training/types";
 import { Badge } from "@/shared/components/Badge";
 import { useTranslation } from "react-i18next";
@@ -44,7 +45,7 @@ export function TrainingEventHistory({
 }: {
   events: TrainingJobEvent[];
 }) {
-  const { t } = useTranslation("training");
+  const { t, i18n } = useTranslation("training");
   if (!events.length) {
     return (
       <div className="text-style-body text-color-muted-foreground">
@@ -60,7 +61,7 @@ export function TrainingEventHistory({
             className="w-36 shrink-0 text-color-muted-foreground"
             dateTime={event.created_at}
           >
-            {new Date(event.created_at).toLocaleString()}
+            {formatDateTime(event.created_at, i18n.language)}
           </time>
           <div className="min-w-0">
             <p className="font-semibold text-color-foreground">

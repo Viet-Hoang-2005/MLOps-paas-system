@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - celery-deployment.yaml
+  - celery-scaledobject.yaml
+  - service.yaml
+  - hpa.yaml
+  - configmap.yaml
+  - network-policy.yaml
+  - servicemonitor.yaml
+  - prometheus-rule.yaml
+  - pdb.yaml
+  - migration-job.yaml

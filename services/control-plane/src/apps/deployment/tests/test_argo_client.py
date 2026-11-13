@@ -90,4 +90,3 @@ def test_argo_webhook_client_handles_non_json_response():
 
     response = ArgoWebhookClient(http=PlainTextHttp()).trigger("http://argo-events/build", {})
     assert response == {"status_code": 200, "text": "success"}
-

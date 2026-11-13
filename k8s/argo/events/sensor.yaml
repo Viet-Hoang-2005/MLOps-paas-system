@@ -1,0 +1,688 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: model-sensor
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: argo-sensor-sa
+    container:
+      resources:
+        requests:
+          cpu: 30m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+  dependencies:
+    - name: build-dep
+      eventSourceName: webhook-eventsource
+      eventName: build
+      filters:
+        data:
+          - path: body.build_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.project_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.tenant_id
+            type: string
+            value: ['^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.image_repository
+            type: string
+            value: ['^registry\.mlops-nids-nt114\.id\.vn/user-images/image-[0-9a-f-]{36}$']
+          - path: body.image_tag
+            type: string
+            value: ['^build-[0-9a-f-]{36}$']
+          - path: body.task_type
+            type: string
+            value: ['^(BUILD|TEST_ZIP)$']
+          - path: body.source_type
+            type: string
+            value: ['^(manual_upload|training_job)$']
+          - path: body.control_plane_webhook_url
+            type: string
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/builds/[0-9a-f-]{36}/$']
+        exprs:
+          - expr: callback =~ build_id && image_repository =~ project_id && image_tag =~ build_id
+            fields:
+              - {name: callback, path: body.control_plane_webhook_url}
+              - {name: build_id, path: body.build_id}
+              - {name: project_id, path: body.project_id}
+              - {name: image_repository, path: body.image_repository}
+              - {name: image_tag, path: body.image_tag}
+    - name: cancel-build-dep
+      eventSourceName: webhook-eventsource
+      eventName: cancel-build
+      filters:
+        data:
+          - path: body.build_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.project_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.tenant_id
+            type: string
+            value: ['^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+    - name: deploy-dep
+      eventSourceName: webhook-eventsource
+      eventName: deploy
+      filters:
+        data:
+          - path: body.deployment_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.control_plane_webhook_url
+            type: string
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/deployments/[0-9a-f-]{36}/$']
+          - path: body.callback_token
+            type: string
+            value: ['^[0-9]{10}\.[0-9a-f]{64}$']
+          - path: body.project_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.model_version_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.tenant_id
+            type: string
+            value: ['^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.image_name
+            type: string
+            value: ['^registry\.mlops-nids-nt114\.id\.vn/user-images/image-[0-9a-f-]{36}@sha256:[0-9a-f]{64}$']
+          - path: body.container_name
+            type: string
+            value: ['^deploy-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.model_type
+            type: string
+            value: ['^(ml|dl)$']
+          - path: body.target_port
+            type: string
+            value: ['^(3000|5001|5002)$']
+        exprs:
+          - expr: image_name =~ project_id && callback =~ deployment_id && container_name == 'deploy-' + deployment_id
+            fields:
+              - {name: image_name, path: body.image_name}
+              - {name: project_id, path: body.project_id}
+              - {name: callback, path: body.control_plane_webhook_url}
+              - {name: deployment_id, path: body.deployment_id}
+              - {name: container_name, path: body.container_name}
+    - name: drift-dep
+      eventSourceName: webhook-eventsource
+      eventName: drift
+      filters:
+        data:
+          - path: body.job_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.project_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.model_version_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.tenant_id
+            type: string
+            value: ['^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.control_plane_webhook_url
+            type: string
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/drift-runs/[0-9a-f-]{36}/$']
+        exprs:
+          - expr: callback =~ job_id
+            fields:
+              - {name: callback, path: body.control_plane_webhook_url}
+              - {name: job_id, path: body.job_id}
+    - name: delete-dep
+      eventSourceName: webhook-eventsource
+      eventName: delete
+      filters:
+        data:
+          - path: body.project_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.control_plane_webhook_url
+            type: string
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/project-deletions/[0-9a-f-]{36}/$']
+        exprs:
+          - expr: callback =~ project_id
+            fields:
+              - {name: callback, path: body.control_plane_webhook_url}
+              - {name: project_id, path: body.project_id}
+    - name: train-dep
+      eventSourceName: webhook-eventsource
+      eventName: train
+      filters:
+        data:
+          - path: body.input_contract
+            type: string
+            value: ['^(legacy|workspace)$']
+          - path: body.runtime_config_url
+            type: string
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/training-jobs/[0-9a-f-]{36}/runtime-config/$']
+          - path: body.job_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.project_id
+            type: string
+            value: ['^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$']
+          - path: body.tenant_id
+            type: string
+            value: ['^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.job_name
+            type: string
+            value: ['^training-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.accelerator_type
+            type: string
+            value: ['^(none|gpu)$']
+          - path: body.accelerator_model
+            type: string
+            value: ['^(|t4|a10g)$']
+          - path: body.control_plane_webhook_url
+            type: string
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/training-jobs/[0-9a-f-]{36}/$']
+        exprs:
+          - expr: callback =~ job_id && job_name =~ job_id && runtime_config =~ job_id
+            fields:
+              - {name: callback, path: body.control_plane_webhook_url}
+              - {name: job_name, path: body.job_name}
+              - {name: job_id, path: body.job_id}
+              - {name: runtime_config, path: body.runtime_config_url}
+          - expr: max_runtime_seconds > 0 && max_runtime_seconds <= 86400
+            fields:
+              - {name: max_runtime_seconds, path: body.max_runtime_seconds}
+          - expr: >-
+              (vcpu == 1 && memory == 2048) ||
+              (vcpu == 2 && memory == 4096) ||
+              (vcpu == 4 && memory == 8192)
+            fields:
+              - name: vcpu
+                path: body.vcpu
+              - name: memory
+                path: body.memory
+          - expr: >-
+              (accelerator_type == "none" && accelerator_count == 0 && accelerator_model == "") ||
+              (accelerator_type == "gpu" && accelerator_count == 1 && (accelerator_model == "t4" || accelerator_model == "a10g"))
+            fields:
+              - name: accelerator_type
+                path: body.accelerator_type
+              - name: accelerator_count
+                path: body.accelerator_count
+              - name: accelerator_model
+                path: body.accelerator_model
+    - name: cancel-train-dep
+      eventSourceName: webhook-eventsource
+      eventName: cancel-train
+      filters:
+        data:
+        - path: body.job_id
+          type: string
+          value:
+          - ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        - path: body.job_name
+          type: string
+          value:
+          - ^training-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        - path: body.control_plane_callback_url
+          type: string
+          value:
+          - ^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/webhooks/training-jobs/[0-9a-f-]{36}/cancellation/$
+        - path: body.project_id
+          type: string
+          value:
+          - ^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$
+        - path: body.tenant_id
+          type: string
+          value:
+          - ^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        exprs:
+        - expr: callback =~ job_id && job_name =~ job_id
+          fields:
+          - name: callback
+            path: body.control_plane_callback_url
+          - name: job_name
+            path: body.job_name
+          - name: job_id
+            path: body.job_id
+    - name: reconcile-dep
+      eventSourceName: webhook-eventsource
+      eventName: reconcile
+      filters:
+        data:
+          - path: body.kind
+            type: string
+            value: ['^(training|drift)$']
+          - path: body.resource_id
+            type: string
+            value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.project_id
+            type: string
+            value: ['^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$']
+          - path: body.tenant_id
+            type: string
+            value: ['^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
+          - path: body.callback_url
+            type: string
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/executions/(training|drift)/[0-9a-f-]{36}/observations/$']
+        exprs:
+          - expr: callback =~ resource_id && callback =~ kind
+            fields:
+              - {name: callback, path: body.callback_url}
+              - {name: resource_id, path: body.resource_id}
+              - {name: kind, path: body.kind}
+  triggers:
+    - template:
+        name: build-workflow-trigger
+        conditions: "build-dep"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: build-model-job-
+                namespace: mlops-paas-execution
+              spec:
+                workflowTemplateRef:
+                  name: mlops-paas-model-packager-template
+                arguments:
+                  parameters:
+                    - name: build_id
+                      value: ""
+                    - name: project_id
+                      value: ""
+                    - name: tenant_id
+                      value: ""
+                    - name: image_repository
+                      value: ""
+                    - name: image_tag
+                      value: ""
+                    - name: flavor
+                      value: ""
+                    - name: task_type
+                      value: ""
+                    - name: requirements_text
+                      value: ""
+                    - name: source_artifact_name
+                      value: ""
+                    - name: source_type
+                      value: "manual_upload"
+                    - name: source_download_url
+                      value: ""
+                    - name: output_upload_url
+                      value: ""
+                    - name: control_plane_webhook_url
+                      value: ""
+                    - name: label_mapping_download_url
+                      value: ""
+                    - name: label_mapping_filename
+                      value: ""
+                    - name: input_schema_download_url
+                      value: ""
+          parameters:
+            - src:
+                dependencyName: build-dep
+                dataKey: body.build_id
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.project_id
+              dest: spec.arguments.parameters.1.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.tenant_id
+              dest: spec.arguments.parameters.2.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.image_repository
+              dest: spec.arguments.parameters.3.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.image_tag
+              dest: spec.arguments.parameters.4.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.flavor
+              dest: spec.arguments.parameters.5.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.task_type
+              dest: spec.arguments.parameters.6.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.requirements_text
+              dest: spec.arguments.parameters.7.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.source_artifact_name
+              dest: spec.arguments.parameters.8.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.source_type
+              dest: spec.arguments.parameters.9.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.source_download_url
+              dest: spec.arguments.parameters.10.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.output_upload_url
+              dest: spec.arguments.parameters.11.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.control_plane_webhook_url
+              dest: spec.arguments.parameters.12.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.label_mapping_download_url
+              dest: spec.arguments.parameters.13.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.label_mapping_filename
+              dest: spec.arguments.parameters.14.value
+            - src:
+                dependencyName: build-dep
+                dataKey: body.input_schema_download_url
+              dest: spec.arguments.parameters.15.value
+
+    - template:
+        name: cancel-build-workflow-trigger
+        conditions: "cancel-build-dep"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: cancel-build-operation-
+                namespace: mlops-paas-execution
+              spec:
+                workflowTemplateRef:
+                  name: mlops-paas-job-submit-template
+                ttlStrategy:
+                  secondsAfterCompletion: 300
+                podGC:
+                  strategy: OnPodCompletion
+                arguments:
+                  parameters:
+                    - {name: execution_kind, value: "cancel-build"}
+                    - {name: execution_payload, value: ""}
+          parameters:
+            - src:
+                dependencyName: cancel-build-dep
+                dataTemplate: '{{ .Input.body | toJson }}'
+              dest: spec.arguments.parameters.1.value
+
+    - template:
+        name: deploy-workflow-trigger
+        conditions: "deploy-dep"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: deploy-model-job-
+                namespace: mlops-paas-execution
+              spec:
+                workflowTemplateRef:
+                  name: mlops-paas-model-server-deploy-template
+                arguments:
+                  parameters:
+                    - name: tenant_id
+                      value: ""
+                    - name: project_id
+                      value: ""
+                    - name: model_version_id
+                      value: ""
+                    - name: version
+                      value: ""
+                    - name: image_name
+                      value: ""
+                    - name: container_name
+                      value: ""
+                    - name: model_type
+                      value: "ml"
+                    - name: target_port
+                      value: "5001"
+                    - name: model_uri
+                      value: ""
+                    - name: deployment_id
+                      value: ""
+                    - name: control_plane_webhook_url
+                      value: ""
+                    - name: callback_token
+                      value: ""
+          parameters:
+            - src:
+                dependencyName: deploy-dep
+                dataKey: body.tenant_id
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: deploy-dep
+                dataKey: body.project_id
+              dest: spec.arguments.parameters.1.value
+            - src:
+                dependencyName: deploy-dep
+                dataKey: body.model_version_id
+              dest: spec.arguments.parameters.2.value
+            - src:
+                dependencyName: deploy-dep
+                dataKey: body.version
+              dest: spec.arguments.parameters.3.value
+            - src:
+                dependencyName: deploy-dep
+                dataKey: body.image_name
+              dest: spec.arguments.parameters.4.value
+            - src:
+                dependencyName: deploy-dep
+                dataKey: body.container_name
+              dest: spec.arguments.parameters.5.value
+            - src:
+                dependencyName: deploy-dep
+                dataKey: body.model_type
+              dest: spec.arguments.parameters.6.value
+            - src:
+                dependencyName: deploy-dep
+                dataKey: body.target_port
+              dest: spec.arguments.parameters.7.value
+            - src:
+                dependencyName: deploy-dep
+                dataKey: body.model_uri
+              dest: spec.arguments.parameters.8.value
+            - src: {dependencyName: deploy-dep, dataKey: body.deployment_id}
+              dest: spec.arguments.parameters.9.value
+            - src: {dependencyName: deploy-dep, dataKey: body.control_plane_webhook_url}
+              dest: spec.arguments.parameters.10.value
+            - src: {dependencyName: deploy-dep, dataKey: body.callback_token}
+              dest: spec.arguments.parameters.11.value
+
+    - template:
+        name: drift-workflow-trigger
+        conditions: "drift-dep"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: drift-operation-
+                namespace: mlops-paas-execution
+              spec:
+                workflowTemplateRef:
+                  name: mlops-paas-job-submit-template
+                ttlStrategy:
+                  secondsAfterCompletion: 300
+                podGC:
+                  strategy: OnPodCompletion
+                arguments:
+                  parameters:
+                    - {name: execution_kind, value: "drift"}
+                    - {name: execution_payload, value: ""}
+          parameters:
+            - src:
+                dependencyName: drift-dep
+                dataTemplate: '{{ .Input.body | toJson }}'
+              dest: spec.arguments.parameters.1.value
+
+    - template:
+        name: delete-workflow-trigger
+        conditions: "delete-dep"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: delete-model-job-
+                namespace: mlops-paas-execution
+              spec:
+                workflowTemplateRef:
+                  name: mlops-paas-model-server-delete-template
+                ttlStrategy:
+                  secondsAfterCompletion: 300
+                podGC:
+                  strategy: OnPodCompletion
+                arguments:
+                  parameters:
+                    - name: project_id
+                      value: ""
+                    - name: container_names
+                      value: "[]"
+                    - name: control_plane_webhook_url
+                      value: ""
+          parameters:
+            - src:
+                dependencyName: delete-dep
+                dataKey: body.project_id
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: delete-dep
+                dataKey: body.container_names
+              dest: spec.arguments.parameters.1.value
+            - src:
+                dependencyName: delete-dep
+                dataKey: body.control_plane_webhook_url
+              dest: spec.arguments.parameters.2.value
+
+    - template:
+        name: train-workflow-trigger
+        conditions: "train-dep"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: training-operation-
+                namespace: mlops-paas-execution
+              spec:
+                workflowTemplateRef:
+                  name: mlops-paas-job-submit-template
+                ttlStrategy:
+                  secondsAfterCompletion: 300
+                podGC:
+                  strategy: OnPodCompletion
+                arguments:
+                  parameters:
+                    - {name: execution_kind, value: "training"}
+                    - {name: execution_payload, value: ""}
+          parameters:
+            - src:
+                dependencyName: train-dep
+                dataTemplate: '{{ .Input.body | toJson }}'
+              dest: spec.arguments.parameters.1.value
+
+    - template:
+        name: cancel-train-workflow-trigger
+        conditions: cancel-train-dep
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: cancel-train-job-
+                namespace: mlops-paas-execution
+              spec:
+                workflowTemplateRef:
+                  name: mlops-paas-training-cancel-template
+                ttlStrategy:
+                  secondsAfterCompletion: 300
+                podGC:
+                  strategy: OnPodCompletion
+                arguments:
+                  parameters:
+                  - name: job_id
+                    value: ''
+                  - name: job_name
+                    value: ''
+                  - name: control_plane_callback_url
+                    value: ''
+                  - name: cancel_reporter_capability
+                    value: ''
+                  - name: project_id
+                    value: ''
+                  - name: tenant_id
+                    value: ''
+          parameters:
+          - src:
+              dependencyName: cancel-train-dep
+              dataKey: body.job_id
+            dest: spec.arguments.parameters.0.value
+          - src:
+              dependencyName: cancel-train-dep
+              dataKey: body.job_name
+            dest: spec.arguments.parameters.1.value
+          - src:
+              dependencyName: cancel-train-dep
+              dataKey: body.control_plane_callback_url
+            dest: spec.arguments.parameters.2.value
+          - src:
+              dependencyName: cancel-train-dep
+              dataKey: body.cancel_reporter_capability
+            dest: spec.arguments.parameters.3.value
+          - src:
+              dependencyName: cancel-train-dep
+              dataKey: body.project_id
+            dest: spec.arguments.parameters.4.value
+          - src:
+              dependencyName: cancel-train-dep
+              dataKey: body.tenant_id
+            dest: spec.arguments.parameters.5.value
+
+    - template:
+        name: reconcile-job-trigger
+        conditions: "reconcile-dep"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: reconcile-operation-
+                namespace: mlops-paas-execution
+              spec:
+                workflowTemplateRef:
+                  name: mlops-paas-job-reconcile-template
+                ttlStrategy:
+                  secondsAfterCompletion: 300
+                podGC:
+                  strategy: OnPodCompletion
+                arguments:
+                  parameters:
+                    - {name: execution_payload, value: ""}
+          parameters:
+            - src:
+                dependencyName: reconcile-dep
+                dataTemplate: '{{ .Input.body | toJson }}'
+              dest: spec.arguments.parameters.0.value

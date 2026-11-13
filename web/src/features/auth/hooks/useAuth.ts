@@ -1,31 +1,35 @@
-import { useCallback, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
 import {
   loginBaseAuth,
   loginGitHub,
   loginGoogle,
+  logoutSession,
 } from "@/features/auth/api/authApi";
-import { getApiErrorMessage } from "@/shared/api/errors";
-import { toast } from "@/shared/components/toastStore";
+import {
+  clearAuthStore,
+  getAccessToken,
+  getTenantId,
+  isAuthenticated,
+  setAuthTokens,
+} from "@/features/auth/authStore";
+import { broadcastLogout, initAuthBroadcast } from "@/features/auth/authSync";
 import type { AuthResponse, LoginCredentials } from "@/features/auth/types";
+import { getApiErrorMessage } from "@/shared/api/errors";
+import { toast } from "@/shared/lib/toastStore";
+import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
-export const getAccessToken = () => localStorage.getItem("access_token");
-export const getRefreshToken = () => localStorage.getItem("refresh_token");
-export const isAuthenticated = () => !!getAccessToken();
-
-const saveTokens = (access: string, refresh: string, tenantId?: string) => {
-  localStorage.setItem("access_token", access);
-  localStorage.setItem("refresh_token", refresh);
-  if (tenantId) {
-    localStorage.setItem("tenant_id", tenantId);
-  }
+export {
+  clearAuthStore,
+  getAccessToken,
+  getTenantId,
+  isAuthenticated,
+  setAuthTokens,
 };
+export const clearAuthTokens = clearAuthStore;
 
-export const clearAuthTokens = () => {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-  localStorage.removeItem("tenant_id");
+const saveTokens = (access: string, tenantId?: string) => {
+  setAuthTokens({ access, tenantId });
 };
 
 export function useAuth() {
@@ -33,9 +37,17 @@ export function useAuth() {
   const { t } = useTranslation("auth");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const cleanup = initAuthBroadcast(() => {
+      clearAuthStore();
+      navigate("/login");
+    });
+    return cleanup;
+  }, [navigate]);
+
   const handleOAuthSuccess = useCallback(
     (response: AuthResponse, successMessage = t("login.oauthSuccess")) => {
-      saveTokens(response.access, response.refresh, response.tenant_id);
+      saveTokens(response.access, response.tenant_id);
       toast.success(successMessage);
       navigate("/dashboard");
     },
@@ -52,7 +64,7 @@ export function useAuth() {
       setLoading(true);
       try {
         const response = await loginBaseAuth(credentials);
-        saveTokens(response.access, response.refresh, response.tenant_id);
+        saveTokens(response.access, response.tenant_id);
         toast.success(t("login.success"));
         navigate("/dashboard");
       } catch (error) {
@@ -96,21 +108,28 @@ export function useAuth() {
   );
 
   const saveAuthTokens = useCallback(
-    (
-      access: string,
-      refresh: string,
-      redirectTo = "/dashboard",
-      tenantId?: string,
-    ) => {
-      saveTokens(access, refresh, tenantId);
+    (access: string, redirectTo = "/dashboard", tenantId?: string) => {
+      saveTokens(access, tenantId);
       navigate(redirectTo);
     },
     [navigate],
   );
 
-  const logout = useCallback(() => {
-    clearAuthTokens();
-    toast.success(t("login.logoutSuccess"));
+  const logout = useCallback(async () => {
+    let serverRevoked = true;
+    try {
+      await logoutSession();
+    } catch {
+      serverRevoked = false;
+    }
+
+    clearAuthStore();
+    broadcastLogout();
+    if (serverRevoked) {
+      toast.success(t("login.logoutSuccess"));
+    } else {
+      toast.warning(t("login.logoutServerFailed"));
+    }
     navigate("/login");
   }, [navigate, t]);
 

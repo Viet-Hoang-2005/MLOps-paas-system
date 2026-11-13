@@ -50,7 +50,7 @@
 
 \newcommand{\resumeProjectHeading}[2]{
     \item
-    \begin{tabular*}{0.97\textwidth}{p{0.78\textwidth}@{\extracolsep{\fill}}r}
+    \begin{tabular*}{0.97\textwidth}{p{0.79\textwidth}@{\extracolsep{\fill}}r}
       \small#1 & #2 \\
     \end{tabular*}\vspace{-7pt}
 }
@@ -74,7 +74,7 @@
 %-----------SUMMARY-----------
 \section{Summary}
 \begin{itemize}[leftmargin=0.15in, label={}]
-  \small{\item{Final-year Computer Networks student at UIT-VNU seeking a \textbf{DevOps Intern} role. Hands-on experience building cloud-native systems with Kubernetes, Terraform, CI/CD pipelines, and MLOps at scale.
+  \small{\item{Final-year Computer Networks student at UIT-VNU seeking a \textbf{DevOps Intern} role. Hands-on experience building cloud-native systems with Docker, Kubernetes, Terraform, Ansible, CI/CD pipelines, and MLOps at scale.
 }}
 \end{itemize}
 
@@ -89,11 +89,36 @@
   \resumeItemListEnd
 \resumeSubHeadingListEnd
 
+%-----------PROJECTS-----------
+\section{Projects}
+\resumeSubHeadingListStart
+
+\resumeProjectHeading
+{\textbf{MLOps PaaS System} $|$ \href{https://github.com/Viet-Hoang-2005/mlops-paas-system}{GitHub} $|$ \emph{Django, FastAPI, Redpanda, PostgreSQL, Kubernetes, AWS, Ansible, GitHub Actions, Argo CD, Argo Workflows, MLflow, Kubeflow, BentoML}}
+{3/2026 -- Present}
+\resumeItemListStart
+\resumeItem{Built a multi-tenant MLOps PaaS automating training, isolated deployment, drift monitoring, and immutable versioning for XGBoost, Scikit-learn, PyTorch, and TensorFlow, orchestrated by a Django REST control plane and Argo Workflows.}
+\resumeItem{Dynamically packaged container images and served isolated per-version models via FastAPI + MLflow (ML) and BentoML (DL), persisting metadata in PostgreSQL and versioned artifacts in AWS S3.}
+\resumeItem{Monitored data drift with Evidently AI by comparing reference datasets against live inference data ingested via Redpanda into PostgreSQL; triggered automated retraining with Kubeflow Training Operator and Karpenter CPU/GPU autoscaling.}
+\resumeItem{Automated CI/CD and GitOps end-to-end: Terraform provisioned AWS cloud infrastructure, Ansible bootstrapped K3s cluster, GitHub Actions built and pushed tagged images, and Argo CD synced applications.}
+\resumeItemListEnd
+
+\resumeProjectHeading
+{\textbf{SageLMS} $|$ \href{https://github.com/daithang59/sagelms}{GitHub} $|$ \emph{React, Spring Boot, FastAPI, Kubernetes, GKE, GitHub Actions, FluxCD, Kyverno, Harbor, Cosign, Trivy, SonarCloud}}
+{4/2026 -- 6/2026}
+\resumeItemListStart
+\resumeItem{Architected a DevSecOps microservices platform (Spring Boot backend + FastAPI LangChain AI tutor) on GKE, provisioning GCP infrastructure with OpenTofu and automating continuous GitOps delivery via FluxCD.}
+\resumeItem{Automated shift-left CI on every PR: Gitleaks secret scanning, multi-stack testing (JUnit/pytest/Vitest), Hadolint Docker linting, Checkov IaC validation, Trivy scans, and SonarCloud quality gates.}
+\resumeItem{Engineered secure CD with Trivy vulnerability gates, keyless Cosign image signing, CycloneDX SBOM attestation, and Kustomize digest PRs; enforced Kyverno policies for Harbor-trusted, non-root pods.}
+\resumeItemListEnd
+
+\resumeSubHeadingListEnd
+
 %-----------AWARDS-----------
 \section{Awards}
 \resumeSubHeadingListStart
   \resumeProjectHeading
-    {\parbox[t]{0.79\textwidth}{\textbf{Encouragement Scholarship for Academic Excellence}}}{}
+    {\textbf{Encouragement Scholarship for Academic Excellence}}{}
   \resumeItemListStart
     \resumeItem{Semester 1, 2023 -- 2024}
     \resumeItem{Semester 1, 2024 -- 2025}
@@ -101,38 +126,14 @@
   \resumeItemListEnd
 \resumeSubHeadingListEnd
 
-%-----------PROJECTS-----------
-\section{Projects}
-\resumeSubHeadingListStart
-
-\resumeProjectHeading
-{\textbf{MLOps PaaS System} $|$ \href{https://github.com/Viet-Hoang-2005/mlops-paas-system}{GitHub} $|$ \emph{Django, FastAPI, Redpanda, PostgreSQL, Docker, Kubernetes, AWS, Argo Workflows, MLflow, Kubeflow, BentoML}}
-{3/2026 -- Present}
-\resumeItemListStart
-\resumeItem{Built a multi-tenant MLOps PaaS automating model training, versioned deployment, and drift monitoring for XGBoost, PyTorch, and TensorFlow, orchestrated by a Django REST control plane and Argo Workflows.}
-\resumeItem{Dynamically served ML/DL models as isolated per-version pods via FastAPI + MLflow (ML) and BentoML (DL); achieved \textasciitilde100 concurrent users with p95 latency $\leq$ 100\,ms and throughput $\geq$ 50\,req/s.}
-\resumeItem{Streamed live predictions through Redpanda into an Evidently AI drift monitor; scaled the consumer via KEDA and triggered automated retraining workflows on detected drift.}
-\resumeItem{Orchestrated distributed model training with Kubeflow Training Operator (PyTorchJob); provisioned GPU/CPU nodes on-demand via Karpenter auto-scaling and delivered zero-downtime updates through rolling HPA.}
-\resumeItemListEnd
-
-\resumeProjectHeading
-{\textbf{SageLMS} $|$ \href{https://github.com/daithang59/sagelms}{GitHub} $|$ \emph{Spring Boot, FastAPI, LangChain, Redis, PostgreSQL, Docker, Kubernetes, GCP, GitHub Actions, FluxCD, Kyverno, Grafana \& Prometheus}}
-{4/2026 -- 6/2026}
-\resumeItemListStart
-\resumeItem{Designed a DevSecOps microservices LMS (Spring Boot gateway/auth/course + FastAPI LangChain AI tutor) on GKE with FluxCD GitOps and Kyverno admission policies enforcing supply-chain security end-to-end.}
-\resumeItem{Automated shift-left CI on every PR: secret scanning (Gitleaks), unit tests (JUnit/pytest/Vitest), Dockerfile linting (Hadolint), Trivy vulnerability scans, IaC validation (Checkov), and SonarCloud quality gates.}
-\resumeItem{Built CD pipeline that builds, Trivy-scans, signs (Cosign), and attests CycloneDX SBOM per image; Kyverno enforces digest-pinned, Harbor-trusted, non-root pods leveraging GCP Workload Identity for passwordless authentication.}
-\resumeItemListEnd
-
-\resumeSubHeadingListEnd
-
 %-----------RESEARCH-----------
 \section{Research}
 \resumeSubHeadingListStart
   \resumeProjectHeading
-    {\parbox[t]{0.79\textwidth}{\textbf{\href{https://csonet-conf.github.io/csonet26/index.html}{CSoNet 2026: A Drift-Aware MLOps Framework for Multi-Model Serving: A Network Intrusion Detection Case Study}}}}{Preview}
+    {\textbf{CSoNet 2026} $|$ \href{https://csonet-conf.github.io/csonet26/index.html}{\emph{A Drift-Aware MLOps Framework for Multi-Model Serving: A Network Intrusion Detection Case Study}}}{Accepted}
   \resumeItemListStart
-    \resumeItem{First author; proposed a cloud-native MLOps framework with decoupled control/data planes for multi-model lifecycle management; drift-triggered retraining on CIC-IDS2017 recovered Macro-F1 from 0.13--0.46 to 0.98--1.00 ($\Delta$+0.54--+0.87).}
+    \resumeItem{First author; proposed a tenant-aware control/data-plane MLOps architecture featuring a Native Registry and asynchronous production logging to trace model-version provenance, reference baselines, and monitoring reports across multi-model endpoints.}
+    \resumeItem{Validated across 120 CICIDS2017 windows: attack prevalence shifts flagged 74.2\%--98.1\% of features at Macro-F1 $\geq$ 0.999, while 25\% held-out attack replacement cut recall to 0.753 with only 1/5 KS-BH alerts, establishing human-reviewed update boundaries.}
   \resumeItemListEnd
 \resumeSubHeadingListEnd
 
@@ -143,10 +144,10 @@
     \textbf{Cloud \& Infrastructure:} AWS, GCP, Terraform, Ansible, Linux \\
     \textbf{Containers \& Orchestration:} Docker, Kubernetes, EKS, GKE, Helm, Argo Workflows \\
     \textbf{CI/CD \& GitOps:} Git, GitHub, GitHub Actions, Argo CD, Flux CD \\
-    \textbf{Observability:} Prometheus, Grafana, Zabbix \\
+    \textbf{Observability:} Prometheus, Alloy, Loki, Grafana, Zabbix \\
     \textbf{MLOps:} MLflow, Kubeflow, BentoML, Evidently AI \\
     \textbf{Frameworks \& Databases:} ReactJS, Django, FastAPI, PostgreSQL, Redis, Redpanda/Kafka \\
-    \textbf{Languages:} Python, TypeScript, Bash, SQL
+    \textbf{Languages:} Python, TypeScript, Java, Bash, SQL
   }}
 \end{itemize}
 

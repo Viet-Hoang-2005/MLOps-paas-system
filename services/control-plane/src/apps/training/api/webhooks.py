@@ -5,8 +5,9 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.catalog.models import ModelProject
 from apps.observability.services.lifecycle import has_event, record_training_event
-from apps.training.models import TrainingJob, TrainingOutput
+from apps.training.models import TrainingJob
 from apps.training.services.capabilities import capability_for_token
 from apps.training.services.logs import append_training_log
 from apps.training.services.storage_scope import validate_training_uri
@@ -36,7 +37,42 @@ class TrainingJobWebhookEndpoint(APIView):
 
     def post(self, request, job_id):
         key = request.headers.get("Idempotency-Key") or str(request.data.get("idempotency_key", ""))
+        output_error = ""
+        candidate = TrainingJob.objects.select_related("project__owner").filter(public_id=job_id).first()
+        if (
+            candidate
+            and candidate.status not in {"cancelling", "completed", "failed", "cancelled"}
+            and not candidate.deletion_requested_at
+            and (not candidate.project_id or candidate.project.deletion_state == "active")
+        ):
+            capability = capability_for_token(job=candidate, purpose="trusted_reporter", token=_bearer_token(request))
+            if (
+                capability
+                and candidate.submitted_at
+                and not capability.consumed_at
+                and _terminal_status(request.data.get("workflow_status")) == "completed"
+            ):
+                from apps.training.services.output_finalization import enqueue_output
+
+                with transaction.atomic():
+                    current = TrainingJob.objects.select_for_update().get(pk=candidate.pk)
+                    if (
+                        current.status not in {"completed", "failed", "cancelled", "cancelling"}
+                        and not current.deletion_requested_at
+                    ):
+                        enqueue_output(current)
+                        capability.consumed_at = timezone.now()
+                        capability.save(update_fields=["consumed_at"])
+                        record_training_event(
+                            job=current,
+                            event_type="output_index_queued",
+                            message="Output verification queued.",
+                            idempotency_key=key,
+                        )
+                return Response({"status": current.status}, status=status.HTTP_202_ACCEPTED)
         with transaction.atomic():
+            if candidate:
+                ModelProject.objects.select_for_update().filter(pk=candidate.project_id).first()
             try:
                 job = TrainingJob.objects.select_for_update().get(public_id=job_id)
             except TrainingJob.DoesNotExist:
@@ -46,7 +82,7 @@ class TrainingJobWebhookEndpoint(APIView):
                 purpose="trusted_reporter",
                 token=_bearer_token(request),
             )
-            if not capability:
+            if not capability or not job.submitted_at:
                 return Response({"detail": "Invalid training reporter capability."}, status=status.HTTP_403_FORBIDDEN)
             if has_event(aggregate_type="training_job", aggregate_id=job.public_id, idempotency_key=key):
                 return Response({"status": job.status, "duplicate": True})
@@ -56,29 +92,36 @@ class TrainingJobWebhookEndpoint(APIView):
                     status=status.HTTP_403_FORBIDDEN,
                 )
             status_value = _terminal_status(request.data.get("workflow_status"))
+            if output_error:
+                status_value = "failed"
             if not status_value:
                 return Response(
                     {"detail": "A terminal workflow_status is required."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            if job.status in {"cancelling", "completed", "failed", "cancelled"} or job.deletion_requested_at:
+            if (
+                job.status in {"cancelling", "completed", "failed", "cancelled"}
+                or job.execution_stop_requested
+                or job.deletion_requested_at
+                or (job.project_id and job.project.deletion_state != "active")
+            ):
                 capability.consumed_at = timezone.now()
                 capability.save(update_fields=["consumed_at"])
                 return Response({"status": job.status, "ignored": True})
             if status_value == "completed":
                 job.mark_finished("completed")
-                TrainingOutput.objects.update_or_create(
-                    job=job,
-                    relative_path="model.tar.gz",
-                    defaults={"kind": "model", "s3_uri": job.output_uri},
-                )
+
             elif status_value == "failed":
                 job.mark_finished("failed")
-                job.error_message = "Training workflow failed."
+                job.error_message = output_error or "Training workflow failed."
             else:
                 job.mark_finished("cancelled")
             capability.consumed_at = timezone.now()
             capability.save(update_fields=["consumed_at"])
+            job.observation_status = "cleanup_pending"
+            job.execution_stop_requested = True
+            job.next_execution_check_at = timezone.now()
+            job.save(update_fields=["observation_status", "execution_stop_requested", "next_execution_check_at"])
             job.save(update_fields=["status", "completed_at", "runtime_seconds", "error_message", "updated_at"])
             record_training_event(
                 job=job,
@@ -94,6 +137,12 @@ class TrainingJobWebhookEndpoint(APIView):
                 reason="Training reporter confirmed failure" if job.status == "failed" else None,
             )
         append_training_log(job.public_id, f"[SYSTEM] Training reached terminal status: {job.status}.")
+        try:
+            from apps.notifications.hooks import notify_training_result
+
+            notify_training_result(job)
+        except Exception:
+            pass
         return Response({"status": job.status})
 
 
@@ -168,19 +217,52 @@ class TrainingCancellationWebhookEndpoint(APIView):
         )
 
 
+class TrainingInputDownloadURLEndpoint(APIView):
+    authentication_classes = ()
+    permission_classes = ()
+
+    def post(self, request, job_id):
+        from apps.training.services.inputs import input_download_urls
+
+        return Response(input_download_urls(job_id, _bearer_token(request)))
+
+
+class TrainingRuntimeConfigEndpoint(APIView):
+    authentication_classes = ()
+    permission_classes = ()
+
+    def post(self, request, job_id):
+        from apps.training.services.workspace_runs import runtime_configuration
+
+        response = Response(runtime_configuration(job_id, _bearer_token(request)))
+        response["Cache-Control"] = "no-store"
+        return response
+
+
 class TrainingOutputUploadURLEndpoint(APIView):
     authentication_classes = ()
     permission_classes = ()
 
     def post(self, request, job_id):
         with transaction.atomic():
-            job = TrainingJob.objects.select_for_update().select_related("project__owner").get(public_id=job_id)
+            job = (
+                TrainingJob.objects.select_for_update(of=("self",))
+                .select_related("project__owner")
+                .get(public_id=job_id)
+            )
             capability = capability_for_token(
                 job=job,
                 purpose="output_upload",
                 token=_bearer_token(request),
             )
-            if not capability or capability.consumed_at:
+            if (
+                not capability
+                or capability.consumed_at
+                or job.status not in {"queued", "running", "uploading"}
+                or job.execution_stop_requested
+                or job.deletion_requested_at
+                or (job.project_id and job.project.deletion_state != "active")
+            ):
                 return Response({"detail": "Invalid training output capability."}, status=status.HTTP_403_FORBIDDEN)
             storage = S3Storage()
             validate_training_uri(job, storage.bucket, "output", job.output_uri)

@@ -71,7 +71,7 @@ def test_execute_build_locks_build_without_joining_nullable_version(monkeypatch)
     class FakeBackend:
         def run(self, selected_build):
             backend_calls.append(selected_build.public_id)
-            return "image built"
+            return {"dispatched": True}
 
     def register_build(*, build, image_uri, image_digest):
         build.status = "ready"
@@ -83,8 +83,8 @@ def test_execute_build_locks_build_without_joining_nullable_version(monkeypatch)
     monkeypatch.setattr("apps.deployment.tasks.build_backend", lambda _: FakeBackend())
     monkeypatch.setattr("apps.deployment.tasks.register_successful_build", register_build)
 
-    assert execute_build.run(str(build.public_id)) == "ready"
+    assert execute_build.run(str(build.public_id)) == "building"
     build.refresh_from_db()
-    assert build.status == "ready"
+    assert build.status == "building"
     assert build.version_id is None
     assert backend_calls == [build.public_id]

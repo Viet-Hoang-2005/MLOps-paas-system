@@ -31,11 +31,13 @@ def output_value(outputs, name):
 
 
 def get_tf_output():
-    # infra directory is ../../infra relative to this file
+    # Terraform AWS directory is ../../terraform/aws relative to this file
     base_dir = os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     )
-    infra_dir = os.path.join(base_dir, "infra")
+    infra_dir = os.path.join(base_dir, "terraform", "aws")
+    if not os.path.isdir(infra_dir):
+        infra_dir = os.path.join(base_dir, "infra")
     try:
         out = subprocess.check_output(
             ["terraform", "output", "-json"], cwd=infra_dir, stderr=subprocess.PIPE

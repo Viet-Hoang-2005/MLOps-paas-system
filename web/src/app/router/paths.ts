@@ -1,17 +1,14 @@
 export const routes = {
   login: "/login",
   dashboard: "/dashboard",
-  overview: "/dashboard/home/models",
-  modelTesting: "/dashboard/home/model-testing",
-  deploy: "/dashboard/management",
-  uploadModel: "/dashboard/management/model/upload/metadata",
-  training: "/dashboard/model-training",
-  registry: "/dashboard/model-evolution",
-  monitoring: "/dashboard/drift-monitoring",
+  projects: "/dashboard/projects",
+  newProject: "/dashboard/projects/new",
+  overview: "/dashboard/overview",
+  deployment: "/dashboard/deployment",
+  monitoring: "/dashboard/monitoring",
+  training: "/dashboard/training",
+  evolution: "/dashboard/evolution",
   notifications: "/dashboard/notifications",
   profile: "/dashboard/settings/profile",
-  developerSettings: "/dashboard/settings/developer",
+  apiKeys: "/dashboard/api-keys",
 } as const;
-
-export const projectRoute = (base: string, projectId: string) =>
-  `${base}/${projectId}`;

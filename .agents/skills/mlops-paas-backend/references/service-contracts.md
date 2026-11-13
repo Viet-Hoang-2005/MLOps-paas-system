@@ -23,6 +23,13 @@ Keep Build, project, model version, training job, deployment, monitor, and run U
 
 Redis log streams are keyed by resource type and UUID and support cursor polling. They are transient presentation state; PostgreSQL status remains authoritative.
 
+Production Argo task logs use Loki stdout/stderr with seven-day retention and a
+tenant-authorized Control Plane proxy. Signed task-bound cursors and server-owned
+queries prevent cross-tenant LogQL access. Docker keeps Redis logs. Deploy waits
+for actual model readiness and reports through a short-lived deployment-bound
+capability; missing callbacks become `unconfirmed` after a one-shot deadline.
+See `docs/runtime-logs.md`.
+
 Application-owned container logs use service-owned `src/logging_utils.py`
 (`src/common/logging_utils.py` in Control Plane), using only the standard library
 and either a concise single-line console format (default) or one-line JSON when
@@ -30,10 +37,29 @@ and either a concise single-line console format (default) or one-line JSON when
 installation are required. Keep the contract aligned through local tests. Default INFO; high-frequency activity
 is summarized per process every 60 seconds. Emit lifecycle transitions after commit,
 distinguish dispatch from completion, and keep request/resource IDs separate. Use
-`RuntimeLog` for sanitized job detail with container fallback if its sink is absent
-or fails. Preserve metric/EOF protocols and never infer lifecycle state from tenant
-output. See `docs/backend-logging.md` for the complete logging contract.
+`RuntimeLog` for sanitized job detail emitted to stdout even when its Redis sink
+succeeds, so production collection captures subprocess output. Preserve metric/EOF
+protocols and never infer lifecycle state from tenant output. See
+`docs/runtime-logs.md` for production collection and access boundaries.
+
+## Durable Training And Drift
+
+PostgreSQL owns dispatch, observation leases and cleanup intent for TrainingJob/DriftRun.
+With TRAINING_EXECUTION_WATCH_ENABLED or DRIFT_EXECUTION_WATCH_ENABLED, Beat scans every 15 seconds; batch size is 100 and
+leases last 60 seconds. Runtime I/O stays outside transactions. Temporary backend
+errors retain lifecycle state and set observation_status=retrying (or cleanup_pending).
+Deterministic UUID runtime names and tenant/project/resource labels fence adoption
+and cleanup. Terminal results commit before runtime removal and verify scoped S3 outputs.
+Training capabilities include runtime_options_seconds; CPU/memory profiles and GPU
+counts are validated on create/update/submit. Runner deadline covers startup through
+upload; input URLs are obtained at start, output PUT sends application/gzip.
+Argo observation capabilities bind kind, resource, tenant, project and lease; callback
+replay or expired leases are denied. See docs/dev/p1-execution-recovery.md for rollout.
 
 ## Configuration
 
 Secrets enter trusted services through environment/Secret resources. Tenant jobs receive explicit minimal values. Inspect `.env.example`, Compose, Kubernetes ConfigMaps/Secrets, workflow templates, and tests together before adding a variable.
+
+## Independent training
+
+Read [training-workspaces.md](training-workspaces.md) for account-owned drafts/jobs, optional Project links, immutable input_contract snapshots, read-only Input preparation, output-directory model export, one-use runtime configuration and resumable preservation during Project deletion. Assignment must not change runtime identity or storage namespace.

@@ -17,12 +17,16 @@ def _job(email="owner@example.com"):
     project = ModelProject.objects.create(owner=user, name=f"project-{email}")
     job = TrainingJob.objects.create(
         project=project,
-        name="nightly",
         model_flavor="sklearn",
         code_snapshot_uri="pending",
         data_snapshot_uri="pending",
         output_uri="pending",
         status="running",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
     )
     uris = expected_training_uris(job, settings.AWS_STORAGE_BUCKET_NAME)
     job.code_snapshot_uri = uris["code"]
@@ -48,6 +52,21 @@ def test_capability_is_hashed_and_bound_to_job_and_purpose():
         HTTP_AUTHORIZATION=f"Bearer {token}",
     )
     assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_dispatch_retry_preserves_existing_capability_and_caps_ttl(settings):
+    job = _job()
+    job.max_runtime_seconds = 43200
+    settings.TRAINING_CAPABILITY_MAX_TTL_SECONDS = 999999
+    first = issue_capability(job, "input_download", preserve_existing=True)
+    second = issue_capability(job, "input_download", preserve_existing=True)
+    from apps.training.services.capabilities import capability_for_token
+
+    assert capability_for_token(job=job, purpose="input_download", token=first)
+    assert capability_for_token(job=job, purpose="input_download", token=second)
+    capability = capability_for_token(job=job, purpose="input_download", token=first)
+    assert 45890 <= (capability.expires_at - timezone.now()).total_seconds() <= 46800
 
 
 @pytest.mark.django_db
@@ -98,7 +117,7 @@ def test_expired_capability_and_legacy_shared_secret_are_rejected():
 
 
 @pytest.mark.django_db
-def test_trusted_reporter_sets_terminal_status_once():
+def test_trusted_reporter_sets_terminal_status_once(monkeypatch):
     job = _job()
     token = issue_capability(job, "trusted_reporter")
     client = APIClient()
@@ -109,10 +128,10 @@ def test_trusted_reporter_sets_terminal_status_once():
     }
 
     response = client.post(url, {"workflow_status": "Succeeded"}, format="json", **headers)
-    assert response.status_code == 200
+    assert response.status_code == 202
     job.refresh_from_db()
-    assert job.status == "completed"
-    assert TrainingOutput.objects.filter(job=job, relative_path="model.tar.gz").exists()
+    assert job.status == "uploading"
+    assert not TrainingOutput.objects.filter(job=job).exists()
 
     duplicate = client.post(url, {"workflow_status": "Succeeded"}, format="json", **headers)
     assert duplicate.status_code == 200
@@ -136,6 +155,33 @@ def test_trusted_reporter_cannot_overwrite_cancelled_job():
     job.refresh_from_db()
     assert job.status == "cancelled"
     assert response.data["ignored"] is True
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "error,expected_status", [(ValueError("empty"), "failed"), (TimeoutError("temporary"), "uploading")]
+)
+def test_trusted_completion_requires_output(monkeypatch, error, expected_status):
+    from apps.training.services.output_finalization import finalize_output
+
+    monkeypatch.setattr("apps.training.services.outputs.verify_training_output", Mock(side_effect=error))
+    job = _job()
+    token = issue_capability(job, "trusted_reporter")
+    response = APIClient().post(
+        f"/internal/webhooks/training-jobs/{job.public_id}/",
+        {"workflow_status": "Succeeded"},
+        format="json",
+        HTTP_AUTHORIZATION=f"Bearer {token}",
+    )
+    assert response.status_code == 202
+    if isinstance(error, TimeoutError):
+        with pytest.raises(RuntimeError, match="temporarily unavailable"):
+            finalize_output.run(str(job.public_id))
+    else:
+        finalize_output.run(str(job.public_id))
+    job.refresh_from_db()
+    assert job.status == expected_status
+    assert not job.outputs.exists()
 
 
 @pytest.mark.django_db

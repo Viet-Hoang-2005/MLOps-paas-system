@@ -19,23 +19,36 @@ from infrastructure.execution.argo_backends import ArgoDeploymentBackend
 def test_build_webhook_is_idempotent(monkeypatch):
     user = get_user_model().objects.create_user("owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="project")
-    version = ModelVersion.objects.create(project=project, version="1")
-    build = Build.objects.create(project=project, version=version, flavor="sklearn", status="building")
+    build = Build.objects.create(
+        project=project, flavor="sklearn", status="building", package_uri="s3://bucket/build/package.zip"
+    )
     registry = SimpleNamespace(promote=lambda **_kwargs: (f"image-{project.public_id}:v1", "sha256:local-image-id"))
     monkeypatch.setattr("apps.registry.services.versions.image_registry_for", lambda _build: registry)
     client = APIClient()
     headers = {"HTTP_X_CONTROL_PLANE_SECRET": "test-webhook-secret"}
     url = f"/internal/webhooks/builds/{build.public_id}/"
 
-    first = client.post(url, {"status": "success"}, format="json", **headers)
+    first = client.post(
+        url,
+        {
+            "status": "success",
+            "image_digest": "sha256:" + "a" * 64,
+            "image_uri": f"image-{project.public_id}:build-{build.public_id}",
+            "package_manifest": {"format": "mlflow"},
+        },
+        format="json",
+        **headers,
+    )
     second = client.post(url, {"status": "error"}, format="json", **headers)
     build.refresh_from_db()
 
     assert first.status_code == 200
     assert second.data["duplicate"] is True
     assert build.status == "ready"
-    assert build.image_uri == f"image-{build.project.public_id}:v1"
-    assert build.image_digest == "sha256:local-image-id"
+    assert build.version_id is None
+    assert not ModelVersion.objects.filter(project=project).exists()
+    assert build.image_uri == f"image-{build.project.public_id}:build-{build.public_id}"
+    assert build.image_digest == "sha256:" + "a" * 64
 
 
 @pytest.mark.django_db
@@ -123,7 +136,7 @@ def test_deployment_backend_does_not_follow_build_backend(monkeypatch):
 
 
 @pytest.mark.django_db
-@override_settings(MODEL_RUNTIME_NAMESPACE="mlops-model-runtimes")
+@override_settings(MODEL_RUNTIME_NAMESPACE="mlops-paas-serving")
 def test_argo_deployment_persists_the_dedicated_runtime_namespace():
     user = get_user_model().objects.create_user("runtime-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="runtime project")
@@ -144,6 +157,39 @@ def test_argo_deployment_persists_the_dedicated_runtime_namespace():
 
     endpoint = backend.deploy(deployment)
 
-    assert endpoint.runtime_namespace == "mlops-model-runtimes"
-    assert endpoint.internal_url == f"http://deploy-{build.public_id}-svc.mlops-model-runtimes.svc.cluster.local:5001"
-    assert dispatched[0][1]["container_name"] == f"deploy-{build.public_id}"
+    assert endpoint.runtime_namespace == "mlops-paas-serving"
+    assert (
+        endpoint.internal_url == f"http://deploy-{deployment.public_id}-svc.mlops-paas-serving.svc.cluster.local:5001"
+    )
+    assert dispatched[0][1]["container_name"] == f"deploy-{deployment.public_id}"
+    assert dispatched[0][1]["target_port"] == "5001"
+
+
+@pytest.mark.django_db
+@override_settings(MODEL_RUNTIME_NAMESPACE="mlops-paas-serving")
+def test_argo_deployment_uses_port_5002_for_deep_learning_flavor():
+    user = get_user_model().objects.create_user("dl-owner@example.com", "password123")
+    project = ModelProject.objects.create(owner=user, name="dl project")
+    version = ModelVersion.objects.create(project=project, version="1", flavor="pytorch")
+    build = Build.objects.create(
+        project=project,
+        version=version,
+        flavor="pytorch",
+        backend="argo",
+        image_uri=f"registry.example/user-images/image-{project.public_id}:build",
+        image_digest="sha256:" + "b" * 64,
+    )
+    deployment = Deployment.objects.create(version=version, build=build, backend="argo")
+    dispatched = []
+    backend = ArgoDeploymentBackend(
+        client=SimpleNamespace(trigger=lambda url, payload: dispatched.append((url, payload)))
+    )
+
+    endpoint = backend.deploy(deployment)
+
+    assert endpoint.runtime_namespace == "mlops-paas-serving"
+    assert (
+        endpoint.internal_url == f"http://deploy-{deployment.public_id}-svc.mlops-paas-serving.svc.cluster.local:5002"
+    )
+    assert dispatched[0][1]["model_type"] == "dl"
+    assert dispatched[0][1]["target_port"] == "5002"

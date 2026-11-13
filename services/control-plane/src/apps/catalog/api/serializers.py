@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
-from apps.catalog.models import ModelProject, WorkspaceAsset
+from apps.catalog.models import ModelPreview, ModelProject, PreviewAsset, WorkspaceAsset
+from apps.deployment.services.runtime_health import effective_health
 from common.api.exceptions import Conflict
 from infrastructure.storage import S3Storage
 
@@ -12,6 +13,11 @@ class ModelProjectSerializer(serializers.ModelSerializer):
     active_endpoint = serializers.SerializerMethodField()
     source_code = serializers.SerializerMethodField()
     reference_data = serializers.SerializerMethodField()
+    latest_version_id = serializers.SerializerMethodField()
+    latest_version_number = serializers.SerializerMethodField()
+    running_version_number = serializers.SerializerMethodField()
+    preview_revision = serializers.IntegerField(source="preview.revision", read_only=True)
+    preview_changed = serializers.SerializerMethodField()
 
     class Meta:
         model = ModelProject
@@ -21,9 +27,14 @@ class ModelProjectSerializer(serializers.ModelSerializer):
             "description",
             "access_mode",
             "flavor",
+            "preview_revision",
+            "preview_changed",
             "source_code",
             "reference_data",
             "lifecycle_status",
+            "latest_version_id",
+            "latest_version_number",
+            "running_version_number",
             "active_endpoint",
             "is_active",
             "deletion_state",
@@ -53,26 +64,27 @@ class ModelProjectSerializer(serializers.ModelSerializer):
         return value
 
     def get_flavor(self, instance):
-        version = instance.versions.order_by("-registered_at").first()
-        return version.flavor if version else ""
+        return instance.active_deployment.version.flavor if self._has_running(instance) else instance.preview.flavor
+
+    @staticmethod
+    def _has_running(instance):
+        return bool(instance.active_deployment_id and instance.active_deployment.status == "succeeded")
+
+    def get_preview_changed(self, instance):
+        return bool(
+            self._has_running(instance)
+            and instance.active_deployment.build.preview_revision != instance.preview.revision
+        )
 
     def get_lifecycle_status(self, instance):
         """Return the current user-facing lifecycle state for the management list."""
-        if instance.versions.filter(deployments__status__in={"pending", "deploying", "healthy", "unhealthy"}).exists():
-            return "deployed"
-        if instance.builds.filter(status="ready").exists():
-            return "image_ready"
-        return "metadata"
+        if self._has_running(instance):
+            return "running"
+        return "registered" if instance.versions.exists() else "preview"
 
     def get_active_endpoint(self, instance):
-        """Return the newest non-terminal deployment endpoint for this project."""
-        deployments = (
-            deployment
-            for version in instance.versions.all()
-            for deployment in version.deployments.all()
-            if deployment.status not in {"failed", "stopped"}
-        )
-        for deployment in sorted(deployments, key=lambda item: item.created_at, reverse=True):
+        """Return only the explicitly selected Running deployment endpoint."""
+        for deployment in [instance.active_deployment] if self._has_running(instance) else []:
             endpoint = getattr(deployment, "endpoint", None)
             if endpoint is None:
                 continue
@@ -87,17 +99,49 @@ class ModelProjectSerializer(serializers.ModelSerializer):
                 "id": str(endpoint.public_id),
                 "deployment_id": str(deployment.public_id),
                 "version_id": str(deployment.version.public_id),
+                "version_number": deployment.version.version,
                 "url": prediction_url,
                 "health_url": health_url,
-                "health_status": endpoint.health_status,
+                "health_status": effective_health(endpoint),
                 "deployment_status": deployment.status,
+                "registration_status": deployment.build.registration_status,
                 "last_checked_at": endpoint.last_checked_at,
             }
         return None
 
+    def get_latest_version_id(self, instance):
+        if self._has_running(instance):
+            return str(instance.active_deployment.version.public_id)
+        latest = instance.versions.order_by("-registered_at", "-id").first()
+        return str(latest.public_id) if latest else None
+
+    def get_latest_version_number(self, instance):
+        if self._has_running(instance):
+            return instance.active_deployment.version.version
+        latest = instance.versions.order_by("-registered_at", "-id").first()
+        return latest.version if latest else None
+
+    def get_running_version_number(self, instance):
+        if self._has_running(instance):
+            return instance.active_deployment.version.version
+        return None
+
     def _asset_summary(self, instance, kind):
-        asset = instance.workspace_assets.filter(kind=kind).order_by("-updated_at").first()
-        return ProjectAssetSummarySerializer(asset).data if asset else None
+        if not self._has_running(instance):
+            return None
+        version = instance.active_deployment.version
+        artifact = version.artifacts.filter(kind={"code": "source_code", "data": "reference_data"}[kind]).first()
+        return (
+            {
+                "name": artifact.name,
+                "checksum": artifact.checksum,
+                "size_bytes": artifact.size_bytes,
+                "content_type": artifact.content_type,
+                "download_url": S3Storage().presigned_get(artifact.uri, 900),
+            }
+            if artifact
+            else None
+        )
 
     def get_source_code(self, instance):
         return self._asset_summary(instance, "code")
@@ -151,5 +195,93 @@ class ProjectMetadataWriteSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=160)
     description = serializers.CharField(required=False, allow_blank=True, default="")
     access_mode = serializers.ChoiceField(choices=ModelProject.ACCESS_MODES, default="private")
-    source_code_file = serializers.FileField(required=False)
-    reference_data_file = serializers.FileField(required=False)
+
+
+class PreviewAssetSerializer(serializers.ModelSerializer):
+    download_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PreviewAsset
+        fields = ("kind", "name", "checksum", "size_bytes", "content_type", "download_url")
+
+    def get_download_url(self, instance):
+        return S3Storage().presigned_get(instance.s3_uri, 900)
+
+
+class ModelPreviewSerializer(serializers.ModelSerializer):
+    assets = PreviewAssetSerializer(many=True)
+
+    class Meta:
+        model = ModelPreview
+        fields = ("revision", "flavor", "artifact_format", "requirements_text", "assets", "updated_at")
+
+
+class UploadedAssetInputSerializer(serializers.Serializer):
+    kind = serializers.ChoiceField(choices=PreviewAsset.KINDS)
+    name = serializers.CharField(max_length=255)
+    s3_uri = serializers.CharField(max_length=1024)
+    checksum = serializers.CharField(max_length=128, required=False, allow_blank=True, default="")
+
+
+class PresignedUploadItemSerializer(serializers.Serializer):
+    kind = serializers.ChoiceField(choices=PreviewAsset.KINDS)
+    filename = serializers.CharField(max_length=255)
+    size_bytes = serializers.IntegerField(min_value=1, required=True)
+    content_type = serializers.CharField(
+        max_length=160, required=False, allow_blank=True, default="application/octet-stream"
+    )
+
+
+class ProjectPreviewUploadUrlsRequestSerializer(serializers.Serializer):
+    flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"), required=False)
+    artifact_format = serializers.ChoiceField(choices=("raw", "mlflow_zip"), required=False)
+    files = serializers.ListField(child=PresignedUploadItemSerializer(), min_length=1)
+
+
+class NewProjectUploadUrlsRequestSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=160)
+    flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"), required=False)
+    artifact_format = serializers.ChoiceField(choices=("raw", "mlflow_zip"), required=False)
+    files = serializers.ListField(child=PresignedUploadItemSerializer(), min_length=1)
+
+    def validate_name(self, value):
+        request = self.context.get("request")
+        if request and ModelProject.objects.filter(owner=request.user, name=value, is_active=True).exists():
+            raise Conflict(f"A model project named {value} already exists.")
+        return value
+
+
+class PreviewWriteSerializer(serializers.Serializer):
+    revision = serializers.IntegerField(min_value=1)
+    flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"), required=False)
+    artifact_format = serializers.ChoiceField(choices=("raw", "mlflow_zip"), required=False)
+    requirements_text = serializers.CharField(required=False, allow_blank=True)
+    remove_assets = serializers.ListField(child=serializers.ChoiceField(choices=PreviewAsset.KINDS), required=False)
+    assets = serializers.ListField(child=UploadedAssetInputSerializer(), required=False)
+
+    def validate(self, attrs):
+        if any(key.endswith("_file") for key in self.initial_data):
+            raise serializers.ValidationError({"assets": "Upload files with a presigned staging URL."})
+        return attrs
+
+
+class ProjectCreateSerializer(PreviewWriteSerializer):
+    project_id = serializers.UUIDField(required=False)
+    revision = serializers.IntegerField(required=False)
+    name = serializers.CharField(max_length=160)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    access_mode = serializers.ChoiceField(choices=ModelProject.ACCESS_MODES, default="private")
+    flavor = serializers.ChoiceField(choices=("sklearn", "xgboost", "pytorch", "tensorflow"))
+
+    def validate_name(self, value):
+        request = self.context.get("request")
+        if request and ModelProject.objects.filter(owner=request.user, name=value, is_active=True).exists():
+            raise Conflict(f"A model project named {value} already exists.")
+        return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        has_asset = any(asset.get("kind") == "source_artifact" for asset in attrs.get("assets", []))
+        if not has_asset:
+            raise serializers.ValidationError({"source_artifact": "A model artifact is required."})
+        return attrs

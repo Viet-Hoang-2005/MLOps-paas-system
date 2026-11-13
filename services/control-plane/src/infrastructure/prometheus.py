@@ -21,3 +21,15 @@ class PrometheusClient:
             params={"query": expression},
         ).json()
         return payload.get("data", {}).get("result", [])
+
+    def query_range(self, expression, *, start, end, step):
+        if not self.enabled:
+            return []
+        payload = self.http.request(
+            "GET",
+            f"{self.base_url}/api/v1/query_range",
+            params={"query": expression, "start": start, "end": end, "step": step},
+        ).json()
+        if payload.get("status") != "success":
+            raise RuntimeError("Prometheus query failed.")
+        return payload.get("data", {}).get("result", [])

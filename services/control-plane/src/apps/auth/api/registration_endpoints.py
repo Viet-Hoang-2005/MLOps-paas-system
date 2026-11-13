@@ -1,11 +1,20 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.auth.models import UserAvatar
-from apps.auth.services.otp import read_token, send_otp, verify_otp
-from apps.auth.services.tokens import token_payload
+from apps.auth.services.avatars import update_profile, validate_avatar
+from apps.auth.services.cookies import clear_refresh_token_cookie, verify_auth_security_headers
+from apps.auth.services.otp import (
+    check_and_record_otp_cooldown,
+    read_token,
+    send_otp,
+    verify_otp,
+)
+from apps.auth.services.tokens import create_auth_response, revoke_user_refresh_tokens
+from apps.auth.throttles import PasswordResetRateThrottle, RegistrationRateThrottle
 
 
 class EmailSerializer(serializers.Serializer):
@@ -19,6 +28,7 @@ class OTPSerializer(EmailSerializer):
 class RegistrationOTPRequestEndpoint(APIView):
     authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = (RegistrationRateThrottle,)
 
     def post(self, request):
         serializer = EmailSerializer(data=request.data)
@@ -33,6 +43,7 @@ class RegistrationOTPRequestEndpoint(APIView):
 class RegistrationOTPVerifyEndpoint(APIView):
     authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = (RegistrationRateThrottle,)
 
     def post(self, request):
         serializer = OTPSerializer(data=request.data)
@@ -48,25 +59,46 @@ class RegistrationOTPVerifyEndpoint(APIView):
 class CompleteRegistrationEndpoint(APIView):
     authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = (RegistrationRateThrottle,)
 
     def post(self, request):
+        verify_auth_security_headers(request)
         token = str(request.data.get("registration_token", ""))
-        payload = read_token(token, "registration")
+        try:
+            payload = read_token(token, "registration", consume=False)
+        except TypeError:
+            payload = read_token(token, "registration")
+        user_model = get_user_model()
+        if user_model.objects.filter(email__iexact=payload["email"]).exists():
+            raise serializers.ValidationError({"email": "An account already exists for this email."})
+
+        full_name = str(request.data.get("full_name", ""))
+        temp_user = user_model(email=payload["email"], full_name=full_name)
         password = str(request.data.get("password", ""))
-        if len(password) < 8:
-            raise serializers.ValidationError({"password": "Password must contain at least 8 characters."})
-        user = get_user_model().objects.create_user(
+        try:
+            validate_password(password, user=temp_user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"password": list(exc.messages)})
+
+        avatar = request.FILES.get("avatar")
+        if avatar is not None:
+            validate_avatar(avatar)
+
+        try:
+            read_token(token, "registration", consume=True)
+        except TypeError:
+            pass
+
+        user = user_model.objects.create_user(
             email=payload["email"],
             password=password,
-            full_name=str(request.data.get("full_name", "")),
+            full_name=full_name,
         )
-        avatar = request.FILES.get("avatar")
-        if avatar:
-            user.avatar = avatar
-            user.save(update_fields=["avatar"])
-            UserAvatar.objects.create(user=user, image=user.avatar.name)
-        return Response(
-            token_payload(user, message="Account created.", is_new_user=True),
+        if avatar is not None:
+            user = update_profile(user, avatar=avatar)
+        return create_auth_response(
+            user,
+            {"message": "Account created.", "is_new_user": True},
             status=status.HTTP_201_CREATED,
         )
 
@@ -74,6 +106,7 @@ class CompleteRegistrationEndpoint(APIView):
 class PasswordResetRequestEndpoint(APIView):
     authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = (PasswordResetRateThrottle,)
 
     def post(self, request):
         serializer = EmailSerializer(data=request.data)
@@ -81,12 +114,15 @@ class PasswordResetRequestEndpoint(APIView):
         email = serializer.validated_data["email"].lower()
         if get_user_model().objects.filter(email__iexact=email, is_active=True).exists():
             send_otp(email=email, purpose="password_reset")
+        else:
+            check_and_record_otp_cooldown(email=email, purpose="password_reset")
         return Response({"message": "If the account exists, a verification code was sent.", "email": email})
 
 
 class PasswordResetVerifyEndpoint(APIView):
     authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = (PasswordResetRateThrottle,)
 
     def post(self, request):
         serializer = OTPSerializer(data=request.data)
@@ -102,13 +138,39 @@ class PasswordResetVerifyEndpoint(APIView):
 class PasswordResetCompleteEndpoint(APIView):
     authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
+    throttle_classes = (PasswordResetRateThrottle,)
 
     def post(self, request):
-        payload = read_token(str(request.data.get("reset_token", "")), "password_reset")
+        token = str(request.data.get("reset_token", ""))
+        try:
+            payload = read_token(token, "password_reset", consume=False)
+        except TypeError:
+            payload = read_token(token, "password_reset")
+        user_model = get_user_model()
+        clean_email = str(payload["email"]).strip().lower()
+        try:
+            user = user_model.objects.get(email__iexact=clean_email, is_active=True)
+        except user_model.MultipleObjectsReturned:
+            user = user_model.objects.filter(email__iexact=clean_email, is_active=True).order_by("-date_joined").first()
+        except user_model.DoesNotExist:
+            raise serializers.ValidationError({"token": "User account not found or inactive."})
+
         password = str(request.data.get("new_password", ""))
-        if len(password) < 8:
-            raise serializers.ValidationError({"new_password": "Password must contain at least 8 characters."})
-        user = get_user_model().objects.get(email__iexact=payload["email"], is_active=True)
+        try:
+            validate_password(password, user=user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"new_password": list(exc.messages)})
+
+        try:
+            read_token(token, "password_reset", consume=True)
+        except TypeError:
+            pass
+
         user.set_password(password)
         user.save(update_fields=["password"])
-        return Response({"message": "Password reset completed."})
+
+        revoke_user_refresh_tokens(user)
+
+        response = Response({"message": "Password reset completed."})
+        clear_refresh_token_cookie(response)
+        return response

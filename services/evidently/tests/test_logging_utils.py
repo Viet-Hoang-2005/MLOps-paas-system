@@ -110,9 +110,9 @@ class LoggingTests(unittest.TestCase):
     def test_partial_private_keys_are_masked_per_stream(self):
         saved = []
         runtime = RuntimeLog(self.logger, lambda line: saved.append(line) or True)
-        runtime.detail("-----BEGIN PRIVATE KEY-----")
+        runtime.detail("-----BEGIN PRIVATE KEY-----")  # gitleaks:allow
         runtime.detail("private-base64-body")
-        runtime.detail("-----END PRIVATE KEY-----")
+        runtime.detail("-----END PRIVATE KEY-----")  # gitleaks:allow
         runtime.detail("useful failure diagnosis")
         self.assertNotIn("private-base64-body", str(saved))
         self.assertIn("useful failure diagnosis", saved)
@@ -128,9 +128,7 @@ class LoggingTests(unittest.TestCase):
     def test_protocol_stays_valid_json_for_token_named_metrics(self):
         runtime = RuntimeLog(self.logger)
         with patch("sys.stdout", new_callable=io.StringIO) as output:
-            runtime.protocol(
-                'METRIC_JSON {"tokens_per_second":123,"api_token":"private-value"}'
-            )
+            runtime.protocol('METRIC_JSON {"tokens_per_second":123,"api_token":"private-value"}')
         payload = json.loads(output.getvalue().split(" ", 1)[1])
         self.assertEqual(payload["tokens_per_second"], 123)
         self.assertEqual(payload["api_token"], "[REDACTED]")
@@ -180,7 +178,7 @@ class LoggingTests(unittest.TestCase):
         runtime = RuntimeLog(self.logger, writer)
         runtime.detail('password="unsafe-value"')
         self.assertNotIn("unsafe-value", saved[0])
-        self.assertIn("[DEBUG]:", self.output.getvalue())
+        self.assertIn("[INFO]:", self.output.getvalue())
         self.output.truncate(0)
         self.output.seek(0)
 

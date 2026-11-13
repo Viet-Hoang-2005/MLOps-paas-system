@@ -1,10 +1,14 @@
 import logging
+from datetime import timedelta
 
 from celery import shared_task
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 
+from apps.deployment.execution_tasks import check_local_execution, scan_local_executions  # noqa: F401
+from apps.deployment.health_tasks import probe_runtime_health, scan_runtime_health  # noqa: F401
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.services.logs import append_deployment_log, reset_deployment_logs
@@ -12,6 +16,7 @@ from apps.observability.services.outbox import enqueue_event
 from apps.registry.services.versions import register_successful_build
 from common.logging import failure_reported, record_transition
 from infrastructure.execution import build_backend, deployment_backend
+from infrastructure.execution.build_cleanup import stop_build_for_deletion
 from infrastructure.execution.image_cleanup import BuildImageCleaner
 from infrastructure.execution.image_references import temporary_image_reference
 from infrastructure.storage import S3Storage
@@ -20,27 +25,82 @@ from infrastructure.storage.paths import build_prefix
 logger = logging.getLogger(__name__)
 
 
-def _mark_deployment_healthy(deployment):
-    Deployment = type(deployment)
-    Deployment.objects.filter(pk=deployment.pk).update(status="healthy", deployed_at=timezone.now(), error_message="")
-    Endpoint.objects.filter(deployment=deployment).update(health_status="healthy", last_checked_at=timezone.now())
+STOP_CLAIMABLE = {"pending", "deploying", "succeeded", "unconfirmed"}
+
+
+def claim_deployment_stop(project, deployment):
+    """Claim the stop under the caller's project and deployment locks.
+
+    The stopped status is written before the runtime is touched, so a late
+    readiness result can no longer promote this deployment.
+    """
+    if deployment.status in STOP_CLAIMABLE:
+        deployment.status = "stopped"
+        deployment.save(update_fields=["status", "updated_at"])
+    Endpoint.objects.filter(deployment=deployment).update(
+        health_status="unknown", last_checked_at=None, health_check_token=None, health_check_lease_until=None
+    )
+    if project.active_deployment_id == deployment.pk:
+        project.active_deployment = None
+        project.save(update_fields=["active_deployment", "updated_at"])
+    version_id = str(deployment.version.public_id)
+    public_id = str(deployment.public_id)
+    transaction.on_commit(lambda: invalidate_model_server_cache(version_id))
+    transaction.on_commit(lambda: stop_deployment.delay(public_id))
+
+
+def _mark_deployment_succeeded(deployment):
+    from apps.catalog.models import ModelProject
+    from apps.drift.models import DriftMonitor
+
+    with transaction.atomic():
+        project = ModelProject.objects.select_for_update().get(pk=deployment.version.project_id)
+        deployment = Deployment.objects.select_for_update(of=("self",)).get(pk=deployment.pk)
+        if (
+            not project.is_active
+            or project.deletion_state != "active"
+            or deployment.status not in {"deploying", "unconfirmed"}
+        ):
+            return False
+        old_id = project.active_deployment_id
+        Deployment.objects.filter(pk=deployment.pk).update(
+            status="succeeded", deployed_at=timezone.now(), error_message=""
+        )
+        Endpoint.objects.filter(deployment=deployment).update(health_status="healthy", last_checked_at=timezone.now())
+        project.active_deployment = deployment
+        project.save(update_fields=["active_deployment", "updated_at"])
+        DriftMonitor.objects.filter(version__project=project).exclude(version_id=deployment.version_id).update(
+            is_active=False
+        )
+        if old_id and old_id != deployment.pk:
+            old = Deployment.objects.select_for_update(of=("self",)).select_related("version").get(pk=old_id)
+            claim_deployment_stop(project, old)
     invalidate_model_server_cache(str(deployment.version.public_id))
-    append_deployment_log(deployment, "Endpoint passed health checks; deployment is healthy.")
-    record_transition(deployment, "healthy")
+    append_deployment_log(deployment, "Runtime passed readiness checks; deployment succeeded.")
+    record_transition(deployment, "succeeded")
     enqueue_event(
         topic="deployment.events",
         aggregate_type="deployment",
         aggregate_id=deployment.public_id,
         event_type="deployment.changed",
-        payload={"deployment_id": str(deployment.public_id), "status": "healthy"},
+        payload={"deployment_id": str(deployment.public_id), "status": "succeeded"},
     )
+    return True
 
 
 @shared_task(bind=True)
 def execute_build(self, build_id):
+    candidate = Build.objects.filter(public_id=build_id).first()
+    if not candidate:
+        return "not_found"
     with transaction.atomic():
+        from apps.catalog.models import ModelProject
+
+        ModelProject.objects.select_for_update().get(pk=candidate.project_id)
         build = Build.objects.select_for_update().select_related("project", "project__owner").get(public_id=build_id)
-        if build.status in {"ready", "cancelled"}:
+        if build.deletion_state != "active":
+            return "deleting"
+        if build.status in {"ready", "cancelled", "failed"}:
             return build.status
         if build.project.deletion_state != "active":
             build.status = "cancelled"
@@ -53,12 +113,21 @@ def execute_build(self, build_id):
         build.celery_task_id = self.request.id or build.celery_task_id
         build.error_message = ""
         build.save(update_fields=["status", "started_at", "celery_task_id", "error_message", "updated_at"])
+        if build.backend == "docker":
+            Build.objects.filter(pk=build.pk).update(
+                execution_deadline_at=build.execution_deadline_at
+                or timezone.now() + timedelta(seconds=settings.LOCAL_BUILD_TIMEOUT_SECONDS),
+                next_execution_check_at=timezone.now(),
+            )
         record_transition(build, "building")
     try:
         result = build_backend(build.backend).run(build)
     except Exception as exc:
+        if not Build.objects.filter(pk=build.pk, deletion_state="active").exists():
+            Build.objects.filter(pk=build.pk).update(status="cancelled", completed_at=timezone.now())
+            return "cancelled"
         already_failed = Build.objects.filter(pk=build.pk, status="failed").exists()
-        Build.objects.filter(pk=build.pk).update(
+        Build.objects.filter(pk=build.pk).exclude(status__in=("cancelled", "ready")).update(
             status="failed", error_message=str(exc)[:12000], completed_at=timezone.now()
         )
         if not already_failed:
@@ -75,27 +144,44 @@ def execute_build(self, build_id):
         cleanup_failed_build_artifacts.delay(str(build.public_id), False)
         raise
     if isinstance(result, dict) and result.get("dispatched"):
+        build.refresh_from_db()
+        if build.status != "building":
+            return build.status
         record_transition(build, "building", phase="dispatched")
         return "building"
-    build.refresh_from_db()
-    registered_locally = build.status != "ready"
-    if build.status != "ready":
-        image_uri = build.image_uri or temporary_image_reference(
-            build.project.public_id,
-            build.public_id,
-            registry=settings.HARBOR_REGISTRY_URL if build.backend == "argo" else "",
-            registry_project=settings.HARBOR_USER_PROJECT,
+    raise RuntimeError("Build backend must return a dispatched execution.")
+
+
+@shared_task
+def register_build(build_id):
+    build = Build.objects.select_related("project").filter(public_id=build_id).first()
+    if not build:
+        return "not_found"
+    if build.version_id:
+        return "registered"
+    try:
+        registered = register_successful_build(build=build, image_uri=build.image_uri, image_digest=build.image_digest)
+    except Exception as exc:
+        Build.objects.filter(pk=build.pk, version__isnull=True).update(
+            registration_status="failed", registration_error=str(exc)[:12000]
         )
-        build = register_successful_build(build=build, image_uri=image_uri, image_digest=build.image_digest)
-    Build.objects.filter(pk=build.pk).update(logs=str(result)[-20000:], completed_at=timezone.now())
-    if registered_locally:
-        record_transition(build, "ready")
-    return "ready"
+        raise
+    # Another worker may still hold this build; it finishes (or fails) the registration.
+    return "registered" if registered.version_id else "in_progress"
 
 
-@shared_task(bind=True)
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=5,
+    reject_on_worker_lost=True,
+)
 def cancel_build(self, build_id):
-    build = Build.objects.select_related("project").get(public_id=build_id)
+    build = Build.objects.select_related("project").filter(public_id=build_id).first()
+    if not build or build.deletion_state != "active":
+        return "deleting"
     build_backend(build.backend).cancel(build)
     Build.objects.filter(pk=build.pk).update(status="cancelled", completed_at=timezone.now())
     record_transition(build, "cancelled")
@@ -103,15 +189,28 @@ def cancel_build(self, build_id):
     return "cancelled"
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_jitter=True, max_retries=5)
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=5,
+    reject_on_worker_lost=True,
+)
 def cleanup_failed_build_artifacts(self, build_id, delete_image=False):
     build = (
         Build.objects.select_related("project", "project__owner")
         .prefetch_related("input_assets")
-        .get(public_id=build_id)
+        .filter(public_id=build_id)
+        .first()
     )
-    if build.status == "ready":
+    if not build:
+        return "not_found"
+    if build.status == "ready" or build.deletion_state != "active" or build.version_id:
         return "retained"
+    if build.backend == "docker" and build.next_execution_check_at:
+        # The watcher must stop/observe the runner before outputs are removed.
+        return "waiting-for-execution"
     if delete_image and build.image_uri:
         BuildImageCleaner().delete(build)
     storage = S3Storage()
@@ -120,17 +219,91 @@ def cleanup_failed_build_artifacts(self, build_id, delete_image=False):
     return "purged"
 
 
+def _check_build_deletable(build):
+    if build.version_id or build.registration_status in {"registering", "registered"} or build.deployments.exists():
+        raise RuntimeError("Registered builds must be retained.")
+
+
+# reject_on_worker_lost: with acks_late, a worker killed mid-task would otherwise acknowledge the
+# message and the build would stay "deleting" with nothing left to finish it. Every step is
+# idempotent, so a redelivery is safe.
+@shared_task(bind=True, max_retries=5, reject_on_worker_lost=True)
+def delete_build(self, build_id):
+    """Keep the tombstone until external cleanup succeeds; repeated DELETE retries it.
+
+    The runtime, image and object-storage cleanup is slow external I/O, so no lock is held
+    while it runs: the build is validated under the lock, cleaned with no lock, and its row is
+    removed in a second short transaction that validates again.
+    """
+    from apps.catalog.models import ModelProject
+
+    candidate = Build.objects.filter(public_id=build_id).first()
+    if not candidate:
+        return "deleted"
+    try:
+        with transaction.atomic():
+            ModelProject.objects.select_for_update().get(pk=candidate.project_id)
+            build = (
+                Build.objects.select_for_update(of=("self",))
+                .select_related("project__owner")
+                .filter(public_id=build_id)
+                .first()
+            )
+            if not build:
+                return "deleted"
+            if build.deletion_state == "active":
+                return "retained"
+            _check_build_deletable(build)
+            prefix = build_prefix(build.project.owner.tenant_id, build.project.public_id, build.public_id)
+            prefix = f"{prefix.rstrip('/')}/"
+
+        # A fresh object: the runner may have reported its end while the lock was released.
+        build = Build.objects.select_related("project").get(pk=build.pk)
+        stop_build_for_deletion(build)
+        # Use the server-generated build tag even if the runner failed before
+        # reporting image_uri. Never delete a caller-supplied repository/digest.
+        build.image_uri = temporary_image_reference(
+            build.project.public_id,
+            build.public_id,
+            registry=settings.HARBOR_REGISTRY_URL if build.backend == "argo" else "",
+            registry_project=settings.HARBOR_USER_PROJECT,
+        )
+        BuildImageCleaner().delete(build)
+        S3Storage().delete_prefix(prefix)
+
+        with transaction.atomic():
+            ModelProject.objects.select_for_update().get(pk=candidate.project_id)
+            build = Build.objects.select_for_update(of=("self",)).filter(pk=build.pk).first()
+            if not build:
+                return "deleted"
+            if build.deletion_state == "active":
+                return "retained"
+            _check_build_deletable(build)
+            build.delete()
+        return "deleted"
+    except Exception as exc:
+        Build.objects.filter(public_id=build_id).update(
+            deletion_state="delete_failed", deletion_error="Build cleanup failed; retry Delete or check worker logs."
+        )
+        logger.warning("Build cleanup failed for %s (%s).", build_id, type(exc).__name__)
+        raise self.retry(exc=exc, countdown=min(10 * 2**self.request.retries, 120)) from exc
+
+
 @shared_task(
     bind=True, autoretry_for=(ConnectionError, TimeoutError), retry_backoff=True, retry_jitter=True, max_retries=5
 )
 def execute_deployment(self, deployment_id):
+    from apps.catalog.models import ModelProject
+
+    candidate = Deployment.objects.select_related("version").get(public_id=deployment_id)
     with transaction.atomic():
+        ModelProject.objects.select_for_update().get(pk=candidate.version.project_id)
         deployment = (
-            Deployment.objects.select_for_update()
+            Deployment.objects.select_for_update(of=("self",))
             .select_related("version", "version__project", "version__project__owner", "build")
             .get(public_id=deployment_id)
         )
-        if deployment.status in {"healthy", "stopped"}:
+        if deployment.status in {"succeeded", "failed", "stopped", "unconfirmed"}:
             return deployment.status
         if deployment.version.project.deletion_state != "active":
             deployment.status = "stopped"
@@ -143,6 +316,12 @@ def execute_deployment(self, deployment_id):
         deployment.celery_task_id = self.request.id or deployment.celery_task_id
         deployment.error_message = ""
         deployment.save(update_fields=["status", "celery_task_id", "error_message", "updated_at"])
+        if deployment.backend == "docker":
+            Deployment.objects.filter(pk=deployment.pk).update(
+                execution_deadline_at=deployment.execution_deadline_at
+                or timezone.now() + timedelta(seconds=settings.LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS),
+                next_execution_check_at=timezone.now(),
+            )
         record_transition(deployment, "deploying")
     if starting:
         reset_deployment_logs(deployment, "Starting deployment process.")
@@ -153,7 +332,12 @@ def execute_deployment(self, deployment_id):
         endpoint = backend.deploy(deployment)
     except Exception as exc:
         invalidate_model_server_cache(str(deployment.version.public_id))
-        Deployment.objects.filter(pk=deployment.pk).update(status="failed", error_message=str(exc)[:12000])
+        changed = Deployment.objects.filter(pk=deployment.pk, status="deploying").update(
+            status="failed", error_message=str(exc)[:12000]
+        )
+        if not changed:
+            deployment.refresh_from_db()
+            return deployment.status
         record_transition(
             deployment,
             "failed",
@@ -169,49 +353,73 @@ def execute_deployment(self, deployment_id):
         invalidate_model_server_cache(str(deployment.version.public_id))
         Deployment.objects.filter(pk=deployment.pk).update(status="stopped", stopped_at=timezone.now())
         Endpoint = type(endpoint)
-        Endpoint.objects.filter(pk=endpoint.pk).update(health_status="stopped")
+        Endpoint.objects.filter(pk=endpoint.pk).update(
+            health_status="unknown",
+            last_checked_at=None,
+            health_check_token=None,
+            health_check_lease_until=None,
+        )
         return "stopped"
-    append_deployment_log(deployment, "Runtime resource created; waiting for endpoint health check.")
+    deployment.refresh_from_db()
+    if deployment.status in {"succeeded", "failed", "stopped", "unconfirmed"}:
+        if deployment.status == "stopped":
+            backend.stop(deployment)
+        return deployment.status
+    append_deployment_log(deployment, "Runtime resource dispatched; waiting for readiness confirmation.")
     record_transition(deployment, "deploying", phase="dispatched")
-    if endpoint.health_status == "healthy":
-        _mark_deployment_healthy(deployment)
-        return "healthy"
-    check_deployment_health.apply_async(args=[str(deployment.public_id)], countdown=10)
+    if deployment.backend == "argo":
+        mark_deployment_unconfirmed.apply_async(args=[str(deployment.public_id)], countdown=33 * 60)
     return "deploying"
 
 
-@shared_task(bind=True, max_retries=30)
-def check_deployment_health(self, deployment_id):
-    deployment = Deployment.objects.select_related("version", "build").get(public_id=deployment_id)
-    if deployment.status in {"healthy", "failed", "stopped"}:
-        return deployment.status
-    healthy, metadata = deployment_backend(deployment.backend).health(deployment)
-    Endpoint.objects.filter(deployment=deployment).update(
-        health_status="healthy" if healthy else "unknown",
-        last_checked_at=timezone.now(),
-        metadata=metadata,
-    )
-    if healthy:
-        _mark_deployment_healthy(deployment)
-        return "healthy"
-    if self.request.retries >= self.max_retries:
+@shared_task
+def mark_deployment_unconfirmed(deployment_id):
+    with transaction.atomic():
+        deployment = Deployment.objects.select_for_update().select_related("version").get(public_id=deployment_id)
+        if deployment.status != "deploying" or deployment.backend != "argo":
+            return deployment.status
+        deployment.status = "unconfirmed"
+        deployment.error_message = "No deployment result callback arrived before the deadline. Check the workflow logs."
+        deployment.save(update_fields=["status", "error_message", "updated_at"])
         invalidate_model_server_cache(str(deployment.version.public_id))
-        Deployment.objects.filter(pk=deployment.pk).update(
-            status="unhealthy", error_message="Endpoint health check timed out."
+        append_deployment_log(deployment, deployment.error_message)
+        record_transition(deployment, "unconfirmed", reason="Deployment result callback timed out")
+        enqueue_event(
+            topic="deployment.events",
+            aggregate_type="deployment",
+            aggregate_id=deployment.public_id,
+            event_type="deployment.changed",
+            payload={"deployment_id": str(deployment.public_id), "status": "unconfirmed"},
         )
-        append_deployment_log(deployment, "Endpoint health check timed out.")
-        record_transition(deployment, "unhealthy", reason="Endpoint health check timed out")
-        return "unhealthy"
-    append_deployment_log(deployment, "Endpoint is not healthy yet; retrying health check.")
-    raise self.retry(countdown=min(10 + self.request.retries * 2, 60))
+    return "unconfirmed"
 
 
-@shared_task(bind=True)
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5, reject_on_worker_lost=True)
 def stop_deployment(self, deployment_id):
+    from apps.catalog.models import ModelProject
+
     deployment = Deployment.objects.select_related("version", "build").get(public_id=deployment_id)
+    with transaction.atomic():
+        # Stops queued before the claim existed still win over a late promotion.
+        project = ModelProject.objects.select_for_update().get(pk=deployment.version.project_id)
+        locked = Deployment.objects.select_for_update(of=("self",)).select_related("version").get(pk=deployment.pk)
+        if locked.status in STOP_CLAIMABLE:
+            locked.status = "stopped"
+            locked.save(update_fields=["status", "updated_at"])
+        if project.active_deployment_id == locked.pk:
+            project.active_deployment = None
+            project.save(update_fields=["active_deployment", "updated_at"])
     deployment_backend(deployment.backend).stop(deployment)
-    Deployment.objects.filter(pk=deployment.pk).update(status="stopped", stopped_at=timezone.now())
+    Deployment.objects.filter(pk=deployment.pk, stopped_at__isnull=True).update(stopped_at=timezone.now())
+    Endpoint.objects.filter(deployment=deployment).update(
+        health_status="unknown", last_checked_at=None, health_check_token=None, health_check_lease_until=None
+    )
     invalidate_model_server_cache(str(deployment.version.public_id))
+    if locked.status != "stopped":
+        # A failed deployment whose workflow still created a runtime: the runtime is removed
+        # but the recorded outcome stays what it was.
+        append_deployment_log(deployment, f"Removed the runtime of a {locked.status} deployment.")
+        return locked.status
     append_deployment_log(deployment, "Deployment stopped.")
     record_transition(deployment, "stopped")
     enqueue_event(
@@ -222,3 +430,74 @@ def stop_deployment(self, deployment_id):
         payload={"deployment_id": str(deployment.public_id), "status": "stopped"},
     )
     return "stopped"
+
+
+@shared_task(ignore_result=True, expires=60, soft_time_limit=50, time_limit=55)
+def reconcile_stopped_deployments():
+    """Re-dispatch stops whose runtime removal never completed.
+
+    A stop is claimed in the database first and the runtime is removed by a queued
+    task. If that task is lost (worker or broker down between commit and enqueue) or
+    exhausts its retries, nothing else would ever remove the runtime. ``stopped_at``
+    is written only after ``backend.stop`` succeeds, so a stopped deployment without
+    it past the grace period still owns a runtime. ``stop_deployment`` is idempotent.
+    """
+    cutoff = timezone.now() - timedelta(seconds=settings.STOP_RECONCILE_GRACE_SECONDS)
+    stale = Deployment.objects.filter(status="stopped", stopped_at__isnull=True, updated_at__lt=cutoff)
+    dispatched = 0
+    for public_id in stale.order_by("updated_at").values_list("public_id", flat=True)[
+        : settings.STOP_RECONCILE_BATCH_SIZE
+    ]:
+        # A failing stop is retried at most once per grace period, not on every scan.
+        if cache.add(f"deployment-stop-reconcile:{public_id}", 1, timeout=settings.STOP_RECONCILE_GRACE_SECONDS):
+            stop_deployment.delay(str(public_id))
+            dispatched += 1
+    if dispatched:
+        logger.warning("Re-dispatched %s stale deployment stop(s).", dispatched)
+    return dispatched
+
+
+def _dispatch_once(kind, public_id, task, grace):
+    # A task that keeps failing is retried at most once per grace period, not on every scan.
+    if cache.add(f"deletion-reconcile:{kind}:{public_id}", 1, timeout=grace):
+        task.delay(str(public_id))
+        return 1
+    return 0
+
+
+@shared_task(ignore_result=True, expires=120, soft_time_limit=100, time_limit=110)
+def reconcile_stalled_deletions():
+    """Re-dispatch deletions whose task was lost.
+
+    Deleting a build, project or training job is first recorded in the database and then
+    carried out by a queued task. If that task is lost (broker or worker down between the
+    commit and the enqueue, or the retries ran out) nothing else would ever finish it, and
+    the resource would stay in ``deleting`` forever. A deletion that is still recorded as in
+    progress after the grace period gets its task enqueued again; the tasks are idempotent.
+    ``delete_failed`` stays user-driven: repeating Delete is the explicit retry.
+    """
+    from apps.catalog.models import ModelProject
+    from apps.catalog.tasks import execute_project_deletion
+    from apps.training.models import TrainingJob
+    from apps.training.tasks import delete_training_job
+
+    grace = settings.DELETION_RECONCILE_GRACE_SECONDS
+    limit = settings.DELETION_RECONCILE_BATCH_SIZE
+    cutoff = timezone.now() - timedelta(seconds=grace)
+    dispatched = 0
+    stale_builds = Build.objects.filter(deletion_state="deleting", updated_at__lt=cutoff).order_by("updated_at")
+    for public_id in stale_builds.values_list("public_id", flat=True)[:limit]:
+        dispatched += _dispatch_once("build", public_id, delete_build, grace)
+    stale_projects = ModelProject.objects.filter(deletion_state="deleting", updated_at__lt=cutoff).order_by(
+        "updated_at"
+    )
+    for public_id in stale_projects.values_list("public_id", flat=True)[:limit]:
+        dispatched += _dispatch_once("project", public_id, execute_project_deletion, grace)
+    stale_jobs = TrainingJob.objects.filter(deletion_requested_at__lt=cutoff, deletion_error="").order_by(
+        "deletion_requested_at"
+    )
+    for public_id in stale_jobs.values_list("public_id", flat=True)[:limit]:
+        dispatched += _dispatch_once("training-job", public_id, delete_training_job, grace)
+    if dispatched:
+        logger.warning("Re-dispatched %s stalled deletion(s).", dispatched)
+    return dispatched

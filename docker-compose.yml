@@ -5,30 +5,35 @@ services:
       context: ./services/control-plane
       dockerfile: Dockerfile
     image: mlops-paas-control-plane
-    container_name: mlops_paas_control_plane
+    container_name: control_plane
     restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
       PYTHONUNBUFFERED: 1
+      PYTHONPATH: /app/src
       LOG_FORMAT: ${LOG_FORMAT:-console}
       LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
-      PYTHONPATH: /app/src
-      DJANGO_SETTINGS_MODULE: config.settings.local
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-local-dev-change-me}
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      DJANGO_SETTINGS_MODULE: config.settings.local
       DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0,control-plane,mlops_paas_control_plane}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,control-plane,api.mlops-nids-nt114.id.vn}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://mlops-nids-nt114.id.vn,http://localhost:5173,http://127.0.0.1:5173}
-      DB_HOST_RW: postgres
-      DB_HOST_RO: postgres
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-https://mlops-nids-nt114.id.vn,http://localhost:5173,http://127.0.0.1:5173}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-False}
+      DB_HOST_RW: ${DB_HOST_RW:-postgres}
+      DB_HOST_RO: ${DB_HOST_RO:-postgres}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_PORT: ${DB_PORT:-5432}
-      DB_NAME: ${DB_NAME}
+      DB_NAME: ${DB_NAME:-mlops_paas_db}
       DB_SCHEMA: ${DB_SCHEMA:-control_plane}
-      REDIS_URL: redis://redis:6379/1
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis-cache:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis-queue:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis-queue:6379/0
       EMAIL_HOST_USER: ${EMAIL_HOST_USER}
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
       GOOGLE_OAUTH2_CLIENT_ID: ${GOOGLE_OAUTH2_CLIENT_ID}
@@ -39,106 +44,143 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_BUCKET_NAME: ${AWS_BUCKET_NAME:-mlops-paas-artifacts}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
-      AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-}
-      EXECUTION_BACKEND: ${EXECUTION_BACKEND:-docker}
-      BUILD_BACKEND: ${BUILD_BACKEND:-}
-      DEPLOYMENT_BACKEND: ${DEPLOYMENT_BACKEND:-}
-      TRAINING_BACKEND: ${TRAINING_BACKEND:-}
-      TRAINING_GPU_ENABLED: ${TRAINING_GPU_ENABLED:-false}
+      TRAINING_ENABLED: ${TRAINING_ENABLED:-true}
+      TRAINING_GPU_ENABLED: ${TRAINING_GPU_ENABLED:-true}
       TRAINING_GPU_COUNTS: ${TRAINING_GPU_COUNTS:-1}
-      DRIFT_BACKEND: ${DRIFT_BACKEND:-}
-      LOCAL_TRAINING_TIMEOUT: ${LOCAL_TRAINING_TIMEOUT:-1800}
-      LOCAL_TRAINING_MAX_OUTPUT_MB: ${LOCAL_TRAINING_MAX_OUTPUT_MB:-500}
-      LOCAL_TRAINING_ALLOW_PIP_INSTALL: ${LOCAL_TRAINING_ALLOW_PIP_INSTALL:-True}
-      ENABLE_GPU_TRAINING: ${ENABLE_GPU_TRAINING:-False}
-      TRAINING_MAX_ACTIVE_JOBS_PER_TENANT: ${TRAINING_MAX_ACTIVE_JOBS_PER_TENANT:-1}
-      MLFLOW_TRACKING_REQUIRED: ${MLFLOW_TRACKING_REQUIRED:-false}
-      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      TRAINING_MAX_RUNTIME_SECONDS: ${TRAINING_MAX_RUNTIME_SECONDS:-86400}
+      TRAINING_SECRET_ENCRYPTION_KEY: ${TRAINING_SECRET_ENCRYPTION_KEY:-}
+      TRAINING_EXECUTION_WATCH_ENABLED: ${TRAINING_EXECUTION_WATCH_ENABLED:-true}
+      DRIFT_EXECUTION_WATCH_ENABLED: ${DRIFT_EXECUTION_WATCH_ENABLED:-true}
+      EXECUTION_DISPATCH_TIMEOUT_SECONDS: ${EXECUTION_DISPATCH_TIMEOUT_SECONDS:-1800}
+      DRIFT_MAX_RUNTIME_SECONDS: ${DRIFT_MAX_RUNTIME_SECONDS:-3600}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://control-plane:8000/api/2.0/mlflow}
       MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:-mlops-paas-training}
-      MLFLOW_UI_URL: ${MLFLOW_UI_URL:-http://localhost:5003}
       MODEL_SERVER_PUBLIC_URL: ${MODEL_SERVER_PUBLIC_URL:-http://localhost:5002}
       MODEL_SERVER_INTERNAL_URL: ${MODEL_SERVER_INTERNAL_URL:-http://traefik:5000}
       MODEL_PACKAGER_URL: ${MODEL_PACKAGER_URL:-http://model-packager:7000}
       CONTROL_PLANE_INTERNAL_URL: ${CONTROL_PLANE_INTERNAL_URL:-http://control-plane:8000}
+      CONTROL_PLANE_WEBHOOK_SECRET: ${CONTROL_PLANE_WEBHOOK_SECRET}
       DOCKER_NETWORK_NAME: ${DOCKER_NETWORK_NAME:-mlops_paas_network}
-      CONTROL_PLANE_WEBHOOK_SECRET: ${CONTROL_PLANE_WEBHOOK_SECRET:-super-secret-key}
-      HARBOR_REGISTRY_URL: ${HARBOR_REGISTRY_URL-}
-      HARBOR_USER_PROJECT: ${HARBOR_USER_PROJECT:-user-images}
-      HARBOR_USERNAME: ${HARBOR_USERNAME}
-      HARBOR_PASSWORD: ${HARBOR_PASSWORD}
     volumes:
       - ./services/control-plane:/app
       - /var/run/docker.sock:/var/run/docker.sock
-    command: sh -c "python manage.py migrate --verbosity 0 && python manage.py collectstatic --noinput --verbosity 0 && exec daphne --verbosity 0 -b 0.0.0.0 -p 8000 config.asgi:application"
+    command: sh -c "python manage.py migrate --verbosity 0 && python manage.py collectstatic --noinput --verbosity 0 && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120 --graceful-timeout 30 --config python:common.gunicorn_conf"
     depends_on:
       postgres:
         condition: service_healthy
       schema-init:
         condition: service_completed_successfully
-      redis:
+      redis-cache:
+        condition: service_started
+      redis-queue:
         condition: service_started
       model-packager:
         condition: service_started
     networks:
       - mlops_paas_network
 
-  # 1.1 Celery Worker for Django Control Plane
+  # 1.1 Local worker shares orchestration and runtime-health execution slots.
   celery-worker:
     build:
       context: ./services/control-plane
       dockerfile: Dockerfile
-    container_name: mlops_paas_celery_worker
+    image: mlops-paas-control-plane
+    container_name: celery_worker
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: 1
+      PYTHONPATH: /app/src
       LOG_FORMAT: ${LOG_FORMAT:-console}
       LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
-      PYTHONPATH: /app/src
       DJANGO_SETTINGS_MODULE: config.settings.local
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-local-dev-change-me}
-      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
-      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
-      DB_HOST_RW: postgres
-      DB_HOST_RO: postgres
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      DB_HOST_RW: ${DB_HOST_RW:-postgres}
+      DB_HOST_RO: ${DB_HOST_RO:-postgres}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_PORT: ${DB_PORT:-5432}
-      DB_NAME: ${DB_NAME}
+      DB_NAME: ${DB_NAME:-mlops_paas_db}
       DB_SCHEMA: ${DB_SCHEMA:-control_plane}
-      REDIS_URL: redis://redis:6379/1
-      CELERY_BROKER_URL: redis://redis:6379/3
-      CELERY_RESULT_BACKEND: redis://redis:6379/4
-      REDPANDA_BROKERS: redpanda:9092
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis-cache:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis-queue:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis-queue:6379/0
+      REDPANDA_BROKERS: ${REDPANDA_BROKERS:-redpanda:9092}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_BUCKET_NAME: ${AWS_BUCKET_NAME:-mlops-paas-artifacts}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
-      AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-}
       EXECUTION_BACKEND: ${EXECUTION_BACKEND:-docker}
-      BUILD_BACKEND: ${BUILD_BACKEND:-}
-      DEPLOYMENT_BACKEND: ${DEPLOYMENT_BACKEND:-}
-      TRAINING_BACKEND: ${TRAINING_BACKEND:-}
-      TRAINING_GPU_ENABLED: ${TRAINING_GPU_ENABLED:-false}
+      TRAINING_EXECUTION_WATCH_ENABLED: ${TRAINING_EXECUTION_WATCH_ENABLED:-true}
+      DRIFT_EXECUTION_WATCH_ENABLED: ${DRIFT_EXECUTION_WATCH_ENABLED:-true}
+      EXECUTION_DISPATCH_TIMEOUT_SECONDS: ${EXECUTION_DISPATCH_TIMEOUT_SECONDS:-1800}
+      DRIFT_MAX_RUNTIME_SECONDS: ${DRIFT_MAX_RUNTIME_SECONDS:-3600}
+      LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS: ${LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS:-90}
+      TRAINING_MAX_RUNTIME_SECONDS: ${TRAINING_MAX_RUNTIME_SECONDS:-86400}
+      TRAINING_SECRET_ENCRYPTION_KEY: ${TRAINING_SECRET_ENCRYPTION_KEY:-}
+      TRAINING_ENABLED: ${TRAINING_ENABLED:-true}
+      TRAINING_GPU_ENABLED: ${TRAINING_GPU_ENABLED:-true}
       TRAINING_GPU_COUNTS: ${TRAINING_GPU_COUNTS:-1}
-      DRIFT_BACKEND: ${DRIFT_BACKEND:-}
       CONTROL_PLANE_INTERNAL_URL: ${CONTROL_PLANE_INTERNAL_URL:-http://control-plane:8000}
-      CONTROL_PLANE_WEBHOOK_SECRET: ${CONTROL_PLANE_WEBHOOK_SECRET:-super-secret-key}
-      DOCKER_NETWORK_NAME: ${DOCKER_NETWORK_NAME:-mlops_paas_network}
-      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      CONTROL_PLANE_WEBHOOK_SECRET: ${CONTROL_PLANE_WEBHOOK_SECRET}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://control-plane:8000/api/2.0/mlflow}
       MODEL_SERVER_PUBLIC_URL: ${MODEL_SERVER_PUBLIC_URL:-http://localhost:5002}
       MODEL_SERVER_INTERNAL_URL: ${MODEL_SERVER_INTERNAL_URL:-http://traefik:5000}
-      HARBOR_REGISTRY_URL: ${HARBOR_REGISTRY_URL-}
-      HARBOR_USER_PROJECT: ${HARBOR_USER_PROJECT:-user-images}
-      HARBOR_USERNAME: ${HARBOR_USERNAME}
-      HARBOR_PASSWORD: ${HARBOR_PASSWORD}
+      DOCKER_NETWORK_NAME: ${DOCKER_NETWORK_NAME:-mlops_paas_network}
     volumes:
       - ./services/control-plane:/app
       - /var/run/docker.sock:/var/run/docker.sock
-    command: celery -A config worker --concurrency=2
+    command: sh -c "until python manage.py migrate --check; do sleep 2; done; exec celery -A config worker -Q celery,runtime-health --concurrency=2"
     depends_on:
       control-plane:
         condition: service_started
-      redis:
+      redis-cache:
+        condition: service_started
+      redis-queue:
+        condition: service_started
+    networks:
+      - mlops_paas_network
+
+  # 1.2 Singleton scheduler; the local worker consumes both scheduled task queues.
+  celery-beat:
+    build:
+      context: ./services/control-plane
+      dockerfile: Dockerfile
+    image: mlops-paas-control-plane
+    container_name: celery_beat
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: 1
+      PYTHONPATH: /app/src
+      LOG_FORMAT: ${LOG_FORMAT:-console}
+      LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
+      DJANGO_SETTINGS_MODULE: config.settings.health
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-local-dev-change-me}
+      DB_HOST_RW: ${DB_HOST_RW:-postgres}
+      DB_HOST_RO: ${DB_HOST_RO:-postgres}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-mlops_paas_db}
+      DB_SCHEMA: ${DB_SCHEMA:-control_plane}
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis-queue:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis-queue:6379/0
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis-cache:6379/0
+      LOCAL_DEPLOYMENT_WATCH_ENABLED: ${LOCAL_DEPLOYMENT_WATCH_ENABLED:-true}
+      TRAINING_EXECUTION_WATCH_ENABLED: ${TRAINING_EXECUTION_WATCH_ENABLED:-true}
+      DRIFT_EXECUTION_WATCH_ENABLED: ${DRIFT_EXECUTION_WATCH_ENABLED:-true}
+    volumes:
+      - ./services/control-plane:/app
+    command: sh -c "until python manage.py migrate --check; do sleep 2; done; exec celery -A config beat --schedule=/tmp/celerybeat-schedule"
+    depends_on:
+      control-plane:
+        condition: service_started
+      redis-cache:
+        condition: service_started
+      redis-queue:
         condition: service_started
     networks:
       - mlops_paas_network
@@ -149,7 +191,7 @@ services:
       context: ./services/model-server
       dockerfile: Dockerfile
     image: mlops-paas-model-server
-    container_name: mlops_paas_model_server
+    container_name: model_server
     restart: unless-stopped
     ports:
       - "5001:5000"
@@ -161,12 +203,14 @@ services:
       DB_PORT: 5432
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
+      DB_NAME: ${DB_NAME:-mlops_paas_db}
       CONTROL_PLANE_DB_SCHEMA: ${DB_SCHEMA:-control_plane}
-      REDPANDA_BROKERS: redpanda:9092
+      REDPANDA_BROKERS: ${REDPANDA_BROKERS:-redpanda:9092}
       KAFKA_TOPIC: ${KAFKA_TOPIC:-mlops_paas_production_data}
-      REDIS_URL: redis://redis:6379/1
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis-cache:6379/0
       JWKS_URL: http://control-plane:8000/api/auth/.well-known/jwks.json
+      LOCAL_RUNTIME_METRICS_ENABLED: "true"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.model-server.rule=PathRegexp(`^/[A-Za-z0-9-]+/models/[0-9A-Fa-f-]{36}/[0-9A-Fa-f-]{36}/(predict|health)$`)"
@@ -179,7 +223,7 @@ services:
         condition: service_healthy
       redpanda:
         condition: service_started
-      redis:
+      redis-cache:
         condition: service_started
     networks:
       - mlops_paas_network
@@ -192,7 +236,7 @@ services:
       context: ./services/machine-learning-serving
       dockerfile: Dockerfile
     image: mlops-paas-machine-learning-serving:latest
-    container_name: mlops_paas_machine_learning_serving
+    container_name: machine_learning_serving
     environment:
       LOG_FORMAT: ${LOG_FORMAT:-console}
       LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
@@ -212,7 +256,7 @@ services:
       context: ./services/deep-learning-serving
       dockerfile: Dockerfile
     image: mlops-paas-deep-learning-serving:latest
-    container_name: mlops_paas_deep_learning_serving
+    container_name: deep_learning_serving
     environment:
       LOG_FORMAT: ${LOG_FORMAT:-console}
     restart: "no"
@@ -228,8 +272,15 @@ services:
   # 2.3 Traefik API Gateway for Model Server
   traefik:
     image: traefik:latest
-    container_name: mlops_paas_traefik
+    container_name: traefik
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     command:
+      - "--ping=true"
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
@@ -249,7 +300,7 @@ services:
       context: ./services/model-packager
       dockerfile: Dockerfile
     image: mlops-paas-model-packager
-    container_name: mlops_paas_model_packager
+    container_name: model_packager
     restart: "no"
     command:
       - python
@@ -269,7 +320,7 @@ services:
       context: ./services/evidently
       dockerfile: Dockerfile
     image: mlops-paas-evidently
-    container_name: mlops_paas_evidently
+    container_name: evidently
     restart: "no"
     command:
       - python
@@ -289,6 +340,7 @@ services:
       context: ./services/training-runner
       dockerfile: Dockerfile
     image: mlops-paas-training-runner:latest
+    container_name: training_runner
     restart: "no"
     command:
       - python
@@ -304,7 +356,7 @@ services:
   # 6. PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: mlops_paas_postgres
+    container_name: postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -313,7 +365,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - mlops_paas_pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - mlops_paas_network
     healthcheck:
@@ -323,17 +375,17 @@ services:
       retries: 5
       start_period: 10s
 
-  # 6.1 Init Container để tạo schema cho Control Plane và MLflow
+  # 6.1 Init Container để tạo schema cho Control Plane
   schema-init:
     image: postgres:15-alpine
-    container_name: mlops_paas_schema_init
+    container_name: postgres_schema_init
     restart: "no"
     environment:
       PGPASSWORD: ${DB_PASSWORD}
     command: >
       sh -c "until pg_isready -h postgres -U ${DB_USER} -d ${DB_NAME}; do sleep 2; done;
       psql -h postgres -U ${DB_USER} -d ${DB_NAME} -v ON_ERROR_STOP=1
-      -c 'CREATE SCHEMA IF NOT EXISTS ${DB_SCHEMA:-control_plane}; CREATE SCHEMA IF NOT EXISTS mlflow;'"
+      -c 'CREATE SCHEMA IF NOT EXISTS ${DB_SCHEMA:-control_plane};'"
     depends_on:
       postgres:
         condition: service_healthy
@@ -345,7 +397,14 @@ services:
   # 7. Redpanda Kafka Broker
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:latest
-    container_name: mlops_paas_redpanda
+    container_name: redpanda
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "info", "-X", "brokers=localhost:9092"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     command:
       - redpanda
       - start
@@ -368,7 +427,7 @@ services:
   # 7.1 Redpanda Init Kafka Topic
   redpanda-init:
     image: docker.redpanda.com/redpandadata/redpanda:latest
-    container_name: mlops_paas_redpanda_init
+    container_name: redpanda_init
     restart: "no"
     entrypoint: ["/bin/sh", "-ec"]
     command:
@@ -381,8 +440,16 @@ services:
           echo "Waiting for Redpanda Kafka API to become ready..."
           sleep 2
         done
+        if [ -n "$$KAFKA_DLQ_TOPIC" ]; then
+          rpk topic create "$$KAFKA_DLQ_TOPIC" \
+            --if-not-exists \
+            --partitions 1 \
+            --replicas 1 \
+            -X brokers=redpanda:9092
+        fi
     environment:
       KAFKA_TOPIC: ${KAFKA_TOPIC:-mlops_paas_production_data}
+      KAFKA_DLQ_TOPIC: ${KAFKA_DLQ_TOPIC-mlops_paas_production_data.dlq}
       KAFKA_TOPIC_PARTITIONS: ${KAFKA_TOPIC_PARTITIONS:-3}
     depends_on:
       redpanda:
@@ -398,21 +465,22 @@ services:
       context: ./services/consumer
       dockerfile: Dockerfile
     image: mlops-paas-consumer
-    container_name: mlops_paas_consumer
+    container_name: consumer
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: 1
       LOG_FORMAT: ${LOG_FORMAT:-console}
       LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
-      DB_HOST_RW: postgres
-      DB_HOST_RO: postgres
+      DB_HOST_RW: ${DB_HOST_RW:-postgres}
+      DB_HOST_RO: ${DB_HOST_RO:-postgres}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_PORT: ${DB_PORT:-5432}
-      DB_NAME: ${DB_NAME}
+      DB_NAME: ${DB_NAME:-mlops_paas_db}
       DB_SCHEMA: ${DB_SCHEMA:-control_plane}
-      REDPANDA_BROKERS: redpanda:9092
+      REDPANDA_BROKERS: ${REDPANDA_BROKERS:-redpanda:9092}
       KAFKA_TOPIC: ${KAFKA_TOPIC:-mlops_paas_production_data}
+      KAFKA_DLQ_TOPIC: ${KAFKA_DLQ_TOPIC-mlops_paas_production_data.dlq}
       KAFKA_TOPIC_RETRY_SECONDS: ${KAFKA_TOPIC_RETRY_SECONDS:-5}
       KAFKA_BATCH_SIZE: ${KAFKA_BATCH_SIZE:-500}
       KAFKA_DB_RETRY_INITIAL_SECONDS: ${KAFKA_DB_RETRY_INITIAL_SECONDS:-5}
@@ -425,8 +493,6 @@ services:
       AUTOMATIC_DRIFT_OUTBOX_RETRY_INITIAL_SECONDS: ${AUTOMATIC_DRIFT_OUTBOX_RETRY_INITIAL_SECONDS:-5}
       AUTOMATIC_DRIFT_OUTBOX_RETRY_MAX_SECONDS: ${AUTOMATIC_DRIFT_OUTBOX_RETRY_MAX_SECONDS:-300}
       AUTOMATIC_DRIFT_OUTBOX_REQUEST_TIMEOUT_SECONDS: ${AUTOMATIC_DRIFT_OUTBOX_REQUEST_TIMEOUT_SECONDS:-10}
-      GITHUB_REPO: ${GITHUB_REPO}
-      GITHUB_TOKEN: ${GITHUB_TOKEN}
     volumes:
       - ./services/consumer:/app
     command: python -m src.main
@@ -438,54 +504,48 @@ services:
     networks:
       - mlops_paas_network
 
-  # 8. Redis
-  redis:
+  # 8. Redis Cache (Django Cache, Model Server Cache, Runtime Metrics)
+  redis-cache:
     image: redis:7-alpine
-    container_name: mlops_paas_redis
+    container_name: redis_cache
     restart: unless-stopped
+    command: ["sh", "-c", 'exec redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""']
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$$REDIS_PASSWORD" --no-auth-warning ping | grep -q PONG']
+      interval: 10s
+      timeout: 3s
+      retries: 5
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     tmpfs:
       - /data
     networks:
       - mlops_paas_network
 
-  # 9. MLflow Tracking Server
-  mlflow:
-    build:
-      context: ./services/mlflow
-      dockerfile: Dockerfile
-    image: mlops-paas-mlflow:v2.14.1
-    container_name: mlops_paas_mlflow
+  # 8.1 Redis Queue (Celery Broker & Celery Result Backend)
+  redis-queue:
+    image: redis:7-alpine
+    container_name: redis_queue
     restart: unless-stopped
-    command: >
-      mlflow server
-      --host 0.0.0.0
-      --port 5000
-      --backend-store-uri postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@postgres:${DB_PORT:-5432}/${DB_NAME}?options=-c%20search_path%3Dmlflow
-      --serve-artifacts
-      --artifacts-destination s3://${AWS_BUCKET_NAME:-mlops-paas-artifacts}
-    ports:
-      - "5003:5000"
+    command: ["sh", "-c", 'exec redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory 512mb --maxmemory-policy noeviction --appendonly yes --appendfsync everysec']
     environment:
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_PORT: ${DB_PORT:-5432}
-      AWS_BUCKET_NAME: ${AWS_BUCKET_NAME:-mlops-paas-artifacts}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
-      MLFLOW_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      schema-init:
-        condition: service_completed_successfully
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$$REDIS_PASSWORD" --no-auth-warning ping | grep -q PONG']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - redis_queue_data:/data
     networks:
       - mlops_paas_network
 
 # Mạng nội bộ cho các container
+
 networks:
   mlops_paas_network:
     name: ${DOCKER_NETWORK_NAME:-mlops_paas_network}
@@ -493,7 +553,9 @@ networks:
 
 # Volume để lưu trữ dữ liệu của PostgreSQL và Redpanda
 volumes:
-  mlops_paas_pgdata:
-    name: ${POSTGRES_VOLUME_NAME:-mlops_paas_pgdata}
+  postgres_data:
+    name: ${POSTGRES_VOLUME_NAME:-postgres_data}
   redpanda_data:
-    name: mlops_paas_redpanda_data
+    name: redpanda_data
+  redis_queue_data:
+    name: redis_queue_data

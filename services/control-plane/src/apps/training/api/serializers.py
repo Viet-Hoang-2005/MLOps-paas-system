@@ -5,6 +5,37 @@ from apps.observability.models import LifecycleEvent
 from apps.training.models import TrainingJob, TrainingOutput
 
 
+class TrainingDraftSettingsSerializer(serializers.Serializer):
+    revision = serializers.IntegerField(min_value=1, required=False)
+    entry_point = serializers.CharField(max_length=512, allow_blank=True, required=False)
+    environment = serializers.DictField(
+        child=serializers.CharField(allow_blank=True, trim_whitespace=False), required=False
+    )
+    model_flavor = serializers.ChoiceField(choices=TrainingJob.MODEL_FLAVORS, required=False)
+    vcpu = serializers.IntegerField(min_value=1, allow_null=True, required=False)
+    memory_mb = serializers.IntegerField(min_value=512, allow_null=True, required=False)
+    max_runtime_seconds = serializers.IntegerField(min_value=1, allow_null=True, required=False)
+    accelerator_type = serializers.ChoiceField(choices=TrainingJob.ACCELERATORS, required=False)
+    accelerator_count = serializers.IntegerField(min_value=0, max_value=1, required=False)
+    accelerator_model = serializers.ChoiceField(choices=["", "t4", "a10g"], required=False)
+    local_gpu_id = serializers.CharField(max_length=80, allow_blank=True, required=False)
+
+    def validate(self, attrs):
+        unknown = set(self.initial_data) - set(self.fields)
+        if unknown:
+            raise serializers.ValidationError({field: "Unsupported draft setting." for field in unknown})
+        return attrs
+
+
+class TrainingSubmissionSerializer(serializers.Serializer):
+    revision = serializers.IntegerField(min_value=1)
+    run_key = serializers.UUIDField()
+
+
+class TrainingCloneSerializer(serializers.Serializer):
+    creation_key = serializers.UUIDField()
+
+
 class TrainingOutputSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="public_id", read_only=True)
 
@@ -31,15 +62,45 @@ class TrainingJobEventSerializer(serializers.ModelSerializer):
         fields = ("id", "event_type", "message", "metadata", "created_at")
 
 
+class TrainingJobBuildRequestSerializer(serializers.Serializer):
+    output_revision = serializers.IntegerField(min_value=1)
+
+
+class NewTrainingProjectSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField(max_length=160, trim_whitespace=True)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    access_mode = serializers.ChoiceField(choices=ModelProject.ACCESS_MODES, default="private")
+
+
+class TrainingJobProjectRequestSerializer(serializers.Serializer):
+    model_id = serializers.UUIDField()
+    artifacts = serializers.JSONField(required=False, default=dict)
+    project_id = serializers.UUIDField(required=False)
+    new_project = NewTrainingProjectSerializer(required=False)
+    output_revision = serializers.IntegerField(min_value=1)
+
+    def validate(self, attrs):
+        if ("project_id" in attrs) == ("new_project" in attrs):
+            raise serializers.ValidationError("Choose an existing project or provide a new project.")
+        return attrs
+
+
 class TrainingJobSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="public_id", read_only=True)
-    project_id = serializers.UUIDField(source="project.public_id", read_only=True)
-    project = serializers.SlugRelatedField(
-        slug_field="public_id", queryset=ModelProject.objects.none(), write_only=True
-    )
-    outputs = TrainingOutputSerializer(many=True, read_only=True)
-    source_zip = serializers.FileField(write_only=True, required=False)
-    training_data = serializers.FileField(write_only=True, required=False)
+    project_id = serializers.UUIDField(source="project.public_id", read_only=True, allow_null=True)
+    entries = serializers.SerializerMethodField()
+    secrets = serializers.SerializerMethodField()
+    secrets_available = serializers.SerializerMethodField()
+    retry_of = serializers.UUIDField(source="retry_of.public_id", read_only=True, allow_null=True)
+    cloned_from = serializers.UUIDField(source="cloned_from.public_id", read_only=True, allow_null=True)
+    outputs = serializers.SerializerMethodField()
+
+    def get_outputs(self, instance):
+        from apps.training.services.output_index import public_outputs
+
+        return TrainingOutputSerializer(public_outputs(instance), many=True).data
+
     output_available = serializers.SerializerMethodField()
     registration_build = serializers.SerializerMethodField()
     model_status = serializers.SerializerMethodField()
@@ -49,28 +110,41 @@ class TrainingJobSerializer(serializers.ModelSerializer):
         model = TrainingJob
         fields = (
             "id",
-            "project",
             "project_id",
-            "name",
+            "input_contract",
+            "input_revision",
+            "run_key",
+            "revision",
+            "environment",
+            "entries",
+            "secrets",
+            "secrets_available",
+            "retry_of",
+            "cloned_from",
+            "submitted_at",
             "model_flavor",
             "entry_point",
             "requirements_text",
-            "source_zip",
-            "training_data",
             "code_snapshot_uri",
             "data_snapshot_uri",
-            "output_uri",
+            "output_revision",
             "mlflow_artifact_uri",
             "mlflow_run_id",
             "backend",
             "external_job_id",
             "celery_task_id",
             "status",
+            "observation_status",
+            "observation_error",
+            "execution_deadline_at",
+            "runtime_started_at",
             "vcpu",
             "memory_mb",
             "max_runtime_seconds",
             "accelerator_type",
             "accelerator_count",
+            "accelerator_model",
+            "local_gpu_id",
             "tracking",
             "error_message",
             "started_at",
@@ -88,10 +162,17 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = (
+            "input_contract",
+            "input_revision",
+            "run_key",
+            "observation_status",
+            "observation_error",
+            "execution_deadline_at",
+            "runtime_started_at",
             "backend",
             "code_snapshot_uri",
             "data_snapshot_uri",
-            "output_uri",
+            "output_revision",
             "mlflow_artifact_uri",
             "external_job_id",
             "celery_task_id",
@@ -109,15 +190,37 @@ class TrainingJobSerializer(serializers.ModelSerializer):
         )
         extra_kwargs = {"requirements_text": {"required": False, "allow_blank": True}}
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        request = self.context.get("request")
-        if request and request.user.is_authenticated:
-            self.fields["project"].queryset = ModelProject.objects.filter(owner=request.user, is_active=True)
+    def get_entries(self, instance):
+        if not self.context.get("include_workspace"):
+            return []
+        from apps.training.services.workspaces import serialize_entries
+
+        return serialize_entries(instance.entries.order_by("relative_path"))
+
+    @staticmethod
+    def get_secrets(instance):
+        return [{"name": secret.name, "updated_at": secret.updated_at.isoformat()} for secret in instance.secrets.all()]
+
+    @staticmethod
+    def get_secrets_available(instance):
+        from apps.training.services.workspaces import ServiceUnavailable, cipher
+
+        try:
+            cipher()
+            return True
+        except ServiceUnavailable:
+            return False
 
     @staticmethod
     def get_output_available(instance):
-        return instance.outputs_purged_at is None and instance.outputs.filter(kind="model").exists()
+        from apps.training.services.output_index import public_outputs
+
+        return (
+            instance.status == "completed"
+            and instance.outputs_purged_at is None
+            and instance.tracking.get("output_contract") == 2
+            and public_outputs(instance).filter(kind="model").exists()
+        )
 
     @staticmethod
     def get_registration_build(instance):
@@ -139,9 +242,9 @@ class TrainingJobSerializer(serializers.ModelSerializer):
         if not ready_builds:
             return "trained"
 
-        active_deployment_statuses = {"pending", "deploying", "healthy"}
+        active_id = instance.project.active_deployment_id if instance.project_id else None
         for build in ready_builds:
-            if any(deployment.status in active_deployment_statuses for deployment in build.version.deployments.all()):
+            if any(deployment.pk == active_id for deployment in build.version.deployments.all()):
                 return "deployed"
         return "built"
 

@@ -1,7 +1,13 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: mlops-redis
+namespace: mlops-paas-data
 
 resources:
-  - deployment.yaml
-  - service.yaml
+  - external-secrets.yaml
+  - configmap.yaml
+  - replication.yaml
+  - sentinel.yaml
+  - cache.yaml
+  - network-policy.yaml
+  - servicemonitor.yaml
+  - prometheus-rule.yaml

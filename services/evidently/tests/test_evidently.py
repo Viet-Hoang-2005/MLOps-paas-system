@@ -54,11 +54,7 @@ def test_redis_log_handler_writes_run_scoped_stream(monkeypatch):
     monkeypatch.setattr(main.redis, "from_url", lambda _url: fake)
     handler = main.RedisLogHandler("redis://unit", "run-uuid")
     handler.setFormatter(logging.Formatter("%(message)s"))
-    handler.emit(
-        logging.LogRecord(
-            "drift", logging.INFO, __file__, 1, "running report", (), None
-        )
-    )
+    handler.emit(logging.LogRecord("drift", logging.INFO, __file__, 1, "running report", (), None))
 
     assert fake.calls == [
         ("delete", "drift_logs:run-uuid"),
@@ -87,9 +83,7 @@ def test_load_reference_http_success_and_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(
         main.requests,
         "get",
-        Mock(
-            return_value=SimpleNamespace(status_code=404, content=b"", text="missing")
-        ),
+        Mock(return_value=SimpleNamespace(status_code=404, content=b"", text="missing")),
     )
     with pytest.raises(FileNotFoundError):
         main.load_reference_data()
@@ -127,9 +121,7 @@ def test_load_production_data_insufficient_returns_empty(monkeypatch):
         "create_engine",
         lambda *_: SimpleNamespace(connect=lambda: Context(object())),
     )
-    monkeypatch.setattr(
-        main.pd, "read_sql", lambda *a, **k: pd.DataFrame({"features": [{"a": 1}]})
-    )
+    monkeypatch.setattr(main.pd, "read_sql", lambda *a, **k: pd.DataFrame({"features": [{"a": 1}]}))
     assert main.load_production_data().empty
 
 
@@ -239,9 +231,7 @@ def test_run_drift_analysis_summary(monkeypatch):
             return result
 
     monkeypatch.setattr(main, "Report", FakeReport)
-    monkeypatch.setattr(
-        main, "save_drift_report", lambda *a: {"summary_json_s3_uri": "s3://report"}
-    )
+    monkeypatch.setattr(main, "save_drift_report", lambda *a: {"summary_json_s3_uri": "s3://report"})
     monkeypatch.setattr(main, "TENANT_ID", "t")
     monkeypatch.setattr(main, "PROJECT_ID", "p")
     monkeypatch.setattr(main, "MODEL_VERSION_ID", "v")
@@ -255,9 +245,7 @@ def test_run_drift_analysis_summary(monkeypatch):
 
 def test_run_drift_analysis_requires_common_columns():
     with pytest.raises(ValueError, match="No common columns"):
-        main.run_drift_analysis(
-            pd.DataFrame({"a": [1]}), pd.DataFrame({"b": [1]}), main.ColumnMapping()
-        )
+        main.run_drift_analysis(pd.DataFrame({"a": [1]}), pd.DataFrame({"b": [1]}), main.ColumnMapping())
 
 
 def test_run_drift_analysis_detects_missing_features_and_alerts(monkeypatch):
@@ -363,9 +351,7 @@ def test_save_report_without_upload(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "MODEL_NAME", "m")
     monkeypatch.setattr(main, "TEMP_ROOT", tmp_path)
     monkeypatch.setattr(main, "HTML_UPLOAD_URL", "")
-    artifacts = main.save_drift_report(
-        report, {"metrics": []}, {"dataset_drift": False}
-    )
+    artifacts = main.save_drift_report(report, {"metrics": []}, {"dataset_drift": False})
     assert Path(artifacts["local_summary_json_path"]).exists()
 
 
@@ -415,18 +401,197 @@ def test_main_success_and_failure_paths(monkeypatch):
     monkeypatch.setattr(main, "trigger_django_webhook", webhook)
     assert main.main() == 0
     webhook.assert_called_once()
-    monkeypatch.setattr(
-        main, "load_production_data", Mock(side_effect=RuntimeError("db"))
-    )
+    monkeypatch.setattr(main, "load_production_data", Mock(side_effect=RuntimeError("db")))
     assert main.main() == 1
 
 
 def test_main_invalid_config_and_insufficient_samples(monkeypatch):
-    monkeypatch.setattr(
-        main, "validate_runtime_config", Mock(side_effect=ValueError("bad"))
-    )
+    monkeypatch.setattr(main, "validate_runtime_config", Mock(side_effect=ValueError("bad")))
     assert main.main() == 1
     monkeypatch.setattr(main, "validate_runtime_config", lambda: None)
     monkeypatch.setattr(main, "MIN_SAMPLES", 2)
     monkeypatch.setattr(main, "load_production_data", lambda: pd.DataFrame({"a": [1]}))
     assert main.main() == 0
+
+
+def test_safe_extract_zip_rejects_symlinks(tmp_path):
+    archive = tmp_path / "symlink.zip"
+    zipinfo = zipfile.ZipInfo("symlink_entry.txt")
+    zipinfo.create_system = 3  # Unix system
+    zipinfo.external_attr = 0o120777 << 16  # S_IFLNK (symlink)
+    with zipfile.ZipFile(archive, "w") as handle:
+        handle.writestr(zipinfo, "target.txt")
+
+    with pytest.raises(ValueError, match="symbolic links"):
+        main.safe_extract_zip(archive, tmp_path / "out")
+
+
+def test_load_production_data_multi_tenant_scoping():
+    from src import data
+
+    executed_queries = []
+    executed_params = []
+
+    class DummyEngine:
+        def connect(self):
+            return Context(self)
+
+    def dummy_read_sql(sql, connection, params=None):
+        executed_queries.append(str(sql))
+        executed_params.append(params)
+        return pd.DataFrame({"features": ['{"f1": 1}'], "prediction": [0]})
+
+    data.load_production_data(
+        connection_url="postgresql://mock",
+        model_version_id="00000000-0000-0000-0000-000000000001",
+        max_samples=100,
+        min_samples=1,
+        create_engine=lambda *_: DummyEngine(),
+        sql_text=lambda q: q,
+        pandas_module=SimpleNamespace(
+            read_sql=dummy_read_sql, json_normalize=pd.json_normalize, DataFrame=pd.DataFrame
+        ),
+        detail=lambda *_: None,
+        db_schema="control_plane",
+        tenant_id="T-tenant-123",
+        project_id="00000000-0000-0000-0000-000000000002",
+    )
+
+    assert len(executed_queries) == 1
+    query = executed_queries[0]
+    assert 'INNER JOIN "control_plane"."catalog_modelproject" AS project' in query
+    assert 'INNER JOIN "control_plane"."identity_customuser" AS owner_user' in query
+    assert "project.public_id = CAST(:project_id AS uuid)" in query
+    assert "owner_user.tenant_id = :tenant_id" in query
+    params = executed_params[0]
+    assert params["tenant_id"] == "T-tenant-123"
+    assert params["project_id"] == "00000000-0000-0000-0000-000000000002"
+    assert params["model_version_id"] == "00000000-0000-0000-0000-000000000001"
+
+
+def test_run_fails_fast_when_s3_upload_fails(monkeypatch):
+    monkeypatch.setattr(main, "validate_runtime_config", lambda: None)
+    monkeypatch.setattr(main, "MIN_SAMPLES", 1)
+    frame = pd.DataFrame({"a": [1]})
+    monkeypatch.setattr(main, "load_production_data", lambda: frame)
+    monkeypatch.setattr(main, "load_reference_data", lambda: frame)
+    monkeypatch.setattr(main, "get_column_mapping", lambda *a: main.ColumnMapping())
+    # Drift analysis succeeded locally, but S3 upload failed so html_s3_uri is missing
+    monkeypatch.setattr(main, "HTML_UPLOAD_URL", "http://upload-target")
+    monkeypatch.setattr(
+        main,
+        "run_drift_analysis",
+        lambda *a: {"dataset_drift": False, "report_artifacts": {"local_html_path": "/tmp/report.html"}},
+    )
+    webhook = Mock()
+    monkeypatch.setattr(main, "trigger_django_webhook", webhook)
+
+    exit_code = main._run()
+    assert exit_code == 1
+    webhook.assert_not_called()
+
+
+def test_insufficient_samples_triggers_skipped_webhook(monkeypatch):
+    monkeypatch.setattr(main, "validate_runtime_config", lambda: None)
+    monkeypatch.setattr(main, "MIN_SAMPLES", 100)
+    monkeypatch.setattr(main, "load_production_data", lambda: pd.DataFrame({"a": [1, 2]}))
+    monkeypatch.setattr(main, "CONTROL_PLANE_WEBHOOK_URL", "http://control-plane/webhook")
+
+    captured_summary = []
+    monkeypatch.setattr(main, "trigger_django_webhook", lambda s: captured_summary.append(s))
+
+    exit_code = main._run()
+    assert exit_code == 0
+    assert len(captured_summary) == 1
+    summary = captured_summary[0]
+    assert summary["status"] == "skipped"
+    assert summary["samples"] == 2
+    assert summary["minimum_samples"] == 100
+    assert "Insufficient production samples" in summary["reason"]
+
+
+def _real_drift_run(monkeypatch, reference, production):
+    monkeypatch.setattr(main, "save_drift_report", lambda *a: {})
+    monkeypatch.setattr(main, "TENANT_ID", "t")
+    monkeypatch.setattr(main, "PROJECT_ID", "p")
+    monkeypatch.setattr(main, "MODEL_VERSION_ID", "v")
+    monkeypatch.setattr(main, "DRIFT_THRESHOLD", 0.5)
+    mapping = main.ColumnMapping()
+    mapping.prediction = "prediction"
+    return main.run_drift_analysis(reference, production, mapping)
+
+
+def test_string_predictions_do_not_register_as_drift_against_numeric_reference(monkeypatch):
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+    features = {f"f{i}": rng.normal(size=300) for i in range(4)}
+    labels = rng.integers(0, 2, size=300)
+    reference = pd.DataFrame({**features, "prediction": labels})
+    # Same distribution, but production stores predictions as text.
+    production = pd.DataFrame(
+        {**{k: rng.normal(size=300) for k in features}, "prediction": rng.permutation(labels).astype(str)}
+    )
+
+    summary = _real_drift_run(monkeypatch, reference, production)
+
+    assert summary["prediction_drift"] is False
+    assert "prediction" not in summary["drifted_feature_names"]
+    assert summary["number_of_drifted_features"] == 0
+    assert summary["has_drift"] is False
+
+
+def test_prediction_column_is_not_part_of_the_feature_drift_share(monkeypatch):
+    import numpy as np
+
+    rng = np.random.default_rng(1)
+    reference = pd.DataFrame(
+        {
+            "a": rng.normal(size=400),
+            "b": rng.normal(size=400),
+            "c": rng.normal(size=400),
+            "prediction": rng.integers(0, 2, 400),
+        }
+    )
+    # Only `a` really moves; the prediction distribution shifts heavily as well.
+    production = pd.DataFrame(
+        {
+            "a": rng.normal(loc=6, size=400),
+            "b": rng.normal(size=400),
+            "c": rng.normal(size=400),
+            "prediction": np.ones(400, dtype=int),
+        }
+    )
+
+    summary = _real_drift_run(monkeypatch, reference, production)
+
+    assert summary["drifted_feature_names"] == ["a"]
+    assert summary["number_of_features"] == 3
+    assert summary["share_drifted_features"] == round(1 / 3, 4)
+    assert summary["prediction_drift"] is True
+    assert summary["share_drifted_features"] <= 1.0
+    assert summary["has_drift"] is False  # 1/3 is below the 0.5 threshold
+
+
+def test_mlflow_signature_enum_types_are_classified_correctly(monkeypatch):
+    from mlflow.types import DataType
+
+    signature = SimpleNamespace(
+        inputs=[
+            SimpleNamespace(name="age", type=DataType.long),
+            SimpleNamespace(name="score", type=DataType.double),
+            SimpleNamespace(name="city", type=DataType.string),
+        ]
+    )
+    monkeypatch.setattr(main, "resolve_model_dir", lambda _: "/model")
+    monkeypatch.setattr(main.mlflow.models, "get_model_info", lambda _: SimpleNamespace(signature=signature))
+
+    mapping = main.get_column_mapping(
+        pd.DataFrame({"age": [1], "score": [0.5], "city": ["a"]}),
+        pd.DataFrame({"age": [2], "score": [0.7], "city": ["b"]}),
+    )
+
+    # With the enum compared against plain strings every column became categorical,
+    # which made Evidently report drift for all numeric features.
+    assert mapping.numerical_features == ["age", "score"]
+    assert mapping.categorical_features == ["city"]

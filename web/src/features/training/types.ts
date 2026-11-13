@@ -1,7 +1,8 @@
 import type { ResourceId } from "@/shared/types";
-import type { ModelFlavor } from "@/features/catalog/types";
+import type { ModelFlavor } from "@/features/projects/types";
 
 export type TrainingJobStatus =
+  | "editing"
   | "pending"
   | "queued"
   | "uploading"
@@ -11,6 +12,7 @@ export type TrainingJobStatus =
   | "failed"
   | "cancelled";
 export type TrainingAcceleratorType = "none" | "gpu";
+export type TrainingAcceleratorModel = "" | "t4" | "a10g";
 export type TrainingModelStatus = "none" | "trained" | "built" | "deployed";
 
 export interface TrainingBuild {
@@ -30,7 +32,8 @@ export interface TrainingBuild {
 
 export interface TrainingOutput {
   id: ResourceId;
-  kind: "model" | "metric" | "insight" | "file";
+  kind:
+    "model" | "metric" | "insight" | "source_code" | "reference_data" | "file";
   relative_path: string;
   s3_uri: string;
   checksum: string;
@@ -41,21 +44,31 @@ export interface TrainingOutput {
 }
 
 export interface TrainingJob {
+  observation_status?: "ok" | "retrying" | "cleanup_pending";
+  observation_error?: string;
+  execution_deadline_at?: string | null;
+  runtime_started_at?: string | null;
   id: ResourceId;
-  project_id: ResourceId;
-  name: string;
+  project_id: ResourceId | null;
+  revision: number;
+  input_revision: number | null;
+  submitted_at: string | null;
+  cloned_from: ResourceId | null;
+  output_revision: number;
   model_flavor: ModelFlavor;
   model_version: string;
   entry_point: string;
   requirements_text: string;
   training_backend: "kubeflow" | "local";
   backend: "docker" | "argo" | "kubeflow" | "local";
-  vcpu: number;
-  memory: number;
-  memory_mb: number;
-  max_runtime_seconds: number;
+  vcpu: number | null;
+  memory: number | null;
+  memory_mb: number | null;
+  max_runtime_seconds: number | null;
   accelerator_type: TrainingAcceleratorType;
   accelerator_count: number;
+  accelerator_model: TrainingAcceleratorModel;
+  local_gpu_id: string;
   source_zip: string;
   requirements_file: string;
   training_data: string;
@@ -66,7 +79,6 @@ export interface TrainingJob {
   sagemaker_job_name: string;
   external_job_id: string;
   output_s3_uri: string;
-  output_uri: string;
   model_artifact_uri: string;
   status: TrainingJobStatus;
   error_message: string;
@@ -102,7 +114,7 @@ export interface TrainingJobDeletionRequest {
 }
 
 export interface TrainingJobFormValues {
-  name: string;
+  reference_path?: string;
   model_version?: string;
   model_flavor: ModelFlavor;
   entry_point: string;
@@ -112,20 +124,49 @@ export interface TrainingJobFormValues {
   max_runtime_seconds: number;
   accelerator_type: TrainingAcceleratorType;
   accelerator_count: number;
+  accelerator_model: TrainingAcceleratorModel;
+  local_gpu_id: string;
   source_zip: File | null;
   training_data: File | null;
   project_id?: ResourceId;
 }
 
 export interface TrainingRuntimeCapabilities {
+  runtime_options_seconds?: number[];
+  dispatch_timeout_seconds?: number;
   enabled: boolean;
   backend: "docker" | "argo";
   cpu_profiles: Array<{ id: string; vcpu: number; memory_mb: number }>;
-  accelerators: Array<{ type: TrainingAcceleratorType; counts: number[] }>;
-}
-
-export interface TrainingJobDownloadURLResponse {
-  download_url: string;
+  local_resources?: {
+    status: "available" | "unavailable" | "checking" | "error";
+    reason: string;
+    checked_at?: string;
+    total_vcpu?: number;
+    total_memory_mb?: number;
+    budget_vcpu?: number;
+    budget_memory_mb?: number;
+    reserved_vcpu?: number;
+    reserved_memory_mb?: number;
+    available_vcpu?: number;
+    available_memory_mb?: number;
+  };
+  accelerators: Array<{
+    type: TrainingAcceleratorType;
+    model?: TrainingAcceleratorModel;
+    device_id?: string;
+    counts: number[];
+  }>;
+  local_gpu?: {
+    status: "available" | "unavailable" | "checking" | "disabled" | "error";
+    reason: string;
+    checked_at?: string;
+    devices: Array<{
+      id: string;
+      name: string;
+      memory_total_mib: number | null;
+      memory_free_mib: number | null;
+    }>;
+  };
 }
 
 export interface TrainingJobLogsResponse {
@@ -148,7 +189,6 @@ export interface TrainingMetricPoint {
   memory_used_mb: number | null;
   memory_limit_mb: number | null;
   memory_percent: number | null;
-  gpu_available: boolean;
   gpu_percent: number | null;
   gpu_memory_used_mb: number | null;
   gpu_memory_total_mb: number | null;
@@ -157,14 +197,10 @@ export interface TrainingMetricPoint {
 
 export interface TrainingJobMetricsResponse {
   job_id: ResourceId;
-  training_job_id: ResourceId;
-  status: TrainingJobStatus;
-  metrics_available: boolean;
+  status: "waiting" | "available" | "unavailable";
+  backend: string;
+  poll_interval_seconds: number;
   latest: TrainingMetricPoint | null;
-  history: TrainingMetricPoint[];
-  log_stream_name: string;
-  message: string;
-  updated_at: string;
 }
 
 export interface TrainingJobEvent {
@@ -181,14 +217,101 @@ export interface TrainingJobEventsResponse {
 }
 
 export interface TrainingUsageResponse {
-  training_backend: "kubeflow" | "local";
-  monthly_quota_seconds: number;
-  monthly_runtime_seconds: number;
-  remaining_seconds: number;
-  active_jobs_count: number;
-  running_jobs_count: number;
-  completed_jobs_count: number;
-  failed_jobs_count: number;
-  current_month_start: string;
-  current_month_end: string;
+  backend: "argo" | "docker";
+  week_start: string;
+  reset_at: string;
+  active_jobs_count: number | null;
+  max_active_jobs: number | null;
+  resources: {
+    resource: string;
+    limit_seconds: number | null;
+    used_seconds: number;
+    reserved_seconds: number;
+    remaining_seconds: number | null;
+  }[];
+}
+
+export interface TrainingOutputSummaryAsset {
+  id: ResourceId;
+  name: string;
+  relative_path: string;
+  kind:
+    "model" | "metric" | "insight" | "source_code" | "reference_data" | "file";
+  checksum: string;
+  size_bytes: number;
+  content_type: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  content?: string;
+}
+
+export interface TrainingJobModelOutputSummary {
+  selection?: { model_id?: string; artifacts?: Record<string, string> };
+  available_outputs?: TrainingOutputSummaryAsset[];
+  job_id: ResourceId;
+  project_id: ResourceId | null;
+  output_revision: number;
+  model_flavor: ModelFlavor;
+  entry_point: string;
+  requirements_text: string;
+  build_requirements_text?: string | null;
+  label_mapping?: TrainingOutputSummaryAsset | null;
+  input_schema?: TrainingOutputSummaryAsset | null;
+  model_artifact: TrainingOutputSummaryAsset | null;
+  source_code: TrainingOutputSummaryAsset | null;
+  reference_data: TrainingOutputSummaryAsset | null;
+  metrics: Record<string, unknown>;
+  params: Record<string, unknown>;
+  insights: Record<string, unknown>;
+  can_edit: boolean;
+  can_build: boolean;
+  outputs_purged_at: string | null;
+}
+
+export interface ReferenceDataPreview {
+  filename: string;
+  format: "csv";
+  columns: string[];
+  rows: Array<Array<string | number | boolean | null>>;
+  total_rows: number;
+}
+
+export interface MetricHistoryPoint {
+  step: number;
+  value: number;
+  timestamp?: string | null;
+}
+
+export interface MetricHistorySeries {
+  name: string;
+  points: MetricHistoryPoint[];
+}
+
+export interface TrainingJobExperimentMetricsResponse {
+  job_id: ResourceId;
+  status: TrainingJobStatus;
+  model_flavor: ModelFlavor;
+  started_at?: string | null;
+  completed_at?: string | null;
+  runtime_seconds: number;
+  params: Record<string, string>;
+  metrics_summary: Record<string, number>;
+  series: MetricHistorySeries[];
+}
+
+export interface TrainingRunComparison {
+  job_id: ResourceId;
+  status: TrainingJobStatus;
+  model_flavor: ModelFlavor;
+  runtime_seconds: number;
+  created_at: string;
+  params: Record<string, string>;
+  metrics_summary: Record<string, number>;
+  series: MetricHistorySeries[];
+}
+
+export interface TrainingRunsCompareResponse {
+  runs: TrainingRunComparison[];
+  metric_names: string[];
+  param_names: string[];
 }

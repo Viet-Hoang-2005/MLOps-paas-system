@@ -9,6 +9,16 @@ def project_prefix(tenant_id, project_id):
     return f"users/{_clean(tenant_id)}/models/{_clean(project_id)}"
 
 
+def preview_staging_prefix(tenant_id, project_id, upload_batch_id=None):
+    base = f"staging/{project_prefix(tenant_id, project_id)}/preview"
+    return f"{base}/{_clean(upload_batch_id)}/" if upload_batch_id else f"{base}/"
+
+
+def preview_committed_prefix(tenant_id, project_id, commit_token=None):
+    base = f"{project_prefix(tenant_id, project_id)}/preview/committed"
+    return f"{base}/{_clean(commit_token)}/" if commit_token else f"{base}/"
+
+
 def workspace_prefix(tenant_id, project_id, kind):
     if kind not in {"code", "data"}:
         raise ValueError("Workspace kind must be code or data")
@@ -18,6 +28,8 @@ def workspace_prefix(tenant_id, project_id, kind):
 def build_input_prefix(tenant_id, project_id, build_id, kind):
     if kind not in {
         "source_artifact",
+        "source_code",
+        "reference_data",
         "training_output",
         "label_mapping",
         "metrics",
@@ -38,6 +50,10 @@ def training_job_prefix(tenant_id, project_id, job_id):
     return f"{project_prefix(tenant_id, project_id)}/training/jobs/{_clean(job_id)}"
 
 
+def tenant_training_job_prefix(tenant_id, job_id):
+    return f"users/{_clean(tenant_id)}/training/jobs/{_clean(job_id)}"
+
+
 def training_input_key(tenant_id, project_id, job_id, kind, relative_path):
     if kind not in {"code", "data"}:
         raise ValueError("Training input kind must be code or data")
@@ -53,6 +69,10 @@ def training_output_prefix(tenant_id, project_id, job_id):
 
 def training_mlflow_prefix(tenant_id, project_id, job_id):
     return f"{training_job_prefix(tenant_id, project_id, job_id)}/mlflow/"
+
+
+def training_mlflow_artifacts_prefix(tenant_id, project_id, job_id):
+    return f"{training_mlflow_prefix(tenant_id, project_id, job_id)}artifacts/"
 
 
 def version_prefix(tenant_id, project_id, version_id):

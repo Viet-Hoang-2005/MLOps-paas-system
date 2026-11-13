@@ -3,8 +3,12 @@ kind: NodePool
 metadata:
   name: mlops-paas-training-cpu
   labels:
+    app.kubernetes.io/name: karpenter-nodepool
+    app.kubernetes.io/instance: mlops-paas-training-cpu
     app.kubernetes.io/part-of: mlops-paas
-    mlops-paas.io/environment: production
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: cluster
 spec:
   limits:
     nodes: 1
@@ -27,9 +31,10 @@ spec:
         - key: node.kubernetes.io/instance-type
           operator: In
           values:
-            - c6i.2xlarge
-            - c6i.4xlarge
-      expireAfter: 24h
+            - c6i.xlarge # 4 vCPU, 8 GiB RAM
+            - c6i.2xlarge # 8 vCPU, 16 GiB RAM
+            - c6i.4xlarge # 16 vCPU, 32 GiB RAM
+      expireAfter: Never
       nodeClassRef:
         group: karpenter.k8s.aws
         kind: EC2NodeClass
@@ -43,8 +48,12 @@ kind: NodePool
 metadata:
   name: mlops-paas-training-gpu
   labels:
+    app.kubernetes.io/name: karpenter-nodepool
+    app.kubernetes.io/instance: mlops-paas-training-gpu
     app.kubernetes.io/part-of: mlops-paas
-    mlops-paas.io/environment: production
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: cluster
 spec:
   limits:
     nodes: 1
@@ -68,7 +77,9 @@ spec:
           operator: In
           values:
             - g4dn.xlarge
+            - g4dn.2xlarge
             - g5.xlarge
+            - g5.2xlarge
       nodeClassRef:
         group: karpenter.k8s.aws
         kind: EC2NodeClass
@@ -77,7 +88,7 @@ spec:
         - key: nvidia.com/gpu
           value: "true"
           effect: NoSchedule
-      expireAfter: 24h
+      expireAfter: Never
   disruption:
     consolidationPolicy: WhenEmpty
     consolidateAfter: 5m

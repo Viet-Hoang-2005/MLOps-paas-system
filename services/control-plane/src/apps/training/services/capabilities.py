@@ -8,11 +8,16 @@ from django.utils import timezone
 from apps.training.models import TrainingJobCapability
 
 
-def issue_capability(job, purpose, *, ttl_seconds=None):
+def issue_capability(job, purpose, *, ttl_seconds=None, preserve_existing=False):
     """Create a short-lived, opaque capability without persisting its raw value."""
+    if not job.submitted_at:
+        from common.api.exceptions import Conflict
+
+        raise Conflict("An unsubmitted draft cannot receive runtime capabilities.")
     token = secrets.token_urlsafe(32)
     expires_at = timezone.now() + timedelta(seconds=ttl_seconds if ttl_seconds is not None else _ttl_seconds(job))
-    TrainingJobCapability.objects.filter(job=job, purpose=purpose, consumed_at__isnull=True).delete()
+    if not preserve_existing:
+        TrainingJobCapability.objects.filter(job=job, purpose=purpose, consumed_at__isnull=True).delete()
     TrainingJobCapability.objects.create(
         job=job,
         purpose=purpose,
@@ -38,11 +43,15 @@ def capability_for_token(*, job, purpose, token):
 
 
 def _ttl_seconds(job):
-    requested = int(job.max_runtime_seconds) + settings.TRAINING_CAPABILITY_GRACE_SECONDS
-    return min(
-        max(requested, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS),
-        settings.TRAINING_CAPABILITY_MAX_TTL_SECONDS,
+    requested = (
+        int(job.max_runtime_seconds)
+        + settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS
+        + settings.TRAINING_CAPABILITY_GRACE_SECONDS
     )
+    configured_cap = settings.TRAINING_CAPABILITY_MAX_TTL_SECONDS
+    if configured_cap and configured_cap < requested:
+        raise ValueError("TRAINING_CAPABILITY_MAX_TTL_SECONDS is shorter than the required training lifetime.")
+    return max(requested, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS)
 
 
 def _token_hash(token):

@@ -3,7 +3,17 @@ import uuid
 from django.db import models
 
 
-class Build(models.Model):
+class ExecutionWatch(models.Model):
+    execution_deadline_at = models.DateTimeField(null=True, blank=True)
+    next_execution_check_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    execution_check_token = models.UUIDField(null=True, blank=True, editable=False)
+    execution_check_lease_until = models.DateTimeField(null=True, blank=True, editable=False)
+
+    class Meta:
+        abstract = True
+
+
+class Build(ExecutionWatch):
     STATUSES = tuple(
         (value, value.replace("_", " ").title())
         for value in ("pending", "queued", "building", "ready", "failed", "cancelled")
@@ -24,6 +34,23 @@ class Build(models.Model):
     flavor = models.CharField(max_length=80)
     artifact_format = models.CharField(max_length=20, default="raw")
     requirements_snapshot = models.TextField(blank=True)
+    preview_revision = models.PositiveIntegerField(null=True, blank=True)
+    source_output_revision = models.PositiveIntegerField(null=True, blank=True)
+    registration_status = models.CharField(
+        max_length=20,
+        default="unregistered",
+        choices=tuple((value, value.title()) for value in ("unregistered", "registering", "registered", "failed")),
+    )
+    registration_error = models.TextField(blank=True)
+    deletion_state = models.CharField(
+        max_length=20,
+        default="active",
+        choices=(("active", "Active"), ("deleting", "Deleting"), ("delete_failed", "Delete Failed")),
+    )
+    deletion_error = models.TextField(blank=True)
+    metrics_summary = models.JSONField(default=dict, blank=True)
+    params_summary = models.JSONField(default=dict, blank=True)
+    insights_summary = models.JSONField(default=dict, blank=True)
     backend = models.CharField(max_length=30, default="docker")
     status = models.CharField(max_length=30, choices=STATUSES, default="pending")
     celery_task_id = models.CharField(max_length=255, blank=True, db_index=True)
@@ -37,6 +64,8 @@ class Build(models.Model):
     error_message = models.TextField(blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    execution_completed_at = models.DateTimeField(null=True, blank=True)
+    callback_wait_until = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -46,7 +75,7 @@ class Build(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["source_job"],
-                condition=models.Q(source_job__isnull=False, status__in=("pending", "queued", "building", "ready")),
+                condition=models.Q(source_job__isnull=False, status__in=("pending", "queued", "building")),
                 name="build_active_source_job_unique",
             )
         ]
@@ -58,6 +87,8 @@ class Build(models.Model):
 class BuildInputAsset(models.Model):
     KINDS = (
         ("source_artifact", "Source Artifact"),
+        ("source_code", "Source Code"),
+        ("reference_data", "Reference Data"),
         ("training_output", "Training Output"),
         ("label_mapping", "Label Mapping"),
         ("metrics", "Metrics"),
@@ -75,6 +106,7 @@ class BuildInputAsset(models.Model):
     checksum = models.CharField(max_length=128, blank=True)
     size_bytes = models.PositiveBigIntegerField(default=0)
     content_type = models.CharField(max_length=160, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
     purged_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -85,16 +117,20 @@ class BuildInputAsset(models.Model):
         return f"{self.build.public_id}/{self.kind}/{self.name}"
 
 
-class Deployment(models.Model):
-    STATUSES = tuple(
-        (value, value.replace("_", " ").title())
-        for value in ("pending", "deploying", "healthy", "unhealthy", "failed", "stopped")
-    )
+class Deployment(ExecutionWatch):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        DEPLOYING = "deploying", "Deploying"
+        SUCCEEDED = "succeeded", "Succeeded"
+        FAILED = "failed", "Failed"
+        STOPPED = "stopped", "Stopped"
+        UNCONFIRMED = "unconfirmed", "Unconfirmed"
+
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     version = models.ForeignKey("registry.ModelVersion", on_delete=models.PROTECT, related_name="deployments")
     build = models.ForeignKey(Build, on_delete=models.PROTECT, related_name="deployments")
     backend = models.CharField(max_length=30, default="docker")
-    status = models.CharField(max_length=30, choices=STATUSES, default="pending")
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING)
     celery_task_id = models.CharField(max_length=255, blank=True, db_index=True)
     external_deployment_id = models.CharField(max_length=255, blank=True)
     error_message = models.TextField(blank=True)
@@ -105,23 +141,44 @@ class Deployment(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(status__in=("pending", "deploying", "succeeded", "failed", "stopped", "unconfirmed")),
+                name="deployment_status_valid",
+            )
+        ]
 
     def __str__(self):
         return f"Deployment {self.public_id} ({self.status})"
 
 
 class Endpoint(models.Model):
+    class HealthStatus(models.TextChoices):
+        UNKNOWN = "unknown", "Unknown"
+        HEALTHY = "healthy", "Healthy"
+        UNHEALTHY = "unhealthy", "Unhealthy"
+
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     deployment = models.OneToOneField(Deployment, on_delete=models.CASCADE, related_name="endpoint")
     public_url = models.CharField(max_length=1024)
     internal_url = models.CharField(max_length=1024, blank=True)
     runtime_name = models.CharField(max_length=255, blank=True)
     runtime_namespace = models.CharField(max_length=255, blank=True)
-    health_status = models.CharField(max_length=30, default="unknown")
+    health_status = models.CharField(max_length=30, choices=HealthStatus.choices, default=HealthStatus.UNKNOWN)
     last_checked_at = models.DateTimeField(null=True, blank=True)
+    health_check_token = models.UUIDField(null=True, blank=True, editable=False)
+    health_check_lease_until = models.DateTimeField(null=True, blank=True, editable=False)
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(health_status__in=("unknown", "healthy", "unhealthy")),
+                name="endpoint_health_valid",
+            )
+        ]
 
     def __str__(self):
         return self.public_url

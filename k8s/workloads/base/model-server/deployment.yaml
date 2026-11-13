@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlops-paas-model-server
+  labels:
+    app.kubernetes.io/name: mlops-paas-model-server
+    app.kubernetes.io/instance: mlops-paas-model-server
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: serving
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mlops-paas-model-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mlops-paas-model-server
+        app.kubernetes.io/instance: mlops-paas-model-server
+        app.kubernetes.io/part-of: mlops-paas
+        app.kubernetes.io/component: gateway
+        app.kubernetes.io/managed-by: kustomize
+        mlops-paas.io/plane: workload
+        mlops-paas.io/domain: serving
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: prometheus-multiprocess
+          emptyDir: {}
+      nodeSelector:
+        workload-type: worker
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: mlops-paas-model-server
+      containers:
+        - name: model-server
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          image: mlops-paas-model-server
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5000
+          env:
+            - name: PROMETHEUS_MULTIPROC_DIR
+              value: /var/run/model-server-metrics
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-paas-model-server-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-paas-model-server-secret
+                  key: DB_PASSWORD
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-paas-model-server-secret
+                  key: REDIS_PASSWORD
+            - name: REDIS_SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-paas-model-server-secret
+                  key: REDIS_SENTINEL_PASSWORD
+          envFrom:
+            - configMapRef:
+                name: mlops-paas-model-server-config
+          volumeMounts:
+            - name: prometheus-multiprocess
+              mountPath: /var/run/model-server-metrics
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

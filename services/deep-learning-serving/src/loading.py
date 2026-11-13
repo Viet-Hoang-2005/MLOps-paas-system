@@ -17,8 +17,7 @@ def download_model_artifact(model_version_id: str, model_uri: str) -> Path:
             return local_path
 
     raise RuntimeError(
-        f"FATAL: Pre-built DL model artifact not found in /app/model_artifact "
-        f"(Model Version ID: {model_version_id}). "
+        f"FATAL: Pre-built DL model artifact not found in /app/model_artifact (Model Version ID: {model_version_id}). "
     )
 
 

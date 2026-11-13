@@ -18,9 +18,7 @@ import xgboost as xgb
 
 def parse_requirements(requirements_text: str) -> list[str] | None:
     requirements = [
-        line.strip()
-        for line in requirements_text.splitlines()
-        if line.strip() and not line.strip().startswith("#")
+        line.strip() for line in requirements_text.splitlines() if line.strip() and not line.strip().startswith("#")
     ]
     return requirements or None
 
@@ -75,9 +73,7 @@ def load_model(path: Path, flavor: str) -> Any:
     raise ValueError(f"Unsupported model flavor: {flavor}")
 
 
-def save_mlflow_model(
-    model: Any, flavor: str, output_dir: Path, requirements: list[str] | None
-) -> None:
+def save_mlflow_model(model: Any, flavor: str, output_dir: Path, requirements: list[str] | None) -> None:
     if flavor == "sklearn":
         mlflow.sklearn.save_model(
             sk_model=model,

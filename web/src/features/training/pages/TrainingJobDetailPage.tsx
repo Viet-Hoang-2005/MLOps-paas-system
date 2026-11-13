@@ -1,13 +1,7 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
+import { downloadWorkspaceSelection } from "@/features/training/api/jobWorkspaceApi";
+import { saveDownload } from "@/features/training/lib/downloadSelection";
+import { formatDateTime } from "@/shared/i18n/formatters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 import {
   Activity,
   AlertTriangle,
@@ -17,35 +11,45 @@ import {
   FileArchive,
   Info,
   RefreshCw,
+  RotateCcw,
   ScrollText,
   Settings,
   Trash2,
 } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useTranslation } from "react-i18next";
+import { ExecutionObservation } from "@/shared/components/ExecutionObservation";
+import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import {
-  buildAndRegisterTrainingJob,
   deleteTrainingJob,
   deleteTrainingOutputs,
   getTrainingJob,
-  getTrainingJobDownloadUrl,
   getTrainingJobEvents,
-  getTrainingJobLogs,
   getTrainingJobMetrics,
   refreshTrainingJobStatus,
+  retryTrainingJob,
 } from "@/features/training/api/trainingApi";
 import { LiveStatusBadge } from "@/features/training/components/TrainingOverviewSections";
 import { trainingQueryKeys } from "@/features/training/queryKeys";
-import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
 import type {
   TrainingJobDetailContextValue,
   TrainingJobDetailSection,
 } from "@/features/training/trainingJobDetailContext";
+import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { computeElapsed, formatDuration } from "@/shared/lib/formatDuration";
+import { getTrainingStartError } from "@/features/training/api/quotaErrors";
 import { Button } from "@/shared/components/Button";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageTabs } from "@/shared/components/PageTabs";
-import { toast } from "@/shared/components/toastStore";
+import { computeElapsed, formatDuration } from "@/shared/lib/formatDuration";
+import { toast } from "@/shared/lib/toastStore";
 
 const ACTIVE_STATUSES: TrainingJobStatus[] = [
   "pending",
@@ -64,7 +68,7 @@ const DETAIL_SECTIONS: TrainingJobDetailSection[] = [
 const AUTO_SYNC_INTERVAL_MS = 3000;
 
 export default function TrainingJobDetailPage() {
-  const { t } = useTranslation("training");
+  const { t, i18n } = useTranslation("training");
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -81,10 +85,13 @@ export default function TrainingJobDetailPage() {
   >(null);
   const [deleteOutputsOpen, setDeleteOutputsOpen] = useState(false);
   const [deleteJobOpen, setDeleteJobOpen] = useState(false);
+  const [retryJobOpen, setRetryJobOpen] = useState(false);
   const [liveElapsed, setLiveElapsed] = useState<number | null>(null);
+  const retryKey = useRef<string | null>(null);
   const lastToastedStatus = useRef<string | null>(null);
 
   const statusLabels: Record<TrainingJobStatus, string> = {
+    editing: t("statusFilter.editing"),
     pending: t("detail.statuses.pending"),
     queued: t("detail.statuses.queued"),
     uploading: t("detail.statuses.uploading"),
@@ -106,37 +113,28 @@ export default function TrainingJobDetailPage() {
     enabled: Boolean(parsedJobId),
     refetchInterval: (query) => {
       const currentJob = query.state.data;
-      return currentJob && ACTIVE_STATUSES.includes(currentJob.status)
+      return currentJob &&
+        (ACTIVE_STATUSES.includes(currentJob.status) ||
+          currentJob.observation_status === "cleanup_pending")
         ? AUTO_SYNC_INTERVAL_MS
         : false;
     },
   });
 
   const {
-    data: logsResponse,
-    isLoading: loadingLogs,
-    refetch: refetchLogs,
-  } = useQuery({
-    queryKey: trainingQueryKeys.logs(parsedJobId),
-    queryFn: () => getTrainingJobLogs(parsedJobId),
-    enabled: Boolean(job) && activeSection === "logs",
-    refetchInterval:
-      job && activeSection === "logs" && ACTIVE_STATUSES.includes(job.status)
-        ? AUTO_SYNC_INTERVAL_MS
-        : false,
-  });
-
-  const {
     data: metrics,
     isLoading: loadingMetrics,
+    isError: metricsError,
     refetch: refetchMetrics,
   } = useQuery({
     queryKey: trainingQueryKeys.metrics(parsedJobId),
     queryFn: () => getTrainingJobMetrics(parsedJobId),
-    enabled: Boolean(job) && activeSection === "metrics",
+    enabled: job?.status === "running" && activeSection === "metrics",
     refetchInterval:
-      job && activeSection === "metrics" && ACTIVE_STATUSES.includes(job.status)
-        ? AUTO_SYNC_INTERVAL_MS
+      job?.status === "running" && activeSection === "metrics"
+        ? job.backend === "docker"
+          ? 15000
+          : 30000
         : false,
   });
 
@@ -182,7 +180,6 @@ export default function TrainingJobDetailPage() {
     onSuccess: (updatedJob) => {
       queryClient.setQueryData(trainingQueryKeys.job(parsedJobId), updatedJob);
       if (activeSection === "logs") {
-        void refetchLogs();
         void refetchEvents();
       }
       if (activeSection === "metrics") void refetchMetrics();
@@ -193,14 +190,8 @@ export default function TrainingJobDetailPage() {
   });
 
   const downloadMutation = useMutation({
-    mutationFn: () => getTrainingJobDownloadUrl(parsedJobId),
-    onSuccess: ({ download_url: downloadUrl }) => {
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    },
+    mutationFn: () => downloadWorkspaceSelection(parsedJobId, "outputs"),
+    onSuccess: saveDownload,
     onError: (error) =>
       toast.error(getApiErrorMessage(error, t("detail.downloadFailed"))),
   });
@@ -213,23 +204,10 @@ export default function TrainingJobDetailPage() {
       await queryClient.invalidateQueries({
         queryKey: trainingQueryKeys.jobs(),
       });
-      navigate("/dashboard/model-training");
+      navigate("/dashboard/training");
     },
     onError: (error) =>
       toast.error(getApiErrorMessage(error, t("delete.failed"))),
-  });
-
-  const buildAndRegisterMutation = useMutation({
-    mutationFn: () => buildAndRegisterTrainingJob(parsedJobId),
-    onSuccess: async () => {
-      toast.success(t("detail.buildStarted"));
-      await refetchJob();
-      await queryClient.invalidateQueries({
-        queryKey: trainingQueryKeys.jobs(),
-      });
-    },
-    onError: (error) =>
-      toast.error(getApiErrorMessage(error, t("detail.buildFailed"))),
   });
 
   const deleteOutputsMutation = useMutation({
@@ -246,6 +224,28 @@ export default function TrainingJobDetailPage() {
       toast.error(getApiErrorMessage(error, t("detail.outputDeleteFailed"))),
   });
 
+  const retryJobMutation = useMutation({
+    mutationFn: () => {
+      retryKey.current ??= crypto.randomUUID();
+      return retryTrainingJob(parsedJobId, retryKey.current);
+    },
+    onSuccess: async (newJob) => {
+      setRetryJobOpen(false);
+      toast.success(t("studio.draftCreated"));
+      await queryClient.invalidateQueries({
+        queryKey: trainingQueryKeys.usage(),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: trainingQueryKeys.jobs(),
+      });
+      navigate(
+        `/dashboard/training/${newJob.id}/workspace${job?.project_id ? `?project=${job.project_id}` : ""}`,
+      );
+    },
+    onError: (error) =>
+      toast.error(getTrainingStartError(error, t, i18n.language)),
+  });
+
   const refreshHeader = async () => {
     setRefreshingSection("header");
     try {
@@ -258,7 +258,7 @@ export default function TrainingJobDetailPage() {
   const refreshLogs = async () => {
     setRefreshingSection("logs");
     try {
-      await Promise.all([refetchLogs(), refetchEvents()]);
+      await refetchEvents();
     } finally {
       setRefreshingSection(null);
     }
@@ -315,7 +315,7 @@ export default function TrainingJobDetailPage() {
           {t("detail.notFoundDescription")}
         </p>
         <Button
-          onClick={() => navigate("/dashboard/model-training")}
+          onClick={() => navigate("/dashboard/training")}
           variant="secondary"
           className="mt-2"
         >
@@ -341,10 +341,9 @@ export default function TrainingJobDetailPage() {
     job,
     statusLabels,
     activeStatuses: ACTIVE_STATUSES,
-    logsResponse,
-    loadingLogs,
     metrics,
     loadingMetrics,
+    metricsError,
     eventsResponse,
     refreshingSection,
     refreshLogs,
@@ -354,17 +353,18 @@ export default function TrainingJobDetailPage() {
     },
     downloadOutput: () => downloadMutation.mutate(),
     downloadingOutput: downloadMutation.isPending,
-    buildAndRegister: () => buildAndRegisterMutation.mutate(),
-    buildingAndRegistering: buildAndRegisterMutation.isPending,
     requestDeleteOutputs: () => setDeleteOutputsOpen(true),
+    requestRetryJob: () => setRetryJobOpen(true),
+    retryingJob: retryJobMutation.isPending,
     copyUri,
   };
 
   return (
     <section className="flex w-full flex-1 flex-col space-y-6">
+      <ExecutionObservation state={job} />
       <button
         type="button"
-        onClick={() => navigate("/dashboard/model-training")}
+        onClick={() => navigate("/dashboard/training")}
         className="group mb-6 flex items-center gap-2 text-style-body-strong text-color-muted-foreground transition-colors hover:text-color-foreground"
       >
         <ArrowLeft className="h-4 w-4 transition-all group-hover:-translate-x-0.5" />
@@ -379,7 +379,7 @@ export default function TrainingJobDetailPage() {
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-style-page-title font-bold text-color-foreground">
-                {job.name}
+                {job.id}
               </h1>
               <p className="mt-1 text-style-caption-strong text-color-muted-foreground">
                 {t("detail.jobNumber", { id: job.id })}
@@ -390,6 +390,27 @@ export default function TrainingJobDetailPage() {
           <div className="flex shrink-0 flex-col items-end gap-3 sm:flex-row sm:items-center">
             {ACTIVE_STATUSES.includes(job.status) && <LiveStatusBadge />}
             <div className="flex flex-wrap items-center justify-end gap-2">
+              {!job.project_id &&
+                job.status === "completed" &&
+                job.output_available &&
+                !job.deletion_pending && (
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      navigate(`/dashboard/training/jobs/${job.id}/project`)
+                    }
+                  >
+                    {t("studio.assignProject")}
+                  </Button>
+                )}
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  navigate(`/dashboard/training/${job.id}/workspace`)
+                }
+              >
+                {t("studio.openDraft")}
+              </Button>
               <Button
                 size="icon"
                 variant="secondary"
@@ -406,6 +427,18 @@ export default function TrainingJobDetailPage() {
                 title={t("detail.refreshStatus")}
                 className="rounded-surface border border-border shadow-sm transition-all hover:border-foreground/30"
               />
+              {(job.status === "failed" || job.status === "cancelled") && (
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  icon={<RotateCcw className="h-4 w-4" />}
+                  disabled={job.deletion_pending || retryJobMutation.isPending}
+                  onClick={() => setRetryJobOpen(true)}
+                  aria-label={t("retryJob")}
+                  title={t("retryJob")}
+                  className="rounded-surface border border-border shadow-sm transition-all hover:border-foreground/30"
+                />
+              )}
               <Button
                 size="icon"
                 variant={job.status === "completed" ? "primary" : "secondary"}
@@ -457,7 +490,7 @@ export default function TrainingJobDetailPage() {
           </SummaryCell>
           <SummaryCell label={t("detail.overview.updatedAt")}>
             <p className="text-style-section-title font-bold text-color-foreground">
-              {new Date(job.updated_at).toLocaleString()}
+              {formatDateTime(job.updated_at, i18n.language)}
             </p>
           </SummaryCell>
         </div>
@@ -470,9 +503,7 @@ export default function TrainingJobDetailPage() {
             icon: tab.icon,
             isActive: activeSection === tab.id,
             onClick: () =>
-              navigate(
-                `/dashboard/model-training/jobs/${job.id}/details/${tab.id}`,
-              ),
+              navigate(`/dashboard/training/jobs/${job.id}/${tab.id}`),
           }))}
         />
       </div>
@@ -481,17 +512,17 @@ export default function TrainingJobDetailPage() {
         <Outlet context={context} />
       </div>
 
-      <ConfirmModal
+      <ConfirmDialog
         open={deleteJobOpen}
         title={t("delete.title")}
-        description={t("delete.description", { job: job.name })}
+        description={t("delete.description", { job: job.id })}
         confirmText={t("delete.confirm")}
         tone="danger"
         loading={deleteJobMutation.isPending}
         onCancel={() => setDeleteJobOpen(false)}
         onConfirm={() => deleteJobMutation.mutate()}
       />
-      <ConfirmModal
+      <ConfirmDialog
         open={deleteOutputsOpen}
         title={t("detail.deleteOutputTitle")}
         description={t("detail.deleteOutputDescription")}
@@ -500,6 +531,16 @@ export default function TrainingJobDetailPage() {
         loading={deleteOutputsMutation.isPending}
         onCancel={() => setDeleteOutputsOpen(false)}
         onConfirm={() => deleteOutputsMutation.mutate()}
+      />
+      <ConfirmDialog
+        open={retryJobOpen}
+        title={t("retryTitle")}
+        description={t("retryDescription", { job: job.id })}
+        confirmText={t("retryJob")}
+        tone="default"
+        loading={retryJobMutation.isPending}
+        onCancel={() => setRetryJobOpen(false)}
+        onConfirm={() => retryJobMutation.mutate()}
       />
     </section>
   );

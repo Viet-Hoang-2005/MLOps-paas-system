@@ -1,6 +1,5 @@
 from django.conf import settings
 from rest_framework import generics, status
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -12,31 +11,46 @@ from apps.deployment.selectors import (
     endpoint_for_user,
     endpoints_for_user,
 )
-from apps.deployment.services.builds import request_build, request_cancel
+from apps.deployment.services.builds import request_build_deletion, request_cancel, request_rebuild
 from apps.deployment.services.deployments import endpoint_logs, request_deployment, request_stop
 from apps.deployment.services.logs import build_logs, deployment_logs
+from infrastructure.runtime_logs import runtime_log_page
 
 from .serializers import BuildSerializer, DeploymentSerializer, EndpointSerializer
 
 
-class BuildListCreateEndpoint(generics.ListCreateAPIView):
+class BuildListEndpoint(generics.ListAPIView):
     serializer_class = BuildSerializer
 
     def get_queryset(self):
         return builds_for_user(self.request.user)
 
-    def perform_create(self, serializer):
-        version = serializer.validated_data["version"]
-        serializer.instance = request_build(version, settings.BUILD_BACKEND)
 
-
-class BuildDetailEndpoint(generics.RetrieveAPIView):
+class BuildDetailEndpoint(generics.RetrieveDestroyAPIView):
     serializer_class = BuildSerializer
     lookup_field = "public_id"
     lookup_url_kwarg = "build_id"
 
     def get_queryset(self):
         return builds_for_user(self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        build = request_build_deletion(self.get_object())
+        return Response(BuildSerializer(build).data, status=status.HTTP_202_ACCEPTED)
+
+
+class BuildRebuildEndpoint(APIView):
+    def post(self, request, build_id):
+        build = request_rebuild(build_for_user(request.user, build_id), backend=settings.BUILD_BACKEND)
+        return Response(BuildSerializer(build).data, status=status.HTTP_201_CREATED)
+
+
+class BuildRegisterEndpoint(APIView):
+    def post(self, request, build_id):
+        from apps.deployment.services.completion import request_registration
+
+        build = request_registration(build_for_user(request.user, build_id))
+        return Response(BuildSerializer(build).data, status=status.HTTP_202_ACCEPTED)
 
 
 class BuildCancelEndpoint(APIView):
@@ -47,20 +61,12 @@ class BuildCancelEndpoint(APIView):
 
 class BuildLogsEndpoint(APIView):
     def get(self, request, build_id):
-        try:
-            offset = int(request.query_params.get("offset", "0"))
-        except (TypeError, ValueError) as exc:
-            raise ValidationError({"offset": "Must be a non-negative integer."}) from exc
-        if offset < 0:
-            raise ValidationError({"offset": "Must be a non-negative integer."})
-
         build = build_for_user(request.user, build_id)
-        logs, next_offset = build_logs(build, offset)
+        page = runtime_log_page(request, build, "build", build_logs)
         return Response(
             {
                 "build_id": str(build.public_id),
-                "logs": logs,
-                "next_offset": next_offset,
+                **page,
                 "status": build.status,
                 "error_message": build.error_message,
             }
@@ -95,20 +101,12 @@ class DeploymentStopEndpoint(APIView):
 
 class DeploymentLogsEndpoint(APIView):
     def get(self, request, deployment_id):
-        try:
-            offset = int(request.query_params.get("offset", "0"))
-        except (TypeError, ValueError) as exc:
-            raise ValidationError({"offset": "Must be a non-negative integer."}) from exc
-        if offset < 0:
-            raise ValidationError({"offset": "Must be a non-negative integer."})
-
         deployment = deployment_for_user(request.user, deployment_id)
-        logs, next_offset = deployment_logs(deployment, offset)
+        page = runtime_log_page(request, deployment, "deployment", deployment_logs)
         return Response(
             {
                 "deployment_id": str(deployment.public_id),
-                "logs": logs,
-                "next_offset": next_offset,
+                **page,
                 "status": deployment.status,
                 "error_message": deployment.error_message,
             }

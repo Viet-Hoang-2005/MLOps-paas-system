@@ -1,0 +1,301 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: mlops-paas-model-packager-template
+  namespace: mlops-paas-execution
+spec:
+  serviceAccountName: argo-workflow-basic-sa
+  entrypoint: build-model
+  podMetadata:
+    labels:
+      app.kubernetes.io/name: mlops-paas-model-packager
+      app.kubernetes.io/part-of: mlops-paas
+      app.kubernetes.io/component: packaging
+      mlops-paas.io/domain: packaging
+      app.kubernetes.io/managed-by: argo-workflows
+      mlops-paas.io/build-id: "{{workflow.parameters.build_id}}"
+  workflowMetadata:
+    labelsFrom:
+      mlops-paas.io/build-id: {expression: workflow.parameters.build_id}
+      mlops-paas.io/project-id: {expression: workflow.parameters.project_id}
+      mlops-paas.io/tenant-id: {expression: workflow.parameters.tenant_id}
+  onExit: notify-build-exit
+  arguments:
+    parameters:
+      - name: build_id
+        value: ""
+      - name: project_id
+        value: ""
+      - name: tenant_id
+        value: ""
+      - name: control_plane_webhook_url
+      - name: label_mapping_download_url
+      - name: input_schema_download_url
+        default: ""
+      - name: label_mapping_filename
+  volumeClaimTemplates:
+    - metadata:
+        name: workspace
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+  volumes:
+    - name: harbor-config
+      secret:
+        secretName: harbor-registry-dockerconfig
+        items:
+          - key: config.json
+            path: config.json
+    - name: harbor-base-pull
+      secret:
+        secretName: harbor-base-pull-dockerconfig
+        optional: true
+        items:
+          - key: config.json
+            path: config.json
+  templates:
+    - name: build-model
+      inputs:
+        parameters:
+          - name: build_id
+          - name: project_id
+          - name: tenant_id
+          - name: image_repository
+          - name: image_tag
+          - name: flavor
+          - name: task_type
+          - name: requirements_text
+          - name: source_artifact_name
+          - name: source_type
+          - name: source_download_url
+          - name: output_upload_url
+          - name: control_plane_webhook_url
+          - name: label_mapping_download_url
+          - name: input_schema_download_url
+            default: ""
+          - name: label_mapping_filename
+      steps:
+        - - name: prepare-package
+            template: prepare-package
+            arguments:
+              parameters:
+                - {name: build_id, value: "{{inputs.parameters.build_id}}"}
+                - {name: project_id, value: "{{inputs.parameters.project_id}}"}
+                - {name: tenant_id, value: "{{inputs.parameters.tenant_id}}"}
+                - {name: image_repository, value: "{{inputs.parameters.image_repository}}"}
+                - {name: image_tag, value: "{{inputs.parameters.image_tag}}"}
+                - {name: flavor, value: "{{inputs.parameters.flavor}}"}
+                - {name: task_type, value: "{{inputs.parameters.task_type}}"}
+                - {name: requirements_text, value: "{{inputs.parameters.requirements_text}}"}
+                - {name: source_artifact_name, value: "{{inputs.parameters.source_artifact_name}}"}
+                - {name: source_type, value: "{{inputs.parameters.source_type}}"}
+                - {name: source_download_url, value: "{{inputs.parameters.source_download_url}}"}
+                - {name: output_upload_url, value: "{{inputs.parameters.output_upload_url}}"}
+                - {name: control_plane_webhook_url, value: "{{inputs.parameters.control_plane_webhook_url}}"}
+                - {name: label_mapping_download_url, value: "{{inputs.parameters.label_mapping_download_url}}"}
+                - {name: input_schema_download_url, value: "{{inputs.parameters.input_schema_download_url}}"}
+                - {name: label_mapping_filename, value: "{{inputs.parameters.label_mapping_filename}}"}
+        - - name: build-image
+            template: build-image
+            arguments:
+              parameters:
+                - {name: build_id, value: "{{inputs.parameters.build_id}}"}
+                - {name: image_repository, value: "{{inputs.parameters.image_repository}}"}
+                - {name: image_tag, value: "{{inputs.parameters.image_tag}}"}
+        - - name: push-image
+            template: push-image
+            arguments:
+              parameters:
+                - {name: build_id, value: "{{inputs.parameters.build_id}}"}
+                - {name: image_repository, value: "{{inputs.parameters.image_repository}}"}
+                - {name: image_tag, value: "{{inputs.parameters.image_tag}}"}
+        - - name: notify-success
+            template: notify-success
+            arguments:
+              parameters:
+                - {name: build_id, value: "{{inputs.parameters.build_id}}"}
+                - {name: image_repository, value: "{{inputs.parameters.image_repository}}"}
+                - {name: image_tag, value: "{{inputs.parameters.image_tag}}"}
+                - {name: control_plane_webhook_url, value: "{{inputs.parameters.control_plane_webhook_url}}"}
+    - name: prepare-package
+      nodeSelector: {workload-type: worker}
+      inputs:
+        parameters:
+          - {name: build_id}
+          - {name: project_id}
+          - {name: tenant_id}
+          - {name: image_repository}
+          - {name: image_tag}
+          - {name: flavor}
+          - {name: task_type}
+          - {name: requirements_text}
+          - {name: source_artifact_name}
+          - {name: source_type}
+          - {name: source_download_url}
+          - {name: output_upload_url}
+          - {name: control_plane_webhook_url}
+          - {name: label_mapping_download_url}
+          - {name: input_schema_download_url, default: ""}
+          - {name: label_mapping_filename}
+      container:
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:81965f1f52b90f1578765eaf99e15aba96f68a8a
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        imagePullPolicy: Always
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+        env:
+          - name: LOG_FORMAT
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_FORMAT}
+          - name: LOG_STORAGE_BACKEND
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_STORAGE_BACKEND}
+          - name: LOG_SUMMARY_INTERVAL_SECONDS
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_SUMMARY_INTERVAL_SECONDS}
+          - {name: REDIS_URL, value: ""}
+          - name: HARBOR_REGISTRY_URL
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: HARBOR_REGISTRY_URL}
+          - {name: BUILD_ENGINE, value: kaniko}
+          - {name: BUILD_WORKSPACE_DIR, value: /workspace}
+          - {name: TASK_TYPE, value: "{{inputs.parameters.task_type}}"}
+          - {name: BUILD_ID, value: "{{inputs.parameters.build_id}}"}
+          - {name: PROJECT_ID, value: "{{inputs.parameters.project_id}}"}
+          - {name: IMAGE_REPOSITORY, value: "{{inputs.parameters.image_repository}}"}
+          - {name: IMAGE_TAG, value: "{{inputs.parameters.image_tag}}"}
+          - {name: TENANT_ID, value: "{{inputs.parameters.tenant_id}}"}
+          - {name: FLAVOR, value: "{{inputs.parameters.flavor}}"}
+          - {name: REQUIREMENTS_TEXT, value: "{{inputs.parameters.requirements_text}}"}
+          - {name: SOURCE_ARTIFACT_NAME, value: "{{inputs.parameters.source_artifact_name}}"}
+          - {name: SOURCE_TYPE, value: "{{inputs.parameters.source_type}}"}
+          - {name: SOURCE_DOWNLOAD_URL, value: "{{inputs.parameters.source_download_url}}"}
+          - {name: LABEL_MAPPING_DOWNLOAD_URL, value: "{{inputs.parameters.label_mapping_download_url}}"}
+          - {name: INPUT_SCHEMA_DOWNLOAD_URL, value: "{{inputs.parameters.input_schema_download_url}}"}
+          - {name: LABEL_MAPPING_FILENAME, value: "{{inputs.parameters.label_mapping_filename}}"}
+          - {name: OUTPUT_UPLOAD_URL, value: "{{inputs.parameters.output_upload_url}}"}
+          - {name: CONTROL_PLANE_WEBHOOK_URL, value: "{{inputs.parameters.control_plane_webhook_url}}"}
+    - name: build-image
+      nodeSelector: {workload-type: worker}
+      inputs:
+        parameters:
+          - {name: build_id}
+          - {name: image_repository}
+          - {name: image_tag}
+      container:
+        image: gcr.io/kaniko-project/executor:latest
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        args:
+          - --context=dir:///workspace
+          - --dockerfile=/workspace/Dockerfile
+          - --destination={{inputs.parameters.image_repository}}:{{inputs.parameters.image_tag}}
+          - --no-push
+          - --tar-path=/workspace/image.tar
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+          - {name: harbor-base-pull, mountPath: /kaniko/.docker/, readOnly: true}
+    - name: push-image
+      nodeSelector: {workload-type: worker}
+      inputs:
+        parameters:
+          - {name: build_id}
+          - {name: image_repository}
+          - {name: image_tag}
+      container:
+        image: quay.io/skopeo/stable:v1.22.3
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
+        command: [skopeo]
+        args:
+          - copy
+          - --dest-authfile=/auth/config.json
+          - --digestfile=/workspace/image-digest
+          - docker-archive:/workspace/image.tar
+          - docker://{{inputs.parameters.image_repository}}:{{inputs.parameters.image_tag}}
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+          - {name: harbor-config, mountPath: /auth, readOnly: true}
+    - name: notify-success
+      nodeSelector: {workload-type: worker}
+      inputs:
+        parameters:
+          - {name: build_id}
+          - {name: image_repository}
+          - {name: image_tag}
+          - {name: control_plane_webhook_url}
+      container:
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:81965f1f52b90f1578765eaf99e15aba96f68a8a
+        resources:
+          requests:
+            cpu: 20m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+        imagePullPolicy: Always
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace}
+        env:
+          - name: LOG_FORMAT
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_FORMAT}
+          - name: LOG_STORAGE_BACKEND
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_STORAGE_BACKEND}
+          - name: LOG_SUMMARY_INTERVAL_SECONDS
+            valueFrom:
+              configMapKeyRef: {name: mlops-paas-execution-config, key: LOG_SUMMARY_INTERVAL_SECONDS}
+          - {name: REDIS_URL, value: ""}
+          - {name: TASK_TYPE, value: NOTIFY_BUILD}
+          - {name: BUILD_WORKSPACE_DIR, value: /workspace}
+          - {name: BUILD_ID, value: "{{inputs.parameters.build_id}}"}
+          - {name: IMAGE_URI, value: "{{inputs.parameters.image_repository}}:{{inputs.parameters.image_tag}}"}
+          - {name: CONTROL_PLANE_WEBHOOK_URL, value: "{{inputs.parameters.control_plane_webhook_url}}"}
+          - name: CONTROL_PLANE_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef: {name: argo-build-callback-secret, key: CONTROL_PLANE_WEBHOOK_SECRET}
+    - name: notify-build-exit
+      nodeSelector: {workload-type: worker}
+      container:
+        image: curlimages/curl:8.8.0
+        resources:
+          requests:
+            cpu: 20m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+        args:
+          - -sS
+          - -X
+          - POST
+          - "{{workflow.parameters.control_plane_webhook_url}}"
+          - -H
+          - "Content-Type: application/json"
+          - -H
+          - "X-Control-Plane-Secret: $(CONTROL_PLANE_WEBHOOK_SECRET)"
+          - --data
+          - '{"status":"{{workflow.status}}","error_message":"Argo workflow {{workflow.name}} finished with {{workflow.status}}"}'
+        env:
+          - name: CONTROL_PLANE_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef: {name: argo-build-callback-secret, key: CONTROL_PLANE_WEBHOOK_SECRET}

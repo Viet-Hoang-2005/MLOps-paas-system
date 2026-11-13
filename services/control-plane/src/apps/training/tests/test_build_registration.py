@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
@@ -39,23 +40,40 @@ def completed_job(email="training-build@example.com"):
     project = ModelProject.objects.create(owner=owner, name="NIDS")
     job = TrainingJob.objects.create(
         project=project,
-        name="training-v1",
         model_flavor="xgboost",
         requirements_text="xgboost==2.0.3",
         code_snapshot_uri="s3://bucket/source.zip",
         data_snapshot_uri="s3://bucket/reference.csv",
         output_uri="s3://bucket/model.tar.gz",
         status="completed",
+        vcpu=2,
+        memory_mb=4096,
+        max_runtime_seconds=3600,
+        input_contract="legacy",
+        submitted_at=timezone.now(),
     )
-    TrainingOutput.objects.create(
+    model = TrainingOutput.objects.create(
         job=job,
         kind="model",
-        relative_path="model.tar.gz",
-        s3_uri=job.output_uri,
+        relative_path="Model/model.joblib",
+        metadata={"contract": 2, "group": "model"},
+        s3_uri="s3://bucket/selected-model.joblib",
         checksum="output-checksum",
         size_bytes=42,
         content_type="application/gzip",
     )
+    TrainingOutput.objects.create(
+        job=job,
+        kind="source_code",
+        relative_path="train.py",
+        s3_uri="s3://bucket/train.py",
+        checksum="source-checksum",
+        size_bytes=100,
+        content_type="text/x-python",
+    )
+    job.artifact_selection = {"model_id": str(model.public_id), "artifacts": {}}
+    job.tracking = {"output_contract": 2}
+    job.save(update_fields=["artifact_selection", "tracking"])
     return job
 
 
@@ -80,7 +98,8 @@ def test_training_build_reuses_active_attempt_and_snapshots_output(monkeypatch, 
     assert first.source_job == job
     assert first.flavor == "xgboost"
     assert first.requirements_snapshot == "xgboost==2.0.3"
-    assert first.input_assets.get().kind == "training_output"
+    assert first.input_assets.get(kind="training_output").s3_uri != job.output_uri
+    assert first.input_assets.get(kind="source_code").s3_uri != "s3://bucket/train.py"
     assert queued == [str(first.public_id)]
 
 
@@ -94,6 +113,20 @@ def test_training_build_requires_completed_output():
 
 
 @pytest.mark.django_db
+def test_training_build_api_requires_valid_output_revision():
+    job = completed_job("training-build-revision@example.com")
+    client = APIClient()
+    client.force_authenticate(job.project.owner)
+
+    missing = client.post(f"/api/training-jobs/{job.public_id}/build/", {}, format="json")
+    invalid = client.post(f"/api/training-jobs/{job.public_id}/build/", {"output_revision": "invalid"}, format="json")
+
+    assert missing.status_code == 400
+    assert invalid.status_code == 400
+    assert not job.builds.exists()
+
+
+@pytest.mark.django_db
 def test_successful_training_build_creates_one_version_with_summaries():
     job = completed_job("training-register@example.com")
     build = Build.objects.create(
@@ -102,7 +135,7 @@ def test_successful_training_build_creates_one_version_with_summaries():
         flavor=job.model_flavor,
         artifact_format="training_output",
         requirements_snapshot=job.requirements_text,
-        status="building",
+        status="ready",
     )
     output = job.outputs.get(kind="model")
     build.input_assets.create(

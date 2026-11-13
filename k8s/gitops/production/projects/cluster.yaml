@@ -12,7 +12,7 @@ spec:
   sourceRepos:
     - https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
   destinations:
-    - namespace: mlops-cluster-config
+    - namespace: mlops-paas-system
       server: https://kubernetes.default.svc
     - namespace: karpenter
       server: https://kubernetes.default.svc

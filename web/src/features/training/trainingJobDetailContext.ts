@@ -3,7 +3,6 @@ import { useOutletContext } from "react-router-dom";
 import type {
   TrainingJob,
   TrainingJobEventsResponse,
-  TrainingJobLogsResponse,
   TrainingJobMetricsResponse,
   TrainingJobStatus,
 } from "@/features/training/types";
@@ -15,10 +14,9 @@ export interface TrainingJobDetailContextValue {
   job: TrainingJob;
   statusLabels: Record<TrainingJobStatus, string>;
   activeStatuses: TrainingJobStatus[];
-  logsResponse?: TrainingJobLogsResponse;
-  loadingLogs: boolean;
   metrics?: TrainingJobMetricsResponse;
   loadingMetrics: boolean;
+  metricsError?: boolean;
   eventsResponse?: TrainingJobEventsResponse;
   refreshingSection: "header" | "logs" | "metrics" | null;
   refreshLogs: () => Promise<void>;
@@ -26,9 +24,9 @@ export interface TrainingJobDetailContextValue {
   refreshJob: () => Promise<void>;
   downloadOutput: () => void;
   downloadingOutput: boolean;
-  buildAndRegister: () => void;
-  buildingAndRegistering: boolean;
   requestDeleteOutputs: () => void;
+  requestRetryJob?: () => void;
+  retryingJob?: boolean;
   copyUri: (value: string) => void;
 }
 
