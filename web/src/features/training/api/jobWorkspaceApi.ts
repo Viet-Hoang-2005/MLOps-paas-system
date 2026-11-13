@@ -14,7 +14,27 @@ export interface WorkspaceEntry {
   size_bytes: number;
   download_url?: string;
 }
-export interface JobWorkspace extends TrainingJob {
+export interface TrainingWorkspace extends Pick<
+  TrainingJob,
+  | "id"
+  | "entry_point"
+  | "model_flavor"
+  | "vcpu"
+  | "memory_mb"
+  | "max_runtime_seconds"
+  | "accelerator_type"
+  | "accelerator_count"
+  | "accelerator_model"
+  | "local_gpu_id"
+  | "created_at"
+  | "updated_at"
+  | "deletion_requested_at"
+  | "deletion_error"
+> {
+  status: "ready" | "preparing" | "running" | "deleting" | "delete_failed";
+  job_count: number;
+  active_job_id: string | null;
+  outputs_purged_at?: string | null;
   id: string;
   revision: number;
   entry_point: string;
@@ -24,17 +44,17 @@ export interface JobWorkspace extends TrainingJob {
   secrets_available: boolean;
 }
 const url = (id?: string) =>
-  controlPlaneURL(`/training-jobs/${id ? `${id}/` : ""}`);
-export const createJobDraft = async () =>
-  (await apiClient.post<JobWorkspace>(url(), {})).data;
-export const getJobWorkspace = async (id: string) =>
-  (await apiClient.get<JobWorkspace>(url(id))).data;
-export const updateJobWorkspace = async (
+  controlPlaneURL(`/training-workspaces/${id ? `${id}/` : ""}`);
+export const createTrainingWorkspace = async () =>
+  (await apiClient.post<TrainingWorkspace>(url(), {})).data;
+export const getTrainingWorkspace = async (id: string) =>
+  (await apiClient.get<TrainingWorkspace>(url(id))).data;
+export const updateTrainingWorkspace = async (
   id: string,
   revision: number,
   changes: Partial<
     Pick<
-      JobWorkspace,
+      TrainingWorkspace,
       | "entry_point"
       | "environment"
       | "model_flavor"
@@ -48,16 +68,24 @@ export const updateJobWorkspace = async (
     >
   >,
 ) =>
-  (await apiClient.patch<JobWorkspace>(url(id), { revision, ...changes })).data;
-export const runJob = async (id: string, revision: number, runKey: string) =>
+  (await apiClient.patch<TrainingWorkspace>(url(id), { revision, ...changes }))
+    .data;
+export const runTrainingWorkspace = async (
+  id: string,
+  revision: number,
+  runKey: string,
+) =>
   (
-    await apiClient.post<TrainingJob>(`${url(id)}submit/`, {
+    await apiClient.post<TrainingJob>(`${url(id)}runs/`, {
       revision,
       run_key: runKey,
     })
   ).data;
 
-export async function saveJobEntry(
+export const isRunResponseError = (error: unknown): boolean =>
+  isAxiosError(error) && Boolean(error.response);
+
+export async function saveWorkspaceEntry(
   id: string,
   revision: number,
   selection: InputFileSelection | { path: string; kind: "folder"; file: null },
@@ -78,7 +106,7 @@ export async function saveJobEntry(
     })
   ).data;
 }
-export const deleteJobEntry = async (
+export const deleteWorkspaceEntry = async (
   id: string,
   entry: string,
   revision: number,
@@ -89,7 +117,7 @@ export const deleteJobEntry = async (
       { data: { revision } },
     )
   ).data;
-export const putJobSecret = async (
+export const putWorkspaceSecret = async (
   id: string,
   revision: number,
   name: string,
@@ -101,7 +129,7 @@ export const putJobSecret = async (
       { revision, value },
     )
   ).data;
-export const deleteJobSecret = async (
+export const deleteWorkspaceSecret = async (
   id: string,
   revision: number,
   name: string,
@@ -132,14 +160,19 @@ export async function downloadWorkspaceSelection(
   revision?: number,
 ) {
   const response = await apiClient
-    .get<Blob>(`${url(id)}${area}/download/`, {
-      params: {
-        ...(path ? { path } : {}),
-        ...(revision !== undefined ? { revision } : {}),
+    .get<Blob>(
+      revision !== undefined
+        ? `${url(id)}input/download/`
+        : controlPlaneURL(`/training-jobs/${id}/${area}/download/`),
+      {
+        params: {
+          ...(path ? { path } : {}),
+          ...(revision !== undefined ? { revision } : {}),
+        },
+        responseType: "blob",
+        timeout: 120000,
       },
-      responseType: "blob",
-      timeout: 120000,
-    })
+    )
     .catch(async (error: unknown) => {
       if (isAxiosError(error) && error.response?.data instanceof Blob) {
         try {
@@ -211,4 +244,35 @@ export async function readEntry(entry: WorkspaceEntry) {
   if (!response.ok)
     throw new Error(`File download failed (${response.status}).`);
   return response.text();
+}
+
+export const listTrainingWorkspaces = async (project?: string) =>
+  (
+    await apiClient.get<{ workspaces: TrainingWorkspace[] }>(url(), {
+      params: { project },
+    })
+  ).data;
+export const deleteTrainingWorkspace = async (id: string) =>
+  apiClient.delete(url(id));
+export const listWorkspaceJobs = async (id: string, page = 1) =>
+  (
+    await apiClient.get<{
+      training_jobs: TrainingJob[];
+      count: number;
+      page: number;
+      page_size: number;
+    }>(`${url(id)}jobs/`, { params: { page } })
+  ).data;
+export const getWorkspaceJob = async (id: string, job: string) =>
+  (await apiClient.get<TrainingJob>(`${url(id)}jobs/${job}/`)).data;
+
+export async function listAllWorkspaceJobs(id: string) {
+  const jobs: TrainingJob[] = [];
+  let page = 1;
+  let response;
+  do {
+    response = await listWorkspaceJobs(id, page++);
+    jobs.push(...response.training_jobs);
+  } while (jobs.length < response.count && response.training_jobs.length > 0);
+  return jobs;
 }

@@ -172,7 +172,11 @@ const router = createBrowserRouter(
         />
         <Route path="training/new" element={<NewTrainingWorkspacePage />} />
         <Route
-          path="training/:jobId/workspace"
+          path="training/workspaces/:workspaceId"
+          element={<TrainingWorkspacePage />}
+        />
+        <Route
+          path="training/workspaces/:workspaceId/jobs/:jobId"
           element={<TrainingWorkspacePage />}
         />
         <Route path="training/jobs/:jobId" element={<TrainingJobDetailPage />}>

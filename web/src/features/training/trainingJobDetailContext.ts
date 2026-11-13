@@ -25,8 +25,7 @@ export interface TrainingJobDetailContextValue {
   downloadOutput: () => void;
   downloadingOutput: boolean;
   requestDeleteOutputs: () => void;
-  requestRetryJob?: () => void;
-  retryingJob?: boolean;
+  openCurrentWorkspace?: () => void;
   copyUri: (value: string) => void;
 }
 

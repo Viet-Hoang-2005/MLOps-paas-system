@@ -6,8 +6,9 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.models import TrainingJob, TrainingJobCapability, TrainingOutput
+from apps.training.models import TrainingJobCapability, TrainingOutput
 from apps.training.services.capabilities import issue_capability
 from apps.training.services.storage_scope import expected_training_uris
 
@@ -15,7 +16,7 @@ from apps.training.services.storage_scope import expected_training_uris
 def _job(email="owner@example.com"):
     user = get_user_model().objects.create_user(email, "password123")
     project = ModelProject.objects.create(owner=user, name=f"project-{email}")
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="sklearn",
         code_snapshot_uri="pending",

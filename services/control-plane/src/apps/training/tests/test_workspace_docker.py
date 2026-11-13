@@ -6,7 +6,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from apps.training.models import TrainingJob
+from apps.training.tests.factories import training_job
 from apps.training.services.storage_scope import expected_training_uris
 from infrastructure.execution import workspace_docker
 from infrastructure.execution.docker_backends import DockerTrainingBackend
@@ -16,7 +16,7 @@ from infrastructure.execution.job_containers import labels_for
 @pytest.mark.django_db
 def test_preparation_is_async_and_main_container_mounts_only_job_input_read_only():
     user = get_user_model().objects.create_user("docker-workspace@example.test", "password")
-    job = TrainingJob.objects.create(
+    job = training_job(
         owner=user,
         storage_layout="tenant",
         input_contract="workspace",
@@ -92,7 +92,7 @@ def test_input_cleanup_refuses_foreign_volume():
     from common.api.exceptions import Conflict
 
     user = get_user_model().objects.create_user("volume-owner@example.test", "password")
-    job = TrainingJob.objects.create(
+    job = training_job(
         owner=user,
         model_flavor="sklearn",
         storage_layout="tenant",

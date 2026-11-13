@@ -13,7 +13,7 @@ from django.conf import settings
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
-from apps.training.models import TrainingJob, TrainingJobEntry, TrainingJobSecret
+from apps.training.models import TrainingWorkspace, TrainingWorkspaceEntry, TrainingWorkspaceSecret
 from common.api.exceptions import Conflict, ServiceUnavailable
 from common.validation.artifacts import validate_reference_data_content
 from infrastructure.storage import S3Storage
@@ -97,17 +97,14 @@ def validate_file(path, kind, payload):
 
 
 def _lock(workspace, revision, *, preparing=False, terminal_secret=False):
-    row = TrainingJob.objects.select_for_update().get(pk=workspace.pk)
+    row = TrainingWorkspace.objects.select_for_update().get(pk=workspace.pk)
     valid_type = (isinstance(revision, int) and not isinstance(revision, bool)) or (
         isinstance(revision, str) and revision.isascii() and revision.isdecimal() and len(revision) <= 10
     )
     valid = valid_type and int(revision) == row.revision
     if not valid:
         raise Conflict("Workspace changed. Reload before saving.")
-    allowed = {"pending"} if preparing else {"editing"}
-    if terminal_secret:
-        allowed |= {"completed", "failed", "cancelled"}
-    if row.status not in allowed or row.deletion_requested_at:
+    if row.deletion_requested_at or (not preparing and row.active_jobs().exists()):
         raise Conflict("This job workspace is read-only.")
     return row
 
@@ -142,7 +139,7 @@ def snapshot_input(workspace, *, revision, storage=None, preparing=False):
             raise ValidationError({"entry_point": "Select a Python entry point before running training."})
 
     storage = storage or S3Storage()
-    prefix = f"users/{tenant_id}/training/jobs/{workspace_id}/draft/objects/"
+    prefix = f"users/{tenant_id}/training/workspaces/{workspace_id}/draft/objects/"
     total = 0
     bundle = BytesIO()
     with ZipFile(bundle, "w", ZIP_DEFLATED) as archive:
@@ -160,7 +157,7 @@ def snapshot_input(workspace, *, revision, storage=None, preparing=False):
             try:
                 payload = storage.read(entry.s3_uri, max_bytes=max_size)
             except Exception as exc:
-                if not TrainingJob.objects.filter(pk=workspace.pk, revision=snapshot_revision).exists():
+                if not TrainingWorkspace.objects.filter(pk=workspace.pk, revision=snapshot_revision).exists():
                     raise Conflict("Workspace changed. Reload before running training.") from exc
                 raise
             if len(payload) != entry.size_bytes or hashlib.sha256(payload).hexdigest() != entry.checksum:
@@ -169,7 +166,7 @@ def snapshot_input(workspace, *, revision, storage=None, preparing=False):
             total += len(payload)
             archive.writestr(path, payload)
 
-    if not TrainingJob.objects.filter(pk=workspace.pk, revision=snapshot_revision).exists():
+    if not TrainingWorkspace.objects.filter(pk=workspace.pk, revision=snapshot_revision).exists():
         raise Conflict("Workspace changed. Reload before running training.")
     return {"archive": bundle.getvalue(), "revision": snapshot_revision, "entry_point": entry_point}
 
@@ -246,7 +243,7 @@ def create_entry(workspace, *, revision, path, kind, payload=None, storage=None)
     storage = storage or S3Storage()
     stored = None
     if kind != "folder":
-        key = f"users/{workspace.owner.tenant_id}/training/jobs/{workspace.public_id}/draft/objects/{uuid.uuid4().hex}"
+        key = f"users/{workspace.owner.tenant_id}/training/workspaces/{workspace.public_id}/draft/objects/{uuid.uuid4().hex}"
         content_type = "text/csv" if kind == "data" else "text/plain; charset=utf-8"
         stored = storage.put(key, payload, content_type)
     try:
@@ -255,8 +252,8 @@ def create_entry(workspace, *, revision, path, kind, payload=None, storage=None)
             _parent_exists(locked, path)
             if locked.entries.filter(relative_path=path).exists():
                 raise Conflict("A file or folder already exists at this path.")
-            entry = TrainingJobEntry.objects.create(
-                job=locked,
+            entry = TrainingWorkspaceEntry.objects.create(
+                workspace=locked,
                 relative_path=path,
                 kind=kind,
                 s3_uri=stored.uri if stored else "",
@@ -300,7 +297,7 @@ def edit_file(workspace, entry_id, *, revision, path=None, kind=None, payload=No
         stored = None
     else:
         validate_file(path, kind, payload)
-        key = f"users/{workspace.owner.tenant_id}/training/jobs/{workspace.public_id}/draft/objects/{uuid.uuid4().hex}"
+        key = f"users/{workspace.owner.tenant_id}/training/workspaces/{workspace.public_id}/draft/objects/{uuid.uuid4().hex}"
         content_type = "text/csv" if kind == "data" else "text/plain; charset=utf-8"
         stored = storage.put(key, payload, content_type)
     try:
@@ -406,8 +403,8 @@ def set_secret(workspace, *, revision, name, value):
             raise Conflict("This name is already used by an environment variable.")
         if not locked.secrets.filter(name=name).exists() and locked.secrets.count() >= 100:
             raise ValidationError({"name": "At most 100 secrets are supported per workspace."})
-        secret, _ = TrainingJobSecret.objects.update_or_create(
-            job=locked, name=name, defaults={"ciphertext": encrypted}
+        secret, _ = TrainingWorkspaceSecret.objects.update_or_create(
+            workspace=locked, name=name, defaults={"ciphertext": encrypted}
         )
         _bump(locked)
         return secret, locked.revision

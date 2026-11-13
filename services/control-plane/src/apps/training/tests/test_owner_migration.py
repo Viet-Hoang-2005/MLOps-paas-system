@@ -15,7 +15,8 @@ def test_existing_jobs_keep_owner_during_migration():
     job_model = old_apps.get_model("training", "TrainingJob")
     user = user_model.objects.create(email="migration-owner@example.test", tenant_id="migration-tenant")
     project = project_model.objects.create(owner_id=user.pk, name="Existing")
-    job = job_model.objects.create(project_id=project.pk, model_flavor="sklearn")
+    workspace = old_apps.get_model("training", "TrainingWorkspace").objects.create(owner_id=user.pk)
+    job = job_model.objects.create(project_id=project.pk, workspace_id=workspace.pk, model_flavor="sklearn")
 
     try:
         executor = MigrationExecutor(connection)
@@ -24,6 +25,6 @@ def test_existing_jobs_keep_owner_during_migration():
         migrated = new_apps.get_model("training", "TrainingJob").objects.get(pk=job.pk)
         assert migrated.owner_id == user.pk
         assert migrated.project_id == project.pk
-        assert not hasattr(migrated, "workspace_id")
+        assert migrated.workspace_id == workspace.pk
     finally:
         MigrationExecutor(connection).migrate([("training", "0016_training_build_options")])

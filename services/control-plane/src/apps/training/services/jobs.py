@@ -15,24 +15,6 @@ from common.api.exceptions import Conflict
 ACTIVE_STATUSES = {"pending", "queued", "uploading", "running", "cancelling"}
 
 
-def create_job(*, owner, validated_data=None):
-    from .drafts import create_draft
-
-    return create_draft(owner=owner, values=validated_data)
-
-
-def retry_job(job, *, creation_key, storage=None):
-    from .drafts import clone_draft
-
-    return clone_draft(job, creation_key=creation_key, retry=True, storage=storage)
-
-
-def submit_job(job, *, revision, run_key, storage=None):
-    from .drafts import submit_draft
-
-    return submit_draft(job, revision=revision, run_key=run_key, storage=storage)
-
-
 @transaction.atomic
 def _submit_job_atomic(job, *, verified_gpu_id, local_capacity=None):
     if job.backend == "argo":
@@ -99,8 +81,11 @@ def cancel_job(job):
 
 def request_job_deletion(job):
     with transaction.atomic():
+        from apps.training.models import TrainingWorkspace
+
+        TrainingWorkspace.objects.select_for_update().get(pk=job.workspace_id)
         job = type(job).objects.select_for_update().get(pk=job.pk)
-        if job.builds.filter(status__in=("pending", "queued", "building")).exists():
+        if job.builds.exists() or job.registered_versions.exists():
             raise Conflict("A model build is still using this training output.")
 
         retrying = bool(job.deletion_requested_at and job.deletion_error)
@@ -111,7 +96,7 @@ def request_job_deletion(job):
         job.deletion_error = ""
         job.capabilities.filter(purpose="tracking").delete()
         if not job.submitted_at:
-            job.status = "editing"
+            job.status = "cancelled"
             job.submission_token = None
             job.save(update_fields=["status", "submission_token"])
         if job.submitted_at and job.status in ACTIVE_STATUSES:

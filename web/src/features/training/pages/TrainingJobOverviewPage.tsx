@@ -23,7 +23,7 @@ import {
 
 export default function TrainingJobOverviewPage() {
   const { t, i18n } = useTranslation("training");
-  const { job, statusLabels, requestRetryJob, retryingJob } =
+  const { job, statusLabels, openCurrentWorkspace } =
     useTrainingJobDetailContext();
 
   const isCompleted = job.status === "completed";
@@ -144,15 +144,15 @@ export default function TrainingJobOverviewPage() {
                 {job.stop_reason || t("detail.overview.failedFallback")}
               </p>
             </div>
-            {requestRetryJob && (
+            {openCurrentWorkspace && (
               <Button
                 variant="secondary"
                 icon={<RotateCcw className="h-4 w-4" />}
-                onClick={requestRetryJob}
-                disabled={job.deletion_pending || retryingJob}
+                onClick={openCurrentWorkspace}
+                disabled={job.deletion_pending}
                 className="shrink-0"
               >
-                {t("retryJob")}
+                {t("workspaceHistory.backToCurrent")}
               </Button>
             )}
           </div>
@@ -178,15 +178,15 @@ export default function TrainingJobOverviewPage() {
                 {job.stop_reason || t("detail.overview.cancelledFallback")}
               </p>
             </div>
-            {requestRetryJob && (
+            {openCurrentWorkspace && (
               <Button
                 variant="secondary"
                 icon={<RotateCcw className="h-4 w-4" />}
-                onClick={requestRetryJob}
-                disabled={job.deletion_pending || retryingJob}
+                onClick={openCurrentWorkspace}
+                disabled={job.deletion_pending}
                 className="shrink-0"
               >
-                {t("retryJob")}
+                {t("workspaceHistory.backToCurrent")}
               </Button>
             )}
           </div>

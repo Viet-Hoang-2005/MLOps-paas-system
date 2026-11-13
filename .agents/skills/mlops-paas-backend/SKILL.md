@@ -57,6 +57,6 @@ python manage.py check --settings=config.settings.test
 python manage.py makemigrations --check --dry-run --settings=config.settings.test
 ```
 
-## Job-owned training workspaces
+## Workspace drafts and training runs
 
-For Editing/submit/clone, nullable Project ownership, input contracts, assignment, Secrets, or Project deletion, read [training-workspaces.md](references/training-workspaces.md). Preserve account-owned job identity and snapshots; project assignment must not redefine storage or runtime identity.
+For workspace/run snapshots, nullable Project ownership, input contracts, assignment, Secrets, or Project deletion, read [training-workspaces.md](references/training-workspaces.md). Preserve account-owned job identity and snapshots; project assignment must not redefine storage or runtime identity.

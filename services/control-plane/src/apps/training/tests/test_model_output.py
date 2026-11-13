@@ -4,16 +4,17 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
-from apps.training.models import TrainingJob, TrainingOutput
+from apps.training.models import TrainingOutput
 
 
 @pytest.fixture
 def completed_training_job(db):
     user = get_user_model().objects.create_user("output-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="Output Project")
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="xgboost",
         status="completed",

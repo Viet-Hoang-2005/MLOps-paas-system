@@ -62,7 +62,7 @@ Local runtime metrics are read-only Docker SDK snapshots of the project's explic
 
 ## Training workspace changes
 
-Use [training-workspaces.md](training-workspaces.md) when changing projectless jobs, assignment or deletion. Draft mutation/preparation/admission share the TrainingJob lock; operations involving Project/job coordinate Project before job. Nullable joined Project rows cannot be locked by PostgreSQL select_for_update without narrowing the lock with of=("self",). Test these paths on PostgreSQL as well as isolated fixtures.
+Use [training-workspaces.md](training-workspaces.md) when changing projectless jobs, assignment or deletion. Draft mutations and run admission serialize on TrainingWorkspace; each TrainingJob owns one immutable execution snapshot. Workspace deletion locks its jobs before checking Build/Version references. Operations involving Project/job coordinate Project before job. Nullable joined Project rows cannot be locked by PostgreSQL select_for_update without narrowing the lock with of=("self",). Test these paths on PostgreSQL as well as isolated fixtures.
 
 ## Account avatar
 

@@ -11,7 +11,6 @@ import {
   FileArchive,
   Info,
   RefreshCw,
-  RotateCcw,
   ScrollText,
   Settings,
   Trash2,
@@ -34,7 +33,6 @@ import {
   getTrainingJobEvents,
   getTrainingJobMetrics,
   refreshTrainingJobStatus,
-  retryTrainingJob,
 } from "@/features/training/api/trainingApi";
 import { LiveStatusBadge } from "@/features/training/components/TrainingOverviewSections";
 import { trainingQueryKeys } from "@/features/training/queryKeys";
@@ -44,7 +42,6 @@ import type {
 } from "@/features/training/trainingJobDetailContext";
 import type { TrainingJob, TrainingJobStatus } from "@/features/training/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
-import { getTrainingStartError } from "@/features/training/api/quotaErrors";
 import { Button } from "@/shared/components/Button";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageTabs } from "@/shared/components/PageTabs";
@@ -85,13 +82,10 @@ export default function TrainingJobDetailPage() {
   >(null);
   const [deleteOutputsOpen, setDeleteOutputsOpen] = useState(false);
   const [deleteJobOpen, setDeleteJobOpen] = useState(false);
-  const [retryJobOpen, setRetryJobOpen] = useState(false);
   const [liveElapsed, setLiveElapsed] = useState<number | null>(null);
-  const retryKey = useRef<string | null>(null);
   const lastToastedStatus = useRef<string | null>(null);
 
   const statusLabels: Record<TrainingJobStatus, string> = {
-    editing: t("statusFilter.editing"),
     pending: t("detail.statuses.pending"),
     queued: t("detail.statuses.queued"),
     uploading: t("detail.statuses.uploading"),
@@ -224,28 +218,6 @@ export default function TrainingJobDetailPage() {
       toast.error(getApiErrorMessage(error, t("detail.outputDeleteFailed"))),
   });
 
-  const retryJobMutation = useMutation({
-    mutationFn: () => {
-      retryKey.current ??= crypto.randomUUID();
-      return retryTrainingJob(parsedJobId, retryKey.current);
-    },
-    onSuccess: async (newJob) => {
-      setRetryJobOpen(false);
-      toast.success(t("studio.draftCreated"));
-      await queryClient.invalidateQueries({
-        queryKey: trainingQueryKeys.usage(),
-      });
-      await queryClient.invalidateQueries({
-        queryKey: trainingQueryKeys.jobs(),
-      });
-      navigate(
-        `/dashboard/training/${newJob.id}/workspace${job?.project_id ? `?project=${job.project_id}` : ""}`,
-      );
-    },
-    onError: (error) =>
-      toast.error(getTrainingStartError(error, t, i18n.language)),
-  });
-
   const refreshHeader = async () => {
     setRefreshingSection("header");
     try {
@@ -354,8 +326,9 @@ export default function TrainingJobDetailPage() {
     downloadOutput: () => downloadMutation.mutate(),
     downloadingOutput: downloadMutation.isPending,
     requestDeleteOutputs: () => setDeleteOutputsOpen(true),
-    requestRetryJob: () => setRetryJobOpen(true),
-    retryingJob: retryJobMutation.isPending,
+    openCurrentWorkspace: () => {
+      if (job) navigate(`/dashboard/training/workspaces/${job.workspace_id}`);
+    },
     copyUri,
   };
 
@@ -406,7 +379,9 @@ export default function TrainingJobDetailPage() {
               <Button
                 variant="secondary"
                 onClick={() =>
-                  navigate(`/dashboard/training/${job.id}/workspace`)
+                  navigate(
+                    `/dashboard/training/workspaces/${job.workspace_id}/jobs/${job.id}`,
+                  )
                 }
               >
                 {t("studio.openDraft")}
@@ -427,18 +402,6 @@ export default function TrainingJobDetailPage() {
                 title={t("detail.refreshStatus")}
                 className="rounded-surface border border-border shadow-sm transition-all hover:border-foreground/30"
               />
-              {(job.status === "failed" || job.status === "cancelled") && (
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  icon={<RotateCcw className="h-4 w-4" />}
-                  disabled={job.deletion_pending || retryJobMutation.isPending}
-                  onClick={() => setRetryJobOpen(true)}
-                  aria-label={t("retryJob")}
-                  title={t("retryJob")}
-                  className="rounded-surface border border-border shadow-sm transition-all hover:border-foreground/30"
-                />
-              )}
               <Button
                 size="icon"
                 variant={job.status === "completed" ? "primary" : "secondary"}
@@ -531,16 +494,6 @@ export default function TrainingJobDetailPage() {
         loading={deleteOutputsMutation.isPending}
         onCancel={() => setDeleteOutputsOpen(false)}
         onConfirm={() => deleteOutputsMutation.mutate()}
-      />
-      <ConfirmDialog
-        open={retryJobOpen}
-        title={t("retryTitle")}
-        description={t("retryDescription", { job: job.id })}
-        confirmText={t("retryJob")}
-        tone="default"
-        loading={retryJobMutation.isPending}
-        onCancel={() => setRetryJobOpen(false)}
-        onConfirm={() => retryJobMutation.mutate()}
       />
     </section>
   );

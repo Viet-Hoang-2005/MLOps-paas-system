@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "test/renderWithProviders";
 import { WorkspaceEditor } from "./WorkspaceEditor";
-import type { JobWorkspace } from "@/features/training/api/jobWorkspaceApi";
+import type { TrainingWorkspace } from "@/features/training/api/jobWorkspaceApi";
 import type { TrainingOutput } from "@/features/training/types";
 
 const mocks = vi.hoisted(() => ({ download: vi.fn(), save: vi.fn() }));
@@ -24,7 +24,7 @@ const workspace = {
   revision: 1,
   entries: [],
   outputs_purged_at: null,
-} as unknown as JobWorkspace;
+} as unknown as TrainingWorkspace;
 const outputs: TrainingOutput[] = [
   {
     id: "model-id",

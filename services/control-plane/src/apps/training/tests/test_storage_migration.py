@@ -14,8 +14,9 @@ def test_migration_keeps_original_storage_project_for_existing_jobs():
         email="storage-migration@example.test", tenant_id="storage-migration"
     )
     project = apps.get_model("catalog", "ModelProject").objects.create(owner_id=user.pk, name="Project")
+    workspace = apps.get_model("training", "TrainingWorkspace").objects.create(owner_id=user.pk)
     job = apps.get_model("training", "TrainingJob").objects.create(
-        owner_id=user.pk, project_id=project.pk, model_flavor="sklearn"
+        owner_id=user.pk, project_id=project.pk, workspace_id=workspace.pk, model_flavor="sklearn"
     )
     try:
         executor = MigrationExecutor(connection)

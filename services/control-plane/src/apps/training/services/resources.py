@@ -16,7 +16,7 @@ def validate_resources(values, instance=None, *, local_capacity=None):
         return values.get(name, getattr(instance, name, default))
 
     errors = {}
-    submitted = instance is not None and instance.status not in {"editing", "pending"}
+    submitted = instance is not None and instance.status != "pending"
     if submitted:
         for field in ("vcpu", "memory_mb"):
             if field in values and values[field] != getattr(instance, field):

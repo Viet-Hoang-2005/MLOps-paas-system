@@ -38,14 +38,14 @@ import { InputFileDialog, type InputFileSelection } from "./InputFileDialog";
 import { HelpDialog } from "./HelpDialog";
 import { FileViewer } from "./FileViewer";
 import {
-  deleteJobEntry,
+  deleteWorkspaceEntry,
   downloadWorkspaceSelection,
   downloadRunOutput,
   getRunFile,
   readEntry,
-  saveJobEntry,
-  updateJobWorkspace,
-  type JobWorkspace,
+  saveWorkspaceEntry,
+  updateTrainingWorkspace,
+  type TrainingWorkspace,
   type WorkspaceEntry,
 } from "@/features/training/api/jobWorkspaceApi";
 import {
@@ -65,13 +65,13 @@ export interface WorkspaceEditorHandle {
 }
 
 interface Props {
-  workspace: JobWorkspace;
+  workspace: TrainingWorkspace;
   entries: WorkspaceEntry[];
   outputs?: TrainingOutput[];
   runId?: string;
   entryPoint: string;
   readOnly: boolean;
-  onRefresh: () => Promise<JobWorkspace>;
+  onRefresh: () => Promise<TrainingWorkspace>;
   onDirty: (dirty: boolean) => void;
   externallyBusy?: boolean;
   onBusy: (busy: boolean) => void;
@@ -276,7 +276,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
           throw new Error(t("studio.reload"));
         let result;
         try {
-          result = await saveJobEntry(
+          result = await saveWorkspaceEntry(
             workspace.id,
             revision,
             { path, kind: entry.kind, file: null },
@@ -345,7 +345,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
     async function saveSelection(selection: InputFileSelection) {
       await task(async () => {
         const current = await cleanDraft();
-        await saveJobEntry(
+        await saveWorkspaceEntry(
           workspace.id,
           current.revision,
           selection,
@@ -368,7 +368,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
           ? `${folder}/${path.split("/").pop()}`
           : path.split("/").pop()!;
         if (destination === path) return;
-        await saveJobEntry(
+        await saveWorkspaceEntry(
           workspace.id,
           current.revision,
           { path: destination, kind: entry.kind, file: null },
@@ -407,7 +407,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
               continue;
             throw new Error(t("studio.pathExists", { path }));
           }
-          const result = await saveJobEntry(
+          const result = await saveWorkspaceEntry(
             workspace.id,
             current.revision,
             item.file
@@ -440,7 +440,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
       const current = runId ? workspace : await cleanDraft();
       saveDownload(
         await downloadWorkspaceSelection(
-          workspace.id,
+          runId ?? workspace.id,
           "input",
           selected,
           runId ? undefined : current.revision,
@@ -452,7 +452,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
       if (!canDownloadOutput) return;
       saveDownload(
         await downloadWorkspaceSelection(
-          workspace.id,
+          runId ?? workspace.id,
           "outputs",
           item?.relative_path ?? selectedOutput,
         ),
@@ -465,7 +465,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
         let current = await cleanDraft();
         for (const entry of [...current.entries]) {
           try {
-            const res = await deleteJobEntry(
+            const res = await deleteWorkspaceEntry(
               workspace.id,
               entry.id,
               current.revision,
@@ -539,7 +539,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
                       onClick={() =>
                         void task(async () => {
                           const current = await cleanDraft();
-                          await updateJobWorkspace(
+                          await updateTrainingWorkspace(
                             workspace.id,
                             current.revision,
                             {
@@ -618,7 +618,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
                       size="sm"
                       variant="secondary"
                       icon={<KeyRound className="h-4 w-4" />}
-                      disabled={readOnly || busy}
+                      disabled={busy}
                       onClick={onOpenEnvironment}
                     >
                       {t("studio.environment")}
@@ -1041,7 +1041,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
                 }
                 void task(async () => {
                   const current = await cleanDraft();
-                  await saveJobEntry(workspace.id, current.revision, {
+                  await saveWorkspaceEntry(workspace.id, current.revision, {
                     path,
                     kind: "folder",
                     file: null,
@@ -1098,7 +1098,11 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
             void task(async () => {
               const current = await cleanDraft();
               if (file)
-                await deleteJobEntry(workspace.id, file.id, current.revision);
+                await deleteWorkspaceEntry(
+                  workspace.id,
+                  file.id,
+                  current.revision,
+                );
               setDeleting(false);
               setSelected(null);
               setContents({});

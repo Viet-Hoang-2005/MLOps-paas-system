@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.db import close_old_connections, connection, transaction
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.training.models import TrainingJob, TrainingQuotaReservation
 from apps.training.services.quota import (
@@ -29,7 +30,7 @@ def job(db, settings):
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     owner = get_user_model().objects.create_user("quota@example.com")
     project = ModelProject.objects.create(owner=owner, name="quota")
-    return TrainingJob.objects.create(
+    return training_job(
         project=project,
         backend="argo",
         model_flavor="pytorch",
@@ -51,7 +52,7 @@ def test_reservation_and_concurrency_across_projects(job):
     reserve_locked(job)
     resource = next(v for v in usage(job.project.owner)["resources"] if v["resource"] == "cpu_medium")
     assert resource["reserved_seconds"] == 3600 and resource["used_seconds"] == 0
-    second = TrainingJob.objects.create(
+    second = training_job(
         project=ModelProject.objects.create(owner=job.project.owner, name="second"),
         backend="argo",
         model_flavor="pytorch",
@@ -173,7 +174,7 @@ def test_submit_enforces_single_active_job_over_all_projects(job):
     job.status = "pending"
     job.submitted_at = None
     job.save(update_fields=["status", "submitted_at"])
-    second = TrainingJob.objects.create(
+    second = training_job(
         project=ModelProject.objects.create(owner=job.project.owner, name="other project"),
         backend="argo",
         model_flavor="pytorch",
@@ -224,7 +225,7 @@ def test_postgres_simultaneous_submit_only_one_succeeds(job, monkeypatch):
     job.status = "pending"
     job.submitted_at = None
     job.save(update_fields=["status", "submitted_at"])
-    second = TrainingJob.objects.create(
+    second = training_job(
         project=job.project,
         backend="argo",
         model_flavor="pytorch",

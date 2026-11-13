@@ -11,6 +11,7 @@ import type {
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
+  getRun: vi.fn(),
   update: vi.fn(),
   run: vi.fn(),
   input: vi.fn(),
@@ -26,9 +27,10 @@ vi.mock("@/features/training/api/jobWorkspaceApi", async (original) => ({
   ...(await original<
     typeof import("@/features/training/api/jobWorkspaceApi")
   >()),
-  getJobWorkspace: mocks.get,
-  runJob: mocks.run,
-  updateJobWorkspace: mocks.update,
+  getTrainingWorkspace: mocks.get,
+  getWorkspaceJob: mocks.getRun,
+  runTrainingWorkspace: mocks.run,
+  updateTrainingWorkspace: mocks.update,
   getRunInput: mocks.input,
 }));
 vi.mock("@/features/training/api/trainingApi", async (original) => ({
@@ -75,7 +77,9 @@ const job = {
 } as unknown as TrainingJob;
 const workspace = {
   ...job,
-  status: "editing",
+  status: "ready",
+  job_count: 0,
+  active_job_id: null,
   submitted_at: null,
   id: "workspace",
   revision: 1,
@@ -100,11 +104,18 @@ function show(language: "en" | "vi" = "en", query = "") {
   return renderWithProviders(
     <Routes>
       <Route
-        path="/training/:jobId/workspace"
+        path="/dashboard/training/workspaces/:workspaceId"
+        element={<TrainingWorkspacePage />}
+      />
+      <Route
+        path="/dashboard/training/workspaces/:workspaceId/jobs/:jobId"
         element={<TrainingWorkspacePage />}
       />
     </Routes>,
-    { language, initialEntries: [`/training/workspace/workspace${query}`] },
+    {
+      language,
+      initialEntries: [`/dashboard/training/workspaces/workspace${query}`],
+    },
   );
 }
 describe("training workspace flow", () => {
@@ -112,6 +123,7 @@ describe("training workspace flow", () => {
     vi.clearAllMocks();
     mocks.get.mockResolvedValue(workspace);
     mocks.update.mockResolvedValue(workspace);
+    mocks.getRun.mockResolvedValue({ ...job, environment: {}, secrets: [] });
     mocks.caps.mockResolvedValue(caps);
     mocks.metrics.mockResolvedValue({
       job_id: "workspace",
@@ -122,8 +134,13 @@ describe("training workspace flow", () => {
     });
     mocks.save.mockResolvedValue(6);
     mocks.run.mockImplementation(() => {
-      mocks.get.mockResolvedValue({ ...workspace, ...job, id: "workspace" });
-      return Promise.resolve({ ...job, id: "workspace" });
+      mocks.get.mockResolvedValue({
+        ...workspace,
+        status: "running",
+        active_job_id: "run-one",
+        job_count: 1,
+      });
+      return Promise.resolve(job);
     });
     mocks.input.mockResolvedValue({ entries: [], entry_point: "train.py" });
   });
@@ -187,15 +204,15 @@ describe("training workspace flow", () => {
     expect(mocks.run).not.toHaveBeenCalled();
   });
   it("loads the job snapshot and enables assignment only with verified model output", async () => {
-    mocks.get.mockResolvedValue({
-      ...workspace,
+    mocks.getRun.mockResolvedValue({
       ...job,
-      id: "workspace",
       status: "completed",
       output_available: true,
+      environment: {},
+      secrets: [],
     });
-    show();
-    await waitFor(() => expect(mocks.input).toHaveBeenCalledWith("workspace"));
+    show("en", "/jobs/run-one");
+    await waitFor(() => expect(mocks.input).toHaveBeenCalledWith("run-one"));
     expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
     expect(await screen.findByTestId("workspace-editor")).toHaveAttribute(
       "data-readonly",
@@ -225,14 +242,14 @@ describe("training workspace flow", () => {
     expect(screen.queryByText("% CPU")).not.toBeInTheDocument();
 
     unmount();
-    mocks.get.mockResolvedValue({
-      ...workspace,
+    mocks.getRun.mockResolvedValue({
       ...job,
-      id: "workspace",
       status: "running",
       started_at: "2026-11-11T00:00:00Z",
+      environment: {},
+      secrets: [],
     });
-    show("en", "?running=1");
+    show("en", "/jobs/run-one");
     expect(await screen.findByText("% CPU")).toBeInTheDocument();
     expect(await screen.findByText("42%")).toBeInTheDocument();
     expect(screen.getByText("0.4 / 1 vCPU")).toBeInTheDocument();

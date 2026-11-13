@@ -41,6 +41,7 @@ urlpatterns = [
     path("api/models/", include("apps.catalog.api.urls")),
     path("api/registry/", include("apps.registry.api.urls")),
     path("api/training-jobs/", include("apps.training.api.urls")),
+    path("api/training-workspaces/", include("apps.training.api.workspace_urls")),
     path("api/builds/", include((build_patterns, "builds"))),
     path("api/deployments/", include((deployment_patterns, "deployments"))),
     path("api/endpoints/", include((endpoint_patterns, "endpoints"))),

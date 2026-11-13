@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.observability.services import executions
@@ -24,7 +25,7 @@ def job(db, settings):
     settings.DRIFT_EXECUTION_WATCH_ENABLED = True
     owner = get_user_model().objects.create_user("p1-test@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="P1")
-    return TrainingJob.objects.create(
+    return training_job(
         project=project,
         model_flavor="sklearn",
         backend="docker",

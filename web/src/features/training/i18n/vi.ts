@@ -1,4 +1,39 @@
 export const trainingVi = {
+  workspaceHistory: {
+    open: "Training Jobs ({{count}})",
+    title: "Training Jobs",
+    jobId: "Training Job ID",
+    project: "Model Project",
+    status: "Trạng thái Training",
+    trainingAt: "Bắt đầu training",
+    actions: "Thao tác",
+    view: "Mở",
+    delete: "Xóa Training Job",
+    backToCurrent: "Quay lại Workspace hiện tại",
+    openActive: "Mở Training Job đang hoạt động",
+    empty: "Chưa có Training Job",
+    previous: "Trước",
+    next: "Tiếp",
+    workspaceId: "Workspace ID",
+    workspaceStatus: "Trạng thái Workspace",
+    createdAt: "Thời gian tạo",
+    updatedAt: "Thời gian cập nhật",
+    newWorkspace: "Tạo Workspace",
+    noWorkspaces: "Không có workspace phù hợp",
+    deleteWorkspace: "Xóa Workspace",
+    deleteWorkspaceDescription:
+      "Xóa workspace và {{count}} Training Job của nó? Job đang chạy phải dừng trước khi hoàn tất xóa.",
+    deleteJobDescription:
+      "Xóa Training Job cùng snapshot, log và Output? Workspace hiện tại vẫn được giữ lại.",
+    states: {
+      all: "Tất cả trạng thái Workspace",
+      ready: "Sẵn sàng",
+      preparing: "Đang chuẩn bị",
+      running: "Đang chạy",
+      deleting: "Đang xóa",
+      delete_failed: "Xóa thất bại",
+    },
+  },
   studio: {
     artifactSelection: {
       model: "Model gốc",

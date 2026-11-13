@@ -283,7 +283,7 @@ def delete_training_job(self, job_id):
 
     if settings.TRAINING_EXECUTION_WATCH_ENABLED and job.observation_status == "cleanup_pending":
         return "waiting-for-runtime-cleanup"
-    if job.builds.filter(status__in=("pending", "queued", "building")).exists():
+    if job.builds.exists() or job.registered_versions.exists():
         TrainingJob.objects.filter(pk=job.pk).update(
             deletion_error="A model build is still using this training output."
         )
@@ -339,3 +339,5 @@ def purge_training_job_outputs(self, job_id):
 
 
 from .services.output_finalization import finalize_output  # noqa: F401,E402 - Celery task registration
+
+from .services.workspace_lifecycle import cleanup_workspace  # noqa: F401,E402 - Celery task registration

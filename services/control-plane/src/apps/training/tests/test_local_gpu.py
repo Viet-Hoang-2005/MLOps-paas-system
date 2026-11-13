@@ -8,6 +8,8 @@ import requests
 from django.core.cache import cache
 from rest_framework.exceptions import ValidationError
 
+from apps.training.tests.factories import unsaved_training_job
+from .test_job_drafts import studio as studio
 from apps.catalog.models import ModelProject
 from apps.training.services import local_gpu
 
@@ -194,41 +196,26 @@ def test_capabilities_keep_cpu_when_docker_unavailable(settings, monkeypatch):
 
 
 @pytest.mark.django_db
-def test_submit_checks_selected_device_before_queuing(settings, monkeypatch):
-    from django.contrib.auth import get_user_model
-    from rest_framework.test import APIClient
+def test_submit_checks_selected_device_before_queuing(settings, monkeypatch, studio):
+    from apps.training.services import workspaces
 
-    from apps.training.models import TrainingJob
-
+    workspace, _, client, _ = studio
     settings.TRAINING_BACKEND = "docker"
     settings.TRAINING_GPU_ENABLED = True
     settings.TRAINING_GPU_COUNTS = (1,)
-    user = get_user_model().objects.create_user("gpu-submit-test@example.com")
-    project = ModelProject.objects.create(owner=user, name="gpu project")
-    job = TrainingJob.objects.create(
-        project=project,
-        model_flavor="pytorch",
-        accelerator_type="gpu",
-        accelerator_count=1,
-        local_gpu_id=GPU,
-        vcpu=2,
-        memory_mb=4096,
-        max_runtime_seconds=3600,
-        input_contract="workspace",
-        status="editing",
-        backend="docker",
+    workspace = workspaces.update_workspace(
+        workspace,
+        revision=workspace.revision,
+        changes={"accelerator_type": "gpu", "accelerator_count": 1, "local_gpu_id": GPU},
     )
     check = Mock(side_effect=ValidationError({"local_gpu_id": "Selected GPU is unavailable."}))
     monkeypatch.setattr(local_gpu, "require_device", check)
-    client = APIClient()
-    client.force_authenticate(user)
     response = client.post(
-        f"/api/training-jobs/{job.public_id}/submit/",
-        {"revision": 1, "run_key": str(__import__("uuid").uuid4())},
+        f"/api/training-workspaces/{workspace.public_id}/runs/",
+        {"revision": workspace.revision, "run_key": str(__import__("uuid").uuid4())},
         format="json",
     )
-    assert response.status_code == 400
-    assert TrainingJob.objects.get(pk=job.pk).status == "editing"
+    assert response.status_code == 400 and not workspace.jobs.exists()
     check.assert_called_once_with(GPU)
 
 
@@ -272,10 +259,10 @@ def test_create_persists_only_a_verified_local_gpu(settings, monkeypatch):
     client = APIClient()
     client.force_authenticate(user)
     payload = {"model_flavor": "pytorch", "accelerator_type": "gpu", "accelerator_count": 1, "local_gpu_id": GPU}
-    response = client.post("/api/training-jobs/", payload, format="json")
+    response = client.post("/api/training-workspaces/", payload, format="json")
     assert response.status_code == 201
     assert response.data["local_gpu_id"] == GPU
-    assert client.get(f"/api/training-jobs/{response.data['id']}/").data["local_gpu_id"] == GPU
+    assert client.get(f"/api/training-workspaces/{response.data['id']}/").data["local_gpu_id"] == GPU
     check.assert_not_called()
 
 
@@ -283,13 +270,12 @@ def test_create_persists_only_a_verified_local_gpu(settings, monkeypatch):
 def test_docker_dispatch_uses_exact_verified_uuid(settings, monkeypatch):
     from django.contrib.auth import get_user_model
 
-    from apps.training.models import TrainingJob
     from apps.training.services.storage_scope import expected_training_uris
     from infrastructure.execution.docker_backends import DockerTrainingBackend
 
     user = get_user_model().objects.create_user("gpu-dispatch-test@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
-    job = TrainingJob(
+    job = unsaved_training_job(
         project=project,
         owner=project.owner,
         model_flavor="pytorch",

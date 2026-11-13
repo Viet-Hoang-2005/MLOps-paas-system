@@ -11,28 +11,28 @@ import { PageTabs } from "@/shared/components/PageTabs";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { toast } from "@/shared/lib/toastStore";
 import {
-  deleteJobSecret,
-  putJobSecret,
-  updateJobWorkspace,
-  type JobWorkspace,
+  deleteWorkspaceSecret,
+  putWorkspaceSecret,
+  updateTrainingWorkspace,
+  type TrainingWorkspace,
 } from "@/features/training/api/jobWorkspaceApi";
 
 export interface VariablesDialogProps {
-  workspace: JobWorkspace;
-  onRefresh: () => Promise<JobWorkspace>;
+  workspace: TrainingWorkspace;
+  onRefresh: () => Promise<TrainingWorkspace>;
   onClose: () => void;
+  readOnly?: boolean;
 }
 
 export function VariablesSecretDialog({
   workspace,
   onRefresh,
   onClose,
+  readOnly: forcedReadOnly = false,
 }: VariablesDialogProps) {
   const { t } = useTranslation("training");
-  const readOnly = workspace.status !== "editing";
-  const canRevoke = ["editing", "completed", "failed", "cancelled"].includes(
-    workspace.status,
-  );
+  const readOnly = forcedReadOnly || workspace.status !== "ready";
+  const canRevoke = !readOnly;
 
   const [activeTab, setActiveTab] = useState<"environment" | "secret">(
     "environment",
@@ -62,7 +62,7 @@ export function VariablesSecretDialog({
         delete next[editingEnvKey];
       }
       next[trimmed] = envFormValue;
-      await updateJobWorkspace(workspace.id, workspace.revision, {
+      await updateTrainingWorkspace(workspace.id, workspace.revision, {
         environment: next,
       });
       await onRefresh();
@@ -79,7 +79,7 @@ export function VariablesSecretDialog({
     try {
       const next = { ...workspace.environment };
       delete next[key];
-      await updateJobWorkspace(workspace.id, workspace.revision, {
+      await updateTrainingWorkspace(workspace.id, workspace.revision, {
         environment: next,
       });
       await onRefresh();
@@ -95,7 +95,7 @@ export function VariablesSecretDialog({
     if (!trimmed || !secretFormValue) return;
     setBusy(true);
     try {
-      await putJobSecret(
+      await putWorkspaceSecret(
         workspace.id,
         workspace.revision,
         trimmed,
@@ -113,7 +113,7 @@ export function VariablesSecretDialog({
   async function handleDeleteSecret(name: string) {
     setBusy(true);
     try {
-      await deleteJobSecret(workspace.id, workspace.revision, name);
+      await deleteWorkspaceSecret(workspace.id, workspace.revision, name);
       await onRefresh();
     } catch (error) {
       toast.error(getApiErrorMessage(error, t("studio.failed")));

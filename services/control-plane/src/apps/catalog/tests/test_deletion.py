@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.catalog.services.deletion import finalize_project_deletion, project_cleanup_manifest
 from apps.deployment.models import Build, Deployment, Endpoint
@@ -29,7 +30,7 @@ def test_project_deletion_preserves_existing_training_jobs(monkeypatch):
 
     owner = get_user_model().objects.create_user("preserve-training@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="Preserve training")
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="sklearn",
         vcpu=2,
@@ -53,13 +54,13 @@ def test_project_deletion_preserves_existing_training_jobs(monkeypatch):
 @pytest.mark.django_db
 def test_project_cleanup_retains_tenant_scoped_training_history(monkeypatch):
     from apps.observability.models import LifecycleEvent
-    from apps.training.models import TrainingJob, TrainingOutput
+    from apps.training.models import TrainingOutput
 
     owner = get_user_model().objects.create_user("detached-training@example.com", "password123")
     project = ModelProject.objects.create(
         owner=owner, name="Detach training", deletion_state="deleting", is_active=False
     )
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="sklearn",
         status="completed",

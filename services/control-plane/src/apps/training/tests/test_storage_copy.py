@@ -4,9 +4,10 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
+from apps.training.tests.factories import unsaved_training_job
 from apps.catalog.models import ModelProject
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
-from apps.training.models import TrainingJob, TrainingOutput
+from apps.training.models import TrainingOutput
 from apps.training.services.storage_migration import migrate_job_storage
 from apps.training.services.storage_scope import expected_training_uris
 
@@ -34,7 +35,7 @@ class CopyStorage(MemoryStorage):
 def test_storage_copy_verifies_before_switching_and_resumes():
     user = get_user_model().objects.create_user("copy-owner@example.test", "test-password")
     project = ModelProject.objects.create(owner=user, name="Copy", deletion_state="deleting", is_active=False)
-    job = TrainingJob(
+    job = unsaved_training_job(
         project=project,
         model_flavor="sklearn",
         status="completed",

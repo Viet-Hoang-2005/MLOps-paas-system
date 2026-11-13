@@ -3,24 +3,12 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment
 from apps.registry.models import ModelVersion
-from apps.training.models import TrainingJob
 
 from .test_job_drafts import studio as studio
-
-
-@pytest.mark.django_db
-def test_training_job_paths_are_job_scoped(studio):
-    job, storage, client, _ = studio
-    response = client.get(f"/api/training-jobs/{job.public_id}/")
-    assert response.status_code == 200 and "workspace_id" not in response.data
-    assert "name" not in response.data
-    assert job.project_id is None
-    assert f"/training/jobs/{job.public_id}/draft/" in job.entries.get().s3_uri
-    rejected = client.post("/api/training-jobs/", {"code_snapshot_uri": "s3://other/source.zip"}, format="json")
-    assert rejected.status_code == 400
 
 
 @pytest.mark.django_db
@@ -62,17 +50,17 @@ def test_editing_is_available_while_submission_is_disabled(studio, settings):
     job, _, client, _ = studio
     settings.TRAINING_ENABLED = False
     assert client.get("/api/training-jobs/runtime-capabilities/").data["enabled"] is False
-    assert client.post("/api/training-jobs/", {}, format="json").status_code == 201
+    assert client.post("/api/training-workspaces/", {}, format="json").status_code == 201
     assert (
         client.post(
-            f"/api/training-jobs/{job.public_id}/submit/",
+            f"/api/training-workspaces/{job.public_id}/runs/",
             {"revision": job.revision, "run_key": str(__import__("uuid").uuid4())},
             format="json",
         ).status_code
         == 503
     )
     job.refresh_from_db()
-    assert job.status == "editing"
+    assert job.status == "ready"
 
 
 @pytest.mark.django_db
@@ -81,7 +69,7 @@ def test_training_job_list_reports_model_lifecycle_status():
     project = ModelProject.objects.create(owner=user, name="NIDS")
 
     def create_job(name, status="completed"):
-        return TrainingJob.objects.create(
+        return training_job(
             project=project,
             model_flavor="sklearn",
             code_snapshot_uri=f"s3://bucket/{name}/source.zip",
@@ -155,28 +143,9 @@ def test_submit_job_is_idempotent_for_one_run_key(studio, monkeypatch):
     job, storage, client, _ = studio
     monkeypatch.setattr("apps.training.services.drafts.S3Storage", lambda: storage)
     payload = {"revision": job.revision, "run_key": str(uuid.uuid4())}
-    url = f"/api/training-jobs/{job.public_id}/submit/"
-    assert client.post(url, payload, format="json").status_code == 202
-    assert client.post(url, payload, format="json").status_code == 202
+    url = f"/api/training-workspaces/{job.public_id}/runs/"
+    assert client.post(url, payload, format="json").status_code == 201
+    assert client.post(url, payload, format="json").status_code == 201
     assert client.post(url, {**payload, "run_key": str(uuid.uuid4())}, format="json").status_code == 409
     job.refresh_from_db()
-    assert job.status == "queued"
-
-
-@pytest.mark.django_db
-def test_failed_job_retry_endpoint_creates_editing_job(studio, monkeypatch):
-    import uuid
-
-    from apps.training.services.drafts import submit_draft
-
-    job, storage, client, _ = studio
-    original = submit_draft(job, revision=job.revision, run_key=uuid.uuid4(), storage=storage)
-    TrainingJob.objects.filter(pk=job.pk).update(status="failed")
-    monkeypatch.setattr("apps.training.services.drafts.S3Storage", lambda: storage)
-    payload = {"creation_key": str(uuid.uuid4())}
-    url = f"/api/training-jobs/{job.public_id}/retry/"
-    response = client.post(url, payload, format="json")
-    assert response.status_code == 201
-    retry = TrainingJob.objects.get(public_id=response.data["id"])
-    assert retry.status == "editing" and retry.retry_of == original and retry.submitted_at is None
-    assert client.post(url, payload, format="json").data["id"] == response.data["id"]
+    assert job.jobs.get().status == "queued"

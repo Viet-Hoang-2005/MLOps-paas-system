@@ -13,11 +13,8 @@ from apps.training.api.serializers import TrainingJobBuildRequestSerializer, Tra
 from apps.training.selectors import job_for_user, jobs_for_user
 from apps.training.services.jobs import (
     cancel_job,
-    create_job,
     request_job_deletion,
     request_output_purge,
-    retry_job,
-    submit_job,
 )
 from apps.training.services.logs import training_logs
 from apps.training.services.outputs import (
@@ -37,7 +34,7 @@ def require_training_enabled():
         raise ServiceUnavailable("Training is temporarily unavailable while the platform is being validated.")
 
 
-class TrainingJobListCreateEndpoint(generics.ListCreateAPIView):
+class TrainingJobListEndpoint(generics.ListAPIView):
     serializer_class = TrainingJobSerializer
 
     def get_queryset(self):
@@ -49,18 +46,7 @@ class TrainingJobListCreateEndpoint(generics.ListCreateAPIView):
             ),
         )
 
-    def create(self, request, *args, **kwargs):
-        from .serializers import TrainingDraftSettingsSerializer
-
-        serializer = TrainingDraftSettingsSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        job = create_job(owner=request.user, validated_data=serializer.validated_data)
-        return Response(
-            TrainingJobSerializer(job, context={"include_workspace": True}).data, status=status.HTTP_201_CREATED
-        )
-
-
-class TrainingJobDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
+class TrainingJobDetailEndpoint(generics.RetrieveDestroyAPIView):
     serializer_class = TrainingJobSerializer
     lookup_field = "public_id"
     lookup_url_kwarg = "job_id"
@@ -77,18 +63,6 @@ class TrainingJobDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
     def get_serializer_context(self):
         return {**super().get_serializer_context(), "include_workspace": True}
 
-    def update(self, request, *args, **kwargs):
-        from apps.training.services.workspaces import update_workspace
-
-        from .serializers import TrainingDraftSettingsSerializer
-
-        serializer = TrainingDraftSettingsSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        values = dict(serializer.validated_data)
-        revision = values.pop("revision", None)
-        job = update_workspace(self.get_object(), revision=revision, changes=values)
-        return Response(self.get_serializer(job).data)
-
     def delete(self, request, *args, **kwargs):
         job = request_job_deletion(self.get_object())
         return Response(
@@ -101,17 +75,6 @@ class TrainingJobDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
             },
             status=status.HTTP_202_ACCEPTED,
         )
-
-
-class TrainingJobSubmitEndpoint(APIView):
-    def post(self, request, job_id):
-        require_training_enabled()
-        from .serializers import TrainingSubmissionSerializer
-
-        serializer = TrainingSubmissionSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        job = submit_job(job_for_user(request.user, job_id), **serializer.validated_data)
-        return Response(TrainingJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
 
 
 class TrainingJobProjectEndpoint(APIView):
@@ -138,29 +101,6 @@ class TrainingJobCancelEndpoint(APIView):
     def post(self, request, job_id):
         job = cancel_job(job_for_user(request.user, job_id))
         return Response(TrainingJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
-
-
-class TrainingJobRetryEndpoint(APIView):
-    def post(self, request, job_id):
-        require_training_enabled()
-        from .serializers import TrainingCloneSerializer
-
-        serializer = TrainingCloneSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        job = retry_job(job_for_user(request.user, job_id), **serializer.validated_data)
-        return Response(TrainingJobSerializer(job).data, status=status.HTTP_201_CREATED)
-
-
-class TrainingJobCloneEndpoint(APIView):
-    def post(self, request, job_id):
-        from apps.training.services.drafts import clone_draft
-
-        from .serializers import TrainingCloneSerializer
-
-        serializer = TrainingCloneSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        job = clone_draft(job_for_user(request.user, job_id), **serializer.validated_data)
-        return Response(TrainingJobSerializer(job).data, status=status.HTTP_201_CREATED)
 
 
 class TrainingJobEventsEndpoint(APIView):

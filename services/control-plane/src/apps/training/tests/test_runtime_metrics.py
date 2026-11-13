@@ -9,8 +9,8 @@ from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.models import TrainingJob
 from apps.training.services import local_gpu
 from apps.training.services import runtime_metrics as metrics
 from infrastructure.execution.job_containers import labels_for
@@ -22,7 +22,7 @@ GPU = "GPU-01234567-89ab-cdef-0123-456789abcdef"
 def job(db):
     owner = get_user_model().objects.create_user("runtime@example.com")
     project = ModelProject.objects.create(owner=owner, name="Runtime")
-    return TrainingJob.objects.create(
+    return training_job(
         project=project,
         model_flavor="pytorch",
         status="running",

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiClient } from "@/shared/api/client";
 import { controlPlaneURL } from "@/shared/api/config";
 import { getTrainingRuntimeCapabilities } from "./trainingApi";
-import { updateJobWorkspace } from "./jobWorkspaceApi";
+import { updateTrainingWorkspace } from "./jobWorkspaceApi";
 
 describe("training GPU payload", () => {
   beforeEach(() => vi.restoreAllMocks());
@@ -10,19 +10,17 @@ describe("training GPU payload", () => {
   it.each(["t4", "a10g"] as const)(
     "persists %s model and one GPU on the draft",
     async (model) => {
-      const patch = vi
-        .spyOn(apiClient, "patch")
-        .mockResolvedValue({
-          data: { id: "job-id", accelerator_model: model },
-        });
-      const result = await updateJobWorkspace("job-id", 4, {
+      const patch = vi.spyOn(apiClient, "patch").mockResolvedValue({
+        data: { id: "job-id", accelerator_model: model },
+      });
+      const result = await updateTrainingWorkspace("job-id", 4, {
         accelerator_type: "gpu",
         accelerator_count: 1,
         accelerator_model: model,
         local_gpu_id: "",
       });
       expect(patch).toHaveBeenCalledWith(
-        controlPlaneURL("/training-jobs/job-id/"),
+        controlPlaneURL("/training-workspaces/job-id/"),
         {
           revision: 4,
           accelerator_type: "gpu",
@@ -40,7 +38,7 @@ describe("training GPU payload", () => {
       .spyOn(apiClient, "patch")
       .mockResolvedValue({ data: { id: "job-id" } });
     const uuid = "GPU-12345678-1234-1234-1234-123456789abc";
-    await updateJobWorkspace("job-id", 7, {
+    await updateTrainingWorkspace("job-id", 7, {
       accelerator_type: "gpu",
       accelerator_count: 1,
       accelerator_model: "",

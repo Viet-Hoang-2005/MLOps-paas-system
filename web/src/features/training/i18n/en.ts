@@ -1,4 +1,39 @@
 export const trainingEn = {
+  workspaceHistory: {
+    open: "Training Jobs ({{count}})",
+    title: "Training Jobs",
+    jobId: "Training Job ID",
+    project: "Model Project",
+    status: "Training Status",
+    trainingAt: "Training At",
+    actions: "Actions",
+    view: "Open",
+    delete: "Delete Training Job",
+    backToCurrent: "Back to current Workspace",
+    openActive: "Open active Training Job",
+    empty: "No training jobs yet",
+    previous: "Previous",
+    next: "Next",
+    workspaceId: "Workspace ID",
+    workspaceStatus: "Workspace Status",
+    createdAt: "Created at",
+    updatedAt: "Updated at",
+    newWorkspace: "New Workspace",
+    noWorkspaces: "No workspaces found",
+    deleteWorkspace: "Delete Workspace",
+    deleteWorkspaceDescription:
+      "Delete this workspace and its {{count}} training jobs? Running jobs must stop before deletion completes.",
+    deleteJobDescription:
+      "Delete this training job, its snapshot, logs and Output? The current workspace will be kept.",
+    states: {
+      all: "All workspace statuses",
+      ready: "Ready",
+      preparing: "Preparing",
+      running: "Running",
+      deleting: "Deleting",
+      delete_failed: "Deletion failed",
+    },
+  },
   studio: {
     artifactSelection: {
       model: "Raw Model Artifact",

@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from apps.training.tests.factories import training_job
 from apps.access.models import UserAPIKey
 from apps.catalog.models import ModelProject
 from apps.training.models import (
@@ -107,7 +108,7 @@ class MLflowCompatibilityTests(APITestCase):
             owner=self.user,
             name="iris-classification",
         )
-        self.job = TrainingJob.objects.create(
+        self.job = training_job(
             project=self.project,
             model_flavor="sklearn",
             status="running",
@@ -189,7 +190,7 @@ class MLflowCompatibilityTests(APITestCase):
             owner=other_user,
             name="secret-project",
         )
-        other_job = TrainingJob.objects.create(
+        other_job = training_job(
             project=other_project,
             model_flavor="sklearn",
             status="running",
@@ -266,7 +267,7 @@ class MLflowCompatibilityTests(APITestCase):
         self.assertEqual(get_resp.data["run"]["info"]["run_id"], str(self.job.public_id))
 
     def test_training_jobs_compare_endpoint(self):
-        job2 = TrainingJob.objects.create(
+        job2 = training_job(
             project=self.project,
             model_flavor="sklearn",
             status="completed",
@@ -407,7 +408,7 @@ class MLflowCompatibilityTests(APITestCase):
         User = get_user_model()
         attacker = User.objects.create_user("attacker@example.com", "password123", tenant_id="tenant-attacker")
         attacker_proj = ModelProject.objects.create(owner=attacker, name="attacker-proj")
-        attacker_job = TrainingJob.objects.create(
+        attacker_job = training_job(
             project=attacker_proj,
             status="running",
             vcpu=2,
@@ -508,7 +509,7 @@ class MLflowCompatibilityTests(APITestCase):
         Verify that a capability token issued for Job A CANNOT access, mutate, or log
         metrics/params/tags/artifacts for Job B, even though both jobs belong to the same tenant.
         """
-        job_b = TrainingJob.objects.create(
+        job_b = training_job(
             project=self.project,
             model_flavor="sklearn",
             status="running",
@@ -598,7 +599,7 @@ class MLflowCompatibilityTests(APITestCase):
             owner=self.user,
             name="project-two-private",
         )
-        job_in_project2 = TrainingJob.objects.create(
+        job_in_project2 = training_job(
             project=project2,
             model_flavor="sklearn",
             status="running",
@@ -1033,7 +1034,7 @@ class MLflowCompatibilityTests(APITestCase):
         Verify that querying the artifact proxy at the experiment-level URI
         returns a directory listing of all jobs (runs) under that experiment.
         """
-        job_2 = TrainingJob.objects.create(
+        job_2 = training_job(
             project=self.project,
             model_flavor="sklearn",
             status="running",

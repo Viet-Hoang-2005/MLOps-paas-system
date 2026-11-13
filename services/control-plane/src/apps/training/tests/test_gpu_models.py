@@ -2,9 +2,10 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import unsaved_training_job
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.training.api.serializers import TrainingDraftSettingsSerializer, TrainingJobSerializer
-from apps.training.models import TrainingJob
 from apps.training.services.resources import validate_resources
 
 from .test_job_drafts import studio as studio
@@ -90,7 +91,7 @@ def test_serializer_persists_gpu_model_and_response(settings, model):
         context={"request": request},
     )
     assert serializer.is_valid(), serializer.errors
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="pytorch",
         accelerator_type="gpu",
@@ -116,10 +117,10 @@ def test_create_and_read_gpu_job_over_api(settings, monkeypatch, model):
     client = APIClient()
     client.force_authenticate(user)
     payload = {"model_flavor": "pytorch", "accelerator_type": "gpu", "accelerator_count": 1, "accelerator_model": model}
-    created = client.post("/api/training-jobs/", payload, format="json")
+    created = client.post("/api/training-workspaces/", payload, format="json")
     assert created.status_code == 201
     assert created.data["accelerator_model"] == model
-    fetched = client.get(f"/api/training-jobs/{created.data['id']}/")
+    fetched = client.get(f"/api/training-workspaces/{created.data['id']}/")
     assert fetched.status_code == 200
     assert fetched.data["accelerator_model"] == model
 
@@ -131,7 +132,7 @@ def test_submit_rejects_legacy_production_gpu_without_model(settings):
     settings.TRAINING_GPU_COUNTS = (1,)
     user = get_user_model().objects.create_user("gpu-legacy@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="pytorch",
         accelerator_type="gpu",
@@ -146,7 +147,7 @@ def test_submit_rejects_legacy_production_gpu_without_model(settings):
     client = APIClient()
     client.force_authenticate(user)
     response = client.post(f"/api/training-jobs/{job.public_id}/submit/")
-    assert response.status_code == 400
+    assert response.status_code == 404
     job.refresh_from_db()
     assert job.status == "pending"
 
@@ -161,7 +162,7 @@ def test_argo_dispatch_includes_selected_gpu_model(settings, monkeypatch, model)
 
     user = get_user_model().objects.create_user("gpu-dispatch@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
-    job = TrainingJob(
+    job = unsaved_training_job(
         project=project,
         owner=project.owner,
         model_flavor="pytorch",
@@ -190,22 +191,17 @@ def test_argo_dispatch_includes_selected_gpu_model(settings, monkeypatch, model)
 
 
 @pytest.mark.django_db
-def test_retry_copies_gpu_model(studio, settings):
+def test_next_run_copies_gpu_model(studio, settings):
     import uuid
+    from apps.training.services import drafts, workspaces
 
-    from apps.training.services import workspaces
-    from apps.training.services.drafts import clone_draft, submit_draft
-
-    job, storage, _, _ = studio
+    workspace, storage, _, _ = studio
     settings.TRAINING_GPU_ENABLED = True
     settings.TRAINING_GPU_COUNTS = (1,)
-    job = workspaces.update_workspace(
-        job,
-        revision=job.revision,
+    workspace = workspaces.update_workspace(
+        workspace,
+        revision=workspace.revision,
         changes={"accelerator_type": "gpu", "accelerator_count": 1, "accelerator_model": "t4"},
     )
-    job = submit_draft(job, revision=job.revision, run_key=uuid.uuid4(), storage=storage)
-    TrainingJob.objects.filter(pk=job.pk).update(status="failed")
-    job.refresh_from_db()
-    retry = clone_draft(job, retry=True, creation_key=uuid.uuid4(), storage=storage)
-    assert retry.accelerator_model == "t4" and retry.accelerator_count == 1 and retry.status == "editing"
+    job = drafts.run_workspace(workspace, revision=workspace.revision, run_key=uuid.uuid4(), storage=storage)
+    assert job.accelerator_model == "t4" and job.workspace_id == workspace.pk

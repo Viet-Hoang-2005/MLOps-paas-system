@@ -32,10 +32,6 @@ class TrainingSubmissionSerializer(serializers.Serializer):
     run_key = serializers.UUIDField()
 
 
-class TrainingCloneSerializer(serializers.Serializer):
-    creation_key = serializers.UUIDField()
-
-
 class TrainingOutputSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="public_id", read_only=True)
 
@@ -92,8 +88,9 @@ class TrainingJobSerializer(serializers.ModelSerializer):
     entries = serializers.SerializerMethodField()
     secrets = serializers.SerializerMethodField()
     secrets_available = serializers.SerializerMethodField()
-    retry_of = serializers.UUIDField(source="retry_of.public_id", read_only=True, allow_null=True)
-    cloned_from = serializers.UUIDField(source="cloned_from.public_id", read_only=True, allow_null=True)
+    workspace_id = serializers.UUIDField(source="workspace.public_id", read_only=True)
+    project_name = serializers.CharField(source="project.name", read_only=True, allow_null=True)
+    environment = serializers.JSONField(source="environment_snapshot", read_only=True)
     outputs = serializers.SerializerMethodField()
 
     def get_outputs(self, instance):
@@ -114,13 +111,12 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "input_contract",
             "input_revision",
             "run_key",
-            "revision",
             "environment",
             "entries",
             "secrets",
             "secrets_available",
-            "retry_of",
-            "cloned_from",
+            "workspace_id",
+            "project_name",
             "submitted_at",
             "model_flavor",
             "entry_point",
@@ -191,15 +187,11 @@ class TrainingJobSerializer(serializers.ModelSerializer):
         extra_kwargs = {"requirements_text": {"required": False, "allow_blank": True}}
 
     def get_entries(self, instance):
-        if not self.context.get("include_workspace"):
-            return []
-        from apps.training.services.workspaces import serialize_entries
-
-        return serialize_entries(instance.entries.order_by("relative_path"))
+        return []
 
     @staticmethod
     def get_secrets(instance):
-        return [{"name": secret.name, "updated_at": secret.updated_at.isoformat()} for secret in instance.secrets.all()]
+        return [{"name": name} for name in instance.secret_snapshot]
 
     @staticmethod
     def get_secrets_available(instance):

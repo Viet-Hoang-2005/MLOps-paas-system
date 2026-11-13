@@ -2,15 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import { isAxiosError } from "axios";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { listModelProjects } from "@/shared/api/catalogApi";
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
 import { Select } from "@/shared/components/Select";
 import { FileDropzone } from "@/shared/components/FileDropzone";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { toast } from "@/shared/lib/toastStore";
 import type { TrainingJob } from "@/features/training/types";
-import { assignTrainingProject } from "@/features/training/api/jobWorkspaceApi";
+import {
+  assignTrainingProject,
+  listAllWorkspaceJobs,
+} from "@/features/training/api/jobWorkspaceApi";
 import {
   getModelOutputSummary,
   patchModelOutput,
@@ -29,6 +34,17 @@ export function TrainingProjectAssignment({
 }) {
   const { t } = useTranslation("training");
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [pendingJob, setPendingJob] = useState<string | null>(null);
+  const jobsQuery = useQuery({
+    queryKey: ["training", "assignment-jobs", job.workspace_id],
+    queryFn: () => listAllWorkspaceJobs(job.workspace_id),
+    enabled: Boolean(job.workspace_id),
+  });
+  const selectJob = (id: string) =>
+    navigate(
+      `/dashboard/training/workspaces/${job.workspace_id}/jobs/${id}?step=project`,
+    );
   const outputKey = ["training", "assignment-output", job.id];
   const outputQuery = useQuery({
     queryKey: outputKey,
@@ -160,6 +176,55 @@ export function TrainingProjectAssignment({
   return (
     <section className="space-y-5 rounded-surface border border-border bg-surface p-5">
       <h2 className="text-style-section-title">{t("studio.assignProject")}</h2>
+      <Select
+        label={t("workspaceHistory.jobId")}
+        value={job.id}
+        disabled={busy || jobsQuery.isLoading || jobsQuery.isError}
+        options={(jobsQuery.data ?? [job]).map((item) => ({
+          value: item.id,
+          label: item.id,
+          hint: t(`detail.statuses.${item.status}`),
+          disabled:
+            item.status !== "completed" ||
+            !item.output_available ||
+            item.deletion_pending,
+        }))}
+        onChange={(id) => {
+          if (id === job.id) return;
+          const saved = outputQuery.data?.selection;
+          const dirty =
+            Object.values(files).some(Boolean) ||
+            removed.length > 0 ||
+            buildRequirements !== null ||
+            name !== "" ||
+            description !== "" ||
+            access !== "private" ||
+            projectId !== (job.project_id ?? suggestedProject ?? "new") ||
+            modelId !== (saved?.model_id ?? "") ||
+            slots.some(
+              (slot) =>
+                (choices[slot] ?? "") !== (saved?.artifacts?.[slot] ?? "") ||
+                (modes[slot] ?? "none") !==
+                  (saved?.artifacts?.[slot] ? "metadata" : "none"),
+            );
+          if (dirty) setPendingJob(id);
+          else selectJob(id);
+        }}
+      />
+      {jobsQuery.isError && (
+        <Button onClick={() => void jobsQuery.refetch()}>
+          {t("studio.reload")}
+        </Button>
+      )}
+      <ConfirmDialog
+        open={Boolean(pendingJob)}
+        title={t("studio.unsaved")}
+        description={t("studio.discard")}
+        onCancel={() => setPendingJob(null)}
+        onConfirm={() => {
+          if (pendingJob) selectJob(pendingJob);
+        }}
+      />
       <p className="text-style-body text-color-muted-foreground">
         {t("studio.assignmentHint")}
       </p>

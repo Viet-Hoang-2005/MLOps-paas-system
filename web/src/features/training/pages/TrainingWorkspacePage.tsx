@@ -26,7 +26,6 @@ import { toast } from "@/shared/lib/toastStore";
 import { getTrainingStartError } from "@/features/training/api/quotaErrors";
 import {
   cancelTrainingJob,
-  cloneTrainingJob,
   deleteTrainingOutputs,
   getTrainingJobMetrics,
   getTrainingRuntimeCapabilities,
@@ -35,14 +34,17 @@ import {
 import { formatQuotaDuration } from "@/features/training/api/quotaFormatting";
 import {
   getRunInput,
-  getJobWorkspace,
-  updateJobWorkspace,
-  runJob,
+  getTrainingWorkspace,
+  getWorkspaceJob,
+  isRunResponseError,
+  updateTrainingWorkspace,
+  runTrainingWorkspace,
 } from "@/features/training/api/jobWorkspaceApi";
 import {
   WorkspaceEditor,
   type WorkspaceEditorHandle,
 } from "@/features/training/components/WorkspaceEditor";
+import { TrainingJobDialog } from "@/features/training/components/TrainingJobDialog";
 import { VariablesSecretDialog } from "@/features/training/components/VariablesDialog";
 import { TrainingProjectAssignment } from "@/features/training/components/TrainingProjectAssignment";
 import { trainingQueryKeys } from "@/features/training/queryKeys";
@@ -93,22 +95,22 @@ const formatMegabytes = (
 };
 
 export default function TrainingWorkspacePage() {
-  const { jobId = "" } = useParams();
-  return <TrainingJobWorkspace key={jobId} />;
+  const { workspaceId = "", jobId = "" } = useParams();
+  return <TrainingTrainingWorkspace key={workspaceId + ":" + jobId} />;
 }
 
-function TrainingJobWorkspace() {
-  const { jobId = "" } = useParams();
+function TrainingTrainingWorkspace() {
+  const { workspaceId = "", jobId = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation("training");
-  const workspaceKey = ["training", "workspace", jobId];
+  const workspaceKey = ["training", "workspace", workspaceId];
   const workspaceQuery = useQuery({
     queryKey: workspaceKey,
-    queryFn: () => getJobWorkspace(jobId),
+    queryFn: () => getTrainingWorkspace(workspaceId),
     refetchInterval: (query) =>
-      query.state.data && active(query.state.data) ? 3000 : false,
+      query.state.data && query.state.data.status !== "ready" ? 3000 : false,
   });
   const capsQuery = useQuery({
     queryKey: ["training", "workspace-capabilities"],
@@ -135,36 +137,65 @@ function TrainingJobWorkspace() {
   const editor = useRef<WorkspaceEditorHandle>(null);
   const allowNavigation = useRef(false);
   const runKey = useRef<string | null>(null);
-  const cloneKey = useRef<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const initialized = useRef("");
-  const workspace = workspaceQuery.data;
-  const isDraft = workspace?.status === "editing";
-  const selectedJob = isDraft ? undefined : workspace;
+  const jobQuery = useQuery({
+    queryKey: ["training", "workspace-job", workspaceId, jobId],
+    queryFn: () => getWorkspaceJob(workspaceId, jobId),
+    enabled: Boolean(jobId),
+    refetchInterval: (query) =>
+      query.state.data && active(query.state.data) ? 3000 : false,
+  });
+  const draft = workspaceQuery.data;
+  const selectedJob = jobQuery.data;
+  useEffect(() => {
+    if (params.get("focus") === "terminal" && draft) {
+      document
+        .getElementById("training-terminal")
+        ?.scrollIntoView({ block: "start" });
+    }
+  }, [params, draft]);
+  const workspace = useMemo(
+    () =>
+      draft && selectedJob
+        ? {
+            ...draft,
+            ...selectedJob,
+            id: draft.id,
+            revision: selectedJob.input_revision ?? draft.revision,
+            environment: selectedJob.environment,
+            secrets: selectedJob.secrets,
+            status: draft.status,
+          }
+        : draft,
+    [draft, selectedJob],
+  );
+  const isDraft = !jobId && draft?.status === "ready";
   const selectedRun = jobId;
   const snapshotQuery = useQuery({
     queryKey: ["training", "input", jobId],
     queryFn: () => getRunInput(jobId),
-    enabled: Boolean(workspace?.submitted_at),
+    enabled: Boolean(selectedJob?.submitted_at),
   });
-  const hasActiveRun = Boolean(workspace && active(workspace));
+  const hasActiveRun = Boolean(selectedJob && active(selectedJob));
   const locked = busy || editorBusy || hasActiveRun || !isDraft;
   const logStream = useRuntimeLogStream({
-    source: workspace?.submitted_at ? { kind: "training", id: jobId } : null,
-    enabled: Boolean(workspace?.submitted_at),
+    source: selectedJob?.submitted_at ? { kind: "training", id: jobId } : null,
+    enabled: Boolean(selectedJob?.submitted_at),
     terminalStatuses: ["completed", "failed", "cancelled"],
   });
   const refresh = useCallback(async () => {
-    const data = await getJobWorkspace(jobId);
-    queryClient.setQueryData(["training", "workspace", jobId], data);
+    const data = await getTrainingWorkspace(workspaceId);
+    queryClient.setQueryData(["training", "workspace", workspaceId], data);
     return data;
-  }, [queryClient, jobId]);
+  }, [queryClient, workspaceId]);
   const metricsQuery = useQuery({
     queryKey: trainingQueryKeys.metrics(jobId),
     queryFn: () => getTrainingJobMetrics(jobId),
     enabled: Boolean(jobId) && hasActiveRun,
     refetchInterval: hasActiveRun
-      ? workspace?.backend === "docker"
+      ? selectedJob?.backend === "docker"
         ? 5000
         : 10000
       : false,
@@ -175,9 +206,9 @@ function TrainingJobWorkspace() {
 
   const [liveElapsed, setLiveElapsed] = useState<number | null>(null);
   const startedAt = hasActiveRun
-    ? workspace?.started_at ||
-      workspace?.runtime_started_at ||
-      workspace?.submitted_at
+    ? selectedJob?.started_at ||
+      selectedJob?.runtime_started_at ||
+      selectedJob?.submitted_at
     : null;
   const initialElapsed = startedAt ? computeElapsed(startedAt) : null;
   const currentElapsed =
@@ -197,8 +228,8 @@ function TrainingJobWorkspace() {
   }, [hasActiveRun, startedAt]);
   const caps = capsQuery.data;
   useEffect(() => {
-    if (!workspace || !caps || initialized.current === jobId) return;
-    initialized.current = jobId;
+    if (!workspace || !caps || initialized.current === workspaceId) return;
+    initialized.current = workspaceId;
     const chosen = caps.cpu_profiles.find(
       (item) =>
         item.vcpu === workspace.vcpu && item.memory_mb === workspace.memory_mb,
@@ -223,7 +254,7 @@ function TrainingJobWorkspace() {
         86400,
     );
     setFlavor(workspace.model_flavor);
-  }, [workspace, caps, jobId]);
+  }, [workspace, caps, workspaceId]);
   const cpu = caps?.cpu_profiles.find((item) => item.id === cpuId);
   const accelerators = useMemo(
     () => caps?.accelerators ?? [],
@@ -275,22 +306,23 @@ function TrainingJobWorkspace() {
     if (!settingsValue) return;
     const revision = await editor.current?.saveAll();
     const current = await refresh();
-    if (current.status !== "editing") return;
+    if (current.status !== "ready") return;
     if (
       Object.entries(settingsValue).every(
         ([key, value]) => current[key as keyof typeof current] === value,
       )
     )
       return;
-    await updateJobWorkspace(
-      jobId,
+    await updateTrainingWorkspace(
+      workspaceId,
       revision ?? current.revision,
       settingsValue,
     );
     await refresh();
-  }, [settingsValue, jobId, refresh]);
+  }, [settingsValue, workspaceId, refresh]);
   useEffect(() => {
-    if (!isDraft || !settingsValue || initialized.current !== jobId) return;
+    if (!isDraft || !settingsValue || initialized.current !== workspaceId)
+      return;
     const timer = setTimeout(() => {
       setSavingConfig(true);
       saveQueue.current = saveQueue.current
@@ -303,7 +335,7 @@ function TrainingJobWorkspace() {
         .finally(() => setSavingConfig(false));
     }, 400);
     return () => clearTimeout(timer);
-  }, [isDraft, settingsValue, persistSettings, jobId, t]);
+  }, [isDraft, settingsValue, persistSettings, workspaceId, t]);
   async function start() {
     if (!workspace || !cpu || !accelerator || !isDraft) return;
     setBusy(true);
@@ -312,10 +344,17 @@ function TrainingJobWorkspace() {
       await persistSettings();
       const revision = await editor.current!.saveAll();
       runKey.current ??= crypto.randomUUID();
-      const job = await runJob(jobId, revision, runKey.current);
+      const job = await runTrainingWorkspace(
+        workspaceId,
+        revision,
+        runKey.current,
+      );
       setDirty(false);
       setSaveError("");
-      queryClient.setQueryData(workspaceKey, { ...workspace, ...job });
+      allowNavigation.current = true;
+      navigate(
+        "/dashboard/training/workspaces/" + workspaceId + "/jobs/" + job.id,
+      );
       await refresh();
       void queryClient.invalidateQueries({
         queryKey: trainingQueryKeys.jobs(),
@@ -324,6 +363,8 @@ function TrainingJobWorkspace() {
         queryKey: trainingQueryKeys.usage(),
       });
     } catch (error) {
+      if (isRunResponseError(error)) runKey.current = null;
+      void refresh();
       toast.error(getTrainingStartError(error, t, i18n.language));
     } finally {
       setBusy(false);
@@ -340,24 +381,6 @@ function TrainingJobWorkspace() {
       setBusy(false);
     }
   }
-  async function clone() {
-    setBusy(true);
-    cloneKey.current ??= crypto.randomUUID();
-    try {
-      const job = await cloneTrainingJob(jobId, cloneKey.current);
-      void queryClient.invalidateQueries({
-        queryKey: trainingQueryKeys.jobs(),
-      });
-      navigate(
-        `/dashboard/training/${job.id}/workspace${workspace?.project_id ? `?project=${workspace.project_id}` : ""}`,
-      );
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, t("studio.failed")));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const formatRuntime = useCallback(
     (seconds: number) => {
       const totalMinutes = Math.round(seconds / 60);
@@ -551,7 +574,7 @@ function TrainingJobWorkspace() {
   const totalRamMb =
     latestMetric?.memory_limit_mb ??
     workspace?.memory_mb ??
-    workspace?.memory ??
+    workspace?.memory_mb ??
     cpu?.memory_mb;
   const ramUsageValue =
     latestMetric?.memory_percent != null
@@ -679,16 +702,26 @@ function TrainingJobWorkspace() {
     }
   };
 
-  if (workspaceQuery.isError)
+  if (workspaceQuery.isError || jobQuery.isError)
     return (
       <div className="space-y-3">
-        <p>{getApiErrorMessage(workspaceQuery.error, t("studio.failed"))}</p>
-        <Button onClick={() => void workspaceQuery.refetch()}>
+        <p>
+          {getApiErrorMessage(
+            workspaceQuery.error || jobQuery.error,
+            t("studio.failed"),
+          )}
+        </p>
+        <Button
+          onClick={() => {
+            void workspaceQuery.refetch();
+            if (jobId) void jobQuery.refetch();
+          }}
+        >
           {t("studio.reload")}
         </Button>
       </div>
     );
-  if (!workspace)
+  if (!workspace || (jobId && !selectedJob))
     return <p className="p-5 text-style-body">{t("studio.loading")}</p>;
 
   return (
@@ -698,25 +731,9 @@ function TrainingJobWorkspace() {
         back
         onBack={handleBack}
         actions={
-          workspace &&
-          ["completed", "failed", "cancelled"].includes(workspace.status) ? (
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                disabled={busy}
-                onClick={() => setEnvironmentOpen(true)}
-              >
-                {t("studio.environment")}
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={busy}
-                onClick={() => void clone()}
-              >
-                {t("studio.clone")}
-              </Button>
-            </div>
-          ) : undefined
+          <Button variant="secondary" onClick={() => setHistoryOpen(true)}>
+            {t("workspaceHistory.open", { count: draft?.job_count ?? 0 })}
+          </Button>
         }
       />
       {params.get("step") === "project" &&
@@ -787,9 +804,9 @@ function TrainingJobWorkspace() {
               </p>
             )}
           </div>
-          {workspace.submitted_at && snapshotQuery.isLoading ? (
+          {selectedJob?.submitted_at && snapshotQuery.isLoading ? (
             <p>{t("studio.loading")}</p>
-          ) : workspace.submitted_at && snapshotQuery.isError ? (
+          ) : selectedJob?.submitted_at && snapshotQuery.isError ? (
             <Button onClick={() => void snapshotQuery.refetch()}>
               {t("studio.reload")}
             </Button>
@@ -799,14 +816,12 @@ function TrainingJobWorkspace() {
               ref={editor}
               workspace={workspace}
               entries={
-                workspace.submitted_at
-                  ? (snapshotQuery.data?.entries ?? [])
-                  : workspace.entries
+                jobId ? (snapshotQuery.data?.entries ?? []) : workspace.entries
               }
               outputs={selectedJob?.outputs ?? []}
               entryPoint={selectedJob?.entry_point ?? workspace.entry_point}
-              runId={workspace.submitted_at ? jobId : undefined}
-              readOnly={hasActiveRun || !isDraft}
+              runId={jobId || undefined}
+              readOnly={!isDraft}
               externallyBusy={busy}
               onRefresh={refresh}
               onDirty={setDirty}
@@ -815,6 +830,7 @@ function TrainingJobWorkspace() {
               onDeleteOutputs={async () => {
                 if (selectedJob) {
                   await deleteTrainingOutputs(selectedJob.id);
+                  await jobQuery.refetch();
                   await refresh();
                 }
               }}
@@ -852,6 +868,7 @@ function TrainingJobWorkspace() {
               />
             </div>
           )}
+          <div id="training-terminal" />
           <TerminalViewer
             title={t("studio.terminal")}
             badge={statusBadge}
@@ -893,9 +910,31 @@ function TrainingJobWorkspace() {
           </div>
         </>
       )}
+      {historyOpen && (
+        <TrainingJobDialog
+          workspaceId={workspaceId}
+          currentJobId={jobId || undefined}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
+      {!jobId && draft?.active_job_id && (
+        <Button
+          onClick={() =>
+            navigate(
+              "/dashboard/training/workspaces/" +
+                workspaceId +
+                "/jobs/" +
+                draft.active_job_id,
+            )
+          }
+        >
+          {t("workspaceHistory.openActive")}
+        </Button>
+      )}
       {environmentOpen && (
         <VariablesSecretDialog
           workspace={workspace}
+          readOnly={Boolean(jobId)}
           onRefresh={refresh}
           onClose={() => setEnvironmentOpen(false)}
         />

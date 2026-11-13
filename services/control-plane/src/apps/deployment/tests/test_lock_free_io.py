@@ -11,6 +11,7 @@ from django.contrib.auth import get_user_model
 from django.db import connection
 from django.utils import timezone
 
+from apps.training.tests.factories import training_job
 from apps.catalog import tasks as catalog_tasks
 from apps.catalog.models import ModelPreview, ModelProject
 from apps.deployment import tasks
@@ -19,6 +20,8 @@ from apps.deployment.services import builds as build_service
 from apps.training import tasks as training_tasks
 from apps.training.models import TrainingJob, TrainingOutput
 from apps.training.services import jobs as job_service
+from apps.training.services import drafts
+from apps.training.models import TrainingQuotaReservation, TrainingWorkspace
 from common.api.exceptions import Conflict
 from infrastructure.storage.s3 import StoredObject
 
@@ -90,7 +93,7 @@ def no_broker(monkeypatch):
 
 def completed_job(project, storage):
     code = storage.put("input/code.zip", b"code")
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="xgboost",
         status="completed",
@@ -241,7 +244,7 @@ def job_storage(monkeypatch, storage, settings):
 def editable_job(project, storage):
     from apps.training.services import workspaces
 
-    job = job_service.create_job(owner=project.owner, validated_data={})
+    job = drafts.create_workspace(owner=project.owner)
     _, revision = workspaces.create_entry(
         job, revision=job.revision, path="train.py", kind="script", payload=b"print(1)", storage=storage
     )
@@ -253,21 +256,21 @@ def editable_job(project, storage):
 
 
 def submit(job, storage):
-    return job_service.submit_job(job, revision=job.revision, run_key=uuid.uuid4(), storage=storage)
+    return drafts.run_workspace(job, revision=job.revision, run_key=uuid.uuid4(), storage=storage)
 
 
 def test_submit_writes_snapshots_outside_any_transaction(project, job_storage):
     job = editable_job(project, job_storage)
     result = submit(job, job_storage)
     assert job_storage.inside_transaction == []
-    assert result.pk == job.pk and result.submitted_at
+    assert result.workspace_id == job.pk and result.submitted_at
     assert len(job_storage.objects) == 3
 
 
 def test_deleting_an_unrelated_project_does_not_prevent_a_draft(project, job_storage):
     ModelProject.objects.filter(pk=project.pk).update(deletion_state="deleting")
-    job = job_service.create_job(owner=project.owner, validated_data={})
-    assert job.project_id is None and job.status == "editing"
+    job = drafts.create_workspace(owner=project.owner)
+    assert job.status == "ready" and not job.jobs.exists()
     assert job_storage.objects == {}
 
 
@@ -277,14 +280,14 @@ def test_deleting_job_during_upload_discards_submission(project, job_storage):
 
     def put_then_delete(key, file, content_type="application/octet-stream"):
         result = original_put(key, file, content_type)
-        TrainingJob.objects.filter(pk=job.pk).update(deletion_requested_at=timezone.now())
+        TrainingWorkspace.objects.filter(pk=job.pk).update(deletion_requested_at=timezone.now())
         return result
 
     job_storage.put = put_then_delete
     with pytest.raises(Conflict):
         submit(job, job_storage)
     job.refresh_from_db()
-    assert job.submitted_at is None
+    assert job.jobs.get().submitted_at is None
     assert job_storage.deleted and job_storage.inside_transaction == []
 
 
@@ -294,19 +297,20 @@ def test_submit_storage_failure_preserves_draft_and_cleans_staging(project, job_
     with pytest.raises(RuntimeError):
         submit(job, job_storage)
     job.refresh_from_db()
-    assert job.status == "editing" and job.entries.count() == 1
+    assert job.status == "ready" and job.entries.count() == 1
     assert len(job_storage.deleted) == 1 and job_storage.inside_transaction == []
 
 
-def test_retry_job_copies_inputs_outside_any_transaction(project, job_storage):
-    job = submit(editable_job(project, job_storage), job_storage)
-    TrainingJob.objects.filter(pk=job.pk).update(status="failed")
-    job.refresh_from_db()
+def test_next_run_snapshots_inputs_outside_any_transaction(project, job_storage):
+    workspace = editable_job(project, job_storage)
+    first = submit(workspace, job_storage)
+    TrainingJob.objects.filter(pk=first.pk).update(status="failed")
+    TrainingQuotaReservation.objects.filter(job_id=first.public_id).update(active=False)
     job_storage.inside_transaction.clear()
-    retry = job_service.retry_job(job, storage=job_storage, creation_key=uuid.uuid4())
+    second = submit(workspace, job_storage)
     assert job_storage.inside_transaction == []
-    assert retry.retry_of_id == job.pk and retry.status == "editing"
-    assert not retry.submitted_at and retry.project_id is None
+    assert second.pk != first.pk and second.workspace_id == workspace.pk
+    assert second.submitted_at and second.project_id is None
 
 
 # ---- build deletion -----------------------------------------------------------------------------
@@ -400,7 +404,7 @@ def test_stalled_deletions_are_dispatched_again(project, dispatch):
     other_owner = get_user_model().objects.create_user("p2@example.com", "test-password")
     stale_project = ModelProject.objects.create(owner=other_owner, name="gone", deletion_state="deleting")
     age(ModelProject, stale_project.pk)
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="sklearn",
         status="cancelled",
@@ -412,7 +416,7 @@ def test_stalled_deletions_are_dispatched_again(project, dispatch):
         submitted_at=timezone.now(),
     )
     TrainingJob.objects.filter(pk=job.pk).update(deletion_requested_at=timezone.now() - timedelta(hours=1))
-    errored = TrainingJob.objects.create(
+    errored = training_job(
         project=project,
         model_flavor="sklearn",
         status="cancelled",

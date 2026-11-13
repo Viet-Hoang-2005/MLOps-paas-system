@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build
 from apps.deployment.services import builds as build_service
@@ -38,7 +39,7 @@ class FakeImageRegistry:
 def completed_job(email="training-build@example.com"):
     owner = get_user_model().objects.create_user(email, "password123")
     project = ModelProject.objects.create(owner=owner, name="NIDS")
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="xgboost",
         requirements_text="xgboost==2.0.3",

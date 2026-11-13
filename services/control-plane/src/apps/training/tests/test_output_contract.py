@@ -11,6 +11,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.training.models import TrainingJob
 from apps.training.services.artifact_selection import validate_json
@@ -72,7 +73,7 @@ class Storage:
 @pytest.fixture
 def output_job(db, tmp_path, monkeypatch):
     owner = get_user_model().objects.create_user("output-v2@example.test", "test-password")
-    job = TrainingJob.objects.create(
+    job = training_job(
         owner=owner,
         status="uploading",
         model_flavor="xgboost",

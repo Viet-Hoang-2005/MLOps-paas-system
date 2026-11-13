@@ -2,7 +2,6 @@ import type { ResourceId } from "@/shared/types";
 import type { ModelFlavor } from "@/features/projects/types";
 
 export type TrainingJobStatus =
-  | "editing"
   | "pending"
   | "queued"
   | "uploading"
@@ -50,10 +49,12 @@ export interface TrainingJob {
   runtime_started_at?: string | null;
   id: ResourceId;
   project_id: ResourceId | null;
-  revision: number;
+  workspace_id: ResourceId;
+  project_name?: string | null;
+  environment: Record<string, string>;
+  secrets: { name: string; updated_at: string }[];
   input_revision: number | null;
   submitted_at: string | null;
-  cloned_from: ResourceId | null;
   output_revision: number;
   model_flavor: ModelFlavor;
   model_version: string;
@@ -93,7 +94,6 @@ export interface TrainingJob {
   registration_build: TrainingBuild | null;
   model_status: TrainingModelStatus;
   stop_reason: string;
-  retry_of: ResourceId | null;
   deletion_requested_at: string | null;
   deletion_error: string;
   deletion_pending: boolean;
