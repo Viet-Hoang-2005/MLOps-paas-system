@@ -20,6 +20,7 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def studio(settings, monkeypatch):
+    monkeypatch.setattr(drafts, "enqueue_preparation", Mock())
     settings.TRAINING_BACKEND = "argo"
     settings.TRAINING_ENABLED = True
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
@@ -27,7 +28,6 @@ def studio(settings, monkeypatch):
     user = get_user_model().objects.create_user("studio@example.test", "password")
     storage = MemoryStorage()
     monkeypatch.setattr(workspaces, "S3Storage", lambda: storage)
-    monkeypatch.setattr(drafts, "S3Storage", lambda: storage)
     enqueue = Mock()
     monkeypatch.setattr("apps.training.services.jobs._enqueue", enqueue)
     workspace = drafts.create_workspace(owner=user)
@@ -45,7 +45,8 @@ def studio(settings, monkeypatch):
 
 
 def run(workspace, storage, key=None):
-    return drafts.run_workspace(workspace, revision=workspace.revision, run_key=key or uuid.uuid4(), storage=storage)
+    job = drafts.run_workspace(workspace, revision=workspace.revision, run_key=key or uuid.uuid4())
+    return drafts.prepare_workspace(job.public_id, job.submission_token, storage=storage) or job
 
 
 def finish(job):
@@ -154,7 +155,8 @@ def test_api_nested_identity_and_legacy_mutations_removed(studio):
         {"revision": workspace.revision, "run_key": str(uuid.uuid4())},
         format="json",
     )
-    assert response.status_code == 201
+    assert response.status_code == 202
+    assert response.data["status"] == "pending"
     job_id = response.data["id"]
     nested = f"/api/training-workspaces/{workspace.public_id}/jobs/{job_id}/"
     assert client.get(nested).status_code == 200
@@ -170,7 +172,7 @@ def test_api_nested_identity_and_legacy_mutations_removed(studio):
 def test_revision_or_validation_errors_create_no_jobs(studio):
     workspace, storage, _, _ = studio
     with pytest.raises(Conflict):
-        drafts.run_workspace(workspace, revision=workspace.revision + 1, run_key=uuid.uuid4(), storage=storage)
+        drafts.run_workspace(workspace, revision=workspace.revision + 1, run_key=uuid.uuid4())
     workspace.entry_point = ""
     workspace.save(update_fields=["entry_point"])
     from rest_framework.exceptions import ValidationError

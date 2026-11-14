@@ -16,6 +16,7 @@ import {
   Play,
   RotateCcw,
 } from "lucide-react";
+import { Loading } from "@/shared/components/Loading";
 import { Button } from "@/shared/components/Button";
 import { Badge } from "@/shared/components/Badge";
 import { PageHeader } from "@/shared/components/PageHeader";
@@ -186,7 +187,11 @@ function TrainingTrainingWorkspace() {
     queryFn: () => getRunInput(jobId),
     enabled: Boolean(selectedJob?.submitted_at),
   });
-  const hasActiveRun = Boolean(selectedJob && active(selectedJob));
+  const hasActiveRun = Boolean(
+    selectedJob?.submitted_at && active(selectedJob),
+  );
+  const isPreparing =
+    selectedJob?.status === "pending" && !selectedJob.submitted_at;
   const locked = busy || editorBusy || hasActiveRun || !isDraft;
   const logStream = useRuntimeLogStream({
     source: selectedJob?.submitted_at ? { kind: "training", id: jobId } : null,
@@ -506,7 +511,7 @@ function TrainingTrainingWorkspace() {
       } else {
         const model = item.model;
         const vram = model === "t4" ? "16 GB" : model === "a10g" ? "24 GB" : "";
-        label = `NVIDIA ${model === "t4" ? "T4" : model === "a10g" ? "A10G" : (model ?? "GPU")}${vram ? ` (${vram})` : ""} ×1`;
+        label = `NVIDIA ${model === "t4" ? "T4" : model === "a10g" ? "A10G" : (model ?? "GPU")}${vram ? ` (${vram})` : ""} Ã—1`;
         if (model) {
           resKeys = [model, `gpu_${model}`];
         }
@@ -671,7 +676,9 @@ function TrainingTrainingWorkspace() {
                   : "neutral"
       }
     >
-      {t(`detail.statuses.${currentStatus}`, currentStatus)}
+      {isPreparing
+        ? t("studio.preparingInput")
+        : t(`detail.statuses.${currentStatus}`, currentStatus)}
     </Badge>
   ) : undefined;
 
@@ -796,7 +803,8 @@ function TrainingTrainingWorkspace() {
           key={`${selectedRun}:${reset}`}
           ref={editor}
           loading={Boolean(
-            selectedJob?.submitted_at && snapshotQuery.isLoading,
+            isPreparing ||
+            (selectedJob?.submitted_at && snapshotQuery.isLoading),
           )}
           workspace={workspace}
           entries={
@@ -858,13 +866,31 @@ function TrainingTrainingWorkspace() {
         badge={statusBadge}
         logs={logStream.logs}
         bodyClassName="h-96 max-h-[45vh] min-h-72"
-        placeholder={t("studio.logPlaceholder")}
+        placeholder={
+          isPreparing ? (
+            <Loading
+              text={t("studio.preparingInput")}
+              description={t("studio.preparingInputHint")}
+            />
+          ) : (
+            t("studio.logPlaceholder")
+          )
+        }
         actionButtons={[runActionButton]}
       />
       {selectedJob?.error_message && (
         <p role="alert" className="text-style-body text-color-danger">
           {selectedJob.error_message}
         </p>
+      )}
+      {selectedJob?.status === "failed" && !selectedJob.submitted_at && (
+        <Button
+          onClick={() =>
+            navigate(`/dashboard/training/workspaces/${workspaceId}`)
+          }
+        >
+          {t("workspaceHistory.currentWorkspace")}
+        </Button>
       )}
       <div className="grid grid-cols-2 gap-4">
         <Button
@@ -899,20 +925,6 @@ function TrainingTrainingWorkspace() {
           currentJobId={jobId || undefined}
           onClose={() => setHistoryOpen(false)}
         />
-      )}
-      {!jobId && draft?.active_job_id && (
-        <Button
-          onClick={() =>
-            navigate(
-              "/dashboard/training/workspaces/" +
-                workspaceId +
-                "/job/" +
-                draft.active_job_id,
-            )
-          }
-        >
-          {t("workspaceHistory.openActive")}
-        </Button>
       )}
       {environmentOpen && (
         <VariablesSecretDialog

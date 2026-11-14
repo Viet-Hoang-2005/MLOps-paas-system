@@ -203,5 +203,5 @@ def test_next_run_copies_gpu_model(studio, settings):
         revision=workspace.revision,
         changes={"accelerator_type": "gpu", "accelerator_count": 1, "accelerator_model": "t4"},
     )
-    job = drafts.run_workspace(workspace, revision=workspace.revision, run_key=uuid.uuid4(), storage=storage)
+    job = drafts.run_workspace(workspace, revision=workspace.revision, run_key=uuid.uuid4())
     assert job.accelerator_model == "t4" and job.workspace_id == workspace.pk

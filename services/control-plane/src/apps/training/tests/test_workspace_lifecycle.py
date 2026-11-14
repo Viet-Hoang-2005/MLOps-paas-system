@@ -96,7 +96,7 @@ def test_concurrent_run_is_serialized_by_workspace(studio, replay):
         try:
             gate.wait(timeout=10)
             try:
-                return drafts.run_workspace(workspace, revision=workspace.revision, run_key=key, storage=storage).pk
+                return drafts.run_workspace(workspace, revision=workspace.revision, run_key=key).pk
             except Conflict:
                 return None
         finally:

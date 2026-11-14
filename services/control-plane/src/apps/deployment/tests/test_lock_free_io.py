@@ -238,6 +238,8 @@ def job_storage(monkeypatch, storage, settings):
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     monkeypatch.setattr(workspaces, "S3Storage", lambda: storage)
     monkeypatch.setattr(job_service, "_enqueue", Mock())
+    monkeypatch.setattr(drafts, "enqueue_preparation", Mock())
+    monkeypatch.setattr("apps.training.services.workspace_lifecycle.cleanup_preparation.apply_async", Mock())
     return storage
 
 
@@ -256,7 +258,8 @@ def editable_job(project, storage):
 
 
 def submit(job, storage):
-    return drafts.run_workspace(job, revision=job.revision, run_key=uuid.uuid4(), storage=storage)
+    pending = drafts.run_workspace(job, revision=job.revision, run_key=uuid.uuid4())
+    return drafts.prepare_workspace(pending.public_id, pending.submission_token, storage=storage)
 
 
 def test_submit_writes_snapshots_outside_any_transaction(project, job_storage):

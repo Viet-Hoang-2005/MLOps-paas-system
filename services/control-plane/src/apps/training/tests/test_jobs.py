@@ -141,11 +141,10 @@ def test_submit_job_is_idempotent_for_one_run_key(studio, monkeypatch):
     import uuid
 
     job, storage, client, _ = studio
-    monkeypatch.setattr("apps.training.services.drafts.S3Storage", lambda: storage)
     payload = {"revision": job.revision, "run_key": str(uuid.uuid4())}
     url = f"/api/training-workspaces/{job.public_id}/runs/"
-    assert client.post(url, payload, format="json").status_code == 201
-    assert client.post(url, payload, format="json").status_code == 201
+    assert client.post(url, payload, format="json").status_code == 202
+    assert client.post(url, payload, format="json").status_code == 202
     assert client.post(url, {**payload, "run_key": str(uuid.uuid4())}, format="json").status_code == 409
     job.refresh_from_db()
-    assert job.jobs.get().status == "queued"
+    assert job.jobs.get().status == "pending"

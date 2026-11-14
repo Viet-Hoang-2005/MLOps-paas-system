@@ -341,3 +341,5 @@ def purge_training_job_outputs(self, job_id):
 from .services.output_finalization import finalize_output  # noqa: F401,E402 - Celery task registration
 
 from .services.workspace_lifecycle import cleanup_workspace  # noqa: F401,E402 - Celery task registration
+
+from .services.preparation import prepare_training_input  # noqa: F401,E402 - Celery task registration

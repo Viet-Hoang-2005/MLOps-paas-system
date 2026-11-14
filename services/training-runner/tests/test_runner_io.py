@@ -1,5 +1,5 @@
+from io import BytesIO
 import stat
-import subprocess
 import tarfile
 import types
 import zipfile
@@ -131,9 +131,10 @@ def test_safe_extract_zip_rejects_decompression_bomb(tmp_path, monkeypatch):
 def test_install_requirements_noop_success_and_failure(monkeypatch, tmp_path, runner_workspace):
     missing = tmp_path / "missing.txt"
     runner.install_requirements(missing)
-    run = Mock(return_value=subprocess.CompletedProcess([], 0, "installed\n", "warning\n"))
+    run = Mock(return_value=Mock(stdout=BytesIO(b"installed\nwarning\n"), wait=Mock(return_value=0)))
+    monkeypatch.setattr("src.pip_stream.open_terminal", lambda: (None, None))
     runtime_log = Mock()
-    monkeypatch.setattr(runner.subprocess, "run", run)
+    monkeypatch.setattr(runner.subprocess, "Popen", run)
     monkeypatch.setattr(runner, "runtime_log", runtime_log)
     requirements = tmp_path / "requirements.txt"
     requirements.write_text("pytest", encoding="utf-8")
@@ -143,7 +144,7 @@ def test_install_requirements_noop_success_and_failure(monkeypatch, tmp_path, ru
     runtime_log.detail.assert_any_call("warning")
     assert "CAPABILITY_TOKEN" not in run.call_args.kwargs["env"]
     assert "PATH" in run.call_args.kwargs["env"]
-    run.return_value = subprocess.CompletedProcess([], 2, "", "bad")
+    run.return_value = Mock(stdout=BytesIO(b"bad\n"), wait=Mock(return_value=2))
     with pytest.raises(RuntimeError, match="exit code 2"):
         runner.install_requirements(requirements)
 

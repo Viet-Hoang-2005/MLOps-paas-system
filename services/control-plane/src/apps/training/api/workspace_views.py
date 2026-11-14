@@ -131,7 +131,7 @@ class WorkspaceRuns(APIView):
         data = TrainingSubmissionSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         job = drafts.run_workspace(_workspace(request.user, workspace_id), **data.validated_data)
-        return Response(TrainingJobSerializer(job).data, status=201)
+        return Response(TrainingJobSerializer(job).data, status=202)
 
 
 class WorkspaceJobs(APIView):

@@ -11,7 +11,7 @@ def runtime_options():
     return sorted({value for value in RUNTIME_OPTIONS if value <= maximum} | {maximum})
 
 
-def validate_resources(values, instance=None, *, local_capacity=None):
+def validate_resources(values, instance=None, *, local_capacity=None, static_only=False):
     def value(name, default):
         return values.get(name, getattr(instance, name, default))
 
@@ -22,7 +22,7 @@ def validate_resources(values, instance=None, *, local_capacity=None):
             if field in values and values[field] != getattr(instance, field):
                 errors[field] = "Submitted training resources are immutable."
     choices = CPU_PROFILES
-    if settings.TRAINING_BACKEND == "docker" and not submitted:
+    if settings.TRAINING_BACKEND == "docker" and not submitted and not static_only:
         from apps.training.services.local_resources import require_capacity
 
         local_capacity = local_capacity or require_capacity()
@@ -34,11 +34,16 @@ def validate_resources(values, instance=None, *, local_capacity=None):
             )
             values["vcpu"], values["memory_mb"] = default["vcpu"], default["memory_mb"]
     if (
-        not (submitted and settings.TRAINING_BACKEND == "docker")
+        not ((submitted or static_only) and settings.TRAINING_BACKEND == "docker")
         and (value("vcpu", 2), value("memory_mb", 4096)) not in choices
     ):
         errors["vcpu"] = "Select a supported CPU/memory profile."
         errors["memory_mb"] = "Select a supported CPU/memory profile."
+    if static_only:
+        for field in ("vcpu", "memory_mb"):
+            resource = value(field, None)
+            if isinstance(resource, bool) or not isinstance(resource, (int, float)) or resource <= 0:
+                errors[field] = "Select valid training resources."
     runtime = value("max_runtime_seconds", 3600)
     invalid_submitted = submitted and (
         (runtime is None or runtime <= 0) or (instance.backend == "argo" and runtime > 86400)

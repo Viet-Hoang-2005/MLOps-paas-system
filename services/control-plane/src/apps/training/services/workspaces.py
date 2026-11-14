@@ -120,7 +120,7 @@ def _parent_exists(workspace, path):
         raise ValidationError({"path": "Parent folder does not exist."})
 
 
-def snapshot_input(workspace, *, revision, storage=None, preparing=False):
+def snapshot_input(workspace, *, revision, storage=None, preparing=False, checkpoint=None):
     """Build a revision-checked Input archive without holding a DB lock during I/O.
 
     This prepares the immutable input contract; dispatch must separately verify
@@ -144,6 +144,8 @@ def snapshot_input(workspace, *, revision, storage=None, preparing=False):
     bundle = BytesIO()
     with ZipFile(bundle, "w", ZIP_DEFLATED) as archive:
         for entry in entries:
+            if checkpoint:
+                checkpoint()
             path = safe_path(entry.relative_path)
             if entry.kind == "folder":
                 archive.writestr(path + "/", b"")

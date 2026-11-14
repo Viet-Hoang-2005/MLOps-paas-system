@@ -79,3 +79,23 @@ acceptance. This implementation does not perform that reset or deploy a cluster.
 Run backend/runner tests, FE tests/lint/build, fresh-schema migration checks and
 offline Kubernetes contract validation. PostgreSQL concurrency and live Docker
 CPU/GPU acceptance require their respective disposable environments.
+
+## Asynchronous Input preparation
+
+Run returns HTTP 202 and a Pending job after the workspace/revision is fenced.
+The HTTP request does not read S3 or probe Docker. An on-commit Celery task claims
+and rotates the submission token, downloads/checks Input and uploads snapshots.
+Dynamic CPU/GPU validation and admission happen afterwards. Only admission sets
+submitted_at and reserves resources/quota. Preparation never counts as training time.
+
+Preparation has a ten-minute deadline including queue time. Its dedicated S3
+client uses 10-second connect/30-second read timeouts and at most two SDK attempts;
+reads are chunked and bounded. Celery soft/hard limits are 540/570 seconds. No
+preparation retry is automatic: errors fail the run and keep the draft available.
+The execution scan fences expired preparation and schedules exact-token cleanup.
+Old task deliveries cannot submit a cancelled, deleted or recovered job.
+
+Deploy local changes by restarting control-plane, celery-worker and celery-beat.
+Pending jobs created by the former synchronous implementation expire through the
+same recovery scan; do not automatically resubmit them. Verify a fresh Run returns
+202 quickly, displays Preparing Input, then reaches Queued/Running after upload.

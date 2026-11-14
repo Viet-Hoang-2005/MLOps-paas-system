@@ -1,26 +1,62 @@
 import Anser from "anser";
 import { Clipboard, Loader2, Terminal } from "lucide-react";
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/shared/lib/cn";
+import { terminalLines } from "@/shared/lib/terminalLines";
 import { toast } from "@/shared/lib/toastStore";
 
-function getAnsiStyle(segment: Anser.AnserJsonEntry): CSSProperties {
+function formatAnsiColor(color: string | null | undefined): string | undefined {
+  if (!color) return undefined;
+  const trimmed = color.trim();
+  if (
+    trimmed.startsWith("#") ||
+    // color-ignore: ANSI escape sequence decoding for terminal stream.
+    trimmed.startsWith("rgb(") ||
+    // color-ignore: ANSI escape sequence decoding for terminal stream.
+    trimmed.startsWith("rgba(") ||
+    trimmed.startsWith("var(")
+  ) {
+    return trimmed;
+  }
+  // color-ignore: ANSI escape sequence decoding for terminal stream.
+  return `rgb(${trimmed})`;
+}
+
+function getAnsiStyle(
+  segment: Anser.AnserJsonEntry,
+  overrideFgColor?: string | null,
+): CSSProperties {
   const decorations = new Set(segment.decorations);
   const textDecorations = [
     decorations.has("underline") ? "underline" : "",
     decorations.has("strikethrough") ? "line-through" : "",
   ].filter(Boolean);
 
+  const fgColor =
+    overrideFgColor !== undefined
+      ? (overrideFgColor ?? undefined)
+      : segment.fg_truecolor
+        ? formatAnsiColor(segment.fg_truecolor)
+        : segment.fg
+          ? formatAnsiColor(segment.fg)
+          : undefined;
+
+  const bgColor = segment.bg_truecolor
+    ? formatAnsiColor(segment.bg_truecolor)
+    : segment.bg
+      ? formatAnsiColor(segment.bg)
+      : undefined;
+
   return {
-    color: segment.fg_truecolor || segment.fg || undefined,
-    backgroundColor: segment.bg_truecolor || segment.bg || undefined,
+    color: fgColor,
+    backgroundColor: bgColor,
     // typography-ignore: ANSI decorations are runtime data, not application typography.
     fontWeight: decorations.has("bold") ? 700 : undefined,
     fontStyle: decorations.has("italic") ? "italic" : undefined,
-    opacity: decorations.has("dim") ? 0.7 : undefined,
+    opacity: overrideFgColor !== undefined ? undefined : decorations.has("dim") ? 0.7 : undefined,
     visibility: decorations.has("hidden") ? "hidden" : undefined,
     textDecoration: textDecorations.length
       ? textDecorations.join(" ")
@@ -28,12 +64,124 @@ function getAnsiStyle(segment: Anser.AnserJsonEntry): CSSProperties {
   };
 }
 
+const isPipProgressBarLine = (log: string): boolean =>
+  /[━╺╸]/.test(log) ||
+  (/[\d.]+\s*(?:kB|MB|GB|B)\b/i.test(log) && /[━─█]/.test(log));
+
+interface ParsedLogSegment {
+  content: string;
+  type: "normal" | "completed" | "track";
+  segment: Anser.AnserJsonEntry;
+}
+
+function parseLogSegments(log: string): ParsedLogSegment[] {
+  const isProgress = isPipProgressBarLine(log);
+  const rawSegments = Anser.ansiToJson(log, { remove_empty: true });
+
+  if (!isProgress) {
+    return rawSegments.map((segment) => ({
+      content: segment.content,
+      type: "normal",
+      segment,
+    }));
+  }
+
+  const result: ParsedLogSegment[] = [];
+  let hasCompletedBar = false;
+
+  for (const segment of rawSegments) {
+    const text = segment.content;
+
+    // Split compound text containing both completed and track characters
+    if (/[━█]/.test(text) && /╺|[─░]/.test(text)) {
+      const match = text.match(/^(\s*)(?:([━█]+╸?))?(?:(╺[━─]*|[─░]+))?(.*)$/);
+      if (match && (match[2] || match[3])) {
+        if (match[1]) {
+          result.push({ content: match[1], type: "normal", segment });
+        }
+        if (match[2]) {
+          result.push({ content: match[2], type: "completed", segment });
+          hasCompletedBar = true;
+        }
+        if (match[3]) {
+          result.push({ content: match[3], type: "track", segment });
+        }
+        if (match[4]) {
+          result.push({ content: match[4], type: "normal", segment });
+        }
+        continue;
+      }
+    }
+
+    if (/^[━█╸]+$/.test(text) && !hasCompletedBar) {
+      result.push({ content: text, type: "completed", segment });
+      hasCompletedBar = true;
+    } else if (
+      /^╺[━─]*$/.test(text) ||
+      (hasCompletedBar && /^[━─░]+$/.test(text))
+    ) {
+      result.push({ content: text, type: "track", segment });
+    } else if (hasCompletedBar && /^[━─█╺╸]+$/.test(text)) {
+      result.push({ content: text, type: "track", segment });
+    } else {
+      const match = text.match(/^(\s*)(?:([━█]+╸?))?(?:(╺[━─]*|[─░]+))?(.*)$/);
+      if (match && (match[2] || match[3])) {
+        if (match[1]) {
+          result.push({ content: match[1], type: "normal", segment });
+        }
+        if (match[2]) {
+          result.push({ content: match[2], type: "completed", segment });
+          hasCompletedBar = true;
+        }
+        if (match[3]) {
+          result.push({ content: match[3], type: "track", segment });
+        }
+        if (match[4]) {
+          result.push({ content: match[4], type: "normal", segment });
+        }
+      } else {
+        result.push({ content: text, type: "normal", segment });
+      }
+    }
+  }
+
+  return result;
+}
+
 function AnsiLogLine({ log }: { log: string }) {
-  return Anser.ansiToJson(log, { remove_empty: true }).map((segment, index) => (
-    <span key={`${index}-${segment.content}`} style={getAnsiStyle(segment)}>
-      {segment.content}
-    </span>
-  ));
+  const parsedSegments = parseLogSegments(log);
+
+  return parsedSegments.map(({ content, type, segment }, index) => {
+    if (type === "completed") {
+      return (
+        <span
+          key={`${index}-${content}`}
+          className="text-color-terminal-foreground"
+          style={getAnsiStyle(segment, null)}
+        >
+          {content}
+        </span>
+      );
+    }
+
+    if (type === "track") {
+      return (
+        <span
+          key={`${index}-${content}`}
+          className="text-color-terminal-muted"
+          style={getAnsiStyle(segment, null)}
+        >
+          {content}
+        </span>
+      );
+    }
+
+    return (
+      <span key={`${index}-${content}`} style={getAnsiStyle(segment)}>
+        {content}
+      </span>
+    );
+  });
 }
 
 export type TerminalButtonType =
@@ -165,26 +313,27 @@ export function TerminalViewer({
 }: TerminalViewerProps) {
   const { t } = useTranslation("common");
   const terminalRef = useRef<HTMLDivElement>(null);
+  const displayLogs = useMemo(() => terminalLines(logs), [logs]);
   const previousLogs = useRef<readonly string[]>([]);
 
   useEffect(() => {
     const previous = previousLogs.current;
     const changed =
-      logs.length !== previous.length ||
-      logs.some((line, index) => line !== previous[index]);
-    previousLogs.current = logs;
+      displayLogs.length !== previous.length ||
+      displayLogs.some((line, index) => line !== previous[index]);
+    previousLogs.current = displayLogs;
     if (
       changed &&
-      logs.length > 0 &&
-      logs.length >= previous.length &&
+      displayLogs.length > 0 &&
+      displayLogs.length >= previous.length &&
       terminalRef.current
     ) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
-  }, [logs]);
+  }, [displayLogs]);
 
   const copyLogs = async () => {
-    await navigator.clipboard.writeText(logs.join("\n"));
+    await navigator.clipboard.writeText(displayLogs.join("\n"));
     toast.success(t("terminal.copied"));
   };
 
@@ -237,8 +386,8 @@ export function TerminalViewer({
         )}
         style={{ scrollBehavior: "smooth" }}
       >
-        {logs.length > 0 ? (
-          logs.map((log, index) => (
+        {displayLogs.length > 0 ? (
+          displayLogs.map((log, index) => (
             <div
               key={`${index}-${log}`}
               className="mb-1 break-all whitespace-pre-wrap"

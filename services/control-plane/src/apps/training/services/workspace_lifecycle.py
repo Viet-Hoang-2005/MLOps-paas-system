@@ -8,14 +8,17 @@ from infrastructure.storage import S3Storage
 
 
 @shared_task(autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
-def cleanup_preparation(job_id, token):
+def cleanup_preparation(job_id, token, prefix=None):
     from apps.training.models import TrainingJob
     from .storage_scope import training_prefix_for
 
     job = TrainingJob.objects.filter(public_id=job_id).first()
-    if not job or job.submitted_at or str(job.submission_token) == token:
+    if job and (job.submitted_at or str(job.submission_token) == token):
         return
-    S3Storage().delete_prefix(f"{training_prefix_for(job)}/input/submissions/{token}/")
+    if job:
+        prefix = f"{training_prefix_for(job)}/input/submissions/{token}/"
+    if prefix and prefix.startswith("users/") and prefix.endswith(f"/training/jobs/{job_id}/input/submissions/{token}/"):
+        S3Storage().delete_prefix(prefix)
 
 
 def request_workspace_deletion(workspace):

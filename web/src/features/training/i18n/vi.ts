@@ -59,6 +59,9 @@ export const trainingVi = {
       "Tải lên file requirements.txt để tự động điền các thư viện phụ thuộc",
   },
   studio: {
+    preparingInput: "Đang chuẩn bị Input",
+    preparingInputHint:
+      "Đang tải, kiểm tra và đóng gói Input. Training sẽ bắt đầu sau khi chuẩn bị hoàn tất.",
     artifactSelection: {
       source_codeInput: "Chọn script Python từ Input",
       reference_dataInput: "Chọn dữ liệu CSV từ Input",

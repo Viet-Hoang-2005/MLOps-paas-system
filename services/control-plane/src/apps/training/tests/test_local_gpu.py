@@ -199,7 +199,7 @@ def test_capabilities_keep_cpu_when_docker_unavailable(settings, monkeypatch):
 def test_submit_checks_selected_device_before_queuing(settings, monkeypatch, studio):
     from apps.training.services import workspaces
 
-    workspace, _, client, _ = studio
+    workspace, storage, client, _ = studio
     settings.TRAINING_BACKEND = "docker"
     settings.TRAINING_GPU_ENABLED = True
     settings.TRAINING_GPU_COUNTS = (1,)
@@ -215,7 +215,14 @@ def test_submit_checks_selected_device_before_queuing(settings, monkeypatch, stu
         {"revision": workspace.revision, "run_key": str(__import__("uuid").uuid4())},
         format="json",
     )
-    assert response.status_code == 400 and not workspace.jobs.exists()
+    assert response.status_code == 202
+    check.assert_not_called()
+    from apps.training.services.drafts import prepare_workspace
+    pending = workspace.jobs.get()
+    with pytest.raises(ValidationError):
+        prepare_workspace(pending.public_id, pending.submission_token, storage=storage)
+    pending.refresh_from_db()
+    assert pending.status == "failed" and not pending.submitted_at
     check.assert_called_once_with(GPU)
 
 

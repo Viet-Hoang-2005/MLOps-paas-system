@@ -19,7 +19,9 @@ def run_workspace(workspace, *, revision, run_key, values, storage):
     for field, value in values.items():
         setattr(workspace, field, value)
     workspace.save()
-    return submit_workspace(workspace, revision=revision, run_key=run_key, storage=storage)
+    from apps.training.services.drafts import prepare_workspace
+    job = submit_workspace(workspace, revision=revision, run_key=run_key)
+    return prepare_workspace(job.public_id, job.submission_token, storage=storage) or job
 
 
 @pytest.fixture

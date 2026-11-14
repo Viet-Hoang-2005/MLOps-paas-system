@@ -25,7 +25,7 @@ services:
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-False}
       DB_HOST_RW: ${DB_HOST_RW:-postgres}
       DB_HOST_RO: ${DB_HOST_RO:-postgres}
-      DB_USER: ${DB_USER}
+      DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-mlops_paas_db}
@@ -98,7 +98,7 @@ services:
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       DB_HOST_RW: ${DB_HOST_RW:-postgres}
       DB_HOST_RO: ${DB_HOST_RO:-postgres}
-      DB_USER: ${DB_USER}
+      DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-mlops_paas_db}
@@ -160,7 +160,7 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-local-dev-change-me}
       DB_HOST_RW: ${DB_HOST_RW:-postgres}
       DB_HOST_RO: ${DB_HOST_RO:-postgres}
-      DB_USER: ${DB_USER}
+      DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-mlops_paas_db}
@@ -201,7 +201,7 @@ services:
       LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
       DB_HOST_RO: postgres
       DB_PORT: 5432
-      DB_USER: ${DB_USER}
+      DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME:-mlops_paas_db}
       CONTROL_PLANE_DB_SCHEMA: ${DB_SCHEMA:-control_plane}
@@ -473,7 +473,7 @@ services:
       LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
       DB_HOST_RW: ${DB_HOST_RW:-postgres}
       DB_HOST_RO: ${DB_HOST_RO:-postgres}
-      DB_USER: ${DB_USER}
+      DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-mlops_paas_db}

@@ -13,7 +13,6 @@ from apps.training.models import TrainingJob, TrainingWorkspace
 from apps.training.services import workspaces
 from apps.training.services.storage_scope import expected_training_uris, training_prefix_for
 from common.api.exceptions import Conflict
-from infrastructure.storage import S3Storage
 
 CONFIG_FIELDS = (
     "model_flavor",
@@ -74,8 +73,7 @@ def recover_preparations():
     return recovered
 
 
-def run_workspace(workspace, *, revision, run_key, storage=None):
-    from apps.training.services.jobs import _submit_job_atomic
+def run_workspace(workspace, *, revision, run_key):
     from apps.training.services.resources import validate_resources
 
     with transaction.atomic():
@@ -93,11 +91,6 @@ def run_workspace(workspace, *, revision, run_key, storage=None):
             from rest_framework.exceptions import ValidationError
 
             raise ValidationError({"entry_point": "Select a Python entry point before running training."})
-        capacity = None
-        if settings.TRAINING_BACKEND == "docker":
-            from apps.training.services.local_resources import require_capacity
-
-            capacity = require_capacity(force=True)
         job = TrainingJob(
             workspace=locked,
             owner=locked.owner,
@@ -111,43 +104,98 @@ def run_workspace(workspace, *, revision, run_key, storage=None):
             preparation_started_at=timezone.now(),
             **{field: getattr(locked, field) for field in CONFIG_FIELDS},
         )
-        validate_resources({}, job, local_capacity=capacity)
-        verified_gpu_id = ""
-        if job.backend == "docker" and job.accelerator_type == "gpu":
-            from apps.training.services.local_gpu import require_device
-
-            require_device(job.local_gpu_id)
-            verified_gpu_id = job.local_gpu_id
+        validate_resources({}, job, static_only=True)
         try:
             with transaction.atomic():
                 job.save()
         except IntegrityError as exc:
             raise Conflict("This submission key is unavailable or the workspace is busy.") from exc
         locked.save(update_fields=["updated_at"])
+        transaction.on_commit(lambda: enqueue_preparation(job.public_id, job.submission_token))
+    return job
+
+
+def enqueue_preparation(job_id, token):
+    from apps.training.services.preparation import prepare_training_input
+
     try:
-        storage = storage or S3Storage()
-        snapshot = workspaces.snapshot_input(locked, revision=revision, storage=storage, preparing=True)
+        prepare_training_input.apply_async(args=[str(job_id), str(token)], retry=False)
+    except Exception:
+        fail_preparation(job_id, token, "Could not queue Input preparation. Run again from the workspace.")
+
+
+def fail_preparation(job_id, token, message):
+    from .workspace_lifecycle import cleanup_preparation
+
+    with transaction.atomic():
+        changed = TrainingJob.objects.filter(
+            public_id=job_id, status="pending", submitted_at__isnull=True, submission_token=token,
+        ).update(status="failed", completed_at=timezone.now(), submission_token=None, error_message=message)
+        if changed:
+            transaction.on_commit(lambda: cleanup_preparation.apply_async(
+                args=[str(job_id), str(token)], countdown=60, retry=False,
+            ), robust=True)
+
+
+def prepare_workspace(job_id, token, *, storage=None):
+    from .jobs import _submit_job_atomic
+    from .preparation import PreparationStorage
+    from .resources import validate_resources
+
+    with transaction.atomic():
+        job = TrainingJob.objects.select_for_update().filter(
+            public_id=job_id, status="pending", submitted_at__isnull=True,
+            submission_token=token, deletion_requested_at__isnull=True,
+        ).first()
+        if not job:
+            return None
+        if not job.preparation_started_at or timezone.now() >= job.preparation_started_at + PREPARATION_LEASE:
+            fail_preparation(job_id, token, "Input preparation expired. Run again from the workspace.")
+            return None
+        job.submission_token = uuid.uuid4()
+        job.save(update_fields=["submission_token", "updated_at"])
+    locked = job.workspace
+    revision = job.input_revision
+    token = job.submission_token
+    def checkpoint():
+        if timezone.now() >= job.preparation_started_at + PREPARATION_LEASE:
+            raise TimeoutError("Input preparation expired.")
+        if not TrainingJob.objects.filter(
+            pk=job.pk, status="pending", submitted_at__isnull=True, submission_token=token,
+            deletion_requested_at__isnull=True, workspace__deletion_requested_at__isnull=True,
+        ).exists():
+            raise Conflict("Input preparation is no longer current.")
+
+    try:
+        storage = storage or PreparationStorage(checkpoint)
+        checkpoint()
+        snapshot = workspaces.snapshot_input(locked, revision=revision, storage=storage, preparing=True, checkpoint=checkpoint)
+        checkpoint()
         uris = expected_training_uris(job, storage.bucket)
         with ZipFile(BytesIO(snapshot["archive"])) as archive:
-            requirements = (
-                archive.read("requirements.txt").decode("utf-8") if "requirements.txt" in archive.namelist() else ""
-            )
+            requirements = archive.read("requirements.txt").decode("utf-8") if "requirements.txt" in archive.namelist() else ""
         storage.put(storage.parse_uri(uris["code"])[1], snapshot["archive"], "application/zip")
+        checkpoint()
         empty = BytesIO()
         with ZipFile(empty, "w"):
             pass
         storage.put(storage.parse_uri(uris["data"])[1], empty.getvalue(), "application/zip")
+        checkpoint()
+        capacity = None
+        if job.backend == "docker":
+            from .local_resources import require_capacity
+            capacity = require_capacity(force=True)
+        validate_resources({}, job, local_capacity=capacity)
+        verified_gpu_id = ""
+        if job.backend == "docker" and job.accelerator_type == "gpu":
+            from .local_gpu import require_device
+            require_device(job.local_gpu_id)
+            verified_gpu_id = job.local_gpu_id
         with transaction.atomic():
             current_workspace = TrainingWorkspace.objects.select_for_update().get(pk=locked.pk)
             current = TrainingJob.objects.select_for_update().get(pk=job.pk)
-            if (
-                current.status != "pending"
-                or current.submission_token != job.submission_token
-                or current_workspace.revision != revision
-                or current_workspace.deletion_requested_at
-                or current.deletion_requested_at
-                or current.submitted_at
-            ):
+            checkpoint()
+            if current_workspace.revision != revision or current.owner_id != current_workspace.owner_id:
                 raise Conflict("The preparation is no longer current.")
             current.requirements_text = requirements
             current.code_snapshot_uri, current.data_snapshot_uri = uris["code"], uris["data"]
@@ -155,17 +203,18 @@ def run_workspace(workspace, *, revision, run_key, storage=None):
             current.save()
             return _submit_job_atomic(current, verified_gpu_id=verified_gpu_id, local_capacity=capacity)
     except Exception:
-        with transaction.atomic():
-            current = TrainingJob.objects.select_for_update().filter(pk=job.pk).first()
-            accepted = current is not None and current.submitted_at is not None
-            if current and not accepted and current.submission_token == job.submission_token:
-                current.status = "failed"
-                current.completed_at = timezone.now()
-                current.error_message = "Input preparation or admission failed. Run again from the workspace."
-                current.submission_token = None
-                current.save(
-                    update_fields=["status", "completed_at", "error_message", "submission_token", "updated_at"]
-                )
-        if not accepted and storage:
-            storage.delete_prefix(f"{training_prefix_for(job)}/input/submissions/{job.submission_token}/")
+        accepted = TrainingJob.objects.filter(pk=job.pk, submitted_at__isnull=False).exists()
+        if not accepted:
+            fail_preparation(job_id, token, "Input preparation or admission failed. Run again from the workspace.")
+            if storage:
+                # A cancelled/deleted job must not leave objects uploaded after its cleanup.
+                try:
+                    storage.delete_prefix(f"{training_prefix_for(job)}/input/submissions/{token}/")
+                except Exception:
+                    from .workspace_lifecycle import cleanup_preparation
+                    # Carry the trusted prefix so deletion of the DB row cannot strand late uploads.
+                    transaction.on_commit(lambda: cleanup_preparation.apply_async(
+                        args=[str(job_id), str(token), f"{training_prefix_for(job)}/input/submissions/{token}/"],
+                        countdown=60, retry=False,
+                    ), robust=True)
         raise
