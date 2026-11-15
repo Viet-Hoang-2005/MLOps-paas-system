@@ -37,6 +37,8 @@ spec:
       kind: NetworkPolicy
     - group: monitoring.coreos.com
       kind: ServiceMonitor
+    - group: monitoring.coreos.com
+      kind: PrometheusRule
   orphanedResources:
     warn: true
     ignore:

@@ -2,8 +2,8 @@
 - name: Require Ubuntu 22.04 or newer
   ansible.builtin.assert:
     that:
-      - ansible_distribution == "Ubuntu"
-      - ansible_distribution_version is version('22.04', '>=')
+      - ansible_facts["distribution"] == "Ubuntu"
+      - ansible_facts["distribution_version"] is version('22.04', '>=')
     fail_msg: The K3s roles support Ubuntu 22.04 or newer.
 
 - name: Wait for cloud-init to finish

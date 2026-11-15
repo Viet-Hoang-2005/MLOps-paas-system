@@ -2,14 +2,13 @@
 - name: Require a Linux control host
   ansible.builtin.assert:
     that:
-      - ansible_system == "Linux"
+      - ansible_facts["system"] == "Linux"
     fail_msg: Run the Ansible control plane from WSL Ubuntu or another Linux host.
 
 - name: Verify required control-host commands
   ansible.builtin.command: "which {{ item }}"
   loop:
     - terraform
-    - aws
     - ssh
   changed_when: false
 
@@ -62,7 +61,12 @@
   when: enable_karpenter | bool
 
 - name: Validate the WSL AWS session
-  ansible.builtin.command: aws sts get-caller-identity --output json
+  delegate_to: localhost
+  become: false
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  amazon.aws.aws_caller_info:
+    region: "{{ aws_region }}"
   changed_when: false
   no_log: true
 

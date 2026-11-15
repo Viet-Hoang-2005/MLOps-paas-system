@@ -126,7 +126,7 @@ ansible/
     ├── helm/                   # Cài đặt Helm binary trên Master node
     ├── platform_core/          # Cài đặt Argo CD và deploy root GitOps Application
     ├── platform_training/      # Cấu hình mở rộng phục vụ Training (Karpenter token, Kubeflow)
-    └── verify/                 # Kiểm tra toàn diện cụm K3s theo 3 phạm vi (verify_scope)
+    └── verify/                 # Kiểm tra cụm K3s theo 4 phạm vi và tùy chọn all (verify_scope)
         ├── defaults/main.yml   # Các biến timeout, retries và cờ kích hoạt mặc định
         └── tasks/
             ├── main.yml        # Dispatcher điều phối include 3 scope chính
@@ -205,7 +205,9 @@ ansible-playbook site.yml --tags verify
 ```
 
 #### Kiểm tra chọn lọc theo phân tầng (Selective Verification Tags)
-Role `verify` được tổ chức thành 10 module độc lập, cho phép kiểm tra nhanh từng phần của hệ thống mà không cần chạy lại toàn bộ:
+Bootstrap verification dùng `community.aws.elb_target_group_info` để đọc lại trạng thái ALB mỗi 10 giây, tối đa 10 lần thử lại (khoảng 100s, cộng thời gian gọi AWS API). Chỉ đạt khi có đúng một Target Group, số target bằng `k3s_expected_worker_count` và tất cả đều `healthy`. Nếu chưa đạt, thông báo lỗi chứa target ID, state, reason, description và lỗi module của lần đọc cuối. Preflight kiểm tra danh tính AWS bằng `amazon.aws.aws_caller_info`. Hai module chạy trên WSL với Python của Ansible; môi trường đó cần cài `boto3` và `botocore` theo `requirements.txt`, cùng các collection trong `requirements.yml`.
+
+Role `verify` gồm 4 phạm vi, với các tag chọn lọc để kiểm tra từng phần của hệ thống mà không cần chạy lại toàn bộ:
 
 ```bash
 # Kiểm tra Node và Runtime K3s (Layer 0):
@@ -214,7 +216,7 @@ ansible-playbook site.yml --tags verify-nodes
 # Kiểm tra Mạng, Ingress và AWS ALB Target Group (Layer 1):
 ansible-playbook site.yml --tags verify-network
 
-# Kiểm tra trạng thái GitOps và 35 Child Applications (Layer 2):
+# Kiểm tra GitOps của các Application hạ tầng, không chờ workload (Layer 2):
 ansible-playbook site.yml --tags verify-gitops
 
 # Kiểm tra và chạy Smoke Test tạo/gắn ổ đĩa AWS EBS gp3 (Layer 3):
@@ -230,7 +232,7 @@ ansible-playbook site.yml --tags verify-security
 ansible-playbook site.yml --tags verify-logging
 
 # Kiểm tra sức khỏe Microservices nghiệp vụ (Control Plane, Celery, Web) (Layer 7):
-ansible-playbook site.yml --tags verify-workloads
+ansible-playbook -i inventory/terraform.py site.yml --tags verify-workloads -e verify_scope=workloads
 
 # Kiểm tra Pipeline MLOps & Argo Events Engine (Layer 8):
 ansible-playbook site.yml --tags verify-execution
@@ -245,6 +247,52 @@ ansible-playbook site.yml --tags preflight,platform-training,verify
 ```
 
 ---
+
+
+### Verification before and after CD
+
+`platform-core` waits for an explicit infrastructure Application list to become
+**Synced/Healthy**: addons, cluster configuration, PostgreSQL, Redis, Redpanda,
+Harbor, Cloudflare, observability, and Argo execution. It does not wait for the
+aggregate Root health or verify business application Deployments, ExternalSecrets,
+or NetworkPolicies. Root must still exist and have a resolved Git revision;
+ComparisonError, InvalidSpecError, and UnknownError remain failures.
+
+| `verify_scope` | Responsibility |
+|---|---|
+| `bootstrap` | K3s nodes, network, ALB |
+| `platform` | Addons, storage, infrastructure Secrets, databases, broker, Harbor, logging, execution |
+| `training` | Trainer, Karpenter, configured CPU/GPU smoke tests |
+| `workloads` | Application/edge sync, migration via GitOps, Secrets, NetworkPolicies, Deployments, Service, full Root health |
+| `all` | All verification phases |
+
+```bash
+# 1. Bootstrap infrastructure before application images exist on Harbor.
+ansible-playbook -i inventory/terraform.py site.yml --tags platform-core
+
+# 2. Run GitHub Actions CD to build, push images, and promote manifests.
+
+# 3. Verify application workloads after CD.
+ansible-playbook -i inventory/terraform.py site.yml --tags verify-workloads -e verify_scope=workloads
+
+# Verify existing infrastructure without application health checks.
+ansible-playbook -i inventory/terraform.py site.yml --tags verify -e verify_scope=platform
+
+# Verify everything after CD (including enabled smoke tests).
+ansible-playbook -i inventory/terraform.py site.yml --tags verify -e verify_scope=all
+```
+
+The scope controls Ansible verification; it does not disable Argo CD auto-sync.
+Root may remain Progressing while application images are unavailable. Workload
+verification still requires full Root and application health: image pulls,
+signatures, migrations, and readiness failures are not ignored. Edge routing is
+verified after CD because its sync wave follows application workloads.
+
+`verify_scope` selects phases from the command line. Each verification play uses
+an internal `verify_phase` to run only its own phase, so `verify_scope=all` does
+not repeat every phase in every play. Without an explicit scope, `--tags verify`
+includes all phases and should be run after CD. `--tags verify-workloads` also
+works without `-e verify_scope=workloads`.
 
 ### 3.4. Sử dụng kubeconfig để quản trị cụm từ xa
 Sau khi chạy phase `bootstrap`, file kubeconfig sẽ được lưu tại `ansible/artifacts/kubeconfig`.

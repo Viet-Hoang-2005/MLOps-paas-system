@@ -1,7 +1,7 @@
 ---
-# Phase 2: Core Platform, GitOps, Data Stores & Workloads Verification
+# Phase 2: Core Infrastructure Verification (independent of application images)
 # --- GitOps Control Plane, Argo CD & Core Addons ---
-- name: Verify Argo CD reports the root application healthy
+- name: Verify the root Application exists and its Git source can be compared
   kubernetes.core.k8s_info:
     api_version: argoproj.io/v1alpha1
     kind: Application
@@ -11,11 +11,12 @@
   register: verified_root_application
   failed_when: >-
     verified_root_application.resources | length != 1 or
-    verified_root_application.resources[0].status.sync.status | default('') != 'Synced' or
-    verified_root_application.resources[0].status.health.status | default('') != 'Healthy'
+    verified_root_application.resources[0].status.sync.revision | default('') | length == 0 or
+    (verified_root_application.resources[0].status.conditions | default([]) |
+    selectattr('type', 'in', ['ComparisonError', 'InvalidSpecError', 'UnknownError']) | list | length > 0)
   tags: [verify, verify-platform, verify-gitops]
 
-- name: Verify every core addon and cluster Application is reconciled
+- name: Verify every core infrastructure Application is reconciled
   kubernetes.core.k8s_info:
     api_version: argoproj.io/v1alpha1
     kind: Application
@@ -27,7 +28,7 @@
     verified_core_application.resources | length != 1 or
     verified_core_application.resources[0].status.sync.status | default('') != 'Synced' or
     verified_core_application.resources[0].status.health.status | default('') != 'Healthy'
-  loop: "{{ core_addon_application_names + core_cluster_application_names }}"
+  loop: "{{ core_addon_application_names + core_cluster_application_names + core_platform_application_names }}"
   tags: [verify, verify-platform, verify-gitops]
 
 - name: Verify every core addon CRD is Established
@@ -263,12 +264,14 @@
   delay: 5
   tags: [verify, verify-platform, verify-security]
 
-- name: Verify every ExternalSecret is Ready
+- name: Verify infrastructure ExternalSecrets are Ready
   kubernetes.core.k8s_info:
     api_version: external-secrets.io/v1
     kind: ExternalSecret
+    namespace: "{{ item }}"
     kubeconfig: "{{ k3s_remote_kubeconfig }}"
   register: verified_external_secrets
+  loop: "{{ platform_secret_namespaces }}"
   until:
     - verified_external_secrets.resources | length > 0
     - >-
@@ -289,7 +292,6 @@
   failed_when: verified_network_policies.resources | length == 0
   loop:
     - mlops-paas-execution
-    - mlops-paas-core
     - mlops-paas-data
   tags: [verify, verify-platform, verify-security]
 
@@ -303,18 +305,18 @@
   tags: [verify, verify-platform, verify-security]
 
 # --- Observability, Metrics & Centralized Logging ---
-- name: Verify Grafana Alloy DaemonSet on worker nodes
+- name: Verify Grafana Alloy Deployment is Ready
   kubernetes.core.k8s_info:
     api_version: apps/v1
-    kind: DaemonSet
+    kind: Deployment
     namespace: mlops-logging
     kubeconfig: "{{ k3s_remote_kubeconfig }}"
     label_selectors:
       - "app.kubernetes.io/name=alloy"
-  register: verified_alloy_daemonset
+  register: verified_alloy_deployment
   until:
-    - verified_alloy_daemonset.resources | length > 0
-    - verified_alloy_daemonset.resources[0].status.numberReady | default(0) >= (groups['workers'] | length)
+    - verified_alloy_deployment.resources | length > 0
+    - verified_alloy_deployment.resources[0].status.readyReplicas | default(0) >= 1
   retries: 60
   delay: 5
   when:
@@ -356,39 +358,6 @@
   retries: 60
   delay: 5
   tags: [verify, verify-platform, verify-logging]
-
-# --- Microservices & Tenant Workloads Health ---
-- name: Verify core workload Deployments are ready
-  kubernetes.core.k8s_info:
-    api_version: apps/v1
-    kind: Deployment
-    name: "{{ item.name }}"
-    namespace: "{{ item.namespace }}"
-    kubeconfig: "{{ k3s_remote_kubeconfig }}"
-  register: verified_workload_deployments
-  until:
-    - verified_workload_deployments.resources | length == 1
-    - verified_workload_deployments.resources[0].status.readyReplicas | default(0) >= 1
-  retries: 60
-  delay: 5
-  loop:
-    - {name: mlops-paas-control-plane, namespace: mlops-paas-core}
-    - {name: mlops-paas-celery-worker, namespace: mlops-paas-core}
-    - {name: mlops-paas-consumer, namespace: mlops-paas-core}
-    - {name: mlops-paas-model-server, namespace: mlops-paas-serving}
-    - {name: mlops-paas-web, namespace: mlops-paas-core}
-  tags: [verify, verify-platform, verify-workloads]
-
-- name: Verify Control Plane Service is registered
-  kubernetes.core.k8s_info:
-    api_version: v1
-    kind: Service
-    name: mlops-paas-control-plane
-    namespace: mlops-paas-core
-    kubeconfig: "{{ k3s_remote_kubeconfig }}"
-  register: verified_control_plane_service
-  failed_when: verified_control_plane_service.resources | length != 1
-  tags: [verify, verify-platform, verify-workloads]
 
 # --- Execution Plane, Event Streaming & Pipeline Engine ---
 - name: Verify Argo Events EventBus is Ready

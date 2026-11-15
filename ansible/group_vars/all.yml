@@ -41,6 +41,31 @@ core_cluster_application_names:
   - mlops-prod-cluster-storage
   - mlops-prod-cluster-secret-store
   - mlops-prod-cluster-image-verification
+# Infrastructure readiness does not depend on images published by application CD.
+core_platform_application_names:
+  - mlops-prod-platform-cloudflare
+  - mlops-prod-platform-postgres
+  - mlops-prod-platform-redis
+  - mlops-prod-platform-redpanda
+  - mlops-prod-platform-harbor
+  - mlops-prod-platform-observability
+  - mlops-prod-execution-argo
+# Edge routing is reconciled after workloads, so verify it after CD.
+workload_application_names:
+  - mlops-prod-workload-control-plane
+  - mlops-prod-workload-consumer
+  - mlops-prod-workload-model-server
+  - mlops-prod-workload-web
+  - mlops-prod-platform-routing
+platform_secret_namespaces:
+  - mlops-paas-data
+  - mlops-paas-routing
+  - mlops-paas-execution
+  - argo-events
+  - kyverno
+workload_secret_namespaces:
+  - mlops-paas-core
+
 core_addon_workloads:
   - {namespace: argocd, release: argocd}
   - {namespace: kube-system, release: aws-ebs-csi-driver}

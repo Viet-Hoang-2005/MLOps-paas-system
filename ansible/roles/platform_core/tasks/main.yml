@@ -43,7 +43,7 @@
     kubeconfig: "{{ k3s_remote_kubeconfig }}"
     definition: "{{ lookup('ansible.builtin.file', playbook_dir + '/../k8s/argocd/application.yaml') | from_yaml }}"
 
-- name: Wait for Argo CD to reconcile every core addon and cluster Application
+- name: Wait for Argo CD to reconcile every core infrastructure Application
   kubernetes.core.k8s_info:
     api_version: argoproj.io/v1alpha1
     kind: Application
@@ -58,20 +58,4 @@
   retries: 90
   delay: 10
   changed_when: false
-  loop: "{{ core_addon_application_names + core_cluster_application_names }}"
-
-- name: Wait for the root GitOps application to synchronize
-  kubernetes.core.k8s_info:
-    api_version: argoproj.io/v1alpha1
-    kind: Application
-    name: mlops-paas-system
-    namespace: argocd
-    kubeconfig: "{{ k3s_remote_kubeconfig }}"
-  register: root_gitops_application
-  until:
-    - root_gitops_application.resources | length == 1
-    - root_gitops_application.resources[0].status.sync.status | default('') == 'Synced'
-    - root_gitops_application.resources[0].status.health.status | default('') == 'Healthy'
-  retries: 90
-  delay: 20
-  changed_when: false
+  loop: "{{ core_addon_application_names + core_cluster_application_names + core_platform_application_names }}"
