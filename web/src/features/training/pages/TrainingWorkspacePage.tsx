@@ -511,7 +511,7 @@ function TrainingTrainingWorkspace() {
       } else {
         const model = item.model;
         const vram = model === "t4" ? "16 GB" : model === "a10g" ? "24 GB" : "";
-        label = `NVIDIA ${model === "t4" ? "T4" : model === "a10g" ? "A10G" : (model ?? "GPU")}${vram ? ` (${vram})` : ""} Ã—1`;
+        label = `NVIDIA ${model === "t4" ? "T4" : model === "a10g" ? "A10G" : (model ?? "GPU")}${vram ? ` (${vram})` : ""} x1`;
         if (model) {
           resKeys = [model, `gpu_${model}`];
         }

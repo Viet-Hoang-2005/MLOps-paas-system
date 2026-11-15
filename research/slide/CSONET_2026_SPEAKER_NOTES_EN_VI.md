@@ -6,8 +6,6 @@
 
 Lịch nói dự kiến **14 phút 35 giây**, dành **25 giây dự phòng** trong phần trình bày 15 phút. Sau đó có **5 phút phản biện**. Tốc độ trung bình khoảng 98 từ/phút. Hãy dừng ngắn sau mỗi ý và dùng thời gian chỉ sơ đồ. Các mốc thời gian là mục tiêu tập dượt, cần điều chỉnh theo tốc độ nói thực tế.
 
-Trong PowerPoint, mở **View → Notes** để đọc ghi chú, hoặc bật **Presenter View** khi trình chiếu. Điều chỉnh kích thước chữ trong vùng ghi chú theo nhu cầu.
-
 ## Thời gian từng slide
 
 | Slide | Nội dung | Thời lượng | Mốc trong bài |
@@ -35,6 +33,9 @@ Trong PowerPoint, mở **View → Notes** để đọc ghi chú, hoặc bật **
 | 21 | Scientific Limitations | 30 giây | 14:00–14:30 |
 | 22 | Thank You and Questions | 5 giây | 14:30–14:35 |
 | 23 | References | Backup / khi được hỏi | Trong phần phản biện |
+| 24 | Model Configuration, Build and Deployment | Backup / khoảng 40 giây | Khi được hỏi trong Q&A |
+| 25 | Prediction Logging and Drift Monitoring | Backup / khoảng 45 giây | Khi được hỏi trong Q&A |
+| 26 | Training Workspace and Model Version Artifacts | Backup / khoảng 45 giây | Khi được hỏi trong Q&A |
 
 
 ## Slide 1 — Title
@@ -43,7 +44,7 @@ Trong PowerPoint, mở **View → Notes** để đọc ghi chú, hoặc bật **
 
 ### English script
 
-> Good morning, everyone. My name is Hoang, and I am from the University of Information Technology in Vietnam.<br>
+> Good morning, everyone. My name is Hoang Tran-Nguyen-Viet , and I am from the University of Information Technology in Vietnam.<br>
 > Today, I will present our drift-aware MLOps framework for multi-model serving, using network intrusion detection as a case study.<br>
 
 ### Giải thích tiếng Việt
@@ -61,11 +62,12 @@ Pause after your name and the presentation topic. Point to the paper title.
 
 ### English script
 
-> In production, a change in traffic raises an important question: is the model still performing well?<br>
-> Distribution monitoring tells us whether recent inputs differ from the reference data. It can work without labels.<br>
-> To assess predictive quality, however, we need ground-truth labels, which often arrive later or require human review.<br>
-> These signals can disagree. A strong drift alert may accompany good predictions, while missed attacks may produce few alerts.<br>
-> This gap motivates our framework: bringing both forms of evidence into model lifecycle decisions.<br>
+> In production environments, when network traffic changes, operators face two distinct questions.<br>
+> First: Has the input distribution changed? This can be monitored in real time using unlabeled feature streams, giving us distribution evidence P(X).<br>
+> Second: Are attacks being missed? This is about predictive quality, which requires ground-truth labels. However, in security operations, labels often arrive late, or require human triage.<br>
+> As shown by Rabanser and colleagues at NeurIPS 2019, these two signals can disagree. A strong drift alert does not necessarily mean predictions have failed, and critical recall loss can occur with very few alerts.<br>
+> Bridging this gap is the primary motivation for our work.<br>
+
 
 ### Giải thích tiếng Việt
 
@@ -82,10 +84,11 @@ Point to the left column, then the right column. Pause after each question.
 
 ### English script
 
-> Our contributions connect system design with scientific evidence.<br>
-> The integrated framework links model versions to their artifacts and monitoring context. A service replay demonstrates the inference-to-monitoring pipeline.<br>
-> We evaluate one fixed XGBoost classifier across one hundred and twenty controlled NIDS windows.<br>
-> The central finding is that drift share does not consistently rank predictive harm. This supports reviewing distribution alerts alongside labeled quality when making lifecycle decisions.<br>
+> Our paper makes three core contributions.<br>
+> First, an integrated MLOps framework that connects model versions with their artifacts, baseline references, and monitoring reports, validated through an end-to-end service replay.<br>
+> Second, a controlled empirical evaluation of a fixed XGBoost classifier across one hundred and twenty NIDS windows, explicitly separating attack prevalence shifts from novel-family replacement.<br>
+> And third, empirical evidence for monitoring decisions, demonstrating that drift magnitude alone does not reliably rank predictive harm, and that lifecycle decisions must combine distribution alerts with labeled quality.<br>
+
 
 ### Giải thích tiếng Việt
 
@@ -489,6 +492,82 @@ Trang backup dùng khi khán giả hỏi về tài liệu liên quan. Nội dung
 ### Gợi ý trình bày
 
 Backup only. Allow about 15 seconds if you need to introduce the references during Q&A.
+
+
+## Slide 24 — Model Configuration, Build and Deployment
+
+**Thời gian** — Trang backup, khoảng 40 giây khi được hỏi; không tính vào phần trình bày chính.
+
+### English script
+
+> These screenshots illustrate how a user prepares and deploys a model through the platform.<br>
+> The configuration screen captures the model framework and API access settings.<br>
+> After the image is built, the user can register a model version and deploy it.<br>
+> The overview then displays the deployment status and resource usage.<br>
+>
+> The main point is that these steps are connected through the platform, allowing the user to follow the model from configuration to a running service.<br>
+>
+> These are prototype interface examples.<br>
+> The displayed resource values are snapshots, rather than controlled production benchmark results.<br>
+
+### Giải thích tiếng Việt
+
+Giải thích luồng cấu hình framework và quyền truy cập API, build image, đăng ký version rồi deploy. Các ảnh được ghép để minh họa chức năng, không theo thứ tự thao tác trên slide. Ảnh có endpoint localhost và log Docker, vì vậy không dùng chúng làm bằng chứng thực nghiệm K3s production. Các giá trị CPU, RAM và requests/second chỉ là số tức thời trong giao diện.
+
+### Gợi ý trình bày
+
+Point to configuration, build, deployment, and overview in that order. Use this slide to explain the interface, not to make performance claims.
+
+
+## Slide 25 — Prediction Logging and Drift Monitoring
+
+**Thời gian** — Trang backup, khoảng 45 giây khi được hỏi; không tính vào phần trình bày chính.
+
+### English script
+
+> This slide illustrates the path from prediction testing to drift monitoring.<br>
+> The prediction interface displays responses and test progress, while the production-data preview shows records available for monitoring.<br>
+> The user can configure a record-count trigger or request a drift check manually, then inspect the report and individual feature results.<br>
+>
+> The record-count trigger determines when a check starts.<br>
+> The drift-share threshold determines whether the report raises an alert.<br>
+>
+> These screenshots show an illustrative run with 202 samples and 53 displayed columns.<br>
+> They are separate from the paper's controlled evaluation.<br>
+> The displayed accuracy and drift score should therefore not be interpreted as research results.<br>
+
+### Giải thích tiếng Việt
+
+Minh họa kiểm thử prediction, dữ liệu production đã ghi và báo cáo drift. Phân biệt ngưỡng số bản ghi dùng để kích hoạt job với ngưỡng drift share dùng để kết luận cảnh báo. Ảnh report có 202 mẫu và 53 cột hiển thị, khác protocol nghiên cứu dùng 1.000 mẫu/cửa sổ và 52 feature. Không dùng accuracy 46% của lần test đang chạy, drift score hoặc “drift detection rate” trong ảnh như metric nghiên cứu. Các panel không chứng minh monitor đã tự kích hoạt khi đủ ngưỡng; giao diện cũng cho phép chạy thủ công.
+
+### Gợi ý trình bày
+
+Follow prediction testing, production records, monitoring controls, and the report. If asked about the numbers, distinguish these interface examples from the frozen experimental results.
+
+
+## Slide 26 — Training Workspace and Model Version Artifacts
+
+**Thời gian** — Trang backup, khoảng 45 giây khi được hỏi; không tính vào phần trình bày chính.
+
+### English script
+
+> These screenshots illustrate the training interface and its connection to model management.<br>
+> Users prepare code, data, dependencies, and resource settings in a workspace.<br>
+> During execution, they can inspect training logs and resource usage.<br>
+> After a successful run, they can select the job and associate its outputs with a model project.<br>
+> The version interface then provides access to the associated artifacts.<br>
+>
+> This demonstrates the user workflow, rather than a measured retraining policy.<br>
+> The training example is separate from the frozen classifier used in our experiments.<br>
+> The GTX 1650 shown here belongs to the demonstration environment, rather than the production cluster.<br>
+
+### Giải thích tiếng Việt
+
+Giới thiệu workspace, cấu hình tài nguyên, theo dõi log và liên kết output của job đã thành công với Model Project. Sau đó giải thích giao diện version lưu các artifact liên quan. Không suy ra các ảnh thuộc cùng một lần chạy, không khẳng định ảnh log Running chứng minh job đó đã hoàn thành, và không nói việc gán Project tự động Build/Deploy. Ví dụ training này không thay model frozen trong paper; GTX 1650 là máy demo, không phải GPU production.
+
+### Gợi ý trình bày
+
+Point to the workspace, live logs, completed-job selection, and version artifacts. Explain the available workflow without claiming that automated retraining was evaluated.
 
 
 ## Cách đọc một số thuật ngữ và số liệu
