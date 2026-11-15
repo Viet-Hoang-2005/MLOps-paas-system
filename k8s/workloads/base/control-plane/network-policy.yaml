@@ -70,4 +70,32 @@ spec:
   policyTypes:
     - Ingress
   ingress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-mlops-paas-control-plane-jwks
+  labels:
+    app.kubernetes.io/name: mlops-paas-control-plane
+    app.kubernetes.io/instance: mlops-paas-control-plane
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: control-plane
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mlops-paas-control-plane
+  policyTypes:
+    - Ingress
+  ingress:
+    # The inference gateway retrieves public JWKS for private-model JWT verification.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mlops-paas-model-server
+      ports:
+        - protocol: TCP
+          port: 8000
 

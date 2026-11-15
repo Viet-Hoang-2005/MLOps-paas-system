@@ -16,6 +16,22 @@ from ..utils import (
 
 
 @pytest.mark.validate
+def validate_gateway_can_fetch_control_plane_jwks(context: ValidationContext) -> None:
+    resources = context.render("k8s/workloads/overlays/production/control-plane")
+    policy = next(r for r in resources if r["kind"] == "NetworkPolicy"
+                  and r["metadata"]["name"] == "np-mlops-paas-control-plane-jwks")
+    assert policy["spec"]["podSelector"]["matchLabels"] == {
+        "app.kubernetes.io/name": "mlops-paas-control-plane"
+    }
+    assert policy["spec"]["ingress"] == [{
+        "from": [{"podSelector": {"matchLabels": {
+            "app.kubernetes.io/name": "mlops-paas-model-server"
+        }}}],
+        "ports": [{"protocol": "TCP", "port": 8000}],
+    }]
+
+
+@pytest.mark.validate
 def validate_control_plane_memory_scaling_has_idle_headroom(context: ValidationContext) -> None:
     resources = context.render("k8s/workloads/overlays/production/control-plane")
     hpa = next(r for r in resources if r["kind"] == "HorizontalPodAutoscaler")
