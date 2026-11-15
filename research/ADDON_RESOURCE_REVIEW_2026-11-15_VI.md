@@ -56,7 +56,7 @@ RAM và CPU đều tính theo container, không phải tổng Pod. Phần chưa 
 | Loki singleBinary | 256Mi / 1Gi | **512Mi / 2Gi** | 100m / 1000m | Ưu tiên: ingest/query/compaction; S3 không loại bỏ nhu cầu RAM |
 | Alloy | 128Mi / 384Mi | 128Mi / 512Mi | 50m / 500m | Bổ sung headroom, phải đo khi nhiều log stream |
 | Headlamp | 64Mi / 128Mi | 64Mi / 256Mi | 30m / 250m | Chưa khẩn cấp, headroom khi xem nhiều resource |
-| Redis operator | 256Mi / 500Mi | Giữ | 100m / 500m | Chưa có lý do tăng; không giảm request chỉ từ snapshot 12Mi |
+| Redis operator | 256Mi / 500Mi | Giữ | 50m / 500m | Điều chỉnh CPU request từ 100m xuống 50m sau rollout workload: operator dùng khoảng 4m, hai worker 2 vCPU thiếu chỗ đặt replica Model Server. Giữ nguyên RAM và CPU limit; cần tăng capacity khi tải/autoscale tăng. |
 | Karpenter controller | 128Mi / 512Mi | 256Mi / 512Mi | 50m / 1000m | Dự phòng scheduling burst; theo dõi khi thực sự provision node |
 | Kubeflow Trainer manager | 128Mi / 512Mi | 256Mi / 512Mi | 50m / 500m | Theo dõi số TrainJob và reconcile |
 | JobSet controller | 128Mi / 512Mi | Giữ | 100m / 500m | Chưa có dữ liệu yêu cầu tăng limit |
