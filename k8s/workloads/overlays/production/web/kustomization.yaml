@@ -8,4 +8,4 @@ resources:
 images:
 - name: mlops-paas-web
   newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-web
-  newTag: ffb45dc8489f81e36b27fe7ea7979f7775cb163f
+  newTag: bad9bec4ab3916c973ddce560c758206648b53ea
