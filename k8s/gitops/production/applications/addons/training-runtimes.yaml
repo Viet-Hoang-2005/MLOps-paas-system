@@ -24,8 +24,6 @@ spec:
     repoURL: https://github.com/Viet-Hoang-2005/MLOps-paas-system.git
     targetRevision: main
     path: k8s/argo/runtimes/training
-    directory:
-      recurse: false
   destination:
     server: https://kubernetes.default.svc
     namespace: kubeflow-system
