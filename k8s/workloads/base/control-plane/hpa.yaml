@@ -27,13 +27,11 @@ spec:
       resource:
         name: cpu
         target:
-          type: Utilization
-          averageUtilization: 65
+          type: AverageValue
+          averageValue: 65m
     - type: Resource
       resource:
         name: memory
         target:
-          # Gunicorn's idle footprint is already ~210Mi per pod. A percentage
-          # of the 256Mi reservation caused perpetual scale-up without traffic.
           type: AverageValue
           averageValue: 384Mi

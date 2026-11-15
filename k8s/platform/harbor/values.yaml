@@ -37,13 +37,22 @@ persistence:
 registry:
   relativeurls: true
   nodeSelector: { workload-type: worker }
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+  registry:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  controller:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 128Mi
 
 trivy:
   enabled: false
@@ -55,7 +64,7 @@ portal:
   nodeSelector: { workload-type: worker }
   resources:
     requests:
-      cpu: 20m
+      cpu: 10m
       memory: 32Mi
     limits:
       cpu: 100m
@@ -65,7 +74,7 @@ core:
   nodeSelector: { workload-type: worker }
   resources:
     requests:
-      cpu: 50m
+      cpu: 20m
       memory: 128Mi
     limits:
       cpu: 300m
@@ -75,7 +84,7 @@ jobservice:
   nodeSelector: { workload-type: worker }
   resources:
     requests:
-      cpu: 30m
+      cpu: 20m
       memory: 64Mi
     limits:
       cpu: 200m
@@ -86,14 +95,14 @@ database:
   internal:
     resources:
       requests:
-        cpu: 50m
+        cpu: 30m
         memory: 128Mi
       limits:
         cpu: 300m
         memory: 512Mi
   resources:
     requests:
-      cpu: 50m
+      cpu: 30m
       memory: 128Mi
     limits:
       cpu: 300m
@@ -104,18 +113,28 @@ redis:
   internal:
     resources:
       requests:
-        cpu: 30m
+        cpu: 20m
         memory: 64Mi
       limits:
         cpu: 150m
         memory: 128Mi
   resources:
     requests:
-      cpu: 30m
+      cpu: 20m
       memory: 64Mi
     limits:
       cpu: 150m
       memory: 128Mi
+
+nginx:
+  nodeSelector: { workload-type: worker }
+  resources:
+    requests:
+      cpu: 40m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 64Mi
 
 exporter:
   nodeSelector: { workload-type: worker }

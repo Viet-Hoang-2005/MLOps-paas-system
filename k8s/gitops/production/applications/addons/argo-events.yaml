@@ -34,7 +34,7 @@ spec:
             workload-type: worker
           resources:
             requests:
-              cpu: 30m
+              cpu: 20m
               memory: 128Mi
             limits:
               cpu: 500m

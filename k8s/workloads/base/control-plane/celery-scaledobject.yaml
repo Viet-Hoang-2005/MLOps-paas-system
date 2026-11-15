@@ -50,7 +50,7 @@ spec:
       authenticationRef:
         name: mlops-paas-celery-redis-auth
     - type: cpu
-      metricType: Utilization
+      metricType: AverageValue
       metadata:
-        value: "80"
+        value: "80m"
 

@@ -31,7 +31,7 @@ spec:
           container:
             resources:
               requests:
-                cpu: 100m
+                cpu: 30m
                 memory: 256Mi
               limits:
                 cpu: 1000m
@@ -41,7 +41,7 @@ spec:
         backgroundController:
           resources:
             requests:
-              cpu: 25m
+              cpu: 20m
               memory: 128Mi
             limits:
               cpu: 250m
@@ -51,8 +51,8 @@ spec:
         cleanupController:
           resources:
             requests:
-              cpu: 25m
-              memory: 64Mi
+              cpu: 20m
+              memory: 128Mi
             limits:
               cpu: 250m
               memory: 256Mi
@@ -61,7 +61,7 @@ spec:
         reportsController:
           resources:
             requests:
-              cpu: 25m
+              cpu: 20m
               memory: 128Mi
             limits:
               cpu: 500m

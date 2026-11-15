@@ -10,26 +10,3 @@ images:
 - name: mlops-paas-model-server
   newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-server
   newTag: df4aa6477cdeb6f069339fc894a050a433f322ae
-
-patches:
-- target:
-    kind: Deployment
-    name: mlops-paas-model-server
-  patch: |-
-    apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      name: mlops-paas-model-server
-    spec:
-      strategy:
-        type: RollingUpdate
-        rollingUpdate:
-          maxSurge: 0
-          maxUnavailable: 1
-      template:
-        spec:
-          containers:
-          - name: model-server
-            resources:
-              requests:
-                cpu: 50m

@@ -42,11 +42,11 @@ spec:
           workload-type: worker
         resources:
           requests:
-            cpu: 50m
-            memory: 256Mi
+            cpu: 20m
+            memory: 64Mi
           limits:
             cpu: 500m
-            memory: 500Mi
+            memory: 256Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: redis-operator

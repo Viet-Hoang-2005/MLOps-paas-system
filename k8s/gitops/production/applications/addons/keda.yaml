@@ -32,15 +32,15 @@ spec:
         resources:
           operator:
             requests:
-              cpu: 30m
+              cpu: 20m
               memory: 128Mi
             limits:
               cpu: 500m
               memory: 256Mi
           metricServer:
             requests:
-              cpu: 30m
-              memory: 64Mi
+              cpu: 20m
+              memory: 128Mi
             limits:
               cpu: 500m
               memory: 256Mi

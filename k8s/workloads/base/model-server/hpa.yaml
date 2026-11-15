@@ -28,6 +28,6 @@ spec:
       resource:
         name: memory
         target:
-          type: Utilization
-          averageUtilization: 75
+          type: AverageValue
+          averageValue: 256Mi
 

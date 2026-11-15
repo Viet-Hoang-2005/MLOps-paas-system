@@ -9,7 +9,7 @@ spec:
     container:
       resources:
         requests:
-          cpu: 30m
+          cpu: 15m
           memory: 64Mi
         limits:
           cpu: 200m
