@@ -239,8 +239,9 @@ jobs:
           fi
 
           if [ "${{ needs.detect-changes.outputs.training_runner }}" == "true" ]; then
-            yq e -i '(.spec.templates[] | select(.name == "cpu-pytorch-job") | .resource.manifest) |= sub("image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:[^\\n]+", "image: '$REG'/mlops-paas-training-runner:'$SHA'")' k8s/argo/workflows/training/workflow.yaml
-            yq e -i '(.spec.templates[] | select(.name == "gpu-pytorch-job") | .resource.manifest) |= sub("image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:[^\\n]+", "image: '$REG'/mlops-paas-training-runner:'$SHA'")' k8s/argo/workflows/training/workflow.yaml
+            export TRAINING_RUNNER_IMAGE="$REG/mlops-paas-training-runner:$SHA"
+            yq e -i '(.spec.template.spec.replicatedJobs[] | select(.name == "node") | .template.spec.template.spec.initContainers[] | select(.name == "prepare-input") | .image) = strenv(TRAINING_RUNNER_IMAGE)' k8s/argo/runtimes/training/single-node.yaml
+            yq e -i '(.spec.template.spec.replicatedJobs[] | select(.name == "node") | .template.spec.template.spec.containers[] | select(.name == "node") | .image) = strenv(TRAINING_RUNNER_IMAGE)' k8s/argo/runtimes/training/single-node.yaml
           fi
 
       - name: Generate Summary Table

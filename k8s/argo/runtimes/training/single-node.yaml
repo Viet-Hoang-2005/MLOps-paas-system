@@ -54,7 +54,7 @@ spec:
                   emptyDir: {}
                 initContainers:
                 - name: prepare-input
-                  image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:81965f1f52b90f1578765eaf99e15aba96f68a8a
+                  image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:ffb45dc8489f81e36b27fe7ea7979f7775cb163f
                   command:
                   - python
                   - -m
@@ -91,7 +91,7 @@ spec:
                     mountPath: /workspace/model
                   - name: training-output
                     mountPath: /workspace/output
-                  image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:81965f1f52b90f1578765eaf99e15aba96f68a8a
+                  image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:ffb45dc8489f81e36b27fe7ea7979f7775cb163f
                   env:
                   - name: PREPARED_INPUT_DIR
                     value: /prepared/input
