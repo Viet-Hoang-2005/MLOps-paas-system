@@ -32,6 +32,11 @@ spec:
           initContainerImageTag: v0.26.0
           watchNamespace: mlops-paas-data
           webhook: false
+          strategy:
+            type: RollingUpdate
+            rollingUpdate:
+              maxSurge: 0
+              maxUnavailable: 1
         featureGates: null
         nodeSelector:
           workload-type: worker
