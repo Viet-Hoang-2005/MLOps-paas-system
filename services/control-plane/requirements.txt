@@ -15,6 +15,8 @@ docker==7.1.0
 mlflow==2.14.1
 whitenoise==6.6.0
 celery[redis]==5.4.0
+# Celery 5.4 requires redis-py <6; Kombu 5.7's transport requires >=6.1.
+kombu[redis]==5.6.2
 gunicorn==22.0.0
 prometheus-client==0.20.0
 google-auth==2.29.0
