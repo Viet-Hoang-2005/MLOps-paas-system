@@ -10,7 +10,7 @@ resources:
 images:
 - name: mlops-paas-control-plane
   newName: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane
-  newTag: c554fcb3dbe76a7344bb683c1ae638095b8f3390
+  newTag: ffb45dc8489f81e36b27fe7ea7979f7775cb163f
 
 patches:
 - patch: |-
