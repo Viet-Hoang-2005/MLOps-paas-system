@@ -7,8 +7,9 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.models import LocalTrainingReservation, TrainingJob
+from apps.training.models import LocalTrainingReservation
 from apps.training.services import local_resources as local
 from common.api.exceptions import Conflict, ServiceUnavailable
 
@@ -82,10 +83,10 @@ def test_outstanding_memory_subtracts_verified_running_usage(settings, monkeypat
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     user = get_user_model().objects.create_user("memory@example.com")
     project = ModelProject.objects.create(owner=user, name="memory")
-    current = TrainingJob.objects.create(
+    current = training_job(
         project=project, vcpu=1, memory_mb=1024, max_runtime_seconds=3600, input_contract="legacy", status="pending"
     )
-    other = TrainingJob.objects.create(
+    other = training_job(
         project=project,
         vcpu=1,
         memory_mb=2048,
@@ -115,7 +116,7 @@ def test_reservation_is_shared_and_released_only_explicitly(settings):
     first = get_user_model().objects.create_user("local-first@example.com")
     second = get_user_model().objects.create_user("local-second@example.com")
     jobs = [
-        TrainingJob.objects.create(
+        training_job(
             project=ModelProject.objects.create(owner=user, name=str(i)),
             vcpu=2,
             memory_mb=2048,
@@ -142,7 +143,7 @@ def test_reservation_is_shared_and_released_only_explicitly(settings):
 def test_dispatch_guard_rejects_low_memory_and_releases_lock(settings, monkeypatch):
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     user = get_user_model().objects.create_user("guard@example.com")
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=ModelProject.objects.create(owner=user, name="guard"),
         vcpu=2,
         memory_mb=2048,
@@ -197,7 +198,7 @@ def test_reconciliation_releases_reservation_only_after_confirmed_stop(settings)
 
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     user = get_user_model().objects.create_user("release@example.com")
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=ModelProject.objects.create(owner=user, name="release"),
         backend="docker",
         status="queued",
@@ -233,7 +234,7 @@ def test_concurrent_reservations_share_a_postgres_pool(settings):
     user = get_user_model().objects.create_user("concurrent@example.com")
     project = ModelProject.objects.create(owner=user, name="concurrent")
     jobs = [
-        TrainingJob.objects.create(
+        training_job(
             project=project, vcpu=2, memory_mb=2048, max_runtime_seconds=3600, input_contract="legacy", status="pending"
         )
         for i in range(2)

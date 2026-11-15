@@ -4,6 +4,10 @@ global:
     workload-type: worker
 
 configs:
+  params:
+    reposerver.parallelism.limit: "2"
+    controller.status.processors: "10"
+    controller.operation.processors: "5"
   cm:
     kustomize.buildOptions: --enable-helm
     resource.customizations.health.argoproj.io_Application: |
@@ -73,73 +77,67 @@ controller:
     workload-type: worker
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 200m
+      memory: 1Gi
     limits:
-      cpu: 500m
-      memory: 512Mi
-
+      cpu: 1000m
+      memory: 2Gi
 dex:
   nodeSelector:
     workload-type: worker
   resources:
     requests:
-      cpu: 25m
-      memory: 64Mi
-    limits:
-      cpu: 100m
+      cpu: 15m
       memory: 128Mi
-
+    limits:
+      cpu: 250m
+      memory: 256Mi
 redis:
   nodeSelector:
     workload-type: worker
   resources:
     requests:
-      cpu: 50m
-      memory: 64Mi
+      cpu: 20m
+      memory: 128Mi
     limits:
       cpu: 200m
-      memory: 128Mi
-
+      memory: 256Mi
 server:
   nodeSelector:
     workload-type: worker
   resources:
     requests:
-      cpu: 50m
+      cpu: 20m
       memory: 128Mi
     limits:
-      cpu: 250m
-      memory: 256Mi
-
+      cpu: 500m
+      memory: 512Mi
 repoServer:
   nodeSelector:
     workload-type: worker
   resources:
     requests:
-      cpu: 100m
+      cpu: 50m
       memory: 256Mi
     limits:
       cpu: 1000m
-      memory: 1Gi
-
+      memory: 2Gi
 applicationSet:
   nodeSelector:
     workload-type: worker
   resources:
     requests:
-      cpu: 30m
+      cpu: 15m
       memory: 64Mi
     limits:
-      cpu: 150m
-      memory: 128Mi
-
+      cpu: 250m
+      memory: 256Mi
 notifications:
   nodeSelector:
     workload-type: worker
   resources:
     requests:
-      cpu: 20m
+      cpu: 15m
       memory: 64Mi
     limits:
       cpu: 100m

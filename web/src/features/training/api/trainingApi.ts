@@ -1,3 +1,4 @@
+import { isAxiosError } from "axios";
 import { apiClient } from "@/shared/api/client";
 import { controlPlaneURL } from "@/shared/api/config";
 import { fetchAllPages } from "@/shared/api/pagination";
@@ -109,17 +110,6 @@ export const cancelTrainingJob = async (
   return "training_job" in data ? data.training_job : data;
 };
 
-export const retryTrainingJob = async (
-  jobId: string,
-  creationKey: string,
-): Promise<TrainingJob> =>
-  (
-    await apiClient.post<TrainingJob>(
-      controlPlaneURL(`/training-jobs/${jobId}/retry/`),
-      { creation_key: creationKey },
-    )
-  ).data;
-
 export const deleteTrainingJob = async (
   jobId: string,
 ): Promise<TrainingJobDeletionRequest> =>
@@ -199,13 +189,5 @@ export const compareTrainingRuns = async (
     >(controlPlaneURL(`/training-jobs/compare/?job_ids=${jobIds.join(",")}`))
   ).data;
 
-export const cloneTrainingJob = async (
-  jobId: string,
-  creationKey: string,
-): Promise<TrainingJob> =>
-  (
-    await apiClient.post<TrainingJob>(
-      controlPlaneURL(`/training-jobs/${jobId}/clone/`),
-      { creation_key: creationKey },
-    )
-  ).data;
+export const isTrainingRevisionConflict = (error: unknown): boolean =>
+  isAxiosError(error) && error.response?.status === 409;

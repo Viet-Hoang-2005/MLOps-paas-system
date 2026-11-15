@@ -62,7 +62,10 @@ export default function EvolutionPage() {
     );
   return (
     <div className="flex w-full flex-1 flex-col space-y-6">
-      <PageHeader title={t("workspace.title")} />
+      <PageHeader
+        title={t("workspace.title")}
+        actions={<ProjectPageSelect />}
+      />
       <Placeholder
         title={t("workspace.title")}
         description={t("workspace.noProject")}
@@ -110,7 +113,10 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
   if (state.loading) {
     return (
       <div className="flex w-full flex-1 flex-col space-y-6">
-        <PageHeader title={t("workspace.title")} />
+        <PageHeader
+          title={t("workspace.title")}
+          actions={<ProjectPageSelect />}
+        />
         <p role="status">{t("workspace.loading")}</p>
       </div>
     );
@@ -119,7 +125,10 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
   if (blocked) {
     return (
       <div className="flex w-full flex-1 flex-col space-y-6">
-        <PageHeader title={t("workspace.title")} />
+        <PageHeader
+          title={t("workspace.title")}
+          actions={<ProjectPageSelect />}
+        />
         <div role="alert" className="space-y-3">
           <p>{getApiErrorMessage(state.error, t("workspace.loadFailed"))}</p>
           <Button variant="secondary" onClick={() => void state.refresh()}>
@@ -133,7 +142,10 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
   if ((state.versions.data?.length ?? 0) === 0) {
     return (
       <div className="flex w-full flex-1 flex-col space-y-6">
-        <PageHeader title={t("workspace.title")} />
+        <PageHeader
+          title={t("workspace.title")}
+          actions={<ProjectPageSelect />}
+        />
         <Placeholder
           title={t("workspace.title")}
           description={t("workspace.empty")}
@@ -155,7 +167,10 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
   return (
     <div className="flex flex-col w-full flex-1 min-h-0 h-[calc(100vh-7.5rem)] max-h-[calc(100vh-7.5rem)] space-y-6 overflow-hidden">
       <div className="shrink-0">
-        <PageHeader title={t("workspace.title")} />
+        <PageHeader
+          title={t("workspace.title")}
+          actions={<ProjectPageSelect />}
+        />
       </div>
 
       <div className="flex flex-col lg:flex-row items-stretch gap-6 flex-1 min-h-0 overflow-hidden">
@@ -377,3 +392,4 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
     </div>
   );
 }
+import { ProjectPageSelect } from "@/features/projects/components/ProjectPageSelect";

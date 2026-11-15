@@ -35,7 +35,7 @@ describe("Projects Navigation - projectSelectionPath", () => {
       "/dashboard/projects/new",
       "/dashboard/projects/old/monitoring/report/run-id",
       "/dashboard/deployments/new",
-      "/dashboard/training/jobs/job-id/config",
+      "/dashboard/training/workspaces/workspace-id/job/job-id",
       "/dashboard/settings/profile",
       "/dashboard/api-keys",
       "/dashboard/notifications",

@@ -1,8 +1,8 @@
 import pytest
 from django.contrib.auth import get_user_model
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.models import TrainingJob
 from apps.training.services.storage_scope import expected_training_uris
 
 
@@ -10,7 +10,7 @@ from apps.training.services.storage_scope import expected_training_uris
 def test_legacy_storage_scope_survives_project_detachment():
     owner = get_user_model().objects.create_user("storage-owner@example.test", "password")
     project = ModelProject.objects.create(owner=owner, name="Project")
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="sklearn",
         vcpu=2,
@@ -29,7 +29,7 @@ def test_legacy_storage_scope_survives_project_detachment():
 @pytest.mark.django_db
 def test_tenant_storage_scope_does_not_depend_on_project():
     owner = get_user_model().objects.create_user("independent-owner@example.test", "password")
-    job = TrainingJob.objects.create(
+    job = training_job(
         owner=owner,
         model_flavor="sklearn",
         storage_layout="tenant",

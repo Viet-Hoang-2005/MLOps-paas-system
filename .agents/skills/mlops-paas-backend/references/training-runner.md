@@ -24,3 +24,5 @@ The Training Runner (`services/training-runner/`) executes user-supplied trainin
    - Collects trained model artifacts (`/workspace/model/`), metrics, parameters, and model insights (`feature_importance.json`, `coefficients.json`).
    - Packages Output v2 into private `model.tar.gz` (`model/`, `metadata/`, `_mlops/`). Control Plane asynchronously verifies/materializes files before Completed.
    - Dispatches authenticated callback to `/internal/webhooks/training-jobs/<id>/` reporting `COMPLETED` or `FAILED`.
+
+Pip installs stream through a Linux PTY, preserving progress bars. RuntimeLog redacts detail/progress before Redis/Loki delivery. TERMINAL_PROGRESS JSON records contain text/done and are display-row updates, never metric events. Keep bounded update frequency, process-group cancellation and isolated pip env. See services/training-runner/README.md.

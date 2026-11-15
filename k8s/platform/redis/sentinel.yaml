@@ -21,7 +21,7 @@ spec:
       key: REDIS_SENTINEL_PASSWORD
     resources:
       requests:
-        cpu: 15m
+        cpu: 25m
         memory: 32Mi
       limits:
         cpu: 100m
@@ -68,7 +68,7 @@ spec:
     image: quay.io/opstree/redis-exporter:v1.44.0
     resources:
       requests:
-        cpu: 15m
+        cpu: 5m
         memory: 32Mi
       limits:
         cpu: 100m

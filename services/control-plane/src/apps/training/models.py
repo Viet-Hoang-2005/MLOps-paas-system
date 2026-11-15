@@ -8,7 +8,55 @@ from django.utils import timezone
 from common.execution_watch import ExecutionWatch
 
 
-class TrainingJobEntry(models.Model):
+class TrainingWorkspace(models.Model):
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="training_workspaces")
+    revision = models.PositiveIntegerField(default=1)
+    entry_point = models.CharField(max_length=512, blank=True, default="")
+    environment = models.JSONField(default=dict, blank=True)
+    model_flavor = models.CharField(max_length=40, default="sklearn")
+    vcpu = models.PositiveIntegerField(null=True, blank=True)
+    memory_mb = models.PositiveIntegerField(null=True, blank=True)
+    max_runtime_seconds = models.PositiveIntegerField(null=True, blank=True)
+    accelerator_type = models.CharField(max_length=20, default="none")
+    accelerator_count = models.PositiveIntegerField(default=0)
+    accelerator_model = models.CharField(max_length=16, blank=True, default="")
+    local_gpu_id = models.CharField(max_length=80, blank=True, default="")
+    deletion_requested_at = models.DateTimeField(null=True, blank=True)
+    deletion_error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return str(self.public_id)
+
+    @staticmethod
+    def active_filter():
+        return (
+            models.Q(status__in=["pending", "queued", "running", "uploading", "cancelling"])
+            | models.Q(observation_status="cleanup_pending")
+            | models.Q(public_id__in=LocalTrainingReservation.objects.filter(active=True).values("job_id"))
+            | models.Q(public_id__in=TrainingQuotaReservation.objects.filter(active=True).values("job_id"))
+        )
+
+    def active_jobs(self):
+        return self.jobs.filter(self.active_filter())
+
+    @property
+    def status(self):
+        if self.deletion_requested_at:
+            return "delete_failed" if self.deletion_error else "deleting"
+        prefetched = getattr(self, "_display_active_jobs", None)
+        job = (prefetched[0] if prefetched else None) if prefetched is not None else self.active_jobs().first()
+        if not job:
+            return "ready"
+        return "preparing" if job.status == "pending" and not job.submitted_at else "running"
+
+
+class TrainingWorkspaceEntry(models.Model):
     KINDS = (
         ("folder", "Folder"),
         ("script", "Script"),
@@ -19,7 +67,7 @@ class TrainingJobEntry(models.Model):
     )
 
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    job = models.ForeignKey("TrainingJob", on_delete=models.CASCADE, related_name="entries")
+    workspace = models.ForeignKey(TrainingWorkspace, on_delete=models.CASCADE, related_name="entries")
     relative_path = models.CharField(max_length=512)
     kind = models.CharField(max_length=16, choices=KINDS)
     s3_uri = models.CharField(max_length=1024, blank=True)
@@ -30,24 +78,26 @@ class TrainingJobEntry(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["job", "relative_path"], name="training_job_entry_path_unique")]
+        constraints = [
+            models.UniqueConstraint(fields=["workspace", "relative_path"], name="training_workspace_entry_path_unique")
+        ]
 
     def __str__(self):
-        return f"{self.job_id}/{self.relative_path}"
+        return f"{self.workspace_id}/{self.relative_path}"
 
 
-class TrainingJobSecret(models.Model):
-    job = models.ForeignKey("TrainingJob", on_delete=models.CASCADE, related_name="secrets")
+class TrainingWorkspaceSecret(models.Model):
+    workspace = models.ForeignKey(TrainingWorkspace, on_delete=models.CASCADE, related_name="secrets")
     name = models.CharField(max_length=128)
     ciphertext = models.BinaryField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["job", "name"], name="training_job_secret_unique")]
+        constraints = [models.UniqueConstraint(fields=["workspace", "name"], name="training_workspace_secret_unique")]
 
     def __str__(self):
-        return f"{self.job_id}/{self.name}"
+        return f"{self.workspace_id}/{self.name}"
 
 
 class TrainingJob(ExecutionWatch):
@@ -61,7 +111,6 @@ class TrainingJob(ExecutionWatch):
     STATUSES = tuple(
         (value, value.replace("_", " ").title())
         for value in (
-            "editing",
             "pending",
             "queued",
             "uploading",
@@ -83,8 +132,7 @@ class TrainingJob(ExecutionWatch):
         max_length=16, choices=(("project", "Project"), ("tenant", "Tenant")), default="project"
     )
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="training_jobs")
-    environment = models.JSONField(default=dict, blank=True)
-    revision = models.PositiveIntegerField(default=1)
+    workspace = models.ForeignKey(TrainingWorkspace, on_delete=models.PROTECT, related_name="jobs")
     input_contract = models.CharField(
         max_length=16, default="workspace", choices=(("legacy", "Legacy"), ("workspace", "Workspace"))
     )
@@ -93,11 +141,8 @@ class TrainingJob(ExecutionWatch):
     submission_token = models.UUIDField(null=True, blank=True, editable=False)
     preparation_started_at = models.DateTimeField(null=True, blank=True, editable=False)
     submitted_at = models.DateTimeField(null=True, blank=True, editable=False)
-    creation_key = models.UUIDField(null=True, blank=True, unique=True, editable=False)
-    cloned_from = models.ForeignKey("self", on_delete=models.SET_NULL, related_name="clones", null=True, blank=True)
     environment_snapshot = models.JSONField(default=dict, blank=True)
     secret_snapshot = models.JSONField(default=dict, blank=True, editable=False)
-    retry_of = models.ForeignKey("self", on_delete=models.SET_NULL, related_name="retries", null=True, blank=True)
     trigger_kind = models.CharField(
         max_length=32,
         choices=(("manual", "Manual"), ("retry", "Retry"), ("maintenance", "Maintenance")),
@@ -123,7 +168,7 @@ class TrainingJob(ExecutionWatch):
     backend = models.CharField(max_length=30, default="local")
     external_job_id = models.CharField(max_length=255, blank=True)
     celery_task_id = models.CharField(max_length=255, blank=True, db_index=True)
-    status = models.CharField(max_length=30, choices=STATUSES, default="editing")
+    status = models.CharField(max_length=30, choices=STATUSES, default="pending")
     vcpu = models.PositiveIntegerField(null=True, blank=True)
     memory_mb = models.PositiveIntegerField(null=True, blank=True)
     max_runtime_seconds = models.PositiveIntegerField(null=True, blank=True)
@@ -145,11 +190,20 @@ class TrainingJob(ExecutionWatch):
     class Meta:
         ordering = ["-created_at"]
         indexes = [models.Index(fields=["project", "status"], name="training_project_status_idx")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workspace"],
+                condition=models.Q(status__in=["pending", "queued", "running", "uploading", "cancelling"]),
+                name="training_workspace_one_active_job",
+            )
+        ]
 
     def __str__(self):
         return str(self.public_id)
 
     def save(self, *args, **kwargs):
+        if self.workspace_id and self.owner_id and self.workspace.owner_id != self.owner_id:
+            raise ValidationError("Training job and workspace must have the same owner.")
         # Legacy creation paths still supply only project. Keep ownership
         # explicit on the job so it can eventually outlive that relationship.
         if not self.owner_id and self.project_id:

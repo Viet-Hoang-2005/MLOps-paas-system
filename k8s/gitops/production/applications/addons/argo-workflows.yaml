@@ -42,7 +42,7 @@ spec:
             workload-type: worker
           resources:
             requests:
-              cpu: 50m
+              cpu: 20m
               memory: 128Mi
             limits:
               cpu: 500m
@@ -54,8 +54,8 @@ spec:
             workload-type: worker
           resources:
             requests:
-              cpu: 30m
-              memory: 64Mi
+              cpu: 15m
+              memory: 128Mi
             limits:
               cpu: 250m
               memory: 256Mi

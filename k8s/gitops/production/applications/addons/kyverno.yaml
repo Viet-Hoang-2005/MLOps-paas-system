@@ -31,41 +31,41 @@ spec:
           container:
             resources:
               requests:
-                cpu: 50m
-                memory: 128Mi
-              limits:
-                cpu: 200m
+                cpu: 30m
                 memory: 256Mi
+              limits:
+                cpu: 1000m
+                memory: 1Gi
           nodeSelector:
             workload-type: worker
         backgroundController:
           resources:
             requests:
-              cpu: 25m
-              memory: 64Mi
-            limits:
-              cpu: 100m
+              cpu: 20m
               memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
           nodeSelector:
             workload-type: worker
         cleanupController:
           resources:
             requests:
-              cpu: 25m
-              memory: 64Mi
-            limits:
-              cpu: 100m
+              cpu: 20m
               memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
           nodeSelector:
             workload-type: worker
         reportsController:
           resources:
             requests:
-              cpu: 25m
-              memory: 64Mi
-            limits:
-              cpu: 100m
+              cpu: 20m
               memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           nodeSelector:
             workload-type: worker
         existingImagePullSecrets:

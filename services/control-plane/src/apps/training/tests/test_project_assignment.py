@@ -5,15 +5,16 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import unsaved_training_job
 from apps.catalog.models import ModelProject
-from apps.training.models import TrainingJob, TrainingOutput
+from apps.training.models import TrainingOutput
 from apps.training.services.storage_scope import expected_training_uris
 
 
 @pytest.fixture
 def unassigned_job(db, monkeypatch):
     user = get_user_model().objects.create_user("assign-owner@example.test", "password")
-    job = TrainingJob(
+    job = unsaved_training_job(
         owner=user,
         model_flavor="sklearn",
         status="completed",

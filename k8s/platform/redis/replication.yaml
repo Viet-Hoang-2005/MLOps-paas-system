@@ -21,8 +21,8 @@ spec:
       key: REDIS_PASSWORD
     resources:
       requests:
-        cpu: 50m
-        memory: 256Mi
+        cpu: 30m
+        memory: 128Mi
       limits:
         cpu: 500m
         memory: 512Mi
@@ -59,7 +59,7 @@ spec:
     image: quay.io/opstree/redis-exporter:v1.44.0
     resources:
       requests:
-        cpu: 15m
+        cpu: 5m
         memory: 32Mi
       limits:
         cpu: 100m

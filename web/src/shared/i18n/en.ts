@@ -70,7 +70,9 @@ export const commonEn = {
   statuses: {
     preview: "Preview",
     running: "Running",
-    registered: "registered",
+    registered: "Registered",
+    deleting: "Deleting",
+    delete_failed: "Delete failed",
     loading: "Loading...",
     loadingPage: "Loading page",
     empty: "No data available",

@@ -5,7 +5,7 @@ import type { NotificationItem } from "@/features/notifications/types";
  *
  * Rules:
  * - Model project: /dashboard/projects
- * - Training: /dashboard/projects/<projectId>/training
+ * - Training: /dashboard/training/workspaces/<workspaceId>/job/<jobId>
  * - Packaging (build) & Deployment: /dashboard/projects/<projectId>/deployment
  * - Data drift: /dashboard/projects/<projectId>/monitoring
  * - Alert: /dashboard/projects/<projectId>/overview
@@ -28,10 +28,16 @@ export function getNotificationDestination(
     case "project":
       return "/dashboard/projects";
 
-    case "training":
-      return projectId
-        ? `/dashboard/projects/${projectId}/training`
+    case "training": {
+      const workspaceId = notification.metadata?.workspace_id;
+      const jobId = notification.metadata?.job_id;
+      return typeof workspaceId === "string" &&
+        typeof jobId === "string" &&
+        /^[a-zA-Z0-9_-]+$/.test(workspaceId) &&
+        /^[a-zA-Z0-9_-]+$/.test(jobId)
+        ? `/dashboard/training/workspaces/${workspaceId}/job/${jobId}`
         : "/dashboard/training";
+    }
 
     case "build":
     case "deployment":

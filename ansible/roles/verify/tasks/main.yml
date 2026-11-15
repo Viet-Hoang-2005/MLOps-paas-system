@@ -7,7 +7,9 @@
     - verify-bootstrap
     - verify-nodes
     - verify-network
-  when: verify_scope in ['bootstrap', 'all']
+  when:
+    - verify_scope in ['bootstrap', 'all']
+    - verify_phase | default('all') in ['bootstrap', 'all']
 
 - name: "Execute Platform Verification Phase"
   ansible.builtin.include_tasks: platform.yml
@@ -19,13 +21,23 @@
     - verify-data
     - verify-security
     - verify-logging
-    - verify-workloads
     - verify-execution
-  when: verify_scope in ['platform', 'all']
+  when:
+    - verify_scope in ['platform', 'all']
+    - verify_phase | default('all') in ['platform', 'all']
 
 - name: "Execute Training Verification Phase"
   ansible.builtin.include_tasks: training.yml
   tags: 
     - verify
     - verify-training
-  when: verify_scope in ['training', 'all']
+  when:
+    - verify_scope in ['training', 'all']
+    - verify_phase | default('all') in ['training', 'all']
+
+- name: Execute Workloads Verification Phase
+  ansible.builtin.include_tasks: workloads.yml
+  tags: [verify, verify-workloads]
+  when:
+    - verify_scope in ['workloads', 'all']
+    - verify_phase | default('all') in ['workloads', 'all']

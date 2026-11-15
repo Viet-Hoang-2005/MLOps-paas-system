@@ -9,15 +9,22 @@ export type PageTab = {
   to?: string;
   onClick?: () => void;
   isActive?: boolean;
+  className?: string;
 };
 
 export type PageTabsProps = {
   tabs: PageTab[];
   className?: string;
+  tabClassName?: string;
   bordered?: boolean;
 };
 
-export function PageTabs({ tabs, className, bordered = false }: PageTabsProps) {
+export function PageTabs({
+  tabs,
+  className,
+  tabClassName,
+  bordered = false,
+}: PageTabsProps) {
   const { t } = useTranslation("common");
   const nav = (
     <nav
@@ -39,12 +46,14 @@ export function PageTabs({ tabs, className, bordered = false }: PageTabsProps) {
                   tab.onClick?.();
                 }}
                 className={({ isActive }) =>
-                  [
-                    "inline-flex h-10 items-center gap-2 border-b-2 px-3 text-style-body-strong transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                  cn(
+                    "inline-flex h-10 items-center justify-center gap-2 border-b-2 px-3 text-style-body-strong transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                     isActive
                       ? "border-primary text-color-primary"
                       : "border-transparent text-color-muted-foreground hover:border-border hover:text-color-foreground",
-                  ].join(" ")
+                    tabClassName,
+                    tab.className,
+                  )
                 }
               >
                 {Icon && <Icon className="h-4 w-4 shrink-0 -translate-y-0.5" />}
@@ -61,12 +70,14 @@ export function PageTabs({ tabs, className, bordered = false }: PageTabsProps) {
                 e.currentTarget.blur();
                 tab.onClick?.();
               }}
-              className={[
-                "inline-flex h-10 items-center gap-2 border-b-2 px-3 text-style-body-strong transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+              className={cn(
+                "inline-flex h-10 items-center justify-center gap-2 border-b-2 px-3 text-style-body-strong transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                 tab.isActive
                   ? "border-primary text-color-primary"
                   : "border-transparent text-color-muted-foreground hover:border-border hover:text-color-foreground",
-              ].join(" ")}
+                tabClassName,
+                tab.className,
+              )}
             >
               {Icon && <Icon className="h-4 w-4 shrink-0 -translate-y-0.5" />}
               <span className="whitespace-nowrap">{tab.label}</span>

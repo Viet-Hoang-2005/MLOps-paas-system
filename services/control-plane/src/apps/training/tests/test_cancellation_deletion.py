@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job as make_training_job
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build
 from apps.registry.models import ModelVersion
@@ -18,7 +19,7 @@ from infrastructure.execution.docker_backends import DockerTrainingBackend
 def training_job(*, email="delete-training@example.com", status="completed"):
     owner = get_user_model().objects.create_user(email, "password123")
     project = ModelProject.objects.create(owner=owner, name=f"project-{email}")
-    job = TrainingJob.objects.create(
+    job = make_training_job(
         project=project,
         model_flavor="sklearn",
         code_snapshot_uri="s3://bucket/code.zip",
@@ -124,13 +125,13 @@ def test_hard_delete_preserves_registered_version_and_ready_image(monkeypatch):
     monkeypatch.setattr("apps.training.tasks.S3Storage", lambda: storage)
     monkeypatch.setattr("apps.training.services.logs.delete_training_logs", lambda _job_id: None)
 
-    assert delete_training_job.run(str(job.public_id)) == "deleted"
+    assert delete_training_job.run(str(job.public_id)) == "blocked-by-build"
 
-    assert not TrainingJob.objects.filter(pk=job.pk).exists()
+    assert TrainingJob.objects.filter(pk=job.pk).exists()
     build.refresh_from_db()
     version.refresh_from_db()
-    assert build.source_job is None
-    assert version.source_job is None
+    assert build.source_job_id == job.pk
+    assert version.source_job_id == job.pk
     assert build.source_job_reference == job.public_id
     assert version.source_job_reference == job.public_id
     assert build.image_uri.endswith(":v1")

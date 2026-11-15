@@ -12,12 +12,12 @@ from django.urls import ResolverMatch
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build
 from apps.deployment.services import logs as deployment_logs
 from apps.deployment.tasks import execute_build
 from apps.drift.services import logs as drift_logs
-from apps.training.models import TrainingJob
 from apps.training.services import logs as training_logs
 from apps.training.tasks import execute_training_job
 from common import celery_logging, gunicorn_conf
@@ -233,7 +233,7 @@ def test_build_dispatch_is_not_completion(project, monkeypatch, django_capture_o
 
 
 def test_training_dispatch_is_not_completion(project, monkeypatch, django_capture_on_commit_callbacks):
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         status="queued",
         backend="argo",

@@ -7,6 +7,8 @@ from django.contrib.auth import get_user_model
 from django.db import connection, connections, transaction
 from django.utils import timezone
 
+from apps.training.tests.factories import unsaved_training_job
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.observability.services import executions
 from apps.observability.services.executions import claim
@@ -21,7 +23,7 @@ def test_concurrent_claims_have_one_owner_per_job(settings):
     project = ModelProject.objects.create(owner=owner, name="lease-concurrency")
     TrainingJob.objects.bulk_create(
         [
-            TrainingJob(
+            unsaved_training_job(
                 project=project,
                 owner=project.owner,
                 model_flavor="sklearn",
@@ -59,7 +61,7 @@ def postgres_job(settings):
         pytest.skip("Observation concurrency requires disposable PostgreSQL.")
     owner = get_user_model().objects.create_user("observations@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="observation-concurrency")
-    return TrainingJob.objects.create(
+    return training_job(
         project=project,
         model_flavor="sklearn",
         backend="docker",

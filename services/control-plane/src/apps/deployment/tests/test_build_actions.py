@@ -8,13 +8,14 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject, PreviewAsset
 from apps.deployment.models import Build, BuildInputAsset
 from apps.deployment.services.builds import request_build_deletion, request_rebuild
 from apps.deployment.services.completion import request_registration
 from apps.deployment.tasks import delete_build, execute_build
 from apps.registry.models import ModelVersion
-from apps.training.models import TrainingJob, TrainingOutput
+from apps.training.models import TrainingOutput
 from common.api.exceptions import Conflict
 from infrastructure.execution.build_cleanup import stop_build_for_deletion
 from infrastructure.execution.image_cleanup import BuildImageCleaner
@@ -248,7 +249,7 @@ def test_rebuild_copies_current_preview_into_new_build(project, status, monkeypa
 
 
 def test_rebuild_uses_original_completed_training_job(project, monkeypatch):
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="xgboost",
         status="completed",
@@ -282,7 +283,7 @@ def test_rebuild_uses_original_completed_training_job(project, monkeypatch):
 
 
 def test_rebuild_does_not_reuse_training_build_being_deleted(project):
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="xgboost",
         status="completed",

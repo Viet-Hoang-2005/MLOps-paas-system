@@ -111,6 +111,17 @@ export const NotificationItemComponent: React.FC<NotificationItemProps> = ({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 overflow-hidden">
+            <h4
+              className={cn(
+                "truncate font-semibold text-color-foreground",
+                isCompact
+                  ? "text-style-caption-strong"
+                  : "text-style-body-strong",
+              )}
+            >
+              {notification.title}
+            </h4>
+
             {!notification.is_read && (
               <span
                 className={cn(
@@ -125,16 +136,6 @@ export const NotificationItemComponent: React.FC<NotificationItemProps> = ({
                 *
               </span>
             )}
-            <h4
-              className={cn(
-                "truncate font-semibold text-color-foreground",
-                isCompact
-                  ? "text-style-caption-strong"
-                  : "text-style-body-strong",
-              )}
-            >
-              {notification.title}
-            </h4>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">

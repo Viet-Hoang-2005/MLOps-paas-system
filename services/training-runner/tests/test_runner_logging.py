@@ -1,7 +1,6 @@
 import io
 import json
 import logging
-import subprocess
 from unittest.mock import Mock
 
 import pytest
@@ -110,11 +109,10 @@ def test_pip_stderr_is_detail_not_error(monkeypatch, runner_workspace, log_captu
     writer.return_value = True
     requirements = tmp_path / "requirements.txt"
     requirements.write_text("example-package", encoding="utf-8")
-    monkeypatch.setattr(
-        runner.subprocess,
-        "run",
-        Mock(return_value=subprocess.CompletedProcess([], 0, "installed\n", "pip warning\n")),
-    )
+    monkeypatch.setattr("src.pip_stream.open_terminal", lambda: (None, None))
+    monkeypatch.setattr(runner.subprocess, "Popen", Mock(return_value=Mock(
+        stdout=io.BytesIO(b"installed\npip warning\n"), wait=Mock(return_value=0),
+    )))
     runner.install_requirements(requirements)
     assert all(record.levelno == logging.DEBUG for record in caplog.records)
     assert any("pip warning" in record.getMessage() for record in caplog.records)

@@ -32,16 +32,21 @@ spec:
           initContainerImageTag: v0.26.0
           watchNamespace: mlops-paas-data
           webhook: false
+          strategy:
+            type: RollingUpdate
+            rollingUpdate:
+              maxSurge: 0
+              maxUnavailable: 1
         featureGates: null
         nodeSelector:
           workload-type: worker
         resources:
           requests:
-            cpu: 100m
-            memory: 256Mi
+            cpu: 20m
+            memory: 64Mi
           limits:
             cpu: 500m
-            memory: 500Mi
+            memory: 256Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: redis-operator

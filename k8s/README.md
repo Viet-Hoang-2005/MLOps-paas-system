@@ -308,6 +308,25 @@ kubectl patch application <application-name> -n argocd --type merge -p '{"operat
 
 ## 4. Các chú ý quan trọng (Important Notes)
 
+### Quy hoạch Capacity và Resource Reservations (Khảo sát ngày 15/11/2026)
+
+Cấu hình resource requests đã được khảo sát toàn diện từ số liệu Prometheus và CloudWatch, tối ưu hóa để tận dụng hai worker tĩnh `t3.large` (tổng allocatable 4.000m CPU, 15.641 MiB RAM):
+
+| Nhóm Workload | Requests Cũ (Live) | Requests Đề xuất | Mức Giảm (Delta) | Tỷ lệ Tiết kiệm |
+|---|---|---|---|---|
+| **Workloads (`mlops-paas-core`)** | 720m | 360m | -360m | Giảm 50,0% |
+| **Platform (`data`, `harbor`, `routing`, `logging`)** | 1.055m | 695m | -360m | Giảm 34,1% |
+| **Addons (`argocd`, `monitoring`, `kyverno`, `keda`,...)** | 1.940m | 1.100m | -840m | Giảm 43,3% |
+| **K3s System (worker components)** | 190m | 130m | -60m | Giảm 31,6% |
+| **TỔNG HAI WORKER TĨNH** | **3.905m (97,6%)** | **2.685m (67,1%)** | **-1.220m** | **Thu hồi 30,5% năng lực** |
+
+- **Dung lượng trống khả dụng (Headroom):** Tăng từ 95m (2,4%) lên **1.315m (32,9%)**, đảm bảo đủ chỗ cho Rolling Update (surge pods), Model Packager Kaniko (250m) và Evidently Drift evaluator (100m) chạy đồng thời.
+- **Khắc phục lỗi Helm Chart Keys:**
+  - Karpenter dùng `controller.resources` (50m) thay vì `resources` trực tiếp để tránh bị chart bỏ qua.
+  - Harbor dùng `registry.registry.resources` (50m), `registry.controller.resources` (25m) và bổ sung `nginx.resources` (40m).
+- **Lưu ý nút thắt RAM:** `worker-node-2` hiện cấp phát 87,4% RAM requests (còn trống 986 MiB). Ưu tiên các tác vụ có RAM lớn sang `worker-node-1` (trống 1.708 MiB).
+- Chi tiết đầy đủ xem tại báo cáo: `docs/reports/k3s-cpu-survey-20261115/REPORT.md`.
+
 > [!CAUTION]
 > **Không sửa trực tiếp trên Cụm (No Ad-hoc Mutations):**
 > Tuyệt đối không dùng lệnh `kubectl edit` hay `kubectl apply` để sửa đổi tài nguyên do Argo CD quản lý trên cluster. Cơ chế `selfHeal: true` của Argo CD sẽ tự động phát hiện và ghi đè lại cấu hình từ Git, làm mất toàn bộ các chỉnh sửa thủ công của bạn.

@@ -367,7 +367,7 @@ class RuntimeLog:
         except Exception:
             return False
 
-    def detail(self, message):
+    def detail(self, message, *, progress=False, completed=False):
         # Redact before per-line truncation; never discard the tail of a chunk.
         stream = threading.get_ident()
         lines = []
@@ -385,7 +385,9 @@ class RuntimeLog:
         # Quoted credential values and SQL parameter dumps may span lines.
         # Sanitize the whole chunk before splitting/truncating presentation lines.
         for line in sanitize("\n".join(lines), limit=None).splitlines():
-            safe = sanitize(line)
+            safe = sanitize(line, limit=256) if progress else sanitize(line)
+            if progress:
+                safe = "TERMINAL_PROGRESS " + json.dumps({"text": safe, "done": completed}, ensure_ascii=False)
             delivered = self._write(safe)
             log_event(
                 self.logger,
@@ -394,6 +396,9 @@ class RuntimeLog:
                 safe,
                 source="untrusted",
             )
+
+    def progress(self, message, *, completed=False):
+        self.detail(message, progress=True, completed=completed)
 
     def event(self, level, event, message, **fields):
         details = [sanitize(message)]

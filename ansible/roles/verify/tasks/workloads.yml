@@ -1,0 +1,95 @@
+---
+# Application images must be published and promoted by CD before this phase.
+- name: Wait for workload and edge Applications to reconcile
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    name: "{{ item }}"
+    namespace: argocd
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_workload_application
+  until:
+    - verified_workload_application.resources | length == 1
+    - verified_workload_application.resources[0].status.sync.status | default('') == 'Synced'
+    - verified_workload_application.resources[0].status.health.status | default('') == 'Healthy'
+  retries: 90
+  delay: 10
+  loop: "{{ workload_application_names }}"
+  tags: [verify, verify-workloads]
+
+- name: Verify workload ExternalSecrets are Ready
+  kubernetes.core.k8s_info:
+    api_version: external-secrets.io/v1
+    kind: ExternalSecret
+    namespace: "{{ item }}"
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_workload_secrets
+  until:
+    - verified_workload_secrets.resources | length > 0
+    - >-
+      (verified_workload_secrets.resources |
+      json_query("[?status.conditions[?type=='Ready' && status=='True']]") |
+      length) == verified_workload_secrets.resources | length
+  retries: 60
+  delay: 5
+  loop: "{{ workload_secret_namespaces }}"
+  tags: [verify, verify-workloads]
+
+- name: Verify workload NetworkPolicies exist
+  kubernetes.core.k8s_info:
+    api_version: networking.k8s.io/v1
+    kind: NetworkPolicy
+    namespace: mlops-paas-core
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_workload_policies
+  failed_when: verified_workload_policies.resources | length == 0
+  tags: [verify, verify-workloads]
+
+# --- Microservices & Tenant Workloads Health ---
+- name: Verify core workload Deployments are ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: "{{ item.name }}"
+    namespace: "{{ item.namespace }}"
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_workload_deployments
+  until:
+    - verified_workload_deployments.resources | length == 1
+    - verified_workload_deployments.resources[0].status.readyReplicas | default(0) >= 1
+  retries: 60
+  delay: 5
+  loop:
+    - {name: mlops-paas-control-plane, namespace: mlops-paas-core}
+    - {name: mlops-paas-celery-worker, namespace: mlops-paas-core}
+    - {name: mlops-paas-consumer, namespace: mlops-paas-core}
+    - {name: mlops-paas-model-server, namespace: mlops-paas-core}
+    - {name: mlops-paas-web, namespace: mlops-paas-core}
+  tags: [verify, verify-workloads]
+
+- name: Verify Control Plane Service is registered
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Service
+    name: mlops-paas-control-plane
+    namespace: mlops-paas-core
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_control_plane_service
+  failed_when: verified_control_plane_service.resources | length != 1
+  tags: [verify, verify-workloads]
+
+- name: Verify the complete root GitOps application is synchronized and healthy
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    name: mlops-paas-system
+    namespace: argocd
+    kubeconfig: "{{ k3s_remote_kubeconfig }}"
+  register: verified_workload_root
+  until:
+    - verified_workload_root.resources | length == 1
+    - verified_workload_root.resources[0].status.sync.status | default('') == 'Synced'
+    - verified_workload_root.resources[0].status.health.status | default('') == 'Healthy'
+  retries: 90
+  delay: 20
+  tags: [verify, verify-workloads]

@@ -213,6 +213,8 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
 
 
 def _check_training_job(job, expected_revision):
+    if job.deletion_requested_at:
+        raise Conflict("This training job is being deleted.")
     if job.status != "completed":
         raise ValidationError({"job": "Training must complete successfully before it can be registered."})
     if job.outputs_purged_at is not None:

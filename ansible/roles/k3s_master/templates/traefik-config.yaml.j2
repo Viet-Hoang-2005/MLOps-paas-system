@@ -5,6 +5,13 @@ metadata:
   namespace: kube-system
 spec:
   valuesContent: |-
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 1000m
+        memory: 512Mi
     additionalArguments:
       # TLS terminates at the public ALB. K3s ServiceLB and Flannel proxy internal hops,
       # so trust the VPC CIDR (ALB & EC2 nodes) and K3s PodCIDR; never enable

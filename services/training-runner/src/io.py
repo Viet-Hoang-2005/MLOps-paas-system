@@ -133,23 +133,20 @@ def install_requirements(
     detail,
     log,
     env=None,
+    progress=None,
 ):
     if not requirements_path.exists():
         return
     validate_safe_requirements(requirements_path)
     log("Installing requirements.txt")
     clean_env = get_isolated_pip_env(env)
-    result = subprocess_module.run(
-        [python_executable, "-m", "pip", "install", "-r", str(requirements_path)],
-        cwd=str(source_dir),
-        env=clean_env,
-        capture_output=True,
-        text=True,
-        check=False,
+    from .pip_stream import install
+
+    clean_env["TERM"] = "xterm"
+    code = install(
+        [python_executable, "-u", "-m", "pip", "install", "--progress-bar", "on", "-r", str(requirements_path)],
+        subprocess_module=subprocess_module, cwd=str(source_dir), env=clean_env,
+        detail=detail, progress=progress or (lambda line, **kwargs: detail(line)),
     )
-    for line in (result.stdout or "").splitlines():
-        detail(line)
-    for line in (result.stderr or "").splitlines():
-        detail(line)
-    if result.returncode != 0:
-        raise RuntimeError(f"pip install -r requirements.txt failed with exit code {result.returncode}")
+    if code != 0:
+        raise RuntimeError(f"pip install -r requirements.txt failed with exit code {code}")

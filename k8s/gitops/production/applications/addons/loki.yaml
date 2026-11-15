@@ -69,8 +69,12 @@ spec:
             storageClass: ebs-gp3
             size: 10Gi
           resources:
-            requests: {cpu: 100m, memory: 256Mi}
-            limits: {cpu: 1000m, memory: 1Gi}
+            requests:
+              cpu: 30m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
         read: {replicas: 0}
         write: {replicas: 0}
         backend: {replicas: 0}

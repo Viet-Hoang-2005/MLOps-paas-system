@@ -3,18 +3,15 @@ from django.urls import path
 from .endpoints import (
     TrainingJobBuildEndpoint,
     TrainingJobCancelEndpoint,
-    TrainingJobCloneEndpoint,
     TrainingJobDetailEndpoint,
     TrainingJobEventsEndpoint,
     TrainingJobInputEndpoint,
-    TrainingJobListCreateEndpoint,
+    TrainingJobListEndpoint,
     TrainingJobLogsEndpoint,
     TrainingJobModelOutputEndpoint,
     TrainingJobOutputsEndpoint,
     TrainingJobProjectEndpoint,
     TrainingJobReferencePreviewEndpoint,
-    TrainingJobRetryEndpoint,
-    TrainingJobSubmitEndpoint,
     TrainingOutputDownloadEndpoint,
     TrainingRuntimeCapabilitiesEndpoint,
     TrainingUsageEndpoint,
@@ -25,7 +22,6 @@ from .metrics_endpoints import (
     TrainingJobRuntimeMetricsEndpoint,
     TrainingJobsCompareEndpoint,
 )
-from .workspaces import WorkspaceEntriesEndpoint, WorkspaceEntryEndpoint, WorkspaceSecretEndpoint
 
 urlpatterns = [
     path(
@@ -40,11 +36,7 @@ urlpatterns = [
         {"area": "output"},
         name="training-outputs-download",
     ),
-    path("<uuid:job_id>/entries/", WorkspaceEntriesEndpoint.as_view(), name="training-job-entries"),
-    path("<uuid:job_id>/entries/<uuid:entry_id>/", WorkspaceEntryEndpoint.as_view(), name="training-job-entry"),
-    path("<uuid:job_id>/secrets/<str:name>/", WorkspaceSecretEndpoint.as_view(), name="training-job-secret"),
-    path("<uuid:job_id>/clone/", TrainingJobCloneEndpoint.as_view(), name="training-job-clone"),
-    path("", TrainingJobListCreateEndpoint.as_view(), name="training-job-list"),
+    path("", TrainingJobListEndpoint.as_view(), name="training-job-list"),
     path("compare/", TrainingJobsCompareEndpoint.as_view(), name="training-jobs-compare"),
     path("usage/", TrainingUsageEndpoint.as_view(), name="training-usage"),
     path("<uuid:job_id>/", TrainingJobDetailEndpoint.as_view(), name="training-job-detail"),
@@ -58,9 +50,7 @@ urlpatterns = [
         TrainingJobRuntimeMetricsEndpoint.as_view(),
         name="training-job-runtime-metrics",
     ),
-    path("<uuid:job_id>/submit/", TrainingJobSubmitEndpoint.as_view(), name="training-job-submit"),
     path("<uuid:job_id>/project/", TrainingJobProjectEndpoint.as_view(), name="training-job-project"),
-    path("<uuid:job_id>/retry/", TrainingJobRetryEndpoint.as_view(), name="training-job-retry"),
     path("<uuid:job_id>/cancel/", TrainingJobCancelEndpoint.as_view(), name="training-job-cancel"),
     path("<uuid:job_id>/events/", TrainingJobEventsEndpoint.as_view(), name="training-job-events"),
     path("<uuid:job_id>/logs/", TrainingJobLogsEndpoint.as_view(), name="training-job-logs"),

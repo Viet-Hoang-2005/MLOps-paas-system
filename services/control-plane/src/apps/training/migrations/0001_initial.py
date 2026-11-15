@@ -36,7 +36,7 @@ class Migration(migrations.Migration):
                 ('backend', models.CharField(default='local', max_length=30)),
                 ('external_job_id', models.CharField(blank=True, max_length=255)),
                 ('celery_task_id', models.CharField(blank=True, db_index=True, max_length=255)),
-                ('status', models.CharField(choices=[('editing', 'Editing'), ('pending', 'Pending'), ('queued', 'Queued'), ('uploading', 'Uploading'), ('running', 'Running'), ('cancelling', 'Cancelling'), ('completed', 'Completed'), ('failed', 'Failed'), ('cancelled', 'Cancelled')], default='editing', max_length=30)),
+                ('status', models.CharField(choices=[('pending', 'Pending'), ('queued', 'Queued'), ('uploading', 'Uploading'), ('running', 'Running'), ('cancelling', 'Cancelling'), ('completed', 'Completed'), ('failed', 'Failed'), ('cancelled', 'Cancelled')], default='pending', max_length=30)),
                 ('vcpu', models.PositiveIntegerField(blank=True, null=True)),
                 ('memory_mb', models.PositiveIntegerField(blank=True, null=True)),
                 ('max_runtime_seconds', models.PositiveIntegerField(blank=True, null=True)),
@@ -55,7 +55,6 @@ class Migration(migrations.Migration):
                 ('baseline_version', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='baseline_training_jobs', to='registry.modelversion')),
                 ('dataset_snapshot', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='training_jobs', to='ct.datasetsnapshot')),
                 ('project', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='training_jobs', to='catalog.modelproject')),
-                ('retry_of', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='retries', to='training.trainingjob')),
             ],
             options={
                 'ordering': ['-created_at'],

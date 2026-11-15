@@ -1,10 +1,7 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import * as Popover from "@radix-ui/react-popover";
 import { useQuery } from "@tanstack/react-query";
 import {
   Check,
-  ChevronDown,
-  ChevronUp,
   createLucideIcon,
   Laptop,
   LogOut,
@@ -23,11 +20,15 @@ import type { ThemeMode } from "@/app/theme/theme";
 import { routes } from "@/app/router/paths";
 import { useTheme } from "@/app/theme/useTheme";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
+import {
+  useModelSelection,
+  type DashboardModel,
+} from "@/features/projects/hooks/useModelSelection";
 import { NotificationDropdown } from "@/features/notifications/components/NotificationDropdown";
 import { getProfile } from "@/features/settings/api/profileApi";
 import { settingsQueryKeys } from "@/features/settings/queryKeys";
 import type { UserProfile } from "@/features/settings/types";
+import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
 import { Search } from "@/shared/components/Search";
 
@@ -46,6 +47,39 @@ const themeOptions: Array<{ value: ThemeMode; icon: typeof Sun }> = [
   { value: "dark", icon: Moon },
   { value: "system", icon: Laptop },
 ];
+
+function renderModelStatusBadge(
+  model: DashboardModel,
+  t: (key: string, options?: { defaultValue?: string }) => string,
+) {
+  const deletionState = model.deletion_state;
+  const lifecycleStatus = model.lifecycle_status ?? "preview";
+  const isDeleting = deletionState === "deleting";
+  const isDeleteFailed = deletionState === "delete_failed";
+
+  const statusKey = isDeleteFailed
+    ? "delete_failed"
+    : isDeleting
+      ? "deleting"
+      : lifecycleStatus;
+
+  const variant: "success" | "primary" | "info" | "warning" | "danger" | "neutral" =
+    isDeleteFailed
+      ? "danger"
+      : isDeleting
+        ? "warning"
+        : lifecycleStatus === "running"
+          ? "success"
+          : lifecycleStatus === "registered"
+            ? "primary"
+            : "neutral";
+
+  return (
+    <Badge variant={variant}>
+      {t(`statuses.${statusKey}`, { defaultValue: statusKey })}
+    </Badge>
+  );
+}
 
 const VnIcon = createLucideIcon("vn", [
   ["path", { d: "m3 6 4 12 4-12", key: "v" }],
@@ -66,9 +100,8 @@ export default function Header({
   const navigate = useNavigate();
   const { t, i18n } = useTranslation("common");
   const { logout } = useAuth();
-  const { models, selectedModel, selectModel } = useModelSelection();
+  const { models } = useModelSelection();
   const { mode, resolvedTheme, setMode } = useTheme();
-  const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
 
   const { data: profile = null } = useQuery({
@@ -79,12 +112,6 @@ export default function Header({
     () => getInitials(profile, t("profile.initialsFallback")),
     [profile, t],
   );
-  const visibleModels = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return term
-      ? models.filter((model) => model.name.toLowerCase().includes(term))
-      : models;
-  }, [models, search]);
 
   return (
     <header className="relative z-30 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-3 md:px-4 xl:px-5">
@@ -112,90 +139,35 @@ export default function Header({
       </button>
 
       <div className="mx-1 min-w-0 flex-1 sm:mx-3 sm:max-w-md lg:absolute lg:left-1/2 lg:top-1/2 lg:w-[min(420px,42vw)] lg:-translate-x-1/2 lg:-translate-y-1/2">
-        <Popover.Root open={modelMenuOpen} onOpenChange={setModelMenuOpen}>
-          <Popover.Trigger asChild>
-            <Button
-              variant="secondary"
-              size="md"
-              fullWidth
-              className="min-w-0 justify-between rounded-surface px-2 text-left text-style-body-strong shadow-sm sm:px-4"
-              aria-label={t("modelSelector.label")}
+        <Search
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={t("modelSelector.search")}
+          aria-label={t("modelSelector.search")}
+          clearAriaLabel={t("modelSelector.clearSearch")}
+          suggestions={models.map((model) => ({
+            value: model.id,
+            label: model.name,
+            description: renderModelStatusBadge(model, t),
+          }))}
+          suggestionsEmptyMessage={t("modelSelector.noMatches")}
+          onSuggestionSelect={(id) => {
+            setSearch("");
+            navigate(`/dashboard/projects/${id}/overview`);
+          }}
+          suggestionsFooter={
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                navigate(routes.newProject);
+              }}
+              className="flex h-10 w-full items-center gap-2 rounded-surface px-3 text-style-body-strong text-color-muted-foreground hover:bg-muted"
             >
-              <span className="truncate">
-                {selectedModel?.name || t("modelSelector.empty")}
-              </span>
-              {modelMenuOpen ? (
-                <ChevronUp className="h-4 w-4 shrink-0 text-color-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-4 w-4 shrink-0 text-color-muted-foreground" />
-              )}
-            </Button>
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content
-              align="start"
-              sideOffset={8}
-              className="z-50 w-(--radix-popover-trigger-width) rounded-surface border border-border bg-surface p-2 shadow-(--shadow-overlay) animate-fade-in"
-            >
-              <Search
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                onClear={() => setSearch("")}
-                placeholder={t("modelSelector.search")}
-                clearAriaLabel={t("modelSelector.clearSearch")}
-                wrapperClassName="mb-2"
-                autoFocus
-              />
-              <div className="max-h-72 overflow-y-auto">
-                {visibleModels.length ? (
-                  visibleModels.map((model) => (
-                    <button
-                      key={model.id}
-                      type="button"
-                      onClick={() => {
-                        selectModel(model.id);
-                        setModelMenuOpen(false);
-                        setSearch("");
-                      }}
-                      className="flex min-h-10 w-full items-center justify-between gap-3 rounded-compact px-3 py-2 text-left hover:bg-muted"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-style-body-strong text-color-foreground">
-                          {model.name}
-                        </span>
-                        <span className="block truncate text-style-caption capitalize text-color-muted-foreground">
-                          {t(
-                            `statuses.${model.lifecycle_status || "registered"}`,
-                          )}{" "}
-                          · {model.flavor || t("statuses.registered")}
-                        </span>
-                      </span>
-                      {selectedModel?.id === model.id && (
-                        <Check className="h-4 w-4 shrink-0 text-color-primary" />
-                      )}
-                    </button>
-                  ))
-                ) : (
-                  <p className="px-3 py-8 text-center text-style-body text-color-muted-foreground">
-                    {t("modelSelector.noMatches")}
-                  </p>
-                )}
-              </div>
-              <div className="mt-2 border-t border-border pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModelMenuOpen(false);
-                    navigate(routes.newProject);
-                  }}
-                  className="flex h-10 w-full items-center gap-2 rounded-surface px-3 text-style-body-strong text-color-muted-foreground hover:bg-muted hover:text-color-foreground"
-                >
-                  <Plus className="h-4 w-4" /> {t("actions.uploadModel")}
-                </button>
-              </div>
-            </Popover.Content>
-          </Popover.Portal>
-        </Popover.Root>
+              <Plus className="h-4 w-4" /> {t("actions.uploadModel")}
+            </button>
+          }
+        />
       </div>
 
       <div className="flex min-w-0 shrink-0 items-center justify-end gap-1 sm:min-w-40 sm:gap-2 xl:min-w-48">

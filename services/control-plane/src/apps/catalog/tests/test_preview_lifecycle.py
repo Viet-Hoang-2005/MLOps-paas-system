@@ -9,6 +9,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.catalog.services.preview import save_preview
 from apps.deployment.models import Build, Deployment, Endpoint
@@ -376,14 +377,14 @@ def test_registration_failure_removes_partial_snapshot_and_can_retry(project):
 
 def test_training_build_provenance_survives_source_job_deletion(project):
     from apps.deployment.services.builds import request_training_build
-    from apps.training.models import TrainingJob, TrainingOutput
+    from apps.training.models import TrainingOutput
 
     storage = MemoryStorage()
     code = storage.put("input/code.zip", SimpleUploadedFile("code.zip", b"code"), "application/zip")
     output = storage.put("output/model.tar.gz", SimpleUploadedFile("model.tar.gz", b"model"), "application/gzip")
     source_file = storage.put("output/train.py", SimpleUploadedFile("train.py", b"print(1)"), "text/x-python")
     ref_file = storage.put("output/reference.csv", SimpleUploadedFile("reference.csv", b"x\n1\n"), "text/csv")
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="xgboost",
         status="completed",
@@ -539,18 +540,17 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
     assert overview.data["reference_data"]["name"] == "reference.csv"
 
 
-def test_training_retry_preserves_frozen_inputs_not_updated_workspace(project, monkeypatch, settings):
+def test_training_history_preserves_frozen_inputs_not_updated_project_workspace(project, monkeypatch, settings):
     from io import BytesIO
     from zipfile import ZipFile
 
     from apps.catalog.models import WorkspaceAsset
-    from apps.training.models import TrainingJob
-    from apps.training.services.jobs import retry_job
+    from apps.training.services.snapshots import input_snapshot
     from apps.training.services.storage_scope import expected_training_uris
 
     settings.TRAINING_BACKEND = "argo"
     storage = MemoryStorage()
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         status="failed",
         model_flavor="xgboost",
@@ -571,11 +571,8 @@ def test_training_retry_preserves_frozen_inputs_not_updated_workspace(project, m
     WorkspaceAsset.objects.create(
         project=project, kind="data", relative_path="data.csv", s3_uri="s3://test-bucket/new-workspace.csv"
     )
-    retry = retry_job(job, storage=storage, creation_key=uuid.uuid4())
-    assert retry.status == "editing" and retry.retry_of_id == job.pk
-    assert retry.project_id is None and not retry.submitted_at
-    assert storage.read(retry.entries.get(relative_path="train.py").s3_uri) == b"print('old code')"
-    assert storage.read(retry.entries.get(relative_path="data.csv").s3_uri) == b"x\n1\n"
+    assert input_snapshot(job, path="train.py", storage=storage)["content"] == "print('old code')"
+    assert input_snapshot(job, path="data.csv", storage=storage)["content"] == "x\n1\n"
     assert job.status == "failed"
 
 

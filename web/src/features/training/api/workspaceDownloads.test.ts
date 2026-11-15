@@ -8,16 +8,13 @@ describe("workspace download API", () => {
 
   it("downloads the exact selected Input path and keeps its filename", async () => {
     const blob = new Blob([new Uint8Array([0, 255, 128])]);
-    const get = vi
-      .spyOn(apiClient, "get")
-      .mockResolvedValue({
-        data: blob,
-        headers: {
-          "content-disposition":
-            "attachment; filename*=utf-8''hu%E1%BA%A5n.zip",
-          "content-type": "application/zip",
-        },
-      });
+    const get = vi.spyOn(apiClient, "get").mockResolvedValue({
+      data: blob,
+      headers: {
+        "content-disposition": "attachment; filename*=utf-8''hu%E1%BA%A5n.zip",
+        "content-type": "application/zip",
+      },
+    });
     const result = await downloadWorkspaceSelection(
       "job",
       "input",
@@ -25,7 +22,7 @@ describe("workspace download API", () => {
       4,
     );
     expect(get).toHaveBeenCalledWith(
-      controlPlaneURL("/training-jobs/job/input/download/"),
+      controlPlaneURL("/training-workspaces/job/input/download/"),
       {
         params: { path: "data/huấn", revision: 4 },
         responseType: "blob",
@@ -37,15 +34,13 @@ describe("workspace download API", () => {
   });
 
   it("omits path when downloading all Output", async () => {
-    const get = vi
-      .spyOn(apiClient, "get")
-      .mockResolvedValue({
-        data: new Blob(),
-        headers: {
-          "content-disposition": 'attachment; filename="output.zip"',
-          "content-type": "application/zip",
-        },
-      });
+    const get = vi.spyOn(apiClient, "get").mockResolvedValue({
+      data: new Blob(),
+      headers: {
+        "content-disposition": 'attachment; filename="output.zip"',
+        "content-type": "application/zip",
+      },
+    });
     const result = await downloadWorkspaceSelection("job", "outputs");
     expect(get).toHaveBeenCalledWith(
       controlPlaneURL("/training-jobs/job/outputs/download/"),

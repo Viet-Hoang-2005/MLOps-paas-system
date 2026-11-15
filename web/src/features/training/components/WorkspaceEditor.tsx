@@ -38,14 +38,14 @@ import { InputFileDialog, type InputFileSelection } from "./InputFileDialog";
 import { HelpDialog } from "./HelpDialog";
 import { FileViewer } from "./FileViewer";
 import {
-  deleteJobEntry,
+  deleteWorkspaceEntry,
   downloadWorkspaceSelection,
   downloadRunOutput,
   getRunFile,
   readEntry,
-  saveJobEntry,
-  updateJobWorkspace,
-  type JobWorkspace,
+  saveWorkspaceEntry,
+  updateTrainingWorkspace,
+  type TrainingWorkspace,
   type WorkspaceEntry,
 } from "@/features/training/api/jobWorkspaceApi";
 import {
@@ -65,15 +65,16 @@ export interface WorkspaceEditorHandle {
 }
 
 interface Props {
-  workspace: JobWorkspace;
+  workspace: TrainingWorkspace;
   entries: WorkspaceEntry[];
   outputs?: TrainingOutput[];
   runId?: string;
   entryPoint: string;
   readOnly: boolean;
-  onRefresh: () => Promise<JobWorkspace>;
+  onRefresh: () => Promise<TrainingWorkspace>;
   onDirty: (dirty: boolean) => void;
   externallyBusy?: boolean;
+  loading?: boolean;
   onBusy: (busy: boolean) => void;
   onOpenEnvironment?: () => void;
   onDeleteOutputs?: () => Promise<void>;
@@ -89,6 +90,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
       entryPoint,
       readOnly,
       externallyBusy = false,
+      loading = false,
       onRefresh,
       onDirty,
       onBusy,
@@ -276,7 +278,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
           throw new Error(t("studio.reload"));
         let result;
         try {
-          result = await saveJobEntry(
+          result = await saveWorkspaceEntry(
             workspace.id,
             revision,
             { path, kind: entry.kind, file: null },
@@ -345,7 +347,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
     async function saveSelection(selection: InputFileSelection) {
       await task(async () => {
         const current = await cleanDraft();
-        await saveJobEntry(
+        await saveWorkspaceEntry(
           workspace.id,
           current.revision,
           selection,
@@ -368,7 +370,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
           ? `${folder}/${path.split("/").pop()}`
           : path.split("/").pop()!;
         if (destination === path) return;
-        await saveJobEntry(
+        await saveWorkspaceEntry(
           workspace.id,
           current.revision,
           { path: destination, kind: entry.kind, file: null },
@@ -407,7 +409,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
               continue;
             throw new Error(t("studio.pathExists", { path }));
           }
-          const result = await saveJobEntry(
+          const result = await saveWorkspaceEntry(
             workspace.id,
             current.revision,
             item.file
@@ -440,7 +442,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
       const current = runId ? workspace : await cleanDraft();
       saveDownload(
         await downloadWorkspaceSelection(
-          workspace.id,
+          runId ?? workspace.id,
           "input",
           selected,
           runId ? undefined : current.revision,
@@ -452,7 +454,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
       if (!canDownloadOutput) return;
       saveDownload(
         await downloadWorkspaceSelection(
-          workspace.id,
+          runId ?? workspace.id,
           "outputs",
           item?.relative_path ?? selectedOutput,
         ),
@@ -465,7 +467,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
         let current = await cleanDraft();
         for (const entry of [...current.entries]) {
           try {
-            const res = await deleteJobEntry(
+            const res = await deleteWorkspaceEntry(
               workspace.id,
               entry.id,
               current.revision,
@@ -539,7 +541,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
                       onClick={() =>
                         void task(async () => {
                           const current = await cleanDraft();
-                          await updateJobWorkspace(
+                          await updateTrainingWorkspace(
                             workspace.id,
                             current.revision,
                             {
@@ -618,7 +620,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
                       size="sm"
                       variant="secondary"
                       icon={<KeyRound className="h-4 w-4" />}
-                      disabled={readOnly || busy}
+                      disabled={busy}
                       onClick={onOpenEnvironment}
                     >
                       {t("studio.environment")}
@@ -657,6 +659,8 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
           {/* Right Column (DirectoryTree Header Top): PageTabs above DirectoryTree */}
           <div className="flex items-center justify-end px-3 py-1.5 border-t md:border-t-0 md:border-l border-border bg-surface">
             <PageTabs
+              className="translate-y-1.5"
+              tabClassName="w-20 justify-center"
               tabs={[
                 {
                   label: t("studio.input"),
@@ -676,7 +680,15 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
         {/* Main Grid: Left = Viewer, Right = DirectoryTree Explorer */}
         <div className="grid min-h-125 md:grid-cols-[minmax(0,1fr)_18rem]">
           {/* LEFT: Viewer Area */}
-          <div className="flex min-w-0 flex-1 flex-col bg-surface h-full">
+          <div
+            className="relative flex min-w-0 flex-1 flex-col bg-surface h-full"
+            aria-busy={loading}
+          >
+            {loading && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface">
+                <Loading size="lg" text={t("studio.loading")} />
+              </div>
+            )}
             {activeTab === "input" ? (
               entries.length === 0 ? (
                 <div className="flex flex-1 flex-col p-4 h-full">
@@ -799,7 +811,15 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
           </div>
 
           {/* RIGHT: DirectoryTree Explorer */}
-          <div className="flex flex-col border-l border-border bg-surface shrink-0">
+          <div
+            className="relative flex flex-col border-l border-border bg-surface shrink-0"
+            aria-busy={loading}
+          >
+            {loading && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface">
+                <Loading size="lg" text={t("studio.loading")} />
+              </div>
+            )}
             {/* Explorer Header */}
             <div className="flex items-center justify-between border-b border-border p-2 text-color-muted-foreground">
               <span className="pl-2 text-style-overline uppercase text-color-muted-foreground font-semibold">
@@ -926,7 +946,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
             >
               {activeTab === "input" ? (
                 nodes.length === 0 ? (
-                  <p className="p-4 text-center text-style-caption text-color-muted-foreground">
+                  <p className="p-4 text-center text-style-body text-color-muted-foreground">
                     {t("studio.noFiles")}
                   </p>
                 ) : (
@@ -1041,7 +1061,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
                 }
                 void task(async () => {
                   const current = await cleanDraft();
-                  await saveJobEntry(workspace.id, current.revision, {
+                  await saveWorkspaceEntry(workspace.id, current.revision, {
                     path,
                     kind: "folder",
                     file: null,
@@ -1098,7 +1118,11 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
             void task(async () => {
               const current = await cleanDraft();
               if (file)
-                await deleteJobEntry(workspace.id, file.id, current.revision);
+                await deleteWorkspaceEntry(
+                  workspace.id,
+                  file.id,
+                  current.revision,
+                );
               setDeleting(false);
               setSelected(null);
               setContents({});
@@ -1156,3 +1180,23 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
     );
   },
 );
+
+export function WorkspaceEditorLoading() {
+  const { t } = useTranslation("training");
+  return (
+    <div
+      className="overflow-hidden rounded-surface border border-border bg-surface"
+      aria-busy="true"
+    >
+      <div className="h-14 border-b border-border" />
+      <div className="grid min-h-125 md:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="flex min-h-64 items-center justify-center">
+          <Loading size="lg" text={t("studio.loading")} />
+        </div>
+        <div className="flex min-h-64 items-center justify-center border-l border-border">
+          <Loading size="lg" text={t("studio.loading")} />
+        </div>
+      </div>
+    </div>
+  );
+}

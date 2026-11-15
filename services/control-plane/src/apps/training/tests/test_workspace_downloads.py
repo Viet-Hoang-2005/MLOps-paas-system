@@ -7,7 +7,8 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
-from apps.training.models import TrainingJob, TrainingJobEntry, TrainingOutput
+from apps.training.models import TrainingWorkspaceEntry, TrainingOutput
+from apps.training.tests.factories import training_job
 from apps.training.services import downloads
 from apps.training.services.storage_scope import expected_training_uris, training_prefix_for
 
@@ -23,7 +24,7 @@ class Storage(MemoryStorage):
 @pytest.fixture
 def files(monkeypatch):
     owner = get_user_model().objects.create_user("downloads@example.test", "password")
-    job = TrainingJob.objects.create(owner=owner, storage_layout="tenant")
+    job = training_job(owner=owner, storage_layout="tenant")
     storage = Storage()
     for path, payload in [
         ("train.py", b"print(1)\r\n"),
@@ -31,9 +32,11 @@ def files(monkeypatch):
         ("database/other.csv", b"x\n1\n"),
         ("zero.md", b""),
     ]:
-        stored = storage.put(f"{training_prefix_for(job)}/draft/objects/{path}", payload)
-        TrainingJobEntry.objects.create(
-            job=job,
+        stored = storage.put(
+            f"users/{owner.tenant_id}/training/workspaces/{job.workspace.public_id}/draft/objects/{path}", payload
+        )
+        TrainingWorkspaceEntry.objects.create(
+            workspace=job.workspace,
             relative_path=path,
             kind="script" if path.endswith(".py") else "document",
             s3_uri=stored.uri,
@@ -41,7 +44,7 @@ def files(monkeypatch):
             size_bytes=stored.size_bytes,
         )
     for path in ["data", "data/empty", "empty"]:
-        TrainingJobEntry.objects.create(job=job, relative_path=path, kind="folder")
+        TrainingWorkspaceEntry.objects.create(workspace=job.workspace, relative_path=path, kind="folder")
     for path, payload in [
         ("model.pkl", b"\x00\xff\x80model"),
         ("reports/a.json", b'{"a":1}'),
@@ -65,8 +68,13 @@ def files(monkeypatch):
 
 
 def get(client, job, area, path=None, **params):
+    url = (
+        f"/api/training-workspaces/{job.workspace.public_id}/input/download/"
+        if area == "input" and not job.submitted_at
+        else f"/api/training-jobs/{job.public_id}/{area}/download/"
+    )
     return client.get(
-        f"/api/training-jobs/{job.public_id}/{area}/download/",
+        url,
         {**params, **({"path": path} if path is not None else {})},
     )
 
@@ -81,7 +89,7 @@ def body(response):
 def freeze(job, storage):
     bundle = BytesIO()
     with ZipFile(bundle, "w") as archive:
-        for entry in job.entries.all():
+        for entry in job.workspace.entries.all():
             archive.writestr(
                 entry.relative_path + ("/" if entry.kind == "folder" else ""),
                 b"" if entry.kind == "folder" else storage.objects[entry.s3_uri],
@@ -98,7 +106,7 @@ def test_input_selection_preserves_exact_file_and_folder_scope(files, submitted)
     if submitted:
         freeze(job, storage)
         # Snapshot downloads must not read mutable draft objects.
-        storage.objects[job.entries.get(relative_path="train.py").s3_uri] = b"changed draft"
+        storage.objects[job.workspace.entries.get(relative_path="train.py").s3_uri] = b"changed draft"
     response = get(client, job, "input", "train.py")
     assert response.status_code == 200
     assert response["Content-Disposition"] == 'attachment; filename="train.py"'
@@ -134,10 +142,10 @@ def test_empty_missing_invalid_and_stale_selections_are_rejected(files):
     assert get(client, job, "input", "empty").status_code == 404
     assert get(client, job, "outputs", "absent").status_code == 404
     assert get(client, job, "input", "../outside").status_code == 400
-    assert get(client, job, "input", revision=job.revision + 1).status_code == 409
+    assert get(client, job, "input", revision=job.workspace.revision + 1).status_code == 409
     job.outputs.all().delete()
     assert get(client, job, "outputs").status_code == 404
-    job.entries.exclude(kind="folder").delete()
+    job.workspace.entries.exclude(kind="folder").delete()
     assert get(client, job, "input").status_code == 404
 
 
@@ -193,7 +201,7 @@ def test_snapshot_scope_and_unsafe_archive_entries_are_rejected(files):
 
 def test_failed_integrity_and_size_checks_do_not_return_partial_downloads(files, monkeypatch):
     job, _, client = files
-    job.entries.filter(relative_path="train.py").update(checksum="0" * 64)
+    job.workspace.entries.filter(relative_path="train.py").update(checksum="0" * 64)
     assert get(client, job, "input", "train.py").status_code == 409
     monkeypatch.setattr(downloads, "MAX_OUTPUT_DOWNLOAD", 2)
     assert get(client, job, "outputs").status_code == 400
@@ -202,7 +210,9 @@ def test_failed_integrity_and_size_checks_do_not_return_partial_downloads(files,
 def test_cross_origin_download_exposes_attachment_filename(files):
     job, _, client = files
     response = client.get(
-        f"/api/training-jobs/{job.public_id}/input/download/", {"path": "train.py"}, HTTP_ORIGIN="http://localhost:5173"
+        f"/api/training-workspaces/{job.workspace.public_id}/input/download/",
+        {"path": "train.py"},
+        HTTP_ORIGIN="http://localhost:5173",
     )
     assert response.status_code == 200
     assert "content-disposition" in response["Access-Control-Expose-Headers"].lower()

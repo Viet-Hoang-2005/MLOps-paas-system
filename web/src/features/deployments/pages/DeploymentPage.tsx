@@ -247,7 +247,10 @@ export default function DeploymentPage() {
     }
     return (
       <div className="flex w-full flex-1 flex-col space-y-6">
-        <PageHeader title={t("workflow.deploymentModel")} />
+        <PageHeader
+          title={t("workflow.deploymentModel")}
+          actions={<ProjectPageSelect />}
+        />
         <Placeholder
           title={t("workflow.deploymentModel")}
           description={t("workflow.noProjectDeployment")}
@@ -268,7 +271,10 @@ export default function DeploymentPage() {
   }
   return (
     <div className="space-y-6">
-      <PageHeader title={t("workflow.deploymentModel")} />
+      <PageHeader
+        title={t("workflow.deploymentModel")}
+        actions={<ProjectPageSelect />}
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="w-full sm:w-60">
@@ -352,3 +358,4 @@ export default function DeploymentPage() {
     </div>
   );
 }
+import { ProjectPageSelect } from "@/features/projects/components/ProjectPageSelect";

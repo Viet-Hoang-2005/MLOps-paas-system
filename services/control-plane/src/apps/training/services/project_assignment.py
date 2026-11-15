@@ -52,7 +52,8 @@ def assign_project(*, job, actor, data, files=None):
             if current.project_id and current.project_id != project.pk:
                 raise Conflict("This job is already assigned to another project.")
             if (
-                current.status != "completed"
+                current.deletion_requested_at
+                or current.status != "completed"
                 or current.outputs_purged_at
                 or current.tracking.get("output_contract") != 2
             ):

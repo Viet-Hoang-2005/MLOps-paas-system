@@ -2,8 +2,8 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.models import TrainingJob
 from apps.training.services.storage_scope import expected_training_uris
 from infrastructure.execution.argo_backends import ArgoTrainingBackend
 
@@ -31,7 +31,7 @@ class FakeStorage:
 def test_argo_training_backend_records_runtime_selectors():
     user = get_user_model().objects.create_user("owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="NIDS")
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         code_snapshot_uri="s3://bucket/code.zip",
         data_snapshot_uri="s3://bucket/train.csv",
@@ -78,7 +78,7 @@ def test_argo_training_backend_records_runtime_selectors():
 def test_argo_cancel_uses_job_bound_callback_capability(settings):
     user = get_user_model().objects.create_user("cancel-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="Cancel NIDS")
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         code_snapshot_uri="s3://bucket/code.zip",
         data_snapshot_uri="s3://bucket/train.csv",
@@ -127,7 +127,7 @@ def test_argo_training_is_not_status_polled_without_the_watcher(settings, monkey
 
     owner = get_user_model().objects.create_user("argo-poll@example.com", "test-password")
     project = ModelProject.objects.create(owner=owner, name="argo-poll")
-    job = TrainingJob.objects.create(
+    job = training_job(
         project=project,
         model_flavor="sklearn",
         backend="argo",

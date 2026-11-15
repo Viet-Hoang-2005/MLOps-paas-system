@@ -6,8 +6,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
+from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.models import TrainingJob
 from apps.training.services.storage_scope import expected_training_uris
 from apps.training.tasks import execute_training_job, poll_training_job_status
 from infrastructure.execution.docker_backends import DockerTrainingBackend
@@ -18,7 +18,7 @@ class DockerTrainingAsyncTests(TestCase):
     def setUp(self):
         self.owner = get_user_model().objects.create_user("async-train@example.com", "password123")
         self.project = ModelProject.objects.create(owner=self.owner, name="async-project")
-        self.job = TrainingJob.objects.create(
+        self.job = training_job(
             project=self.project,
             model_flavor="sklearn",
             status="queued",

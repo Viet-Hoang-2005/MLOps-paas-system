@@ -75,9 +75,14 @@ PREDICT_TIMEOUT_SECONDS = 60.0
 HEALTH_TIMEOUT_SECONDS = 10.0
 
 
+def _redis_password_options():
+    password = os.environ.get("REDIS_PASSWORD")
+    return {"password": password} if password else {}
+
+
 def _redis_connection():
     if REDIS_CONNECTION_MODE == "direct":
-        return redis.from_url(REDIS_URL, socket_connect_timeout=2, socket_timeout=2)
+        return redis.from_url(REDIS_URL, socket_connect_timeout=2, socket_timeout=2, **_redis_password_options())
     if REDIS_CONNECTION_MODE != "sentinel":
         raise ValueError("REDIS_CONNECTION_MODE must be direct or sentinel")
     addresses = os.environ.get("REDIS_SENTINEL_HOSTS", "")
@@ -207,7 +212,9 @@ async def lifespan(app: FastAPI):
     redis_client = create_redis_client()
     if LOCAL_RUNTIME_METRICS_ENABLED:
         # A separate, bounded async connection; no blocking Redis IO in predict.
-        metrics_redis_client = async_redis.from_url(REDIS_URL, socket_timeout=0.2, socket_connect_timeout=0.2)
+        metrics_redis_client = async_redis.from_url(
+            REDIS_URL, socket_timeout=0.2, socket_connect_timeout=0.2, **_redis_password_options()
+        )
     kafka_producer = create_kafka_producer()
     get_worker_client()
     try:

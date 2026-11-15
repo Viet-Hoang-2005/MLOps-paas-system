@@ -526,6 +526,7 @@ def install_requirements(requirements_path: Path) -> None:
         python_executable=sys.executable,
         source_dir=SOURCE_DIR,
         detail=runtime_log.detail,
+        progress=runtime_log.progress,
         log=log,
     )
 

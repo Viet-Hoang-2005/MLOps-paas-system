@@ -1,6 +1,73 @@
 export const trainingEn = {
+  workspaceHistory: {
+    open: "Training Jobs ({{count}})",
+    title: "Training Jobs",
+    jobId: "Training Job ID",
+    project: "Model Project",
+    status: "Training Status",
+    trainingAt: "Training At",
+    actions: "Actions",
+    view: "Open",
+    delete: "Delete Training Job",
+    currentWorkspace: "Current workspace",
+    openActive: "Open active Training Job",
+    empty: "No training jobs yet",
+    previous: "Previous",
+    next: "Next",
+    workspaceId: "Workspace ID",
+    workspaceStatus: "Workspace Status",
+    createdAt: "Created at",
+    updatedAt: "Updated at",
+    newWorkspace: "New Workspace",
+    noWorkspaces: "No workspaces found",
+    deleteWorkspace: "Delete Workspace",
+    deleteWorkspaceDescription:
+      "Delete this workspace and its {{count}} training jobs? Running jobs must stop before deletion completes.",
+    deleteJobDescription:
+      "Delete this training job, its snapshot, logs and Output? The current workspace will be kept.",
+    states: {
+      all: "All workspace statuses",
+      ready: "Ready",
+      preparing: "Preparing",
+      running: "Running",
+      deleting: "Deleting",
+      delete_failed: "Deletion failed",
+    },
+  },
+  assignment: {
+    sourceTitle: "Training Run Source",
+    sourceDescription:
+      "Select the completed training job run whose trained weights and outputs will be linked to a model project.",
+    projectTitle: "Target Model Project",
+    projectDescription:
+      "Assign this run to an existing model project or register a new project to host its deployment and metrics.",
+    artifactsTitle: "Model Artifacts & Metadata",
+    artifactsDescription:
+      "Select the primary model weights and link optional JSON artifacts for label mapping, schema validation, and evaluation metrics.",
+    codeDataTitle: "Code & Data",
+    codeDataDescription:
+      "Inspect supplemental inference code and baseline reference dataset provided for this run.",
+    requirementsTitle: "Requirements",
+    requirementsDescription:
+      "Configure Python dependencies (requirements.txt) required to build the model serving image.",
+    requirementsSelectLabel: "Requirements source",
+    requirementsNone: "Not used",
+    requirementsFromInput: "From Training Job Input",
+    requirementsUpload: "Upload new",
+    uploadRequirements: "Upload requirements.txt",
+    uploadRequirementsHint:
+      "Upload a requirements.txt file to auto-populate dependencies",
+  },
   studio: {
+    preparingInput: "Preparing Input",
+    preparingInputHint:
+      "Downloading, checking and packaging Input. Training will start after preparation completes.",
     artifactSelection: {
+      source_codeInput: "Select script Python from Input",
+      reference_dataInput: "Select data CSV from Input",
+      source_codeUpload: "Upload new Source code",
+      reference_dataUpload: "Upload new Reference data",
+
       model: "Raw Model Artifact",
       chooseModel: "Select a model",
       label_mapping: "Label mapping",

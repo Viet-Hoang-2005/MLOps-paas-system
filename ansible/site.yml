@@ -39,8 +39,8 @@
   tags: [bootstrap, verify]
   roles:
     - role: verify
-      verify_scope: bootstrap
-      when: bootstrap_k3s_cluster | bool
+      verify_phase: bootstrap
+      when: bootstrap_k3s_cluster | bool and verify_scope in ['bootstrap', 'all']
 
 - name: Bootstrap Argo CD and reconcile the core platform through GitOps
   hosts: master
@@ -60,8 +60,8 @@
   tags: [platform-core, verify]
   roles:
     - role: verify
-      verify_scope: platform
-      when: deploy_core_platform | bool
+      verify_phase: platform
+      when: deploy_core_platform | bool and verify_scope in ['platform', 'all']
 
 - name: Wait for optional training operators and GitOps-managed capacity
   hosts: master
@@ -79,5 +79,15 @@
   tags: [platform-training, verify]
   roles:
     - role: verify
-      verify_scope: training
-      when: deploy_training_platform | bool
+      verify_phase: training
+      when: deploy_training_platform | bool and verify_scope in ['training', 'all']
+
+- name: Verify application workloads after CD publishes and promotes images
+  hosts: master
+  become: true
+  gather_facts: false
+  tags: [verify, verify-workloads]
+  roles:
+    - role: verify
+      verify_phase: workloads
+      when: deploy_core_platform | bool and verify_scope in ['workloads', 'all']

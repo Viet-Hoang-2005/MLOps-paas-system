@@ -23,15 +23,15 @@ describe("getNotificationDestination", () => {
     expect(getNotificationDestination(notif)).toBe("/dashboard/projects");
   });
 
-  it("navigates training notifications to /dashboard/projects/<id>/training", () => {
+  it("navigates training notifications to the workspace job snapshot", () => {
     const notif: NotificationItem = {
       ...baseNotification,
       type: "training",
-      link: "/dashboard/projects/proj-123/training",
-      metadata: { project_id: "proj-123" },
+      link: "/dashboard/training/workspaces/ws-123/job/job-123",
+      metadata: { workspace_id: "ws-123", job_id: "job-123" },
     };
     expect(getNotificationDestination(notif)).toBe(
-      "/dashboard/projects/proj-123/training",
+      "/dashboard/training/workspaces/ws-123/job/job-123",
     );
   });
 
@@ -45,6 +45,16 @@ describe("getNotificationDestination", () => {
     expect(getNotificationDestination(notif)).toBe(
       "/dashboard/projects/proj-123/deployment",
     );
+  });
+
+  it("opens Training when an old notification has no workspace identity", () => {
+    expect(
+      getNotificationDestination({
+        ...baseNotification,
+        type: "training",
+        metadata: { job_id: "job-one", project_id: "project-one" },
+      }),
+    ).toBe("/dashboard/training");
   });
 
   it("navigates deployment notifications to /dashboard/projects/<id>/deployment", () => {

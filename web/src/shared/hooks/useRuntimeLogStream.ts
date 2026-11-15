@@ -77,7 +77,9 @@ export function useRuntimeLogStream({
           sourceKey,
           logs:
             append && previous.sourceKey === sourceKey
-              ? [...previous.logs, ...nextLogs].slice(-10000)
+              ? nextLogs.length
+                ? [...previous.logs, ...nextLogs].slice(-10000)
+                : previous.logs
               : nextLogs,
           status: batch.status,
           error:

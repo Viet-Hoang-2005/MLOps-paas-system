@@ -244,7 +244,7 @@ export default function DriftMonitoringPage() {
     }
     return (
       <div className="flex w-full flex-1 flex-col space-y-6">
-        <PageHeader title={t("title")} />
+        <PageHeader title={t("title")} actions={<ProjectPageSelect />} />
         <Placeholder
           title={tCommon("navigation.driftMonitoring")}
           description={tProjects("workflow.noProjectMonitoring")}
@@ -266,7 +266,7 @@ export default function DriftMonitoringPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} />
+      <PageHeader title={t("title")} actions={<ProjectPageSelect />} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="w-full sm:w-60">
@@ -326,3 +326,4 @@ export default function DriftMonitoringPage() {
     </div>
   );
 }
+import { ProjectPageSelect } from "@/features/projects/components/ProjectPageSelect";

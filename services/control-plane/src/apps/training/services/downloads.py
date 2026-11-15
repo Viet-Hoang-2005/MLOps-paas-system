@@ -133,14 +133,14 @@ def _snapshot(job, storage, path):
 def workspace_download(job, *, area, path=None, revision=None, storage=None):
     """Caller authorizes the job first. This service accepts paths, never storage URIs."""
     storage = storage or S3Storage()
-    if area == "input" and job.submitted_at:
+    if area == "input" and hasattr(job, "submitted_at"):
         return _snapshot(job, storage, path)
     if area == "input":
         if revision is not None and str(job.revision) != str(revision):
             raise Conflict("Workspace changed. Reload before downloading.")
         entries = list(job.entries.all())
         files = {entry.relative_path: entry for entry in entries if entry.kind != "folder"}
-        prefix = f"users/{job.owner.tenant_id}/training/jobs/{job.public_id}/draft/objects/"
+        prefix = f"users/{job.owner.tenant_id}/training/workspaces/{job.public_id}/draft/objects/"
         limit = MAX_WORKSPACE_SNAPSHOT
     elif area == "output":
         if job.outputs_purged_at:

@@ -254,3 +254,20 @@ python -m pytest --cov=src --cov-report=term-missing
 > Để biểu đồ tiến độ trên giao diện người dùng hiển thị đúng, mã nguồn người dùng chỉ cần in ra stdout theo cú pháp:
 > `print("METRIC_JSON " + json.dumps({"epoch": 1, "loss": 0.35, "val_accuracy": 0.91}))`
 > Hệ thống sẽ tự động bắt dòng log này và chuyển thành dữ liệu chuỗi thời gian (Time-series Metric) mà không yêu cầu cài đặt thêm SDK phức tạp.
+
+## Live dependency-install logs
+
+Pip installation streams merged stdout/stderr through a Linux PTY with
+`--progress-bar on`. Download progress is retained even though the job has no
+interactive terminal. Pip inherits the runner process group so cancellation
+still terminates its children; it receives only the isolated pip environment.
+
+Redacted progress updates use `TERMINAL_PROGRESS {"text":"...","done":false}`
+records, capped at four refreshes per second and 256 text characters. A final
+record has `done:true`. Ordinary package-install messages remain ordinary logs.
+TerminalViewer reconstructs one mutable row per active bar, retains completed
+bars, and copies rendered text rather than internal progress records. Existing
+cursor/offset polling and tenant isolation apply unchanged.
+
+After changing runner code, rebuild `docker compose build training-runner`.
+New jobs use the rebuilt image; already-running job containers keep their image.

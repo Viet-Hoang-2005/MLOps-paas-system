@@ -41,8 +41,12 @@ spec:
           clusterRules: []
         alloy:
           resources:
-            requests: {cpu: 50m, memory: 128Mi}
-            limits: {cpu: 500m, memory: 384Mi}
+            requests:
+              cpu: 25m
+              memory: 384Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           configMap:
             content: |
               discovery.kubernetes "tasks" {

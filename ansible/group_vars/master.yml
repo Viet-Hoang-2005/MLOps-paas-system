@@ -1,4 +1,5 @@
 ---
+ansible_python_interpreter: /usr/bin/python3
 k3s_node_labels:
   - workload-type=control-plane
 k3s_node_taints:

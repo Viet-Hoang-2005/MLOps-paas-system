@@ -6,12 +6,12 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.training.models import TrainingJob
+from apps.training.models import TrainingWorkspace
 from apps.training.services import workspaces as service
 
 
-def _workspace(user, job_id):
-    return get_object_or_404(TrainingJob.objects.filter(owner=user), public_id=job_id)
+def _workspace(user, workspace_id):
+    return get_object_or_404(TrainingWorkspace.objects.filter(owner=user), public_id=workspace_id)
 
 
 def _entry(workspace, entry_id):
@@ -39,8 +39,8 @@ def _payload(request, *, required=False, max_bytes=service.MAX_DATA):
 
 
 class WorkspaceEntriesEndpoint(APIView):
-    def post(self, request, job_id):
-        workspace = _workspace(request.user, job_id)
+    def post(self, request, workspace_id):
+        workspace = _workspace(request.user, workspace_id)
         kind = request.data.get("kind", "")
         payload, uploaded = _payload(request, max_bytes=service.MAX_DATA if kind == "data" else service.MAX_TEXT)
         if kind == "data" and not uploaded:
@@ -52,8 +52,8 @@ class WorkspaceEntriesEndpoint(APIView):
 
 
 class WorkspaceEntryEndpoint(APIView):
-    def patch(self, request, job_id, entry_id):
-        workspace = _workspace(request.user, job_id)
+    def patch(self, request, workspace_id, entry_id):
+        workspace = _workspace(request.user, workspace_id)
         entry = _entry(workspace, entry_id)
         kind = request.data.get("kind")
         payload, replacement = _payload(
@@ -74,22 +74,22 @@ class WorkspaceEntryEndpoint(APIView):
         entry.refresh_from_db()
         return Response({"entry": _serialize_entry(entry), "revision": revision})
 
-    def delete(self, request, job_id, entry_id):
-        workspace = _workspace(request.user, job_id)
+    def delete(self, request, workspace_id, entry_id):
+        workspace = _workspace(request.user, workspace_id)
         _entry(workspace, entry_id)
         revision = service.delete_entry(workspace, entry_id, revision=request.data.get("revision"))
         return Response({"revision": revision})
 
 
 class WorkspaceSecretEndpoint(APIView):
-    def put(self, request, job_id, name):
-        workspace = _workspace(request.user, job_id)
+    def put(self, request, workspace_id, name):
+        workspace = _workspace(request.user, workspace_id)
         secret, revision = service.set_secret(
             workspace, revision=request.data.get("revision"), name=name, value=request.data.get("value")
         )
         return Response({"name": secret.name, "updated_at": secret.updated_at.isoformat(), "revision": revision})
 
-    def delete(self, request, job_id, name):
-        workspace = _workspace(request.user, job_id)
+    def delete(self, request, workspace_id, name):
+        workspace = _workspace(request.user, workspace_id)
         revision = service.delete_secret(workspace, revision=request.data.get("revision"), name=name)
         return Response({"revision": revision})
