@@ -34,8 +34,8 @@ spec:
             cpu: 30m
             memory: 64Mi
           limits:
-            cpu: 200m
-            memory: 128Mi
+            cpu: 250m
+            memory: 256Mi
         ingress:
           enabled: false
         config:

@@ -36,10 +36,10 @@ spec:
             resources:
               requests:
                 cpu: 150m
-                memory: 512Mi
+                memory: 1Gi
               limits:
                 cpu: 1000m
-                memory: 1024Mi
+                memory: 2Gi
             storageSpec:
               volumeClaimTemplate:
                 spec:
@@ -54,13 +54,17 @@ spec:
             podMonitorNamespaceSelector: {}
             serviceMonitorNamespaceSelector: {}
         grafana:
+          sidecar:
+            resources:
+              requests: {cpu: 10m, memory: 32Mi}
+              limits: {cpu: 200m, memory: 128Mi}
           resources:
             requests:
               cpu: 50m
               memory: 128Mi
             limits:
-              cpu: 250m
-              memory: 256Mi
+              cpu: 500m
+              memory: 512Mi
           additionalDataSources:
             - name: Runtime logs
               type: loki
@@ -89,8 +93,8 @@ spec:
                 cpu: 25m
                 memory: 64Mi
               limits:
-                cpu: 100m
-                memory: 128Mi
+                cpu: 250m
+                memory: 256Mi
             storage:
               volumeClaimTemplate:
                 spec:
@@ -99,6 +103,10 @@ spec:
                     requests:
                       storage: 2Gi
         prometheusOperator:
+          prometheusConfigReloader:
+            resources:
+              requests: {cpu: 10m, memory: 32Mi}
+              limits: {cpu: 100m, memory: 128Mi}
           nodeSelector:
             workload-type: worker
           resources:
@@ -106,12 +114,16 @@ spec:
               cpu: 50m
               memory: 128Mi
             limits:
-              cpu: 200m
-              memory: 256Mi
+              cpu: 500m
+              memory: 512Mi
           admissionWebhooks:
             enabled: false
           tls:
             enabled: false
+        prometheus-node-exporter:
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {cpu: 250m, memory: 128Mi}
         kube-state-metrics:
           metricLabelsAllowlist:
             - pods=[mlops-paas.io/deployment-id,mlops-paas.io/tenant-id,mlops-paas.io/project-id,mlops-paas.io/model-version-id,mlops-paas.io/training-job-id]
@@ -120,10 +132,10 @@ spec:
           resources:
             requests:
               cpu: 25m
-              memory: 64Mi
-            limits:
-              cpu: 100m
               memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
