@@ -17,6 +17,11 @@ spec:
     name: mlops-paas-control-plane
   minReplicas: 2
   maxReplicas: 5
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 60
   metrics:
     - type: Resource
       resource:
@@ -28,5 +33,7 @@ spec:
       resource:
         name: memory
         target:
-          type: Utilization
-          averageUtilization: 75
+          # Gunicorn's idle footprint is already ~210Mi per pod. A percentage
+          # of the 256Mi reservation caused perpetual scale-up without traffic.
+          type: AverageValue
+          averageValue: 384Mi

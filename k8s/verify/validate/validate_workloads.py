@@ -16,6 +16,22 @@ from ..utils import (
 
 
 @pytest.mark.validate
+def validate_control_plane_memory_scaling_has_idle_headroom(context: ValidationContext) -> None:
+    resources = context.render("k8s/workloads/overlays/production/control-plane")
+    hpa = next(r for r in resources if r["kind"] == "HorizontalPodAutoscaler")
+    memory = next(m["resource"] for m in hpa["spec"]["metrics"] if m["resource"]["name"] == "memory")
+    assert memory["target"]["type"] == "AverageValue"
+    target = int(memory["target"]["averageValue"].removesuffix("Mi"))
+    deployment = next(r for r in resources if r["kind"] == "Deployment" and r["metadata"]["name"] == "mlops-paas-control-plane")
+    container = deployment["spec"]["template"]["spec"]["containers"][0]
+    reservation = int(container["resources"]["requests"]["memory"].removesuffix("Mi"))
+    limit = int(container["resources"]["limits"]["memory"].removesuffix("Mi"))
+    assert reservation < target < limit
+    assert hpa["spec"]["minReplicas"] == 2
+    assert hpa["spec"]["maxReplicas"] >= 2
+
+
+@pytest.mark.validate
 def validate_control_plane_secret_refs_match_webhook_defaults(context: ValidationContext) -> None:
     """ESO default injection must not leave the Application perpetually OutOfSync."""
     defaults = {
