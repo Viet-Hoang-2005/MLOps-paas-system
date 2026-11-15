@@ -16,6 +16,23 @@ from ..utils import (
 
 
 @pytest.mark.validate
+def validate_control_plane_secret_refs_match_webhook_defaults(context: ValidationContext) -> None:
+    """ESO default injection must not leave the Application perpetually OutOfSync."""
+    defaults = {
+        "conversionStrategy": "Default",
+        "decodingStrategy": "None",
+        "metadataPolicy": "None",
+        "nullBytePolicy": "Ignore",
+    }
+    for resource in context.render("k8s/workloads/overlays/production/control-plane"):
+        if resource.get("kind") != "ExternalSecret":
+            continue
+        for entry in resource["spec"].get("data", []):
+            ref = entry["remoteRef"]
+            assert {key: ref.get(key) for key in defaults} == defaults, resource["metadata"]["name"]
+
+
+@pytest.mark.validate
 def validate_workload_layout_and_images(context: ValidationContext) -> None:
     """Verify workload applications point to correct overlays and bases don't hardcode digests."""
     errors: list[str] = []
