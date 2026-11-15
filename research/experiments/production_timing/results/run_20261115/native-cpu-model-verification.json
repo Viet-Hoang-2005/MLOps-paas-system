@@ -1,0 +1,15 @@
+{
+  "source_model_sha256": "bd0a91ec11d38ccceca4950a571857f3710bc7034bb8aaf30b40295dfd15e8b5",
+  "predictions_checked": 12000,
+  "label_mismatches": 0,
+  "max_probability_difference_from_rounded_scoring": 2.9776000998182894e-08,
+  "native_loader": "mlflow.xgboost",
+  "source_artifacts_modified": false,
+  "requirements": [
+    "mlflow==3.11.1",
+    "xgboost-cpu==3.2.0",
+    "pandas==2.2.1",
+    "numpy==1.26.4"
+  ],
+  "archive_sha256": "eb51b8e6642b1931020baad50127c9e1e889a0dddfae637cc0b8fcb56fffec8e"
+}

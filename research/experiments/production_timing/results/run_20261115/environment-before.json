@@ -1,0 +1,823 @@
+{
+  "observed_utc": "2026-11-15T13:18:32.772539+00:00",
+  "nodes": [
+    {
+      "name": "master-node",
+      "capacity": {
+        "cpu": "2",
+        "ephemeral-storage": "40458684Ki",
+        "hugepages-1Gi": "0",
+        "hugepages-2Mi": "0",
+        "memory": "3928796Ki",
+        "pods": "110"
+      },
+      "allocatable": {
+        "cpu": "2",
+        "ephemeral-storage": "39358207765",
+        "hugepages-1Gi": "0",
+        "hugepages-2Mi": "0",
+        "memory": "3928796Ki",
+        "pods": "110"
+      },
+      "node_info": {
+        "architecture": "amd64",
+        "bootID": "16d8535e-37ec-4aaa-ba0c-cb3ea27f44ff",
+        "containerRuntimeVersion": "containerd://2.2.5-k3s2",
+        "kernelVersion": "6.8.0-1069-aws",
+        "kubeProxyVersion": "",
+        "kubeletVersion": "v1.34.9+k3s1",
+        "machineID": "ec2a108d157ae32030c951df41f7bbc4",
+        "operatingSystem": "linux",
+        "osImage": "Ubuntu 22.04.5 LTS",
+        "systemUUID": "ec2a108d-157a-e320-30c9-51df41f7bbc4"
+      },
+      "instance_type": "k3s"
+    },
+    {
+      "name": "worker-node-1",
+      "capacity": {
+        "cpu": "2",
+        "ephemeral-storage": "40458684Ki",
+        "hugepages-1Gi": "0",
+        "hugepages-2Mi": "0",
+        "memory": "8008420Ki",
+        "pods": "110"
+      },
+      "allocatable": {
+        "cpu": "2",
+        "ephemeral-storage": "39358207765",
+        "hugepages-1Gi": "0",
+        "hugepages-2Mi": "0",
+        "memory": "8008420Ki",
+        "pods": "110"
+      },
+      "node_info": {
+        "architecture": "amd64",
+        "bootID": "408243af-88c6-4bfd-a27b-1c4913bed53d",
+        "containerRuntimeVersion": "containerd://2.2.5-k3s2",
+        "kernelVersion": "6.8.0-1069-aws",
+        "kubeProxyVersion": "",
+        "kubeletVersion": "v1.34.9+k3s1",
+        "machineID": "ec2e19f0ded1216c2a39897dd1cf4814",
+        "operatingSystem": "linux",
+        "osImage": "Ubuntu 22.04.5 LTS",
+        "systemUUID": "ec2e19f0-ded1-216c-2a39-897dd1cf4814"
+      },
+      "instance_type": "k3s"
+    },
+    {
+      "name": "worker-node-2",
+      "capacity": {
+        "cpu": "2",
+        "ephemeral-storage": "40458684Ki",
+        "hugepages-1Gi": "0",
+        "hugepages-2Mi": "0",
+        "memory": "8008424Ki",
+        "pods": "110"
+      },
+      "allocatable": {
+        "cpu": "2",
+        "ephemeral-storage": "39358207765",
+        "hugepages-1Gi": "0",
+        "hugepages-2Mi": "0",
+        "memory": "8008424Ki",
+        "pods": "110"
+      },
+      "node_info": {
+        "architecture": "amd64",
+        "bootID": "7b3c94ff-5781-47ac-a70b-d4b42de6a690",
+        "containerRuntimeVersion": "containerd://2.2.5-k3s2",
+        "kernelVersion": "6.8.0-1069-aws",
+        "kubeProxyVersion": "",
+        "kubeletVersion": "v1.34.9+k3s1",
+        "machineID": "ec210352c2949796cc6cd879b66bf375",
+        "operatingSystem": "linux",
+        "osImage": "Ubuntu 22.04.5 LTS",
+        "systemUUID": "ec210352-c294-9796-cc6c-d879b66bf375"
+      },
+      "instance_type": "k3s"
+    }
+  ],
+  "pods": [
+    {
+      "name": "mlops-paas-celery-beat-66dfb98d94-wv9rn",
+      "namespace": "mlops-paas-core",
+      "node": "worker-node-1",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "celery-beat",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane:76d1f3bca2022851ebbf0246dce22267dd9c9403@sha256:78f98aa1206e396a60ab4853bbbfb181317be03a139e71e8fb6088d08aeef613",
+          "resources": {
+            "limits": {
+              "cpu": "150m",
+              "memory": "256Mi"
+            },
+            "requests": {
+              "cpu": "20m",
+              "memory": "128Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "celery-beat",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane@sha256:78f98aa1206e396a60ab4853bbbfb181317be03a139e71e8fb6088d08aeef613",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "mlops-paas-celery-health-worker-55b7d9954f-6ndm9",
+      "namespace": "mlops-paas-core",
+      "node": "worker-node-1",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "celery-health-worker",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane:76d1f3bca2022851ebbf0246dce22267dd9c9403@sha256:78f98aa1206e396a60ab4853bbbfb181317be03a139e71e8fb6088d08aeef613",
+          "resources": {
+            "limits": {
+              "cpu": "300m",
+              "memory": "512Mi"
+            },
+            "requests": {
+              "cpu": "25m",
+              "memory": "192Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "celery-health-worker",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane@sha256:78f98aa1206e396a60ab4853bbbfb181317be03a139e71e8fb6088d08aeef613",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "mlops-paas-celery-worker-675f5dc99b-58kcs",
+      "namespace": "mlops-paas-core",
+      "node": "worker-node-2",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "worker",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane:76d1f3bca2022851ebbf0246dce22267dd9c9403@sha256:78f98aa1206e396a60ab4853bbbfb181317be03a139e71e8fb6088d08aeef613",
+          "resources": {
+            "limits": {
+              "cpu": "800m",
+              "memory": "768Mi"
+            },
+            "requests": {
+              "cpu": "40m",
+              "memory": "256Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "worker",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane@sha256:78f98aa1206e396a60ab4853bbbfb181317be03a139e71e8fb6088d08aeef613",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "mlops-paas-celery-worker-675f5dc99b-64wv2",
+      "namespace": "mlops-paas-core",
+      "node": "worker-node-1",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "worker",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane:76d1f3bca2022851ebbf0246dce22267dd9c9403@sha256:78f98aa1206e396a60ab4853bbbfb181317be03a139e71e8fb6088d08aeef613",
+          "resources": {
+            "limits": {
+              "cpu": "800m",
+              "memory": "768Mi"
+            },
+            "requests": {
+              "cpu": "40m",
+              "memory": "256Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "worker",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane@sha256:78f98aa1206e396a60ab4853bbbfb181317be03a139e71e8fb6088d08aeef613",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "mlops-paas-consumer-5c979f96c6-dpl97",
+      "namespace": "mlops-paas-core",
+      "node": "worker-node-2",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "consumer",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-consumer:ffb45dc8489f81e36b27fe7ea7979f7775cb163f@sha256:99eaec974b01393dae82e1f695973feba889a624be2a70d43bc5423e90695125",
+          "resources": {
+            "limits": {
+              "cpu": "500m",
+              "memory": "512Mi"
+            },
+            "requests": {
+              "cpu": "25m",
+              "memory": "128Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "consumer",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-consumer@sha256:99eaec974b01393dae82e1f695973feba889a624be2a70d43bc5423e90695125",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "mlops-paas-control-plane-77896d8955-57mj4",
+      "namespace": "mlops-paas-core",
+      "node": "worker-node-2",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "control-plane",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane:76d1f3bca2022851ebbf0246dce22267dd9c9403@sha256:78f98aa1206e396a60ab4853bbbfb181317be03a139e71e8fb6088d08aeef613",
+          "resources": {
+            "limits": {
+              "cpu": "800m",
+              "memory": "768Mi"
+            },
+            "requests": {
+              "cpu": "50m",
+              "memory": "256Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "control-plane",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane@sha256:78f98aa1206e396a60ab4853bbbfb181317be03a139e71e8fb6088d08aeef613",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "mlops-paas-control-plane-77896d8955-pvkvv",
+      "namespace": "mlops-paas-core",
+      "node": "worker-node-1",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "control-plane",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane:76d1f3bca2022851ebbf0246dce22267dd9c9403@sha256:78f98aa1206e396a60ab4853bbbfb181317be03a139e71e8fb6088d08aeef613",
+          "resources": {
+            "limits": {
+              "cpu": "800m",
+              "memory": "768Mi"
+            },
+            "requests": {
+              "cpu": "50m",
+              "memory": "256Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "control-plane",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-control-plane@sha256:78f98aa1206e396a60ab4853bbbfb181317be03a139e71e8fb6088d08aeef613",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "mlops-paas-model-server-75c56479cd-vrzk7",
+      "namespace": "mlops-paas-core",
+      "node": "worker-node-1",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "model-server",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-server:df4aa6477cdeb6f069339fc894a050a433f322ae@sha256:42b9d5a86b7b33286deb1ce4ac452e05ddaa656b443b104d1a459e3b39311432",
+          "resources": {
+            "limits": {
+              "cpu": "500m",
+              "memory": "512Mi"
+            },
+            "requests": {
+              "cpu": "50m",
+              "memory": "192Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "model-server",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-server@sha256:42b9d5a86b7b33286deb1ce4ac452e05ddaa656b443b104d1a459e3b39311432",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "mlops-paas-model-server-75c56479cd-vvssc",
+      "namespace": "mlops-paas-core",
+      "node": "worker-node-2",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "model-server",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-server:df4aa6477cdeb6f069339fc894a050a433f322ae@sha256:42b9d5a86b7b33286deb1ce4ac452e05ddaa656b443b104d1a459e3b39311432",
+          "resources": {
+            "limits": {
+              "cpu": "500m",
+              "memory": "512Mi"
+            },
+            "requests": {
+              "cpu": "50m",
+              "memory": "192Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "model-server",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-server@sha256:42b9d5a86b7b33286deb1ce4ac452e05ddaa656b443b104d1a459e3b39311432",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "mlops-paas-web-b89ccdc45-fmtms",
+      "namespace": "mlops-paas-core",
+      "node": "worker-node-2",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "web",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-web:ffb45dc8489f81e36b27fe7ea7979f7775cb163f@sha256:cc0fc2ac23e0e7d821b1055e403f6d1846fab874d558b7f14211af4d6758d206",
+          "resources": {
+            "limits": {
+              "cpu": "250m",
+              "memory": "128Mi"
+            },
+            "requests": {
+              "cpu": "10m",
+              "memory": "64Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "web",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-web@sha256:cc0fc2ac23e0e7d821b1055e403f6d1846fab874d558b7f14211af4d6758d206",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "build-model-job-88blm-notify-build-exit-1813718060",
+      "namespace": "mlops-paas-execution",
+      "node": "worker-node-1",
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "wait",
+          "image": "quay.io/argoproj/argoexec:v3.6.5",
+          "resources": {}
+        },
+        {
+          "name": "main",
+          "image": "curlimages/curl:8.8.0",
+          "resources": {
+            "limits": {
+              "cpu": "100m",
+              "memory": "64Mi"
+            },
+            "requests": {
+              "cpu": "20m",
+              "memory": "32Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "main",
+          "image_id": "docker.io/curlimages/curl@sha256:73e4d532ea62d7505c5865b517d3704966ffe916609bedc22af6833dc9969bcd",
+          "restart_count": 0
+        },
+        {
+          "name": "wait",
+          "image_id": "quay.io/argoproj/argoexec@sha256:ef6200b5f7631248a4b4bd95a755badb25e69bc476456767fa40ce0964bf25f1",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "build-model-job-88blm-prepare-package-987974289",
+      "namespace": "mlops-paas-execution",
+      "node": "worker-node-2",
+      "phase": "Failed",
+      "containers": [
+        {
+          "name": "wait",
+          "image": "quay.io/argoproj/argoexec:v3.6.5",
+          "resources": {}
+        },
+        {
+          "name": "main",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:ffb45dc8489f81e36b27fe7ea7979f7775cb163f@sha256:7232be65fd88d8598e0ccd0889547b62774c0b3b68041dc643b79ade948e7c74",
+          "resources": {
+            "limits": {
+              "cpu": "500m",
+              "memory": "512Mi"
+            },
+            "requests": {
+              "cpu": "100m",
+              "memory": "256Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "main",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager@sha256:7232be65fd88d8598e0ccd0889547b62774c0b3b68041dc643b79ade948e7c74",
+          "restart_count": 0
+        },
+        {
+          "name": "wait",
+          "image_id": "quay.io/argoproj/argoexec@sha256:ef6200b5f7631248a4b4bd95a755badb25e69bc476456767fa40ce0964bf25f1",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "build-model-job-gjzm4-notify-build-exit-3792657931",
+      "namespace": "mlops-paas-execution",
+      "node": "worker-node-1",
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "wait",
+          "image": "quay.io/argoproj/argoexec:v3.6.5",
+          "resources": {}
+        },
+        {
+          "name": "main",
+          "image": "curlimages/curl:8.8.0",
+          "resources": {
+            "limits": {
+              "cpu": "100m",
+              "memory": "64Mi"
+            },
+            "requests": {
+              "cpu": "20m",
+              "memory": "32Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "main",
+          "image_id": "docker.io/curlimages/curl@sha256:73e4d532ea62d7505c5865b517d3704966ffe916609bedc22af6833dc9969bcd",
+          "restart_count": 0
+        },
+        {
+          "name": "wait",
+          "image_id": "quay.io/argoproj/argoexec@sha256:ef6200b5f7631248a4b4bd95a755badb25e69bc476456767fa40ce0964bf25f1",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "build-model-job-gjzm4-prepare-package-1702430566",
+      "namespace": "mlops-paas-execution",
+      "node": "worker-node-1",
+      "phase": "Failed",
+      "containers": [
+        {
+          "name": "wait",
+          "image": "quay.io/argoproj/argoexec:v3.6.5",
+          "resources": {}
+        },
+        {
+          "name": "main",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:ffb45dc8489f81e36b27fe7ea7979f7775cb163f@sha256:7232be65fd88d8598e0ccd0889547b62774c0b3b68041dc643b79ade948e7c74",
+          "resources": {
+            "limits": {
+              "cpu": "500m",
+              "memory": "512Mi"
+            },
+            "requests": {
+              "cpu": "100m",
+              "memory": "256Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "main",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager@sha256:7232be65fd88d8598e0ccd0889547b62774c0b3b68041dc643b79ade948e7c74",
+          "restart_count": 0
+        },
+        {
+          "name": "wait",
+          "image_id": "quay.io/argoproj/argoexec@sha256:ef6200b5f7631248a4b4bd95a755badb25e69bc476456767fa40ce0964bf25f1",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "build-model-job-kcwgl-build-image-2149727381",
+      "namespace": "mlops-paas-execution",
+      "node": "worker-node-1",
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "wait",
+          "image": "quay.io/argoproj/argoexec:v3.6.5",
+          "resources": {}
+        },
+        {
+          "name": "main",
+          "image": "gcr.io/kaniko-project/executor:latest",
+          "resources": {
+            "limits": {
+              "cpu": "1",
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "250m",
+              "memory": "512Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "main",
+          "image_id": "gcr.io/kaniko-project/executor@sha256:4e7a52dd1f14872430652bb3b027405b8dfd17c4538751c620ac005741ef9698",
+          "restart_count": 0
+        },
+        {
+          "name": "wait",
+          "image_id": "quay.io/argoproj/argoexec@sha256:ef6200b5f7631248a4b4bd95a755badb25e69bc476456767fa40ce0964bf25f1",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "build-model-job-kcwgl-notify-build-exit-2602585847",
+      "namespace": "mlops-paas-execution",
+      "node": "worker-node-1",
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "wait",
+          "image": "quay.io/argoproj/argoexec:v3.6.5",
+          "resources": {}
+        },
+        {
+          "name": "main",
+          "image": "curlimages/curl:8.8.0",
+          "resources": {
+            "limits": {
+              "cpu": "100m",
+              "memory": "64Mi"
+            },
+            "requests": {
+              "cpu": "20m",
+              "memory": "32Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "main",
+          "image_id": "docker.io/curlimages/curl@sha256:73e4d532ea62d7505c5865b517d3704966ffe916609bedc22af6833dc9969bcd",
+          "restart_count": 0
+        },
+        {
+          "name": "wait",
+          "image_id": "quay.io/argoproj/argoexec@sha256:ef6200b5f7631248a4b4bd95a755badb25e69bc476456767fa40ce0964bf25f1",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "build-model-job-kcwgl-notify-success-812572306",
+      "namespace": "mlops-paas-execution",
+      "node": "worker-node-2",
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "wait",
+          "image": "quay.io/argoproj/argoexec:v3.6.5",
+          "resources": {}
+        },
+        {
+          "name": "main",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:ffb45dc8489f81e36b27fe7ea7979f7775cb163f@sha256:7232be65fd88d8598e0ccd0889547b62774c0b3b68041dc643b79ade948e7c74",
+          "resources": {
+            "limits": {
+              "cpu": "500m",
+              "memory": "512Mi"
+            },
+            "requests": {
+              "cpu": "100m",
+              "memory": "128Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "main",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager@sha256:7232be65fd88d8598e0ccd0889547b62774c0b3b68041dc643b79ade948e7c74",
+          "restart_count": 0
+        },
+        {
+          "name": "wait",
+          "image_id": "quay.io/argoproj/argoexec@sha256:ef6200b5f7631248a4b4bd95a755badb25e69bc476456767fa40ce0964bf25f1",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "build-model-job-kcwgl-prepare-package-4100394034",
+      "namespace": "mlops-paas-execution",
+      "node": "worker-node-1",
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "wait",
+          "image": "quay.io/argoproj/argoexec:v3.6.5",
+          "resources": {}
+        },
+        {
+          "name": "main",
+          "image": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:ffb45dc8489f81e36b27fe7ea7979f7775cb163f@sha256:7232be65fd88d8598e0ccd0889547b62774c0b3b68041dc643b79ade948e7c74",
+          "resources": {
+            "limits": {
+              "cpu": "500m",
+              "memory": "512Mi"
+            },
+            "requests": {
+              "cpu": "100m",
+              "memory": "256Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "main",
+          "image_id": "registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager@sha256:7232be65fd88d8598e0ccd0889547b62774c0b3b68041dc643b79ade948e7c74",
+          "restart_count": 0
+        },
+        {
+          "name": "wait",
+          "image_id": "quay.io/argoproj/argoexec@sha256:ef6200b5f7631248a4b4bd95a755badb25e69bc476456767fa40ce0964bf25f1",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "build-model-job-kcwgl-push-image-3211871354",
+      "namespace": "mlops-paas-execution",
+      "node": "worker-node-1",
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "wait",
+          "image": "quay.io/argoproj/argoexec:v3.6.5",
+          "resources": {}
+        },
+        {
+          "name": "main",
+          "image": "quay.io/skopeo/stable:v1.22.3",
+          "resources": {
+            "limits": {
+              "cpu": "300m",
+              "memory": "256Mi"
+            },
+            "requests": {
+              "cpu": "50m",
+              "memory": "64Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "main",
+          "image_id": "quay.io/skopeo/stable@sha256:2681eccb8b02c495b013c2669cbf7f41d5c0b0b0e644e7c69bd3ea9bcb20641f",
+          "restart_count": 0
+        },
+        {
+          "name": "wait",
+          "image_id": "quay.io/argoproj/argoexec@sha256:ef6200b5f7631248a4b4bd95a755badb25e69bc476456767fa40ce0964bf25f1",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "deploy-model-job-ppb5f-apply-deployment-2568237555",
+      "namespace": "mlops-paas-execution",
+      "node": "worker-node-1",
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "main",
+          "image": "quay.io/argoproj/argoexec:v3.6.5",
+          "resources": {}
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "main",
+          "image_id": "quay.io/argoproj/argoexec@sha256:ef6200b5f7631248a4b4bd95a755badb25e69bc476456767fa40ce0964bf25f1",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "deploy-model-job-ppb5f-apply-service-2161092286",
+      "namespace": "mlops-paas-execution",
+      "node": "worker-node-1",
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "main",
+          "image": "quay.io/argoproj/argoexec:v3.6.5",
+          "resources": {}
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "main",
+          "image_id": "quay.io/argoproj/argoexec@sha256:ef6200b5f7631248a4b4bd95a755badb25e69bc476456767fa40ce0964bf25f1",
+          "restart_count": 0
+        }
+      ]
+    },
+    {
+      "name": "deploy-model-job-ppb5f-await-model-ready-3357135377",
+      "namespace": "mlops-paas-execution",
+      "node": "worker-node-1",
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "wait",
+          "image": "quay.io/argoproj/argoexec:v3.6.5",
+          "resources": {}
+        },
+        {
+          "name": "main",
+          "image": "registry.k8s.io/kubectl:v1.34.1",
+          "resources": {
+            "limits": {
+              "cpu": "100m",
+              "memory": "128Mi"
+            },
+            "requests": {
+              "cpu": "25m",
+              "memory": "64Mi"
+            }
+          }
+        }
+      ],
+      "image_ids": [
+        {
+          "name": "main",
+          "image_id": "registry.k8s.io/kubectl@sha256:59bafa07ff3a6d4b417e7633ddb9d79a9606ca98bf64bac080b3e65748669250",
+          "restart_count": 0
+        },
+        {
+          "name": "wait",
+          "image_id": "quay.io/argoproj/argoexec@sha256:ef6200b5f7631248a4b4bd95a755badb25e69bc476456767fa40ce0964bf25f1",
+          "restart_count": 0
+        }
+      ]
+    }
+  ]
+}

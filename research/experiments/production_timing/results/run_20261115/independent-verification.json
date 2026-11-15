@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "repeats_verified": 3,
+  "raw_percentiles_recomputed": true,
+  "report_durations_recomputed": 2,
+  "all_cleanup_receipts_zero": true,
+  "client_failures_retained": 1
+}

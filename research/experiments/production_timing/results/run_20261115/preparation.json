@@ -1,0 +1,15 @@
+{
+  "project_id": "69628eec-d3d8-44bc-b7c0-93e8fd5e07ec",
+  "project_name": "csonet-timing-20261115-124916",
+  "preview_revision": 4,
+  "previous_failed_builds": [
+    "62e3778e-5e4f-4364-bb4c-7511f90d6d89",
+    "2e595925-87ce-4934-8c04-f653fd809313"
+  ],
+  "build_id": "a73ed64d-3629-4a3f-ac77-3339d0ba3af3",
+  "image_digest": "sha256:4ae2ac09b4903395f33863d09e8b9ce3fcb0c740316b3b1ed6e8b02c9c9e8f1e",
+  "version_id": "681b4679-5ca1-4fd2-bc07-1587d547e548",
+  "deployment_id": "e5de065e-5127-4ded-b2f8-3cf63096e161",
+  "predict_url": "https://mlops-nids-nt114.id.vn/T-15292321-55d4-412c-857b-7c2a8db1658d/models/69628eec-d3d8-44bc-b7c0-93e8fd5e07ec/681b4679-5ca1-4fd2-bc07-1587d547e548/predict",
+  "health_url": "https://mlops-nids-nt114.id.vn/T-15292321-55d4-412c-857b-7c2a8db1658d/models/69628eec-d3d8-44bc-b7c0-93e8fd5e07ec/681b4679-5ca1-4fd2-bc07-1587d547e548/health"
+}

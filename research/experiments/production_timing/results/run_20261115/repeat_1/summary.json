@@ -1,0 +1,16 @@
+{
+  "repeat": 1,
+  "valid_measurement": false,
+  "attempts": 1000,
+  "valid_responses": 999,
+  "http_or_response_failures": 1,
+  "persisted_records": 999,
+  "prediction_mismatches_from_frozen_baseline": 0,
+  "inference_p95_ms": 364.4025399989908,
+  "actual_dispatch_rps": 5.004783954751179,
+  "window_closed_utc": null,
+  "report_status": "not_triggered_incomplete_window",
+  "window_to_report_seconds": null,
+  "failure_type": "ReadError",
+  "failure_latency_ms": 19249.051599996164
+}

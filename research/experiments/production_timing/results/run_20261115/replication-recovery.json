@@ -1,0 +1,9 @@
+{
+  "observed_failure": "Read replica has zero versions; primary has benchmark version. No WAL sender/receiver connection.",
+  "action": "Restart standby pod postgresql-2 while retaining its PVC",
+  "primary_restarted": false,
+  "configuration_changed": false,
+  "measurement_started": false,
+  "public_health_status": 200,
+  "recovered": true
+}

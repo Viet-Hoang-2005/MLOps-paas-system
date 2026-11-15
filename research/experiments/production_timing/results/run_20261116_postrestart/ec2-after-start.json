@@ -1,0 +1,20 @@
+[
+    {
+        "Id": "i-054177f35c570d396",
+        "State": "running",
+        "System": "ok",
+        "Instance": "ok"
+    },
+    {
+        "Id": "i-0141ccf0e0fbf3ae7",
+        "State": "running",
+        "System": "ok",
+        "Instance": "ok"
+    },
+    {
+        "Id": "i-0cc8ae4b646916050",
+        "State": "running",
+        "System": "ok",
+        "Instance": "ok"
+    }
+]

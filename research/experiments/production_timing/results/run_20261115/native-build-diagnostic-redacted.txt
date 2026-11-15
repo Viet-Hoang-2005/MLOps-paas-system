@@ -1,0 +1,15 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794747527.378743      15 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+I0000 00:00:1794747529.315519      15 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX512F FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794747535.962574      15 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+2026-11-15T12:59:07.042Z [INFO]: Starting TEST_ZIP process
+2026-11-15T12:59:07.045Z [INFO]: Using shared workspace directory: /workspace
+2026-11-15T12:59:07.048Z [INFO]: Downloading artifact to native-model.zip...
+2026-11-15T12:59:07.170Z [INFO]: Download completed.
+2026-11-15T12:59:07.175Z [INFO]: Scanning model package security...
+2026-11-15T12:59:07.200Z [INFO]: Extracting ZIP archive safely...
+2026-11-15T12:59:07.207Z [INFO]: Found MLmodel at .
+2026-11-15T12:59:07.223Z [INFO]: Found requirements.txt.
+2026-11-15T12:59:07.228Z [INFO]: Installing package requirements for validation...

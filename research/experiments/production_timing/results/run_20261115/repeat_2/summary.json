@@ -1,0 +1,14 @@
+{
+  "repeat": 2,
+  "valid_measurement": true,
+  "attempts": 1000,
+  "valid_responses": 1000,
+  "http_or_response_failures": 0,
+  "persisted_records": 1000,
+  "prediction_mismatches_from_frozen_baseline": 0,
+  "inference_p95_ms": 184.15086500754109,
+  "actual_dispatch_rps": 5.004838569214889,
+  "window_closed_utc": "2026-11-15T14:03:21.484460+00:00",
+  "report_status": "completed",
+  "window_to_report_seconds": 50.47422140004346
+}

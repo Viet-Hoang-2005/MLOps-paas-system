@@ -1,0 +1,11 @@
+{
+  "purpose": "Independent validation cohort after authorized EC2 start; prior three repeats retained unchanged",
+  "local_date": "2026-11-16",
+  "previous_run": "run_20261115",
+  "instance_ids": [
+    "i-0cc8ae4b646916050",
+    "i-0141ccf0e0fbf3ae7",
+    "i-054177f35c570d396"
+  ],
+  "protocol": "Three repeats, 1000 requests each, 5 requests/sec, no retries; retain all errors"
+}

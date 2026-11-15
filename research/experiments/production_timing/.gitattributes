@@ -1,0 +1,2 @@
+# Preserve the exact bytes and formatting of retained experimental evidence.
+results/** -text -whitespace

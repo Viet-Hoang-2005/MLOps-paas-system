@@ -1,0 +1,51 @@
+{
+  "status": "completed",
+  "run_id": "3d497e77-f0ef-41f2-85ef-d5e2e336d412",
+  "ready_monotonic": 474670.5966666,
+  "ready_utc": "2026-11-15T19:06:36.679803+00:00",
+  "production_records": 1000,
+  "summary": {
+    "samples": 1000,
+    "has_drift": false,
+    "tenant_id": "T-15292321-55d4-412c-857b-7c2a8db1658d",
+    "project_id": "69628eec-d3d8-44bc-b7c0-93e8fd5e07ec",
+    "drift_score": 0.0192,
+    "data_quality": {
+      "status": "healthy",
+      "extra_features": [],
+      "missing_features": [],
+      "high_null_features": [],
+      "has_schema_mismatch": false,
+      "extra_features_count": 0,
+      "common_features_count": 52,
+      "missing_features_count": 0,
+      "expected_features_count": 52
+    },
+    "dataset_drift": false,
+    "extra_features": [],
+    "drift_threshold": 0.6,
+    "missing_features": [],
+    "model_version_id": "681b4679-5ca1-4fd2-bc07-1587d547e548",
+    "prediction_drift": null,
+    "report_artifacts": {
+      "html_url": "",
+      "html_s3_uri": "s3://mlops-paas-artifacts/users/T-15292321-55d4-412c-857b-7c2a8db1658d/models/69628eec-d3d8-44bc-b7c0-93e8fd5e07ec/drift/d279698d-2a42-4221-9607-17e9d1860c01/3d497e77-f0ef-41f2-85ef-d5e2e336d412/report.html",
+      "local_html_path": "/tmp/drift_reports/T-15292321-55d4-412c-857b-7c2a8db1658d/csonet-timing-20261115-124916/20261115T190626Z/report.html",
+      "s3_report_prefix": "",
+      "report_json_s3_uri": "s3://mlops-paas-artifacts/users/T-15292321-55d4-412c-857b-7c2a8db1658d/models/69628eec-d3d8-44bc-b7c0-93e8fd5e07ec/drift/d279698d-2a42-4221-9607-17e9d1860c01/3d497e77-f0ef-41f2-85ef-d5e2e336d412/report.json",
+      "summary_json_s3_uri": "s3://mlops-paas-artifacts/users/T-15292321-55d4-412c-857b-7c2a8db1658d/models/69628eec-d3d8-44bc-b7c0-93e8fd5e07ec/drift/d279698d-2a42-4221-9607-17e9d1860c01/3d497e77-f0ef-41f2-85ef-d5e2e336d412/summary.json",
+      "local_report_json_path": "/tmp/drift_reports/T-15292321-55d4-412c-857b-7c2a8db1658d/csonet-timing-20261115-124916/20261115T190626Z/report.json",
+      "local_summary_json_path": "/tmp/drift_reports/T-15292321-55d4-412c-857b-7c2a8db1658d/csonet-timing-20261115-124916/20261115T190626Z/summary.json"
+    },
+    "number_of_features": 52,
+    "production_records": 1000,
+    "drifted_feature_names": [
+      "act_data_pkt_fwd"
+    ],
+    "share_drifted_features": 0.0192,
+    "number_of_drifted_features": 1,
+    "statistical_drifted_features": [
+      "act_data_pkt_fwd"
+    ]
+  }
+}

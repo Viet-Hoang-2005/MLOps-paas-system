@@ -1,0 +1,6 @@
+{
+  "status": "not_triggered_incomplete_window",
+  "production_records": 999,
+  "trigger_threshold": 1000,
+  "automatic_runs": 0
+}

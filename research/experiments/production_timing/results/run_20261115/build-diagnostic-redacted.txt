@@ -1,0 +1,16 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794747143.740816      18 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+I0000 00:00:1794747145.706443      18 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX512F FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794747154.033765      18 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+2026-11-15T12:52:45.515Z [INFO]: Starting TEST_ZIP process
+2026-11-15T12:52:45.518Z [INFO]: Using shared workspace directory: /workspace
+2026-11-15T12:52:45.520Z [INFO]: Downloading artifact to mlflow.zip...
+2026-11-15T12:52:45.646Z [INFO]: Download completed.
+2026-11-15T12:52:45.650Z [INFO]: Scanning model package security...
+2026-11-15T12:52:45.670Z [ERROR]: Build runner execution failed â€” error=PackageSecurityError; MLmodel in mlflow.zip:MLmodel uses a disallowed loader_module: mlflow.pyfunc.loaders.code_model; traceback: tasks.py:478:main <- tasks.py:287:run_test_zip_task <- security.py:754:validate_model_package_security <- security.py:650:_validate_mlmodel
+2026-11-15T12:52:45.673Z [INFO]: No callback credential in this step; the workflow exit handler reports the failure.
+BUILD_EOF_ERROR
+time="2026-11-15T12:52:52.318Z" level=info msg="sub-process exited" argo=true error="<nil>"
+Error: exit status 1

@@ -1,0 +1,52 @@
+{
+  "complete": true,
+  "repeats": [
+    {
+      "repeat": 1,
+      "valid_measurement": true,
+      "attempts": 1000,
+      "valid_responses": 1000,
+      "http_or_response_failures": 0,
+      "persisted_records": 1000,
+      "prediction_mismatches_from_frozen_baseline": 0,
+      "inference_p95_ms": 165.65041501889922,
+      "actual_dispatch_rps": 5.008000925651718,
+      "window_closed_utc": "2026-11-15T18:56:52.650704+00:00",
+      "report_status": "completed",
+      "window_to_report_seconds": 47.966905100038275
+    },
+    {
+      "repeat": 2,
+      "valid_measurement": true,
+      "attempts": 1000,
+      "valid_responses": 1000,
+      "http_or_response_failures": 0,
+      "persisted_records": 1000,
+      "prediction_mismatches_from_frozen_baseline": 0,
+      "inference_p95_ms": 161.77992000302763,
+      "actual_dispatch_rps": 5.009455382135128,
+      "window_closed_utc": "2026-11-15T19:01:33.466352+00:00",
+      "report_status": "completed",
+      "window_to_report_seconds": 33.550299199996516
+    },
+    {
+      "repeat": 3,
+      "valid_measurement": true,
+      "attempts": 1000,
+      "valid_responses": 1000,
+      "http_or_response_failures": 0,
+      "persisted_records": 1000,
+      "prediction_mismatches_from_frozen_baseline": 0,
+      "inference_p95_ms": 159.93099999031978,
+      "actual_dispatch_rps": 5.005523028470843,
+      "window_closed_utc": "2026-11-15T19:05:57.456977+00:00",
+      "report_status": "completed",
+      "window_to_report_seconds": 39.20490879996214
+    }
+  ],
+  "complete_windows": 3,
+  "report_timing_repeats": 3,
+  "total_client_failures": 0,
+  "median_inference_p95_ms": 161.77992000302763,
+  "median_window_to_report_seconds": 39.20490879996214
+}

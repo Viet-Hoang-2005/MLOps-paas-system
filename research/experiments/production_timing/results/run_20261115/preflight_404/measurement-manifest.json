@@ -1,0 +1,17 @@
+{
+  "started_utc": "2026-11-15T13:19:44.963166+00:00",
+  "project_id": "69628eec-d3d8-44bc-b7c0-93e8fd5e07ec",
+  "version_id": "681b4679-5ca1-4fd2-bc07-1587d547e548",
+  "model_sha256": "bd0a91ec11d38ccceca4950a571857f3710bc7034bb8aaf30b40295dfd15e8b5",
+  "reference_sha256": "b7f4d1ad4975539bb77b18cd05ef1da9406404ebbbbb032401cb6b9e837f59c3",
+  "window_id": "S0_n1000_s42",
+  "window_size": 1000,
+  "feature_count": 52,
+  "target_rps": 5,
+  "max_inflight": 10,
+  "poll_interval_seconds": 2,
+  "report_timeout_seconds": 900,
+  "percentile_method": "linear",
+  "retry_policy": "No client inference retries",
+  "image_digest": "sha256:4ae2ac09b4903395f33863d09e8b9ce3fcb0c740316b3b1ed6e8b02c9c9e8f1e"
+}

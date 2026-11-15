@@ -1,0 +1,7 @@
+{
+  "status": 200,
+  "content_type": "text/html",
+  "bytes": 5699992,
+  "sha256": "bd336a2755c0e4bde04d6cd4ec190707dd634ca4c419cf704322fd22aab01e92",
+  "observer_failure": "Required a full html element before saving availability timestamp"
+}
