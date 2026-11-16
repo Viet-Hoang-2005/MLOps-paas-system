@@ -5,15 +5,6 @@ from typing import Any
 
 import cloudpickle
 import joblib
-import keras
-import mlflow.keras
-import mlflow.pytorch
-import mlflow.sklearn
-import mlflow.tensorflow
-import mlflow.xgboost
-import tensorflow as tf
-import torch
-import xgboost as xgb
 
 
 def parse_requirements(requirements_text: str) -> list[str] | None:
@@ -50,6 +41,8 @@ def load_model(path: Path, flavor: str) -> Any:
 
     if flavor == "xgboost":
         if extension == ".xgb":
+            import xgboost as xgb
+
             booster = xgb.Booster()
             booster.load_model(str(path))
             return booster
@@ -60,14 +53,20 @@ def load_model(path: Path, flavor: str) -> Any:
     if flavor == "pytorch":
         if extension not in {".pth", ".pt"}:
             raise ValueError("PyTorch flavor requires a .pth or .pt artifact.")
+        import torch
+
         return torch.load(path, map_location="cpu")
 
     if flavor in {"tensorflow", "keras"}:
         if extension not in {".h5", ".keras"}:
             raise ValueError("Keras flavor requires a .h5 or .keras artifact.")
         try:
+            import tensorflow as tf
+
             return tf.keras.models.load_model(path)
         except ImportError:
+            import keras
+
             return keras.models.load_model(path)
 
     raise ValueError(f"Unsupported model flavor: {flavor}")
@@ -75,6 +74,8 @@ def load_model(path: Path, flavor: str) -> Any:
 
 def save_mlflow_model(model: Any, flavor: str, output_dir: Path, requirements: list[str] | None) -> None:
     if flavor == "sklearn":
+        import mlflow.sklearn
+
         mlflow.sklearn.save_model(
             sk_model=model,
             path=str(output_dir),
@@ -83,6 +84,8 @@ def save_mlflow_model(model: Any, flavor: str, output_dir: Path, requirements: l
         return
 
     if flavor == "xgboost":
+        import mlflow.xgboost
+
         mlflow.xgboost.save_model(
             xgb_model=model,
             path=str(output_dir),
@@ -91,6 +94,8 @@ def save_mlflow_model(model: Any, flavor: str, output_dir: Path, requirements: l
         return
 
     if flavor == "pytorch":
+        import mlflow.pytorch
+
         mlflow.pytorch.save_model(
             pytorch_model=model,
             path=str(output_dir),
@@ -99,6 +104,8 @@ def save_mlflow_model(model: Any, flavor: str, output_dir: Path, requirements: l
         return
 
     if flavor in {"tensorflow", "keras"}:
+        import mlflow.keras
+
         try:
             mlflow.keras.save_model(
                 keras_model=model,
@@ -106,6 +113,8 @@ def save_mlflow_model(model: Any, flavor: str, output_dir: Path, requirements: l
                 pip_requirements=requirements,
             )
         except AttributeError:
+            import mlflow.tensorflow
+
             mlflow.tensorflow.save_model(
                 model=model,
                 path=str(output_dir),

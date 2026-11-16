@@ -140,7 +140,7 @@ spec:
           - {name: input_schema_download_url, default: ""}
           - {name: label_mapping_filename}
       container:
-        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:ffb45dc8489f81e36b27fe7ea7979f7775cb163f
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:9d670b5a05e16119a18e6564dc613ba0dd380504
         resources:
           requests:
             cpu: 100m
@@ -243,14 +243,14 @@ spec:
           - {name: image_tag}
           - {name: control_plane_webhook_url}
       container:
-        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:ffb45dc8489f81e36b27fe7ea7979f7775cb163f
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:9d670b5a05e16119a18e6564dc613ba0dd380504
         resources:
           requests:
             cpu: 20m
             memory: 32Mi
           limits:
             cpu: 100m
-            memory: 64Mi
+            memory: 128Mi
         imagePullPolicy: Always
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
