@@ -140,7 +140,7 @@ spec:
           - {name: input_schema_download_url, default: ""}
           - {name: label_mapping_filename}
       container:
-        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:ffb45dc8489f81e36b27fe7ea7979f7775cb163f
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:baf3eca6b8c2cf41913be8b08dbad0c8b37026cd
         resources:
           requests:
             cpu: 100m
@@ -243,7 +243,7 @@ spec:
           - {name: image_tag}
           - {name: control_plane_webhook_url}
       container:
-        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:ffb45dc8489f81e36b27fe7ea7979f7775cb163f
+        image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-model-packager:baf3eca6b8c2cf41913be8b08dbad0c8b37026cd
         resources:
           requests:
             cpu: 20m
