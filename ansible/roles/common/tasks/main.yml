@@ -90,6 +90,17 @@
     - name: net.ipv4.ip_forward
       value: "1"
 
+- name: Configure inotify instance capacity for Kubernetes log followers
+  become: true
+  ansible.posix.sysctl:
+    name: fs.inotify.max_user_instances
+    value: "1024"
+    state: present
+    sysctl_set: true
+    sysctl_file: /etc/sysctl.d/99-k3s.conf
+    reload: true
+  tags: [inotify]
+
 - name: Set the host timezone to UTC
   become: true
   community.general.timezone:
