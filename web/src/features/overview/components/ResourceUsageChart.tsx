@@ -34,7 +34,13 @@ export function ResourceUsageChart({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <Title
           title={t("workflow.resourceUsage")}
-          subtitle={t("workflow.realtimeHint")}
+          subtitle={
+            metrics.data?.mode === "history"
+              ? t("workflow.historyHint")
+              : metrics.data?.mode === "realtime"
+                ? t("workflow.realtimeHint")
+                : undefined
+          }
           className="mb-0"
         />
         {!realtime && (

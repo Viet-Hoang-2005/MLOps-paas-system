@@ -98,6 +98,7 @@ export const overviewVi = {
     deletionFailed: "Dọn dẹp thất bại. Hãy thử xóa lại.",
     realtimeHint:
       "Cập nhật trực tiếp khi mở trang · cập nhật mỗi 5 giây · tối đa 5 phút trong bộ nhớ, không lưu lịch sử.",
+    historyHint: "Lịch sử Prometheus · cập nhật mỗi 15 giây · dữ liệu tính từ khi triển khai bắt đầu.",
     range_15m: "15 phút",
     range_1h: "1 giờ",
     range_24h: "24 giờ",

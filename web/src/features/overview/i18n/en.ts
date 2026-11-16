@@ -99,6 +99,7 @@ export const overviewEn = {
     deletionFailed: "Cleanup failed. Retry deletion.",
     realtimeHint:
       "Live while this page is open · refreshed every 5 seconds · up to 5 minutes in memory, no saved history.",
+    historyHint: "Prometheus history · refreshed every 15 seconds · data begins when the deployment starts.",
     range_15m: "15 minutes",
     range_1h: "1 hour",
     range_24h: "24 hours",
