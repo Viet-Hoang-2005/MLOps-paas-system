@@ -98,6 +98,34 @@ def test_log_api_resolves_tenant_ownership_before_querying_loki(settings, monkey
     get.assert_not_called()
 
 
+@pytest.mark.django_db
+def test_deployment_runtime_logs_reject_other_tenant(settings, monkeypatch):
+    from django.contrib.auth import get_user_model
+    from rest_framework.test import APIClient
+
+    from apps.catalog.models import ModelProject
+    from apps.deployment.models import Build, Deployment
+    from apps.registry.models import ModelVersion
+
+    settings.LOKI_URL = "http://loki.test:3100"
+    owner = get_user_model().objects.create_user("runtime-owner@example.test", "test-password")
+    other = get_user_model().objects.create_user("runtime-other@example.test", "test-password")
+    project = ModelProject.objects.create(owner=owner, name="private runtime")
+    version = ModelVersion.objects.create(project=project, version="1")
+    build = Build.objects.create(project=project, version=version, flavor="sklearn")
+    deployment = Deployment.objects.create(version=version, build=build, backend="argo")
+    Deployment.objects.filter(pk=deployment.pk).update(created_at=timezone.now() - timedelta(minutes=1))
+    get = Mock(return_value=response([]))
+    monkeypatch.setattr("infrastructure.runtime_logs.requests.get", get)
+    client = APIClient()
+    client.force_authenticate(other)
+    assert client.get(f"/api/deployments/{deployment.public_id}/runtime-logs/").status_code == 404
+    get.assert_not_called()
+    client.force_authenticate(owner)
+    assert client.get(f"/api/deployments/{deployment.public_id}/runtime-logs/").status_code == 200
+    get.assert_called_once()
+
+
 def test_runtime_log_query_includes_control_plane_namespace(resource, monkeypatch):
     resource.monitor = SimpleNamespace(backend="argo")
     get = Mock(return_value=response([]))
@@ -106,6 +134,39 @@ def test_runtime_log_query_includes_control_plane_namespace(resource, monkeypatc
         runtime_log_page(SimpleNamespace(query_params={}), resource, kind, Mock())
         query = get.call_args.kwargs["params"]["query"]
         assert "mlops-paas-core" in query
+
+
+def test_deployment_and_serving_queries_are_separate(resource, monkeypatch):
+    get = Mock(return_value=response([]))
+    monkeypatch.setattr("infrastructure.runtime_logs.requests.get", get)
+    runtime_log_page(SimpleNamespace(query_params={}), resource, "deployment", Mock())
+    assert "mlops-paas-serving" not in get.call_args.kwargs["params"]["query"]
+    runtime_log_page(SimpleNamespace(query_params={}), resource, "deployment_runtime", Mock())
+    query = get.call_args.kwargs["params"]["query"]
+    assert 'namespace=~"mlops-paas-serving"' in query
+    assert 'container="model-server"' in query
+    assert 'task_kind="deployment"' in query
+
+
+def test_docker_runtime_cursor_handles_duplicate_timestamps(resource, monkeypatch):
+    from apps.deployment.services.runtime_logs import docker_runtime_page
+
+    resource.backend = "docker"
+    resource.external_deployment_id = "container-id"
+    timestamp = (timezone.now() - timedelta(seconds=10)).strftime("%Y-%m-%dT%H:%M:%S")
+    lines = [f"{timestamp}.123456789Z line-{i}\n".encode() for i in range(501)]
+    container = Mock()
+    container.logs.side_effect = lambda **kwargs: iter(lines)
+    monkeypatch.setattr("apps.deployment.services.runtime_logs.DockerClient", Mock())
+    monkeypatch.setattr("apps.deployment.services.runtime_logs.owned_container", Mock(return_value=container))
+    first = docker_runtime_page(SimpleNamespace(query_params={}), resource)
+    assert len(first["logs"]) == 500 and first["has_more"]
+    second = docker_runtime_page(SimpleNamespace(query_params={"cursor": first["next_cursor"]}), resource)
+    assert second["logs"] == ["line-500"]
+    assert not second["has_more"]
+    other = SimpleNamespace(public_id=uuid.uuid4(), backend="docker", created_at=resource.created_at)
+    with pytest.raises(ValidationError):
+        docker_runtime_page(SimpleNamespace(query_params={"cursor": first["next_cursor"]}), other)
 
 
 def test_append_deployment_log_bypasses_redis_in_production(settings, monkeypatch):

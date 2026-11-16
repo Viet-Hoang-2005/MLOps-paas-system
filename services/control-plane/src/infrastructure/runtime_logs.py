@@ -17,7 +17,8 @@ PAGE_SIZE = 500
 CURSOR_SALT = "runtime-logs-v1"
 NAMESPACES = {
     "build": "mlops-paas-execution|mlops-paas-core",
-    "deployment": "mlops-paas-execution|mlops-paas-serving|mlops-paas-core",
+    "deployment": "mlops-paas-execution|mlops-paas-core",
+    "deployment_runtime": "mlops-paas-serving",
     "drift": "mlops-paas-execution|mlops-paas-core",
     "training": "mlops-paas-execution|mlops-paas-training|mlops-paas-core",
 }
@@ -83,8 +84,10 @@ def runtime_log_page(request, resource, kind, fallback):
     end = int((timezone.now() - timedelta(seconds=2)).timestamp() * 1_000_000_000)
     if end < start:
         return result
+    task_kind = "deployment" if kind == "deployment_runtime" else kind
+    container = ',container="model-server"' if kind == "deployment_runtime" else ""
     query = (
-        f"{{namespace=~{json.dumps(NAMESPACES[kind])},task_kind={json.dumps(kind)}}}"
+        f"{{namespace=~{json.dumps(NAMESPACES[kind])},task_kind={json.dumps(task_kind)}{container}}}"
         f" | task_id={json.dumps(state['task'])}"
     )
     try:

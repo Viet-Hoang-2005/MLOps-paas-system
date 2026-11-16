@@ -2,14 +2,16 @@ import type { ModelProject } from "@/features/projects/types";
 import { currentApiHealth } from "@/features/overview/runtimeHealth";
 import { formatDateTime } from "@/shared/i18n/formatters";
 import { Badge } from "@/shared/components/Badge";
-import { Button } from "@/shared/components/Button";
+import { TerminalViewer } from "@/shared/components/TerminalViewer";
+import { useRuntimeLogStream } from "@/shared/hooks/useRuntimeLogStream";
+import { Callout } from "@/shared/components/Callout";
+import { Loading } from "@/shared/components/Loading";
 import {
   ProgressLine,
   type ProgressLineStep,
 } from "@/shared/components/ProgressLine";
 import { Title } from "@/shared/components/Title";
-import { toast } from "@/shared/lib/toastStore";
-import { Activity, Bot, Check, Copy, Package, GitBranch } from "lucide-react";
+import { Activity, Bot, Package, GitBranch } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -21,7 +23,6 @@ export function ModelStatusLine({
   healthUnavailable?: boolean;
 }) {
   const { t, i18n } = useTranslation("overview");
-  const [copied, setCopied] = useState(false);
   const monitoring = model.active_endpoint?.deployment_status === "succeeded";
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -85,17 +86,6 @@ export function ModelStatusLine({
     ];
   }, [model.active_endpoint?.registration_status, healthStatus, monitoring, t]);
 
-  const endpointUrl = model.endpoint_url || model.active_endpoint?.url || "";
-
-  const handleCopy = () => {
-    if (endpointUrl) {
-      void navigator.clipboard.writeText(endpointUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      toast.success(t("workflow.endpointCopied"));
-    }
-  };
-
   const healthSubtitle = `${
     healthUnavailable
       ? t("workflow.healthUnavailable")
@@ -136,31 +126,24 @@ export function ModelStatusLine({
         <ProgressLine steps={modelStatusSteps} />
       </div>
 
-      <div className="flex flex-col gap-3 rounded-surface border border-border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <span className="shrink-0 text-style-body-strong uppercase text-color-muted-foreground">
-            {t("workflow.apiUrl")}
-          </span>
-          <code className="min-w-0 flex-1 break-all select-all font-mono text-style-body font-medium text-color-foreground">
-            {endpointUrl}
-          </code>
-        </div>
-        <Button
-          size="sm"
-          variant="secondary"
-          icon={
-            copied ? (
-              <Check className="h-4 w-4" />
-            ) : (
-              <Copy className="h-4 w-4" />
-            )
-          }
-          onClick={handleCopy}
-          className="shrink-0"
-        >
-          {copied ? t("workflow.copied") : t("workflow.copyEndpoint")}
-        </Button>
-      </div>
+      <RuntimeLogs deploymentId={model.active_endpoint?.deployment_id ?? ""} />
     </section>
+  );
+}
+
+function RuntimeLogs({ deploymentId }: { deploymentId: string }) {
+  const { t } = useTranslation("overview");
+  const logs = useRuntimeLogStream({
+    source: deploymentId ? { kind: "deployment_runtime", id: deploymentId } : null,
+  });
+  return (
+    <div className="space-y-2">
+      <TerminalViewer
+        title={t("workflow.runtimeLogs")}
+        logs={logs.logs}
+        placeholder={deploymentId && !logs.status && !logs.error ? <Loading size="sm" /> : t("workflow.noRuntimeLogs")}
+      />
+      {logs.error && <Callout variant="warning" title={t("workflow.runtimeLogsUnavailable")} description={logs.error} />}
+    </div>
   );
 }

@@ -42,5 +42,6 @@ export interface RuntimeLogBatch {
 export type RuntimeLogSource =
   | { kind: "build"; id: ResourceId }
   | { kind: "deployment"; id: ResourceId }
+    | { kind: "deployment_runtime"; id: ResourceId }
   | { kind: "training"; id: ResourceId }
   | { kind: "drift"; id: ResourceId };
