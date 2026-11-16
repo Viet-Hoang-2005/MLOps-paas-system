@@ -1,4 +1,5 @@
 import pickle
+import subprocess
 import sys
 import zipfile
 from types import ModuleType, SimpleNamespace
@@ -6,6 +7,15 @@ from unittest.mock import Mock
 
 import pytest
 from src import core
+
+
+def test_import_core_does_not_eagerly_load_frameworks():
+    script = (
+        "import sys; import src.core; "
+        "assert not any(name in sys.modules for name in "
+        "('tensorflow', 'keras', 'torch', 'xgboost', 'mlflow'))"
+    )
+    subprocess.run([sys.executable, "-c", script], check=True)
 
 
 def test_parse_requirements():
@@ -40,12 +50,12 @@ def test_load_model_dispatch(monkeypatch, tmp_path, flavor, suffix, loader_name)
         monkeypatch.setattr(core, "load_pickle_model", lambda _: "model")
     elif loader_name == "xgb":
         booster = Mock()
-        monkeypatch.setattr(core, "xgb", SimpleNamespace(Booster=lambda: booster))
+        monkeypatch.setitem(sys.modules, "xgboost", SimpleNamespace(Booster=lambda: booster))
     elif loader_name == "torch":
-        monkeypatch.setattr(core, "torch", SimpleNamespace(load=lambda *a, **k: "model"))
+        monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(load=lambda *a, **k: "model"))
     else:
         fake_tf = SimpleNamespace(keras=SimpleNamespace(models=SimpleNamespace(load_model=lambda _: "model")))
-        monkeypatch.setattr(core, "tf", fake_tf)
+        monkeypatch.setitem(sys.modules, "tensorflow", fake_tf)
     result = core.load_model(path, flavor)
     assert result == "model" or loader_name == "xgb"
 
