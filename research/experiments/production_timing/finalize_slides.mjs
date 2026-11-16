@@ -9,6 +9,8 @@ const runtime = 'C:/Program Files/WindowsApps/OpenAI.CodexPrimaryRuntime.v26-111
 process.env.RUNTIME_NODE_MODULES = runtime + '/node/node_modules';
 const source = path.resolve(base, '../../slide/CSONET_2026_Presentation.pptx');
 const outputStem = process.argv[2] || 'CSONET_2026_Presentation_Production_Benchmark';
+const totalSlides = Number(process.argv[3] || 23);
+const tableSlides = totalSlides === 24 ? [17, 18, 24] : [17, 18];
 const { finalizePresentation } = await import(pathToFileURL(skill + '/container_tools/artifact_tool_utils.mjs'));
 await finalizePresentation({
   workspaceDir: base,
@@ -17,10 +19,10 @@ await finalizePresentation({
   pythonExecutable: runtime + '/python/python.exe',
   integrityValidatorPath: skill + '/container_tools/inspect_presentation_package_integrity.py',
   layoutValidatorPath: skill + '/container_tools/inspect_presentation_layout_geometry.py',
-  explicitTotalSlideCount: 23,
+  explicitTotalSlideCount: totalSlides,
   layoutArgs: ['--expected-slide-size-emu', '12192000,6858000',
-    '--require-native-table-slide', '17', '--require-native-table-slide', '18'],
-  requiredNativeTableOwnerSlides: [17, 18],
+    ...tableSlides.flatMap(number => ['--require-native-table-slide', String(number)])],
+  requiredNativeTableOwnerSlides: tableSlides,
   requiredNativeChartOwnerSlides: [12, 14, 15, 16, 18],
   nativeChartTargetApplication: 'powerpoint',
   fontPolicy: {
@@ -30,5 +32,5 @@ await finalizePresentation({
   verifyArtifactToolImport: true,
   receiptPath: base + '/.build/' + outputStem + '-validation.json',
 });
-console.log('Finalized the 23-slide presentation with the measured timing annotation.');
+console.log(`Finalized the ${totalSlides}-slide presentation.`);
 process.exit(0);

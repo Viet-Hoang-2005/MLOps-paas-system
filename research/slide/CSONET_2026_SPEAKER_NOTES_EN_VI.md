@@ -524,3 +524,20 @@ Backup only. Allow about 15 seconds if you need to introduce the references duri
 
 
 Các số được làm tròn trong lời nói để dễ đọc; số chính xác tiếp tục nằm trên slide. Phần giải thích tiếng Việt giữ các điều kiện và giới hạn cần hiểu khi trả lời câu hỏi.
+
+
+## Slide 24 — Serving Workflow Benchmark (backup, A2)
+
+### English script
+
+We measured the deployed serving path with three repeats of one thousand S0 requests at five requests per second. All three thousand requests returned valid responses. The median of the per-repeat p95 latencies was 162 milliseconds. The timer includes the public network and the complete response body.
+
+### Diễn giải tiếng Việt
+
+Slide dự phòng dành cho câu hỏi về workflow serving. Luồng đo đi qua client HTTPS, ingress công khai, gateway xác thực JWT và worker XGBoost. Hai số chính là median của ba p95 và số response hợp lệ. Mỗi lượt có 1.000 request S0 ở tải mục tiêu 5 request/giây, tối đa 10 in flight. Warm-up 50 request được audit và dọn riêng. Các prediction và record đã được đối chiếu baseline đóng băng. Phạm vi đo gồm một classifier và một mức tải. Đợt trước vẫn được giữ với một ReadError và 2.999/3.000 response hợp lệ, median p95 355 ms. Hai đợt có kết quả trình bày riêng.
+
+### Sources
+
+research/experiments/production_timing/results/run_20261116_postrestart/repeat_summary.csv
+research/experiments/production_timing/results/run_20261116_postrestart/independent-verification.json
+research/experiments/production_timing/results/run_20261115/summary.json

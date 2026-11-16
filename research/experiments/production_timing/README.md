@@ -1,5 +1,11 @@
 # CSoNet production timing
 
+## Current presentation handoff
+
+The current files are `research/slide/CSONET_2026_Presentation.pptx`, its PDF and the bilingual notes in the same folder. The deck has 24 slides. Slides 1–23 retain the original presentation content, including the original slide 18. Hidden backup A2 follows References and presents the serving path, median inference p95 and valid response count from the post-restart cohort. Monitoring report duration is retained in the experiment reports.
+
+The serving backup uses the original 23-slide source from commit `07d1449d` so it can be reproduced after publishing the updated deck. Build it with `author_serving_backup.mjs`, `append_serving_backup.py`, `sync_chart_cache.py`, and `finalize_slides.mjs CSONET_2026_Presentation_Serving_Backup 24`. Export with `export_slides.ps1 -OutputStem CSONET_2026_Presentation_Serving_Backup -ExpectedSlides 24`. The validated exports and notes are also retained in `output/`.
+
 This experiment adds two operational measurements to the deployed NIDS replay.
 
 - Median of the three per-repeat client inference p95 values, in milliseconds.
