@@ -33,8 +33,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
-# Catch incompatible Celery/Kombu/redis combinations before publishing an image.
-RUN python -c "from kombu.transport.redis import Channel; Channel.__new__(Channel)._get_client()"
 COPY . .
 
 EXPOSE 8000

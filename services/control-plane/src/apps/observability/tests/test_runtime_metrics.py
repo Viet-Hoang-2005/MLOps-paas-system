@@ -86,10 +86,10 @@ def test_production_metrics_join_owned_kubernetes_pods(deployment, settings):
         assert 'container="model-server"' in query
         assert "* on (namespace,pod) group_left()" in query
         assert "max by (namespace,pod) (kube_pod_labels{" in query
-        assert f'label_mlops_io_deployment_id="{deployment.public_id}"' in query
-        assert f'label_mlops_io_tenant_id="{project.owner.tenant_id}"' in query
-        assert f'label_mlops_io_project_id="{project.public_id}"' in query
-        assert f'label_mlops_io_model_version_id="{deployment.version.public_id}"' in query
+        assert f'label_mlops_paas_io_deployment_id="{deployment.public_id}"' in query
+        assert f'label_mlops_paas_io_tenant_id="{project.owner.tenant_id}"' in query
+        assert f'label_mlops_paas_io_project_id="{project.public_id}"' in query
+        assert f'label_mlops_paas_io_model_version_id="{deployment.version.public_id}"' in query
         assert "max by (namespace,pod,container)" in query
         assert "container_label_" not in query
     assert "[2m]" in queries[0]

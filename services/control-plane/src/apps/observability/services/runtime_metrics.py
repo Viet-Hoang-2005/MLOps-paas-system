@@ -36,10 +36,10 @@ def runtime_metrics(project, *, window="1h", prometheus=None, docker=None, redis
     # Join the explicit KSM allowlist; deduplicate exporter/scrape replicas.
     labels = {
         "namespace": settings.MODEL_RUNTIME_NAMESPACE,
-        "label_mlops_io_deployment_id": str(deployment.public_id),
-        "label_mlops_io_tenant_id": str(project.owner.tenant_id),
-        "label_mlops_io_project_id": str(project.public_id),
-        "label_mlops_io_model_version_id": str(deployment.version.public_id),
+        "label_mlops_paas_io_deployment_id": str(deployment.public_id),
+        "label_mlops_paas_io_tenant_id": str(project.owner.tenant_id),
+        "label_mlops_paas_io_project_id": str(project.public_id),
+        "label_mlops_paas_io_model_version_id": str(deployment.version.public_id),
     }
     scope = ",".join(f"{key}={json.dumps(value)}" for key, value in labels.items())
     owned_pods = f"max by (namespace,pod) (kube_pod_labels{{{scope}}})"

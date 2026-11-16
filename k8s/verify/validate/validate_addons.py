@@ -9,7 +9,6 @@ import pytest
 import yaml
 
 from ..utils import (
-    STANDARD_APP_LABELS,
     STANDARD_GITOPS_APP_LABELS,
     ValidationContext,
     application_name,
@@ -47,7 +46,7 @@ def validate_helm_addon_sources(context: ValidationContext) -> None:
         # Validate Multiple Sources and valueFiles resolution
         helm_spec = source.get("helm") or {}
         for vf in helm_spec.get("valueFiles") or []:
-            if not (vf.startswith("$") or vf.startswith("values")):
+            if not vf.startswith(("$", "values")):
                 errors.append(f"{name} valueFiles path {vf} must start with a repo alias e.g. $values/")
             clean_vf = re.sub(r"^\$[a-zA-Z0-9_\-]+/", "", vf)
             resolved_vf = context.source_root / clean_vf
@@ -61,10 +60,35 @@ def validate_helm_addon_sources(context: ValidationContext) -> None:
                 parsed = yaml.safe_load(inlined_values)
                 if not isinstance(parsed, dict):
                     errors.append(f"{name} inlined values must parse to a mapping")
-            except Exception as exc:
+            except yaml.YAMLError as exc:
                 errors.append(f"{name} inlined values YAML parse error: {exc}")
 
     assert not errors, "\n".join(errors)
+
+
+@pytest.mark.validate
+def validate_alloy_task_label_discovery(context: ValidationContext) -> None:
+    """Discovery must use the sanitized labels actually emitted by workflows."""
+    application = context.application("mlops-prod-addon-alloy")
+    values = yaml.safe_load(application["spec"]["source"]["helm"]["values"])
+    content = values["alloy"]["configMap"]["content"]
+    expected = {
+        "build": "build-id",
+        "deploy": "deployment-id",
+        "evidently": "drift-run-id",
+        "training": "training-job-id",
+    }
+    for workflow, suffix in expected.items():
+        labels = load_yaml_documents(
+            context.source_root / f"k8s/argo/workflows/{workflow}/workflow.yaml"
+        )[0]["spec"]["podMetadata"]["labels"]
+        label = f"mlops-paas.io/{suffix}"
+        assert label in labels, f"{workflow} must label task Pods with {label}"
+        discovery_label = "__meta_kubernetes_pod_label_" + re.sub(r"[^a-zA-Z0-9_]", "_", label)
+        assert content.count(f'source_labels = ["{discovery_label}"]') == 2, (
+            f"Alloy must derive task_id and task_kind from {label}"
+        )
+    assert "__meta_kubernetes_pod_label_mlops_io_" not in content
 
 
 @pytest.mark.validate

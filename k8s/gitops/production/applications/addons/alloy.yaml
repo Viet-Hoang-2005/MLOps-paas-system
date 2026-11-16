@@ -73,45 +73,45 @@ spec:
                   target_label = "container"
                 }
                 rule {
-                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_build_id"]
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_paas_io_build_id"]
                   regex = "(.+)"
                   target_label = "task_id"
                 }
                 rule {
-                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_build_id"]
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_paas_io_build_id"]
                   regex = "(.+)"
                   target_label = "task_kind"
                   replacement = "build"
                 }
                 rule {
-                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_deployment_id"]
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_paas_io_deployment_id"]
                   regex = "(.+)"
                   target_label = "task_id"
                 }
                 rule {
-                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_deployment_id"]
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_paas_io_deployment_id"]
                   regex = "(.+)"
                   target_label = "task_kind"
                   replacement = "deployment"
                 }
                 rule {
-                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_drift_run_id"]
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_paas_io_drift_run_id"]
                   regex = "(.+)"
                   target_label = "task_id"
                 }
                 rule {
-                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_drift_run_id"]
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_paas_io_drift_run_id"]
                   regex = "(.+)"
                   target_label = "task_kind"
                   replacement = "drift"
                 }
                 rule {
-                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_training_job_id"]
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_paas_io_training_job_id"]
                   regex = "(.+)"
                   target_label = "task_id"
                 }
                 rule {
-                  source_labels = ["__meta_kubernetes_pod_label_mlops_io_training_job_id"]
+                  source_labels = ["__meta_kubernetes_pod_label_mlops_paas_io_training_job_id"]
                   regex = "(.+)"
                   target_label = "task_kind"
                   replacement = "training"
