@@ -1,62 +1,15 @@
 ---
 name: mlops-paas-backend
-description: "Implement, diagnose, or review Python backend services and their contracts: Control Plane, consumer, model-packager, model-server, ML/DL serving, Evidently, and training-runner. Use for API, database, task, callback, execution, storage, inference, drift, or backend test changes."
+description: Implement or diagnose Python service behavior in MLOps PaaS, including Django APIs, jobs, inference, packaging, training, drift, and backend tests.
 ---
 
 # MLOps PaaS Backend
 
-Use this skill to implement, modify, review, or troubleshoot Python backend services, API endpoints, database interactions, Celery tasks, and execution runners.
+Start with the API route, task, or service entry point that reproduces the behavior. Trace through serializers, selectors/services and backend adapters to the state or external side effect they own. Check callers that replay the operation or process late results. In Django, keep state transitions in the owning domain service and dispatch dependent tasks after commit.
 
-Never embed passwords, tokens, private keys, real environment values, or SSH credentials in skills, tests, fixtures, or source code.
+- [Control Plane](references/control-plane.md) maps Django apps, auth, request handling and state ownership.
+- [Service contracts](references/service-contracts.md) covers internal callbacks, storage, log transport and async recovery.
+- [Training workspaces](references/training-workspaces.md) covers Run admission, job snapshots, Output and assignment. Read the [runner reference](references/training-runner.md) when changing the runtime boundary.
+- For a worker change, read the relevant service reference: [Consumer](references/consumer.md), [Model Server](references/model-server.md), [ML serving](references/machine-learning-serving.md), [DL serving](references/deep-learning-serving.md), [Model Packager](references/model-packager.md) or [Evidently](references/evidently.md).
 
-## Workflow
-
-1. Inspect target service code, migrations, tests, Dockerfile, requirements, and calling/called services.
-2. Read the specific service reference (e.g. [control-plane.md](references/control-plane.md), [consumer.md](references/consumer.md), [model-server.md](references/model-server.md)) and [service-contracts.md](references/service-contracts.md).
-3. Maintain explicit boundaries between API serializers, tenant-scoped selectors, transaction services, async Celery tasks, and execution backends.
-4. Mock databases, message brokers, S3, Docker, MLflow, HTTP clients, and Kubernetes in unit tests.
-5. Preserve public API contracts, response schemas, and error semantics unless explicitly requested to change them.
-6. Resolve prose conflicts in favor of live source code, migrations, tests, and Kubernetes manifests.
-7. Preserve user modifications and avoid unrelated refactors.
-8. When intentionally altering a backend service contract, update this skill and its references.
-
-## Architectural Boundaries
-
-- Refresh issuance must verify that the token's user exists, is active and owns its tenant before rotation; retain the account row lock through issuance. Atomically claim the old token in the blacklist and reject a duplicate claim. Never rotate an orphaned refresh token with `user=None`.
-
-- **Strict Layering:** API endpoints must never directly invoke external infrastructure clients (Docker, Boto3, Argo, Harbor, Redis).
-- **Local training capacity:** Derive local profiles from Docker capacity, serialize durable per-daemon reservations, verify available memory before dispatch, and release reservations only after confirmed runtime cleanup.
-- **Transactional Dispatch:** Celery tasks must be dispatched inside `transaction.on_commit` hooks, ensuring the database transaction has committed before the background task runs.
-- **Service Segregation:**
-  - `control-plane`: 10 domain apps (`auth`, `access`, `catalog`, `registry`, `training`, `deployment`, `drift`, `ct`, `production`, `observability`).
-  - `consumer`: Redpanda Kafka ingestion, micro-batching into PostgreSQL, and Transactional Outbox for drift signals.
-  - `model-server`: Trusted inference gateway, RS256 JWT / JWKS auth (only `token_type=access`, issuer `django-control-plane`, audience `mlops-paas`, with required identity and lifetime claims), project API keys, dynamic worker routing, and asynchronous Kafka telemetry emission.
-  - `machine-learning-serving`: Stateless FastAPI worker for Scikit-Learn/XGBoost, Model Signature column ordering, and confidence calculation via `predict_proba`.
-  - `deep-learning-serving`: Stateless BentoML worker for PyTorch/TensorFlow, MLflow PyFunc loading, and tensor normalization.
-  - `model-packager`: Formats models to MLflow PyFunc, generates Dockerfiles, and builds images via Docker SDK (local) or Kaniko (production).
-  - `training-runner`: Untrusted training execution sandbox, short-lived Capability Tokens, Presigned S3 URLs, process group termination on `SIGTERM`, and `METRIC_JSON` log parsing.
-  - `evidently`: Statistical drift testing (K-S test, Chi-square), S3 HTML/JSON/Summary reports, and automatic Continuous Training (`apps.ct`) trigger.
-
-## Identifier Invariants
-
-- Model packager: `BUILD_ID`
-- Model serving and Evidently: Pair of `PROJECT_ID` and `MODEL_VERSION_ID`
-- Training runner: `TRAINING_JOB_ID`
-- Drift run: `DRIFT_RUN_ID`
-- Never fallback to or introduce the legacy `MODEL_ID` variable.
-
-## Validation
-
-Execute the target service's isolated pytest suite with coverage as described in [testing.md](references/testing.md):
-```bash
-python -m pytest tests --cov=src --cov-report=term-missing
-```
-For Control Plane changes, also run Django checks and dry-run migration validation:
-```bash
-python manage.py check --settings=config.settings.test
-python manage.py makemigrations --check --dry-run --settings=config.settings.test
-```
-
-## Workspace drafts and training runs
-
-For workspace/run snapshots, nullable Project ownership, input contracts, assignment, Secrets, or Project deletion, read [training-workspaces.md](references/training-workspaces.md). Preserve account-owned job identity and snapshots; project assignment must not redefine storage or runtime identity.
+Use [backend testing](references/testing.md) to choose the affected tests, Django migration checks and Docker dependency checks. If the change crosses tenancy, callbacks, credentials, or untrusted execution, follow the [security skill](../mlops-paas-security/SKILL.md) for that boundary.

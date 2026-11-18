@@ -28,7 +28,7 @@ tenant-authorized Control Plane proxy. Signed task-bound cursors and server-owne
 queries prevent cross-tenant LogQL access. Docker keeps Redis logs. Deploy waits
 for actual model readiness and reports through a short-lived deployment-bound
 capability; missing callbacks become `unconfirmed` after a one-shot deadline.
-See `docs/runtime-logs.md`.
+See [Argo execution](../../mlops-paas-deployment/references/argo-execution.md) for the production log path.
 
 Application-owned container logs use service-owned `src/logging_utils.py`
 (`src/common/logging_utils.py` in Control Plane), using only the standard library
@@ -39,8 +39,7 @@ is summarized per process every 60 seconds. Emit lifecycle transitions after com
 distinguish dispatch from completion, and keep request/resource IDs separate. Use
 `RuntimeLog` for sanitized job detail emitted to stdout even when its Redis sink
 succeeds, so production collection captures subprocess output. Preserve metric/EOF
-protocols and never infer lifecycle state from tenant output. See
-`docs/runtime-logs.md` for production collection and access boundaries.
+protocols and never infer lifecycle state from tenant output.
 
 ## Durable Training And Drift
 
@@ -54,7 +53,7 @@ Training capabilities include runtime_options_seconds; CPU/memory profiles and G
 counts are validated on create/update/submit. Runner deadline covers startup through
 upload; input URLs are obtained at start, output PUT sends application/gzip.
 Argo observation capabilities bind kind, resource, tenant, project and lease; callback
-replay or expired leases are denied. See docs/dev/p1-execution-recovery.md for rollout.
+replay or expired leases are denied. Check execution settings and focused training/drift tests before changing the recovery schedule.
 
 ## Configuration
 

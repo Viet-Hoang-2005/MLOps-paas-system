@@ -1,4 +1,4 @@
 interface:
   display_name: "MLOps PaaS Infrastructure"
-  short_description: "AWS, Terraform, Ansible, and K3s guidance"
-  default_prompt: "Use $mlops-paas-architecture to plan and validate this infrastructure change."
+  short_description: "Terraform, Ansible and K3s bootstrap"
+  default_prompt: "Use $mlops-paas-architecture to find the infrastructure layer that owns this change."

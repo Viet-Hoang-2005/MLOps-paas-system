@@ -1,23 +1,7 @@
 # Platform services
 
-Service/domain child Applications cover PostgreSQL/CloudNativePG, Redis,
-Redpanda, MLflow, Harbor, monitoring, Cloudflare, storage, health, workflows,
-and application workloads. The root Application owns only GitOps control
-resources. Karpenter NodeClass/NodePool are not GitOps-owned.
+Start with the relevant Application under [production GitOps](../../../../k8s/gitops/production/applications). Addons own controllers; platform Applications own backing services and routing. Consult Application sources and sync waves for the actual installation and dependencies.
 
-Operators/controllers may be installed first by Ansible:
-
-- External Secrets.
-- CloudNativePG.
-- KEDA.
-- Argo Workflows.
-- Monitoring stack.
-- Argo CD.
-
-Kubeflow Training Operator, Karpenter CRD/controller, NFD and GPU Operator are
-Argo CD child Applications. Ansible still supplies cluster-specific Karpenter
-runtime settings and capacity resources. CPU capacity comes before GPU capacity.
-
-Confirm CRDs/controllers exist before applying custom resources. Harbor is reconciled through its GitOps directory once referenced by root. Cloudflare exposes selected low-bandwidth/private UIs; do not assume it is suitable for large model uploads or registry pushes.
-
-KEDA/HPA scale application workloads; Karpenter scales nodes only where the underlying cloud integration exists. External VM K3s deployments require an alternate capacity plan.
+- Change chart resources in the owning Application and check the rendered container-level requests and limits.
+- For capacity changes, trace the matching Karpenter Application and NodePool/NodeClass. Use [Trainer v2](../../../../docs/dev/trainer-v2.md) for the training runtime boundary.
+- Verify workload health after CD promotes images. Compare core, training and workloads verification scopes in [Ansible site.yml](../../../../ansible/site.yml).

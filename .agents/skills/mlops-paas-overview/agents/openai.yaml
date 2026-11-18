@@ -1,4 +1,4 @@
 interface:
   display_name: "MLOps PaaS Overview"
-  short_description: "System architecture and lifecycle guidance"
-  default_prompt: "Use $mlops-paas-overview to trace this request across the MLOps platform."
+  short_description: "System ownership and cross-service workflows"
+  default_prompt: "Use $mlops-paas-overview to trace this request to its owning component."

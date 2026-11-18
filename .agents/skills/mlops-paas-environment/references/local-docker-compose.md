@@ -1,29 +1,9 @@
 # Local Docker Compose
 
-The Compose topology includes PostgreSQL/schema initialization, Control Plane, Celery worker, model-server, ML/DL base images, Traefik, model-packager/Evidently/training-runner utility images, Redpanda/init, consumer, Redis and MLflow. Local does not deploy Prometheus/cAdvisor. Check live Compose before assuming ancillary dashboards exist.
+Use [docker-compose.yml](../../../../docker-compose.yml) for service names, profiles, networks, ports and volumes. The local stack includes PostgreSQL, Redpanda, Redis cache and queue, Control Plane, Celery worker/Beat, Model Server, Consumer and on-demand runtime images. Use each caller's network and actual settings when checking its dependencies.
 
-- Internal DNS uses Compose service names on `mlops_paas_network`.
-- Browser URLs use published localhost ports; containers must not call browser-only localhost addresses.
-- Docker execution builds local images and starts runtime containers named from Build/deployment/job UUIDs.
-- Docker socket access is privileged infrastructure; limit it to trusted orchestration services.
-- Named volumes retain database/broker/cache state across ordinary restarts.
-- Training workspace migrations preserve existing data and backfill job ownership; do not reset application DB, volumes or brokers. Fixed container names prevent side-by-side stacks by project-name alone.
-- Local runtime metrics use bounded Docker SDK stats for CPU/RAM and a shared transient gateway request counter in Redis (TTL 300s). Web polls every 5s while foregrounded, keeps at most 60 points/5 minutes in page memory, and resets on leave/refresh/deployment change. Never accept client container IDs; verify all runtime ownership labels. Missing stats/counter resets are not zero; production Prometheus remains unchanged.
-- Use `docs/dev/web-workflow-local.md` for bootstrap and runtime smoke. Static tests/mock API integration are not a completed Docker/S3/Evidently/training end-to-end test.
-
-Before changing a port or service name, search Compose, `.env.example`, Control Plane settings, Traefik configuration, frontend environment, and tests.
-
-Use `docker compose config`, `docker ps -a`, service health checks, and scoped `docker logs`. Do not delete volumes or images unless explicitly authorized.
-
-P1 training/drift use PostgreSQL leases and Beat recovery with
-`TRAINING_EXECUTION_WATCH_ENABLED=true, DRIFT_EXECUTION_WATCH_ENABLED=true` in Compose. Separate Control Plane readiness from
-Traefik ping, gateway `http://localhost:5001/health/ready` and Kafka/consumer ingestion checks. Port 5002 routes inference and does not expose gateway readiness. Inference
-uses a cookie-free Bearer client. Training applies CPU/RAM/optional GPU and a runner
-wall-clock deadline. See `docs/dev/p1-execution-recovery.md` for additive migrations,
-ownership inventory, scoped Docker/S3 acceptance and offline Argo staging smoke.
-
-## Training workspace rollout
-
-Apply additive training migrations, rebuild the training-runner image, and restart Control Plane/Celery worker/Beat to load code changes. Wait for /health/ready before smoke runs. Docker Input helpers run asynchronously with per-job labeled volumes; the main runtime mounts Input read-only and cleanup must verify ownership before removal. Keep CPU/RAM reservations until runtime cleanup is confirmed.
-
-TRAINING_SECRET_ENCRYPTION_KEY is optional and backend-only: absent key makes Secrets unavailable without disabling jobs that use no Secrets. Do not print real keys. The disposable integration script services/control-plane/scripts/verify_training_workspace.py exercises actual Docker/S3 execution, model upload, assignment and storage retention; clean up only its test tenant and confirmed runtimes.
+- Containers use Compose DNS names; host/browser clients use the published ports. In a container, localhost refers to that container. Check both the Kafka bootstrap address and advertised listener from the consumer's network.
+- Check service state with `docker compose ps -a` and scoped logs with `docker compose logs --tail 100 <service>`. Use `docker compose config --services` for discovery without printing the resolved environment.
+- Identify whether a fix needs a process restart, service recreation for new env, or a rebuild for installed dependencies. Keep volumes and unrelated services intact during ordinary troubleshooting.
+- Training preparation runs in Celery before Docker dispatch; see [workspace lifecycle](../../../../docs/dev/training-workspaces.md). After dispatch, inspect the labeled Input helper, per-job volume and main container separately. Use job and tenant labels before any scoped cleanup.
+- Verify dependency changes against the actual Dockerfile and installed Python, using [backend testing](../../mlops-paas-backend/references/testing.md).

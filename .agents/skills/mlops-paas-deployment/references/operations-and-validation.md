@@ -1,31 +1,13 @@
 # Operations and validation
 
-## Order
+## Local checks
 
-1. Cluster/CRDs/operators.
-2. Namespaces, storage classes, external-secret stores.
-3. PostgreSQL, Redis, Redpanda, object/registry dependencies.
-4. Control Plane and platform gateways.
-5. Argo event/workflow execution.
-6. Web, monitoring, and external routing.
+- Render the owning target with `kubectl kustomize <path>` (or the standalone Kustomize used by CI). Check schemas and CRD-dependent assumptions against the matching contract tests under [k8s/verify/validate](../../../../k8s/verify/validate).
+- Compare [CI](../../../../.github/workflows/ci.yml) for tooling and its aggregate `pytest k8s/verify/validate/ -v` command. Follow the target workflow's resource and policy dependencies.
+- `kubectl apply --dry-run=client` may still use cluster discovery; use pure rendering when only offline checks are in scope.
 
-## Checks
+## Live checks
 
-```bash
-kubectl kustomize <path>
-kubectl apply --dry-run=client -k <path>
-kubectl diff -k <path>
-kubectl get applications -n argocd
-kubectl get pods,svc -A
-```
-
-Use server-side dry-run when cluster access and CRDs are available. Validate WorkflowTemplates separately.
-
-## Rollback boundaries
-
-- GitOps manifest: revert/promote a Git commit.
-- Application image: restore the prior immutable digest/tag.
-- Dynamic deployment: use Control Plane lifecycle/delete/redeploy.
-- Database migration: use an explicitly designed reverse/forward migration; never improvise data rollback.
-
-CI builds/scans images; CD authenticates through AWS OIDC, pushes/signs Harbor images, and opens GitOps promotion changes. Verify live workflow before modifying it.
+- When authorized, compare Git revision and rendered Application with Argo sync/health, then inspect the exact owning workload or workflow. Verify the symptom from the caller and collect logs from the correct namespace and resource.
+- Use the matching Ansible verify scope for bootstrap, core platform, training or workloads. A successful core-addon check does not establish workload health.
+- Roll back a GitOps change through its owning revision or pinned image. Use domain lifecycle APIs for dynamic model runtimes. A database rollback needs its own migration strategy.

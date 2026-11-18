@@ -1,4 +1,4 @@
 interface:
   display_name: "MLOps PaaS Environment"
-  short_description: "Local and production environment guidance"
-  default_prompt: "Use $mlops-paas-environment to diagnose or configure the correct runtime environment."
+  short_description: "Docker Compose and K3s runtime diagnosis"
+  default_prompt: "Use $mlops-paas-environment to identify the configuration in use."

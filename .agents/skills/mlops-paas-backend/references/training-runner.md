@@ -9,8 +9,7 @@ The Training Runner (`services/training-runner/`) executes user-supplied trainin
    - Never receives AWS credentials (`AWS_ACCESS_KEY_ID`), PostgreSQL credentials, or system Redis write access.
    - Operates solely through scoped Presigned S3 URLs and a short-lived, signed **Capability Token**.
 3. **Workspace Isolation:**
-   - Downloads source code and training dataset snapshots from S3.
-   - Safely extracts archives into `/workspace/source` and `/workspace/input/train`.
+   - Workspace runs consume prepared, read-only Input at `SM_CHANNEL_TRAIN`. Use `MLOPS_WORK_DIR` for writable work. Check the selected input contract before changing legacy paths.
    - Installs job requirements (`requirements.txt`).
 4. **Subprocess Lifecycle & Process Group Cleanup:**
    - Executes main script (`ENTRY_POINT`, default: `train.py`) in an isolated subprocess.
@@ -22,7 +21,7 @@ The Training Runner (`services/training-runner/`) executes user-supplied trainin
    - Logs supported params/metrics through Control Plane MLflow endpoints; never uploads the output package through the artifact proxy.
 6. **Output Bundling & Callback:**
    - Collects trained model artifacts (`/workspace/model/`), metrics, parameters, and model insights (`feature_importance.json`, `coefficients.json`).
-   - Packages Output v2 into private `model.tar.gz` (`model/`, `metadata/`, `_mlops/`). Control Plane asynchronously verifies/materializes files before Completed.
-   - Dispatches authenticated callback to `/internal/webhooks/training-jobs/<id>/` reporting `COMPLETED` or `FAILED`.
+   - Packages Output v2 into private `model.tar.gz` (`model/`, `metadata/`, `_mlops/`). Control Plane verifies and indexes files before Completed, then removes the temporary archive.
+   - Dispatches authenticated callback to `/internal/webhooks/training-jobs/<id>/` for runtime results. Successful workspace runs must pass trusted output finalization before the job becomes Completed.
 
 Pip installs stream through a Linux PTY, preserving progress bars. RuntimeLog redacts detail/progress before Redis/Loki delivery. TERMINAL_PROGRESS JSON records contain text/done and are display-row updates, never metric events. Keep bounded update frequency, process-group cancellation and isolated pip env. See services/training-runner/README.md.

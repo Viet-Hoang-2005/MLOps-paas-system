@@ -11,11 +11,10 @@ cd terraform/cloudflare && terraform fmt -check -recursive && terraform init -ba
 
 # Ansible
 cd ansible
-ansible-playbook --syntax-check <playbook>
-ansible-playbook --check --diff <playbook>
+ansible-playbook --syntax-check -i localhost, site.yml
 ```
 
-Use targeted Kustomize/Helm validation from the deployment skill for cluster resources.
+Match dependency setup and syntax checks to [CI](../../../../.github/workflows/ci.yml). Use targeted Kustomize/Helm checks for cluster resources. Ansible check mode may contact inventory hosts; use it only within authorized live scope.
 
 ## Review checklist
 

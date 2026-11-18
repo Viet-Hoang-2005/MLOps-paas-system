@@ -1,39 +1,15 @@
 ---
 name: mlops-paas-frontend
-description: Implement or review the React/Vite frontend, including feature-first boundaries, route coordinators, React Query, API clients, design tokens, responsive UI, accessibility, i18n, and runtime logs. Use for any change under web/ or any browser-facing workflow.
+description: Implement or diagnose React/Vite routes, feature state, API integration, shared UI, accessibility, or i18n under web/.
 ---
 
 # MLOps PaaS Frontend
 
-Use this skill to implement, modify, review, or troubleshoot the React 18 / TypeScript / Vite frontend application (`web/`).
+Find the route in [AppRouter](../../../web/src/app/router/AppRouter.tsx). Follow the page into its feature components, query keys and API client. Keep page coordination in the feature and use shared components for interaction patterns already provided by the design system.
 
-Never embed passwords, tokens, private keys, or credentials in source code, mock fixtures, or translations.
+- [Code architecture](references/code-architecture.md) explains feature and shared-module ownership.
+- [Routing and state](references/routing-and-state.md) covers navigation, Model Project context and the Training workspace/job routes.
+- [API and server state](references/api-and-server-state.md) covers caching, invalidation, errors and log queries.
+- [Design system](references/design-system.md) locates the shared components and styling conventions. [i18n and quality gates](references/i18n-and-quality-gates.md) covers both locales and the matching tests.
 
-## Workflow
-
-1. Inspect the relevant route, page coordinator, feature API client, React Query hook, shared component, and translation files (`web/src/locales/`).
-2. Read the relevant references: [code-architecture.md](references/code-architecture.md), [routing-and-state.md](references/routing-and-state.md), [api-and-server-state.md](references/api-and-server-state.md), [design-system.md](references/design-system.md), and [i18n-and-quality-gates.md](references/i18n-and-quality-gates.md).
-3. Preserve the strict dependency direction: `app` $\rightarrow$ `features` $\rightarrow$ `shared`. Components in `shared/` must never import from `features/`.
-4. Keep page components as coordinators and compositional shells (`Outlet`); delegate network calls to domain API clients and server state to `@tanstack/react-query` hooks.
-5. Maintain route conventions, payload typing, error handling, dark/light theme tokens, ARIA accessibility, and responsive layouts.
-6. Verify live backend endpoints and serializers (`services/control-plane/src/apps/`) when an API contract is uncertain.
-7. Support real-time task log streaming via cursor-based HTTP polling hooks (`useRuntimeLogs`).
-8. Ensure all user-facing strings are localized in both English (`en.json`) and Vietnamese (`vi.json`).
-
-## Required Validation
-
-Execute from the `web/` directory:
-```bash
-pnpm lint
-pnpm build
-```
-
-Manually smoke-test:
-- Affected routes and query parameter preservation.
-- Light and dark theme transitions.
-- Form validation, dirty form exit confirmation, and error recovery states.
-- Responsive breakpoints (mobile, tablet, desktop).
-
-## Training studio
-
-Training is account-scoped and works without a Model Project. Follow [routing-and-state.md](references/routing-and-state.md) for durable workspace/run selection, readonly snapshots, dirty-buffer saving and post-run Project assignment; do not restore the old Metadata/Source/Execution wizard.
+Run the focused tests from `web/` using `pnpm exec vitest run <test-path>`. Use the lint, quality and build scripts in [package.json](../../../web/package.json) when the affected behavior warrants them. Verify user-visible route or state changes in the relevant loading, error and success states.

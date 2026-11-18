@@ -13,7 +13,7 @@ Environment-neutral manifests and logical image names live under
 promotion updates only each overlay's Git SHA tag; never write registry or
 environment-specific image values into base.
 
-Dynamic model workers are created by deployment workflows, not a fixed per-model Deployment. Training jobs run in `user-jobs`.
+Dynamic model workers are created by deployment workflows, not a fixed per-model Deployment. Training jobs run in `mlops-paas-training`.
 
 For each workload verify:
 

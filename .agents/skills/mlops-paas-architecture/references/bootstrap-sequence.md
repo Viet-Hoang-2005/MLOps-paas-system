@@ -12,7 +12,7 @@
 8. Let the root reconcile child Applications in lifecycle order: cluster namespaces,
    pinned core add-ons, cluster storage/secret-store/policy, shared platform
    data/services, execution, workloads and edge.
-9. Validate storage, database, messaging, control workloads, ingress, and monitoring.
+9. Verify core addons with the platform phase. After CD publishes and promotes workload images, use the workloads phase to verify the application workloads.
 10. Let Argo CD reconcile Karpenter capacity, then validate CPU capacity and
     opt into the GPU smoke test only when AWS quota is effective.
 

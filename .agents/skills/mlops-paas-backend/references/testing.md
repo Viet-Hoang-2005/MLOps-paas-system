@@ -1,21 +1,8 @@
 # Backend testing
 
-Use pytest for every service. Common tooling is in `services/requirements-test.txt`; service-specific test dependencies may be local.
+Run checks from the target service so pytest finds the correct config, fixtures and imports. Match the environment in [CI](../../../../.github/workflows/ci.yml), including Python 3.12 and runtime/test requirements. See [TESTING.md](../../../../TESTING.md) for broader acceptance.
 
-From a service directory:
-
-```bash
-python -m pytest tests --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=70
-```
-
-Control Plane test paths may follow its Django source layout; run the smallest affected app set first.
-
-## Isolation rules
-
-- No real PostgreSQL, Redis, Redpanda, MLflow, Docker, S3, Harbor, Kubernetes, or Control Plane calls in unit tests.
-- Use pytest fixtures, monkeypatch, `tmp_path`, `Mock`/`AsyncMock`, and FastAPI TestClient/httpx.
-- Reset environment, caches, and global clients between tests.
-- Cover success, validation, timeout, retry, non-2xx, callback replay, tenant isolation, and cleanup.
-- Keep import-time behavior side-effect free.
-
-CI runs services as an isolated matrix and enforces at least 70% line coverage per service.
+- Control Plane: `python -m pytest src/apps/<app>/tests`. For model/schema changes also run `python manage.py check --settings=config.settings.test` and `python manage.py makemigrations --check --dry-run --settings=config.settings.test`.
+- Other services: `python -m pytest tests` or an affected test file. CI applies service-specific coverage gates.
+- For Python code changes, run Ruff against the changed paths. Keep unit tests isolated from real brokers, S3, Docker and cluster credentials. Use the repository's integration settings when PostgreSQL behavior, real Docker, or external I/O is the subject of the test.
+- For image dependencies, identify install inputs from the target Dockerfile. Resolve intersecting pins on the target Python/platform, build with that Dockerfile, run `python -m pip check` in the image, then run targeted tests or smoke the affected entry point. A host resolver check alone does not verify Linux wheels, native libraries or image startup.

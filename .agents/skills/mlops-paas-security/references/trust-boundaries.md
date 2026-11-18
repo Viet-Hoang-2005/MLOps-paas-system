@@ -22,9 +22,9 @@ reporters hold an expiring resource-bound capability, never tenant model Pods.
 
 Untrusted workloads must not receive shared application secrets, JWT private keys, OAuth secrets, AWS credentials, production Redis, broad MLflow access, or node metadata access. Kubernetes target Secrets are scoped to the consuming workload: AWS may be a shared source, but a broad cross-workload target Secret is prohibited.
 
-Dynamic model Deployments and Services run only in `mlops-model-runtimes`.
+Dynamic model Deployments and Services run only in `mlops-paas-serving`.
 Trusted Control Plane, Consumer and Model Server workloads run in separate
-`mlops-*` namespaces and use explicit FQDN service references across boundaries.
+platform namespaces and use explicit FQDN service references across boundaries.
 
 Platform images from `registry.mlops-nids-nt114.id.vn/mlops-paas/*` are trusted
 only after Kyverno verifies a keyless Cosign signature from this repository's

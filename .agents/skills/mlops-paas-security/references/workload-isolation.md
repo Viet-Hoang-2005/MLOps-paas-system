@@ -4,7 +4,7 @@ Training and dynamic model workers execute tenant-controlled artifacts.
 
 Required controls:
 
-- Dedicated `user-jobs` namespace and least-privilege service accounts.
+- Dedicated training (`mlops-paas-training`) and model runtime (`mlops-paas-serving`) namespaces, with least-privilege service accounts.
 - Disable service-account token automount unless required.
 - Pod Security admission/profile and restrictive security contexts.
 - Default-deny ingress and egress with explicit DNS/storage/callback exceptions.
