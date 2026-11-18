@@ -69,7 +69,7 @@ def test_argo_training_backend_records_runtime_selectors():
     assert "namespace" not in client.calls[0][1]
     assert "expires=900" in client.calls[0][1]["s3_source_uri"]
     assert "expires=900" in client.calls[0][1]["s3_training_data_uri"]
-    assert client.calls[0][1]["mlflow_tracking_uri"].endswith("/api/2.0/mlflow")
+    assert client.calls[0][1]["mlflow_tracking_uri"] == "http://control-plane:8000"
     assert "mlflow_tracking_token" in client.calls[0][1]
     assert "redis_url" not in client.calls[0][1]
 

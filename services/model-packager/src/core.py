@@ -5,6 +5,7 @@ from typing import Any
 
 import cloudpickle
 import joblib
+from src.image_build import normalize_mlflow_requirements
 
 
 def parse_requirements(requirements_text: str) -> list[str] | None:
@@ -73,13 +74,15 @@ def load_model(path: Path, flavor: str) -> Any:
 
 
 def save_mlflow_model(model: Any, flavor: str, output_dir: Path, requirements: list[str] | None) -> None:
+    platform_requirements = normalize_mlflow_requirements(requirements)
     if flavor == "sklearn":
         import mlflow.sklearn
 
         mlflow.sklearn.save_model(
             sk_model=model,
             path=str(output_dir),
-            pip_requirements=requirements,
+            pip_requirements=platform_requirements,
+            serialization_format="cloudpickle",
         )
         return
 
@@ -89,7 +92,7 @@ def save_mlflow_model(model: Any, flavor: str, output_dir: Path, requirements: l
         mlflow.xgboost.save_model(
             xgb_model=model,
             path=str(output_dir),
-            pip_requirements=requirements,
+            pip_requirements=platform_requirements,
         )
         return
 
@@ -99,7 +102,8 @@ def save_mlflow_model(model: Any, flavor: str, output_dir: Path, requirements: l
         mlflow.pytorch.save_model(
             pytorch_model=model,
             path=str(output_dir),
-            pip_requirements=requirements,
+            pip_requirements=platform_requirements,
+            serialization_format="pickle",
         )
         return
 
@@ -110,7 +114,7 @@ def save_mlflow_model(model: Any, flavor: str, output_dir: Path, requirements: l
             mlflow.keras.save_model(
                 keras_model=model,
                 path=str(output_dir),
-                pip_requirements=requirements,
+                pip_requirements=platform_requirements,
             )
         except AttributeError:
             import mlflow.tensorflow
@@ -118,7 +122,7 @@ def save_mlflow_model(model: Any, flavor: str, output_dir: Path, requirements: l
             mlflow.tensorflow.save_model(
                 model=model,
                 path=str(output_dir),
-                pip_requirements=requirements,
+                pip_requirements=platform_requirements,
             )
         return
 

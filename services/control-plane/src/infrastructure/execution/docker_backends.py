@@ -132,7 +132,7 @@ class DockerTrainingBackend:
             if job.requirements_text
             else "",
             "REDIS_URL": settings.REDIS_URL,
-            "MLFLOW_TRACKING_URI": f"{settings.CONTROL_PLANE_INTERNAL_URL}/api/2.0/mlflow",
+            "MLFLOW_TRACKING_URI": settings.CONTROL_PLANE_INTERNAL_URL,
             "MLFLOW_TRACKING_TOKEN": issue_capability(job, "tracking", preserve_existing=True),
         }
         from .job_containers import start

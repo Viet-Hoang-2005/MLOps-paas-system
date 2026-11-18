@@ -1,5 +1,5 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
-mlflow==3.11.1
+mlflow==3.18.0
 scikit-learn==1.7.2
 xgboost==2.0.3
 joblib==1.3.2

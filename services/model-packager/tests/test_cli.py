@@ -303,7 +303,7 @@ def configure_zip_task(monkeypatch, tmp_path, kaniko=False):
     def download(url, destination):
         with zipfile.ZipFile(destination, "w") as archive:
             archive.writestr("model/MLmodel", VALID_MLMODEL)
-            archive.writestr("model/requirements.txt", "numpy==1.26.4\n")
+            archive.writestr("model/requirements.txt", "numpy==1.26.4\nmlflow==3.11.1\n")
 
     monkeypatch.setattr(cli, "download_presigned_file", download)
     monkeypatch.setattr(cli, "upload_presigned_file", Mock())
@@ -332,6 +332,10 @@ def test_run_test_zip_task_kaniko(monkeypatch, tmp_path):
     payload = json.loads((tmp_path / "webhook_payload.json").read_text())
     assert payload["task_type"] == "TEST_ZIP"
     assert "machine-learning-serving" in (tmp_path / "Dockerfile").read_text()
+    assert "mlflow" not in (tmp_path / "requirements.txt").read_text()
+    with zipfile.ZipFile(tmp_path / "package.zip") as archive:
+        assert archive.read("model/requirements.txt").decode() == "numpy==1.26.4\nmlflow==3.11.1\n"
+    assert (tmp_path / "validation-requirements.txt").read_text() == "numpy==1.26.4\n"
 
 
 @pytest.mark.parametrize("kaniko", [False, True])

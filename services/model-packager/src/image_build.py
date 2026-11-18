@@ -3,7 +3,22 @@
 import re
 
 # Packages the serving image pins itself; a model's requirements must not replace them.
-PROTECTED_PACKAGES = frozenset({"fastapi", "uvicorn", "starlette", "pydantic", "pydantic-core", "bentoml", "httpx"})
+PROTECTED_PACKAGES = frozenset(
+    {
+        "fastapi",
+        "uvicorn",
+        "starlette",
+        "pydantic",
+        "pydantic-core",
+        "bentoml",
+        "httpx",
+        "mlflow",
+        "mlflow-skinny",
+        "mlflow-tracing",
+    }
+)
+MLFLOW_FAMILY = frozenset({"mlflow", "mlflow-skinny", "mlflow-tracing"})
+MLFLOW_VERSION = "3.18.0"
 _REQUIREMENT_NAME = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?")
 
 
@@ -39,6 +54,22 @@ def filter_protected_requirements(requirements_text):
             raise ValueError(f"Unrecognised requirement line: {stripped[:80]!r}")
         (dropped if name in PROTECTED_PACKAGES else kept).append(stripped)
     return "\n".join(kept), dropped
+
+
+def normalize_mlflow_requirements(requirements):
+    """Keep model dependencies while aligning generated packages to platform MLflow."""
+    kept = [line for line in (requirements or []) if requirement_name(line) not in MLFLOW_FAMILY]
+    return [*kept, f"mlflow=={MLFLOW_VERSION}"]
+
+
+def filter_mlflow_requirements(requirements_text):
+    """Exclude archive MLflow pins when validating in the platform's own packager process."""
+    kept = []
+    for line in _logical_lines(requirements_text or ""):
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and requirement_name(stripped) not in MLFLOW_FAMILY:
+            kept.append(stripped)
+    return "\n".join(kept)
 
 
 def render_dockerfile(base_image, *, has_requirements):

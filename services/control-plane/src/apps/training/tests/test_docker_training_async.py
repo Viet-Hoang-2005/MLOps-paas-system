@@ -55,6 +55,7 @@ class DockerTrainingAsyncTests(TestCase):
         docker_client.run.assert_called_once()
         call_kwargs = docker_client.run.call_args[1]
         self.assertIn("REDIS_URL", call_kwargs["environment"])
+        self.assertEqual(call_kwargs["environment"]["MLFLOW_TRACKING_URI"], "http://control-plane:8000")
         self.assertEqual(call_kwargs["image"], "mlops-paas-training-runner:latest")
 
     def test_docker_training_poll_running(self):

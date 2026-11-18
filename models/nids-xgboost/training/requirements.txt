@@ -2,5 +2,5 @@ xgboost==2.0.3
 scikit-learn==1.7.2
 pandas==2.2.1
 numpy==1.26.4
-mlflow==3.11.1
+mlflow==3.18.0
 joblib==1.3.2

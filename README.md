@@ -5,11 +5,11 @@
 ### Nền tảng AI Platform-as-a-Service End-to-End phục vụ đa mô hình ML/DL cho các tác vụ xây dựng, đóng gói, triển khai, suy luận, giám sát trôi dạt và tái huấn luyện mô hình tự động
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![Django](https://img.shields.io/badge/Django-5.0-092E20?style=flat-square&logo=django&logoColor=white)](https://djangoproject.com)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.x-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![MLflow](https://img.shields.io/badge/MLflow-2.14-0194E2?style=flat-square&logo=mlflow&logoColor=white)](https://mlflow.org)
-[![BentoML](https://img.shields.io/badge/BentoML-1.2-00A396?style=flat-square)](https://bentoml.com)
-[![Evidently AI](https://img.shields.io/badge/Evidently_AI-0.4.15-6D31FF?style=flat-square)](https://evidentlyai.com)
+[![Django](https://img.shields.io/badge/Django-5.2-092E20?style=flat-square&logo=django&logoColor=white)](https://djangoproject.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.163.2-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![MLflow](https://img.shields.io/badge/MLflow-3.18-0194E2?style=flat-square&logo=mlflow&logoColor=white)](https://mlflow.org)
+[![BentoML](https://img.shields.io/badge/BentoML-1.4-00A396?style=flat-square)](https://bentoml.com)
+[![Evidently AI](https://img.shields.io/badge/Evidently_AI-0.7.23-6D31FF?style=flat-square)](https://evidentlyai.com)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-K3s-326CE5?style=flat-square&logo=kubernetes&logoColor=white)](https://k3s.io)
 [![Terraform](https://img.shields.io/badge/Terraform-AWS-7B42BC?style=flat-square&logo=terraform&logoColor=white)](https://www.terraform.io)
 [![Ansible](https://img.shields.io/badge/Ansible-Boostrap-EE0000?style=flat-square&logo=ansible&logoColor=white)](https://ansible.com)

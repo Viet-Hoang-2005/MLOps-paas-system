@@ -21,7 +21,7 @@ from src.core import (
     parse_requirements,
     save_mlflow_model,
 )
-from src.image_build import serving_base_image, write_build_context
+from src.image_build import filter_mlflow_requirements, normalize_mlflow_requirements, serving_base_image, write_build_context
 from src.logging_utils import (
     RuntimeLog,
     bind_context,
@@ -180,13 +180,10 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
         model = load_model(artifact_path, flavor)
         package_name = "model"
         package_dir = workspace / package_name
-        requirements = parse_requirements(requirements_text)
+        requirements = normalize_mlflow_requirements(parse_requirements(requirements_text))
 
         runtime_log.detail("Saving MLflow model format...")
         save_mlflow_model(model, flavor, package_dir, requirements)
-
-        if requirements_text.strip():
-            (package_dir / "requirements.txt").write_text(requirements_text.strip() + "\n", encoding="utf-8")
 
         schema_url = os.environ.get("INPUT_SCHEMA_DOWNLOAD_URL", "")
         if schema_url:
@@ -314,10 +311,11 @@ def run_test_zip_task(build_id: str, webhook_url: str) -> None:
             runtime_log.detail("No requirements.txt or conda.yaml found. Proceeding with default environment.")
 
         if requirements_text.strip():
-            validate_safe_requirements(requirements_text)
-            runtime_log.detail("Installing package requirements for validation...")
+            validation_requirements = filter_mlflow_requirements(requirements_text)
+            validate_safe_requirements(validation_requirements)
+            runtime_log.detail("Installing non-platform package requirements for validation...")
             temp_req = workspace / "validation-requirements.txt"
-            temp_req.write_text(requirements_text + "\n", encoding="utf-8")
+            temp_req.write_text(validation_requirements + "\n", encoding="utf-8")
             try:
                 result = subprocess.run(
                     [sys.executable, "-m", "pip", "install", "-r", str(temp_req)],

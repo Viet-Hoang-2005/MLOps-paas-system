@@ -74,8 +74,21 @@ def test_save_mlflow_dispatch_sklearn(monkeypatch, tmp_path):
 
     mock = Mock()
     monkeypatch.setattr(mlflow.sklearn, "save_model", mock)
-    core.save_mlflow_model("model", "sklearn", tmp_path / "out", ["numpy"])
-    mock.assert_called_once()
+    core.save_mlflow_model("model", "sklearn", tmp_path / "out", ["numpy", "mlflow==3.11.1"])
+    assert mock.call_args.kwargs["serialization_format"] == "cloudpickle"
+    assert mock.call_args.kwargs["pip_requirements"] == ["numpy", "mlflow==3.18.0"]
+
+
+def test_save_mlflow_dispatch_pytorch_uses_pickle(monkeypatch, tmp_path):
+    import mlflow
+
+    fake_pytorch = ModuleType("mlflow.pytorch")
+    fake_pytorch.save_model = Mock()
+    monkeypatch.setitem(sys.modules, "mlflow.pytorch", fake_pytorch)
+    monkeypatch.setattr(mlflow, "pytorch", fake_pytorch, raising=False)
+    core.save_mlflow_model("model", "pytorch", tmp_path / "out", None)
+    assert fake_pytorch.save_model.call_args.kwargs["serialization_format"] == "pickle"
+    assert fake_pytorch.save_model.call_args.kwargs["pip_requirements"] == ["mlflow==3.18.0"]
 
 
 def test_save_mlflow_keras_falls_back_to_tensorflow(monkeypatch, tmp_path):
@@ -92,6 +105,7 @@ def test_save_mlflow_keras_falls_back_to_tensorflow(monkeypatch, tmp_path):
     monkeypatch.setattr(mlflow, "tensorflow", fake_tensorflow, raising=False)
     core.save_mlflow_model("model", "keras", tmp_path / "out", None)
     fallback.assert_called_once()
+    assert fallback.call_args.kwargs["pip_requirements"] == ["mlflow==3.18.0"]
 
 
 def test_save_mlflow_rejects_unknown_flavor(tmp_path):

@@ -204,7 +204,7 @@ class ArgoTrainingBackend(_ArgoBackend):
                     f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/training-jobs/{job.public_id}/"
                 ),
                 "reporter_capability": reporter_capability,
-                "mlflow_tracking_uri": f"{settings.CONTROL_PLANE_INTERNAL_URL}/api/2.0/mlflow",
+                "mlflow_tracking_uri": settings.CONTROL_PLANE_INTERNAL_URL,
                 "mlflow_tracking_token": issue_capability(job, "tracking", preserve_existing=True),
             }
         )

@@ -76,7 +76,7 @@ def test_run_training_streams_output_and_sets_environment(monkeypatch, runner_wo
     captured = {}
     monkeypatch.setenv("TENANT_ID", "tenant-1")
     monkeypatch.setenv("S3_OUTPUT_UPLOAD_CAPABILITY", "must-not-leak")
-    monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://control-plane:8000/api/2.0/mlflow")
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://control-plane:8000")
     monkeypatch.setenv("MLFLOW_TRACKING_TOKEN", "test-tracking-token")
     emitter = Mock()
     monkeypatch.setattr(runner, "start_metric_emitter", emitter)
@@ -93,7 +93,7 @@ def test_run_training_streams_output_and_sets_environment(monkeypatch, runner_wo
     assert result.stdout == "out one\nout two\n"
     assert result.stderr == "warning\n"
     assert captured["env"]["MODEL_VERSION"] == "v2"
-    assert captured["env"]["MLFLOW_TRACKING_URI"] == "http://control-plane:8000/api/2.0/mlflow"
+    assert captured["env"]["MLFLOW_TRACKING_URI"] == "http://control-plane:8000"
     assert captured["env"]["MLFLOW_TRACKING_TOKEN"] == "test-tracking-token"
     assert "MLFLOW_EXPERIMENT_NAME" not in captured["env"]
     assert "S3_OUTPUT_UPLOAD_CAPABILITY" not in captured["env"]

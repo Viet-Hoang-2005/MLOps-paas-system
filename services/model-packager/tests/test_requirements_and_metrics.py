@@ -10,6 +10,8 @@ from src import io, tasks
 from src.image_build import (
     PROTECTED_PACKAGES,
     filter_protected_requirements,
+    filter_mlflow_requirements,
+    normalize_mlflow_requirements,
     render_dockerfile,
     requirement_name,
     write_build_context,
@@ -63,7 +65,18 @@ def test_blank_lines_and_comments_are_ignored_and_names_are_normalized():
     assert filter_protected_requirements("\n# note\n   \n") == ("", [])
     assert requirement_name("Scikit_Learn==1") == "scikit-learn"
     assert requirement_name("==1.0") is None
-    assert {"fastapi", "pydantic-core"} <= PROTECTED_PACKAGES
+    assert {"fastapi", "pydantic-core", "mlflow", "mlflow-skinny", "mlflow-tracing"} <= PROTECTED_PACKAGES
+
+
+def test_platform_mlflow_family_is_normalized_without_dropping_model_dependencies():
+    assert normalize_mlflow_requirements(
+        ["numpy==1.26.4", "MLflow==3.11.1", "mlflow_skinny==3.11.1", "mlflow-tracing==3.11.1"]
+    ) == ["numpy==1.26.4", "mlflow==3.18.0"]
+    assert normalize_mlflow_requirements(None) == ["mlflow==3.18.0"]
+
+
+def test_archive_mlflow_pins_are_filtered_for_packager_validation_only():
+    assert filter_mlflow_requirements("numpy==1.26.4\nmlflow==3.11.1\nmlflow-skinny==3.11.1\n") == "numpy==1.26.4"
 
 
 @pytest.mark.parametrize("line", ["==1.0", "<2", "; python_version<'3'", "$(whoami)"])
@@ -101,6 +114,14 @@ def test_build_context_uses_the_filtered_requirements(tmp_path):
     assert "fastapi" not in (tmp_path / "requirements.txt").read_text()
     assert "fastapi==0.163.2" in detail.call_args.args[0]
     assert "pip install" in (tmp_path / "Dockerfile").read_text()
+    kept = write_build_context(
+        tmp_path,
+        "base:latest",
+        "numpy==1.26\nmlflow==2.13.2\nmlflow_skinny==2.13.2\nmlflow-tracing==2.13.2\n",
+        detail,
+    )
+    assert kept == "numpy==1.26"
+    assert "mlflow" not in (tmp_path / "requirements.txt").read_text()
     write_build_context(tmp_path, "base:latest", "fastapi==0.163.2", detail)
     assert "pip" not in (tmp_path / "Dockerfile").read_text()
 

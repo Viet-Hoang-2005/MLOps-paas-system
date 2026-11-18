@@ -2,7 +2,7 @@ fastapi==0.163.2
 uvicorn==0.54.0
 python-multipart==0.0.34
 pydantic==2.14.3
-mlflow==3.11.1
+mlflow==3.18.0
 numpy==1.26.4
 pandas==2.2.1
 scikit-learn==1.7.2
