@@ -17,26 +17,21 @@ spec:
     - name: Owner
       value: Platform Engineering
     - name: Source
-      value: ghcr.io/ot-container-kit/charts/redis-operator@0.26.0
+      value: ghcr.io/ot-container-kit/charts/redis-operator@0.27.0
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#redis
   source:
     repoURL: ghcr.io/ot-container-kit/charts
     chart: redis-operator
-    targetRevision: 0.26.0
+    targetRevision: 0.27.0
     helm:
       releaseName: redis-operator
       values: |
         redisOperator:
-          imageTag: v0.26.0
-          initContainerImageTag: v0.26.0
+          imageTag: v0.27.0
+          initContainerImageTag: v0.27.0
           watchNamespace: mlops-paas-data
           webhook: false
-          strategy:
-            type: RollingUpdate
-            rollingUpdate:
-              maxSurge: 0
-              maxUnavailable: 1
         featureGates: null
         nodeSelector:
           workload-type: worker

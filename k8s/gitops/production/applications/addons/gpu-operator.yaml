@@ -17,13 +17,13 @@ spec:
     - name: Owner
       value: Platform Engineering
     - name: Source
-      value: helm.ngc.nvidia.com/nvidia/gpu-operator@v26.3.3
+      value: helm.ngc.nvidia.com/nvidia/gpu-operator@v26.7.2
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
   source:
     repoURL: https://helm.ngc.nvidia.com/nvidia
     chart: gpu-operator
-    targetRevision: v26.3.3
+    targetRevision: v26.7.2
     helm:
       releaseName: gpu-operator
       values: |

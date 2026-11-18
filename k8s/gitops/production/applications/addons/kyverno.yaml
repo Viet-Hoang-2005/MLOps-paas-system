@@ -17,13 +17,13 @@ spec:
     - name: Owner
       value: Platform Engineering
     - name: Source
-      value: kyverno.github.io/kyverno@3.8.2
+      value: kyverno.github.io/kyverno@3.9.2
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#image-verification
   source:
     repoURL: https://kyverno.github.io/kyverno
     chart: kyverno
-    targetRevision: 3.8.2
+    targetRevision: 3.9.2
     helm:
       releaseName: kyverno
       values: |

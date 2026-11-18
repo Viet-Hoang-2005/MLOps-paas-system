@@ -17,13 +17,13 @@ spec:
     - name: Owner
       value: Platform Engineering
     - name: Source
-      value: prometheus-community.github.io/helm-charts/kube-prometheus-stack@69.8.2
+      value: prometheus-community.github.io/helm-charts/kube-prometheus-stack@93.1.1
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
   source:
     repoURL: https://prometheus-community.github.io/helm-charts
     chart: kube-prometheus-stack
-    targetRevision: 69.8.2
+    targetRevision: 93.1.1
     helm:
       releaseName: monitoring
       values: |

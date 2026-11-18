@@ -17,13 +17,13 @@ spec:
     - name: Owner
       value: Platform Engineering
     - name: Source
-      value: public.ecr.aws/karpenter/karpenter@1.13.0
+      value: public.ecr.aws/karpenter/karpenter@1.15.1
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
   source:
     repoURL: public.ecr.aws/karpenter
     chart: karpenter
-    targetRevision: 1.13.0
+    targetRevision: 1.15.1
     helm:
       releaseName: karpenter
       values: |

@@ -17,13 +17,13 @@ spec:
     - name: Owner
       value: Platform Engineering
     - name: Source
-      value: kedacore.github.io/charts/keda@2.17.2
+      value: kedacore.github.io/charts/keda@2.21.0
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
   source:
     repoURL: https://kedacore.github.io/charts
     chart: keda
-    targetRevision: 2.17.2
+    targetRevision: 2.21.0
     helm:
       releaseName: keda
       values: |

@@ -17,8 +17,8 @@ def validate_redis_ha_topology(context: ValidationContext) -> None:
     errors: list[str] = []
     app = context.application("mlops-prod-addon-redis-operator")
     source = (app.get("spec") or {}).get("source") or {}
-    if (source.get("chart"), str(source.get("targetRevision"))) != ("redis-operator", "0.26.0"):
-        errors.append("Redis Operator must use pinned chart redis-operator@0.26.0")
+    if (source.get("chart"), str(source.get("targetRevision"))) != ("redis-operator", "0.27.0"):
+        errors.append("Redis Operator must use pinned chart redis-operator@0.27.0")
 
     rendered = context.render("k8s/platform/redis")
     queue_replication = find_resource(rendered, "RedisReplication", "redis-queue-ha")

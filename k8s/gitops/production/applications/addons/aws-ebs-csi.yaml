@@ -17,13 +17,13 @@ spec:
     - name: Owner
       value: Platform Engineering
     - name: Source
-      value: kubernetes-sigs.github.io/aws-ebs-csi-driver@2.40.1
+      value: kubernetes-sigs.github.io/aws-ebs-csi-driver@2.68.0
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
   source:
     repoURL: https://kubernetes-sigs.github.io/aws-ebs-csi-driver
     chart: aws-ebs-csi-driver
-    targetRevision: 2.40.1
+    targetRevision: 2.68.0
     helm:
       releaseName: aws-ebs-csi-driver
       values: |

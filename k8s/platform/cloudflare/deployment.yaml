@@ -46,7 +46,7 @@ spec:
       containers:
         - name: cloudflared
           # Pull image chính thức của Cloudflared từ Docker Hub
-          image: cloudflare/cloudflared:latest
+          image: cloudflare/cloudflared:2026.10.7
           imagePullPolicy: IfNotPresent
           args:
             - tunnel

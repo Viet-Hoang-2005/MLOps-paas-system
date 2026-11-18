@@ -17,13 +17,13 @@ spec:
     - name: Owner
       value: Platform Engineering
     - name: Source
-      value: registry.k8s.io/nfd/charts/node-feature-discovery@0.18.3
+      value: registry.k8s.io/nfd/charts/node-feature-discovery@0.20.1
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
   source:
     repoURL: registry.k8s.io/nfd/charts
     chart: node-feature-discovery
-    targetRevision: 0.18.3
+    targetRevision: 0.20.1
     helm:
       releaseName: nfd
       values: |

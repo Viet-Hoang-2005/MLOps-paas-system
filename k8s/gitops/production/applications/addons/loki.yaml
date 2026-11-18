@@ -17,7 +17,7 @@ spec:
     - { name: Owner, value: Platform Engineering }
     - {
         name: Source,
-        value: "grafana-community.github.io/helm-charts/loki@18.13.1",
+        value: "grafana-community.github.io/helm-charts/loki@21.1.1",
       }
     - {
         name: Runbook,
@@ -26,7 +26,7 @@ spec:
   source:
     repoURL: https://grafana-community.github.io/helm-charts
     chart: loki
-    targetRevision: 18.13.1
+    targetRevision: 21.1.1
     helm:
       releaseName: loki
       values: |

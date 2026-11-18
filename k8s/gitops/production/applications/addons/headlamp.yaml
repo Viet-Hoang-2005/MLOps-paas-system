@@ -17,13 +17,13 @@ spec:
     - name: Owner
       value: Platform Engineering
     - name: Source
-      value: kubernetes-sigs.github.io/headlamp/headlamp@0.45.0
+      value: kubernetes-sigs.github.io/headlamp/headlamp@0.46.0
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
   source:
     repoURL: https://kubernetes-sigs.github.io/headlamp
     chart: headlamp
-    targetRevision: 0.45.0
+    targetRevision: 0.46.0
     helm:
       releaseName: headlamp
       values: |

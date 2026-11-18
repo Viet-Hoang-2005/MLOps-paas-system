@@ -15,12 +15,12 @@ spec:
   project: mlops-addons
   info:
     - {name: Owner, value: Platform Engineering}
-    - {name: Source, value: "grafana.github.io/helm-charts/alloy@1.13.0"}
+    - {name: Source, value: "grafana.github.io/helm-charts/alloy@1.15.0"}
     - {name: Runbook, value: "https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#runtime-logs"}
   source:
     repoURL: https://grafana.github.io/helm-charts
     chart: alloy
-    targetRevision: 1.13.0
+    targetRevision: 1.15.0
     helm:
       releaseName: alloy
       values: |

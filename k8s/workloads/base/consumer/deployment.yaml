@@ -58,7 +58,7 @@ spec:
             capabilities:
               drop:
                 - ALL
-          image: docker.redpanda.com/redpandadata/redpanda:v23.3.21
+          image: docker.redpanda.com/redpandadata/redpanda:v26.2.2
           command: ["/bin/sh", "-c"]
           args: ["rpk topic create mlops_paas_production_data mlops_paas_production_data.dlq --brokers redpanda.mlops-paas-data.svc.cluster.local:9092 || true"]
           env:

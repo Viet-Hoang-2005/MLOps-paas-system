@@ -131,7 +131,7 @@ MLOps PaaS được xây dựng theo kiến trúc phân tách rõ ràng giữa *
 | **Data Ingestion** | confluent-kafka, Pandas, SQLAlchemy | Worker tiêu thụ dữ liệu, micro-batching và Transactional Outbox pattern |
 | **Drift & CT** | Evidently AI (v0.4.x), Scipy | Kiểm định thống kê Kolmogorov-Smirnov, Chi-square, xuất báo cáo và kích hoạt CT |
 | **Experiment Tracking** | MLflow Server 2.14, AWS S3 | Theo dõi tham số huấn luyện, metrics và lưu trữ artifacts mô hình |
-| **Relational Database** | PostgreSQL 15, CloudNativePG Operator | Nguồn chân lý quan hệ (SSOT) cho toàn bộ trạng thái domain hệ thống |
+| **Relational Database** | PostgreSQL 17, CloudNativePG Operator | Nguồn chân lý quan hệ (SSOT) cho toàn bộ trạng thái domain hệ thống |
 | **Cache & Task Broker** | Redis 7.4, Redis Sentinel HA | Broker/Result backend cho Celery, stream logs thời gian thực và cache gateway |
 | **Container Registry** | Harbor OCI Registry, Cosign Keyless | Lưu trữ image nội bộ, bảo mật chuỗi cung ứng với chữ ký số xác thực ảnh |
 | **Container Engine** | K3s (Lightweight Kubernetes v1.36), Docker | Nền tảng điều phối và thực thi container chuẩn hóa đám mây |

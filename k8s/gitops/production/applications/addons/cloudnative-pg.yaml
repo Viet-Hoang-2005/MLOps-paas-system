@@ -17,13 +17,13 @@ spec:
     - name: Owner
       value: Platform Engineering
     - name: Source
-      value: cloudnative-pg.github.io/charts/cloudnative-pg@0.24.0
+      value: cloudnative-pg.github.io/charts/cloudnative-pg@0.29.1
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
   source:
     repoURL: https://cloudnative-pg.github.io/charts
     chart: cloudnative-pg
-    targetRevision: 0.24.0
+    targetRevision: 0.29.1
     helm:
       releaseName: cloudnative-pg
       values: |

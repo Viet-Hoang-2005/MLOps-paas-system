@@ -17,13 +17,13 @@ spec:
     - name: Owner
       value: Platform Engineering
     - name: Source
-      value: argoproj.github.io/argo-helm/argo-workflows@0.45.11
+      value: argoproj.github.io/argo-helm/argo-workflows@2.0.18
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
   source:
     repoURL: https://argoproj.github.io/argo-helm
     chart: argo-workflows
-    targetRevision: 0.45.11
+    targetRevision: 2.0.18
     helm:
       releaseName: argo-workflows
       values: |

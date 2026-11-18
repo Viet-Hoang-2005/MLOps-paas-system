@@ -355,7 +355,7 @@ services:
 
   # 6. PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     container_name: postgres
     restart: unless-stopped
     environment:
@@ -377,7 +377,7 @@ services:
 
   # 6.1 Init Container để tạo schema cho Control Plane
   schema-init:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     container_name: postgres_schema_init
     restart: "no"
     environment:
@@ -396,7 +396,7 @@ services:
 
   # 7. Redpanda Kafka Broker
   redpanda:
-    image: docker.redpanda.com/redpandadata/redpanda:latest
+    image: docker.redpanda.com/redpandadata/redpanda:v26.2.2
     container_name: redpanda
     restart: unless-stopped
     healthcheck:
@@ -426,7 +426,7 @@ services:
 
   # 7.1 Redpanda Init Kafka Topic
   redpanda-init:
-    image: docker.redpanda.com/redpandadata/redpanda:latest
+    image: docker.redpanda.com/redpandadata/redpanda:v26.2.2
     container_name: redpanda_init
     restart: "no"
     entrypoint: ["/bin/sh", "-ec"]

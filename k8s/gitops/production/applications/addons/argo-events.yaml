@@ -17,13 +17,13 @@ spec:
     - name: Owner
       value: Platform Engineering
     - name: Source
-      value: argoproj.github.io/argo-helm/argo-events@2.4.16
+      value: argoproj.github.io/argo-helm/argo-events@2.4.28
     - name: Runbook
       value: https://github.com/Viet-Hoang-2005/MLOps-paas-system/blob/main/k8s/README.md#addons
   source:
     repoURL: https://argoproj.github.io/argo-helm
     chart: argo-events
-    targetRevision: 2.4.16
+    targetRevision: 2.4.28
     helm:
       releaseName: argo-events
       values: |

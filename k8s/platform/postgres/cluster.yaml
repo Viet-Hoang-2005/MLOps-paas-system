@@ -29,7 +29,7 @@ spec:
   # Node 1: Primary (RW), Node 2: Standby (RO)
   instances: 2
   enableSuperuserAccess: true
-  imageName: ghcr.io/cloudnative-pg/postgresql:15
+  imageName: ghcr.io/cloudnative-pg/postgresql:17
 
   # Khởi tạo database và application owner
   bootstrap:
