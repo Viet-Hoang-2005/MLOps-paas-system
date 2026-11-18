@@ -1,6 +1,6 @@
 # Secret management CLI
 
-Install dependencies with `python -m pip install -r scripts/requirements.txt`.
+Use Python 3.12 in a dedicated virtual environment. Install dependencies with `python -m pip install -r scripts/requirements.txt`.
 Run `python scripts/create_and_push_secrets_to_aws.py` for the interactive menu:
 choose **local .env** or **AWS**, then the secret groups. Existing non-empty
 values are preserved. Missing internal secrets offer automatic generation or

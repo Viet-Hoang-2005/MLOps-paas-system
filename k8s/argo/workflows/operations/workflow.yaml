@@ -20,7 +20,7 @@ spec:
   templates:
     - name: stopped
       container:
-        image: python:3.10-slim@sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2
+        image: python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df
         command: ["true"]
         resources:
           requests:
@@ -57,7 +57,7 @@ spec:
         retryPolicy: Always
         backoff: {duration: "2s", factor: "2", maxDuration: "30s"}
       container:
-        image: python:3.10-slim@sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2
+        image: python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df
         command: [python, /ops/job_ops.py, submit]
         env:
           - {name: EXECUTION_KIND, value: "{{workflow.parameters.execution_kind}}"}
@@ -98,7 +98,7 @@ spec:
         retryPolicy: Always
         backoff: {duration: "2s", factor: "2", maxDuration: "30s"}
       container:
-        image: python:3.10-slim@sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2
+        image: python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df
         command: [python, /ops/job_ops.py, reconcile]
         env:
           - {name: EXECUTION_PAYLOAD, value: "{{workflow.parameters.execution_payload}}"}

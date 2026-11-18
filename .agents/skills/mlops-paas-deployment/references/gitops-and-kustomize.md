@@ -1,5 +1,7 @@
 # GitOps & Kustomize
 
+Argo Operations and Training helpers use a digest-pinned Python 3.12 image. When promoting Python runtime updates, verify the matching model-packager and serving base images and both Training Runner containers. Keep the preceding signed image references for rollback through GitOps.
+
 ## Root Application & Sync Waves
 
 Argo CD manages the cluster using the Application-of-Applications pattern anchored at `k8s/gitops/production/applications.yaml`. Resources are synchronized according to strict **Sync Waves**:

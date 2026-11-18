@@ -146,7 +146,7 @@ ansible/
 1. **Khởi tạo môi trường Python và cài đặt thư viện:**
    ```bash
    cd /mnt/d/AI\ Models/mlops-paas-system
-   python3 -m venv .venv-ansible
+   python3.12 -m venv .venv-ansible
    source .venv-ansible/bin/activate
    pip install -r ansible/requirements.txt
    ansible-galaxy collection install -r ansible/requirements.yml

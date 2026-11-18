@@ -37,7 +37,9 @@ Chế độ này phù hợp cho việc phát triển tính năng, kiểm thử �
 | **CPU / RAM** | 4 Cores / 8 GB RAM | 8 Cores / 16 GB RAM trở lên |
 | **Docker Engine** | Docker v24.0+ & Docker Compose v2.20+ | Docker Desktop bản mới nhất |
 | **Node.js** | Node.js v18+ & pnpm v9+ | Node.js v20 LTS |
-| **Python** | Python 3.10+ | Python 3.12+ |
+| **Python** | Python 3.12 | Python 3.12 |
+
+Tạo lại virtual environment bằng Python 3.12 trước khi cài dependencies. Trên Windows dùng `py -3.12 -m venv .venv` nếu đã cài Python Launcher. Trên WSL hoặc Linux dùng `python3.12 -m venv .venv`. Dùng môi trường riêng cho Ansible, Predict Tester và kiểm thử từng service để tránh xung đột dependencies.
 
 ---
 

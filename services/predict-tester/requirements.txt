@@ -1,20 +1,13 @@
-# --- Core Data Science & Image Processing ---
-pandas==2.0.3
+pandas==2.2.1
 opencv-python
-scikit-image==0.21.0
+scikit-image==0.23.2
 pillow
-
-# --- Machine Learning & AI Models ---
 numpy==1.26.4
 scikit-learn
 xgboost
 optuna
-
-# --- Data Visualization (Training/Reasearch) ---
 matplotlib
 seaborn
-
-# --- Web/API Demo ---
 gradio
 joblib
 flask

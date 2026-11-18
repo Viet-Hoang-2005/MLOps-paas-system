@@ -9,11 +9,11 @@ numpy==1.26.4
 redis==5.0.8
 requests==2.31.0
 docker==7.0.0
-bentoml>=1.2.0
-tensorflow>=2.16.1
-keras>=3.0.0
+bentoml==1.4.40
+tensorflow==2.21.0
+keras==3.15.1
 torch==2.2.2+cpu; platform_machine != "aarch64" and platform_machine != "arm64"
 torch==2.2.2; platform_machine == "aarch64" or platform_machine == "arm64"
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
+pytest==8.2.2
+pytest-asyncio==0.23.7
 

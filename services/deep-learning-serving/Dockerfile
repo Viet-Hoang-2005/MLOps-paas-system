@@ -1,4 +1,4 @@
-FROM python:3.10-slim AS builder
+FROM python:3.12-slim-bookworm AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ COPY requirements.txt /app/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -m pip install --prefix=/install -r /app/requirements.txt
 
-FROM python:3.10-slim
+FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 

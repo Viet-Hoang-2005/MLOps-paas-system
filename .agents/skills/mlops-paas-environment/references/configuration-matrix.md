@@ -1,5 +1,7 @@
 # Configuration Matrix
 
+Repository-managed Python tooling and application images use Python 3.12. The Ansible controller uses a Python 3.12 virtual environment, and EC2 targets use the Ubuntu system interpreter at `/usr/bin/python3`.
+
 ## Environment Comparison Matrix
 
 | Category | Local Docker Compose | Production Kubernetes K3s |

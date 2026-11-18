@@ -42,6 +42,10 @@ jobs:
       gitops_promotion: ${{ steps.matrix.outputs.gitops_promotion }}
     steps:
       - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Filter changed paths
         uses: dorny/paths-filter@v3
         id: filter
@@ -68,6 +72,7 @@ jobs:
       - name: Generate Dynamic Matrix
         id: matrix
         run: |
+          python --version
           python3 - <<'PY'
           import os, json
           manual_component = "${{ inputs.component || '' }}"
