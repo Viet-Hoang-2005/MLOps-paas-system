@@ -26,6 +26,7 @@
 
 - name: Join the pinned K3s workers
   hosts: workers
+  serial: 1
   gather_facts: true
   tags: [bootstrap]
   roles:

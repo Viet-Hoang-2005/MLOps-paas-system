@@ -141,7 +141,7 @@ flowchart TD
     end
 
     subgraph K3S_INIT["4. K3s Installation & Clustering"]
-        SWAP --> K3S_SERVER["roles/k3s_master: Cài K3s Server v1.34.9+k3s1"]
+        SWAP --> K3S_SERVER["roles/k3s_master: Cài K3s Server v1.36.6+k3s1"]
         K3S_SERVER --> ETCD["Kích hoạt Embedded etcd & Secrets Encryption"]
         K3S_SERVER --> TRAEFIK["Cấu hình Traefik Ingress (Timeout 600s, Trusted IPs)"]
         K3S_SERVER --> TOKEN["Trích xuất Node Token & Kubeconfig"]

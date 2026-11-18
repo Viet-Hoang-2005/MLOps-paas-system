@@ -134,7 +134,7 @@ MLOps PaaS được xây dựng theo kiến trúc phân tách rõ ràng giữa *
 | **Relational Database** | PostgreSQL 15, CloudNativePG Operator | Nguồn chân lý quan hệ (SSOT) cho toàn bộ trạng thái domain hệ thống |
 | **Cache & Task Broker** | Redis 7.4, Redis Sentinel HA | Broker/Result backend cho Celery, stream logs thời gian thực và cache gateway |
 | **Container Registry** | Harbor OCI Registry, Cosign Keyless | Lưu trữ image nội bộ, bảo mật chuỗi cung ứng với chữ ký số xác thực ảnh |
-| **Container Engine** | K3s (Lightweight Kubernetes v1.34), Docker | Nền tảng điều phối và thực thi container chuẩn hóa đám mây |
+| **Container Engine** | K3s (Lightweight Kubernetes v1.36), Docker | Nền tảng điều phối và thực thi container chuẩn hóa đám mây |
 | **Infrastructure as Code**| Terraform (AWS & Cloudflare Providers) | Quản lý tài nguyên đám mây AWS (VPC, EC2, S3, ALB, IAM) và Cloudflare (DNS, Tunnel, SSL) |
 | **Automation Bootstrap** | Ansible Automation Engine | Chuẩn hóa OS Ubuntu, cài đặt K3s embedded etcd, Helm và bootstrap Argo CD |
 | **GitOps Delivery** | Argo CD, Kustomize | Tự động hóa đồng bộ và kiểm soát triển khai ứng dụng khai báo (5 Sync Waves) |

@@ -64,7 +64,7 @@ spec:
     chmod 0700 /tmp/install-k3s.sh
     K3S_URL="https://k3s-api.internal.mlops-nids-nt114.id.vn:6443" \
       K3S_TOKEN="${k3s_token}" \
-      INSTALL_K3S_VERSION="v1.34.9+k3s1" \
+      INSTALL_K3S_VERSION="v1.36.6+k3s1" \
       INSTALL_K3S_EXEC="agent \
         --node-label=karpenter.sh/nodepool=mlops-paas-training-cpu \
         --node-label=karpenter.k8s.aws/ec2nodeclass=training-cpu \
@@ -143,7 +143,7 @@ spec:
     chmod 0700 /tmp/install-k3s.sh
     K3S_URL="https://k3s-api.internal.mlops-nids-nt114.id.vn:6443" \
       K3S_TOKEN="${k3s_token}" \
-      INSTALL_K3S_VERSION="v1.34.9+k3s1" \
+      INSTALL_K3S_VERSION="v1.36.6+k3s1" \
       INSTALL_K3S_EXEC="agent \
         --node-label=karpenter.sh/nodepool=mlops-paas-training-gpu \
         --node-label=karpenter.k8s.aws/ec2nodeclass=training-gpu \

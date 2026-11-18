@@ -36,7 +36,7 @@ Trong kiến trúc tổng thể của MLOps PaaS, Ansible đóng vai trò là **
    - Tắt swap, cài đặt các gói tiện ích phụ trợ (`curl`, `iptables`, `socat`).
 
 3. **Cài đặt cụm K3s (`roles/k3s_master` & `roles/k3s_worker`):**
-   - Cài đặt K3s server phiên bản cố định (`v1.34.9+k3s1`) với cơ chế lưu trữ **Embedded etcd** (hỗ trợ tự động sao lưu snapshot định kỳ lên ổ đĩa).
+   - Cài đặt K3s server phiên bản cố định (`v1.36.6+k3s1`) với cơ chế lưu trữ **Embedded etcd** (hỗ trợ tự động sao lưu snapshot định kỳ lên ổ đĩa).
    - Kích hoạt mã hóa Secret ở tầng lưu trữ (Secrets Encryption at rest).
    - Đặt taint `CriticalAddonsOnly=true:NoSchedule` trên Master node để bảo vệ control-plane không bị quá tải bởi workload người dùng.
    - Cấu hình Traefik Ingress Controller nội bộ với request timeout 600s (khớp với AWS ALB idle timeout) và danh sách dải IP tin cậy (Trusted IPs) để xử lý đúng header `X-Forwarded-Proto`.
