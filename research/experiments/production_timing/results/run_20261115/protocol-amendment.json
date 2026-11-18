@@ -1,7 +1,0 @@
-{
-  "user_decision": "Retain the observed client error and disclose it with the results",
-  "inference_percentile_population": "Successful responses, with errors reported separately",
-  "report_aggregate_population": "Completed full-window reports only; denominator must be shown",
-  "incomplete_windows_retained": true,
-  "automatic_inference_retries": false
-}

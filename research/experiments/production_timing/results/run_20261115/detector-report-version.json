@@ -1,5 +1,0 @@
-{
-  "raw_json_does_not_include_version": true,
-  "verified_runtime_inventory": "evidently-versions.json",
-  "measured_evidently_version": "0.4.15"
-}
