@@ -2,7 +2,7 @@
 domain_name: "mlops-nids-nt114.id.vn"
 aws_region: "ap-southeast-1"
 k3s_version: "v1.36.6+k3s1"
-helm_version: "v3.17.3"
+helm_version: "v4.3.1"
 k3s_etcd_snapshot_schedule: "0 */6 * * *"
 k3s_etcd_snapshot_retention: 12
 k3s_expected_worker_count: 2
@@ -114,7 +114,7 @@ training_smoke_image: "nvidia/cuda@sha256:001469ea0f3dec85a1ca929aeea3b58ae369d4
 # effective. The CPU smoke test remains part of every training verification.
 training_gpu_smoke_enabled: false
 
-argocd_chart_version: "7.8.23"
+argocd_chart_version: "10.18.0"
 
 ansible_artifacts_directory: "{{ playbook_dir }}/artifacts"
 k3s_local_kubeconfig: "{{ ansible_artifacts_directory }}/kubeconfig"

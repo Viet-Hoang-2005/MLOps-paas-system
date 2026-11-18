@@ -149,7 +149,7 @@ flowchart TD
     end
 
     subgraph GITOPS_CORE["5. GitOps Bootstrap (roles/helm & platform_core)"]
-        K3S_AGENT --> HELM["Cài đặt Helm CLI v3.17.3"]
+        K3S_AGENT --> HELM["Cài đặt Helm CLI v4.3.1"]
         HELM --> ARGOCD_INSTALL["Helm Install Argo CD (Official Chart)"]
         ARGOCD_INSTALL --> ROOT_APP["Tạo Root Application: mlops-paas-system"]
         ROOT_APP --> VERIFY["roles/verify: Kiểm tra Pods, CRDs & Trạng thái Sync"]

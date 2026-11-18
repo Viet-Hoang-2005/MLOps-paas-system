@@ -44,7 +44,7 @@ Trong kiến trúc tổng thể của MLOps PaaS, Ansible đóng vai trò là **
    - Tự động trích xuất file cấu hình truy cập cụm (`kubeconfig`) về máy điều khiển.
 
 4. **Khởi động GitOps Core (`roles/helm` & `roles/platform_core`):**
-   - Cài đặt Helm CLI (`v3.17.3`) trực tiếp trên Master node.
+   - Cài đặt Helm CLI (`v4.3.1`) trực tiếp trên Master node.
    - Dùng Helm cài đặt Argo CD chính thức (`argo/argo-cd`).
    - Tạo Application gốc (`mlops-paas-system`) trỏ về repository Git để Argo CD tự động đồng bộ toàn bộ hạ tầng K8s còn lại.
 

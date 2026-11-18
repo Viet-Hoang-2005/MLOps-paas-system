@@ -67,6 +67,26 @@ def validate_helm_addon_sources(context: ValidationContext) -> None:
 
 
 @pytest.mark.validate
+def validate_argocd_bootstrap_and_gitops_match(context: ValidationContext) -> None:
+    """Check that bootstrap and self-management use the same chart and values."""
+    bootstrap = load_yaml_documents(context.source_root / "ansible/group_vars/all.yml")[0]
+    version = bootstrap["argocd_chart_version"]
+    assert isinstance(version, str) and re.fullmatch(r"\d+\.\d+\.\d+", version)
+
+    application = context.application("mlops-prod-addon-argocd")
+    source = next(source for source in application_sources(application) if source.get("chart") == "argo-cd")
+    values_file = "$values/k8s/argocd/values.yaml"
+    assert source["targetRevision"] == version, "Keep the GitOps and Ansible Argo CD chart pins in sync"
+    assert source["helm"]["releaseName"] == "argocd"
+    assert source["helm"]["valueFiles"] == [values_file]
+    assert any(source.get("ref") == "values" for source in application_sources(application))
+    assert application["spec"]["destination"]["namespace"] == "argocd"
+    assert "ServerSideApply=true" in application["spec"]["syncPolicy"]["syncOptions"]
+    source_info = next(item["value"] for item in application["spec"]["info"] if item["name"] == "Source")
+    assert source_info == f"argoproj.github.io/argo-helm/argo-cd@{version} + {values_file}"
+
+
+@pytest.mark.validate
 def validate_alloy_task_label_discovery(context: ValidationContext) -> None:
     """Discovery must use the sanitized labels actually emitted by workflows."""
     application = context.application("mlops-prod-addon-alloy")

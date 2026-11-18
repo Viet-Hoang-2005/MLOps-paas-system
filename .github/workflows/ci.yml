@@ -497,7 +497,7 @@ jobs:
         if: matrix.target.id == 'kubernetes'
         uses: azure/setup-helm@v4
         with:
-          version: v3.16.4
+          version: v4.3.1
       - name: Install Kubeconform v0.7.0
         if: matrix.target.id == 'kubernetes'
         run: |
