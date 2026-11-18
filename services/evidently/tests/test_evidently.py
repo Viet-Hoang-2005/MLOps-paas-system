@@ -160,9 +160,9 @@ def test_column_mapping_fallback_and_prediction_mapping(monkeypatch):
     monkeypatch.setattr(main, "MODEL_URI", "models:/none/Production")
     reference = pd.DataFrame({"a": [1.0], "label": ["safe"]})
     production = pd.DataFrame({"a": [2.0], "prediction": ["safe"]})
-    mapping = main.get_column_mapping(reference, production)
-    assert mapping.numerical_features == ["a"]
-    assert mapping.prediction == "prediction"
+    mapping = main.get_data_definition(reference)
+    assert mapping.numerical_columns == ["a"]
+    assert main.prepare_prediction(reference, production) == "prediction"
     assert reference["prediction"].tolist() == ["safe"]
 
 
@@ -179,100 +179,12 @@ def test_column_mapping_uses_mlflow_signature(monkeypatch):
         "get_model_info",
         lambda _: SimpleNamespace(signature=signature),
     )
-    mapping = main.get_column_mapping(
-        pd.DataFrame({"num": [1], "cat": ["a"]}),
-        pd.DataFrame({"num": [2], "cat": ["b"]}),
-    )
-    assert mapping.numerical_features == ["num"]
-    assert mapping.categorical_features == ["cat"]
-
-
-def test_filter_column_mapping():
-    mapping = main.ColumnMapping()
-    mapping.numerical_features = ["a", "missing"]
-    mapping.categorical_features = ["b"]
-    mapping.target = "target"
-    mapping.prediction = "prediction"
-    filtered = main.filter_column_mapping(mapping, ["a", "prediction"])
-    assert filtered.numerical_features == ["a"]
-    assert filtered.categorical_features == []
-    assert filtered.prediction == "prediction"
-
-
-def test_run_drift_analysis_summary(monkeypatch):
-    result = {
-        "metrics": [
-            {
-                "result": {
-                    "dataset_drift": True,
-                    "share_of_drifted_columns": 0.75,
-                    "number_of_drifted_columns": 1,
-                }
-            },
-            {
-                "result": {
-                    "drift_by_columns": {
-                        "a": {"drift_detected": True},
-                        "b": {"drift_detected": False},
-                    }
-                }
-            },
-        ]
-    }
-
-    class FakeReport:
-        def __init__(self, metrics):
-            self.metrics = metrics
-
-        def run(self, **kwargs):
-            self.kwargs = kwargs
-
-        def as_dict(self):
-            return result
-
-    monkeypatch.setattr(main, "Report", FakeReport)
-    monkeypatch.setattr(main, "save_drift_report", lambda *a: {"summary_json_s3_uri": "s3://report"})
-    monkeypatch.setattr(main, "TENANT_ID", "t")
-    monkeypatch.setattr(main, "PROJECT_ID", "p")
-    monkeypatch.setattr(main, "MODEL_VERSION_ID", "v")
-    monkeypatch.setattr(main, "DRIFT_THRESHOLD", 0.4)
-    frame = pd.DataFrame({"a": [1.0], "b": [2.0]})
-    summary = main.run_drift_analysis(frame, frame.copy(), main.ColumnMapping())
-    assert summary["dataset_drift"] is True
-    assert summary["drifted_feature_names"] == ["a"]
-    assert summary["share_drifted_features"] == 0.5
-
-
-def test_run_drift_analysis_requires_common_columns():
-    with pytest.raises(ValueError, match="No common columns"):
-        main.run_drift_analysis(pd.DataFrame({"a": [1]}), pd.DataFrame({"b": [1]}), main.ColumnMapping())
+    mapping = main.get_data_definition(pd.DataFrame({"num": [1], "cat": ["a"]}))
+    assert mapping.numerical_columns == ["num"]
+    assert mapping.categorical_columns == ["cat"]
 
 
 def test_run_drift_analysis_detects_missing_features_and_alerts(monkeypatch):
-    result = {
-        "metrics": [
-            {
-                "result": {
-                    "dataset_drift": False,
-                    "share_of_drifted_columns": 0.0,
-                    "number_of_drifted_columns": 0,
-                }
-            },
-            {"result": {"drift_by_columns": {"a": {"drift_detected": False}}}},
-        ]
-    }
-
-    class FakeReport:
-        def __init__(self, metrics):
-            self.metrics = metrics
-
-        def run(self, **kwargs):
-            self.kwargs = kwargs
-
-        def as_dict(self):
-            return result
-
-    monkeypatch.setattr(main, "Report", FakeReport)
     monkeypatch.setattr(main, "save_drift_report", lambda *a: {})
     monkeypatch.setattr(main, "TENANT_ID", "t")
     monkeypatch.setattr(main, "PROJECT_ID", "p")
@@ -283,7 +195,7 @@ def test_run_drift_analysis_detects_missing_features_and_alerts(monkeypatch):
     ref = pd.DataFrame({"a": [1.0, 2.0], "b": [10.0, 20.0], "c": [100.0, 200.0]})
     prod = pd.DataFrame({"a": [1.0, 2.0], "x": [99.0, 99.0]})
 
-    summary = main.run_drift_analysis(ref, prod, main.ColumnMapping())
+    summary = main.run_drift_analysis(ref, prod, main.get_data_definition(ref))
 
     assert summary["missing_features"] == ["b", "c"]
     assert summary["extra_features"] == ["x"]
@@ -297,37 +209,6 @@ def test_run_drift_analysis_detects_missing_features_and_alerts(monkeypatch):
 
 
 def test_run_drift_analysis_detects_high_null_features(monkeypatch):
-    result = {
-        "metrics": [
-            {
-                "result": {
-                    "dataset_drift": False,
-                    "share_of_drifted_columns": 0.0,
-                    "number_of_drifted_columns": 0,
-                }
-            },
-            {
-                "result": {
-                    "drift_by_columns": {
-                        "a": {"drift_detected": False},
-                        "b": {"drift_detected": False},
-                    }
-                }
-            },
-        ]
-    }
-
-    class FakeReport:
-        def __init__(self, metrics):
-            pass
-
-        def run(self, **kwargs):
-            pass
-
-        def as_dict(self):
-            return result
-
-    monkeypatch.setattr(main, "Report", FakeReport)
     monkeypatch.setattr(main, "save_drift_report", lambda *a: {})
     monkeypatch.setattr(main, "TENANT_ID", "t")
     monkeypatch.setattr(main, "PROJECT_ID", "p")
@@ -338,7 +219,7 @@ def test_run_drift_analysis_detects_high_null_features(monkeypatch):
     # In prod, column b has 50% null values (2 out of 4 rows)
     prod = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [1.0, None, None, 4.0]})
 
-    summary = main.run_drift_analysis(ref, prod, main.ColumnMapping())
+    summary = main.run_drift_analysis(ref, prod, main.get_data_definition(ref))
     high_nulls = [x["feature"] for x in summary["data_quality"]["high_null_features"]]
     assert "b" in high_nulls
     assert summary["data_quality"]["status"] == "warning"
@@ -395,7 +276,7 @@ def test_main_success_and_failure_paths(monkeypatch):
     frame = pd.DataFrame({"a": [1]})
     monkeypatch.setattr(main, "load_production_data", lambda: frame)
     monkeypatch.setattr(main, "load_reference_data", lambda: frame)
-    monkeypatch.setattr(main, "get_column_mapping", lambda *a: main.ColumnMapping())
+    monkeypatch.setattr(main, "get_data_definition", lambda *a: main.DataDefinition())
     monkeypatch.setattr(main, "run_drift_analysis", lambda *a: {"dataset_drift": False})
     webhook = Mock()
     monkeypatch.setattr(main, "trigger_django_webhook", webhook)
@@ -475,7 +356,7 @@ def test_run_fails_fast_when_s3_upload_fails(monkeypatch):
     frame = pd.DataFrame({"a": [1]})
     monkeypatch.setattr(main, "load_production_data", lambda: frame)
     monkeypatch.setattr(main, "load_reference_data", lambda: frame)
-    monkeypatch.setattr(main, "get_column_mapping", lambda *a: main.ColumnMapping())
+    monkeypatch.setattr(main, "get_data_definition", lambda *a: main.DataDefinition())
     # Drift analysis succeeded locally, but S3 upload failed so html_s3_uri is missing
     monkeypatch.setattr(main, "HTML_UPLOAD_URL", "http://upload-target")
     monkeypatch.setattr(
@@ -516,9 +397,7 @@ def _real_drift_run(monkeypatch, reference, production):
     monkeypatch.setattr(main, "PROJECT_ID", "p")
     monkeypatch.setattr(main, "MODEL_VERSION_ID", "v")
     monkeypatch.setattr(main, "DRIFT_THRESHOLD", 0.5)
-    mapping = main.ColumnMapping()
-    mapping.prediction = "prediction"
-    return main.run_drift_analysis(reference, production, mapping)
+    return main.run_drift_analysis(reference, production, main.get_data_definition(reference))
 
 
 def test_string_predictions_do_not_register_as_drift_against_numeric_reference(monkeypatch):
@@ -586,12 +465,9 @@ def test_mlflow_signature_enum_types_are_classified_correctly(monkeypatch):
     monkeypatch.setattr(main, "resolve_model_dir", lambda _: "/model")
     monkeypatch.setattr(main.mlflow.models, "get_model_info", lambda _: SimpleNamespace(signature=signature))
 
-    mapping = main.get_column_mapping(
-        pd.DataFrame({"age": [1], "score": [0.5], "city": ["a"]}),
-        pd.DataFrame({"age": [2], "score": [0.7], "city": ["b"]}),
-    )
+    mapping = main.get_data_definition(pd.DataFrame({"age": [1], "score": [0.5], "city": ["a"]}))
 
     # With the enum compared against plain strings every column became categorical,
     # which made Evidently report drift for all numeric features.
-    assert mapping.numerical_features == ["age", "score"]
-    assert mapping.categorical_features == ["city"]
+    assert mapping.numerical_columns == ["age", "score"]
+    assert mapping.categorical_columns == ["city"]

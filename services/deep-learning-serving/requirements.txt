@@ -1,7 +1,6 @@
 bentoml==1.4.40
-fastapi==0.163.2
 pydantic==2.14.3
-python-multipart==0.0.20
+python-multipart==0.0.34
 mlflow==3.11.1
 pandas==2.2.1
 numpy==1.26.4

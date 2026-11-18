@@ -1,6 +1,6 @@
 # Evidently — Động Cơ Phân Tích & Giám Sát Trôi Dạt Dữ Liệu (Drift Detection Engine)
 
-Thư mục `services/evidently/` chứa mã nguồn của **Evidently Service**, một Worker Runner chuyên biệt thực hiện việc phân tích trôi dạt dữ liệu (Data Drift) và trôi dạt dự đoán (Target/Prediction Drift). Dịch vụ dựa trên nền tảng thư viện **Evidently AI** (phiên bản ổn định 0.4.x), đóng vai trò then chốt trong việc giám sát chất lượng mô hình sau triển khai và là ngòi nổ kích hoạt quy trình Tái huấn luyện Liên tục (Continuous Training - CT).
+Thư mục `services/evidently/` chứa mã nguồn của **Evidently Service**, một Worker Runner chuyên biệt thực hiện việc phân tích trôi dạt dữ liệu (Data Drift) và trôi dạt dự đoán (Target/Prediction Drift). Dịch vụ dựa trên nền tảng thư viện **Evidently AI** (phiên bản ổn định 0.7.23), đóng vai trò then chốt trong việc giám sát chất lượng mô hình sau triển khai và là ngòi nổ kích hoạt quy trình Tái huấn luyện Liên tục (Continuous Training - CT).
 
 ---
 
@@ -17,7 +17,7 @@ Sau khi một mô hình học máy được triển khai lên môi trường s�
      - **Biến liên tục (Numerical Features):** Kolmogorov-Smirnov Test (K-S test) hoặc Wasserstein Distance.
      - **Biến phân loại (Categorical Features):** Chi-Square Test hoặc Jensen-Shannon Divergence.
 2. **Tự động Đối chiếu Cấu trúc Cột (Signature & Column Mapping):**
-   - Đọc thông tin chữ ký mô hình (MLflow Model Signature) hoặc phân tích cấu trúc trường `features` (dạng `JSONB` trong database) để tự động ánh xạ các cột đặc trưng (`ColumnMapping`).
+   - Đọc thông tin chữ ký mô hình (MLflow Model Signature) hoặc phân tích cấu trúc trường `features` (dạng `JSONB` trong database) để tự động ánh xạ các cột đặc trưng (`DataDefinition`).
    - Tự động làm phẳng (flatten) dữ liệu JSON lồng nhau và loại bỏ các cột không liên quan trước khi đưa vào thuật toán phân tích.
 3. **Sinh Báo cáo Toàn diện Đa Định dạng (Multi-Format Reporting):**
    - **Báo cáo HTML Tương tác (`report.html`):** Chứa các biểu đồ phân phối trực quan, bảng thống kê p-value chi tiết của từng đặc trưng để người dùng xem trực tiếp trên Web Dashboard.
@@ -40,8 +40,8 @@ Sau khi một mô hình học máy được triển khai lên môi trường s�
 |                                                                           |
 |  1. Đọc ngữ cảnh: TENANT_ID, PROJECT_ID, MODEL_VERSION_ID, DRIFT_RUN_ID   |
 |  2. Tiền xử lý dữ liệu: Flatten JSONB features, kiểm tra min samples      |
-|  3. Thiết lập ColumnMapping dựa trên MLmodel Signature                    |
-|  4. Thực thi Evidently AI: Report([DataDriftPreset()])                    |
+|  3. Thiết lập DataDefinition dựa trên MLmodel Signature                    |
+|  4. Thực thi Evidently AI: Report([DataDriftPreset(...)])                    |
 |  5. Tính toán p-value, drift share và so sánh với DRIFT_THRESHOLD         |
 |  6. Sinh 3 định dạng: report.html, report.json, summary.json              |
 |  7. Upload cả 3 file lên S3 qua Presigned PUT URLs                        |
@@ -65,7 +65,7 @@ Sau khi một mô hình học máy được triển khai lên môi trường s�
 | **`src/main.py`** | Entrypoint mỏng khởi chạy ứng dụng và xử lý mã lỗi thoát an toàn. |
 | **`src/application.py`** | Điều phối toàn bộ vòng đời phiên phân tích trôi dạt (`main`): kiểm tra tham số môi trường, phối hợp các module tải dữ liệu, phân tích, xuất báo cáo và gửi webhook callback. |
 | **`src/data.py`** | Tầng truy xuất và chuẩn hóa dữ liệu: tải dataset tham chiếu từ S3 (hỗ trợ CSV), truy vấn bản ghi suy luận từ cơ sở dữ liệu PostgreSQL, làm phẳng cấu trúc `features` JSONB và đính kèm cột `prediction`. |
-| **`src/analysis.py`** | Nhân phân tích thống kê: cấu hình `ColumnMapping`, áp dụng `DataDriftPreset` của Evidently AI, tính toán số lượng đặc trưng trôi dạt và tỷ lệ `drift_share`. |
+| **`src/analysis.py`** | Nhân phân tích thống kê: cấu hình `DataDefinition`, áp dụng `DataDriftPreset` của Evidently AI, tính toán số lượng đặc trưng trôi dạt và tỷ lệ `drift_share`. |
 | **`src/reporting.py`** | Tầng sinh và xuất bản báo cáo: tạo file HTML tương tác, xuất dữ liệu JSON chi tiết và tóm tắt JSON, thực hiện upload lên S3 qua Presigned PUT URLs. |
 | **`src/config.py`** | Quản lý các biến môi trường, ngưỡng `DRIFT_THRESHOLD` (mặc định: `0.6`), giới hạn số lượng mẫu (`MIN_SAMPLES`, `MAX_SAMPLES`). |
 | **`src/logging_utils.py`** | Bộ quản lý log chuyên biệt: hỗ trợ stream nhật ký chạy trực tiếp vào Redis (`drift_logs:{run_id}`) và ghi nhật ký có cấu trúc ra stdout. |
@@ -84,17 +84,17 @@ Sau khi một mô hình học máy được triển khai lên môi trường s�
    - Nếu số lượng bản ghi sản xuất thu thập được nhỏ hơn `MIN_SAMPLES` (mặc định 100 mẫu), hệ thống đánh dấu trạng thái `insufficient_samples` một cách có kiểm soát và báo cáo về Control Plane, không làm sập tiến trình.
    - Làm phẳng các cột đặc trưng JSONB và đối chiếu danh sách cột dùng chung giữa hai tập dữ liệu.
 4. **Thực thi Phân tích Trôi dạt:**
-   - Khởi tạo báo cáo Evidently: `Report(metrics=[DataDriftPreset()])`.
-   - Chạy tính toán phân phối và kiểm định giả thuyết thống kê giữa Reference Data và Current Data.
-   - Trích xuất số lượng cột bị drift và tính `drift_share = drift_features / total_features`.
+   - Tạo hai `Dataset` với cùng `DataDefinition` và lấy snapshot từ `Report.run(current_data=..., reference_data=...)`.
+   - Chạy `DataDriftPreset` trên các feature chung và đo prediction drift riêng.
+   - Tính tỷ lệ drift từ hợp của feature có drift thống kê và feature bị thiếu, chia cho số feature kỳ vọng.
 5. **Xuất bản Báo cáo & Upload S3:**
-   - Xuất file HTML trực quan: `report.save_html()`.
-   - Xuất file JSON chi tiết: `report.json()`.
+   - Xuất HTML từ `snapshot.save_html()`.
+   - Xuất JSON v2 từ số liệu từng cột đã chuẩn hóa và metric của snapshot.
    - Xuất file JSON tóm tắt chứa các thông số:
      ```json
      {
-       "drift_detected": true,
-       "drift_share": 0.75,
+       "dataset_drift": true,
+       "share_drifted_features": 0.75,
        "drift_threshold": 0.6,
        "number_of_features": 20,
        "number_of_drifted_features": 15,
@@ -237,3 +237,7 @@ python -m pytest --cov=src --cov-report=term-missing
 > [!TIP]
 > **Tích Hợp Tự Động Hóa Continuous Training (CT):**
 > Khi tỷ lệ `drift_share` vượt quá `DRIFT_THRESHOLD`, Webhook callback sẽ mang cờ `drift_detected: true`. Control Plane sẽ dựa vào cờ này và cấu hình của `DriftMonitor` để tự động kích hoạt một `TrainingJob` mới, thực hiện tải dữ liệu sản xuất đã tích lũy và tiến hành tái huấn luyện mô hình một cách hoàn toàn tự động.
+
+### Định dạng báo cáo v2
+
+`report.json` chứa `schema_version: 2`, phiên bản Evidently, chi tiết từng cột và kết quả metric của snapshot. `summary.json` và webhook chứa quyết định drift mà Monitoring và Continuous Training sử dụng. Control Plane đọc được cả báo cáo v2 và báo cáo lịch sử từ Evidently 0.4.15.

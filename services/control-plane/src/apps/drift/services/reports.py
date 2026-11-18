@@ -75,7 +75,9 @@ def get_drift_report_data(run):
                 exc_info=True,
             )
 
-    metrics_list = parsed_report.get("metrics", []) if isinstance(parsed_report, dict) else []
+    report = parsed_report if isinstance(parsed_report, dict) else {}
+    is_current_report = report.get("schema_version") == 2 or summary.get("report_schema_version") == 2
+    metrics_list = [] if is_current_report else report.get("metrics", [])
 
     dataset_drift_metric = {}
     data_drift_table_metric = {}
@@ -112,7 +114,9 @@ def get_drift_report_data(run):
     drift_by_columns = data_drift_table_metric.get("drift_by_columns", {})
     columns = []
 
-    if drift_by_columns:
+    if is_current_report:
+        columns = [column for column in report.get("columns", []) if isinstance(column, dict)]
+    elif drift_by_columns:
         for col_name, col_data in drift_by_columns.items():
             if not isinstance(col_data, dict):
                 continue

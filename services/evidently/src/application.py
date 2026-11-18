@@ -1,4 +1,5 @@
-# main.py: Phát hiện Data Drift (Sử dụng Evidently 0.4.15 Stable)
+"""Execute a drift run and publish its reports."""
+
 import json
 import logging
 import os
@@ -12,11 +13,10 @@ import pandas as pd
 import redis
 import requests
 from dotenv import load_dotenv
-from evidently.metric_preset import DataDriftPreset
-from evidently.pipeline.column_mapping import ColumnMapping
-from evidently.report import Report
+from evidently import DataDefinition
 from requests.adapters import HTTPAdapter
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import URL
 from src import analysis, config, data, reporting
 from src.logging_utils import (
     RuntimeLog,
@@ -131,7 +131,14 @@ def load_reference_data():
 # 2. Truy vấn dữ liệu Production Data
 def load_production_data():
     return data.load_production_data(
-        connection_url=f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST_RO}:{DB_PORT}/{DB_NAME}",
+        connection_url=URL.create(
+            "postgresql+psycopg2",
+            username=DB_USER,
+            password=DB_PASSWORD,
+            host=DB_HOST_RO,
+            port=DB_PORT,
+            database=DB_NAME,
+        ),
         model_version_id=MODEL_VERSION_ID,
         max_samples=MAX_SAMPLES,
         min_samples=MIN_SAMPLES,
@@ -159,89 +166,67 @@ def safe_extract_zip(zip_path, destination):
     return data.safe_extract_zip(zip_path, destination)
 
 
-# 3. Trích xuất column mapping từ MLFlow
-def get_column_mapping(reference_df, production_df):
-    runtime_log.detail(f"[3/4] Extracting Model Signature from MLflow: {MODEL_URI}")
-    column_mapping = ColumnMapping()
-    has_signature = False
+LABEL_COLUMNS = ("target", "Target", "label", "Label", "class", "Class")
+NON_FEATURE_COLUMNS = {
+    *LABEL_COLUMNS,
+    "prediction",
+    "timestamp",
+    "created_at",
+    "prediction_id",
+    "id",
+    "model_version_id",
+    "project_id",
+    "tenant_id",
+    "endpoint_url",
+    "request_id",
+    "status_code",
+    "latency_ms",
+    "confidence",
+    "raw_payload",
+}
 
-    if mlflow is not None:
-        try:
-            resolved_uri = resolve_model_dir(MODEL_URI)
-            if resolved_uri:
-                runtime_log.detail(f"Resolved model directory: {resolved_uri}")
-                model_info = mlflow.models.get_model_info(resolved_uri)
-                signature = model_info.signature
-                if signature and signature.inputs:
-                    num_cols = []
-                    cat_cols = []
-                    for inp in signature.inputs:
-                        type_name = getattr(inp.type, "name", str(inp.type))
-                        if type_name in ["integer", "long", "float", "double"]:
-                            num_cols.append(inp.name)
-                        else:
-                            cat_cols.append(inp.name)
-                    column_mapping.numerical_features = num_cols
-                    column_mapping.categorical_features = cat_cols
-                    has_signature = True
-                    runtime_log.detail(f"-> MLflow Signature: {len(num_cols)} numerical, {len(cat_cols)} categorical.")
-        except Exception as e:
-            runtime_log.event(
-                logging.WARNING,
-                "model_signature_unavailable",
-                "MLflow signature extraction failed",
-                reason=sanitize(str(e)),
-            )
 
-    # Fallback: Auto-infer feature types from actual DataFrame structure
-    if not has_signature:
-        runtime_log.detail("-> Fallback: Auto-infer feature types from actual DataFrame structure...")
-        ignore_cols = {
-            "prediction",
-            "target",
-            "Target",
-            "label",
-            "Label",
-            "class",
-            "Class",
-            "timestamp",
-            "model_version_id",
-            "project_id",
-            "tenant_id",
-        }
-        feature_cols = [c for c in production_df.columns if c not in ignore_cols]
-        num_cols = (
-            production_df[feature_cols].select_dtypes(include=["int64", "float64", "int32", "float32"]).columns.tolist()
+def get_data_definition(reference_df):
+    """Use named model inputs when available and infer types from the reference otherwise."""
+    try:
+        resolved_uri = resolve_model_dir(MODEL_URI)
+        if resolved_uri:
+            signature = mlflow.models.get_model_info(resolved_uri).signature
+            inputs = getattr(signature, "inputs", None)
+            types = {inp.name: getattr(inp.type, "name", str(inp.type)) for inp in (inputs or ()) if inp.name}
+            if types:
+                numerical = [name for name, kind in types.items() if kind in {"integer", "long", "float", "double"}]
+                return DataDefinition(
+                    numerical_columns=numerical, categorical_columns=[name for name in types if name not in numerical]
+                )
+    except Exception as exc:
+        runtime_log.event(
+            logging.WARNING,
+            "model_signature_unavailable",
+            "MLflow signature extraction failed",
+            reason=sanitize(str(exc)),
         )
-        cat_cols = production_df[feature_cols].select_dtypes(include=["object", "category", "bool"]).columns.tolist()
-        column_mapping.numerical_features = num_cols
-        column_mapping.categorical_features = cat_cols
-        runtime_log.detail(f"Column: {len(num_cols)} numerical, {len(cat_cols)} categorical.")
 
-    if "prediction" in production_df.columns:
-        if "prediction" not in reference_df.columns:
-            for cand in ["target", "Target", "label", "Label", "class", "Class"]:
-                if cand in reference_df.columns:
-                    reference_df["prediction"] = reference_df[cand].values
-                    runtime_log.detail(f"Mapped column '{cand}' of Reference to 'prediction'.")
-                    break
-        if "prediction" in reference_df.columns:
-            column_mapping.prediction = "prediction"
-
-    for cand in ["target", "Target", "label", "Label", "class", "Class"]:
-        if cand in reference_df.columns and cand in production_df.columns:
-            column_mapping.target = cand
-            break
-
-    return column_mapping
+    features = reference_df.drop(columns=list(NON_FEATURE_COLUMNS), errors="ignore")
+    numerical = features.select_dtypes(include="number").columns.tolist()
+    return DataDefinition(
+        numerical_columns=numerical,
+        categorical_columns=[name for name in features if name not in numerical],
+    )
 
 
-# 4. Lọc column mapping
-def filter_column_mapping(column_mapping, common_cols):
-    return analysis.filter_column_mapping(column_mapping, common_cols, ColumnMapping)
+def prepare_prediction(reference_df, production_df):
+    if "prediction" not in production_df:
+        return None
+    if "prediction" not in reference_df:
+        label = next((column for column in LABEL_COLUMNS if column in reference_df), None)
+        if label is None:
+            return None
+        reference_df["prediction"] = reference_df[label]
+    align_prediction_types(reference_df, production_df)
+    return "prediction"
 
 
-# 5. Phân tích Data drift & Data Quality (Evidently 0.4.15)
 def align_prediction_types(reference_df, production_df):
     """Give `prediction` the same kind of values on both sides.
 
@@ -254,48 +239,28 @@ def align_prediction_types(reference_df, production_df):
     if pd.api.types.is_numeric_dtype(reference) and not pd.api.types.is_bool_dtype(reference):
         production_df["prediction"] = pd.to_numeric(production_df["prediction"], errors="coerce")
     else:
-        reference_df["prediction"] = reference.astype(str)
-        production_df["prediction"] = production_df["prediction"].astype(str)
+        reference_df["prediction"] = reference.astype("string")
+        production_df["prediction"] = production_df["prediction"].astype("string")
 
 
-def run_drift_analysis(reference_df, production_df, column_mapping):
-    runtime_log.detail("[4/4] Running Evidently AI Data Drift & Data Quality analysis...")
-    align_prediction_types(reference_df, production_df)
+def run_drift_analysis(reference_df, production_df, definition):
+    runtime_log.detail("[4/4] Running Evidently Data Drift & Data Quality analysis...")
+    reference_df = reference_df.copy(deep=False)
+    production_df = production_df.copy(deep=False)
+    prediction = prepare_prediction(reference_df, production_df)
 
-    ignore_cols = {
-        "prediction",
-        "target",
-        "Target",
-        "label",
-        "Label",
-        "class",
-        "Class",
-        "timestamp",
-        "created_at",
-        "prediction_id",
-        "id",
-        "model_version_id",
-        "project_id",
-        "tenant_id",
-        "endpoint_url",
-        "request_id",
-        "status_code",
-        "latency_ms",
-        "confidence",
-        "raw_payload",
-    }
+    numerical = definition.numerical_columns or []
+    categorical = definition.categorical_columns or []
+    expected_features = [column for column in [*numerical, *categorical] if column not in NON_FEATURE_COLUMNS]
+    if not expected_features:
+        raise ValueError("No input features defined for drift analysis.")
 
-    # 1. Xác định tập đặc trưng kỳ vọng từ Reference Data / Column Mapping
-    if column_mapping.numerical_features or column_mapping.categorical_features:
-        expected_features = set((column_mapping.numerical_features or []) + (column_mapping.categorical_features or []))
-    else:
-        expected_features = set(c for c in reference_df.columns if c not in ignore_cols)
-
-    production_features = set(c for c in production_df.columns if c not in ignore_cols)
-
-    # 2. Phát hiện bất thường Schema / Data Quality (Missing Features & Extra Features)
-    missing_features = sorted(list(expected_features - set(production_df.columns)))
-    extra_features = sorted(list(production_features - set(reference_df.columns)))
+    missing_features = sorted(set(expected_features) - set(production_df))
+    extra_features = sorted(set(production_df) - set(reference_df) - NON_FEATURE_COLUMNS)
+    common_features = [column for column in expected_features if column in production_df]
+    missing_reference = sorted(set(expected_features) - set(reference_df))
+    if missing_reference:
+        raise ValueError(f"Reference data lacks expected features: {', '.join(missing_reference)}.")
 
     if missing_features:
         runtime_log.event(
@@ -307,18 +272,11 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
     if extra_features:
         runtime_log.detail(f"Production data contains {len(extra_features)} extra features")
 
-    # 3. Lấy các cột chung để chạy kiểm định thống kê Evidently
-    common_cols = [col for col in reference_df.columns if col in production_df.columns]
-    if len(common_cols) == 0:
-        raise ValueError("No common columns found between reference and production datasets.")
-
-    # 4. Kiểm tra tỷ lệ giá trị null bất thường trên các cột chung
     high_null_features = []
-    for col in common_cols:
-        if col not in ignore_cols and col in production_df.columns:
-            null_rate = float(production_df[col].isnull().mean())
-            if null_rate >= 0.20:
-                high_null_features.append({"feature": col, "null_rate": round(null_rate, 4)})
+    for column in common_features:
+        null_rate = float(production_df[column].isna().mean())
+        if null_rate >= 0.20:
+            high_null_features.append({"feature": column, "null_rate": round(null_rate, 4)})
 
     if high_null_features:
         runtime_log.event(
@@ -328,47 +286,23 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
             count=len(high_null_features),
         )
 
-    ref_clean = reference_df[common_cols]
-    prod_clean = production_df[common_cols]
-    filtered_mapping = filter_column_mapping(column_mapping, common_cols)
-
-    try:
-        report = Report(metrics=[DataDriftPreset(drift_share=DRIFT_THRESHOLD)])
-    except TypeError:
-        runtime_log.event(
-            logging.WARNING,
-            "drift_threshold_compatibility",
-            "Evidently DataDriftPreset does not accept drift_share. Applying threshold in summary only.",
-        )
-        report = Report(metrics=[DataDriftPreset()])
-    report.run(
-        reference_data=ref_clean,
-        current_data=prod_clean,
-        column_mapping=filtered_mapping,
+    numerical_columns = [column for column in common_features if column in numerical]
+    categorical_columns = [column for column in common_features if column in categorical]
+    if prediction:
+        reference_prediction = reference_df[prediction]
+        if pd.api.types.is_numeric_dtype(reference_prediction) and reference_prediction.nunique() > 2:
+            numerical_columns.append(prediction)
+        else:
+            categorical_columns.append(prediction)
+    shared_definition = DataDefinition(numerical_columns=numerical_columns, categorical_columns=categorical_columns)
+    snapshot, result_dict, rows = analysis.build_report(
+        reference_df, production_df, common_features, shared_definition, prediction, DRIFT_THRESHOLD
     )
 
-    result_dict = report.as_dict()
-    data_drift_table = {}
-
-    for item in result_dict.get("metrics", []):
-        result_data = item.get("result", {})
-        if "drift_by_columns" in result_data:
-            data_drift_table = result_data
-
-    drift_by_columns = data_drift_table.get("drift_by_columns", {})
-    # Only input features count towards the drifted share: Evidently also reports the
-    # prediction/target columns, which are not part of the denominator below.
-    feature_universe = expected_features or (set(common_cols) - ignore_cols)
-    stat_drifted_feature_names = [
-        col_name
-        for col_name, col_data in drift_by_columns.items()
-        if col_data.get("drift_detected", False) and col_name in feature_universe
-    ]
-    prediction_drift = (drift_by_columns.get("prediction") or {}).get("drift_detected")
-
-    # 5. Tổng hợp độ trôi dạt tổng thể (Statistical Drift + Missing Features)
-    all_drifted_features = sorted(list(set(stat_drifted_feature_names) | set(missing_features)))
-    total_expected_count = len(expected_features) if expected_features else len(common_cols)
+    stat_drifted_feature_names = [column for column in common_features if rows[column]["drift_detected"]]
+    prediction_drift = rows[prediction]["drift_detected"] if prediction else None
+    all_drifted_features = sorted(set(stat_drifted_feature_names) | set(missing_features))
+    total_expected_count = len(expected_features)
     total_drifted_count = len(all_drifted_features)
     effective_drift_share = (total_drifted_count / total_expected_count) if total_expected_count > 0 else 0.0
 
@@ -384,10 +318,12 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
         "extra_features_count": len(extra_features),
         "high_null_features": high_null_features,
         "expected_features_count": total_expected_count,
-        "common_features_count": len(common_cols),
+        "common_features_count": len(common_features),
     }
 
     summary = {
+        "report_schema_version": result_dict["schema_version"],
+        "evidently_version": result_dict["evidently_version"],
         "tenant_id": TENANT_ID,
         "project_id": PROJECT_ID,
         "model_version_id": MODEL_VERSION_ID,
@@ -407,7 +343,7 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
         "production_records": len(production_df),
         "samples": len(production_df),
     }
-    summary["report_artifacts"] = save_drift_report(report, result_dict, summary)
+    summary["report_artifacts"] = save_drift_report(snapshot, result_dict, summary)
 
     runtime_log.event(
         logging.INFO,
@@ -425,7 +361,7 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
         production_samples=len(production_df),
         status=data_quality["status"],
         reason=(
-            f"threshold={DRIFT_THRESHOLD}; common={len(common_cols)}; "
+            f"threshold={DRIFT_THRESHOLD}; common={len(common_features)}; "
             f"missing={len(missing_features)}; extra={len(extra_features)}; "
             f"high_null={len(high_null_features)}"
         ),
@@ -435,7 +371,7 @@ def run_drift_analysis(reference_df, production_df, column_mapping):
 
 
 # 6. Lưu báo cáo drift
-def save_drift_report(report, result_dict, summary):
+def save_drift_report(snapshot, result_dict, summary):
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     report_dir = str(TEMP_ROOT / "drift_reports" / str(TENANT_ID) / str(MODEL_NAME) / run_id)
     os.makedirs(report_dir, exist_ok=True)
@@ -444,9 +380,17 @@ def save_drift_report(report, result_dict, summary):
     result_json_path = os.path.join(report_dir, "report.json")
     summary_json_path = os.path.join(report_dir, "summary.json")
 
-    report.save_html(html_path)
+    if snapshot is not None:
+        snapshot.save_html(html_path)
+    else:
+        Path(html_path).write_text(
+            '<!doctype html><html lang="en"><meta charset="utf-8"><title>Drift report</title>'
+            "<h1>Schema mismatch</h1><p>No input features available for statistical comparison. "
+            "See the report summary for the missing features.</p></html>",
+            encoding="utf-8",
+        )
     with open(result_json_path, "w", encoding="utf-8") as fp:
-        json.dump(result_dict, fp, ensure_ascii=False, indent=2, default=str)
+        json.dump(result_dict, fp, ensure_ascii=False, indent=2, allow_nan=False)
     with open(summary_json_path, "w", encoding="utf-8") as fp:
         json.dump(summary, fp, ensure_ascii=False, indent=2, default=str)
 
@@ -633,10 +577,9 @@ def _run():
         reference_df = production_df.iloc[half_idx:].copy()
         production_df = production_df.iloc[:half_idx].copy()
 
-    column_mapping = get_column_mapping(reference_df, production_df)
-
     try:
-        drift_summary = run_drift_analysis(reference_df, production_df, column_mapping)
+        definition = get_data_definition(reference_df)
+        drift_summary = run_drift_analysis(reference_df, production_df, definition)
     except Exception as e:
         runtime_log.event(
             logging.ERROR,

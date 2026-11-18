@@ -100,14 +100,11 @@ def test_summary_is_one_compact_event_and_report_payload_unchanged(monkeypatch, 
     logger.addHandler(caplog.handler)
     writer = Mock(return_value=True)
     monkeypatch.setattr(main, "runtime_log", RuntimeLog(logger, writer=writer))
-    report = Mock()
-    report.as_dict.return_value = {"metrics": []}
-    monkeypatch.setattr(main, "Report", Mock(return_value=report))
     save = Mock(return_value={})
     monkeypatch.setattr(main, "save_drift_report", save)
     reference = pd.DataFrame({"x": [1, 2], "missing": [3, 4]})
-    production = pd.DataFrame({"x": [2, 3]})
-    summary = main.run_drift_analysis(reference, production, main.ColumnMapping())
+    production = pd.DataFrame({"x": [1, 2]})
+    summary = main.run_drift_analysis(reference, production, main.get_data_definition(reference))
     events = [record for record in caplog.records if record.event == "drift_analysis_summary"]
     assert len(events) == 1
     assert events[0].drift_detected is True

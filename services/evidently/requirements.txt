@@ -1,11 +1,11 @@
-pydantic==1.10.13
-evidently==0.4.15
+pydantic==1.10.26
+evidently==0.7.23
 numpy==1.26.4
 pandas==2.2.1
-sqlalchemy==2.0.25
-psycopg2-binary==2.9.9
+sqlalchemy==2.1.9
+psycopg2-binary==2.9.13
 requests==2.34.2
 python-dotenv==1.0.1
-redis==5.0.3
+redis==8.1.0
 mlflow==2.13.2
 setuptools==81.0.0

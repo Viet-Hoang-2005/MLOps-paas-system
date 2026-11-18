@@ -21,7 +21,7 @@ from src.security import PackageSecurityError, validate_safe_requirements
     "line",
     [
         "fastapi",
-        "fastapi==0.50.0",
+        "fastapi==0.163.2",
         "FastAPI>=0.1",
         "fastapi [all] == 0.50.0",
         "fastapi[all]~=0.50",
@@ -33,9 +33,9 @@ from src.security import PackageSecurityError, validate_safe_requirements
         "pydantic.core==2.0",
         "bentoml>1",
         "httpx===0.1",
-        'fastapi==0.50.0; python_version >= "3.8"',
+        'fastapi==0.163.2; python_version >= "3.8"',
         "fastapi @ file:///x",
-        "fastapi==0.50.0 # pinned",
+        "fastapi==0.163.2 # pinned",
     ],
 )
 def test_protected_packages_are_dropped_in_every_spelling(line):
@@ -49,8 +49,8 @@ def test_protected_packages_are_dropped_in_every_spelling(line):
 
 def test_old_filter_hole_is_closed():
     """The grep pattern anchored the name to the end of the line, so a version let it through."""
-    kept, dropped = filter_protected_requirements("fastapi==0.50.0\nrequests")
-    assert dropped == ["fastapi==0.50.0"] and kept == "requests"
+    kept, dropped = filter_protected_requirements("fastapi==0.163.2\nrequests")
+    assert dropped == ["fastapi==0.163.2"] and kept == "requests"
 
 
 def test_continuation_lines_cannot_hide_a_protected_package():
@@ -95,13 +95,13 @@ def test_dockerfile_without_requirements_installs_nothing():
 
 def test_build_context_uses_the_filtered_requirements(tmp_path):
     detail = Mock()
-    kept = write_build_context(tmp_path, "base:latest", "numpy==1.26\nfastapi==0.50.0\n", detail)
+    kept = write_build_context(tmp_path, "base:latest", "numpy==1.26\nfastapi==0.163.2\n", detail)
     assert kept == "numpy==1.26"
     assert (tmp_path / "requirements.txt").read_text() == "numpy==1.26\n"
     assert "fastapi" not in (tmp_path / "requirements.txt").read_text()
-    assert "fastapi==0.50.0" in detail.call_args.args[0]
+    assert "fastapi==0.163.2" in detail.call_args.args[0]
     assert "pip install" in (tmp_path / "Dockerfile").read_text()
-    write_build_context(tmp_path, "base:latest", "fastapi==0.50.0", detail)
+    write_build_context(tmp_path, "base:latest", "fastapi==0.163.2", detail)
     assert "pip" not in (tmp_path / "Dockerfile").read_text()
 
 
