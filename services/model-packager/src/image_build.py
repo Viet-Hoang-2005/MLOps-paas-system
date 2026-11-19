@@ -15,6 +15,9 @@ PROTECTED_PACKAGES = frozenset(
         "mlflow",
         "mlflow-skinny",
         "mlflow-tracing",
+        # Preserve the serving runtime's NumPy/PyArrow ABI-compatible pair.
+        "numpy",
+        "pyarrow",
     }
 )
 MLFLOW_FAMILY = frozenset({"mlflow", "mlflow-skinny", "mlflow-tracing"})

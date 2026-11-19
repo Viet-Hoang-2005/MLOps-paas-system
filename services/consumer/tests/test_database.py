@@ -24,7 +24,9 @@ def test_create_engine_safe_quotes_password(monkeypatch):
     create = Mock(return_value="engine")
     monkeypatch.setattr(database, "create_engine", create)
     assert database.create_engine_safe("db", "RW") == "engine"
-    assert "p%40ss+word" in create.call_args.args[0]
+    url = create.call_args.args[0]
+    assert url.startswith("postgresql+psycopg://")
+    assert "p%40ss+word" in url
 
 
 def test_init_db_only_checks_migration_owned_tables(monkeypatch):

@@ -1,8 +1,6 @@
 fastapi==0.163.2
 uvicorn==0.54.0
-python-multipart==0.0.34
-psycopg2-binary==2.9.13
-python-dotenv==1.0.1
+psycopg[binary]==3.3.9
 sqlalchemy==2.1.9
 httpx==0.28.1
 PyJWT==2.8.0

@@ -18,12 +18,14 @@ class Context:
 
 def test_build_database_url_explicit_and_composed(monkeypatch):
     monkeypatch.setenv("CONTROL_PLANE_DATABASE_URL", "postgresql://explicit")
-    assert database.build_control_plane_database_url() == "postgresql://explicit"
+    assert database.build_control_plane_database_url() == "postgresql+psycopg://explicit"
+    monkeypatch.setenv("CONTROL_PLANE_DATABASE_URL", "postgresql+psycopg2://explicit")
+    assert database.build_control_plane_database_url() == "postgresql+psycopg://explicit"
     monkeypatch.delenv("CONTROL_PLANE_DATABASE_URL")
     monkeypatch.setenv("DB_USER", "u@x")
     monkeypatch.setenv("DB_PASSWORD", "p word")
     monkeypatch.setenv("DB_HOST_RO", "db")
-    assert database.build_control_plane_database_url() == "postgresql://u%40x:p+word@db:5432/mlops_paas_db"
+    assert database.build_control_plane_database_url() == "postgresql+psycopg://u%40x:p+word@db:5432/mlops_paas_db"
     monkeypatch.delenv("DB_PASSWORD")
     assert database.build_control_plane_database_url() is None
 

@@ -323,7 +323,7 @@ def test_load_production_data_multi_tenant_scoping():
         return pd.DataFrame({"features": ['{"f1": 1}'], "prediction": [0]})
 
     data.load_production_data(
-        connection_url="postgresql://mock",
+        connection_url="postgresql+psycopg://mock",
         model_version_id="00000000-0000-0000-0000-000000000001",
         max_samples=100,
         min_samples=1,

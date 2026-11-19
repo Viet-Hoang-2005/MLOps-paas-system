@@ -39,7 +39,7 @@ PROJECT_TABLE = f'"{DB_SCHEMA}"."catalog_modelproject"'
 
 def create_engine_safe(host: str, label: str):
     password = quote_plus(DB_PASSWORD) if DB_PASSWORD else ""
-    url = f"postgresql://{DB_USER}:{password}@{host}:{DB_PORT}/{DB_NAME}"
+    url = f"postgresql+psycopg://{DB_USER}:{password}@{host}:{DB_PORT}/{DB_NAME}"
     try:
         engine = create_engine(
             url,

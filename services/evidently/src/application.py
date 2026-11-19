@@ -132,7 +132,7 @@ def load_reference_data():
 def load_production_data():
     return data.load_production_data(
         connection_url=URL.create(
-            "postgresql+psycopg2",
+            "postgresql+psycopg",
             username=DB_USER,
             password=DB_PASSWORD,
             host=DB_HOST_RO,

@@ -1,6 +1,6 @@
 pandas==2.2.1
 confluent-kafka==2.16.2
 sqlalchemy==2.1.9
-psycopg2-binary==2.9.13
+psycopg[binary]==3.3.9
 python-dotenv==1.0.1
 requests==2.34.2

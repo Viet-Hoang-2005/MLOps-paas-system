@@ -6,6 +6,7 @@ from typing import Any
 from urllib.parse import quote_plus
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 from src.logging_utils import Summary, get_logger
 
@@ -17,13 +18,21 @@ MODEL_RECORD_CACHE_TTL = int(os.environ.get("MODEL_RECORD_CACHE_TTL_SECONDS", "3
 def build_control_plane_database_url():
     explicit_url = os.environ.get("CONTROL_PLANE_DATABASE_URL")
     if explicit_url:
-        return explicit_url
+        parsed_url = make_url(explicit_url)
+        if parsed_url.drivername not in {
+            "postgres",
+            "postgresql",
+            "postgresql+psycopg2",
+            "postgresql+psycopg",
+        }:
+            raise ValueError("CONTROL_PLANE_DATABASE_URL must use PostgreSQL.")
+        return parsed_url.set(drivername="postgresql+psycopg").render_as_string(hide_password=False)
     db_user = os.environ.get("DB_USER")
     db_password = os.environ.get("DB_PASSWORD")
     if not db_user or not db_password:
         return None
     return (
-        f"postgresql://{quote_plus(db_user)}:{quote_plus(db_password)}"
+        f"postgresql+psycopg://{quote_plus(db_user)}:{quote_plus(db_password)}"
         f"@{os.environ.get('DB_HOST_RO', 'postgres')}:{os.environ.get('DB_PORT', '5432')}"
         f"/{os.environ.get('DB_NAME', 'mlops_paas_db')}"
     )

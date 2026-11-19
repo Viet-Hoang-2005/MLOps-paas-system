@@ -35,18 +35,20 @@ from src.security import PackageSecurityError, validate_safe_requirements
         "pydantic.core==2.0",
         "bentoml>1",
         "httpx===0.1",
+        "numpy==2.0.0",
+        "pyarrow==26.0.1",
         'fastapi==0.163.2; python_version >= "3.8"',
         "fastapi @ file:///x",
         "fastapi==0.163.2 # pinned",
     ],
 )
 def test_protected_packages_are_dropped_in_every_spelling(line):
-    kept, dropped = filter_protected_requirements(f"numpy==1.26\n{line}\nscikit-learn")
+    kept, dropped = filter_protected_requirements(f"pandas==2.2.1\n{line}\nscikit-learn")
     if line.startswith("Fast_API"):
         assert dropped == [] and line in kept
         return
     assert dropped == [line]
-    assert kept == "numpy==1.26\nscikit-learn"
+    assert kept == "pandas==2.2.1\nscikit-learn"
 
 
 def test_old_filter_hole_is_closed():
@@ -57,15 +59,25 @@ def test_old_filter_hole_is_closed():
 
 def test_continuation_lines_cannot_hide_a_protected_package():
     kept, dropped = filter_protected_requirements("numpy\nfastapi \\\n  ==0.50.0\npandas")
-    assert kept == "numpy\npandas"
-    assert len(dropped) == 1 and dropped[0].startswith("fastapi")
+    assert kept == "pandas"
+    assert len(dropped) == 2
+    assert dropped[0] == "numpy"
+    assert dropped[1].startswith("fastapi")
 
 
 def test_blank_lines_and_comments_are_ignored_and_names_are_normalized():
     assert filter_protected_requirements("\n# note\n   \n") == ("", [])
     assert requirement_name("Scikit_Learn==1") == "scikit-learn"
     assert requirement_name("==1.0") is None
-    assert {"fastapi", "pydantic-core", "mlflow", "mlflow-skinny", "mlflow-tracing"} <= PROTECTED_PACKAGES
+    assert {
+        "fastapi",
+        "pydantic-core",
+        "mlflow",
+        "mlflow-skinny",
+        "mlflow-tracing",
+        "numpy",
+        "pyarrow",
+    } <= PROTECTED_PACKAGES
 
 
 def test_platform_mlflow_family_is_normalized_without_dropping_model_dependencies():
@@ -108,19 +120,27 @@ def test_dockerfile_without_requirements_installs_nothing():
 
 def test_build_context_uses_the_filtered_requirements(tmp_path):
     detail = Mock()
-    kept = write_build_context(tmp_path, "base:latest", "numpy==1.26\nfastapi==0.163.2\n", detail)
-    assert kept == "numpy==1.26"
-    assert (tmp_path / "requirements.txt").read_text() == "numpy==1.26\n"
+    kept = write_build_context(
+        tmp_path,
+        "base:latest",
+        "numpy==2.0.0\npyarrow==26.0.1\nscikit-learn==1.7.2\nfastapi==0.163.2\n",
+        detail,
+    )
+    assert kept == "scikit-learn==1.7.2"
+    assert (tmp_path / "requirements.txt").read_text() == "scikit-learn==1.7.2\n"
     assert "fastapi" not in (tmp_path / "requirements.txt").read_text()
-    assert "fastapi==0.163.2" in detail.call_args.args[0]
+    log_messages = [call.args[0] for call in detail.call_args_list]
+    assert any("numpy==2.0.0" in message for message in log_messages)
+    assert any("pyarrow==26.0.1" in message for message in log_messages)
+    assert any("fastapi==0.163.2" in message for message in log_messages)
     assert "pip install" in (tmp_path / "Dockerfile").read_text()
     kept = write_build_context(
         tmp_path,
         "base:latest",
-        "numpy==1.26\nmlflow==2.13.2\nmlflow_skinny==2.13.2\nmlflow-tracing==2.13.2\n",
+        "numpy==2.0.0\nmlflow==2.13.2\nmlflow_skinny==2.13.2\nmlflow-tracing==2.13.2\n",
         detail,
     )
-    assert kept == "numpy==1.26"
+    assert kept == ""
     assert "mlflow" not in (tmp_path / "requirements.txt").read_text()
     write_build_context(tmp_path, "base:latest", "fastapi==0.163.2", detail)
     assert "pip" not in (tmp_path / "Dockerfile").read_text()
