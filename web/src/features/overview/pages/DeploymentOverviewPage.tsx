@@ -44,8 +44,8 @@ export function DeploymentOverviewPage({
 
   return (
     <div role="tabpanel" className="space-y-6">
-      <ModelStatusLine model={model} healthUnavailable={healthUnavailable} />
       <ModelEndpoint model={model} />
+      <ModelStatusLine model={model} healthUnavailable={healthUnavailable} />
       <ResourceUsageChart
         projectId={modelId}
         deploymentId={model.active_endpoint?.deployment_id ?? ""}
