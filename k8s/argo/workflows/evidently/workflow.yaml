@@ -31,7 +31,6 @@ spec:
           - name: project_id
           - name: model_version_id
           - name: model_name
-          - name: model_uri
           - name: reference_data_url
           - name: html_s3_uri
           - name: report_json_s3_uri
@@ -41,6 +40,8 @@ spec:
           - name: report_json_upload_url
           - name: summary_json_upload_url
           - name: control_plane_webhook_url
+          - name: control_plane_internal_url
+            value: "http://mlops-paas-control-plane:8000"
       container:
         image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-evidently:ffb45dc8489f81e36b27fe7ea7979f7775cb163f
         imagePullPolicy: Always
@@ -60,8 +61,6 @@ spec:
             value: "{{inputs.parameters.model_version_id}}"
           - name: MODEL_NAME
             value: "{{inputs.parameters.model_name}}"
-          - name: MODEL_URI
-            value: "{{inputs.parameters.model_uri}}"
           - name: REFERENCE_DATA_URL
             value: "{{inputs.parameters.reference_data_url}}"
           - name: DRIFT_THRESHOLD
@@ -82,6 +81,8 @@ spec:
             value: "{{inputs.parameters.summary_json_upload_url}}"
           - name: CONTROL_PLANE_WEBHOOK_URL
             value: "{{inputs.parameters.control_plane_webhook_url}}"
+          - name: CONTROL_PLANE_INTERNAL_URL
+            value: "{{inputs.parameters.control_plane_internal_url}}"
           - name: DRIFT_REPORTS_S3_PREFIX
             value: "drift-reports"
         resources:

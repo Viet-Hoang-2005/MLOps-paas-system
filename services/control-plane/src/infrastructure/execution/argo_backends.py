@@ -361,7 +361,6 @@ class ArgoDriftBackend(_ArgoBackend):
                 "project_id": str(project.public_id),
                 "model_version_id": str(monitor.version.public_id),
                 "model_name": project.name,
-                "model_uri": "",
                 "reference_data_url": self.storage.presigned_get(monitor.reference_uri, 7200),
                 "html_s3_uri": uris["report.html"],
                 "report_json_s3_uri": uris["report.json"],
@@ -373,5 +372,6 @@ class ArgoDriftBackend(_ArgoBackend):
                 "control_plane_webhook_url": (
                     f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/drift-runs/{drift_run.public_id}/"
                 ),
+                "control_plane_internal_url": settings.CONTROL_PLANE_INTERNAL_URL,
             }
         )

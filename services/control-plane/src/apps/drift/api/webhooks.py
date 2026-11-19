@@ -11,6 +11,38 @@ from apps.drift.services.automatic import request_automatic_drift_runs
 from apps.drift.services.reports import report_artifact_uris
 from common.api.permissions import HasInternalWebhookSecret
 from common.logging import record_transition
+from infrastructure.storage import S3Storage
+
+
+class DriftRunModelPackageURLEndpoint(APIView):
+    authentication_classes = ()
+    permission_classes = (HasInternalWebhookSecret,)
+
+    def get(self, request, run_id):
+        run = DriftRun.objects.select_related("monitor__version__project__owner").filter(public_id=run_id).first()
+        if not run or run.status not in {"queued", "running"} or run.execution_stop_requested:
+            return Response({"detail": "Drift run is unavailable."}, status=404)
+        project = run.monitor.version.project
+        if project.deletion_state != "active" or (
+            request.headers.get("X-Tenant-ID") != project.owner.tenant_id
+            or request.headers.get("X-Project-ID") != str(project.public_id)
+            or request.headers.get("X-Model-Version-ID") != str(run.monitor.version.public_id)
+        ):
+            return Response({"detail": "Drift run is unavailable."}, status=404)
+        package = run.monitor.version.artifacts.filter(kind="package").first()
+        if not package:
+            return Response({"detail": "Model package is unavailable."}, status=404)
+        package_url = S3Storage().presigned_get(package.uri, 900)
+        return Response(
+            {
+                "url": package_url,
+                "package_url": package_url,
+                "size_bytes": package.size_bytes,
+                "checksum": package.checksum,
+                "expires_in": 900,
+            },
+            headers={"Cache-Control": "no-store"},
+        )
 
 
 class AutomaticDriftSignalSerializer(serializers.Serializer):

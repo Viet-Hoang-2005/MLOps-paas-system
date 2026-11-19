@@ -244,6 +244,13 @@ def validate_workflow_evidently_task(context: ValidationContext) -> None:
     resources = container.get("resources") or {}
     assert ((resources.get("limits") or {}).get("memory")) == "2Gi"
 
+    # Contract checks: MODEL_URI removed in favor of presigned URL flow
+    input_params = {p.get("name") for p in (evidently_step.get("inputs") or {}).get("parameters") or []}
+    env_vars = {e.get("name"): e.get("value") for e in container.get("env") or []}
+    assert "model_uri" not in input_params
+    assert "MODEL_URI" not in env_vars
+    assert "CONTROL_PLANE_INTERNAL_URL" in env_vars
+
 
 @pytest.mark.validate
 def validate_workflow_training_task(context: ValidationContext) -> None:

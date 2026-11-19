@@ -306,7 +306,6 @@ class DockerDriftBackend:
             name: f"s3://{self.storage.bucket}/{prefix}{name}"
             for name in ("report.html", "report.json", "summary.json")
         }
-        source = monitor.version.artifacts.filter(kind__in=("source", "training_output")).first()
         environment = {
             **_logging_environment(),
             "JOB_ID": str(drift_run.public_id),
@@ -314,7 +313,6 @@ class DockerDriftBackend:
             "PROJECT_ID": str(project.public_id),
             "MODEL_VERSION_ID": str(monitor.version.public_id),
             "MODEL_NAME": project.name,
-            "MODEL_URI": source.uri if source else "",
             "REFERENCE_DATA_URL": self.storage.presigned_get(monitor.reference_uri, 7200),
             "HTML_S3_URI": uris["report.html"],
             "REPORT_JSON_S3_URI": uris["report.json"],
@@ -325,6 +323,7 @@ class DockerDriftBackend:
             "CONTROL_PLANE_WEBHOOK_URL": (
                 f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/drift-runs/{drift_run.public_id}/"
             ),
+            "CONTROL_PLANE_INTERNAL_URL": settings.CONTROL_PLANE_INTERNAL_URL,
             "CONTROL_PLANE_WEBHOOK_SECRET": settings.CONTROL_PLANE_WEBHOOK_SECRET,
             "DRIFT_RUN_ID": str(drift_run.public_id),
             "REDIS_URL": settings.REDIS_URL,

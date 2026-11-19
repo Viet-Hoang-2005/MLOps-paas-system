@@ -44,7 +44,7 @@ PROJECT_ID = os.getenv("PROJECT_ID")
 MODEL_VERSION_ID = os.getenv("MODEL_VERSION_ID")
 MODEL_NAME = os.getenv("MODEL_NAME", PROJECT_ID)
 REFERENCE_DATA_URL = os.getenv("REFERENCE_DATA_URL")
-MODEL_URI = os.getenv("MODEL_URI", f"models:/{MODEL_NAME}/Production")
+CONTROL_PLANE_INTERNAL_URL = os.getenv("CONTROL_PLANE_INTERNAL_URL", "")
 CONTROL_PLANE_WEBHOOK_URL = os.getenv("CONTROL_PLANE_WEBHOOK_URL", "")
 CONTROL_PLANE_WEBHOOK_SECRET = os.getenv("CONTROL_PLANE_WEBHOOK_SECRET", "super-secret-key")
 HTML_S3_URI = os.getenv("HTML_S3_URI", "")
@@ -116,7 +116,7 @@ def validate_runtime_config():
     config.validate(DRIFT_THRESHOLD, TENANT_ID, PROJECT_ID, MODEL_VERSION_ID)
 
 
-# 1. Tải Reference Data
+# 1. Táº£i Reference Data
 def load_reference_data():
     return data.load_reference_data(
         REFERENCE_DATA_URL,
@@ -128,7 +128,7 @@ def load_reference_data():
     )
 
 
-# 2. Truy vấn dữ liệu Production Data
+# 2. Truy váº¥n dá»¯ liá»‡u Production Data
 def load_production_data():
     return data.load_production_data(
         connection_url=URL.create(
@@ -152,13 +152,21 @@ def load_production_data():
     )
 
 
-# Hàm hỗ trợ tải model trên S3
-def resolve_model_dir(model_uri):
-    return data.resolve_model_dir(
-        model_uri,
-        temp_root=TEMP_ROOT,
-        model_version_id=MODEL_VERSION_ID,
-        requests_module=requests,
+# HÃ m há»— trá»£ táº£i model trÃªn S3
+def resolve_model_dir():
+    endpoint_url = None
+    if CONTROL_PLANE_INTERNAL_URL and DRIFT_RUN_ID:
+        endpoint_url = f"{CONTROL_PLANE_INTERNAL_URL.rstrip('/')}/internal/drift-runs/{DRIFT_RUN_ID}/model-package-url/"
+    return data.download_model_metadata(
+        CONTROL_PLANE_WEBHOOK_URL,
+        CONTROL_PLANE_WEBHOOK_SECRET,
+        DRIFT_RUN_ID,
+        TENANT_ID,
+        PROJECT_ID,
+        MODEL_VERSION_ID,
+        TEMP_ROOT,
+        requests,
+        endpoint_url=endpoint_url,
     )
 
 
@@ -188,25 +196,39 @@ NON_FEATURE_COLUMNS = {
 
 def get_data_definition(reference_df):
     """Use named model inputs when available and infer types from the reference otherwise."""
+    resolved_uri = None
     try:
-        resolved_uri = resolve_model_dir(MODEL_URI)
+        resolved_uri = resolve_model_dir()
         if resolved_uri:
-            signature = mlflow.models.get_model_info(resolved_uri).signature
-            inputs = getattr(signature, "inputs", None)
-            types = {inp.name: getattr(inp.type, "name", str(inp.type)) for inp in (inputs or ()) if inp.name}
-            if types:
-                numerical = [name for name, kind in types.items() if kind in {"integer", "long", "float", "double"}]
-                return DataDefinition(
-                    numerical_columns=numerical, categorical_columns=[name for name in types if name not in numerical]
+            try:
+                signature = mlflow.models.get_model_info(resolved_uri).signature
+                inputs = getattr(signature, "inputs", None)
+                types = {inp.name: getattr(inp.type, "name", str(inp.type)) for inp in (inputs or ()) if inp.name}
+                if types:
+                    runtime_log.detail("Data definition generated from MLflow model package signature")
+                    numerical = [name for name, kind in types.items() if kind in {"integer", "long", "float", "double"}]
+                    return DataDefinition(
+                        numerical_columns=numerical, categorical_columns=[name for name in types if name not in numerical]
+                    )
+                runtime_log.event(
+                    logging.WARNING,
+                    "model_signature_unavailable",
+                    "MLflow signature is empty or missing in model package",
+                    reason="SignatureMissing",
                 )
+            finally:
+                import shutil
+
+                shutil.rmtree(resolved_uri, ignore_errors=True)
     except Exception as exc:
         runtime_log.event(
             logging.WARNING,
             "model_signature_unavailable",
             "MLflow signature extraction failed",
-            reason=sanitize(str(exc)),
+            reason=type(exc).__name__,
         )
 
+    runtime_log.detail("Data definition inferred from reference dataset")
     features = reference_df.drop(columns=list(NON_FEATURE_COLUMNS), errors="ignore")
     numerical = features.select_dtypes(include="number").columns.tolist()
     return DataDefinition(
@@ -370,7 +392,7 @@ def run_drift_analysis(reference_df, production_df, definition):
     return summary
 
 
-# 6. Lưu báo cáo drift
+# 6. LÆ°u bÃ¡o cÃ¡o drift
 def save_drift_report(snapshot, result_dict, summary):
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     report_dir = str(TEMP_ROOT / "drift_reports" / str(TENANT_ID) / str(MODEL_NAME) / run_id)
@@ -496,7 +518,7 @@ def save_drift_report(snapshot, result_dict, summary):
     return artifacts
 
 
-# 7. Gửi kết quả về Django Webhook
+# 7. Gá»­i káº¿t quáº£ vá» Django Webhook
 def trigger_django_webhook(drift_summary):
     def on_error(message, **fields):
         if "reason" in fields:

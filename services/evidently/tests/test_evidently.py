@@ -126,11 +126,12 @@ def test_load_production_data_insufficient_returns_empty(monkeypatch):
 
 
 def test_resolve_model_directory(monkeypatch, tmp_path):
-    nested = tmp_path / "model"
-    nested.mkdir()
-    (nested / "MLmodel").write_text("x")
-    assert main.resolve_model_dir(str(tmp_path)) == str(nested)
-    assert main.resolve_model_dir("models:/name/1") is None
+    monkeypatch.setattr(main, "DRIFT_RUN_ID", "")
+    assert main.resolve_model_dir() is None
+
+    monkeypatch.setattr(main, "DRIFT_RUN_ID", "run-1")
+    monkeypatch.setattr(main.data, "download_model_metadata", lambda *a, **kw: str(tmp_path))
+    assert main.resolve_model_dir() == str(tmp_path)
 
 
 def test_safe_extract_zip_rejects_traversal(tmp_path):

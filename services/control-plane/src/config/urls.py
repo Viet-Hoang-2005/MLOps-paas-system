@@ -4,7 +4,7 @@ from django.urls import include, path
 from apps.catalog.api.webhooks import ProjectDeletionWebhookEndpoint
 from apps.deployment.api.urls import build_patterns, deployment_patterns, endpoint_patterns
 from apps.deployment.api.webhooks import BuildWebhookEndpoint, DeploymentWebhookEndpoint
-from apps.drift.api.webhooks import AutomaticDriftWebhookEndpoint, DriftRunWebhookEndpoint
+from apps.drift.api.webhooks import AutomaticDriftWebhookEndpoint, DriftRunModelPackageURLEndpoint, DriftRunWebhookEndpoint
 from apps.mlflow.views import (
     MLflowArtifactsMultipartFallbackView,
     MLflowArtifactsProxyView,
@@ -61,6 +61,7 @@ urlpatterns = [
     path("internal/training-jobs/<uuid:job_id>/runtime-config/", TrainingRuntimeConfigEndpoint.as_view()),
     path("api/notifications/", include("apps.notifications.api.urls")),
     path("internal/webhooks/drift-runs/<uuid:run_id>/", DriftRunWebhookEndpoint.as_view()),
+    path("internal/drift-runs/<uuid:run_id>/model-package-url/", DriftRunModelPackageURLEndpoint.as_view()),
     path("internal/webhooks/automatic-drift/", AutomaticDriftWebhookEndpoint.as_view()),
     path("internal/webhooks/alerts/", AlertWebhookEndpoint.as_view()),
 ]
