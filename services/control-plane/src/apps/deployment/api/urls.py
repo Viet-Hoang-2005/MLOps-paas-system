@@ -10,6 +10,7 @@ from .endpoints import (
     DeploymentDetailEndpoint,
     DeploymentListCreateEndpoint,
     DeploymentLogsEndpoint,
+    DeploymentRuntimeLogsEndpoint,
     DeploymentStopEndpoint,
     EndpointListEndpoint,
     EndpointLogsEndpoint,
@@ -27,6 +28,7 @@ deployment_patterns = [
     path("", DeploymentListCreateEndpoint.as_view(), name="deployment-list"),
     path("<uuid:deployment_id>/", DeploymentDetailEndpoint.as_view(), name="deployment-detail"),
     path("<uuid:deployment_id>/logs/", DeploymentLogsEndpoint.as_view(), name="deployment-logs"),
+    path("<uuid:deployment_id>/runtime-logs/", DeploymentRuntimeLogsEndpoint.as_view(), name="deployment-runtime-logs"),
     path("<uuid:deployment_id>/stop/", DeploymentStopEndpoint.as_view(), name="deployment-stop"),
 ]
 endpoint_patterns = [

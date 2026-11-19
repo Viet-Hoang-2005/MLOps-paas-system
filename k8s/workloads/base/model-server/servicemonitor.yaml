@@ -14,16 +14,14 @@ metadata:
 spec:
   selector:
     matchExpressions:
-      # Scrape both dynamic serving workers and the central model gateway.
+      # Only the central gateway exposes /metrics.
       - key: app.kubernetes.io/name
         operator: In
         values:
           - mlops-paas-model-server
-          - mlops-paas-model-serving
   namespaceSelector:
     matchNames:
       - mlops-paas-core
-      - mlops-paas-serving
   targetLabels:
     - app.kubernetes.io/name
     - app.kubernetes.io/component

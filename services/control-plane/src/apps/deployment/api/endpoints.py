@@ -113,6 +113,21 @@ class DeploymentLogsEndpoint(APIView):
         )
 
 
+class DeploymentRuntimeLogsEndpoint(APIView):
+    def get(self, request, deployment_id):
+        from apps.deployment.services.runtime_logs import docker_runtime_page
+        from infrastructure.runtime_logs import uses_loki
+
+        deployment = deployment_for_user(request.user, deployment_id)
+        if uses_loki(deployment.backend):
+            page = runtime_log_page(request, deployment, "deployment_runtime", lambda *_: ([], 0))
+        elif deployment.backend == "docker":
+            page = docker_runtime_page(request, deployment)
+        else:
+            page = {"logs": [], "next_offset": 0, "log_error": "unavailable"}
+        return Response({"deployment_id": str(deployment.public_id), **page, "status": deployment.status})
+
+
 class EndpointListEndpoint(generics.ListAPIView):
     serializer_class = EndpointSerializer
 

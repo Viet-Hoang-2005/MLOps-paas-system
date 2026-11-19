@@ -1,5 +1,6 @@
 import { buildDeploymentPath } from "@/features/deployments/navigation";
 import { ModelPredictionsTesting } from "@/features/overview/components/ModelPredictionsTesting";
+import { ModelEndpoint } from "@/features/overview/components/ModelEndpoint";
 import { ModelStatusLine } from "@/features/overview/components/ModelStatusLine";
 import { ResourceUsageChart } from "@/features/overview/components/ResourceUsageChart";
 import type { ModelProject } from "@/features/projects/types";
@@ -44,6 +45,7 @@ export function DeploymentOverviewPage({
   return (
     <div role="tabpanel" className="space-y-6">
       <ModelStatusLine model={model} healthUnavailable={healthUnavailable} />
+      <ModelEndpoint model={model} />
       <ResourceUsageChart
         projectId={modelId}
         deploymentId={model.active_endpoint?.deployment_id ?? ""}
