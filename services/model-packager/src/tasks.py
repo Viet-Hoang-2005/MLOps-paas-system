@@ -13,7 +13,7 @@ import mlflow.pyfunc
 import redis
 import requests
 import yaml
-from src import config, image_build, io
+from src import config, image_build, io, pip_stream
 from src.core import (
     build_preview_tree,
     load_model,
@@ -157,21 +157,18 @@ def install_validation_requirements(requirements_text: str, workspace: Path) -> 
     runtime_log.detail("Installing non-platform package requirements for validation...")
     temp_req = workspace / "validation-requirements.txt"
     temp_req.write_text(validation_requirements + "\n", encoding="utf-8")
-    try:
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-r", str(temp_req)],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except subprocess.CalledProcessError as exc:
-        for output in (exc.stdout, exc.stderr):
-            for line in (output or "").splitlines():
-                runtime_log.detail(line)
-        raise
-    for output in (result.stdout, result.stderr):
-        for line in (output or "").splitlines():
-            runtime_log.detail(line)
+    clean_env = dict(os.environ)
+    clean_env["TERM"] = "xterm"
+    code = pip_stream.install(
+        [sys.executable, "-u", "-m", "pip", "install", "--progress-bar", "on", "-r", str(temp_req)],
+        subprocess_module=subprocess,
+        cwd=str(workspace),
+        env=clean_env,
+        detail=runtime_log.detail,
+        progress=runtime_log.progress,
+    )
+    if code != 0:
+        raise RuntimeError(f"pip install failed with exit code {code}")
 
 
 def run_build_task(build_id: str, webhook_url: str) -> None:

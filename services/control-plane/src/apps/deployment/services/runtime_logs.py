@@ -22,7 +22,7 @@ def docker_runtime_page(request, deployment):
     stream = None
     try:
         container = owned_container(DockerClient(timeout=5).client, deployment, "deploy")
-        stream = container.logs(stdout=True, stderr=True, timestamps=True, stream=True,
+        stream = container.logs(stdout=True, stderr=True, timestamps=True, stream=True, follow=False,
                                 since=max(0, state["ns"] // 1_000_000_000 - 1))
         entries = []
         skipped = 0
