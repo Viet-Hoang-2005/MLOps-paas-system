@@ -287,6 +287,22 @@ Truy cập SSH vào Master Node thông qua ProxyJump:
 ssh -i ~/.ssh/aws_key ubuntu@$(cd ../terraform/aws && terraform output -raw master_public_ip)
 ```
 
+Lấy mật khẩu đăng nhập Dashboard lần đầu
+```bash
+# ArgoCD
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d; echo
+
+# Harbor
+kubectl -n mlops-paas-harbor get secret harbor-core \
+  -o jsonpath='{.data.HARBOR_ADMIN_PASSWORD}' | base64 -d; echo
+
+# Grafana
+sudo k3s kubectl -n monitoring get secret monitoring-grafana \
+  -o jsonpath='{.data.admin-password}' | base64 -d; echo
+```
+
+
 Kiểm tra trạng thái các node và ứng dụng GitOps:
 ```bash
 # Kiểm tra nodes
@@ -295,9 +311,6 @@ sudo k3s kubectl get nodes -L workload-type
 # Kiểm tra tình trạng đồng bộ Argo CD
 sudo k3s kubectl get applications -n argocd \
   -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status
-
-# Kiểm tra cơ sở dữ liệu CloudNativePG HA
-sudo k3s kubectl get clusters.postgresql.cnpg.io -A
 
 # Kiểm tra ExternalSecrets đồng bộ thành công từ AWS
 sudo k3s kubectl get externalsecret -A

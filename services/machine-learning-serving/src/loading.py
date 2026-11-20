@@ -15,6 +15,20 @@ MODEL_CACHE_DIR = os.environ.get("MODEL_CACHE_DIR", "/tmp/mlops_paas_models")
 MODEL_CACHE: dict[str, dict[str, Any]] = {}
 
 
+def _apply_sklearn_compatibility_shims() -> None:
+    """Ensure older scikit-learn artifacts (<= 1.6.1) can be unpickled in >= 1.7.0."""
+    try:
+        import sklearn.compose._column_transformer as _ct
+
+        if not hasattr(_ct, "_RemainderColsList"):
+            class _RemainderColsList(list):
+                pass
+
+            _ct._RemainderColsList = _RemainderColsList
+    except Exception:
+        pass
+
+
 def _is_double_column(input_spec: Any) -> bool:
     data_type = getattr(input_spec, "type", None)
     return getattr(data_type, "name", data_type) == "double"
@@ -92,6 +106,7 @@ def load_model_from_uri(model_version_id: str, model_uri: str, version_marker: s
         raise HTTPException(status_code=503, detail="Model artifact URI is empty.")
 
     try:
+        _apply_sklearn_compatibility_shims()
         source_dir = download_model_artifact(model_version_id, model_uri)
         mlflow_model_dir = resolve_mlflow_model_dir(source_dir)
         pyfunc_model = mlflow.pyfunc.load_model(str(mlflow_model_dir))

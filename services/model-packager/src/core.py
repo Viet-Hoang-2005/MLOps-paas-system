@@ -15,21 +15,67 @@ def parse_requirements(requirements_text: str) -> list[str] | None:
     return requirements or None
 
 
+def _apply_sklearn_compatibility_shims() -> None:
+    """Ensure older scikit-learn artifacts (<= 1.6.1) can be unpickled in >= 1.7.0."""
+    try:
+        import sklearn.compose._column_transformer as _ct
+
+        if not hasattr(_ct, "_RemainderColsList"):
+            class _RemainderColsList(list):
+                pass
+
+            _ct._RemainderColsList = _RemainderColsList
+    except Exception:
+        pass
+
+
+def _sanitize_sklearn_model(model: Any) -> Any:
+    """Normalize internal objects to standard Python types for forward compatibility."""
+    try:
+        from sklearn.pipeline import Pipeline
+        from sklearn.compose import ColumnTransformer
+
+        transformers = []
+        if isinstance(model, Pipeline):
+            for _, step in model.steps:
+                if isinstance(step, ColumnTransformer):
+                    transformers.append(step)
+        elif isinstance(model, ColumnTransformer):
+            transformers.append(model)
+
+        for ct in transformers:
+            if hasattr(ct, "_remainder") and isinstance(ct._remainder, tuple) and len(ct._remainder) == 3:
+                ct._remainder = (ct._remainder[0], ct._remainder[1], list(ct._remainder[2]))
+    except Exception:
+        pass
+    return model
+
+
 def load_pickle_model(path: Path) -> Any:
+    _apply_sklearn_compatibility_shims()
+
+    extension = path.suffix.lower()
     loaders = (
-        lambda item: joblib.load(item),
-        lambda item: cloudpickle.load(item.open("rb")),
-        lambda item: pickle.load(item.open("rb")),
+        ("joblib", lambda item: joblib.load(item)),
+        ("cloudpickle", lambda item: cloudpickle.load(item.open("rb"))),
+        ("pickle", lambda item: pickle.load(item.open("rb"))),
     )
 
-    last_error: Exception | None = None
-    for loader in loaders:
+    errors: list[str] = []
+    joblib_exc: Exception | None = None
+    for name, loader in loaders:
         try:
-            return loader(path)
+            model = loader(path)
+            return _sanitize_sklearn_model(model)
         except Exception as exc:
-            last_error = exc
+            errors.append(f"{name}: {exc}")
+            if name == "joblib" and joblib_exc is None:
+                joblib_exc = exc
 
-    raise ValueError(f"Unable to load model artifact: {last_error}")
+    if extension == ".joblib" and joblib_exc is not None:
+        raise ValueError(f"Unable to load model artifact: {joblib_exc}")
+
+    raise ValueError(f"Unable to load model artifact: {errors[-1] if errors else 'unknown error'}")
 
 
 def load_model(path: Path, flavor: str) -> Any:

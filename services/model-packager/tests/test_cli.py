@@ -3,6 +3,7 @@ import json
 import logging
 import pickle
 import subprocess
+import sys
 import tarfile
 import zipfile
 from types import SimpleNamespace
@@ -237,6 +238,27 @@ def test_run_build_task_docker_posts_callback(monkeypatch, tmp_path):
     cli.run_build_task("version", "http://callback")
     build.assert_called_once()
     assert webhook.call_args.args[1]["status"] == "success"
+
+
+def test_run_build_task_installs_user_requirements(monkeypatch, tmp_path):
+    configure_build(monkeypatch, tmp_path)
+    monkeypatch.setenv("REQUIREMENTS_TEXT", "scikit-learn==1.6.1\npandas==2.3.3\n")
+    stub_package_helpers(monkeypatch)
+    pip_run = Mock(return_value=subprocess.CompletedProcess([], 0, "", ""))
+    monkeypatch.setattr(cli.subprocess, "run", pip_run)
+    build = Mock()
+    webhook = Mock()
+    monkeypatch.setattr(cli, "build_custom_image", build)
+    monkeypatch.setattr(cli, "post_webhook", webhook)
+
+    cli.run_build_task("version", "http://callback")
+
+    assert pip_run.called
+    installed_cmd = pip_run.call_args.args[0]
+    assert installed_cmd[:4] == [sys.executable, "-m", "pip", "install"]
+    req_file_path = tmp_path / "validation-requirements.txt"
+    assert req_file_path.exists()
+    assert "scikit-learn==1.6.1" in req_file_path.read_text()
 
 
 def test_run_build_task_training_job_pytorch(monkeypatch, tmp_path):

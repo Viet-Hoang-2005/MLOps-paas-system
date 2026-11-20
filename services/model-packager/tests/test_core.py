@@ -33,6 +33,22 @@ def test_load_pickle_model_falls_back(monkeypatch, tmp_path):
     assert core.load_pickle_model(path) == {"model": 1}
 
 
+def test_load_pickle_model_joblib_failure_reports_joblib_error(monkeypatch, tmp_path):
+    path = tmp_path / "model.joblib"
+    path.write_bytes(b"corrupted_or_mismatched_data")
+    monkeypatch.setattr(core.joblib, "load", Mock(side_effect=AttributeError("Can't get attribute '_RemainderColsList'")))
+    with pytest.raises(ValueError, match="_RemainderColsList"):
+        core.load_pickle_model(path)
+
+
+def test_sklearn_compatibility_shim_defines_remainder_cols_list():
+    core._apply_sklearn_compatibility_shims()
+    import sklearn.compose._column_transformer as _ct
+
+    assert hasattr(_ct, "_RemainderColsList")
+    assert issubclass(_ct._RemainderColsList, list)
+
+
 @pytest.mark.parametrize(
     "flavor,suffix,loader_name",
     [

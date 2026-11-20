@@ -21,7 +21,12 @@ from src.core import (
     parse_requirements,
     save_mlflow_model,
 )
-from src.image_build import filter_mlflow_requirements, normalize_mlflow_requirements, serving_base_image, write_build_context
+from src.image_build import (
+    filter_mlflow_requirements,
+    normalize_mlflow_requirements,
+    serving_base_image,
+    write_build_context,
+)
 from src.logging_utils import (
     RuntimeLog,
     bind_context,
@@ -144,6 +149,31 @@ def parse_conda_pip_requirements(conda_file: Path) -> list[str]:
     return pip_requirements
 
 
+def install_validation_requirements(requirements_text: str, workspace: Path) -> None:
+    if not requirements_text.strip():
+        return
+    validation_requirements = filter_mlflow_requirements(requirements_text)
+    validate_safe_requirements(validation_requirements)
+    runtime_log.detail("Installing non-platform package requirements for validation...")
+    temp_req = workspace / "validation-requirements.txt"
+    temp_req.write_text(validation_requirements + "\n", encoding="utf-8")
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-r", str(temp_req)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        for output in (exc.stdout, exc.stderr):
+            for line in (output or "").splitlines():
+                runtime_log.detail(line)
+        raise
+    for output in (result.stdout, result.stderr):
+        for line in (output or "").splitlines():
+            runtime_log.detail(line)
+
+
 def run_build_task(build_id: str, webhook_url: str) -> None:
     flavor = os.environ.get("FLAVOR", "").lower()
     requirements_text = os.environ.get("REQUIREMENTS_TEXT", "")
@@ -173,8 +203,7 @@ def run_build_task(build_id: str, webhook_url: str) -> None:
         artifact_path = workspace / artifact_name
         download_presigned_file(source_download_url, artifact_path)
         validate_model_package_security(artifact_path)
-        if requirements_text.strip():
-            validate_safe_requirements(requirements_text)
+        install_validation_requirements(requirements_text, workspace)
 
         runtime_log.detail(f"Loading {flavor} model...")
         model = load_model(artifact_path, flavor)
@@ -310,27 +339,7 @@ def run_test_zip_task(build_id: str, webhook_url: str) -> None:
         else:
             runtime_log.detail("No requirements.txt or conda.yaml found. Proceeding with default environment.")
 
-        if requirements_text.strip():
-            validation_requirements = filter_mlflow_requirements(requirements_text)
-            validate_safe_requirements(validation_requirements)
-            runtime_log.detail("Installing non-platform package requirements for validation...")
-            temp_req = workspace / "validation-requirements.txt"
-            temp_req.write_text(validation_requirements + "\n", encoding="utf-8")
-            try:
-                result = subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "-r", str(temp_req)],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-            except subprocess.CalledProcessError as exc:
-                for output in (exc.stdout, exc.stderr):
-                    for line in (output or "").splitlines():
-                        runtime_log.detail(line)
-                raise
-            for output in (result.stdout, result.stderr):
-                for line in (output or "").splitlines():
-                    runtime_log.detail(line)
+        install_validation_requirements(requirements_text, workspace)
 
         runtime_log.detail("Validating model load via mlflow.pyfunc...")
 

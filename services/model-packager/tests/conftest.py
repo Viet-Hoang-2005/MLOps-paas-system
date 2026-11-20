@@ -9,7 +9,10 @@ import pytest
 # Keep optional native runtimes out of this isolated service test process.
 _framework_patches = pytest.MonkeyPatch()
 for name in ("torch", "tensorflow", "keras", "xgboost"):
-    _framework_patches.setitem(sys.modules, name, ModuleType(name))
+    stub = ModuleType(name)
+    if name == "torch":
+        stub.Tensor = type("Tensor", (), {})
+    _framework_patches.setitem(sys.modules, name, stub)
 for flavor in ("pytorch", "tensorflow", "keras", "xgboost"):
     module = ModuleType(f"mlflow.{flavor}")
     module.save_model = Mock()
