@@ -7,6 +7,7 @@ import { AuthCard } from "@/features/auth/components/AuthCard";
 import { useCountdown } from "@/features/auth/hooks/useCountdown";
 import { useForm } from "@/features/auth/hooks/useForm";
 import { getApiErrorMessage } from "@/shared/api/errors";
+import { clearAuthSession } from "@/shared/api/authSession";
 import { Back } from "@/shared/components/Back";
 import { Button } from "@/shared/components/Button";
 import { Input, InputPassword } from "@/shared/components/Input";
@@ -149,6 +150,7 @@ function ForgotPasswordResetStep({
   const onSubmit = handleSubmit(async (formValues) => {
     try {
       await resetForgottenPassword(resetToken, formValues.password);
+      clearAuthSession();
       toast.success(t("recovery.resetSuccess"));
       navigate("/login", { replace: true });
     } catch (error) {

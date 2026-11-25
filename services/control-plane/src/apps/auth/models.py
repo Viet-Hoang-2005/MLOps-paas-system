@@ -58,6 +58,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     field_of_work = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=100, blank=True)
     auth_provider = models.CharField(max_length=20, default="email")
+    session_version = models.PositiveBigIntegerField(default=0)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)

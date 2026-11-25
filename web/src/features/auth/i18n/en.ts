@@ -1,5 +1,7 @@
 export const authEn = {
   session: {
+    changed:
+      "Your sign-in session changed. Check the active account before trying again.",
     unavailableTitle: "Unable to verify your session",
     unavailableDescription:
       "The server is unavailable or your connection was interrupted. Please try again.",

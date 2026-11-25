@@ -295,6 +295,10 @@ def test_password_reset_revokes_existing_refresh_tokens():
     )
     assert reset_res.status_code == 200
 
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {refreshed.data['access']}")
+    assert client.get("/api/auth/profile/").status_code == 200
+    client.credentials()
+
     # 3. Old refresh tokens must now be blacklisted
     client.cookies["refresh_token"] = active_refresh_cookie
     failed_refresh = client.post("/api/auth/token/refresh/", format="json", **browser_auth_headers())
@@ -348,6 +352,10 @@ def test_password_change_enforces_validators_and_revokes_old_refresh_tokens():
     assert "access" in success_res.data
     new_refresh_cookie = success_res.cookies["refresh_token"].value
     assert new_refresh_cookie != old_refresh_cookie
+
+    assert client.get("/api/auth/profile/").status_code == 200
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {success_res.data['access']}")
+    assert client.get("/api/auth/profile/").status_code == 200
 
     # 5. Old refresh token is revoked
     client.credentials()  # clear bearer header

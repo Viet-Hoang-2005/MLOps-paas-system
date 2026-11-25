@@ -1,8 +1,10 @@
-import axios, { type InternalAxiosRequestConfig } from "axios";
-import { getAccessToken } from "./authSession";
-import { refreshAccessToken } from "./client";
-
-type InferenceRequest = InternalAxiosRequestConfig & { _retry?: boolean };
+import axios from "axios";
+import {
+  assertCurrentSession,
+  attachSessionToken,
+  refreshAccessToken,
+  type RetryableRequestConfig,
+} from "./client";
 
 export const inferenceClient = axios.create({
   withCredentials: false,
@@ -10,11 +12,7 @@ export const inferenceClient = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-inferenceClient.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
+inferenceClient.interceptors.request.use(attachSessionToken);
 
 inferenceClient.interceptors.response.use(
   (response) => response,
@@ -24,17 +22,19 @@ inferenceClient.interceptors.response.use(
         error instanceof Error ? error : new Error(String(error)),
       );
     }
-    const request = error.config as InferenceRequest | undefined;
+    const request = error.config as RetryableRequestConfig | undefined;
     if (
       !request ||
+      request.authSessionVersion === undefined ||
       request._retry ||
       error.response?.status !== 401 ||
       error.response.data?.detail !== "Unauthorized: Token has expired"
     )
       return Promise.reject(error);
+    assertCurrentSession(request.authSessionVersion);
     request._retry = true;
-    const access = await refreshAccessToken();
-    request.headers.Authorization = `Bearer ${access}`;
+    await refreshAccessToken();
+    assertCurrentSession(request.authSessionVersion);
     return inferenceClient(request);
   },
 );

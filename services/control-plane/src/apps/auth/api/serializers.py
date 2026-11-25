@@ -40,6 +40,7 @@ class _KeyIdAccessToken(_KeyIdTokenMixin, AccessToken):
 
 class _KeyIdRefreshToken(_KeyIdTokenMixin, RefreshToken):
     access_token_class = _KeyIdAccessToken
+    no_copy_claims = (*RefreshToken.no_copy_claims, "session_version")
 
 
 class TenantTokenSerializer(TokenObtainPairSerializer):
@@ -49,6 +50,7 @@ class TenantTokenSerializer(TokenObtainPairSerializer):
     def get_token(cls, user):
         token = super().get_token(user)
         token["tenant_id"] = user.tenant_id
+        token["session_version"] = user.session_version
         return token
 
     def validate(self, attrs):
@@ -78,6 +80,10 @@ class TenantTokenRefreshSerializer(TokenRefreshSerializer):
             raise TokenError("User account not found or inactive.")
         if refresh_token.get("tenant_id") != user.tenant_id:
             raise TokenError("Token does not belong to this tenant.")
+        # A refresh token issued before migration belongs to version zero.
+        session_version = refresh_token.get("session_version", 0)
+        if type(session_version) is not int or session_version != user.session_version:
+            raise TokenError("This session is no longer valid.")
         data = {"access": str(refresh_token.access_token), "tenant_id": user.tenant_id}
         if api_settings.ROTATE_REFRESH_TOKENS:
             if (

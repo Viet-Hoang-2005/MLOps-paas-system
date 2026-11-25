@@ -44,13 +44,21 @@ export const verifyPasswordChangeOTP = async (
     )
   ).data;
 
+type PasswordChangeResponse = MessageResponse & {
+  access: string;
+  tenant_id: string;
+};
+
 export const completePasswordChange = async (
   passwordChangeToken: string,
   newPassword: string,
-): Promise<MessageResponse> =>
+): Promise<PasswordChangeResponse> =>
   (
-    await apiClient.post<MessageResponse>("/auth/profile/change-password/", {
-      password_change_token: passwordChangeToken,
-      new_password: newPassword,
-    })
+    await apiClient.post<PasswordChangeResponse>(
+      "/auth/profile/change-password/",
+      {
+        password_change_token: passwordChangeToken,
+        new_password: newPassword,
+      },
+    )
   ).data;

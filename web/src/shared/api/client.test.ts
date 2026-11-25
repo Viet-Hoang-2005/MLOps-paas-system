@@ -1,4 +1,6 @@
 import { apiClient } from "@/shared/api/client";
+import { inferenceClient } from "@/shared/api/inferenceClient";
+import { SessionChangedError } from "@/shared/api/authErrors";
 import * as authSession from "@/shared/api/authSession";
 import * as authCoordination from "@/shared/api/authCoordination";
 import axios, {
@@ -185,4 +187,71 @@ describe("apiClient Interceptors & Token Handling", () => {
     expect(refresh).not.toHaveBeenCalled();
     expect(broadcast).not.toHaveBeenCalled();
   });
+
+  it.each([apiClient, inferenceClient])(
+    "does not replay a write when refresh returns another tenant",
+    async (client) => {
+      authSession.setAuthSession({ access: "access-a", tenantId: "tenant-a" });
+      const refresh = vi.spyOn(axios, "post").mockResolvedValue({
+        data: { access: "access-b", tenant_id: "tenant-b" },
+      });
+      const send = vi.fn((config: InternalAxiosRequestConfig) =>
+        Promise.reject(
+          new axios.AxiosError("Expired", undefined, config, undefined, {
+            status: 401,
+            statusText: "Unauthorized",
+            data: { detail: "Unauthorized: Token has expired" },
+            headers: {},
+            config,
+          }),
+        ),
+      );
+
+      await expect(
+        client.post("/protected", { name: "example" }, { adapter: send }),
+      ).rejects.toBeInstanceOf(SessionChangedError);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(refresh).toHaveBeenCalledTimes(1);
+      expect(authSession.getTenantId()).toBe("tenant-b");
+    },
+  );
+
+  it.each(["before refresh", "during refresh"])(
+    "keeps a new sign-in when the session changes %s",
+    async (timing) => {
+      authSession.setAuthSession({ access: "old-access", tenantId: "tenant" });
+      const signInAgain = () =>
+        authSession.setAuthSession({
+          access: "new-access",
+          tenantId: "tenant",
+        });
+      const refresh = vi.spyOn(axios, "post").mockImplementation(() => {
+        signInAgain();
+        return Promise.resolve({
+          data: { access: "late-access", tenant_id: "tenant" },
+        });
+      });
+      const send = vi.fn((config: InternalAxiosRequestConfig) => {
+        if (timing === "before refresh") signInAgain();
+        return Promise.reject(
+          new axios.AxiosError("Expired", undefined, config, undefined, {
+            status: 401,
+            statusText: "Unauthorized",
+            data: {},
+            headers: {},
+            config,
+          }),
+        );
+      });
+
+      await expect(
+        apiClient.post("/protected", {}, { adapter: send }),
+      ).rejects.toBeInstanceOf(SessionChangedError);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(refresh).toHaveBeenCalledTimes(
+        timing === "before refresh" ? 0 : 1,
+      );
+      expect(authSession.getAccessToken()).toBe("new-access");
+    },
+  );
 });

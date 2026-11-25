@@ -16,6 +16,11 @@ import type {
   UserProfile,
 } from "@/features/settings/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
+import {
+  getAuthSessionVersion,
+  setAuthSession,
+} from "@/shared/api/authSession";
+import { assertCurrentSession } from "@/shared/api/client";
 import { toast } from "@/shared/lib/toastStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -220,7 +225,13 @@ export function useProfileSettings() {
 
     setPasswordActionLoading(true);
     try {
-      await completePasswordChange(passwordChangeToken, newPassword);
+      const version = getAuthSessionVersion();
+      const session = await completePasswordChange(
+        passwordChangeToken,
+        newPassword,
+      );
+      assertCurrentSession(version);
+      setAuthSession({ access: session.access, tenantId: session.tenant_id });
       toast.success(t("profilePage.passwordChanged"));
       setPasswordModalStep("closed");
     } catch (error) {

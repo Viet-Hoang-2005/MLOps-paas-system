@@ -16,4 +16,4 @@ Start with [MLOps PaaS Overview](.agents/skills/mlops-paas-overview/SKILL.md) fo
 | GitOps, Argo execution, image promotion and cluster workloads | [Deployment](.agents/skills/mlops-paas-deployment/SKILL.md) |
 | Tenancy, credentials, capabilities, IAM and untrusted workloads | [Security](.agents/skills/mlops-paas-security/SKILL.md) |
 
-Use the executable entry points, tests and selected configuration to confirm behavior. [README](README.md), [architecture](ARCHITECTURE.md) and [testing](TESTING.md) give context. [CI](.github/workflows/ci.yml) defines the current merge checks. Keep credentials and signed URLs out of patches, examples and outputs. Treat production reads and mutations as separate from local validation and confirm that the requested scope covers them.
+For Django schema changes during local development, you may edit an existing migration, including an initial migration, instead of creating a new numbered migration. Verify the edited migration on a fresh database and report any schema update needed for databases that already applied it.

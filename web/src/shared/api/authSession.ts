@@ -1,5 +1,6 @@
 let currentAccessToken: string | null = null;
 let currentTenantId: string | null = null;
+let sessionVersion = 0;
 
 const LEGACY_AUTH_KEYS = ["access_token", "refresh_token", "tenant_id"];
 
@@ -20,6 +21,8 @@ export const getAccessToken = (): string | null => currentAccessToken;
 
 export const getTenantId = (): string | null => currentTenantId;
 
+export const getAuthSessionVersion = (): number => sessionVersion;
+
 export const isAuthenticated = (): boolean => Boolean(currentAccessToken);
 
 type SessionResetListener = () => void;
@@ -39,27 +42,30 @@ const notifySessionReset = (): void => {
   for (const listener of sessionResetListeners) listener();
 };
 
-export const setAuthSession = (session: {
-  access: string;
-  tenantId?: string;
-}): void => {
+export const setAuthSession = (
+  session: {
+    access: string;
+    tenantId?: string;
+  },
+  { refresh = false } = {},
+): void => {
   const previousTenantId = currentTenantId;
   const hadSession = currentAccessToken !== null;
   currentAccessToken = session.access;
-  // A refresh that omits the tenant must not forget which tenant the session belongs to.
-  currentTenantId = session.tenantId ?? (hadSession ? previousTenantId : null);
+  currentTenantId = session.tenantId ?? null;
+  const tenantChanged = previousTenantId !== currentTenantId;
+  if (!refresh || !hadSession || tenantChanged) {
+    sessionVersion += 1;
+  }
   // A silent refresh keeps the tenant; a different one means another account signed in
   // (for example from another tab sharing the refresh cookie).
-  if (
-    previousTenantId &&
-    session.tenantId &&
-    previousTenantId !== session.tenantId
-  ) {
+  if (hadSession && tenantChanged) {
     notifySessionReset();
   }
 };
 
 export const clearAuthSession = (): void => {
+  sessionVersion += 1;
   currentAccessToken = null;
   currentTenantId = null;
   clearLegacyAuthStorage();

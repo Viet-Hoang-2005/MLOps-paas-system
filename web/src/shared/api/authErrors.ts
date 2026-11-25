@@ -1,4 +1,12 @@
 import axios from "axios";
+import i18n from "i18next";
+
+export class SessionChangedError extends Error {
+  constructor() {
+    super(i18n.t("auth:session.changed"));
+    this.name = "SessionChangedError";
+  }
+}
 
 /** Only an authentication rejection proves that the refresh session is unusable. */
 export const isInvalidRefreshSession = (error: unknown): boolean => {

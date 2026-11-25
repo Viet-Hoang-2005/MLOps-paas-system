@@ -5,16 +5,20 @@ import {
 import {
   clearAuthSession,
   getAccessToken,
+  getAuthSessionVersion,
   setAuthSession,
 } from "@/shared/api/authSession";
 import axios, { type InternalAxiosRequestConfig } from "axios";
 import { apiBaseURL } from "./config";
-import { isInvalidRefreshSession } from "./authErrors";
+import { isInvalidRefreshSession, SessionChangedError } from "./authErrors";
 
-type RetryableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+export type RetryableRequestConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean;
+  authSessionVersion?: number;
+};
 type TokenRefreshResponse = {
   access: string;
-  tenant_id?: string;
+  tenant_id: string;
 };
 
 const refreshTokenPath = "/auth/token/refresh/";
@@ -25,7 +29,7 @@ const publicAuthPaths = [
   "/auth/password-reset/",
   "/auth/logout/",
 ];
-let refreshPromise: Promise<string> | null = null;
+let pendingRefresh: { version: number; promise: Promise<string> } | null = null;
 
 const buildURL = (baseURL: string, path: string) =>
   `${baseURL.replace(/\/+$/, "")}${path}`;
@@ -40,31 +44,54 @@ export const clearAuthAndRedirect = () => {
   }
 };
 
-export const refreshAccessToken = (): Promise<string> => {
-  if (!refreshPromise) {
-    refreshPromise = runWithRefreshLock(async () => {
-      const response = await axios.post<TokenRefreshResponse>(
-        buildURL(apiBaseURL, refreshTokenPath),
-        {},
-        {
-          withCredentials: true,
-          headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-          },
-        },
-      );
-      const newAccess = response.data.access;
-      setAuthSession({
-        access: newAccess,
-        tenantId: response.data.tenant_id,
-      });
-      return newAccess;
-    }).finally(() => {
-      refreshPromise = null;
-    });
+export const assertCurrentSession = (version: number | undefined): void => {
+  if (version !== getAuthSessionVersion()) {
+    throw new SessionChangedError();
   }
-  return refreshPromise;
+};
+
+export const attachSessionToken = (config: RetryableRequestConfig) => {
+  if (config._retry) {
+    // Axios runs this interceptor again, after the response interceptor schedules a retry.
+    assertCurrentSession(config.authSessionVersion);
+  }
+  const token = getAccessToken();
+  if (token) {
+    config.authSessionVersion = getAuthSessionVersion();
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+};
+
+export const refreshAccessToken = (): Promise<string> => {
+  const version = getAuthSessionVersion();
+  if (pendingRefresh?.version === version) return pendingRefresh.promise;
+
+  const promise = runWithRefreshLock(async () => {
+    assertCurrentSession(version);
+    const response = await axios.post<TokenRefreshResponse>(
+      buildURL(apiBaseURL, refreshTokenPath),
+      {},
+      {
+        withCredentials: true,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      },
+    );
+    assertCurrentSession(version);
+    const { access, tenant_id: tenantId } = response.data;
+    if (typeof tenantId !== "string" || !tenantId) {
+      throw new SessionChangedError();
+    }
+    setAuthSession({ access, tenantId }, { refresh: true });
+    return access;
+  }).finally(() => {
+    if (pendingRefresh?.promise === promise) pendingRefresh = null;
+  });
+  pendingRefresh = { version, promise };
+  return promise;
 };
 
 export const apiClient = axios.create({
@@ -78,10 +105,7 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   (config) => {
-    const token = getAccessToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    attachSessionToken(config);
     if (!config.headers["X-Requested-With"]) {
       config.headers["X-Requested-With"] = "XMLHttpRequest";
     }
@@ -109,20 +133,24 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config as RetryableRequestConfig | undefined;
     if (
       !originalRequest ||
-      originalRequest._retry ||
+      originalRequest.authSessionVersion === undefined ||
       isPublicAuthRequest(originalRequest.url)
     ) {
-      if (originalRequest?._retry) {
-        clearAuthAndRedirect();
-      }
+      return Promise.reject(error);
+    }
+    const { authSessionVersion } = originalRequest;
+    assertCurrentSession(authSessionVersion);
+    if (originalRequest._retry) {
+      clearAuthAndRedirect();
       return Promise.reject(error);
     }
     originalRequest._retry = true;
     try {
-      const newAccess = await refreshAccessToken();
-      originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+      await refreshAccessToken();
+      assertCurrentSession(authSessionVersion);
       return apiClient(originalRequest);
     } catch (refreshError: unknown) {
+      assertCurrentSession(authSessionVersion);
       if (isInvalidRefreshSession(refreshError)) {
         clearAuthAndRedirect();
       }

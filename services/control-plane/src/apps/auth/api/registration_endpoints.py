@@ -6,14 +6,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.auth.services.avatars import update_profile, validate_avatar
-from apps.auth.services.cookies import clear_refresh_token_cookie, verify_auth_security_headers
+from apps.auth.services.cookies import verify_auth_security_headers
 from apps.auth.services.otp import (
     check_and_record_otp_cooldown,
     read_token,
     send_otp,
     verify_otp,
 )
-from apps.auth.services.tokens import create_auth_response, revoke_user_refresh_tokens
+from apps.auth.services.passwords import complete_password_update
+from apps.auth.services.tokens import create_auth_response
 from apps.auth.throttles import PasswordResetRateThrottle, RegistrationRateThrottle
 
 
@@ -141,36 +142,7 @@ class PasswordResetCompleteEndpoint(APIView):
     throttle_classes = (PasswordResetRateThrottle,)
 
     def post(self, request):
-        token = str(request.data.get("reset_token", ""))
-        try:
-            payload = read_token(token, "password_reset", consume=False)
-        except TypeError:
-            payload = read_token(token, "password_reset")
-        user_model = get_user_model()
-        clean_email = str(payload["email"]).strip().lower()
-        try:
-            user = user_model.objects.get(email__iexact=clean_email, is_active=True)
-        except user_model.MultipleObjectsReturned:
-            user = user_model.objects.filter(email__iexact=clean_email, is_active=True).order_by("-date_joined").first()
-        except user_model.DoesNotExist:
-            raise serializers.ValidationError({"token": "User account not found or inactive."})
-
-        password = str(request.data.get("new_password", ""))
-        try:
-            validate_password(password, user=user)
-        except DjangoValidationError as exc:
-            raise serializers.ValidationError({"new_password": list(exc.messages)})
-
-        try:
-            read_token(token, "password_reset", consume=True)
-        except TypeError:
-            pass
-
-        user.set_password(password)
-        user.save(update_fields=["password"])
-
-        revoke_user_refresh_tokens(user)
-
-        response = Response({"message": "Password reset completed."})
-        clear_refresh_token_cookie(response)
-        return response
+        return complete_password_update(
+            str(request.data.get("reset_token", "")),
+            str(request.data.get("new_password", "")),
+        )

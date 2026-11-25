@@ -1,5 +1,6 @@
 import {
   clearAuthSession,
+  getAuthSessionVersion,
   onAuthSessionReset,
   setAuthSession,
 } from "@/shared/api/authSession";
@@ -30,11 +31,15 @@ describe("Auth Session & QueryClient Cache Isolation", () => {
 
   it("should keep cache on silent token refresh for the same tenant", () => {
     setAuthSession({ access: "token-b1", tenantId: "tenant-b" });
+    const version = getAuthSessionVersion();
     queryClient.setQueryData(["profile"], { email: "b@example.com" });
 
-    setAuthSession({ access: "token-b2", tenantId: "tenant-b" });
-    setAuthSession({ access: "token-b3" });
+    setAuthSession(
+      { access: "token-b2", tenantId: "tenant-b" },
+      { refresh: true },
+    );
 
+    expect(getAuthSessionVersion()).toBe(version);
     expect(queryClient.getQueryData(["profile"])).toEqual({
       email: "b@example.com",
     });

@@ -7,8 +7,7 @@ from apps.auth.services.cookies import set_refresh_token_cookie
 
 def revoke_user_refresh_tokens(user) -> int:
     """
-    Revokes (blacklists) all outstanding refresh tokens for the given user,
-    invalidating all existing sessions.
+    Blacklist the user's outstanding refresh tokens.
     """
     outstanding_tokens = OutstandingToken.objects.filter(user=user).exclude(blacklistedtoken__isnull=False)
     revoked = 0

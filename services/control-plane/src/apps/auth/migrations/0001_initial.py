@@ -34,6 +34,7 @@ class Migration(migrations.Migration):
                 ('field_of_work', models.CharField(blank=True, max_length=100)),
                 ('country', models.CharField(blank=True, max_length=100)),
                 ('auth_provider', models.CharField(default='email', max_length=20)),
+                ('session_version', models.PositiveBigIntegerField(default=0)),
                 ('is_active', models.BooleanField(default=True)),
                 ('is_staff', models.BooleanField(default=False)),
                 ('deleted_at', models.DateTimeField(blank=True, null=True)),

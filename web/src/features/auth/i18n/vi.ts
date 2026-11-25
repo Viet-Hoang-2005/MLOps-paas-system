@@ -1,5 +1,7 @@
 export const authVi = {
   session: {
+    changed:
+      "Phiên đăng nhập đã thay đổi. Hãy kiểm tra tài khoản đang sử dụng trước khi thử lại.",
     unavailableTitle: "Chưa thể xác minh phiên đăng nhập",
     unavailableDescription:
       "Máy chủ chưa khả dụng hoặc kết nối bị gián đoạn. Vui lòng thử lại.",
