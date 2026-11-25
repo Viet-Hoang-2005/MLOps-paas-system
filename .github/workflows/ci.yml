@@ -18,6 +18,7 @@ jobs:
       unit_test_targets: ${{ steps.matrix.outputs.unit_test_targets }}
       image_targets: ${{ steps.matrix.outputs.image_targets }}
       infra_targets: ${{ steps.matrix.outputs.infra_targets }}
+      run_frontend_e2e: ${{ steps.matrix.outputs.run_frontend_e2e }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python for the CI matrix
@@ -119,6 +120,7 @@ jobs:
               f.write(f"unit_test_targets={json.dumps(unit_test_targets)}\n")
               f.write(f"image_targets={json.dumps(image_targets)}\n")
               f.write(f"infra_targets={json.dumps(infra_targets)}\n")
+              f.write(f"run_frontend_e2e={'true' if (changed['frontend'] or run_all) else 'false'}\n")
           PY
 
   secret-scan:
@@ -471,6 +473,45 @@ jobs:
             exit 1
           fi
 
+  frontend-e2e:
+    name: "Frontend E2E (Playwright)"
+    needs: [detect-changes, workflow-lint, code-quality]
+    if: >-
+      needs.detect-changes.result == 'success' &&
+      needs.workflow-lint.result == 'success' &&
+      needs.code-quality.result == 'success' &&
+      needs.detect-changes.outputs.run_frontend_e2e == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install frontend dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+      - name: Build frontend bundle
+        working-directory: web
+        run: pnpm run build
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run Playwright E2E tests
+        working-directory: web
+        run: pnpm test:e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/playwright-report
+          if-no-files-found: ignore
+
   infra-validate:
     name: "Infrastructure Validation (${{ matrix.target.name }})"
     needs: [detect-changes, workflow-lint]
@@ -596,12 +637,14 @@ jobs:
       - detect-changes
       - workflow-lint
       - unit-tests
+      - frontend-e2e
     if: >-
       always() &&
       needs.detect-changes.result == 'success' &&
       needs.workflow-lint.result == 'success' &&
       needs.detect-changes.outputs.image_targets != '[]' &&
-      (needs.unit-tests.result == 'success' || needs.unit-tests.result == 'skipped')
+      (needs.unit-tests.result == 'success' || needs.unit-tests.result == 'skipped') &&
+      (needs.frontend-e2e.result == 'success' || needs.frontend-e2e.result == 'skipped')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -676,6 +719,7 @@ jobs:
         secret-scan,
         code-quality,
         unit-tests,
+        frontend-e2e,
         infra-validate,
         images-scan,
       ]
@@ -720,8 +764,10 @@ jobs:
 
           secret_res = "${{ needs.secret-scan.result }}" == "success"
           workflow_lint_res = "${{ needs.workflow-lint.result }}" == "success"
+          e2e_raw = "${{ needs.frontend-e2e.result }}"
 
           fmt = lambda ok: "Passed" if ok else "Failed"
+          fmt_e2e = {"success": "Passed", "skipped": "Skipped (no changes)"}.get(e2e_raw, "Failed")
 
           result_files = Path("ci-results")
           def service_result(kind, service_id, scheduled):
@@ -751,6 +797,7 @@ jobs:
           summary = ["### Unified CI Pipeline Results\n"]
           summary.append(f"**Workflow syntax (actionlint)**: {fmt(workflow_lint_res)}\n")
           summary.append(f"**Secret Security (GitLeaks)**: {fmt(secret_res)}\n")
+          summary.append(f"**Frontend E2E (Playwright)**: {fmt_e2e}\n")
 
           rows = []
           if "frontend" in quality_ids or "frontend" in unit_ids or "frontend" in image_ids:

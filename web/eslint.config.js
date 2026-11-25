@@ -22,7 +22,7 @@ const architectureImportRestrictions = [
 ]
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage']),
+  globalIgnores(['dist', 'coverage', 'playwright-report', 'test-results', 'blob-report']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -97,6 +97,21 @@ export default defineConfig([
           { group: ['**/shared/api/client', '**/lib/api'], message: 'Pages must call a feature API or hook.' },
         ],
       }],
+    },
+  },
+  {
+    files: ['e2e/**/*.ts', 'playwright.config.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+      },
+    },
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      'react-refresh/only-export-components': 'off',
+      'boundaries/dependencies': 'off',
+      'no-restricted-imports': 'off',
     },
   },
 ])

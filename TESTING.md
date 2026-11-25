@@ -65,7 +65,7 @@ python -m ruff check services/
 python -m ruff check --fix services/
 ```
 
-### 2.2. Frontend Linting & Build (ESLint / TypeScript)
+### 2.2. Frontend Linting, Build & E2E (ESLint / TypeScript / Playwright)
 
 Thực hiện từ thư mục `web/`:
 
@@ -77,6 +77,16 @@ pnpm lint
 
 # Kiểm tra tính toàn vẹn của tiến trình build đóng gói
 pnpm build
+
+# Cài đặt trình duyệt Chromium cho Playwright (chỉ cần chạy lần đầu)
+pnpm test:e2e:install
+
+# Chạy kiểm thử E2E trên Chromium (chế độ Mocked API mặc định)
+pnpm test:e2e
+
+# Chạy chế độ giao diện trực quan / debug hoặc trỏ vào stack Docker Compose thật
+pnpm test:e2e:ui
+PLAYWRIGHT_BASE_URL=http://localhost:5173 pnpm test:e2e
 ```
 
 ### 2.3. Infrastructure Validation (Terraform & Ansible)

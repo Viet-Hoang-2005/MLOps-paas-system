@@ -12,6 +12,10 @@ dist
 dist-ssr
 coverage
 test-results.xml
+playwright-report
+test-results
+blob-report
+playwright/.cache
 .cache
 *.local
 
