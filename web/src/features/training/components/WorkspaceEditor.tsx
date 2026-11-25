@@ -69,6 +69,7 @@ interface Props {
   entries: WorkspaceEntry[];
   outputs?: TrainingOutput[];
   runId?: string;
+  inputSource?: "workspace" | "snapshot";
   entryPoint: string;
   readOnly: boolean;
   onRefresh: () => Promise<TrainingWorkspace>;
@@ -87,6 +88,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
       entries,
       outputs = [],
       runId,
+      inputSource,
       entryPoint,
       readOnly,
       externallyBusy = false,
@@ -102,7 +104,23 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
     const { t } = useTranslation("training");
     const [activeTab, setActiveTab] = useState<"input" | "output">("input");
     const [selected, setSelected] = useState<string | null>(null);
-    const [selectedOutput, setSelectedOutput] = useState<string | null>(null);
+    const [selectedOutputByRun, setSelectedOutputByRun] = useState<{
+      runId: string | undefined;
+      path: string | null;
+    }>({ runId, path: null });
+    const selectedOutput =
+      selectedOutputByRun.runId === runId ? selectedOutputByRun.path : null;
+    const setSelectedOutput = (
+      next: string | null | ((current: string | null) => string | null),
+    ) => {
+      setSelectedOutputByRun((prev) => {
+        const current = prev.runId === runId ? prev.path : null;
+        return {
+          runId,
+          path: typeof next === "function" ? next(current) : next,
+        };
+      });
+    };
     const [contents, setContents] = useState<Record<string, string>>({});
     const [outputContents, setOutputContents] = useState<
       Record<string, string>
@@ -118,12 +136,15 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
     >(new Set());
     const [localBusy, setBusy] = useState(false);
     const busy = localBusy || externallyBusy;
-    const [dialog, setDialog] = useState<"new" | "edit" | "folder" | null>(
-      null,
-    );
+    const [dialog, setDialog] = useState<
+      "new" | "edit" | "folder" | "edit-folder" | null
+    >(null);
     const [folderName, setFolderName] = useState("");
     const [folderParent, setFolderParent] = useState("");
     const [folderError, setFolderError] = useState("");
+    const [editingFolder, setEditingFolder] = useState<WorkspaceEntry | null>(
+      null,
+    );
     const [deleting, setDeleting] = useState(false);
     const [removeAllOpen, setRemoveAllOpen] = useState(false);
     const [resetAllOpen, setResetAllOpen] = useState(false);
@@ -131,7 +152,14 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
     const [helpOpen, setHelpOpen] = useState(false);
     const needsReload = useRef(false);
     const [preview, setPreview] = useState(false);
-    const [outputPreview, setOutputPreview] = useState(false);
+    const [outputPreviewByRun, setOutputPreviewByRun] = useState<{
+      runId: string | undefined;
+      value: boolean;
+    }>({ runId, value: false });
+    const outputPreview =
+      outputPreviewByRun.runId === runId ? outputPreviewByRun.value : false;
+    const setOutputPreview = (value: boolean) =>
+      setOutputPreviewByRun({ runId, value });
 
     const file = entries.find((entry) => entry.path === selected);
     const parent =
@@ -173,7 +201,9 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
       );
     }, [outputs, selectedOutput]);
 
-    const scope = runId ?? workspace.id;
+    const resolvedInputSource = inputSource ?? (runId ? "snapshot" : "workspace");
+    const useSnapshotInput = resolvedInputSource === "snapshot" && Boolean(runId);
+    const scope = useSnapshotInput && runId ? runId : workspace.id;
     const loadedScope = useRef(scope);
     const currentScope = useRef(scope);
     currentScope.current = scope;
@@ -199,7 +229,11 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
         return;
       let alive = true;
       const requestedScope = scope;
-      void (runId ? getRunFile(runId, file.path) : readEntry(file))
+      void (
+        useSnapshotInput && runId
+          ? getRunFile(runId, file.path)
+          : readEntry(file)
+      )
         .then((content) => {
           if (alive && currentScope.current === requestedScope) {
             setContents((current) => ({
@@ -214,7 +248,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
       return () => {
         alive = false;
       };
-    }, [file, runId, scope, contents, t]);
+    }, [file, runId, useSnapshotInput, scope, contents, t]);
 
     // Load output file content if readable
     useEffect(() => {
@@ -344,6 +378,21 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
       return workspaceRef.current;
     }
 
+    function openEditFolder(path: string) {
+      const target = entries.find(
+        (entry) => entry.path === path && entry.kind === "folder",
+      );
+      if (!target) return;
+      setSelected(path);
+      setEditingFolder(target);
+      setFolderName(path.split("/").pop() ?? path);
+      setFolderParent(
+        path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "",
+      );
+      setFolderError("");
+      setDialog("edit-folder");
+    }
+
     async function saveSelection(selection: InputFileSelection) {
       await task(async () => {
         const current = await cleanDraft();
@@ -439,13 +488,17 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
 
     async function download() {
       if (!canDownloadInput) return;
-      const current = runId ? workspace : await cleanDraft();
+      if (useSnapshotInput && runId) {
+        saveDownload(await downloadWorkspaceSelection(runId, "input", selected));
+        return;
+      }
+      const current = readOnly ? workspace : await cleanDraft();
       saveDownload(
         await downloadWorkspaceSelection(
-          runId ?? workspace.id,
+          workspace.id,
           "input",
           selected,
-          runId ? undefined : current.revision,
+          current.revision,
         ),
       );
     }
@@ -842,6 +895,7 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
                     <button
                       type="button"
                       onClick={() => {
+                        setEditingFolder(null);
                         setFolderName("");
                         setFolderParent(parent);
                         setFolderError("");
@@ -856,19 +910,16 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
                     <button
                       type="button"
                       onClick={() => {
-                        if (selected && file && file.kind !== "folder") {
+                        if (!selected || !file) return;
+                        if (file.kind === "folder") {
+                          openEditFolder(file.path);
+                        } else {
                           setDialog("edit");
                         }
                       }}
                       title={t("studio.edit")}
                       aria-label={t("studio.edit")}
-                      disabled={
-                        readOnly ||
-                        busy ||
-                        !selected ||
-                        !file ||
-                        file.kind === "folder"
-                      }
+                      disabled={readOnly || busy || !selected || !file}
                       className="rounded-surface p-1.5 text-color-foreground hover:bg-surface-hover disabled:opacity-30 disabled:pointer-events-none"
                     >
                       <PenLine className="h-4 w-4" />
@@ -967,14 +1018,6 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
                         return next;
                       })
                     }
-                    onEditFile={
-                      !readOnly && !busy
-                        ? (path) => {
-                            setSelected(path);
-                            setDialog("edit");
-                          }
-                        : undefined
-                    }
                     onMove={
                       !readOnly && !busy
                         ? (path, folder) => void move(path, folder)
@@ -1032,9 +1075,13 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
           />
         )}
 
-        {dialog === "folder" && (
+        {(dialog === "folder" || dialog === "edit-folder") && (
           <BaseDialog
-            title={t("studio.newFolder")}
+            title={
+              dialog === "edit-folder"
+                ? t("studio.editFolder")
+                : t("studio.newFolder")
+            }
             onClose={() => setDialog(null)}
           >
             <form
@@ -1055,22 +1102,54 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
                   return;
                 }
                 const path = folderParent ? `${folderParent}/${name}` : name;
-                if (entries.some((entry) => entry.path === path)) {
+                const isEdit = dialog === "edit-folder" && editingFolder;
+                if (isEdit && path === editingFolder.path) {
+                  setDialog(null);
+                  return;
+                }
+                if (
+                  entries.some(
+                    (entry) =>
+                      entry.path === path &&
+                      (!isEdit || entry.id !== editingFolder.id),
+                  )
+                ) {
                   setFolderError(t("studio.pathExists", { path }));
                   return;
                 }
                 void task(async () => {
                   const current = await cleanDraft();
-                  await saveWorkspaceEntry(workspace.id, current.revision, {
-                    path,
-                    kind: "folder",
-                    file: null,
-                  });
+                  await saveWorkspaceEntry(
+                    workspace.id,
+                    current.revision,
+                    {
+                      path,
+                      kind: "folder",
+                      file: null,
+                    },
+                    isEdit ? editingFolder.id : undefined,
+                  );
                   setSelected(path);
-                  if (folderParent)
+                  if (isEdit) {
+                    const oldPath = editingFolder.path;
+                    setExpanded((prev) => {
+                      const next = new Set<string>();
+                      for (const item of prev) {
+                        if (item === oldPath) next.add(path);
+                        else if (item.startsWith(`${oldPath}/`)) {
+                          next.add(`${path}${item.slice(oldPath.length)}`);
+                        } else {
+                          next.add(item);
+                        }
+                      }
+                      return next;
+                    });
+                    setContents({});
+                  } else if (folderParent) {
                     setExpanded((current) =>
                       new Set(current).add(folderParent),
                     );
+                  }
                   setDialog(null);
                   await refresh();
                 });
@@ -1099,7 +1178,9 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
                   {t("workspace.fileDialog.cancel")}
                 </Button>
                 <Button type="submit" loading={busy}>
-                  {t("workspace.fileDialog.createAction")}
+                  {dialog === "edit-folder"
+                    ? t("workspace.fileDialog.save")
+                    : t("workspace.fileDialog.createAction")}
                 </Button>
               </div>
             </form>

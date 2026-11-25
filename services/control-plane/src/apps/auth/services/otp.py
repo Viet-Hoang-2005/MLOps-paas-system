@@ -3,8 +3,9 @@ import time
 
 from django.core import signing
 from django.core.cache import cache
-from django.core.mail import send_mail
 from rest_framework.exceptions import Throttled, ValidationError
+
+from apps.auth.services.otp_email import send_otp_email
 
 OTP_TTL_SECONDS = 600
 TOKEN_TTL_SECONDS = 900
@@ -89,12 +90,12 @@ def send_otp(*, email: str, purpose: str) -> None:
     cache.set(key, code, OTP_TTL_SECONDS)
     cache.delete(attempts_key)
 
-    send_mail(
-        subject=f"MLOps PaaS {purpose.replace('_', ' ')} code",
-        message=f"Your verification code is {code}. It expires in 10 minutes.",
-        from_email=None,
-        recipient_list=[email.strip()],
-        fail_silently=False,
+    send_otp_email(
+        email=email,
+        purpose=purpose,
+        code=code,
+        ttl_seconds=OTP_TTL_SECONDS,
+        max_attempts=MAX_OTP_ATTEMPTS,
     )
 
 

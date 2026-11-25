@@ -47,6 +47,7 @@ interface DirectoryTreeProps {
   selectedPath: string | null;
   onSelect: (path: string) => void;
   onEditFile?: (path: string) => void;
+  onEditFolder?: (path: string) => void;
   onMove?: (path: string, folder: string) => void;
   onDropFiles?: (event: DragEvent, folder: string) => void;
   unsavedContents: Record<string, string>;
@@ -64,6 +65,7 @@ export function DirectoryTree({
   selectedPath,
   onSelect,
   onEditFile,
+  onEditFolder,
   onMove,
   onDropFiles,
   unsavedContents,
@@ -122,6 +124,14 @@ export function DirectoryTree({
                   onSelect(node.path);
                   toggleFolder(node.path);
                 }}
+                onDoubleClick={
+                  onEditFolder
+                    ? (event) => {
+                        event.stopPropagation();
+                        onEditFolder(node.path);
+                      }
+                    : undefined
+                }
                 className={`flex w-full items-center gap-1.5 rounded-compact px-2 py-1.5 text-left text-style-body transition-colors hover:bg-(--color-muted) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring) ${
                   isSelected
                     ? "bg-(--color-primary-subtle) font-medium text-(--color-primary)"
@@ -159,6 +169,7 @@ export function DirectoryTree({
                     selectedPath={selectedPath}
                     onSelect={onSelect}
                     onEditFile={onEditFile}
+                    onEditFolder={onEditFolder}
                     onMove={onMove}
                     onDropFiles={onDropFiles}
                     unsavedContents={unsavedContents}

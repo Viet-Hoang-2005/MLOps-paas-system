@@ -34,8 +34,7 @@ Log progress xuất mỗi 10 boosting rounds; learning curves gửi từng round
 | Trường | Mặc định / ý nghĩa |
 |---|---|
 | `train_csv`, `feature_schema` | `data/train.csv`, `feature_schema.json`; phải là file bên trong Input |
-| `classification_mode` | `binary`: BENIGN/Normal (không phân biệt hoa thường) → 0, các nhãn khác → ATTACK/1; `multiclass`: giữ nhãn đã trim và sắp xếp mapping xác định |
-| `label_column` | `Label`; không tự suy đoán cột cuối |
+| `label_column` | `Label`; không tự suy đoán cột cuối. Script tự đọc cột `Label` để xác định số lớp (2 lớp → binary, ≥ 3 lớp → multiclass) và ánh xạ theo thứ tự: `0: BENIGN`, `1: DDoS`, `2: PortScan`, `3: BruteForce`, `4: WebAttacks` |
 | `seed` | `42` |
 | `validation_fraction`, `test_fraction` | `0.15`, `0.15`; phần còn lại train, làm tròn số mẫu lên cho validation/test |
 | `device` | `auto`, hoặc ép `cpu` / `cuda` |
@@ -49,9 +48,8 @@ script luôn sắp theo schema. Không cho thiếu/thừa feature, tên cột tr
 label trùng tên feature. Hàng thiếu nhãn, không numeric, vô hạn hoặc vượt miền
 float32 bị loại và thống kê; không tự điền 0 hay encode cột feature dạng text.
 
-Loại duplicate feature trước khi split; vector giống nhau nhưng nhãn target
-khác nhau bị từ chối. Trong binary mode, các họ attack đã được gộp thành ATTACK
-trước bước này. Mỗi split phải có đủ mọi lớp, thiếu mẫu thì báo lỗi thay vì bỏ
+Loại bỏ các dòng có vector giống nhau nhưng nhãn target xung đột (nếu còn), sau đó loại
+duplicate feature trước khi split. Mỗi split phải có đủ mọi lớp, thiếu mẫu thì báo lỗi thay vì bỏ
 stratification. Trọng số cân bằng lớp chỉ được tính từ train. Validation phục vụ
 early stopping; test chỉ phục vụ đánh giá cuối. Đây là **random holdout** trên
 dữ liệu đã xử lý, không chứng minh tính độc lập theo host/session/time, không

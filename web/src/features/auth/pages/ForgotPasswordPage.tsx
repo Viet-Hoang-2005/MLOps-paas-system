@@ -72,7 +72,9 @@ function ForgotPasswordOTPStep({
 
   return (
     <div className="max-w-sm w-full mx-auto text-center">
-      <Back onBack={onBack} title={t("otp.back")} className="mb-8" />
+      <div className="flex justify-start mb-8">
+        <Back onBack={onBack} title={t("otp.back")} />
+      </div>
 
       <div className="mx-auto mb-4 rounded-surface flex items-center justify-center">
         <Mail className="h-8 w-8 text-color-foreground" />
@@ -160,7 +162,9 @@ function ForgotPasswordResetStep({
 
   return (
     <div className="max-w-sm w-full mx-auto">
-      <Back onBack={onBack} title={t("recovery.startOver")} className="mb-8" />
+      <div className="flex justify-start mb-8">
+        <Back onBack={onBack} title={t("recovery.startOver")} />
+      </div>
 
       <div className="mb-4 rounded-surface flex items-center justify-center mx-auto">
         <LockKeyhole className="h-8 w-8 text-color-foreground" />
@@ -242,11 +246,12 @@ export default function ForgotPasswordPage() {
       {step === "email" && (
         <div className="max-w-sm w-full mx-auto">
           {/* Back to Login */}
-          <Back
-            to="/login"
-            title={t("recovery.backToSignIn")}
-            className="mb-8"
-          />
+          <div className="flex justify-start mb-8">
+            <Back
+              to="/login"
+              title={t("recovery.backToSignIn")}
+            />
+          </div>
 
           {/* Icon */}
           <div className="mb-4 rounded-surface flex items-center justify-center mx-auto">

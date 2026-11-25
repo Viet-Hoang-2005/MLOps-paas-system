@@ -29,7 +29,6 @@ from sklearn.utils.class_weight import compute_sample_weight
 DEFAULTS = {
     "train_csv": "data/train.csv",
     "feature_schema": "feature_schema.json",
-    "classification_mode": "binary",
     "label_column": "Label",
     "seed": 42,
     "validation_fraction": 0.15,
@@ -43,6 +42,23 @@ DEFAULTS = {
     "subsample": 0.8,
     "colsample_bytree": 0.8,
 }
+
+CANONICAL_CLASS_ORDER = (
+    "BENIGN",
+    "DDoS",
+    "PortScan",
+    "BruteForce",
+    "WebAttacks",
+)
+
+
+def order_classes(unique_labels):
+    """Assign deterministic indices following the canonical NIDS class order."""
+    rank = {name: index for index, name in enumerate(CANONICAL_CLASS_ORDER)}
+    return sorted(
+        unique_labels,
+        key=lambda label: (rank.get(label, len(CANONICAL_CLASS_ORDER)), label),
+    )
 
 
 class TrainingError(RuntimeError):
@@ -83,10 +99,6 @@ def load_config(root, config_path):
             "config.json must be an object containing only documented options."
         )
     config = {**DEFAULTS, **supplied}
-    if not isinstance(config["classification_mode"], str) or config[
-        "classification_mode"
-    ] not in {"binary", "multiclass"}:
-        raise ValueError("classification_mode must be binary or multiclass.")
     if not isinstance(config["device"], str) or config["device"] not in {
         "auto",
         "cpu",
@@ -172,20 +184,27 @@ def load_data(path, names, config):
     valid = finite & has_label.to_numpy(dtype=bool, na_value=False)
     clean = features.loc[valid].copy()
     labels = raw_labels.loc[valid].astype(str)
-    if config["classification_mode"] == "binary":
-        benign = labels.str.upper().isin({"BENIGN", "NORMAL"})
-        labels = pd.Series(np.where(benign, "BENIGN", "ATTACK"), index=labels.index)
-        classes = ["BENIGN", "ATTACK"]
-    else:
-        classes = sorted(labels.unique().tolist())
     # Exact feature identity (including +0/-0 equivalence), not label+features.
-    conflict = (
-        clean.assign(__label=labels).groupby(names, dropna=False)["__label"].nunique()
-    )
-    if (conflict > 1).any():
-        raise ValueError("Identical feature vectors have conflicting target labels.")
+    dup_features = clean.duplicated(keep=False)
+    conflicting_rows_removed = 0
+    if dup_features.any():
+        conflict_subset = (
+            clean.loc[dup_features]
+            .assign(__label=labels.loc[dup_features])
+            .groupby(names, dropna=False)["__label"]
+            .transform("nunique")
+        )
+        conflicting_indices = conflict_subset.index[conflict_subset > 1]
+        conflicting_rows_removed = len(conflicting_indices)
+        if conflicting_rows_removed:
+            log(
+                f"WARNING: Removed {conflicting_rows_removed} rows with identical features and conflicting target labels."
+            )
+            clean = clean.drop(index=conflicting_indices)
+            labels = labels.drop(index=conflicting_indices)
     duplicates = clean.duplicated(keep="first")
     clean, labels = clean.loc[~duplicates], labels.loc[~duplicates]
+    classes = order_classes(labels.unique().tolist())
     mapping = {name: index for index, name in enumerate(classes)}
     y = labels.map(mapping).to_numpy(dtype=int)
     if len(classes) < 2 or len(np.unique(y)) != len(classes):
@@ -195,6 +214,7 @@ def load_data(path, names, config):
         "invalid_rows_removed": int((~valid).sum()),
         "missing_label_rows": int((~has_label.fillna(False)).sum()),
         "invalid_feature_rows": int((~finite).sum()),
+        "conflicting_rows_removed": conflicting_rows_removed,
         "duplicate_rows_removed": int(duplicates.sum()),
         "clean_rows": len(clean),
         "class_counts": {name: int((labels == name).sum()) for name in classes},
@@ -407,11 +427,16 @@ def evaluate(model, features, y, classes):
                 undefined.append(f"{name}.{key}: undefined denominator")
         report[name] = row
     matrix = confusion_matrix(y, predicted, labels=np.arange(len(classes)))
-    if classes == ["BENIGN", "ATTACK"]:
+    if len(classes) == 2:
         tn, fp, fn, tp = matrix.ravel()
-        metrics.update(
-            attack_recall=float(tp / (tp + fn)), benign_fpr=float(fp / (tn + fp))
-        )
+        if tp + fn > 0:
+            metrics["attack_recall"] = float(tp / (tp + fn))
+        else:
+            undefined.append("attack_recall: undefined denominator")
+        if tn + fp > 0:
+            metrics["benign_fpr"] = float(fp / (tn + fp))
+        else:
+            undefined.append("benign_fpr: undefined denominator")
     try:
         auc = (
             roc_auc_score(y, probabilities[:, 1])
@@ -486,6 +511,7 @@ def main(argv=None):
     threads = cpu_threads(config["max_threads"])
     tracking = Tracking()
     progress = Progress(tracking, device)
+    classification_mode = "binary" if len(classes) == 2 else "multiclass"
     objective = "binary:logistic" if len(classes) == 2 else "multi:softprob"
     parameters = {
         key: config[key]
@@ -523,6 +549,7 @@ def main(argv=None):
         **{k: v for k, v in parameters.items()},
         **versions,
         "algorithm": "xgboost",
+        "classification_mode": classification_mode,
         "weighting": "balanced_train_only",
         "num_classes": len(classes),
         "feature_count": len(names),
@@ -532,7 +559,7 @@ def main(argv=None):
     params["max_threads"] = threads
     tracking.send(params=params)
     log(
-        f"Training XGBoost on {device}, threads={threads}, rows={stats['clean_rows']}, classes={classes}"
+        f"Training XGBoost ({classification_mode}) on {device}, threads={threads}, rows={stats['clean_rows']}, classes={classes}"
     )
     model = xgb.XGBClassifier(**parameters, callbacks=[progress])
     train_x, train_y = parts["train"]

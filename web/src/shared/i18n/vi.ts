@@ -109,6 +109,7 @@ export const commonVi = {
     copied: "Đã sao chép log.",
     copyTitle: "Sao chép log",
     copy: "Sao chép",
+    loading: "Đang tải",
     error: "Lỗi:",
     logsUnavailable:
       "Tạm thời không lấy được log. Đang thử lại; trạng thái tác vụ vẫn đang được kiểm tra.",

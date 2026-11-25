@@ -294,6 +294,8 @@ export interface TerminalViewerProps {
   title?: ReactNode;
   badge?: ReactNode;
   logs?: readonly string[];
+  loading?: boolean;
+  loadingText?: ReactNode;
   placeholder?: ReactNode;
   actions?: ReactNode;
   actionButtons?: readonly TerminalActionItem[];
@@ -301,10 +303,22 @@ export interface TerminalViewerProps {
   bodyClassName?: string;
 }
 
+function AnimatedEllipsis() {
+  return (
+    <span aria-hidden="true" className="inline-flex">
+      <span className="animate-pulse [animation-delay:0ms]">.</span>
+      <span className="animate-pulse [animation-delay:200ms]">.</span>
+      <span className="animate-pulse [animation-delay:400ms]">.</span>
+    </span>
+  );
+}
+
 export function TerminalViewer({
   title,
   badge,
   logs = [],
+  loading = false,
+  loadingText,
   placeholder,
   actions,
   actionButtons,
@@ -323,14 +337,15 @@ export function TerminalViewer({
       displayLogs.some((line, index) => line !== previous[index]);
     previousLogs.current = displayLogs;
     if (
-      changed &&
-      displayLogs.length > 0 &&
-      displayLogs.length >= previous.length &&
+      ((changed &&
+        displayLogs.length > 0 &&
+        displayLogs.length >= previous.length) ||
+        loading) &&
       terminalRef.current
     ) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
-  }, [displayLogs]);
+  }, [displayLogs, loading]);
 
   const copyLogs = async () => {
     await navigator.clipboard.writeText(displayLogs.join("\n"));
@@ -386,20 +401,30 @@ export function TerminalViewer({
         )}
         style={{ scrollBehavior: "smooth" }}
       >
-        {displayLogs.length > 0 ? (
-          displayLogs.map((log, index) => (
-            <div
-              key={`${index}-${log}`}
-              className="mb-1 break-all whitespace-pre-wrap"
-            >
-              <AnsiLogLine log={log} />
-            </div>
-          ))
-        ) : placeholder ? (
-          <div className="break-all whitespace-pre-wrap text-color-terminal-muted italic">
-            {placeholder}
+        {displayLogs.length > 0
+          ? displayLogs.map((log, index) => (
+              <div
+                key={`${index}-${log}`}
+                className="mb-1 break-all whitespace-pre-wrap"
+              >
+                <AnsiLogLine log={log} />
+              </div>
+            ))
+          : !loading && placeholder && (
+              <div className="break-all whitespace-pre-wrap text-color-terminal-muted italic">
+                {placeholder}
+              </div>
+            )}
+        {loading && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-1 break-all whitespace-pre-wrap text-color-terminal-muted"
+          >
+            <span>{loadingText ?? t("terminal.loading")}</span>
+            <AnimatedEllipsis />
           </div>
-        ) : null}
+        )}
       </div>
     </div>
   );

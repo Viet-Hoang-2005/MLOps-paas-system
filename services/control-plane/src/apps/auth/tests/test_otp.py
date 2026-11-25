@@ -495,3 +495,61 @@ def test_registration_otp_endpoints_rate_throttled():
         ).status_code
         == 429
     )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("purpose", "expected_subject", "expected_badge", "expected_action"),
+    [
+        ("registration", "Account Registration Code", "ACCOUNT REGISTRATION", "New Account Registration"),
+        ("password_reset", "Forgot Password Reset Code", "FORGOT PASSWORD", "Forgot Password Recovery"),
+        (
+            "password_change",
+            "Password Change Verification Code",
+            "PASSWORD CHANGE",
+            "Change Account Password (Profile Settings)",
+        ),
+    ],
+)
+def test_otp_emails_clearly_distinguish_purpose_and_include_html(
+    settings, purpose, expected_subject, expected_badge, expected_action
+):
+    settings.EMAIL_HOST_USER = "security@mlops.test"
+    mail.outbox.clear()
+    email = f"{purpose}@example.com"
+
+    send_otp(email=email, purpose=purpose)
+
+    assert len(mail.outbox) == 1
+    sent = mail.outbox[0]
+    code = cache.get(_cache_key(email, purpose))
+    assert code is not None
+    assert sent.from_email == "MLOps PaaS <security@mlops.test>"
+    assert expected_subject in sent.subject
+    assert code in sent.body
+    assert expected_action in sent.body
+    assert email in sent.body
+
+    alternatives = dict((mimetype, content) for content, mimetype in sent.alternatives)
+    assert "text/html" in alternatives
+    html_body = alternatives["text/html"]
+    assert code in html_body
+    assert expected_badge in html_body
+    assert expected_action in html_body
+    assert email in html_body
+
+
+def test_send_otp_email_escapes_html_characters():
+    from apps.auth.services.otp_email import send_otp_email
+
+    mail.outbox.clear()
+    send_otp_email(
+        email="<script>alert(1)</script>@example.com",
+        purpose="registration",
+        code="123456",
+        ttl_seconds=600,
+        max_attempts=5,
+    )
+    html_body = dict((m, c) for c, m in mail.outbox[0].alternatives)["text/html"]
+    assert "<script>alert(1)</script>" not in html_body
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;@example.com" in html_body

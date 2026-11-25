@@ -5,7 +5,6 @@ services:
       context: ./services/control-plane
       dockerfile: Dockerfile
     image: mlops-paas-control-plane
-    container_name: control_plane
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -85,7 +84,6 @@ services:
       context: ./services/control-plane
       dockerfile: Dockerfile
     image: mlops-paas-control-plane
-    container_name: celery_worker
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: 1
@@ -149,7 +147,6 @@ services:
       context: ./services/control-plane
       dockerfile: Dockerfile
     image: mlops-paas-control-plane
-    container_name: celery_beat
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: 1
@@ -191,7 +188,6 @@ services:
       context: ./services/model-server
       dockerfile: Dockerfile
     image: mlops-paas-model-server
-    container_name: model_server
     restart: unless-stopped
     ports:
       - "5001:5000"
@@ -236,7 +232,6 @@ services:
       context: ./services/machine-learning-serving
       dockerfile: Dockerfile
     image: mlops-paas-machine-learning-serving:latest
-    container_name: machine_learning_serving
     environment:
       LOG_FORMAT: ${LOG_FORMAT:-console}
       LOG_SUMMARY_INTERVAL_SECONDS: ${LOG_SUMMARY_INTERVAL_SECONDS:-60}
@@ -256,7 +251,6 @@ services:
       context: ./services/deep-learning-serving
       dockerfile: Dockerfile
     image: mlops-paas-deep-learning-serving:latest
-    container_name: deep_learning_serving
     environment:
       LOG_FORMAT: ${LOG_FORMAT:-console}
     restart: "no"
@@ -272,7 +266,6 @@ services:
   # 2.3 Traefik API Gateway for Model Server
   traefik:
     image: traefik:latest
-    container_name: traefik
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
@@ -300,7 +293,6 @@ services:
       context: ./services/model-packager
       dockerfile: Dockerfile
     image: mlops-paas-model-packager
-    container_name: model_packager
     restart: "no"
     command:
       - python
@@ -320,7 +312,6 @@ services:
       context: ./services/evidently
       dockerfile: Dockerfile
     image: mlops-paas-evidently
-    container_name: evidently
     restart: "no"
     command:
       - python
@@ -340,7 +331,6 @@ services:
       context: ./services/training-runner
       dockerfile: Dockerfile
     image: mlops-paas-training-runner:latest
-    container_name: training_runner
     restart: "no"
     command:
       - python
@@ -356,7 +346,6 @@ services:
   # 6. PostgreSQL Database
   postgres:
     image: postgres:17-alpine
-    container_name: postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -378,7 +367,6 @@ services:
   # 6.1 Init Container để tạo schema cho Control Plane
   schema-init:
     image: postgres:17-alpine
-    container_name: postgres_schema_init
     restart: "no"
     environment:
       PGPASSWORD: ${DB_PASSWORD}
@@ -397,7 +385,6 @@ services:
   # 7. Redpanda Kafka Broker
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v26.2.2
-    container_name: redpanda
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "rpk", "cluster", "info", "-X", "brokers=localhost:9092"]
@@ -427,7 +414,6 @@ services:
   # 7.1 Redpanda Init Kafka Topic
   redpanda-init:
     image: docker.redpanda.com/redpandadata/redpanda:v26.2.2
-    container_name: redpanda_init
     restart: "no"
     entrypoint: ["/bin/sh", "-ec"]
     command:
@@ -465,7 +451,6 @@ services:
       context: ./services/consumer
       dockerfile: Dockerfile
     image: mlops-paas-consumer
-    container_name: consumer
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: 1
@@ -507,7 +492,6 @@ services:
   # 8. Redis Cache (Django Cache, Model Server Cache, Runtime Metrics)
   redis-cache:
     image: redis:7-alpine
-    container_name: redis_cache
     restart: unless-stopped
     command: ["sh", "-c", 'exec redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""']
     environment:
@@ -527,9 +511,9 @@ services:
   # 8.1 Redis Queue (Celery Broker & Celery Result Backend)
   redis-queue:
     image: redis:7-alpine
-    container_name: redis_queue
     restart: unless-stopped
-    command: ["sh", "-c", 'exec redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory 512mb --maxmemory-policy noeviction --appendonly yes --appendfsync everysec']
+    stop_grace_period: 30s
+    command: ["sh", "-c", 'if [ -f /data/appendonlydir/appendonly.aof.manifest ]; then printf "y\n" | redis-check-aof --fix /data/appendonlydir/appendonly.aof.manifest || true; fi; exec redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory 512mb --maxmemory-policy noeviction --appendonly yes --appendfsync everysec']
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
     healthcheck:
@@ -554,8 +538,5 @@ networks:
 # Volume để lưu trữ dữ liệu của PostgreSQL và Redpanda
 volumes:
   postgres_data:
-    name: ${POSTGRES_VOLUME_NAME:-postgres_data}
   redpanda_data:
-    name: redpanda_data
   redis_queue_data:
-    name: redis_queue_data

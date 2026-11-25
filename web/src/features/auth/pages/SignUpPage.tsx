@@ -74,7 +74,9 @@ function SignUpOTPStep({ email, onVerified, onBack }: SignUpOTPStepProps) {
 
   return (
     <div className="flex flex-col max-w-sm w-full mx-auto text-center gap-8">
-      <Back onBack={onBack} title={t("otp.back")} />
+      <div className="flex justify-start">
+        <Back onBack={onBack} title={t("otp.back")} />
+      </div>
 
       <div className="flex flex-col items-center justify-center gap-3">
         <Mail className="h-8 w-8 text-color-foreground" />
@@ -229,7 +231,9 @@ function SignUpProfileStep({
 
   return (
     <div className="max-w-sm w-full mx-auto">
-      <Back onBack={onBack} title={t("profile.back")} className="mb-4" />
+      <div className="flex justify-start mb-4">
+        <Back onBack={onBack} title={t("profile.back")} />
+      </div>
 
       <h2 className="mb-1 text-style-page-title font-bold text-color-foreground">
         {t("profile.title")}

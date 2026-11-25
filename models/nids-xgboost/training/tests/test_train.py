@@ -58,7 +58,7 @@ def test_schema_matches_existing_dataset():
     "option,value",
     [
         ("device", "gpu"),
-        ("classification_mode", "other"),
+        ("classification_mode", "binary"),
         ("n_estimators", 0),
         ("seed", True),
         ("test_fraction", 0),
@@ -110,7 +110,7 @@ def test_data_cleaning_mapping_and_split(workspace):
     frame.loc[len(frame) - 1, "Label"] = " "
     frame.to_csv(root / "data/train.csv", index=False)
     x, y, classes, stats = trainer.load_data(root / "data/train.csv", names, config)
-    assert classes == ["BENIGN", "ATTACK"]
+    assert classes == ["BENIGN", "DDoS"]
     assert stats["invalid_rows_removed"] == 2
     assert stats["duplicate_rows_removed"] == 1
     assert len(x) == 200 and list(x.columns) == names
@@ -126,7 +126,7 @@ def test_data_cleaning_mapping_and_split(workspace):
 
 
 @pytest.mark.parametrize(
-    "change", ["missing", "extra", "duplicate", "conflict", "single", "invalid_numeric"]
+    "change", ["missing", "extra", "duplicate", "single", "invalid_numeric"]
 )
 def test_bad_csv_is_rejected(workspace, change):
     root, config, names, frame = workspace
@@ -137,10 +137,6 @@ def test_bad_csv_is_rejected(workspace, change):
         frame["Source IP"] = "127.0.0.1"
     elif change == "duplicate":
         frame.columns = [" Label " if col == names[0] else col for col in frame.columns]
-    elif change == "conflict":
-        row = frame.iloc[[0]].copy()
-        row["Label"] = "BENIGN" if row.Label.iloc[0] != "BENIGN" else "ATTACK"
-        frame = pd.concat([frame, row])
     elif change == "single":
         frame["Label"] = "BENIGN"
     else:
@@ -148,6 +144,20 @@ def test_bad_csv_is_rejected(workspace, change):
     frame.to_csv(path, index=False)
     with pytest.raises(ValueError):
         trainer.load_data(path, names, config)
+
+
+def test_conflicting_feature_vectors_are_removed(workspace):
+    root, config, names, frame = workspace
+    path = root / "data/train.csv"
+    conflict_row = frame.iloc[[0]].copy()
+    conflict_row["Label"] = "PortScan" if conflict_row["Label"].iloc[0] == "BENIGN" else "BENIGN"
+    frame = pd.concat([frame, conflict_row], ignore_index=True)
+    frame.to_csv(path, index=False)
+    clean, y, classes, stats = trainer.load_data(path, names, config)
+    assert stats["conflicting_rows_removed"] == 2
+    assert len(clean) == len(frame) - 2
+    assert classes == ["BENIGN", "DDoS"]
+    assert len(y) == len(clean)
 
 
 def test_tiny_classes_never_disable_stratification(workspace):
@@ -160,14 +170,34 @@ def test_tiny_classes_never_disable_stratification(workspace):
         )
 
 
-def test_multiclass_mapping_deterministic(workspace):
+@pytest.mark.parametrize(
+    "labels,expected_classes,expected_y",
+    [
+        ([" DDoS ", "BENIGN"] * 100, ["BENIGN", "DDoS"], [1, 0]),
+        (
+            [" PortScan ", "BENIGN", "DDoS"] * 67,
+            ["BENIGN", "DDoS", "PortScan"],
+            [2, 0, 1],
+        ),
+        (
+            ["BruteForce", "PortScan", "BENIGN", "DDoS"] * 50,
+            ["BENIGN", "DDoS", "PortScan", "BruteForce"],
+            [3, 2, 0, 1],
+        ),
+        (
+            ["WebAttacks", "BruteForce", "PortScan", "BENIGN", "DDoS"] * 40,
+            ["BENIGN", "DDoS", "PortScan", "BruteForce", "WebAttacks"],
+            [4, 3, 2, 0, 1],
+        ),
+    ],
+)
+def test_label_mapping_deterministic(workspace, labels, expected_classes, expected_y):
     root, config, names, frame = workspace
-    config["classification_mode"] = "multiclass"
-    frame["Label"] = [" PortScan ", "BENIGN", "DDoS", "WebAttack"] * 50
+    frame["Label"] = labels[: len(frame)]
     frame.to_csv(root / "data/train.csv", index=False)
     _, y, classes, _ = trainer.load_data(root / "data/train.csv", names, config)
-    assert classes == ["BENIGN", "DDoS", "PortScan", "WebAttack"]
-    assert list(y[:4]) == [2, 0, 1, 3]
+    assert classes == expected_classes
+    assert list(y[: len(expected_y)]) == expected_y
 
 
 def test_cgroup_v1_v2_and_fractional_cpu(tmp_path, monkeypatch):
@@ -293,9 +323,9 @@ def test_undefined_precision_is_not_fabricated(workspace):
         fake,
         pd.DataFrame(np.zeros((4, 52)), columns=names),
         np.array([0, 0, 1, 1]),
-        ["BENIGN", "ATTACK"],
+        ["BENIGN", "DDoS"],
     )
-    assert report["per_class"]["ATTACK"]["precision"] is None
+    assert report["per_class"]["DDoS"]["precision"] is None
     assert report["undefined_metrics"] and metrics["attack_recall"] == 0
     json.dumps(report, allow_nan=False)
 
@@ -304,7 +334,6 @@ def test_undefined_precision_is_not_fabricated(workspace):
 def test_cpu_training_export_and_outputs(workspace, monkeypatch, capsys, multiclass):
     root, config, names, frame = workspace
     if multiclass:
-        config["classification_mode"] = "multiclass"
         frame["Label"] = np.where(
             frame[names[0]] > 0.4,
             "DDoS",
@@ -326,6 +355,12 @@ def test_cpu_training_export_and_outputs(workspace, monkeypatch, capsys, multicl
     assert model.callbacks is None
     assert set(model.predict(frame[names])) <= set(range(3 if multiclass else 2))
     assert len(list(model_dir.glob("*.joblib"))) == 1
+    label_mapping = json.loads((root.parent / "output/label_mapping.json").read_text())
+    assert label_mapping == (
+        {"0": "BENIGN", "1": "DDoS", "2": "PortScan"}
+        if multiclass
+        else {"0": "BENIGN", "1": "DDoS"}
+    )
     schema = json.loads((root.parent / "output/input_schema.json").read_text())
     assert schema["required"] == schema["x-feature-order"] == names
     assert (

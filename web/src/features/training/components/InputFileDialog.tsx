@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Badge } from "@/shared/components/Badge";
 import BaseDialog from "@/shared/components/BaseDialog";
 import { Button } from "@/shared/components/Button";
 import { FileDropzone } from "@/shared/components/FileDropzone";
@@ -55,6 +56,10 @@ export function InputFileDialog({
       value: "requirements",
       label: t("workspace.fileDialog.requirements"),
       disabled: !lockedRequirements && (hasRequirements || Boolean(existing)),
+      hint:
+        !lockedRequirements && hasRequirements ? (
+          <Badge variant="neutral">{t("workspace.fileDialog.existing")}</Badge>
+        ) : undefined,
     },
   ];
 
@@ -195,11 +200,6 @@ export function InputFileDialog({
         {lockedRequirements && (
           <p className="text-style-caption text-color-muted-foreground">
             {t("workspace.fileDialog.requirementsEdit")}
-          </p>
-        )}
-        {hasRequirements && !existing && (
-          <p className="text-style-caption text-color-muted-foreground">
-            {t("workspace.fileDialog.requirementsExists")}
           </p>
         )}
         <div className="flex justify-end gap-3">

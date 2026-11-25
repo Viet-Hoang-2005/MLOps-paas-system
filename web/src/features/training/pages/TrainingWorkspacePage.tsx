@@ -16,7 +16,6 @@ import {
   Play,
   RotateCcw,
 } from "lucide-react";
-import { Loading } from "@/shared/components/Loading";
 import { Button } from "@/shared/components/Button";
 import { Badge } from "@/shared/components/Badge";
 import { PageHeader } from "@/shared/components/PageHeader";
@@ -104,8 +103,8 @@ const formatMegabytes = (
 };
 
 export default function TrainingWorkspacePage() {
-  const { workspaceId = "", jobId = "" } = useParams();
-  return <TrainingTrainingWorkspace key={workspaceId + ":" + jobId} />;
+  const { workspaceId = "" } = useParams();
+  return <TrainingTrainingWorkspace key={workspaceId} />;
 }
 
 function TrainingTrainingWorkspace() {
@@ -172,6 +171,7 @@ function TrainingTrainingWorkspace() {
             ...draft,
             ...selectedJob,
             id: draft.id,
+            entries: draft.entries,
             revision: selectedJob.input_revision ?? draft.revision,
             environment: selectedJob.environment,
             secrets: selectedJob.secrets,
@@ -182,16 +182,24 @@ function TrainingTrainingWorkspace() {
   );
   const isDraft = !jobId && draft?.status === "ready";
   const selectedRun = jobId;
+  const isPreparing =
+    selectedJob?.status === "pending" && !selectedJob.submitted_at;
+  const matchesWorkspaceRevision = Boolean(
+    draft &&
+      selectedJob?.input_revision != null &&
+      selectedJob.input_revision === draft.revision,
+  );
+  const useWorkspaceInput = Boolean(
+    !jobId || isPreparing || matchesWorkspaceRevision,
+  );
   const snapshotQuery = useQuery({
     queryKey: ["training", "input", jobId],
     queryFn: () => getRunInput(jobId),
-    enabled: Boolean(selectedJob?.submitted_at),
+    enabled: Boolean(selectedJob?.submitted_at && !useWorkspaceInput),
   });
   const hasActiveRun = Boolean(
     selectedJob?.submitted_at && active(selectedJob),
   );
-  const isPreparing =
-    selectedJob?.status === "pending" && !selectedJob.submitted_at;
   const locked = busy || editorBusy || hasActiveRun || !isDraft;
   const logStream = useRuntimeLogStream({
     source: selectedJob?.submitted_at ? { kind: "training", id: jobId } : null,
@@ -240,9 +248,11 @@ function TrainingTrainingWorkspace() {
     };
   }, [hasActiveRun, startedAt]);
   const caps = capsQuery.data;
+  const settingsScope = `${workspaceId}:${jobId}`;
   useEffect(() => {
-    if (!workspace || !caps || initialized.current === workspaceId) return;
-    initialized.current = workspaceId;
+    if (!workspace || !caps || initialized.current === settingsScope) return;
+    initialized.current = settingsScope;
+    if (!jobId) runKey.current = null;
     const chosen = caps.cpu_profiles.find(
       (item) =>
         item.vcpu === workspace.vcpu && item.memory_mb === workspace.memory_mb,
@@ -267,7 +277,7 @@ function TrainingTrainingWorkspace() {
         86400,
     );
     setFlavor(workspace.model_flavor);
-  }, [workspace, caps, workspaceId]);
+  }, [workspace, caps, settingsScope, jobId]);
   const cpu = caps?.cpu_profiles.find((item) => item.id === cpuId);
   const accelerators = useMemo(
     () => caps?.accelerators ?? [],
@@ -334,7 +344,7 @@ function TrainingTrainingWorkspace() {
     await refresh();
   }, [settingsValue, workspaceId, refresh]);
   useEffect(() => {
-    if (!isDraft || !settingsValue || initialized.current !== workspaceId)
+    if (!isDraft || !settingsValue || initialized.current !== settingsScope)
       return;
     const timer = setTimeout(() => {
       setSavingConfig(true);
@@ -348,7 +358,7 @@ function TrainingTrainingWorkspace() {
         .finally(() => setSavingConfig(false));
     }, 400);
     return () => clearTimeout(timer);
-  }, [isDraft, settingsValue, persistSettings, workspaceId, t]);
+  }, [isDraft, settingsValue, persistSettings, settingsScope, t]);
   async function start() {
     if (!workspace || !cpu || !accelerator || !isDraft) return;
     setBusy(true);
@@ -361,6 +371,10 @@ function TrainingTrainingWorkspace() {
         workspaceId,
         revision,
         runKey.current,
+      );
+      queryClient.setQueryData(
+        ["training", "workspace-job", workspaceId, job.id],
+        job,
       );
       setDirty(false);
       setSaveError("");
@@ -794,22 +808,26 @@ function TrainingTrainingWorkspace() {
           </p>
         )}
       </div>
-      {selectedJob?.submitted_at && snapshotQuery.isError ? (
+      {!useWorkspaceInput && selectedJob?.submitted_at && snapshotQuery.isError ? (
         <Button onClick={() => void snapshotQuery.refetch()}>
           {t("studio.reload")}
         </Button>
       ) : (
         <WorkspaceEditor
-          key={`${selectedRun}:${reset}`}
+          key={`${useWorkspaceInput ? "workspace" : selectedRun}:${reset}`}
           ref={editor}
           loading={Boolean(
-            isPreparing ||
-            (selectedJob?.submitted_at && snapshotQuery.isLoading),
+            !useWorkspaceInput &&
+              selectedJob?.submitted_at &&
+              snapshotQuery.isLoading,
           )}
           workspace={workspace}
           entries={
-            jobId ? (snapshotQuery.data?.entries ?? []) : workspace.entries
+            useWorkspaceInput
+              ? (draft?.entries ?? [])
+              : (snapshotQuery.data?.entries ?? [])
           }
+          inputSource={useWorkspaceInput ? "workspace" : "snapshot"}
           outputs={selectedJob?.outputs ?? []}
           entryPoint={selectedJob?.entry_point ?? workspace.entry_point}
           runId={jobId || undefined}
@@ -865,17 +883,10 @@ function TrainingTrainingWorkspace() {
         title={t("studio.terminal")}
         badge={statusBadge}
         logs={logStream.logs}
+        loading={isPreparing}
+        loadingText={t("studio.preparingInputHint")}
         bodyClassName="h-96 max-h-[45vh] min-h-72"
-        placeholder={
-          isPreparing ? (
-            <Loading
-              text={t("studio.preparingInput")}
-              description={t("studio.preparingInputHint")}
-            />
-          ) : (
-            t("studio.logPlaceholder")
-          )
-        }
+        placeholder={t("studio.logPlaceholder")}
         actionButtons={[runActionButton]}
       />
       {selectedJob?.error_message && (

@@ -118,5 +118,27 @@ describe("TerminalViewer Component", () => {
 
     expect(writeTextSpy).toHaveBeenCalledWith("Line 1\nLine 2");
   });
+
+  it("renders default and custom loading log lines with animated ellipsis", () => {
+    const { rerender } = renderWithProviders(
+      <TerminalViewer loading placeholder="Idle" />,
+      { language: "en" },
+    );
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Loading...");
+    expect(screen.queryByText("Idle")).not.toBeInTheDocument();
+
+    rerender(
+      <TerminalViewer
+        loading
+        loadingText="Preparing Input"
+        logs={["Queued job"]}
+      />,
+    );
+
+    expect(screen.getByText("Queued job")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Preparing Input...");
+  });
 });
 

@@ -15,5 +15,3 @@ Start with [MLOps PaaS Overview](.agents/skills/mlops-paas-overview/SKILL.md) fo
 | Terraform, Ansible and K3s bootstrap | [Infrastructure](.agents/skills/mlops-paas-architecture/SKILL.md) |
 | GitOps, Argo execution, image promotion and cluster workloads | [Deployment](.agents/skills/mlops-paas-deployment/SKILL.md) |
 | Tenancy, credentials, capabilities, IAM and untrusted workloads | [Security](.agents/skills/mlops-paas-security/SKILL.md) |
-
-For Django schema changes during local development, you may edit an existing migration, including an initial migration, instead of creating a new numbered migration. Verify the edited migration on a fresh database and report any schema update needed for databases that already applied it.
