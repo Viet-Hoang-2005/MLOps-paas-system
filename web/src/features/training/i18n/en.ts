@@ -61,7 +61,7 @@ export const trainingEn = {
   studio: {
     preparingInput: "Preparing Input",
     preparingInputHint:
-      "Downloading, checking and packaging Input. Training will start after preparation completes.",
+      "Downloading, checking and packaging Input. Training will start after preparation completes",
     artifactSelection: {
       source_codeInput: "Select script Python from Input",
       reference_dataInput: "Select data CSV from Input",

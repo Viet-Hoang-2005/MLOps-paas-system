@@ -26,7 +26,9 @@ from apps.training.services.resources import CPU_PROFILES, GPU_MODELS, runtime_o
 from common.api.exceptions import Conflict, ServiceUnavailable
 from infrastructure.runtime_logs import runtime_log_page
 
-from .serializers import TrainingBuildSerializer, TrainingJobEventSerializer, TrainingJobSerializer
+from apps.deployment.api.serializers import BuildSerializer
+
+from .serializers import TrainingJobEventSerializer, TrainingJobSerializer
 
 
 def require_training_enabled():
@@ -177,7 +179,7 @@ class TrainingJobBuildEndpoint(APIView):
             backend=settings.BUILD_BACKEND,
         )
         response_status = status.HTTP_201_CREATED if created else status.HTTP_200_OK
-        return Response(TrainingBuildSerializer(build).data, status=response_status)
+        return Response(BuildSerializer(build).data, status=response_status)
 
 
 class TrainingJobModelOutputEndpoint(APIView):

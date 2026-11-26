@@ -1,0 +1,12 @@
+{
+  "train_csv": "data/training_data.csv",
+  "feature_schema": "feature_schema.json",
+  "label_column": "Label",
+  "seed": 445,
+  "validation_fraction": 0.2,
+  "C": 1.0,
+  "solver": "lbfgs",
+  "class_weight": "balanced",
+  "max_iter": 2000,
+  "threshold": 0.5
+}

@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "time_in_hospital": {
+      "type": "number"
+    },
+    "num_lab_procedures": {
+      "type": "number"
+    },
+    "num_procedures": {
+      "type": "number"
+    },
+    "num_medications": {
+      "type": "number"
+    },
+    "number_diagnoses": {
+      "type": "number"
+    },
+    "gender": {
+      "type": "string"
+    },
+    "age": {
+      "type": "string"
+    },
+    "admission_source_id": {
+      "type": "string"
+    },
+    "medical_specialty": {
+      "type": "string"
+    },
+    "primary_diagnosis": {
+      "type": "string"
+    },
+    "max_glu_serum": {
+      "type": "string"
+    },
+    "A1Cresult": {
+      "type": "string"
+    },
+    "insulin": {
+      "type": "string"
+    },
+    "change": {
+      "type": "string"
+    },
+    "diabetesMed": {
+      "type": "string"
+    },
+    "medicare": {
+      "type": "number"
+    },
+    "medicaid": {
+      "type": "number"
+    },
+    "had_emergency": {
+      "type": "number"
+    },
+    "had_inpatient_days": {
+      "type": "number"
+    },
+    "had_outpatient_days": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "time_in_hospital",
+    "num_lab_procedures",
+    "num_procedures",
+    "num_medications",
+    "number_diagnoses",
+    "gender",
+    "age",
+    "admission_source_id",
+    "medical_specialty",
+    "primary_diagnosis",
+    "max_glu_serum",
+    "A1Cresult",
+    "insulin",
+    "change",
+    "diabetesMed",
+    "medicare",
+    "medicaid",
+    "had_emergency",
+    "had_inpatient_days",
+    "had_outpatient_days"
+  ],
+  "additionalProperties": false,
+  "x-feature-order": [
+    "time_in_hospital",
+    "num_lab_procedures",
+    "num_procedures",
+    "num_medications",
+    "number_diagnoses",
+    "gender",
+    "age",
+    "admission_source_id",
+    "medical_specialty",
+    "primary_diagnosis",
+    "max_glu_serum",
+    "A1Cresult",
+    "insulin",
+    "change",
+    "diabetesMed",
+    "medicare",
+    "medicaid",
+    "had_emergency",
+    "had_inpatient_days",
+    "had_outpatient_days"
+  ]
+}

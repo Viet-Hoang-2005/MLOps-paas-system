@@ -332,7 +332,7 @@ class Tracking:
             # Control Plane maps create_run to the authenticated job, not a new job.
             run = self.client.create_run("0", tags={"mlflow.runName": "nids-xgboost"})
             self.run_id = run.info.run_id
-        except Exception as exc:  # noqa: BLE001 - optional tracking must not abort training
+        except Exception as exc:
             self.disable(exc)
 
     def disable(self, exc):
@@ -355,7 +355,7 @@ class Tracking:
                 ],
                 params=[Param(k, str(v)) for k, v in (params or {}).items()],
             )
-        except Exception as exc:  # noqa: BLE001 - disable all further tracking after a failure
+        except Exception as exc:
             self.disable(exc)
 
 
@@ -648,7 +648,7 @@ def main(argv=None):
 if __name__ == "__main__":
     try:
         main()
-    except Exception as error:  # noqa: BLE001 - CLI boundary redacts HTTP/capability details
+    except Exception as error:
         # Never print HTTP exception details: they can contain capability URLs/tokens.
         if isinstance(error, (ValueError, FileNotFoundError, TrainingError)):
             log(f"ERROR: {error}")

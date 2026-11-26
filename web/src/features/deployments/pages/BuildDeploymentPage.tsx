@@ -154,7 +154,7 @@ function BuildDeploymentContent() {
   const existingAssets = useMemo(() => {
     if (build.data) {
       const map: Record<string, string> = {};
-      for (const asset of build.data.input_assets) {
+      for (const asset of build.data.input_assets ?? []) {
         map[asset.kind === "training_output" ? "source_artifact" : asset.kind] =
           asset.name;
       }

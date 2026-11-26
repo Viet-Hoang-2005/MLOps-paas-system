@@ -179,7 +179,7 @@ export function InformationEvolutionPage({
           description={t("workspace.buildAndRegisterDesc")}
           action={
             sourceJob.data ? (
-              <Button asChild variant="secondary" size="sm">
+              <Button asChild variant="secondary" size="md">
                 <Link
                   to={`/dashboard/training/workspaces/${sourceJob.data.workspace_id}/job/${sourceJob.data.id}`}
                 >

@@ -7,6 +7,7 @@ import { getVersionDetail } from "@/features/evolution/api/evolutionApi";
 import { evolutionQueryKeys } from "@/features/evolution/queryKeys";
 import BaseDialog from "@/shared/components/BaseDialog";
 import { Button } from "@/shared/components/Button";
+import { Select, type SelectOption } from "@/shared/components/Select";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { VersionRecords } from "./VersionRecords";
 
@@ -56,6 +57,10 @@ export function ComparisonVersionDialog({
               : row.key,
       }))
     : [];
+  const versionOptions: SelectOption[] = versions.map((version) => ({
+    value: version.id,
+    label: `v${version.version}`,
+  }));
   return (
     <BaseDialog
       title={t("workspace.compare")}
@@ -65,33 +70,22 @@ export function ComparisonVersionDialog({
         event.preventDefault();
         restoreFocus();
       }}
-      className="w-[min(94vw,72rem)]"
+      className="w-[min(84vw,62rem)]"
     >
       <div className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          {[
-            { id: leftId, set: setLeftId, label: t("workspace.left") },
-            { id: rightId, set: setRightId, label: t("workspace.right") },
-          ].map((item) => (
-            <label
-              key={item.label}
-              className="space-y-2 text-style-body-strong"
-            >
-              <span>{item.label}</span>
-              <select
-                value={item.id}
-                onChange={(event) => item.set(event.target.value)}
-                className="h-12 w-full rounded-control border border-input bg-surface px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {versions.map((version) => (
-                  <option
-                    key={version.id}
-                    value={version.id}
-                  >{`v${version.version}`}</option>
-                ))}
-              </select>
-            </label>
-          ))}
+          <Select
+            label={t("workspace.left")}
+            value={leftId}
+            onChange={setLeftId}
+            options={versionOptions}
+          />
+          <Select
+            label={t("workspace.right")}
+            value={rightId}
+            onChange={setRightId}
+            options={versionOptions}
+          />
         </div>
         {error ? (
           <div role="alert" className="space-y-3">
@@ -120,7 +114,6 @@ export function ComparisonVersionDialog({
               { key: "key", title: t("workspace.field") },
               { key: "left", title: `v${left.data!.version}` },
               { key: "right", title: `v${right.data!.version}` },
-              { key: "delta", title: t("workspace.delta") },
             ]}
             empty={t("workspace.missing")}
           />

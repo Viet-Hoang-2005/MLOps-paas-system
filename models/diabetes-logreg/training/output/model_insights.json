@@ -1,0 +1,577 @@
+{
+  "kind": "feature_importance",
+  "source": "logistic_regression_coefficients",
+  "intercept": -0.05679,
+  "feature_count": 20,
+  "total_coefficients_count": 45,
+  "items": [
+    {
+      "name": "time_in_hospital",
+      "value": 0.071559
+    },
+    {
+      "name": "num_lab_procedures",
+      "value": 0.004941
+    },
+    {
+      "name": "num_procedures",
+      "value": 0.053916
+    },
+    {
+      "name": "num_medications",
+      "value": 0.061687
+    },
+    {
+      "name": "number_diagnoses",
+      "value": 0.079771
+    },
+    {
+      "name": "medicare",
+      "value": 0.034267
+    },
+    {
+      "name": "medicaid",
+      "value": 0.00246
+    },
+    {
+      "name": "had_emergency",
+      "value": 0.109202
+    },
+    {
+      "name": "had_inpatient_days",
+      "value": 0.308176
+    },
+    {
+      "name": "had_outpatient_days",
+      "value": 0.003452
+    },
+    {
+      "name": "gender_Female",
+      "value": 0.040931
+    },
+    {
+      "name": "gender_Male",
+      "value": 0.01568
+    },
+    {
+      "name": "age_30 years or younger",
+      "value": 0.040578
+    },
+    {
+      "name": "age_30-60 years",
+      "value": 0.114958
+    },
+    {
+      "name": "age_Over 60 years",
+      "value": 0.098924
+    },
+    {
+      "name": "admission_source_id_Emergency",
+      "value": 0.023146
+    },
+    {
+      "name": "admission_source_id_Other",
+      "value": 0.097506
+    },
+    {
+      "name": "admission_source_id_Referral",
+      "value": 0.017749
+    },
+    {
+      "name": "medical_specialty_Cardiology",
+      "value": 0.257445
+    },
+    {
+      "name": "medical_specialty_Emergency/Trauma",
+      "value": 0.054066
+    },
+    {
+      "name": "medical_specialty_Family/GeneralPractice",
+      "value": 0.123083
+    },
+    {
+      "name": "medical_specialty_InternalMedicine",
+      "value": 0.042995
+    },
+    {
+      "name": "medical_specialty_Missing",
+      "value": 0.052967
+    },
+    {
+      "name": "medical_specialty_Other",
+      "value": 0.035854
+    },
+    {
+      "name": "primary_diagnosis_Diabetes",
+      "value": 0.134802
+    },
+    {
+      "name": "primary_diagnosis_Genitourinary Issues",
+      "value": 0.063421
+    },
+    {
+      "name": "primary_diagnosis_Musculoskeletal Issues",
+      "value": 0.01963
+    },
+    {
+      "name": "primary_diagnosis_Other",
+      "value": 0.057332
+    },
+    {
+      "name": "primary_diagnosis_Respiratory Issues",
+      "value": 0.204954
+    },
+    {
+      "name": "max_glu_serum_>200",
+      "value": 0.025777
+    },
+    {
+      "name": "max_glu_serum_>300",
+      "value": 0.033041
+    },
+    {
+      "name": "max_glu_serum_Missing",
+      "value": 0.078317
+    },
+    {
+      "name": "max_glu_serum_Norm",
+      "value": 0.014442
+    },
+    {
+      "name": "A1Cresult_>7",
+      "value": 0.002036
+    },
+    {
+      "name": "A1Cresult_>8",
+      "value": 0.041515
+    },
+    {
+      "name": "A1Cresult_Missing",
+      "value": 0.07932
+    },
+    {
+      "name": "A1Cresult_Norm",
+      "value": 0.092381
+    },
+    {
+      "name": "insulin_Down",
+      "value": 0.110804
+    },
+    {
+      "name": "insulin_No",
+      "value": 0.098497
+    },
+    {
+      "name": "insulin_Steady",
+      "value": 0.092373
+    },
+    {
+      "name": "insulin_Up",
+      "value": 0.023456
+    },
+    {
+      "name": "change_Ch",
+      "value": 0.067191
+    },
+    {
+      "name": "change_No",
+      "value": 0.01058
+    },
+    {
+      "name": "diabetesMed_No",
+      "value": 0.116659
+    },
+    {
+      "name": "diabetesMed_Yes",
+      "value": 0.060048
+    }
+  ],
+  "top_positive_risk_factors": [
+    {
+      "feature": "had_inpatient_days",
+      "coefficient": 0.30818,
+      "odds_ratio": 1.36094
+    },
+    {
+      "feature": "primary_diagnosis_Diabetes",
+      "coefficient": 0.1348,
+      "odds_ratio": 1.14431
+    },
+    {
+      "feature": "medical_specialty_Family/GeneralPractice",
+      "coefficient": 0.12308,
+      "odds_ratio": 1.13098
+    },
+    {
+      "feature": "insulin_Down",
+      "coefficient": 0.1108,
+      "odds_ratio": 1.11718
+    },
+    {
+      "feature": "had_emergency",
+      "coefficient": 0.1092,
+      "odds_ratio": 1.11539
+    },
+    {
+      "feature": "age_Over 60 years",
+      "coefficient": 0.09892,
+      "odds_ratio": 1.10398
+    },
+    {
+      "feature": "number_diagnoses",
+      "coefficient": 0.07977,
+      "odds_ratio": 1.08304
+    },
+    {
+      "feature": "A1Cresult_Missing",
+      "coefficient": 0.07932,
+      "odds_ratio": 1.08255
+    },
+    {
+      "feature": "time_in_hospital",
+      "coefficient": 0.07156,
+      "odds_ratio": 1.07418
+    },
+    {
+      "feature": "num_medications",
+      "coefficient": 0.06169,
+      "odds_ratio": 1.06363
+    }
+  ],
+  "top_protective_factors": [
+    {
+      "feature": "medical_specialty_Cardiology",
+      "coefficient": -0.25745,
+      "odds_ratio": 0.77302
+    },
+    {
+      "feature": "primary_diagnosis_Respiratory Issues",
+      "coefficient": -0.20495,
+      "odds_ratio": 0.81468
+    },
+    {
+      "feature": "diabetesMed_No",
+      "coefficient": -0.11666,
+      "odds_ratio": 0.88989
+    },
+    {
+      "feature": "age_30-60 years",
+      "coefficient": -0.11496,
+      "odds_ratio": 0.8914
+    },
+    {
+      "feature": "insulin_No",
+      "coefficient": -0.0985,
+      "odds_ratio": 0.9062
+    },
+    {
+      "feature": "admission_source_id_Other",
+      "coefficient": -0.09751,
+      "odds_ratio": 0.9071
+    },
+    {
+      "feature": "insulin_Steady",
+      "coefficient": -0.09237,
+      "odds_ratio": 0.91176
+    },
+    {
+      "feature": "A1Cresult_Norm",
+      "coefficient": -0.09238,
+      "odds_ratio": 0.91176
+    },
+    {
+      "feature": "max_glu_serum_Missing",
+      "coefficient": -0.07832,
+      "odds_ratio": 0.92467
+    },
+    {
+      "feature": "change_Ch",
+      "coefficient": -0.06719,
+      "odds_ratio": 0.93502
+    }
+  ],
+  "all_coefficients": [
+    {
+      "feature": "time_in_hospital",
+      "coefficient": 0.07156,
+      "odds_ratio": 1.07418
+    },
+    {
+      "feature": "num_lab_procedures",
+      "coefficient": 0.00494,
+      "odds_ratio": 1.00495
+    },
+    {
+      "feature": "num_procedures",
+      "coefficient": -0.05392,
+      "odds_ratio": 0.94751
+    },
+    {
+      "feature": "num_medications",
+      "coefficient": 0.06169,
+      "odds_ratio": 1.06363
+    },
+    {
+      "feature": "number_diagnoses",
+      "coefficient": 0.07977,
+      "odds_ratio": 1.08304
+    },
+    {
+      "feature": "medicare",
+      "coefficient": -0.03427,
+      "odds_ratio": 0.96631
+    },
+    {
+      "feature": "medicaid",
+      "coefficient": -0.00246,
+      "odds_ratio": 0.99754
+    },
+    {
+      "feature": "had_emergency",
+      "coefficient": 0.1092,
+      "odds_ratio": 1.11539
+    },
+    {
+      "feature": "had_inpatient_days",
+      "coefficient": 0.30818,
+      "odds_ratio": 1.36094
+    },
+    {
+      "feature": "had_outpatient_days",
+      "coefficient": 0.00345,
+      "odds_ratio": 1.00346
+    },
+    {
+      "feature": "gender_Female",
+      "coefficient": -0.04093,
+      "odds_ratio": 0.9599
+    },
+    {
+      "feature": "gender_Male",
+      "coefficient": -0.01568,
+      "odds_ratio": 0.98444
+    },
+    {
+      "feature": "age_30 years or younger",
+      "coefficient": -0.04058,
+      "odds_ratio": 0.96023
+    },
+    {
+      "feature": "age_30-60 years",
+      "coefficient": -0.11496,
+      "odds_ratio": 0.8914
+    },
+    {
+      "feature": "age_Over 60 years",
+      "coefficient": 0.09892,
+      "odds_ratio": 1.10398
+    },
+    {
+      "feature": "admission_source_id_Emergency",
+      "coefficient": 0.02315,
+      "odds_ratio": 1.02342
+    },
+    {
+      "feature": "admission_source_id_Other",
+      "coefficient": -0.09751,
+      "odds_ratio": 0.9071
+    },
+    {
+      "feature": "admission_source_id_Referral",
+      "coefficient": 0.01775,
+      "odds_ratio": 1.01791
+    },
+    {
+      "feature": "medical_specialty_Cardiology",
+      "coefficient": -0.25745,
+      "odds_ratio": 0.77302
+    },
+    {
+      "feature": "medical_specialty_Emergency/Trauma",
+      "coefficient": -0.05407,
+      "odds_ratio": 0.94737
+    },
+    {
+      "feature": "medical_specialty_Family/GeneralPractice",
+      "coefficient": 0.12308,
+      "odds_ratio": 1.13098
+    },
+    {
+      "feature": "medical_specialty_InternalMedicine",
+      "coefficient": 0.043,
+      "odds_ratio": 1.04393
+    },
+    {
+      "feature": "medical_specialty_Missing",
+      "coefficient": 0.05297,
+      "odds_ratio": 1.0544
+    },
+    {
+      "feature": "medical_specialty_Other",
+      "coefficient": 0.03585,
+      "odds_ratio": 1.0365
+    },
+    {
+      "feature": "primary_diagnosis_Diabetes",
+      "coefficient": 0.1348,
+      "odds_ratio": 1.14431
+    },
+    {
+      "feature": "primary_diagnosis_Genitourinary Issues",
+      "coefficient": -0.06342,
+      "odds_ratio": 0.93855
+    },
+    {
+      "feature": "primary_diagnosis_Musculoskeletal Issues",
+      "coefficient": 0.01963,
+      "odds_ratio": 1.01982
+    },
+    {
+      "feature": "primary_diagnosis_Other",
+      "coefficient": 0.05733,
+      "odds_ratio": 1.05901
+    },
+    {
+      "feature": "primary_diagnosis_Respiratory Issues",
+      "coefficient": -0.20495,
+      "odds_ratio": 0.81468
+    },
+    {
+      "feature": "max_glu_serum_>200",
+      "coefficient": -0.02578,
+      "odds_ratio": 0.97455
+    },
+    {
+      "feature": "max_glu_serum_>300",
+      "coefficient": 0.03304,
+      "odds_ratio": 1.03359
+    },
+    {
+      "feature": "max_glu_serum_Missing",
+      "coefficient": -0.07832,
+      "odds_ratio": 0.92467
+    },
+    {
+      "feature": "max_glu_serum_Norm",
+      "coefficient": 0.01444,
+      "odds_ratio": 1.01455
+    },
+    {
+      "feature": "A1Cresult_>7",
+      "coefficient": -0.00204,
+      "odds_ratio": 0.99797
+    },
+    {
+      "feature": "A1Cresult_>8",
+      "coefficient": -0.04152,
+      "odds_ratio": 0.95933
+    },
+    {
+      "feature": "A1Cresult_Missing",
+      "coefficient": 0.07932,
+      "odds_ratio": 1.08255
+    },
+    {
+      "feature": "A1Cresult_Norm",
+      "coefficient": -0.09238,
+      "odds_ratio": 0.91176
+    },
+    {
+      "feature": "insulin_Down",
+      "coefficient": 0.1108,
+      "odds_ratio": 1.11718
+    },
+    {
+      "feature": "insulin_No",
+      "coefficient": -0.0985,
+      "odds_ratio": 0.9062
+    },
+    {
+      "feature": "insulin_Steady",
+      "coefficient": -0.09237,
+      "odds_ratio": 0.91176
+    },
+    {
+      "feature": "insulin_Up",
+      "coefficient": 0.02346,
+      "odds_ratio": 1.02373
+    },
+    {
+      "feature": "change_Ch",
+      "coefficient": -0.06719,
+      "odds_ratio": 0.93502
+    },
+    {
+      "feature": "change_No",
+      "coefficient": 0.01058,
+      "odds_ratio": 1.01064
+    },
+    {
+      "feature": "diabetesMed_No",
+      "coefficient": -0.11666,
+      "odds_ratio": 0.88989
+    },
+    {
+      "feature": "diabetesMed_Yes",
+      "coefficient": 0.06005,
+      "odds_ratio": 1.06189
+    }
+  ],
+  "labels": [
+    "No Readmission within 30 Days",
+    "Readmission within 30 Days"
+  ],
+  "confusion_matrix": [
+    [
+      9192,
+      5269
+    ],
+    [
+      844,
+      975
+    ]
+  ],
+  "per_class": {
+    "No Readmission within 30 Days": {
+      "support": 14461,
+      "precision": 0.915903,
+      "recall": 0.635641,
+      "f1": 0.750459
+    },
+    "Readmission within 30 Days": {
+      "support": 1819,
+      "precision": 0.15615,
+      "recall": 0.536009,
+      "f1": 0.241845
+    }
+  },
+  "undefined_metrics": [],
+  "data_cleaning": {
+    "input_rows": 81397,
+    "invalid_rows_removed": 0,
+    "invalid_label_rows": 0,
+    "invalid_feature_rows": 0,
+    "clean_rows": 81397,
+    "class_counts": {
+      "No Readmission within 30 Days": 72303,
+      "Readmission within 30 Days": 9094
+    }
+  },
+  "splits": {
+    "train": {
+      "rows": 65117,
+      "class_counts": {
+        "No Readmission within 30 Days": 57842,
+        "Readmission within 30 Days": 7275
+      }
+    },
+    "validation": {
+      "rows": 16280,
+      "class_counts": {
+        "No Readmission within 30 Days": 14461,
+        "Readmission within 30 Days": 1819
+      }
+    }
+  },
+  "tracking_warning": null
+}
