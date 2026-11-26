@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -74,7 +75,8 @@ def project_cleanup_manifest(project):
 def run_project_cleanup(project):
     if project.deletion_state != "deleting":
         raise ValidationError({"project": "Project deletion is not active."})
-    _stop_project_jobs(project)
+    if not _stop_project_jobs(project):
+        return {"dispatched": True, "waiting_for_stop": True}
     from apps.training.services.storage_migration import migrate_project_storage
 
     migrate_project_storage(project)
@@ -83,7 +85,7 @@ def run_project_cleanup(project):
 
 def _stop_project_jobs(project):
     from apps.drift.models import DriftRun
-    from infrastructure.execution import build_backend, drift_backend, training_backend
+    from infrastructure.execution import build_backend, deployment_backend, drift_backend, training_backend
 
     for build in project.builds.exclude(status__in=("ready", "failed", "cancelled")):
         result = build_backend(build.backend).cancel(build)
@@ -101,14 +103,23 @@ def _stop_project_jobs(project):
             observation_status="cleanup_pending",
             next_execution_check_at=timezone.now(),
         )
-    for run in DriftRun.objects.filter(monitor__version__project=project).exclude(
-        status__in=("completed", "failed", "cancelled")
+    confirmed = True
+    for deployment in Deployment.objects.filter(version__project=project, backend="argo"):
+        result = deployment_backend("argo").stop(deployment)
+        if not isinstance(result, dict) or not result.get("confirmed"):
+            confirmed = False
+    for run in DriftRun.objects.filter(monitor__version__project=project).filter(
+        Q(monitor__backend="argo") | Q(status__in=("pending", "queued", "running"))
     ):
         backend = drift_backend(run.monitor.backend)
-        if not hasattr(backend, "cancel"):
-            raise ValidationError("Cancel running drift workflows before retrying project cleanup.")
-        backend.cancel(run)
-        type(run).objects.filter(pk=run.pk).update(status="cancelled", completed_at=timezone.now())
+        result = backend.cancel(run)
+        if run.monitor.backend == "argo" and (not isinstance(result, dict) or not result.get("confirmed")):
+            confirmed = False
+            continue
+        DriftRun.objects.filter(pk=run.pk, status__in=("pending", "queued", "running")).update(
+            status="cancelled", completed_at=timezone.now()
+        )
+    return confirmed
 
 
 def delete_project_build_images(project):

@@ -40,9 +40,18 @@ def execute_drift_run(self, run_id):
                 "monitor__version__project__owner",
                 "monitor__reference_asset",
             )
-            .get(public_id=run_id)
+            .filter(public_id=run_id)
+            .first()
         )
-        if run.status in {"completed", "cancelled", "failed"} or run.monitor.version.project.deletion_state != "active":
+        if not run:
+            return "not_found"
+        if (
+            run.status in TERMINAL_RUN_STATUSES
+            or run.execution_stop_requested
+            or run.monitor.version.project.deletion_state != "active"
+            or run.monitor.deletion_requested
+            or run.monitor.version.deletion_requested
+        ):
             return run.status
         run.status = "running"
         run.started_at = run.started_at or timezone.now()
@@ -181,9 +190,13 @@ def cancel_drift_run(self, run_id):
 
     from .models import DriftRun
 
+    run = DriftRun.objects.select_related("monitor").filter(public_id=run_id).first()
+    if not run:
+        return "deleted"
     try:
-        run = DriftRun.objects.select_related("monitor").get(public_id=run_id)
-        drift_backend(run.monitor.backend).cancel(run)
-    except Exception:
-        pass
+        result = drift_backend(run.monitor.backend).cancel(run)
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=15) from exc
+    if run.monitor.backend == "argo" and not result.get("confirmed"):
+        raise self.retry(countdown=30, max_retries=10)
     return "cancelled"

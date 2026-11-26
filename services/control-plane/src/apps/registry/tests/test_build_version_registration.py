@@ -33,6 +33,7 @@ def build_for(project, name="model.pkl"):
         flavor="sklearn",
         requirements_snapshot="numpy==1.26.4",
         status="ready",
+        image_uri=f"image-{project.public_id}:temporary",
     )
     BuildInputAsset.objects.create(
         build=build,

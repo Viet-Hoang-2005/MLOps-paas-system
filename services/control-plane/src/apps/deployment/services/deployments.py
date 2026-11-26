@@ -3,6 +3,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.deployment.models import Deployment
 from apps.deployment.tasks import claim_deployment_stop, execute_deployment
+from common.api.exceptions import Conflict
 from common.logging import runtime_line
 from infrastructure.execution import deployment_backend
 
@@ -17,12 +18,12 @@ def request_deployment(build, backend):
         if Deployment.objects.filter(
             version__project=project, status__in=("pending", "deploying", "unconfirmed")
         ).exists():
-            from common.api.exceptions import Conflict
-
             raise Conflict("A deployment is already in progress for this project.")
         build = type(build).objects.select_for_update().get(pk=build.pk)
         if build.status != "ready" or build.version_id is None:
             raise ValidationError({"build": "Only a ready build can be deployed."})
+        if build.version.deletion_requested:
+            raise Conflict("This model version is being deleted.")
         deployment = Deployment.objects.create(version=build.version, build=build, backend=backend, status="pending")
         transaction.on_commit(lambda: _enqueue(deployment))
     return deployment

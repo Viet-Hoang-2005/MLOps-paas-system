@@ -85,8 +85,8 @@ def request_job_deletion(job):
 
         TrainingWorkspace.objects.select_for_update().get(pk=job.workspace_id)
         job = type(job).objects.select_for_update().get(pk=job.pk)
-        if job.builds.exists() or job.registered_versions.exists():
-            raise Conflict("A model build is still using this training output.")
+        if job.builds.exclude(status__in=("failed", "cancelled")).exists() or job.registered_versions.exists():
+            raise Conflict("Delete the model version or build referencing this training job first.")
 
         retrying = bool(job.deletion_requested_at and job.deletion_error)
         if job.deletion_requested_at and not retrying:

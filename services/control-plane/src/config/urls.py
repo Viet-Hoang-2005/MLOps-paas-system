@@ -4,14 +4,18 @@ from django.urls import include, path
 from apps.catalog.api.webhooks import ProjectDeletionWebhookEndpoint
 from apps.deployment.api.urls import build_patterns, deployment_patterns, endpoint_patterns
 from apps.deployment.api.webhooks import BuildWebhookEndpoint, DeploymentWebhookEndpoint
-from apps.drift.api.webhooks import AutomaticDriftWebhookEndpoint, DriftRunModelPackageURLEndpoint, DriftRunWebhookEndpoint
+from apps.drift.api.webhooks import (
+    AutomaticDriftWebhookEndpoint,
+    DriftRunModelPackageURLEndpoint,
+    DriftRunWebhookEndpoint,
+)
 from apps.mlflow.views import (
     MLflowArtifactsMultipartFallbackView,
     MLflowArtifactsProxyView,
 )
 from apps.notifications.api.webhooks import AlertWebhookEndpoint
 from apps.observability.api.endpoints import ProductionDataEndpoint
-from apps.observability.api.executions import ExecutionObservationEndpoint
+from apps.observability.api.executions import ArgoRuntimeStopEndpoint, ExecutionObservationEndpoint
 from apps.training.api.webhooks import (
     TrainingCancellationWebhookEndpoint,
     TrainingInputDownloadURLEndpoint,
@@ -22,6 +26,7 @@ from apps.training.api.webhooks import (
 
 urlpatterns = [
     path("internal/executions/<str:kind>/<uuid:public_id>/observations/", ExecutionObservationEndpoint.as_view()),
+    path("internal/executions/<str:kind>/<uuid:public_id>/stops/", ArgoRuntimeStopEndpoint.as_view()),
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.auth.api.urls")),
     path("api/api-keys/", include("apps.access.api.urls")),

@@ -85,6 +85,8 @@ def _plan_registration(build, metrics_summary, params_summary, insights_summary)
             raise ValidationError({"build": "Only successful builds of active projects can be registered."})
         if build.version_id:
             return build, None
+        if not build.image_uri:
+            raise ValidationError({"build": "Rebuild the image before registering a model version."})
         version_number = project.next_version_number
         while ModelVersion.objects.filter(project=project, version=str(version_number)).exists():
             version_number += 1
@@ -296,11 +298,17 @@ def _commit_registration(build, plan, copies, *, image_uri, version_image_uri, i
     return build
 
 
+@transaction.atomic
 def set_alias(*, project, actor, name, version):
     from apps.registry.models import RegistryAlias
+    from common.api.exceptions import Conflict
 
     if version.project_id != project.id:
         raise ValidationError({"version": "The version belongs to another project."})
+    project = type(project).objects.select_for_update().filter(pk=project.pk, deletion_state="active").first()
+    version = ModelVersion.objects.filter(pk=version.pk, deletion_requested=False).first()
+    if not project or not version:
+        raise Conflict("This project or model version is being deleted.")
     alias, _ = RegistryAlias.objects.update_or_create(project=project, name=name, defaults={"version": version})
     record_registry_event(version=version, actor=actor, event_type="alias_updated", to_state=name)
     enqueue_event(
@@ -429,8 +437,8 @@ def _check_supplemental_allowed(version, project, uploads) -> None:
     """Reject uploads the version cannot accept. Runs before S3 and again under the lock."""
     from common.api.exceptions import Conflict
 
-    if getattr(project, "deletion_state", "active") != "active":
-        raise Conflict("This project is being deleted.")
+    if getattr(project, "deletion_state", "active") != "active" or version.deletion_requested:
+        raise Conflict("This project or model version is being deleted.")
     existing = set(version.artifacts.filter(kind__in=[u.kind for u in uploads]).values_list("kind", flat=True))
     snapshot = {
         "metrics": version.metrics_summary,
@@ -509,7 +517,11 @@ def add_supplemental_artifacts(
 
         with transaction.atomic():
             project = type(version.project).objects.select_for_update().get(pk=version.project_id)
-            locked = ModelVersion.objects.select_for_update().get(pk=version.pk)
+            locked = ModelVersion.objects.select_for_update().filter(pk=version.pk).first()
+            if locked is None:
+                from common.api.exceptions import Conflict
+
+                raise Conflict("This model version was deleted during upload.")
             _check_supplemental_allowed(locked, project, uploads)
             uploaded_at = timezone.now().isoformat()
             for upload, stored in zip(uploads, stored_objects, strict=True):

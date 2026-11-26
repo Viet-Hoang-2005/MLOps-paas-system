@@ -137,16 +137,30 @@ export default function TrainingModelPage() {
             >
               <Play className="h-4 w-4" />
             </Button>
-            <Button
-              size="icon"
-              variant="secondary"
-              border={false}
-              disabled={row.original.status === "deleting"}
-              aria-label={t("workspaceHistory.deleteWorkspace")}
-              onClick={() => setDeleting(row.original)}
+            <span
+              title={t(
+                row.original.job_count > 0
+                  ? "workspaceHistory.deleteWorkspaceBlocked"
+                  : "workspaceHistory.deleteWorkspace",
+              )}
             >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+              <Button
+                size="icon"
+                variant="secondary"
+                border={false}
+                disabled={
+                  row.original.status === "deleting" || row.original.job_count > 0
+                }
+                aria-label={t(
+                  row.original.job_count > 0
+                    ? "workspaceHistory.deleteWorkspaceBlocked"
+                    : "workspaceHistory.deleteWorkspace",
+                )}
+                onClick={() => setDeleting(row.original)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </span>
           </div>
         ),
       },
@@ -226,9 +240,8 @@ export default function TrainingModelPage() {
       <ConfirmDialog
         open={Boolean(deleting)}
         title={t("workspaceHistory.deleteWorkspace")}
-        description={t("workspaceHistory.deleteWorkspaceDescription", {
-          count: deleting?.job_count ?? 0,
-        })}
+        description={t("workspaceHistory.deleteWorkspaceDescription")}
+        confirmText={t("workspaceHistory.deleteWorkspace")}
         tone="danger"
         loading={busy}
         onCancel={() => setDeleting(null)}

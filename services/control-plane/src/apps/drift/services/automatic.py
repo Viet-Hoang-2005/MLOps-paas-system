@@ -2,6 +2,7 @@
 
 from django.db import transaction
 
+from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor
 from apps.drift.services.runs import request_run
 from apps.production.models import PredictionRecord
@@ -15,20 +16,24 @@ def production_data_count_for_version(model_version_id: str) -> int:
 def request_automatic_drift_runs(model_version_id: str) -> int:
     """Create at most one new run per active monitor and threshold crossing.
 
-    Monitor rows are locked so concurrent outbox deliveries cannot independently
+    The project row is locked so concurrent outbox deliveries cannot independently
     observe the same crossing.  The persisted watermark and deterministic run
     idempotency key make replay after worker failures safe.
     """
     with transaction.atomic():
+        project_id = (
+            ModelProject.objects.filter(versions__public_id=model_version_id).values_list("pk", flat=True).first()
+        )
+        if not ModelProject.objects.select_for_update().filter(pk=project_id, deletion_state="active").first():
+            return 0
         monitors = list(
-            DriftMonitor.objects.select_for_update()
-            .filter(
+            DriftMonitor.objects.filter(
                 version__public_id=model_version_id,
+                version__deletion_requested=False,
+                deletion_requested=False,
                 is_active=True,
                 version__project__active_deployment__version__public_id=model_version_id,
-                version__project__deletion_state="active",
-            )
-            .order_by("pk")
+            ).order_by("pk")
         )
         if not monitors:
             return 0

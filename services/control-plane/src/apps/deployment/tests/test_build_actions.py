@@ -227,15 +227,24 @@ class CopyStorage:
         )
 
 
-@pytest.mark.parametrize("status", ["failed", "ready", "cancelled"])
-def test_rebuild_copies_current_preview_into_new_build(project, status, monkeypatch):
+@pytest.mark.parametrize(
+    "status,registration_status",
+    [("failed", "unregistered"), ("ready", "unregistered"), ("ready", "registering"), ("cancelled", "unregistered")],
+)
+def test_rebuild_copies_current_preview_into_new_build(project, status, registration_status, monkeypatch):
     project.preview.flavor = "xgboost"
     project.preview.revision = 3
     project.preview.save()
     PreviewAsset.objects.create(
         preview=project.preview, kind="source_artifact", name="current.pkl", s3_uri="s3://test-bucket/current.pkl"
     )
-    original = Build.objects.create(project=project, flavor="sklearn", status=status, preview_revision=1)
+    original = Build.objects.create(
+        project=project,
+        flavor="sklearn",
+        status=status,
+        preview_revision=1,
+        registration_status=registration_status,
+    )
     storage = CopyStorage()
     monkeypatch.setattr("apps.deployment.services.builds._enqueue", Mock())
     result = request_rebuild(original, backend="docker", storage=storage)
@@ -305,7 +314,7 @@ def test_rebuild_does_not_reuse_training_build_being_deleted(project):
     "field,value", [("status", "building"), ("deletion_state", "deleting"), ("registration_status", "registering")]
 )
 def test_rebuild_rejects_busy_or_deleting_build(project, field, value):
-    build = Build.objects.create(project=project, flavor="sklearn", status="ready")
+    build = Build.objects.create(project=project, flavor="sklearn", status="ready", image_uri="image-project:temporary")
     setattr(build, field, value)
     build.save()
     with pytest.raises(Conflict):

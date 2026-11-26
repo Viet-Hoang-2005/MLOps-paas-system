@@ -201,6 +201,7 @@ def test_repeated_failure_callback_does_not_trigger_a_stop(
 
 def test_stopping_a_failed_deployment_removes_the_runtime_but_keeps_the_outcome(failed_deployment, monkeypatch):
     backend = Mock()
+    backend.stop.return_value = {"confirmed": True}
     monkeypatch.setattr("apps.deployment.tasks.deployment_backend", lambda _: backend)
     transition = Mock()
     monkeypatch.setattr("apps.deployment.tasks.record_transition", transition)

@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.drift.selectors import monitor_for_user, monitors_for_user, run_for_user
+from apps.drift.services.deletion import delete_drift_monitor, delete_drift_run
 from apps.drift.services.logs import drift_run_logs
 from apps.drift.services.monitors import get_monitor_reference_preview, reference_download_url
 from apps.drift.services.reports import get_drift_report_data, report_uri_for_run
@@ -37,6 +38,9 @@ class DriftMonitorDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return monitors_for_user(self.request.user).prefetch_related("runs")
+
+    def perform_destroy(self, instance):
+        delete_drift_monitor(instance)
 
 
 class DriftRunEndpoint(APIView):
@@ -94,7 +98,7 @@ class DriftRunReportDataEndpoint(APIView):
 class DriftRunDetailEndpoint(APIView):
     def delete(self, request, run_id):
         run = run_for_user(request.user, run_id)
-        run.delete()
+        delete_drift_run(run)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

@@ -54,6 +54,14 @@ export const evolutionVi = {
     noDescription: "Chưa có mô tả.",
     versionTitle: "Phiên bản v{{version}}",
     compare: "So sánh phiên bản",
+    deleteVersion: "Xóa phiên bản",
+    deleteVersionTitle: "Xóa phiên bản mô hình v{{version}}?",
+    deleteVersionDescription:
+      "Hành động này sẽ xóa artifact, container image, alias và lịch sử giám sát drift của phiên bản này, đồng thời gỡ liên kết để có thể xóa build. Nếu kho lưu trữ bật versioning, các bản artifact cũ có thể được giữ theo chính sách lưu giữ.",
+    deleteVersionRunningWarning:
+      "Phiên bản này hiện đang chạy deployment. Khi xóa, pod deployment đang chạy sẽ bị dừng ngay lập tức.",
+    deleteVersionSuccess: "Đã xóa phiên bản mô hình v{{version}}.",
+    deleteVersionFailed: "Không thể xóa phiên bản mô hình.",
     openDeployment: "Mở triển khai",
     refresh: "Làm mới",
     loading: "Đang tải phiên bản…",

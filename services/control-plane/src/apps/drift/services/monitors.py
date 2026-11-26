@@ -63,6 +63,8 @@ def create_monitor(*, data, backend, storage=None):
             data["version"] = version
             if not project.is_active or project.deletion_state != "active":
                 raise Conflict("This project is being deleted.")
+            if version.deletion_requested:
+                raise Conflict("This model version is being deleted.")
             if (
                 not project.active_deployment_id
                 or project.active_deployment.version_id != version.pk

@@ -42,9 +42,11 @@ def request_registration(build):
         build = Build.objects.select_for_update().select_related("project").get(pk=build.pk)
         if build.status != "ready" or build.project.deletion_state != "active" or build.deletion_state != "active":
             raise Conflict("Only a successful build can be registered.")
-        if build.version_id or (
-            build.registration_status == "registering" and build.updated_at > timezone.now() - timedelta(minutes=10)
-        ):
+        if build.version_id:
+            return build
+        if not build.image_uri:
+            raise Conflict("This build has no image. Rebuild it before registering a model version.")
+        if build.registration_status == "registering" and build.updated_at > timezone.now() - timedelta(minutes=10):
             return build
         build.registration_status = "registering"
         build.registration_error = ""

@@ -159,7 +159,13 @@ class S3Storage:
         for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
             objects = [{"Key": item["Key"]} for item in page.get("Contents", [])]
             if objects:
-                self.client.delete_objects(Bucket=self.bucket, Delete={"Objects": objects})
+                response = self.client.delete_objects(Bucket=self.bucket, Delete={"Objects": objects})
+                errors = response.get("Errors", [])
+                if errors:
+                    codes = ", ".join(sorted({error.get("Code", "Unknown") for error in errors}))
+                    raise RuntimeError(
+                        f"Object storage could not delete {len(errors)} of {len(objects)} objects ({codes})."
+                    )
 
     def delete(self, uri):
         bucket, key = self.parse_uri(uri)

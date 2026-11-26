@@ -72,3 +72,7 @@ export async function getVersionReferencePreview(
     )
   ).data;
 }
+
+export async function deleteModelVersion(versionId: string): Promise<void> {
+  await apiClient.delete(controlPlaneURL(`/registry/versions/${versionId}/`));
+}

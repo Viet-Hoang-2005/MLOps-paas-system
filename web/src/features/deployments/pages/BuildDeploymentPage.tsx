@@ -6,7 +6,7 @@ import {
   buildPreview,
   buildTraining,
 } from "@/features/deployments/api/lifecycleApi";
-import { canRebuild } from "@/features/deployments/buildActions";
+import { canRebuild, isBuildImageMissing } from "@/features/deployments/buildActions";
 import { isRegisteredBuild } from "@/features/deployments/deploymentEligibility";
 import { useBuildRegistration } from "@/features/deployments/hooks/useBuildRegistration";
 import {
@@ -281,8 +281,10 @@ function BuildDeploymentContent() {
   const awaitingRegistrationRef = useRef(false);
 
   const register = useBuildRegistration(buildId, activeProjectId);
+  const imageMissing = isBuildImageMissing(build.data);
   const isRegistering =
-    register.isPending || build.data?.registration_status === "registering";
+    register.isPending ||
+    (!imageMissing && build.data?.registration_status === "registering");
 
   useEffect(() => {
     if (!awaitingRegistrationRef.current || !build.data) return;
@@ -333,7 +335,6 @@ function BuildDeploymentContent() {
   const isFinished = Boolean(
     build.data && ["ready", "failed", "cancelled"].includes(build.data.status),
   );
-
   const buildButtonDisabled =
     isRegistering ||
     Boolean(buildId && (!build.data || !canRebuild(build.data))) ||
@@ -347,16 +348,20 @@ function BuildDeploymentContent() {
   const statusBadge = build.data?.status ? (
     <Badge
       variant={
-        build.data.status === "ready"
-          ? "success"
-          : build.data.status === "failed"
-            ? "danger"
-            : ["pending", "queued", "building"].includes(build.data.status)
-              ? "info"
-              : "warning"
+        imageMissing
+          ? "warning"
+          : build.data.status === "ready"
+            ? "success"
+            : build.data.status === "failed"
+              ? "danger"
+              : ["pending", "queued", "building"].includes(build.data.status)
+                ? "info"
+                : "warning"
       }
     >
-      {t(`workflow.${build.data.status}`, build.data.status)}
+      {imageMissing
+        ? t("workflow.buildImageMissing")
+        : t(`workflow.${build.data.status}`, build.data.status)}
     </Badge>
   ) : undefined;
 
@@ -443,7 +448,15 @@ function BuildDeploymentContent() {
           actionButtons={[buildActionButton]}
         />
 
-        {build.data?.status === "ready" && (
+        {imageMissing && (
+          <Callout
+            variant="warning"
+            title={t("workflow.buildImageMissing")}
+            description={t("workflow.buildImageMissingHint")}
+          />
+        )}
+
+        {build.data?.status === "ready" && !imageMissing && (
           <Callout
             variant="success"
             title={t("workflow.buildCompleted")}
@@ -471,7 +484,7 @@ function BuildDeploymentContent() {
           />
         )}
 
-        {build.data?.registration_status === "registering" && (
+        {!imageMissing && build.data?.registration_status === "registering" && (
           <Callout
             variant="info"
             title={t("workflow.registering")}
@@ -534,6 +547,7 @@ function BuildDeploymentContent() {
             loading={isRegistering}
             disabled={
               build.data?.status !== "ready" ||
+              imageMissing ||
               Boolean(build.data?.version_id) ||
               isRegistering ||
               build.data?.deletion_state !== "active"

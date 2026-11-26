@@ -11,6 +11,8 @@ spec:
   podMetadata:
     labels:
       mlops-paas.io/deployment-id: "{{workflow.parameters.deployment_id}}"
+      mlops-paas.io/tenant-id: "{{workflow.parameters.tenant_id}}"
+      mlops-paas.io/project-id: "{{workflow.parameters.project_id}}"
   arguments:
     parameters:
       - name: deployment_id
@@ -92,6 +94,9 @@ spec:
               tenant: {{=toJson(inputs.parameters.tenant_id)}}
               project: {{=toJson(inputs.parameters.project_id)}}
               model-version: {{=toJson(inputs.parameters.model_version_id)}}
+              mlops-paas.io/deployment-id: "{{workflow.parameters.deployment_id}}"
+              mlops-paas.io/tenant-id: {{=toJson(inputs.parameters.tenant_id)}}
+              mlops-paas.io/project-id: {{=toJson(inputs.parameters.project_id)}}
           spec:
             replicas: 1
             progressDeadlineSeconds: 1500
@@ -188,6 +193,9 @@ spec:
               app.kubernetes.io/managed-by: argo-workflows
               component: model-server
               serving-engine: {{=toJson(inputs.parameters.model_type)}}
+              mlops-paas.io/deployment-id: "{{workflow.parameters.deployment_id}}"
+              mlops-paas.io/tenant-id: "{{workflow.parameters.tenant_id}}"
+              mlops-paas.io/project-id: "{{workflow.parameters.project_id}}"
           spec:
             selector:
               app: {{=toJson(inputs.parameters.container_name)}}

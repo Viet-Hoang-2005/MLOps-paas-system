@@ -54,6 +54,14 @@ export const registryEn = {
     noDescription: "No description provided.",
     versionTitle: "Version v{{version}}",
     compare: "Compare versions",
+    deleteVersion: "Delete version",
+    deleteVersionTitle: "Delete model version v{{version}}?",
+    deleteVersionDescription:
+      "This deletes the version's artifacts, container image, aliases, and drift monitoring history, and unlinks its build so the build can be removed. If storage versioning is enabled, older copies of the artifacts may be retained according to the storage retention policy.",
+    deleteVersionRunningWarning:
+      "This version is currently deployed and running. Deleting it will stop the active deployment pod immediately.",
+    deleteVersionSuccess: "Model version v{{version}} deleted.",
+    deleteVersionFailed: "Failed to delete model version.",
     openDeployment: "Open deployment",
     refresh: "Refresh",
     loading: "Loading version…",

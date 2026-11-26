@@ -96,6 +96,7 @@ def record_transition(resource, status, *, phase=None, source="task", reason=Non
         "TrainingJob": "training_job",
         "DriftRun": "drift_run",
         "ModelProject": "project",
+        "ModelVersion": "model_version",
     }[type(resource).__name__]
     # Only use relations already loaded by orchestration; logging must not issue queries.
     related = resource

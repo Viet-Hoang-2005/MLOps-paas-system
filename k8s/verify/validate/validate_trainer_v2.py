@@ -177,6 +177,41 @@ def validate_cancel_before_submit_is_idempotent_and_blocks_late_events():
 
 
 @pytest.mark.validate
+@pytest.mark.parametrize("kind", ["deployment", "drift"])
+def validate_stop_blocks_replayed_submit_for_serving_and_drift(kind):
+    payload = {**PAYLOAD, "kind": kind, "project_id": "33333333-3333-3333-3333-333333333333",
+               "resource_id": PAYLOAD["job_id"], "stop": True}
+    name, labels = ops.identity(payload, kind)
+    api = FakeAPI(workflow=False)
+    assert ops.reconcile(api, payload)["status"] == "stopped"
+    assert ops.submit(api, payload, kind)["metadata"]["labels"] == labels
+    assert api.objects[ops.workflow_path(name)]["spec"]["workflowTemplateRef"]["name"] == "mlops-paas-job-tombstone-template"
+
+
+@pytest.mark.validate
+def validate_deployment_stop_waits_for_workflow_and_serving_pods():
+    payload = {**PAYLOAD, "kind": "deployment", "project_id": "33333333-3333-3333-3333-333333333333",
+               "resource_id": PAYLOAD["job_id"], "stop": True}
+    name, labels = ops.identity(payload, "deployment")
+    api = FakeAPI(workflow=False)
+    workflow = ops.submit(api, payload, "deployment")
+    workflow["status"] = {"phase": "Running"}
+    api.objects[ops.workflow_path(name)] = workflow
+    deployment_path = f"/apis/apps/v1/namespaces/{ops.SERVING_NS}/deployments/{name}"
+    service_path = f"/api/v1/namespaces/{ops.SERVING_NS}/services/{name}-svc"
+    pod_path = f"/api/v1/namespaces/{ops.SERVING_NS}/pods/serving-pod"
+    for path in (deployment_path, service_path, pod_path):
+        api.objects[path] = {"metadata": {"name": path.split("/")[-1], "uid": path, "labels": labels}}
+    api.defer_workflow_stop = True
+    assert ops.reconcile(api, payload)["status"] == "error"
+    assert deployment_path not in api.objects and service_path not in api.objects
+    api.defer_workflow_stop = False
+    assert ops.reconcile(api, payload)["status"] == "error"
+    del api.objects[pod_path]
+    assert ops.reconcile(api, payload)["status"] == "stopped"
+
+
+@pytest.mark.validate
 def validate_unobserved_workflow_is_not_reported_stopped():
     api = FakeAPI()
     api.objects[ops.workflow_path(NAME)]["status"] = {}

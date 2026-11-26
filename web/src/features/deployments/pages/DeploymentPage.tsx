@@ -7,6 +7,7 @@ import { isDeployableBuild } from "@/features/deployments/deploymentEligibility"
 import {
   canDeleteBuild,
   canRebuild,
+  isBuildImageMissing,
 } from "@/features/deployments/buildActions";
 import {
   buildStatuses,
@@ -113,6 +114,9 @@ export default function DeploymentPage() {
       accessorKey: "status",
       header: t("workflow.buildStatus"),
       cell: ({ row }) => {
+        if (isBuildImageMissing(row.original)) {
+          return <Badge variant="warning">{t("workflow.buildImageMissing")}</Badge>;
+        }
         const status = buildStatuses[row.original.status];
         return <Badge variant={status.tone}>{t(status.label)}</Badge>;
       },

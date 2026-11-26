@@ -233,7 +233,7 @@ def test_build_completion_requires_explicit_idempotent_registration(project):
 
 
 def test_register_double_click_only_dispatches_once(project, monkeypatch, django_capture_on_commit_callbacks):
-    build = Build.objects.create(project=project, flavor="xgboost", status="ready")
+    build = Build.objects.create(project=project, flavor="xgboost", status="ready", image_uri="temporary")
     calls = []
     monkeypatch.setattr("apps.deployment.tasks.register_build.delay", lambda id: calls.append(id))
     with django_capture_on_commit_callbacks(execute=True):

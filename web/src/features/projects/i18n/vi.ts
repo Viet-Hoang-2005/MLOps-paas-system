@@ -87,6 +87,8 @@ export const projectsVi = {
     build: "Build Image",
     stopBuild: "Stop build",
     rebuild: "Re-build",
+    buildImageMissing: "Image không còn khả dụng",
+    buildImageMissingHint: "Build lại để tạo image trước khi đăng ký phiên bản mô hình.",
     rebuildTitle: "Build lại image mô hình",
     rebuildLabel: "Build lại {{id}}",
     rebuildDescription:

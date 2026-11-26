@@ -1,6 +1,6 @@
 import uuid
 
-from django.db import models
+from django.db import models, router, transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
@@ -12,6 +12,31 @@ class PublicModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+class VersionReferenceModel(PublicModel):
+    """Serialize lineage writes with the version's deletion claim."""
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        from apps.registry.models import ModelVersion
+        from common.api.exceptions import Conflict
+
+        version_ids = {getattr(self, field) for field in self.version_reference_fields} - {None}
+        database = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=database):
+            versions = list(
+                ModelVersion.objects.using(database)
+                .select_for_update()
+                .filter(pk__in=version_ids)
+                .order_by("pk")
+                .values_list("deletion_requested", flat=True)
+            )
+            if len(versions) != len(version_ids) or any(versions):
+                raise Conflict("Continuous training cannot reference a model version being deleted.")
+            return super().save(*args, **kwargs)
 
 
 class MaintenancePolicy(PublicModel):
@@ -68,7 +93,8 @@ class DatasetSnapshot(PublicModel):
         return f"Dataset snapshot {self.public_id}"
 
 
-class EvidenceWindow(PublicModel):
+class EvidenceWindow(VersionReferenceModel):
+    version_reference_fields = ("champion_id",)
     STATUSES = (
         ("collecting", "Collecting"),
         ("sealed", "Sealed"),
@@ -273,7 +299,8 @@ class LabelLedgerEntry(PublicModel):
         return f"Label ledger entry {self.public_id}"
 
 
-class MaintenanceDecision(PublicModel):
+class MaintenanceDecision(VersionReferenceModel):
+    version_reference_fields = ("expected_champion_id",)
     ACTIONS = (("keep", "Keep"), ("request_labels", "Request labels"), ("hold", "Hold"), ("retrain", "Retrain"))
 
     window = models.ForeignKey("ct.EvidenceWindow", on_delete=models.PROTECT, related_name="decisions")
@@ -306,7 +333,8 @@ class MaintenanceDecision(PublicModel):
         return f"Maintenance decision {self.public_id}"
 
 
-class MaintenanceRun(PublicModel):
+class MaintenanceRun(VersionReferenceModel):
+    version_reference_fields = ("expected_champion_id", "candidate_id")
     ACTIVE_STATES = ("awaiting_execution", "running", "awaiting_gate", "awaiting_update")
     STATES = tuple(
         (value, value.replace("_", " ").title())
@@ -396,7 +424,8 @@ class MaintenanceStepAttempt(PublicModel):
         return f"Maintenance step {self.public_id}"
 
 
-class EvaluationGate(PublicModel):
+class EvaluationGate(VersionReferenceModel):
+    version_reference_fields = ("champion_id", "candidate_id")
     STATUSES = (
         ("pending", "Pending"),
         ("running", "Running"),

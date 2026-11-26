@@ -252,7 +252,7 @@ spec:
         data:
           - path: body.kind
             type: string
-            value: ['^(training|drift)$']
+            value: ['^(training|drift|deployment)$']
           - path: body.resource_id
             type: string
             value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
@@ -264,7 +264,7 @@ spec:
             value: ['^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
           - path: body.callback_url
             type: string
-            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/executions/(training|drift)/[0-9a-f-]{36}/observations/$']
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/executions/((training|drift)/[0-9a-f-]{36}/observations|(drift|deployment)/[0-9a-f-]{36}/stops)/$']
         exprs:
           - expr: callback =~ resource_id && callback =~ kind
             fields:
@@ -426,80 +426,20 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: deploy-model-job-
+                generateName: deploy-submission-
                 namespace: mlops-paas-execution
               spec:
                 workflowTemplateRef:
-                  name: mlops-paas-model-server-deploy-template
+                  name: mlops-paas-job-submit-template
                 arguments:
                   parameters:
-                    - name: tenant_id
-                      value: ""
-                    - name: project_id
-                      value: ""
-                    - name: model_version_id
-                      value: ""
-                    - name: version
-                      value: ""
-                    - name: image_name
-                      value: ""
-                    - name: container_name
-                      value: ""
-                    - name: model_type
-                      value: "ml"
-                    - name: target_port
-                      value: "5001"
-                    - name: model_uri
-                      value: ""
-                    - name: deployment_id
-                      value: ""
-                    - name: control_plane_webhook_url
-                      value: ""
-                    - name: callback_token
-                      value: ""
+                    - {name: execution_kind, value: "deployment"}
+                    - {name: execution_payload, value: ""}
           parameters:
             - src:
                 dependencyName: deploy-dep
-                dataKey: body.tenant_id
-              dest: spec.arguments.parameters.0.value
-            - src:
-                dependencyName: deploy-dep
-                dataKey: body.project_id
+                dataTemplate: '{{ .Input.body | toJson }}'
               dest: spec.arguments.parameters.1.value
-            - src:
-                dependencyName: deploy-dep
-                dataKey: body.model_version_id
-              dest: spec.arguments.parameters.2.value
-            - src:
-                dependencyName: deploy-dep
-                dataKey: body.version
-              dest: spec.arguments.parameters.3.value
-            - src:
-                dependencyName: deploy-dep
-                dataKey: body.image_name
-              dest: spec.arguments.parameters.4.value
-            - src:
-                dependencyName: deploy-dep
-                dataKey: body.container_name
-              dest: spec.arguments.parameters.5.value
-            - src:
-                dependencyName: deploy-dep
-                dataKey: body.model_type
-              dest: spec.arguments.parameters.6.value
-            - src:
-                dependencyName: deploy-dep
-                dataKey: body.target_port
-              dest: spec.arguments.parameters.7.value
-            - src:
-                dependencyName: deploy-dep
-                dataKey: body.model_uri
-              dest: spec.arguments.parameters.8.value
-            - src: {dependencyName: deploy-dep, dataKey: body.deployment_id}
-              dest: spec.arguments.parameters.9.value
-            - src: {dependencyName: deploy-dep, dataKey: body.control_plane_webhook_url}
-              dest: spec.arguments.parameters.10.value
-            - src: {dependencyName: deploy-dep, dataKey: body.callback_token}
-              dest: spec.arguments.parameters.11.value
 
     - template:
         name: drift-workflow-trigger

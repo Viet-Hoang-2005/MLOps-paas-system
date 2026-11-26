@@ -22,7 +22,8 @@ export const trainingEn = {
     noWorkspaces: "No workspaces found",
     deleteWorkspace: "Delete Workspace",
     deleteWorkspaceDescription:
-      "Delete this workspace and its {{count}} training jobs? Running jobs must stop before deletion completes.",
+      "Delete this workspace and its files and secrets? The workspace must be empty of training jobs.",
+    deleteWorkspaceBlocked: "Delete all Training Jobs in this workspace first.",
     deleteJobDescription:
       "Delete this training job, its snapshot, logs and Output? The current workspace will be kept.",
     states: {
@@ -492,7 +493,7 @@ export const trainingEn = {
     deleteOutput: "Delete Training Output",
     deleteOutputTitle: "Delete training output?",
     deleteOutputDescription:
-      "The output bundle will be removed permanently. The job, events, logs, and any version already registered remain available.",
+      "The output bundle will be deleted. If storage versioning is enabled, older copies may be retained according to the storage retention policy. The job, events, logs, and any registered version remain available.",
     deleteOutputConfirm: "Delete output",
     registry: {
       title: "Build and register this training output",

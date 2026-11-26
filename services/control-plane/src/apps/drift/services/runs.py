@@ -2,19 +2,26 @@ import uuid
 
 from django.db import transaction
 
-from apps.drift.models import DriftRun
+from apps.catalog.models import ModelProject
+from apps.drift.models import DriftMonitor, DriftRun
 from apps.drift.tasks import execute_drift_run
+from common.api.exceptions import Conflict
 
 
 def request_run(monitor, idempotency_key=None):
-    from common.api.exceptions import Conflict
-
-    if monitor.version.project.deletion_state != "active":
-        raise Conflict("This project is being deleted.")
     key = idempotency_key or str(uuid.uuid4())
-    run, created = DriftRun.objects.get_or_create(monitor=monitor, idempotency_key=key, defaults={"status": "queued"})
-    if created:
-        transaction.on_commit(lambda: _enqueue(run))
+    with transaction.atomic():
+        project = ModelProject.objects.select_for_update().filter(pk=monitor.version.project_id).first()
+        if not project or project.deletion_state != "active":
+            raise Conflict("This project is being deleted.")
+        monitor = DriftMonitor.objects.select_related("version").filter(pk=monitor.pk).first()
+        if not monitor or monitor.deletion_requested or monitor.version.deletion_requested:
+            raise Conflict("This monitor or model version is being deleted.")
+        run, created = DriftRun.objects.get_or_create(
+            monitor=monitor, idempotency_key=key, defaults={"status": "queued"}
+        )
+        if created:
+            transaction.on_commit(lambda: _enqueue(run))
     return run
 
 

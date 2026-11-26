@@ -111,6 +111,8 @@ def claim(kind, public_id=None):
         if kind == "training":
             candidates |= Q(deletion_requested_at__isnull=False)
             candidates &= Q(submitted_at__isnull=False)
+        elif kind == "drift":
+            candidates &= Q(monitor__deletion_requested=False, monitor__version__deletion_requested=False)
         rows = (
             model_for(kind)
             .objects.select_for_update(skip_locked=True)

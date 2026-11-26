@@ -86,6 +86,8 @@ export const catalogEn = {
     build: "Build Image",
     stopBuild: "Stop build",
     rebuild: "Re-build",
+    buildImageMissing: "Image unavailable",
+    buildImageMissingHint: "Re-build to create an image before registering a model version.",
     rebuildTitle: "Re-build model image",
     rebuildLabel: "Re-build {{id}}",
     rebuildDescription:

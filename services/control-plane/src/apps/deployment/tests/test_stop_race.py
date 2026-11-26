@@ -98,9 +98,15 @@ def test_promotion_claims_the_replaced_deployment_stop(runtimes, django_capture_
 def test_stop_task_records_runtime_stop_after_backend(runtimes, monkeypatch):
     project, running, _candidate, _stops = runtimes
     backend = Mock()
+    backend.stop.return_value = {"confirmed": False}
     monkeypatch.setattr("apps.deployment.tasks.deployment_backend", lambda _: backend)
+    assert stop_deployment.run(str(running.public_id)) == "stopping"
+    running.refresh_from_db()
+    assert running.stopped_at is None
+
+    backend.stop.return_value = {"confirmed": True}
     assert stop_deployment.run(str(running.public_id)) == "stopped"
-    backend.stop.assert_called_once()
+    assert backend.stop.call_count == 2
     project.refresh_from_db()
     running.refresh_from_db()
     assert project.active_deployment_id is None
@@ -157,7 +163,10 @@ def test_reconcile_ignores_completed_and_live_deployments(runtimes, settings):
 
     cache.clear()
     _project, running, candidate, stops = runtimes
-    Deployment.objects.filter(pk=running.pk).update(status="stopped", stopped_at=timezone.now())
+    stopped_at = timezone.now()
+    Deployment.objects.filter(pk=running.pk).update(
+        status="stopped", stopped_at=stopped_at, argo_stop_confirmed_at=stopped_at
+    )
     _age(running, settings.STOP_RECONCILE_GRACE_SECONDS + 5)
     _age(candidate, settings.STOP_RECONCILE_GRACE_SECONDS + 5)  # still deploying
 

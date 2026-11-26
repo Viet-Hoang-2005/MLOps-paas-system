@@ -136,6 +136,7 @@ class Deployment(ExecutionWatch):
     error_message = models.TextField(blank=True)
     deployed_at = models.DateTimeField(null=True, blank=True)
     stopped_at = models.DateTimeField(null=True, blank=True)
+    argo_stop_confirmed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

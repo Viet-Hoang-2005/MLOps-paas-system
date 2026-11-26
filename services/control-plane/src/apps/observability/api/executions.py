@@ -5,6 +5,14 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.deployment.models import Deployment
+from apps.drift.models import DriftRun
+from apps.observability.services.argo_stops import (
+    STOP_TOKEN_SALT,
+    confirm_stop,
+    project_has_unconfirmed_argo_stops,
+    stop_identity,
+)
 from apps.observability.services.executions import apply_observation, ownership_for, resource_for
 
 
@@ -41,3 +49,44 @@ class ExecutionObservationEndpoint(APIView):
         if result == "ignored":
             raise PermissionDenied("Observation lease expired or was consumed.")
         return Response({"status": result})
+
+
+class ArgoRuntimeStopEndpoint(APIView):
+    authentication_classes = ()
+    permission_classes = ()
+
+    def post(self, request, kind, public_id):
+        token = request.headers.get("Authorization", "").removeprefix("Bearer ")
+        try:
+            claims = signing.loads(token, salt=STOP_TOKEN_SALT, max_age=300)
+        except signing.BadSignature:
+            raise PermissionDenied("Invalid runtime stop capability.")
+        if claims.get("kind") != kind or claims.get("resource_id") != str(public_id):
+            raise PermissionDenied("Runtime stop capability resource mismatch.")
+        if kind == "deployment":
+            rows = Deployment.objects.filter(backend="argo").select_related("version__project__owner")
+        elif kind == "drift":
+            rows = DriftRun.objects.filter(monitor__backend="argo").select_related("monitor__version__project__owner")
+        else:
+            raise PermissionDenied("Unsupported runtime kind.")
+        resource = rows.filter(public_id=public_id).first()
+        if not resource or claims != stop_identity(resource, kind):
+            raise PermissionDenied("Runtime stop capability ownership mismatch.")
+        serializer = ObservationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        status = serializer.validated_data["status"]
+        if status == "stopped" and confirm_stop(resource, kind):
+            _resume_stop(resource, kind)
+        return Response({"status": status})
+
+
+def _resume_stop(resource, kind):
+    from apps.catalog.tasks import execute_project_deletion
+    from apps.deployment.tasks import stop_deployment
+
+    project = resource.version.project if kind == "deployment" else resource.monitor.version.project
+    if project.deletion_state == "deleting":
+        if not project_has_unconfirmed_argo_stops(project):
+            execute_project_deletion.delay(str(project.public_id))
+    elif kind == "deployment" and resource.status in {"stopped", "failed"} and not resource.version.deletion_requested:
+        stop_deployment.delay(str(resource.public_id))

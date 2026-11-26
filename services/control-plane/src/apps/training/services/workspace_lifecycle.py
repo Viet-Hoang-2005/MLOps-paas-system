@@ -22,22 +22,19 @@ def cleanup_preparation(job_id, token, prefix=None):
 
 
 def request_workspace_deletion(workspace):
-    from .jobs import request_job_deletion
-
     with transaction.atomic():
         row = TrainingWorkspace.objects.select_for_update().get(pk=workspace.pk)
         list(row.jobs.select_for_update().values_list("pk", flat=True))
-        blockers = list(row.jobs.filter(builds__isnull=False).values_list("public_id", flat=True).distinct())
-        blockers += list(row.jobs.filter(registered_versions__isnull=False).values_list("public_id", flat=True))
-        if blockers:
+        if row.jobs.exists():
             raise Conflict(
-                {"jobs": [str(value) for value in blockers], "detail": "Builds or versions still reference these jobs."}
+                {
+                    "jobs": [str(value) for value in row.jobs.values_list("public_id", flat=True)],
+                    "detail": "Delete all training jobs in this workspace before deleting the workspace.",
+                }
             )
         row.deletion_requested_at = timezone.now()
         row.deletion_error = ""
         row.save(update_fields=["deletion_requested_at", "deletion_error", "updated_at"])
-        for job in row.jobs.all():
-            request_job_deletion(job)
         transaction.on_commit(lambda: cleanup_workspace.delay(str(row.public_id)))
 
 

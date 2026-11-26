@@ -14,6 +14,8 @@ from apps.training.models import TrainingJob
 from apps.training.services import jobs as job_service
 from apps.training.tasks import delete_training_job, execute_training_job
 from infrastructure.execution.docker_backends import DockerTrainingBackend
+from infrastructure.execution.image_references import temporary_image_reference
+from infrastructure.storage.paths import build_prefix
 
 
 def training_job(*, email="delete-training@example.com", status="completed"):
@@ -100,6 +102,60 @@ def test_delete_is_blocked_by_active_model_build():
     assert response.status_code == 409
     job.refresh_from_db()
     assert job.deletion_requested_at is None
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("status", ["failed", "cancelled"])
+def test_delete_job_quiesces_and_cleans_terminal_builds(monkeypatch, django_capture_on_commit_callbacks, status):
+    owner, job = training_job()
+    failed_build = Build.objects.create(
+        project=job.project,
+        source_job=job,
+        source_job_reference=job.public_id,
+        flavor="sklearn",
+        status=status,
+        backend="docker",
+        next_execution_check_at=timezone.now(),
+    )
+    client = APIClient()
+    client.force_authenticate(owner)
+    monkeypatch.setattr(job_service.delete_training_job, "delay", lambda _id: SimpleNamespace(id="task-1"))
+
+    with django_capture_on_commit_callbacks(execute=True):
+        response = client.delete(f"/api/training-jobs/{job.public_id}/")
+
+    assert response.status_code == 202
+    storage = Mock()
+    runtime_stop = Mock(side_effect=RuntimeError("runner still active"))
+    image_cleanup = Mock()
+    delete_logs = Mock()
+    monkeypatch.setattr("apps.training.tasks.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.tasks.stop_build_for_deletion", runtime_stop)
+    monkeypatch.setattr("apps.deployment.tasks.BuildImageCleaner", lambda: image_cleanup)
+    monkeypatch.setattr("apps.training.services.logs.delete_training_logs", delete_logs)
+
+    with pytest.raises(RuntimeError, match="runner still active"):
+        delete_training_job.run(str(job.public_id))
+    failed_build.refresh_from_db()
+    assert failed_build.deletion_state == "delete_failed"
+    job.refresh_from_db()
+    assert job.deletion_error == "runner still active"
+    storage.delete_prefix.assert_not_called()
+    image_cleanup.delete.assert_not_called()
+    delete_logs.assert_not_called()
+
+    runtime_stop.side_effect = None
+    prefix = f"{build_prefix(owner.tenant_id, job.project.public_id, failed_build.public_id).rstrip('/')}/"
+    assert delete_training_job.run(str(job.public_id)) == "deleted"
+    assert storage.delete_prefix.call_args_list[0].args == (prefix,)
+    assert storage.delete_prefix.call_count == 2
+    assert image_cleanup.delete.call_args.args[0].image_uri == temporary_image_reference(
+        job.project.public_id, failed_build.public_id
+    )
+    delete_logs.assert_called_once_with(job.public_id)
+    assert not TrainingJob.objects.filter(pk=job.pk).exists()
+    assert not Build.objects.filter(pk=failed_build.pk).exists()
 
 
 @pytest.mark.django_db

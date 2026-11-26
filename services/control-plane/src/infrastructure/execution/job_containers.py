@@ -79,7 +79,7 @@ def start(docker_client, resource, kind, **kwargs):
     rows.update(**{field: container.id})
     setattr(resource, field, container.id)
     current = type(resource).objects.filter(pk=resource.pk).first()
-    if not current or current.status in {"cancelled", "failed", "completed"}:
+    if not current or current.execution_stop_requested or current.status in {"cancelled", "failed", "completed"}:
         remove(docker_client.client, resource, kind)
     return container
 

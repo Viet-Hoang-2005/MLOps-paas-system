@@ -17,18 +17,22 @@ from .test_job_drafts import run
 pytestmark = pytest.mark.django_db
 
 
-def test_workspace_deletion_waits_for_jobs_and_keeps_input_until_cleanup(studio, monkeypatch):
+def test_workspace_deletion_is_blocked_while_any_training_job_exists(studio):
     workspace, storage, _, _ = studio
     job = run(workspace, storage)
-    monkeypatch.setattr("apps.training.services.jobs.cancel_training_job.delay", Mock())
+    with pytest.raises(Conflict):
+        request_workspace_deletion(workspace)
+    workspace.refresh_from_db()
+    job.refresh_from_db()
+    assert workspace.deletion_requested_at is None and job.deletion_requested_at is None
+
+
+def test_workspace_deletion_succeeds_when_all_jobs_are_removed(studio, monkeypatch):
+    workspace, _, _, _ = studio
     monkeypatch.setattr(cleanup_workspace, "delay", Mock())
     request_workspace_deletion(workspace)
     workspace.refresh_from_db()
-    job.refresh_from_db()
-    assert workspace.status == "deleting" and job.status == "cancelling"
-    assert workspace.entries.exists() and storage.objects
-    with pytest.raises(Conflict):
-        run(workspace, storage)
+    assert workspace.status == "deleting"
 
 
 def test_workspace_deletion_rejects_build_references_atomically(studio):

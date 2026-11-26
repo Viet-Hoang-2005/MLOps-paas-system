@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from apps.catalog.selectors import project_for_user
 from apps.registry.models import ModelVersion, RegistryAlias
 from apps.registry.selectors import version_for_user
+from apps.registry.services.deletion import delete_model_version
 from apps.registry.services.routing import predict_alias, predict_version
 from apps.registry.services.versions import (
     add_supplemental_artifacts,
@@ -34,7 +35,7 @@ class ProjectVersionListCreateEndpoint(generics.ListAPIView):
         return {**super().get_serializer_context(), "project": self.project()}
 
 
-class ModelVersionDetailEndpoint(generics.RetrieveAPIView):
+class ModelVersionDetailEndpoint(generics.RetrieveDestroyAPIView):
     serializer_class = ModelVersionSerializer
     lookup_field = "public_id"
     lookup_url_kwarg = "version_id"
@@ -45,6 +46,9 @@ class ModelVersionDetailEndpoint(generics.RetrieveAPIView):
             .select_related("project", "source_job")
             .prefetch_related("artifacts", "metrics")
         )
+
+    def perform_destroy(self, instance):
+        delete_model_version(instance)
 
 
 class ProjectAliasListCreateEndpoint(generics.ListCreateAPIView):

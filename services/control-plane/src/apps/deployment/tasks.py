@@ -5,6 +5,7 @@ from celery import shared_task
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.deployment.execution_tasks import check_local_execution, scan_local_executions  # noqa: F401
@@ -159,10 +160,15 @@ def register_build(build_id):
         return "not_found"
     if build.version_id:
         return "registered"
+    if not build.image_uri:
+        Build.objects.filter(pk=build.pk, image_uri="", registration_status="registering").update(
+            registration_status="unregistered", registration_error=""
+        )
+        return "image_missing"
     try:
         registered = register_successful_build(build=build, image_uri=build.image_uri, image_digest=build.image_digest)
     except Exception as exc:
-        Build.objects.filter(pk=build.pk, version__isnull=True).update(
+        Build.objects.filter(pk=build.pk, version__isnull=True).exclude(image_uri="").update(
             registration_status="failed", registration_error=str(exc)[:12000]
         )
         raise
@@ -229,6 +235,13 @@ def _check_build_deletable(build):
 # idempotent, so a redelivery is safe.
 @shared_task(bind=True, max_retries=5, reject_on_worker_lost=True)
 def delete_build(self, build_id):
+    try:
+        return cleanup_build_for_deletion(build_id)
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=min(10 * 2**self.request.retries, 120)) from exc
+
+
+def cleanup_build_for_deletion(build_id):
     """Keep the tombstone until external cleanup succeeds; repeated DELETE retries it.
 
     The runtime, image and object-storage cleanup is slow external I/O, so no lock is held
@@ -258,7 +271,9 @@ def delete_build(self, build_id):
             prefix = f"{prefix.rstrip('/')}/"
 
         # A fresh object: the runner may have reported its end while the lock was released.
-        build = Build.objects.select_related("project").get(pk=build.pk)
+        build = Build.objects.select_related("project").filter(pk=build.pk).first()
+        if not build:
+            return "deleted"
         stop_build_for_deletion(build)
         # Use the server-generated build tag even if the runner failed before
         # reporting image_uri. Never delete a caller-supplied repository/digest.
@@ -286,7 +301,7 @@ def delete_build(self, build_id):
             deletion_state="delete_failed", deletion_error="Build cleanup failed; retry Delete or check worker logs."
         )
         logger.warning("Build cleanup failed for %s (%s).", build_id, type(exc).__name__)
-        raise self.retry(exc=exc, countdown=min(10 * 2**self.request.retries, 120)) from exc
+        raise
 
 
 @shared_task(
@@ -305,10 +320,10 @@ def execute_deployment(self, deployment_id):
         )
         if deployment.status in {"succeeded", "failed", "stopped", "unconfirmed"}:
             return deployment.status
-        if deployment.version.project.deletion_state != "active":
+        if deployment.version.project.deletion_state != "active" or deployment.version.deletion_requested:
             deployment.status = "stopped"
             deployment.stopped_at = timezone.now()
-            deployment.error_message = "Project deletion is in progress."
+            deployment.error_message = "Project or version deletion is in progress."
             deployment.save(update_fields=["status", "stopped_at", "error_message", "updated_at"])
             return "stopped"
         starting = deployment.status == "pending"
@@ -409,7 +424,9 @@ def stop_deployment(self, deployment_id):
         if project.active_deployment_id == locked.pk:
             project.active_deployment = None
             project.save(update_fields=["active_deployment", "updated_at"])
-    deployment_backend(deployment.backend).stop(deployment)
+    result = deployment_backend(deployment.backend).stop(deployment)
+    if deployment.backend == "argo" and (not isinstance(result, dict) or not result.get("confirmed")):
+        return "stopping"
     Deployment.objects.filter(pk=deployment.pk, stopped_at__isnull=True).update(stopped_at=timezone.now())
     Endpoint.objects.filter(deployment=deployment).update(
         health_status="unknown", last_checked_at=None, health_check_token=None, health_check_lease_until=None
@@ -443,7 +460,9 @@ def reconcile_stopped_deployments():
     it past the grace period still owns a runtime. ``stop_deployment`` is idempotent.
     """
     cutoff = timezone.now() - timedelta(seconds=settings.STOP_RECONCILE_GRACE_SECONDS)
-    stale = Deployment.objects.filter(status="stopped", stopped_at__isnull=True, updated_at__lt=cutoff)
+    stale = Deployment.objects.filter(status="stopped", updated_at__lt=cutoff).filter(
+        Q(backend="docker", stopped_at__isnull=True) | Q(backend="argo", argo_stop_confirmed_at__isnull=True)
+    )
     dispatched = 0
     for public_id in stale.order_by("updated_at").values_list("public_id", flat=True)[
         : settings.STOP_RECONCILE_BATCH_SIZE

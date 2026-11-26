@@ -22,7 +22,8 @@ export const trainingVi = {
     noWorkspaces: "Không có workspace phù hợp",
     deleteWorkspace: "Xóa Workspace",
     deleteWorkspaceDescription:
-      "Xóa workspace và {{count}} Training Job của nó? Job đang chạy phải dừng trước khi hoàn tất xóa.",
+      "Xóa Workspace cùng các file và secret của nó? Chỉ có thể xóa khi Workspace đã hết Training Job.",
+    deleteWorkspaceBlocked: "Hãy xóa tất cả Training Job trong Workspace này trước.",
     deleteJobDescription:
       "Xóa Training Job cùng snapshot, log và Output? Workspace hiện tại vẫn được giữ lại.",
     states: {
@@ -490,7 +491,7 @@ export const trainingVi = {
     deleteOutput: "Xóa đầu ra huấn luyện",
     deleteOutputTitle: "Xóa đầu ra huấn luyện?",
     deleteOutputDescription:
-      "Gói đầu ra sẽ bị xóa vĩnh viễn. Tác vụ, sự kiện, log và phiên bản đã đăng ký vẫn được giữ.",
+      "Gói đầu ra sẽ bị xóa. Nếu kho lưu trữ bật versioning, các bản sao cũ có thể được giữ theo chính sách lưu giữ. Tác vụ, sự kiện, log và phiên bản đã đăng ký vẫn được giữ.",
     deleteOutputConfirm: "Xóa đầu ra",
     registry: {
       title: "Tạo image và đăng ký đầu ra huấn luyện",

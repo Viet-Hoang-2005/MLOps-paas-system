@@ -262,17 +262,14 @@ def confirm_training_cancellation(job_id):
 )
 def delete_training_job(self, job_id):
     from apps.deployment.models import Build
-    from apps.deployment.tasks import cleanup_failed_build_artifacts
+    from apps.deployment.services.builds import request_build_deletion
+    from apps.deployment.tasks import cleanup_build_for_deletion
 
     from .models import TrainingJob
     from .services.logs import delete_training_logs
 
     try:
-        job = (
-            TrainingJob.objects.select_related("project", "project__owner")
-            .prefetch_related("builds")
-            .get(public_id=job_id)
-        )
+        job = TrainingJob.objects.select_related("project", "project__owner").get(public_id=job_id)
     except TrainingJob.DoesNotExist:
         return "deleted"
     if not job.deletion_requested_at:
@@ -283,19 +280,22 @@ def delete_training_job(self, job_id):
 
     if settings.TRAINING_EXECUTION_WATCH_ENABLED and job.observation_status == "cleanup_pending":
         return "waiting-for-runtime-cleanup"
-    if job.builds.exists() or job.registered_versions.exists():
+    if job.builds.exclude(status__in=("failed", "cancelled")).exists() or job.registered_versions.exists():
         TrainingJob.objects.filter(pk=job.pk).update(
-            deletion_error="A model build is still using this training output."
+            deletion_error="Delete the model version or build referencing this training job first."
         )
         return "blocked-by-build"
 
     try:
-        disposable_builds = list(
-            job.builds.filter(status__in=("failed", "cancelled")).values_list("public_id", flat=True)
-        )
-        for build_id in disposable_builds:
-            cleanup_failed_build_artifacts.run(str(build_id), True)
-        Build.objects.filter(public_id__in=disposable_builds).delete()
+        for build in job.builds.filter(status__in=("failed", "cancelled")):
+            try:
+                request_build_deletion(build, enqueue=False)
+            except Build.DoesNotExist:
+                continue
+            cleanup_build_for_deletion(str(build.public_id))
+
+        if job.builds.exists():
+            return "waiting-for-build-cleanup"
 
         storage = S3Storage()
         storage.delete_prefix(f"{training_prefix_for(job)}/")

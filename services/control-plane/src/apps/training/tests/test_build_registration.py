@@ -137,6 +137,7 @@ def test_successful_training_build_creates_one_version_with_summaries():
         artifact_format="training_output",
         requirements_snapshot=job.requirements_text,
         status="ready",
+        image_uri=f"image-{job.project.public_id}:temporary",
     )
     output = job.outputs.get(kind="model")
     build.input_assets.create(

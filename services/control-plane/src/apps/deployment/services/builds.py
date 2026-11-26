@@ -341,10 +341,12 @@ def request_rebuild(build, *, backend, storage=None):
     # with no lock held.
     with transaction.atomic():
         project = type(build.project).objects.select_for_update().get(pk=build.project_id)
-        build = Build.objects.select_for_update().select_related("source_job").get(pk=build.pk)
+        build = Build.objects.select_for_update(of=("self",)).select_related("source_job").get(pk=build.pk)
         if build.deletion_state != "active" or project.deletion_state != "active":
             raise Conflict("This build or project is being deleted.")
-        if build.status not in {"ready", "failed", "cancelled"} or build.registration_status == "registering":
+        image_missing = build.status == "ready" and not build.image_uri
+        registering = build.registration_status == "registering" and not image_missing
+        if build.status not in {"ready", "failed", "cancelled"} or registering:
             raise Conflict("Wait for this build and registration to finish before rebuilding.")
         from_job = bool(build.source_job_reference or build.source_job_id)
         if from_job and not build.source_job_id:
@@ -357,7 +359,7 @@ def request_rebuild(build, *, backend, storage=None):
     return request_preview_build(project=project, revision=revision, backend=backend, storage=storage)
 
 
-def request_build_deletion(build):
+def request_build_deletion(build, *, enqueue=True):
     from apps.deployment.tasks import delete_build
 
     with transaction.atomic():
@@ -372,5 +374,6 @@ def request_build_deletion(build):
         build.deletion_state = "deleting"
         build.deletion_error = ""
         build.save(update_fields=["deletion_state", "deletion_error", "updated_at"])
-        transaction.on_commit(lambda: delete_build.delay(str(build.public_id)))
+        if enqueue:
+            transaction.on_commit(lambda: delete_build.delay(str(build.public_id)))
     return build

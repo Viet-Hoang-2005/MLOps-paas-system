@@ -1,9 +1,14 @@
 import { RouteFallback } from "@/app/router/RouteFallback";
+import { deleteModelVersion } from "@/features/evolution/api/evolutionApi";
+import { evolutionQueryKeys } from "@/features/evolution/queryKeys";
 import { useEvolution } from "@/features/evolution/hooks/useEvolution";
 import {
   evolutionParams,
   normalizeEvolutionTab,
 } from "@/features/evolution/evolutionState";
+import { catalogQueryKeys } from "@/features/projects/queryKeys";
+import { deploymentFlowKeys } from "@/features/deployments/queryKeys";
+import { driftQueryKeys } from "@/features/monitoring/queryKeys";
 import { VersionLineage } from "@/features/evolution/components/VersionLineage";
 import { InformationEvolutionPage } from "@/features/evolution/pages/InformationEvolutionPage";
 import { MonitoringEvolutionPage } from "@/features/evolution/pages/MonitoringEvolutionPage";
@@ -21,8 +26,11 @@ import { useModelSelection } from "@/features/projects/hooks/useModelSelection";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Button } from "@/shared/components/Button";
 import { Callout } from "@/shared/components/Callout";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { PageTabs } from "@/shared/components/PageTabs";
+import { toast } from "@/shared/lib/toastStore";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   Code,
@@ -33,6 +41,7 @@ import {
   SlidersHorizontal,
   Play,
   Plus,
+  Trash2,
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -87,14 +96,58 @@ export default function EvolutionPage() {
 
 function EvolutionWorkspace({ projectId }: { projectId: string }) {
   const { t } = useTranslation("evolution");
+  const { t: tCommon } = useTranslation("common");
   const [params, setParams] = useSearchParams();
   const [compare, setCompare] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const compareButton = useRef<HTMLButtonElement | null>(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const state = useEvolution(projectId, params.get("versionId"));
   const tab = normalizeEvolutionTab(params.get("tab"));
   const version = state.version;
+
+  const deleteMutation = useMutation({
+    mutationFn: (versionId: string) => deleteModelVersion(versionId),
+    onSuccess: async (_data, deletedId) => {
+      const deletedNumber = version?.version ?? "";
+      setConfirmDelete(false);
+      setParams((previous) =>
+        evolutionParams(previous, { tab, versionId: undefined }),
+      );
+      queryClient.removeQueries({
+        queryKey: evolutionQueryKeys.snapshot(deletedId),
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: evolutionQueryKeys.versions(projectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: catalogQueryKeys.project(projectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: catalogQueryKeys.projects(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: deploymentFlowKeys.history(projectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: deploymentFlowKeys.deployments(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: driftQueryKeys.monitors(projectId),
+        }),
+      ]);
+      toast.success(
+        t("workspace.deleteVersionSuccess", { version: deletedNumber }),
+      );
+    },
+    onError: (err) => {
+      setConfirmDelete(false);
+      toast.error(getApiErrorMessage(err, t("workspace.deleteVersionFailed")));
+    },
+  });
 
   const loadFailed = Boolean(state.error);
   const blocked = loadFailed && (!state.versions.data || !state.project.data);
@@ -260,6 +313,15 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
                         setCompare(true);
                       }}
                     />
+                    <Button
+                      size="icon"
+                      variant="danger"
+                      icon={<Trash2 className="h-4 w-4" />}
+                      aria-label={t("workspace.deleteVersion")}
+                      title={t("workspace.deleteVersion")}
+                      disabled={deleteMutation.isPending}
+                      onClick={() => setConfirmDelete(true)}
+                    />
                   </div>
                 </div>
 
@@ -387,6 +449,33 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
           selectedId={version.id}
           onClose={() => setCompare(false)}
           restoreFocus={() => compareButton.current?.focus()}
+        />
+      )}
+
+      {version && (
+        <ConfirmDialog
+          open={confirmDelete}
+          tone="danger"
+          title={t("workspace.deleteVersionTitle", {
+            version: version.version,
+          })}
+          description={
+            <div className="space-y-3">
+              <p>{t("workspace.deleteVersionDescription")}</p>
+              {version.id === state.runningId && (
+                <p className="font-medium text-color-danger">
+                  {t("workspace.deleteVersionRunningWarning")}
+                </p>
+              )}
+            </div>
+          }
+          confirmText={t("workspace.deleteVersion")}
+          cancelText={tCommon("actions.cancel")}
+          loading={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate(version.id)}
+          onCancel={() => {
+            if (!deleteMutation.isPending) setConfirmDelete(false);
+          }}
         />
       )}
     </div>

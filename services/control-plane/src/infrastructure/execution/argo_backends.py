@@ -1,9 +1,11 @@
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 
 from apps.deployment.models import Endpoint
 from apps.deployment.services.callbacks import issue_callback_token
+from apps.observability.services.argo_stops import stop_payload
 from apps.training.services.capabilities import issue_capability
 from apps.training.services.storage_scope import validate_training_uri
 from infrastructure.argo import ArgoWebhookClient
@@ -36,6 +38,23 @@ class _ArgoBackend:
     def poll(self, resource):
         # Actual cluster observations arrive through the scoped reconcile workflow.
         return {"status": "not_found"}
+
+    def request_runtime_stop(self, resource, kind):
+        pending = type(resource).objects.filter(pk=resource.pk, argo_stop_confirmed_at__isnull=True)
+        needs_stop = pending.update(execution_stop_requested=True) if kind == "drift" else pending.exists()
+        if not needs_stop:
+            return {"confirmed": True}
+        key = f"argo-runtime-stop:{kind}:{resource.public_id}"
+        if cache.add(key, True, timeout=150):
+            try:
+                self.client.trigger(
+                    settings.ARGO_RECONCILE_WEBHOOK_URL,
+                    stop_payload(resource, kind, settings.CONTROL_PLANE_INTERNAL_URL),
+                )
+            except Exception:
+                cache.delete(key)
+                raise
+        return {"confirmed": False}
 
     def persist_dispatch(self, resource, **fields):
         from common.api.exceptions import Conflict
@@ -299,10 +318,7 @@ class ArgoDeploymentBackend(_ArgoBackend):
         return endpoint
 
     def stop(self, deployment):
-        endpoint = getattr(deployment, "endpoint", None)
-        if endpoint and settings.ARGO_DELETE_WEBHOOK_URL:
-            return self.client.trigger(settings.ARGO_DELETE_WEBHOOK_URL, {"container_name": endpoint.runtime_name})
-        return None
+        return self.request_runtime_stop(deployment, "deployment")
 
     def health(self, deployment):
         endpoint = getattr(deployment, "endpoint", None)
@@ -328,6 +344,9 @@ class ArgoDeploymentBackend(_ArgoBackend):
 
 class ArgoDriftBackend(_ArgoBackend):
     setting_name = "ARGO_DRIFT_WEBHOOK_URL"
+
+    def cancel(self, drift_run):
+        return self.request_runtime_stop(drift_run, "drift")
 
     def run(self, drift_run):
         monitor = drift_run.monitor
