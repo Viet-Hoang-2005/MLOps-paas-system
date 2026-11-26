@@ -18,7 +18,7 @@ def read_report(monkeypatch, report, summary):
         report_json_uri="s3://test/report.json",
     )
     storage = Mock()
-    storage.presigned_get.side_effect = lambda uri, _: uri.replace("s3://", "https://")
+    storage.presigned_get.side_effect = lambda uri, _, **__: uri.replace("s3://", "https://")
     storage.read.return_value = json.dumps(report).encode("utf-8")
     monkeypatch.setattr("infrastructure.storage.S3Storage", lambda: storage)
     return get_drift_report_data(run)

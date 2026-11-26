@@ -80,7 +80,7 @@ class DriftRunReportURLEndpoint(APIView):
         report_uri = report_uri_for_run(run, "report_html_uri")
         if not report_uri:
             raise Conflict("The completed drift run does not have an HTML report.")
-        return Response({"url": S3Storage().presigned_get(report_uri, 900)})
+        return Response({"url": S3Storage().presigned_get(report_uri, 900, public=True)})
 
 
 class DriftRunReportDataEndpoint(APIView):

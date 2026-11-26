@@ -186,7 +186,7 @@ def serialize_entries(entries):
             "updated_at": entry.updated_at.isoformat(),
         }
         if entry.s3_uri:
-            item["download_url"] = storage.presigned_get(entry.s3_uri)
+            item["download_url"] = storage.presigned_get(entry.s3_uri, public=True)
         result.append(item)
     return result
 

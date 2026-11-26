@@ -115,7 +115,7 @@ def test_completed_run_report_url_is_tenant_scoped_and_presigned(monkeypatch):
     )
     monkeypatch.setattr(
         "apps.drift.api.endpoints.S3Storage.presigned_get",
-        lambda _self, uri, expires_in: f"https://s3.example/{uri.removeprefix('s3://')}?ttl={expires_in}",
+        lambda _self, uri, expires_in, **_: f"https://s3.example/{uri.removeprefix('s3://')}?ttl={expires_in}",
     )
     client = APIClient()
     client.force_authenticate(other)

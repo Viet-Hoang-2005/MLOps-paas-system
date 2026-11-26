@@ -14,7 +14,7 @@ def input_snapshot(job, *, path=None, download=False, storage=None):
     storage = storage or S3Storage()
     validate_training_uri(job, storage.bucket, "code", job.code_snapshot_uri)
     if download:
-        return {"download_url": storage.presigned_get(job.code_snapshot_uri)}
+        return {"download_url": storage.presigned_get(job.code_snapshot_uri, public=True)}
     payload = storage.read(job.code_snapshot_uri, max_bytes=256 * 1024 * 1024)
     with ZipFile(BytesIO(payload)) as archive:
         if len(archive.infolist()) > 20_000 or sum(info.file_size for info in archive.infolist()) > 256 * 1024 * 1024:
@@ -57,4 +57,4 @@ def output_download(job, output_id, *, storage=None):
     bucket, key = storage.parse_uri(output.s3_uri)
     if bucket != storage.bucket or not key.startswith(training_prefix_for(job) + "/"):
         raise Conflict("Training output has an invalid storage scope.")
-    return {"download_url": storage.presigned_get(output.s3_uri)}
+    return {"download_url": storage.presigned_get(output.s3_uri, public=True)}

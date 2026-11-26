@@ -127,7 +127,7 @@ class MLflowArtifactsUploadUrlView(APIView):
         bucket = _bucket_name()
         s3_key = f"{training_prefix_for(job)}/mlflow/artifacts/{artifact_path}"
         storage = S3Storage()
-        upload_url = storage.presigned_put(f"s3://{bucket}/{s3_key}", expires_in=3600)
+        upload_url = storage.presigned_put(f"s3://{bucket}/{s3_key}", expires_in=3600, public=job_from_auth is None)
 
         # Record output in TrainingOutput
         TrainingOutput.objects.update_or_create(
@@ -423,7 +423,7 @@ class MLflowArtifactsProxyView(APIView):
             if request.query_params.get("presigned") == "true":
                 try:
                     storage.head(s3_uri)
-                    presigned_url = storage.presigned_get(s3_uri, expires_in=3600)
+                    presigned_url = storage.presigned_get(s3_uri, expires_in=3600, public=job_from_auth is None)
                     return Response({"download_url": presigned_url, "s3_uri": s3_uri}, status=status.HTTP_200_OK)
                 except Exception as e:
                     if isinstance(e, FileNotFoundError) or "NoSuchKey" in str(e) or "404" in str(e):

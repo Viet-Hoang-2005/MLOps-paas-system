@@ -39,10 +39,12 @@ services:
       GITHUB_OAUTH2_CLIENT_ID: ${GITHUB_OAUTH2_CLIENT_ID}
       GITHUB_OAUTH2_CLIENT_SECRET: ${GITHUB_OAUTH2_CLIENT_SECRET}
       GITHUB_OAUTH_REDIRECT_URI: ${GITHUB_OAUTH_REDIRECT_URI:-http://localhost:5173/oauth/github/callback}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_BUCKET_NAME: ${AWS_BUCKET_NAME:-mlops-paas-artifacts}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
+      AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-}
+      AWS_S3_PUBLIC_ENDPOINT_URL: ${AWS_S3_PUBLIC_ENDPOINT_URL:-}
       TRAINING_ENABLED: ${TRAINING_ENABLED:-true}
       TRAINING_GPU_ENABLED: ${TRAINING_GPU_ENABLED:-true}
       TRAINING_GPU_COUNTS: ${TRAINING_GPU_COUNTS:-1}
@@ -75,6 +77,8 @@ services:
         condition: service_started
       model-packager:
         condition: service_started
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - mlops_paas_network
 
@@ -106,10 +110,12 @@ services:
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis-queue:6379/0
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis-queue:6379/0
       REDPANDA_BROKERS: ${REDPANDA_BROKERS:-redpanda:9092}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_BUCKET_NAME: ${AWS_BUCKET_NAME:-mlops-paas-artifacts}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
+      AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-}
+      AWS_S3_PUBLIC_ENDPOINT_URL: ${AWS_S3_PUBLIC_ENDPOINT_URL:-}
       EXECUTION_BACKEND: ${EXECUTION_BACKEND:-docker}
       TRAINING_EXECUTION_WATCH_ENABLED: ${TRAINING_EXECUTION_WATCH_ENABLED:-true}
       DRIFT_EXECUTION_WATCH_ENABLED: ${DRIFT_EXECUTION_WATCH_ENABLED:-true}
@@ -138,6 +144,8 @@ services:
         condition: service_started
       redis-queue:
         condition: service_started
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - mlops_paas_network
 
@@ -179,6 +187,8 @@ services:
         condition: service_started
       redis-queue:
         condition: service_started
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - mlops_paas_network
 
@@ -528,15 +538,56 @@ services:
     networks:
       - mlops_paas_network
 
-# Mạng nội bộ cho các container
+  # 9. MinIO Local Object Storage (S3-compatible)
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOW_ORIGIN:-http://localhost:5173,http://127.0.0.1:5173}
+    volumes:
+      - minio_data:/data
+    networks:
+      - mlops_paas_network
 
+  # 9.1 MinIO Bucket Init (waits for MinIO and creates default bucket)
+  minio-init:
+    build:
+      context: ./services/control-plane
+      dockerfile: Dockerfile
+    image: mlops-paas-control-plane
+    restart: "no"
+    environment:
+      PYTHONUNBUFFERED: 1
+      PYTHONPATH: /app/src
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_BUCKET_NAME: ${AWS_BUCKET_NAME:-mlops-paas-artifacts}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
+      AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-}
+    volumes:
+      - ./services/control-plane:/app
+    command: ["python", "-m", "infrastructure.storage.init_minio"]
+    depends_on:
+      minio:
+        condition: service_started
+    networks:
+      - mlops_paas_network
+
+# Mạng nội bộ cho các container
 networks:
   mlops_paas_network:
     name: ${DOCKER_NETWORK_NAME:-mlops_paas_network}
     driver: bridge
 
-# Volume để lưu trữ dữ liệu của PostgreSQL và Redpanda
+# Volume để lưu trữ dữ liệu của PostgreSQL, Redpanda, Redis Queue và MinIO
 volumes:
   postgres_data:
   redpanda_data:
   redis_queue_data:
+  minio_data:

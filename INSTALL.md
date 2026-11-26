@@ -97,16 +97,18 @@ Giao diện sẽ sẵn sàng tại: `http://localhost:5173`.
 
 ---
 
-### 1.3. Tùy chọn hạ tầng S3 AWS cho Local
+### 1.3. Lưu trữ Object Storage cục bộ (MinIO) & Tùy chọn AWS S3
 
-Nếu bạn muốn môi trường Docker Compose cục bộ lưu trữ Model Artifacts thật trên AWS S3 thay vì mock local, bạn có thể tạo riêng một bucket S3 duy nhất thông qua cấu hình `s3-only.tfvars`:
+Mặc định khi để trống `AWS_ACCESS_KEY_ID` và `AWS_SECRET_ACCESS_KEY` trong `.env`, môi trường Docker Compose cục bộ sẽ tự động sử dụng **MinIO** (`cgr.dev/chainguard/minio:latest`) làm S3-compatible storage tại `http://localhost:9000`. Service `minio-init` sẽ tự động tạo bucket `mlops-paas-artifacts` khi khởi động.
+
+Nếu bạn muốn môi trường Docker Compose cục bộ lưu trữ Model Artifacts thật trên **AWS S3** thay vì MinIO local. Bạn có thể tạo riêng một bucket S3 thông qua cấu hình `s3-only.tfvars`:
 
 ```bash
 cd terraform/aws/
 terraform init
 terraform apply -var-file="s3-only.tfvars"
 ```
-Sau đó, lấy tên bucket được xuất ra (`s3_bucket_name`) và điền vào biến `AWS_BUCKET_NAME` trong file `.env` ở root.
+Sau đó, lấy tên bucket được xuất ra (`s3_bucket_name`) cùng `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` và điền vào file `.env` ở root. Hệ thống sẽ tự chuyển sang AWS S3 và `minio-init` sẽ tự động bỏ qua. 
 
 ---
 
@@ -117,6 +119,8 @@ Sau đó, lấy tên bucket được xuất ra (`s3_bucket_name`) và điền v�
 | **React Dashboard** | `http://localhost:5173` | Giao diện điều khiển AI PaaS người dùng |
 | **Control Plane API** | `http://localhost:8000/api/` | REST API Backend chính của Control Plane |
 | **API Health Check** | `http://localhost:8000/health/ready` | Kiểm tra kết nối DB, Redis và tính sẵn sàng |
+| **MinIO S3 API** | `http://localhost:9000` | Endpoint S3-compatible cho trình duyệt & local dev |
+| **MinIO Console** | `http://localhost:9001` | Giao diện quản lý bucket & object cục bộ (`minioadmin`) |
 | **Model Server Gateway** | `http://localhost:5002/` | Cổng tiếp nhận suy luận tập trung |
 | **ML Serving Worker** | `http://localhost:5001/health` | Phục vụ suy luận mô hình Scikit-Learn/XGBoost |
 | **DL Serving Worker** | `http://localhost:5004/health` | Phục vụ suy luận mô hình BentoML Deep Learning |

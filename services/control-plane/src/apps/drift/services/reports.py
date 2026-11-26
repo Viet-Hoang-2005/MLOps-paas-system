@@ -57,8 +57,8 @@ def get_drift_report_data(run):
     html_uri = report_uri_for_run(run, "report_html_uri")
     json_uri = report_uri_for_run(run, "report_json_uri")
 
-    html_url = storage.presigned_get(html_uri, 900) if html_uri else None
-    json_url = storage.presigned_get(json_uri, 900) if json_uri else None
+    html_url = storage.presigned_get(html_uri, 900, public=True) if html_uri else None
+    json_url = storage.presigned_get(json_uri, 900, public=True) if json_uri else None
 
     summary = run.summary if isinstance(run.summary, dict) else {}
 

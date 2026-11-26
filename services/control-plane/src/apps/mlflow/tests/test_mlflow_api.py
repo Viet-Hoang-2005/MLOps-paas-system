@@ -1,5 +1,6 @@
 import hashlib
 from unittest.mock import patch
+from urllib.parse import urlsplit
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -84,11 +85,13 @@ class MockS3Storage:
             if prefix in k:
                 self.objects.pop(k, None)
 
-    def presigned_get(self, uri, expires_in=900):
-        return f"https://s3.mock.download/{uri}"
+    def presigned_get(self, uri, expires_in=900, *, public=False):
+        host = "localhost" if public else "minio"
+        return f"http://{host}:9000/{uri.removeprefix('s3://')}"
 
-    def presigned_put(self, uri, expires_in=900, content_type=None, size_bytes=None):
-        return f"https://s3.mock.upload/{uri}"
+    def presigned_put(self, uri, expires_in=900, content_type=None, size_bytes=None, *, public=False):
+        host = "localhost" if public else "minio"
+        return f"http://{host}:9000/{uri.removeprefix('s3://')}"
 
 
 class MLflowCompatibilityTests(APITestCase):
@@ -727,26 +730,38 @@ class MLflowCompatibilityTests(APITestCase):
         content = b"".join(get_resp.streaming_content) if hasattr(get_resp, "streaming_content") else get_resp.content
         self.assertEqual(content, test_content)
 
-    def test_mlflow_artifact_proxy_presigned_download(self):
-        """
-        Verify that adding ?presigned=true generates a direct presigned download URL.
-        """
-        upload_url = (
+    def test_mlflow_presigned_artifact_urls_use_the_endpoint_for_the_caller(self):
+        raw_key, prefix, key_hash = UserAPIKey.issue()
+        api_key = UserAPIKey.objects.create(user=self.user, name="host-client", key_prefix=prefix, key_hash=key_hash)
+        api_key.allowed_projects.add(self.project)
+        artifact_url = (
             f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
             f"models/{self.project.public_id}/training/jobs/{self.job.public_id}/mlflow/artifacts/test_presigned.bin"
         )
-        self.client.put(
-            upload_url,
+        seed_response = self.client.put(
+            artifact_url,
             data=b"presigned-target-data",
             content_type="application/octet-stream",
             HTTP_AUTHORIZATION=f"Bearer {self.token}",
         )
 
-        presigned_req_url = f"{upload_url}?presigned=true"
-        get_resp = self.client.get(presigned_req_url, HTTP_AUTHORIZATION=f"Bearer {self.token}")
-        self.assertEqual(get_resp.status_code, status.HTTP_200_OK)
-        self.assertIn("download_url", get_resp.data)
-        self.assertTrue(get_resp.data["download_url"].startswith("https://"))
+        self.assertEqual(seed_response.status_code, status.HTTP_200_OK)
+
+        for token, host in ((self.token, "minio"), (raw_key, "localhost")):
+            with self.subTest(host=host):
+                headers = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
+                upload = self.client.post(
+                    "/api/2.0/mlflow/artifacts/upload-url",
+                    data={"run_id": str(self.job.public_id), "path": "new_artifact.bin"},
+                    format="json",
+                    **headers,
+                )
+                self.assertEqual(upload.status_code, status.HTTP_200_OK, upload.data)
+                self.assertEqual(urlsplit(upload.data["upload_url"]).hostname, host)
+
+                download = self.client.get(f"{artifact_url}?presigned=true", **headers)
+                self.assertEqual(download.status_code, status.HTTP_200_OK, download.data)
+                self.assertEqual(urlsplit(download.data["download_url"]).hostname, host)
 
     def test_mlflow_artifact_proxy_download_size_limit_exceeded(self):
         """

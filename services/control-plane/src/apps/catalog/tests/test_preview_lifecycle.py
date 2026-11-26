@@ -73,10 +73,10 @@ class MemoryStorage:
     def compute_sha256(self, uri):
         return hashlib.sha256(self.objects[uri]).hexdigest()
 
-    def presigned_put(self, uri, expires_in=900, content_type=None, size_bytes=None):
+    def presigned_put(self, uri, expires_in=900, content_type=None, size_bytes=None, *, public=False):
         return f"https://{self.bucket}.s3.test/{uri}?signature=mock"
 
-    def presigned_get(self, uri, expires_in=900):
+    def presigned_get(self, uri, expires_in=900, *, public=False):
         return f"https://{self.bucket}.s3.test/{uri}?signature=mock-get"
 
     @staticmethod
@@ -444,7 +444,7 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
     from apps.deployment.tasks import execute_deployment, register_build
 
     storage = MemoryStorage()
-    storage.presigned_get = lambda uri, expires: f"https://storage.test/{uri}"
+    storage.presigned_get = lambda uri, expires, **_: f"https://storage.test/{uri}"
     monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
     monkeypatch.setattr("apps.catalog.api.serializers.S3Storage", lambda: storage)
     monkeypatch.setattr("apps.deployment.services.builds.S3Storage", lambda: storage)

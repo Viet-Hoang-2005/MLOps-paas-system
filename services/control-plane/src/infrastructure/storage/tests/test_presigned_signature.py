@@ -31,3 +31,76 @@ def test_custom_client_config_keeps_sigv4():
     assert storage.client.meta.config.signature_version == "s3v4"
     assert storage.client.meta.config.connect_timeout == 3
     assert "X-Amz-Signature" in _query(storage.presigned_get("s3://bucket/key"))
+
+
+def test_minio_dual_endpoint_presigned_urls(settings):
+    settings.AWS_S3_ENDPOINT_URL = "http://minio:9000"
+    settings.AWS_S3_PUBLIC_ENDPOINT_URL = "http://localhost:9000"
+    storage = S3Storage(bucket="mlops-paas-artifacts")
+
+    internal_get = urlparse(storage.presigned_get("s3://mlops-paas-artifacts/path/file.csv"))
+    public_get = urlparse(storage.presigned_get("s3://mlops-paas-artifacts/path/file.csv", public=True))
+    public_put = urlparse(
+        storage.presigned_put(
+            "s3://mlops-paas-artifacts/path/model.pkl",
+            content_type="application/octet-stream",
+            size_bytes=512,
+            public=True,
+        )
+    )
+
+    assert internal_get.netloc == "minio:9000"
+    assert internal_get.path == "/mlops-paas-artifacts/path/file.csv"
+    assert public_get.netloc == "localhost:9000"
+    assert public_get.path == "/mlops-paas-artifacts/path/file.csv"
+    assert "X-Amz-Signature" in parse_qs(public_get.query)
+    assert public_put.netloc == "localhost:9000"
+    assert public_put.path == "/mlops-paas-artifacts/path/model.pkl"
+    assert "X-Amz-Signature" in parse_qs(public_put.query)
+
+
+def test_django_storage_uses_public_endpoint_for_url(settings):
+    from infrastructure.storage.django_storage import PublicPresignedS3Storage
+
+    settings.AWS_S3_ENDPOINT_URL = "http://minio:9000"
+    settings.AWS_S3_PUBLIC_ENDPOINT_URL = "http://localhost:9000"
+    settings.AWS_STORAGE_BUCKET_NAME = "mlops-paas-artifacts"
+    storage = PublicPresignedS3Storage()
+
+    parsed = urlparse(storage.url("users/tenant/avatar/pic.png"))
+    assert parsed.netloc == "localhost:9000"
+    assert parsed.path == "/mlops-paas-artifacts/users/tenant/avatar/pic.png"
+    assert "X-Amz-Signature" in parse_qs(parsed.query)
+
+
+def test_init_minio_skips_when_real_aws_keys_set(monkeypatch):
+    from infrastructure.storage import init_minio
+
+    monkeypatch.delenv("AWS_S3_ENDPOINT_URL", raising=False)
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIAIOSFODNN7EXAMPLE")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
+    assert init_minio.resolve_minio_config() is None
+    assert init_minio.main() == 0
+
+
+def test_init_minio_defaults_to_minio_when_aws_keys_empty(monkeypatch):
+    from infrastructure.storage import init_minio
+
+    monkeypatch.delenv("AWS_S3_ENDPOINT_URL", raising=False)
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "")
+    assert init_minio.resolve_minio_config() == ("http://minio:9000", "mlops-paas-artifacts", "ap-southeast-1")
+
+
+def test_init_minio_creates_missing_bucket(monkeypatch):
+    from unittest.mock import Mock
+    from botocore.exceptions import ClientError
+    from infrastructure.storage import init_minio
+
+    client = Mock()
+    client.head_bucket.side_effect = ClientError({"Error": {"Code": "404"}}, "HeadBucket")
+    monkeypatch.setattr(init_minio.boto3, "client", lambda *args, **kwargs: client)
+
+    init_minio.ensure_bucket("http://minio:9000", "mlops-paas-artifacts", "ap-southeast-1")
+    client.head_bucket.assert_called_once_with(Bucket="mlops-paas-artifacts")
+    client.create_bucket.assert_called_once_with(Bucket="mlops-paas-artifacts")

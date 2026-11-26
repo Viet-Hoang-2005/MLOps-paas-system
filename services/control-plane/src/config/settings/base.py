@@ -379,11 +379,13 @@ PROMETHEUS_INTERNAL_URL = str(env("PROMETHEUS_INTERNAL_URL", "")).rstrip("/")
 AWS_STORAGE_BUCKET_NAME = env("AWS_BUCKET_NAME", "mlops-paas-artifacts")
 AWS_S3_REGION_NAME = env("AWS_DEFAULT_REGION", "ap-southeast-1")
 AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", "") or None
+AWS_S3_PUBLIC_ENDPOINT_URL = env("AWS_S3_PUBLIC_ENDPOINT_URL", "") or None
+AWS_S3_ADDRESSING_STYLE = "path" if AWS_S3_ENDPOINT_URL else "auto"
 AWS_DEFAULT_ACL = None
 AWS_QUERYSTRING_AUTH = True
 AWS_S3_FILE_OVERWRITE = False
 STORAGES = {
-    "default": {"BACKEND": "storages.backends.s3.S3Storage"},
+    "default": {"BACKEND": "infrastructure.storage.django_storage.PublicPresignedS3Storage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 

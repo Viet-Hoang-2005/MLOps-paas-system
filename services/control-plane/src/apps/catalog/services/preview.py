@@ -84,7 +84,9 @@ def generate_preview_upload_urls(
         key = f"staging/{project_prefix(tenant_id, project_id)}/preview/{upload_batch_id}/{kind}/{filename}"
         s3_uri = f"s3://{storage.bucket}/{key}"
         content_type = item.get("content_type") or "application/octet-stream"
-        upload_url = storage.presigned_put(s3_uri, expires_in=900, content_type=content_type, size_bytes=size_bytes)
+        upload_url = storage.presigned_put(
+            s3_uri, expires_in=900, content_type=content_type, size_bytes=size_bytes, public=True
+        )
         result.append(
             {
                 "kind": kind,

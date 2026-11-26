@@ -137,7 +137,7 @@ class ModelProjectSerializer(serializers.ModelSerializer):
                 "checksum": artifact.checksum,
                 "size_bytes": artifact.size_bytes,
                 "content_type": artifact.content_type,
-                "download_url": S3Storage().presigned_get(artifact.uri, 900),
+                "download_url": S3Storage().presigned_get(artifact.uri, 900, public=True),
             }
             if artifact
             else None
@@ -171,7 +171,7 @@ class WorkspaceAssetSerializer(serializers.ModelSerializer):
         read_only_fields = ("kind", "s3_uri", "checksum", "size_bytes", "content_type", "created_at", "updated_at")
 
     def get_download_url(self, instance):
-        return S3Storage().presigned_get(instance.s3_uri, 900)
+        return S3Storage().presigned_get(instance.s3_uri, 900, public=True)
 
 
 class WorkspaceUploadSerializer(serializers.Serializer):
@@ -188,7 +188,7 @@ class ProjectAssetSummarySerializer(serializers.ModelSerializer):
         fields = ("name", "download_url", "checksum", "size_bytes", "content_type")
 
     def get_download_url(self, instance):
-        return S3Storage().presigned_get(instance.s3_uri, 900)
+        return S3Storage().presigned_get(instance.s3_uri, 900, public=True)
 
 
 class ProjectMetadataWriteSerializer(serializers.Serializer):
@@ -205,7 +205,7 @@ class PreviewAssetSerializer(serializers.ModelSerializer):
         fields = ("kind", "name", "checksum", "size_bytes", "content_type", "download_url")
 
     def get_download_url(self, instance):
-        return S3Storage().presigned_get(instance.s3_uri, 900)
+        return S3Storage().presigned_get(instance.s3_uri, 900, public=True)
 
 
 class ModelPreviewSerializer(serializers.ModelSerializer):

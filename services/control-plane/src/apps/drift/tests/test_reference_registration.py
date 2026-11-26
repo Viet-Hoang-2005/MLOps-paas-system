@@ -137,7 +137,7 @@ def test_reference_endpoints_enforce_tenant_and_existing_reference(running_versi
     reference_url = f"/api/drift-monitors/{monitor_id}/reference-url/"
     monkeypatch.setattr(
         "apps.drift.services.monitors.S3Storage",
-        lambda: Mock(presigned_get=lambda uri, expires: "https://s3.example/reference"),
+        lambda: Mock(presigned_get=lambda uri, expires, **_: "https://s3.example/reference"),
     )
     assert client.get(reference_url).data == {"url": "https://s3.example/reference"}
     other = get_user_model().objects.create_user("other-reference@example.test", "test-password")

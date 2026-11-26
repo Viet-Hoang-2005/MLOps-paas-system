@@ -21,7 +21,7 @@ MAX_REFERENCE_BYTES = 100 * 1024 * 1024
 def reference_download_url(monitor, storage=None):
     if not monitor.reference_uri:
         raise Conflict("The monitor does not have a reference snapshot.")
-    return (storage or S3Storage()).presigned_get(monitor.reference_uri, 900)
+    return (storage or S3Storage()).presigned_get(monitor.reference_uri, 900, public=True)
 
 
 def validate_reference_upload(upload):

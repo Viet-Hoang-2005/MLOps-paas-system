@@ -19,14 +19,34 @@ class StoredObject:
 class S3Storage:
     def __init__(self, client=None, bucket=None, client_config=None):
         # SigV4 signs Content-Length, which bounds what a presigned PUT can upload.
-        config = Config(signature_version="s3v4")
+        s3_config = {"addressing_style": "path"} if settings.AWS_S3_ENDPOINT_URL else None
+        config = Config(signature_version="s3v4", s3=s3_config)
         if client_config is not None:
             config = config.merge(client_config)
+        self._config = config
         kwargs = {"region_name": settings.AWS_S3_REGION_NAME, "config": config}
         if settings.AWS_S3_ENDPOINT_URL:
             kwargs["endpoint_url"] = settings.AWS_S3_ENDPOINT_URL
         self.client = client or boto3.client("s3", **kwargs)
+        self._custom_client = client is not None
+        self._public_client = None
         self.bucket = bucket or settings.AWS_STORAGE_BUCKET_NAME
+
+    def _presign_client(self, public: bool):
+        if not public or self._custom_client:
+            return self.client
+        public_endpoint = getattr(settings, "AWS_S3_PUBLIC_ENDPOINT_URL", None)
+        if not public_endpoint or public_endpoint == settings.AWS_S3_ENDPOINT_URL:
+            return self.client
+        if self._public_client is None:
+            public_config = self._config.merge(Config(signature_version="s3v4", s3={"addressing_style": "path"}))
+            self._public_client = boto3.client(
+                "s3",
+                region_name=settings.AWS_S3_REGION_NAME,
+                endpoint_url=public_endpoint,
+                config=public_config,
+            )
+        return self._public_client
 
     def put(self, key, body, content_type="application/octet-stream"):
         payload = body.read() if hasattr(body, "read") else body
@@ -110,20 +130,20 @@ class S3Storage:
             etag=response.get("ETag", ""),
         )
 
-    def presigned_get(self, uri, expires_in=900):
+    def presigned_get(self, uri, expires_in=900, *, public=False):
         bucket, key = self.parse_uri(uri)
-        return self.client.generate_presigned_url(
+        return self._presign_client(public).generate_presigned_url(
             "get_object", Params={"Bucket": bucket, "Key": key}, ExpiresIn=expires_in
         )
 
-    def presigned_put(self, uri, expires_in=900, content_type=None, size_bytes=None):
+    def presigned_put(self, uri, expires_in=900, content_type=None, size_bytes=None, *, public=False):
         bucket, key = self.parse_uri(uri)
         params = {"Bucket": bucket, "Key": key}
         if content_type:
             params["ContentType"] = content_type
         if size_bytes is not None:
             params["ContentLength"] = size_bytes
-        return self.client.generate_presigned_url("put_object", Params=params, ExpiresIn=expires_in)
+        return self._presign_client(public).generate_presigned_url("put_object", Params=params, ExpiresIn=expires_in)
 
     def delete_prefix(self, prefix):
         paginator = self.client.get_paginator("list_objects_v2")
