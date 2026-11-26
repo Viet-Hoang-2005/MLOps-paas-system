@@ -84,12 +84,17 @@ def test_init_minio_skips_when_real_aws_keys_set(monkeypatch):
 
 
 def test_init_minio_defaults_to_minio_when_aws_keys_empty(monkeypatch):
+    import os
     from infrastructure.storage import init_minio
 
     monkeypatch.delenv("AWS_S3_ENDPOINT_URL", raising=False)
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "")
+    monkeypatch.setenv("MINIO_ROOT_USER", "custom-minio-user")
+    monkeypatch.setenv("MINIO_ROOT_PASSWORD", "custom-minio-pass")
     assert init_minio.resolve_minio_config() == ("http://minio:9000", "mlops-paas-artifacts", "ap-southeast-1")
+    assert os.environ["AWS_ACCESS_KEY_ID"] == "custom-minio-user"
+    assert os.environ["AWS_SECRET_ACCESS_KEY"] == "custom-minio-pass"
 
 
 def test_init_minio_creates_missing_bucket(monkeypatch):

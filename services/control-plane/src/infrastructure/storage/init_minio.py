@@ -21,9 +21,9 @@ def resolve_minio_config() -> tuple[str, str, str] | None:
         endpoint = "http://minio:9000"
 
     if not access_key:
-        os.environ["AWS_ACCESS_KEY_ID"] = "minioadmin"
+        os.environ["AWS_ACCESS_KEY_ID"] = os.environ.get("MINIO_ROOT_USER", "").strip() or "minioadmin"
     if not secret_key:
-        os.environ["AWS_SECRET_ACCESS_KEY"] = "minioadmin"
+        os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get("MINIO_ROOT_PASSWORD", "").strip() or "minioadmin"
 
     bucket = os.environ.get("AWS_BUCKET_NAME", "mlops-paas-artifacts").strip() or "mlops-paas-artifacts"
     region = os.environ.get("AWS_DEFAULT_REGION", "ap-southeast-1").strip() or "ap-southeast-1"

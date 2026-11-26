@@ -15,7 +15,9 @@ if AWS_S3_ENDPOINT_URL is None and not _has_real_aws_keys:
     AWS_S3_ENDPOINT_URL = "http://minio:9000"
     AWS_S3_PUBLIC_ENDPOINT_URL = AWS_S3_PUBLIC_ENDPOINT_URL or "http://localhost:9000"
     AWS_S3_ADDRESSING_STYLE = "path"
+
+if AWS_S3_ENDPOINT_URL:
     if not _access_key:
-        os.environ["AWS_ACCESS_KEY_ID"] = "minioadmin"
+        os.environ["AWS_ACCESS_KEY_ID"] = env("MINIO_ROOT_USER", "").strip() or "minioadmin"
     if not _secret_key:
-        os.environ["AWS_SECRET_ACCESS_KEY"] = "minioadmin"
+        os.environ["AWS_SECRET_ACCESS_KEY"] = env("MINIO_ROOT_PASSWORD", "").strip() or "minioadmin"
