@@ -34,7 +34,7 @@ export function FileViewer({
     );
   if (lower.endsWith(".csv")) {
     return (
-      <div className={className || "h-full w-full flex-1 overflow-auto"}>
+      <div className={className || "h-full w-full flex-1 min-h-0 overflow-hidden"}>
         <DataViewer
           initialCsvText={content}
           onChange={onChange}
@@ -46,7 +46,7 @@ export function FileViewer({
 
   if (lower.endsWith(".md") && showMarkdownPreview) {
     return (
-      <div className={className || "h-full w-full flex-1 overflow-auto p-4"}>
+      <div className={className || "custom-scrollbar h-full w-full flex-1 min-h-0 overflow-auto p-4"}>
         <MarkdownPreview content={content} />
       </div>
     );

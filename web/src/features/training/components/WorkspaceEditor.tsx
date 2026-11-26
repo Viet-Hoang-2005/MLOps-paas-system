@@ -731,10 +731,10 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
         </div>
 
         {/* Main Grid: Left = Viewer, Right = DirectoryTree Explorer */}
-        <div className="grid min-h-125 md:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="grid min-h-125 md:h-125 md:grid-cols-[minmax(0,1fr)_18rem]">
           {/* LEFT: Viewer Area */}
           <div
-            className="relative flex min-w-0 flex-1 flex-col bg-surface h-full"
+            className="relative flex h-125 md:h-full min-h-0 min-w-0 flex-1 flex-col bg-surface"
             aria-busy={loading}
           >
             {loading && (

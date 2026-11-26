@@ -26,15 +26,17 @@ def verify_training_output(job, storage=None):
 
     from .storage_scope import validate_training_uri
 
-    storage = storage or S3Storage(client_config=Config(connect_timeout=3, read_timeout=5, retries={"max_attempts": 0}))
-    validate_training_uri(job, storage.bucket, "output", job.output_uri)
+    head_storage = storage or S3Storage(
+        client_config=Config(connect_timeout=3, read_timeout=5, retries={"max_attempts": 0})
+    )
+    validate_training_uri(job, head_storage.bucket, "output", job.output_uri)
     if job.tracking.get("output_contract") != 2:
-        bucket, key = storage.parse_uri(job.output_uri)
-        if not storage.client.head_object(Bucket=bucket, Key=key).get("ContentLength"):
+        bucket, key = head_storage.parse_uri(job.output_uri)
+        if not head_storage.client.head_object(Bucket=bucket, Key=key).get("ContentLength"):
             raise ValueError("Training output is empty.")
     from .output_index import index_output
 
-    index_output(job, storage)
+    index_output(job, storage or S3Storage())
 
 
 def serialize_output_asset(output: TrainingOutput, storage=None) -> dict[str, Any]:

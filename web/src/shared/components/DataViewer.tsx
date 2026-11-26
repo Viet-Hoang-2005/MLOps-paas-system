@@ -143,7 +143,7 @@ export function DataViewer({
         </div>
       ) : (
         <>
-          <div className="flex-1 min-h-0 overflow-auto">
+          <div className="custom-scrollbar flex-1 min-h-0 overflow-auto">
             <table className="min-w-full divide-y divide-border border-collapse">
               <tbody className="divide-y divide-border bg-surface">
                 {paginatedData.map((row, pRowIndex) => {

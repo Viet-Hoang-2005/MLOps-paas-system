@@ -49,7 +49,12 @@ export default function BaseDialog({
             className,
           )}
         >
-          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4">
+          <div
+            className={cn(
+              "flex shrink-0 justify-between gap-4 border-b border-border px-5 py-4",
+              description ? "items-start" : "items-center",
+            )}
+          >
             <div className="space-y-1">
               <Dialog.Title className="text-style-section-title text-color-foreground">
                 {title}

@@ -237,7 +237,7 @@ export const overviewEn = {
     accuracy: "Accuracy",
     correctHelper: "{{correct}}/{{total}} correct",
     noLabels: "no target labels",
-    consoleTitle: "Testing console",
+    consoleTitle: "Predict console",
     consolePlaceholder: "Select Run to start processing the CSV file.",
     leaveTitle: "Leave model testing?",
     leaveDescription:

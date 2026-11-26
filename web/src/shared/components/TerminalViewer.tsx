@@ -13,15 +13,12 @@ function formatAnsiColor(color: string | null | undefined): string | undefined {
   const trimmed = color.trim();
   if (
     trimmed.startsWith("#") ||
-    // color-ignore: ANSI escape sequence decoding for terminal stream.
     trimmed.startsWith("rgb(") ||
-    // color-ignore: ANSI escape sequence decoding for terminal stream.
     trimmed.startsWith("rgba(") ||
     trimmed.startsWith("var(")
   ) {
     return trimmed;
   }
-  // color-ignore: ANSI escape sequence decoding for terminal stream.
   return `rgb(${trimmed})`;
 }
 

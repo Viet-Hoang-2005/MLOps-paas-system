@@ -16,6 +16,13 @@ class StoredObject:
     etag: str = ""
 
 
+def _drop_empty_put_expect(request, **_kwargs):
+    # MinIO replies 200 OK immediately on 0-byte PutObject; Expect: 100-continue
+    # leaves an unread response in the urllib3 keep-alive socket for the next call.
+    if str(request.headers.get("Content-Length", "")) in {"0", "b'0'"} or request.headers.get("Content-Length") == b"0":
+        request.headers.pop("Expect", None)
+
+
 class S3Storage:
     def __init__(self, client=None, bucket=None, client_config=None):
         # SigV4 signs Content-Length, which bounds what a presigned PUT can upload.
@@ -28,6 +35,8 @@ class S3Storage:
         if settings.AWS_S3_ENDPOINT_URL:
             kwargs["endpoint_url"] = settings.AWS_S3_ENDPOINT_URL
         self.client = client or boto3.client("s3", **kwargs)
+        if client is None and settings.AWS_S3_ENDPOINT_URL:
+            self.client.meta.events.register("before-send.s3.PutObject", _drop_empty_put_expect)
         self._custom_client = client is not None
         self._public_client = None
         self.bucket = bucket or settings.AWS_STORAGE_BUCKET_NAME

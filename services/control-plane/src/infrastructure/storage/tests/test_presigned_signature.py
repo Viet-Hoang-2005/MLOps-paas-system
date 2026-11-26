@@ -97,6 +97,19 @@ def test_init_minio_defaults_to_minio_when_aws_keys_empty(monkeypatch):
     assert os.environ["AWS_SECRET_ACCESS_KEY"] == "custom-minio-pass"
 
 
+def test_drop_empty_put_expect_removes_expect_for_zero_length():
+    from types import SimpleNamespace
+    from infrastructure.storage.s3 import _drop_empty_put_expect
+
+    empty_req = SimpleNamespace(headers={"Content-Length": "0", "Expect": "100-continue"})
+    _drop_empty_put_expect(empty_req)
+    assert "Expect" not in empty_req.headers
+
+    non_empty_req = SimpleNamespace(headers={"Content-Length": "42", "Expect": "100-continue"})
+    _drop_empty_put_expect(non_empty_req)
+    assert non_empty_req.headers["Expect"] == "100-continue"
+
+
 def test_init_minio_creates_missing_bucket(monkeypatch):
     from unittest.mock import Mock
     from botocore.exceptions import ClientError
