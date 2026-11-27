@@ -12,6 +12,7 @@ export const monitoringVi = {
   noCurrentResult: "Chưa có kết quả drift hoàn tất cho phiên bản Đang chạy.",
   currentStatus: "Phiên bản Đang chạy · độ lệch dữ liệu",
   archived: "Lưu lịch sử",
+  deleting: "Đang xóa",
   title: "Giám sát lệch dữ liệu",
   create: "Tạo cấu hình giám sát",
   run: "Chạy ngay",
@@ -196,7 +197,7 @@ export const monitoringVi = {
     runDeleteFailed: "Không thể xóa kết quả lần chạy.",
     runCancelled: "Đã hủy lần kiểm tra drift.",
     runCancelFailed: "Không thể hủy lần kiểm tra drift.",
-    deleted: "Đã xóa cấu hình giám sát.",
+    deleteQueued: "Đã gửi yêu cầu xóa cấu hình giám sát.",
     deleteFailed: "Không thể xóa cấu hình giám sát.",
   },
   actions: {

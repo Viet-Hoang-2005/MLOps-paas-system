@@ -1,4 +1,4 @@
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from apps.catalog.selectors import project_for_user
 from apps.registry.models import ModelVersion
 from apps.registry.selectors import version_for_user
-from apps.registry.services.deletion import delete_model_version
+from apps.registry.services.deletion import request_model_version_deletion
 from apps.registry.services.versions import (
     add_supplemental_artifacts,
     get_version_reference_preview,
@@ -69,8 +69,10 @@ class ModelVersionDetailEndpoint(generics.RetrieveDestroyAPIView):
             .prefetch_related("artifacts", "metrics")
         )
 
-    def perform_destroy(self, instance):
-        delete_model_version(instance)
+    def destroy(self, request, *args, **kwargs):
+        version = version_for_user(request.user, kwargs["version_id"])
+        request_model_version_deletion(version)
+        return Response({"id": version.public_id, "deletion_requested": True}, status=status.HTTP_202_ACCEPTED)
 
 
 class ModelVersionSupplementalArtifactsEndpoint(APIView):

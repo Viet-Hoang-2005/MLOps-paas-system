@@ -11,6 +11,7 @@ export const driftEn = {
   noCurrentResult: "No completed drift analysis for the Running version yet.",
   currentStatus: "Running version · Data drift",
   archived: "Archived",
+  deleting: "Deleting",
   title: "Drift Monitoring",
   create: "Create drift monitor",
   run: "Run now",
@@ -194,7 +195,7 @@ export const driftEn = {
     runDeleteFailed: "Unable to delete the drift run.",
     runCancelled: "The drift run was cancelled.",
     runCancelFailed: "Unable to cancel the drift run.",
-    deleted: "The drift monitor was deleted.",
+    deleteQueued: "Deletion requested for the drift monitor.",
     deleteFailed: "Unable to delete the drift monitor.",
   },
   actions: {

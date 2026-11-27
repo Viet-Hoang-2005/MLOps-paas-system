@@ -1,10 +1,12 @@
 from django.conf import settings
+from django.db import transaction
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.catalog.models import ModelProject
 from apps.drift.selectors import monitor_for_user, monitors_for_user, run_for_user
-from apps.drift.services.deletion import delete_drift_monitor, delete_drift_run
+from apps.drift.services.deletion import delete_drift_run, request_drift_monitor_deletion
 from apps.drift.services.logs import drift_run_logs
 from apps.drift.services.monitors import get_monitor_reference_preview, reference_download_url
 from apps.drift.services.reports import get_drift_report_data, report_uri_for_run
@@ -59,15 +61,23 @@ class DriftMonitorDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
             )
         )
 
-    def perform_update(self, serializer):
-        from common.api.exceptions import Conflict
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        monitor = monitor_for_user(request.user, kwargs["monitor_id"])
+        project = ModelProject.objects.select_for_update().filter(pk=monitor.version.project_id).first()
+        if not project or project.deletion_state != "active":
+            raise Conflict("This project is being deleted.")
+        return super().update(request, *args, **kwargs)
 
-        if serializer.instance.deletion_requested:
-            raise Conflict("This drift monitor is being deleted.")
+    def perform_update(self, serializer):
+        if serializer.instance.deletion_requested or serializer.instance.version.deletion_requested:
+            raise Conflict("This drift monitor or model version is being deleted.")
         serializer.save()
 
-    def perform_destroy(self, instance):
-        delete_drift_monitor(instance)
+    def destroy(self, request, *args, **kwargs):
+        monitor = monitor_for_user(request.user, kwargs["monitor_id"])
+        request_drift_monitor_deletion(monitor)
+        return Response({"id": monitor.public_id, "deletion_requested": True}, status=status.HTTP_202_ACCEPTED)
 
 
 class DriftRunEndpoint(APIView):

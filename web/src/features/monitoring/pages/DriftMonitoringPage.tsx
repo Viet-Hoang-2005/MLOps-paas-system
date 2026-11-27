@@ -177,11 +177,14 @@ export default function DriftMonitoringPage() {
     {
       accessorKey: "is_active",
       header: t("status"),
-      cell: ({ row }) => (
-        <Badge variant={row.original.is_active ? "success" : "neutral"}>
-          {row.original.is_active ? t("active") : t("archived")}
-        </Badge>
-      ),
+      cell: ({ row }) =>
+        row.original.deletion_requested ? (
+          <Badge variant="warning">{t("deleting")}</Badge>
+        ) : (
+          <Badge variant={row.original.is_active ? "success" : "neutral"}>
+            {row.original.is_active ? t("active") : t("archived")}
+          </Badge>
+        ),
     },
     {
       id: "actions",
@@ -190,6 +193,7 @@ export default function DriftMonitoringPage() {
       cell: ({ row }) => {
         const job = row.original;
         const isRunningThis = runningJobId === job.id;
+        const actionsDisabled = isDeleting || job.deletion_requested;
         return (
           <div className="flex flex-wrap items-center gap-1">
             <Button
@@ -197,7 +201,7 @@ export default function DriftMonitoringPage() {
               variant="secondary"
               border={false}
               loading={isRunningThis}
-              disabled={isRunningThis || isDeleting}
+              disabled={isRunningThis || actionsDisabled}
               icon={<Play className="h-4 w-4" />}
               title={t("actionTooltips.run")}
               aria-label={t("actionTooltips.run")}
@@ -207,7 +211,7 @@ export default function DriftMonitoringPage() {
               size="icon"
               variant="secondary"
               border={false}
-              disabled={isDeleting}
+              disabled={actionsDisabled}
               icon={<Edit className="h-4 w-4" />}
               title={t("actionTooltips.edit")}
               aria-label={t("actionTooltips.edit")}
@@ -217,7 +221,7 @@ export default function DriftMonitoringPage() {
               size="icon"
               variant="danger"
               border={false}
-              disabled={isDeleting}
+              disabled={actionsDisabled}
               icon={<Trash2 className="h-4 w-4" />}
               title={t("actionTooltips.delete")}
               aria-label={t("actionTooltips.delete")}

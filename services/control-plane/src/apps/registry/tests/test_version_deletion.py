@@ -17,8 +17,9 @@ from apps.drift.models import DriftMonitor, DriftRun
 from apps.drift.services.monitors import create_monitor
 from apps.drift.services.runs import request_run
 from apps.registry.models import ModelArtifact, ModelVersion, RegistryAlias
+from apps.registry.tasks import cleanup_model_version
 from apps.training.tests.factories import training_job as make_training_job
-from common.api.exceptions import Conflict
+from common.api.exceptions import Conflict, ServiceUnavailable
 
 
 @pytest.mark.django_db(transaction=True)
@@ -83,6 +84,27 @@ def test_delete_version_removes_runtime_monitors_s3_image_and_unlocks_build(monk
     client = APIClient()
     client.force_authenticate(owner)
     url = f"/api/registry/versions/{version.public_id}/"
+    dispatched_after_commit = []
+
+    def capture_dispatch(**_):
+        dispatched_after_commit.append(
+            not connection.in_atomic_block and ModelVersion.objects.get(pk=version.pk).deletion_requested
+        )
+
+    dispatch = Mock(side_effect=capture_dispatch)
+    monkeypatch.setattr(cleanup_model_version, "apply_async", dispatch)
+    response = client.delete(url)
+    assert response.status_code == 202
+    assert response.data["deletion_requested"] is True
+    dispatch.assert_called_once_with(args=[str(version.public_id)], retry=False)
+    assert dispatched_after_commit == [True]
+    assert client.get(url).data["deletion_requested"] is True
+    assert client.delete(url).status_code == 202
+    dispatch.assert_called_once()
+    backend.stop.assert_not_called()
+    remove_image.assert_not_called()
+    storage.delete_prefix.assert_not_called()
+    invalidate_cache.assert_not_called()
     if failure is None:
 
         def assert_writes_blocked():
@@ -127,7 +149,8 @@ def test_delete_version_removes_runtime_monitors_s3_image_and_unlocks_build(monk
                     raise TimeoutError("storage unavailable")
 
             storage.delete_prefix.side_effect = fail_on_version_prefix
-        assert client.delete(url).status_code == 503
+        with pytest.raises(ServiceUnavailable):
+            cleanup_model_version.run(str(version.public_id))
         assert ModelVersion.objects.filter(pk=version.pk, deletion_requested=True, artifacts__uri=artifact_uri).exists()
         assert Deployment.objects.filter(pk=deployment.pk, endpoint__isnull=False).exists()
         assert RegistryAlias.objects.filter(version=version).exists()
@@ -141,9 +164,8 @@ def test_delete_version_removes_runtime_monitors_s3_image_and_unlocks_build(monk
         remove_image.side_effect = None
         storage.delete_prefix.side_effect = None
 
-    response = client.delete(url)
-
-    assert response.status_code == 204
+    assert cleanup_model_version.run(str(version.public_id)) == "deleted"
+    assert client.get(url).status_code == 404
     assert not ModelVersion.objects.filter(pk=version.pk).exists()
     assert not Deployment.objects.filter(pk=deployment.pk).exists()
     assert not RegistryAlias.objects.filter(project=project).exists()

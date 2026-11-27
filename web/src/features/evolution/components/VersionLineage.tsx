@@ -53,6 +53,11 @@ export function VersionLineage({
           {chronologicalVersions(versions).map((version) => {
             const isRunning = version.id === runningId;
             const isSelected = version.id === selectedId;
+            const status = version.deletion_requested
+              ? t("workspace.deleting")
+              : isRunning
+                ? t("workspace.running")
+                : t("workspace.registered");
 
             const borderClasses = isSelected
               ? "border-primary"
@@ -75,16 +80,13 @@ export function VersionLineage({
                     <button
                       type="button"
                       aria-current={isSelected ? "true" : undefined}
-                      aria-label={`v${version.version} - ${isRunning ? t("workspace.running") : t("workspace.registered")}`}
+                      aria-label={`v${version.version} - ${status}`}
                       onClick={() => onSelect(version.id)}
                       className={`relative flex h-10 w-10 items-center justify-center rounded-full border-2 text-style-body-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${borderClasses} ${bgTextClasses} ${selectedClasses}`}
                     >
                       <span>{version.version}</span>
                       <span className="sr-only">
-                        {`v${version.version}`}{" "}
-                        {isRunning
-                          ? t("workspace.running")
-                          : t("workspace.registered")}
+                        {`v${version.version}`} {status}
                       </span>
                     </button>
                   </Tooltip.Trigger>
@@ -96,10 +98,18 @@ export function VersionLineage({
                     >
                       <div className="flex items-center justify-between gap-3">
                         <p className="font-semibold text-style-body">{`Version v${version.version}`}</p>
-                        <Badge variant={isRunning ? "success" : "neutral"}>
-                          {isRunning
-                            ? t("workspace.running")
-                            : projectStatus || t("workspace.registered")}
+                        <Badge
+                          variant={
+                            version.deletion_requested
+                              ? "warning"
+                              : isRunning
+                                ? "success"
+                                : "neutral"
+                          }
+                        >
+                          {version.deletion_requested || isRunning
+                            ? status
+                            : projectStatus || status}
                         </Badge>
                       </div>
                       <p className="text-color-muted-foreground text-style-caption">

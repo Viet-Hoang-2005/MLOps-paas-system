@@ -62,4 +62,17 @@ describe("VersionLineage Component", () => {
     await userEvent.click(v2Button);
     expect(handleSelect).toHaveBeenCalledWith(v2.id);
   });
+
+  it("labels a pending deletion even when the version still has a running deployment", () => {
+    renderWithProviders(
+      <VersionLineage
+        versions={[{ ...v1, deletion_requested: true }]}
+        runningId={v1.id}
+        onSelect={vi.fn()}
+      />,
+      { language: "en" },
+    );
+
+    expect(screen.getByRole("button", { name: /deleting/i })).toBeInTheDocument();
+  });
 });

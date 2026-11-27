@@ -52,14 +52,19 @@ export default function DriftMonitoringDetailPage() {
   const { data: jobs, isLoading: isLoadingJobs } =
     useDriftMonitoringJobs(effectiveModelId);
 
-  const activeJob = singleJob ?? jobs?.find((job) => job.id === monitorId);
-  const projectIdForJob = effectiveModelId ?? activeJob?.project_id;
+  const activeJob =
+    singleJob === null
+      ? undefined
+      : singleJob ?? jobs?.find((job) => job.id === monitorId);
+  const projectIdForJob = activeJob?.project_id ?? effectiveModelId;
 
   const {
     data: results,
     isLoading: isLoadingResults,
     refetch: refetchResults,
-  } = useDriftMonitoringResults(activeJob?.id);
+  } = useDriftMonitoringResults(
+    activeJob?.deletion_requested ? undefined : activeJob?.id,
+  );
 
   const { data: productionDataCount } = useProductionDataCount(
     projectIdForJob,
@@ -85,7 +90,7 @@ export default function DriftMonitoringDetailPage() {
 
   const stream = useRuntimeLogStream({
     source: effectiveRunId ? { kind: "drift", id: effectiveRunId } : null,
-    enabled: Boolean(effectiveRunId),
+    enabled: Boolean(effectiveRunId && !activeJob?.deletion_requested),
     terminalStatuses: DRIFT_TERMINAL_STATUSES,
   });
 
@@ -211,6 +216,15 @@ export default function DriftMonitoringDetailPage() {
             </Button>
           }
         />
+      </div>
+    );
+  }
+
+  if (activeJob.deletion_requested) {
+    return (
+      <div className="flex w-full flex-1 flex-col space-y-6">
+        <PageHeader title={t("detailTitle")} back onBack={handleBack} />
+        <p role="status">{t("deleting")}</p>
       </div>
     );
   }

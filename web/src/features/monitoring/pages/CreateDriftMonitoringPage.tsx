@@ -160,12 +160,24 @@ function CreateDriftMonitorContent({
     form.projectId && (form.project.isLoading || form.production.isLoading),
   );
 
+  const pageHeader = (
+    <PageHeader
+      title={t(monitorId ? "createPage.editTitle" : "createPage.createTitle")}
+      back
+    />
+  );
+  if (form.deleting || form.existing.data === null) {
+    return (
+      <div className="space-y-6">
+        {pageHeader}
+        <p role="status">{form.deleting ? t("deleting") : t("jobNotFound")}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={t(monitorId ? "createPage.editTitle" : "createPage.createTitle")}
-        back
-      />
+      {pageHeader}
       <form
         className="space-y-6"
         onSubmit={(event) => {

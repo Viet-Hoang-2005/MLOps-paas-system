@@ -7,6 +7,7 @@ import {
   normalizeEvolutionTab,
 } from "@/features/evolution/evolutionState";
 import { catalogQueryKeys } from "@/features/projects/queryKeys";
+import type { ModelVersion } from "@/features/projects/types";
 import { deploymentFlowKeys } from "@/features/deployments/queryKeys";
 import { driftQueryKeys } from "@/features/monitoring/queryKeys";
 import { VersionLineage } from "@/features/evolution/components/VersionLineage";
@@ -43,7 +44,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Navigate,
@@ -107,41 +108,67 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
   const state = useEvolution(projectId, params.get("versionId"));
   const tab = normalizeEvolutionTab(params.get("tab"));
   const version = state.version;
+  const pendingDeletions = useRef(new Set<string>());
+  const versions = state.versions.data;
+  const versionsKey = evolutionQueryKeys.versions(projectId);
+
+  useEffect(() => {
+    if (!versions) return;
+    for (const item of versions) {
+      if (item.deletion_requested) pendingDeletions.current.add(item.id);
+    }
+    const completed = [...pendingDeletions.current].filter(
+      (id) => !versions.some((item) => item.id === id),
+    );
+    if (completed.length === 0) return;
+    for (const id of completed) {
+      pendingDeletions.current.delete(id);
+      queryClient.removeQueries({ queryKey: evolutionQueryKeys.snapshot(id) });
+    }
+    if (completed.includes(params.get("versionId") ?? "")) {
+      setParams(
+        (previous) => {
+          const next = new URLSearchParams(previous);
+          next.delete("versionId");
+          return next;
+        },
+        { replace: true },
+      );
+    }
+    void Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: catalogQueryKeys.project(projectId),
+      }),
+      queryClient.invalidateQueries({ queryKey: catalogQueryKeys.projects() }),
+      queryClient.invalidateQueries({
+        queryKey: deploymentFlowKeys.history(projectId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: deploymentFlowKeys.deployments(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: driftQueryKeys.monitors(projectId),
+      }),
+    ]);
+  }, [params, projectId, queryClient, setParams, versions]);
 
   const deleteMutation = useMutation({
-    mutationFn: (versionId: string) => deleteModelVersion(versionId),
-    onSuccess: async (_data, deletedId) => {
-      const deletedNumber = version?.version ?? "";
+    mutationFn: (target: ModelVersion) => deleteModelVersion(target.id),
+    onSuccess: async (_data, target) => {
       setConfirmDelete(false);
-      setParams((previous) =>
-        evolutionParams(previous, { tab, versionId: undefined }),
+      pendingDeletions.current.add(target.id);
+      await queryClient.cancelQueries({ queryKey: versionsKey });
+      queryClient.setQueryData<ModelVersion[]>(versionsKey, (items) =>
+        items?.map((item) =>
+          item.id === target.id ? { ...item, deletion_requested: true } : item,
+        ),
       );
-      queryClient.removeQueries({
-        queryKey: evolutionQueryKeys.snapshot(deletedId),
-      });
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: evolutionQueryKeys.versions(projectId),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: catalogQueryKeys.project(projectId),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: catalogQueryKeys.projects(),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: deploymentFlowKeys.history(projectId),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: deploymentFlowKeys.deployments(),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: driftQueryKeys.monitors(projectId),
-        }),
-      ]);
       toast.success(
-        t("workspace.deleteVersionSuccess", { version: deletedNumber }),
+        t("workspace.deleteVersionQueued", { version: target.version }),
       );
+      await queryClient.invalidateQueries({
+        queryKey: versionsKey,
+      });
     },
     onError: (err) => {
       setConfirmDelete(false);
@@ -250,6 +277,12 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
 
           {!state.selected ? (
             <p role="alert">{t("workspace.notFound")}</p>
+          ) : state.selected.deletion_requested ? (
+            <p role="status">
+              {t("workspace.deletingVersion", {
+                version: state.selected.version,
+              })}
+            </p>
           ) : state.detail.error && !version ? (
             <div role="alert" className="space-y-3">
               <p>
@@ -441,7 +474,7 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
           )}
       </div>
 
-      {compare && version && (
+      {compare && version && !state.selected?.deletion_requested && (
         <ComparisonVersionDialog
           key={version.id}
           projectId={projectId}
@@ -452,7 +485,7 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
         />
       )}
 
-      {version && (
+      {version && !state.selected?.deletion_requested && (
         <ConfirmDialog
           open={confirmDelete}
           tone="danger"
@@ -472,7 +505,7 @@ function EvolutionWorkspace({ projectId }: { projectId: string }) {
           confirmText={t("workspace.deleteVersion")}
           cancelText={tCommon("actions.cancel")}
           loading={deleteMutation.isPending}
-          onConfirm={() => deleteMutation.mutate(version.id)}
+          onConfirm={() => deleteMutation.mutate(version)}
           onCancel={() => {
             if (!deleteMutation.isPending) setConfirmDelete(false);
           }}

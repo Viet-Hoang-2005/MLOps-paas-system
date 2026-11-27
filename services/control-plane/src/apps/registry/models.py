@@ -20,6 +20,7 @@ class ModelVersion(models.Model):
     source_job_reference = models.UUIDField(null=True, blank=True, db_index=True)
     version = models.CharField(max_length=80)
     deletion_requested = models.BooleanField(default=False)
+    deletion_cleanup_due_at = models.DateTimeField(null=True, blank=True, db_index=True, editable=False)
     requirements_snapshot = models.TextField(blank=True)
     flavor = models.CharField(max_length=80, blank=True)
     stage = models.CharField(max_length=20, choices=STAGES, default="none")

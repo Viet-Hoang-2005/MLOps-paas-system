@@ -14,6 +14,7 @@ from apps.deployment.models import Build, BuildInputAsset
 from apps.deployment.services.completion import request_registration
 from apps.deployment.tasks import cleanup_registered_build_storage, reconcile_stalled_deletions
 from apps.registry.models import ModelArtifact, ModelVersion
+from apps.registry.services.deletion import delete_model_version, request_model_version_deletion
 from apps.registry.services.versions import register_successful_build
 from infrastructure.storage.paths import build_prefix
 from infrastructure.storage.s3 import StoredObject
@@ -334,7 +335,8 @@ def test_registration_rollback_does_not_dispatch_cleanup(monkeypatch, django_cap
 
 
 @pytest.mark.django_db
-def test_registered_build_cleanup_retries_after_storage_timeout(monkeypatch, django_capture_on_commit_callbacks):
+@pytest.mark.parametrize("detach", [False, True])
+def test_registered_build_cleanup_retries_after_storage_timeout(monkeypatch, detach):
     project, build = _project_and_build("reg-purge-retry@example.com")
     storage = RecordingStorage()
     storage.delete_prefix = Mock(side_effect=[TimeoutError("S3 timeout"), None])
@@ -348,12 +350,21 @@ def test_registered_build_cleanup_retries_after_storage_timeout(monkeypatch, dja
     assert build.registered_storage_cleanup_due_at > timezone.now()
     assert cleanup_registered_build_storage.run(str(build.public_id)) == "not_due"
 
+    if detach:
+        monkeypatch.setattr("apps.registry.services.deletion.invalidate_model_server_cache", Mock())
+        request_model_version_deletion(registered.version)
+        delete_model_version(registered.version, storage=Mock(bucket=storage.bucket), image_remover=Mock())
+        build.refresh_from_db()
+        assert build.version_id is None
+        assert build.registered_storage_cleanup_due_at is not None
+
     Build.objects.filter(pk=build.pk).update(registered_storage_cleanup_due_at=timezone.now() - timedelta(seconds=1))
     dispatch = Mock(side_effect=cleanup_registered_build_storage.run)
     monkeypatch.setattr(cleanup_registered_build_storage, "delay", dispatch)
     assert reconcile_stalled_deletions.run() == 1
-    assert request_registration(build).version_id == registered.version_id
-    assert ModelVersion.objects.filter(project=project).count() == 1
+    if not detach:
+        assert request_registration(build).version_id == registered.version_id
+    assert ModelVersion.objects.filter(project=project).count() == (0 if detach else 1)
     assert storage.delete_prefix.call_count == 2
     build.refresh_from_db()
     assert build.registered_storage_cleanup_due_at is None

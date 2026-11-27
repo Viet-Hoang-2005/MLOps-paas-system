@@ -5,7 +5,7 @@ from celery import shared_task
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import F, Q
 from django.db.models.functions import Coalesce, Now
 from django.utils import timezone
 
@@ -15,6 +15,7 @@ from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.services.logs import append_deployment_log, reset_deployment_logs
 from apps.registry.services.versions import register_successful_build
+from common.deletion_retry import deletion_cleanup_retry_at
 from common.logging import failure_reported, record_transition
 from infrastructure.execution import build_backend, deployment_backend
 from infrastructure.execution.build_cleanup import stop_build_for_deletion
@@ -204,7 +205,7 @@ def cleanup_registered_build_storage(build_id):
         if not build:
             return "not_due"
         # The next scan can retry after this lease if the worker or storage fails.
-        retry_at = now + timedelta(seconds=max(1, settings.DELETION_RECONCILE_GRACE_SECONDS))
+        retry_at = deletion_cleanup_retry_at(now)
         build.registered_storage_cleanup_due_at = retry_at
         build.save(update_fields=["registered_storage_cleanup_due_at"])
 
@@ -559,6 +560,27 @@ def _dispatch_once(kind, public_id, task, grace):
     return 0
 
 
+def _dispatch_due_cleanup(rows, task, now, limit):
+    # Pending rows from before the deadline was introduced are immediately eligible.
+    due = Q(deletion_cleanup_due_at__isnull=True) | Q(deletion_cleanup_due_at__lte=now)
+    candidates = list(
+        rows.filter(due)
+        .order_by(F("deletion_cleanup_due_at").asc(nulls_first=True), "pk")
+        .values_list("pk", "public_id")[:limit]
+    )
+    pending = rows.model.objects.filter(deletion_requested=True).filter(due)
+    dispatched = 0
+    for pk, public_id in candidates:
+        # Advance before publishing so a failed publish or lost message does not monopolize the next batch.
+        if pending.filter(pk=pk).update(deletion_cleanup_due_at=deletion_cleanup_retry_at(now)):
+            try:
+                task.delay(str(public_id))
+                dispatched += 1
+            except Exception:
+                logger.warning("Failed to dispatch cleanup for %s %s.", rows.model.__name__, public_id, exc_info=True)
+    return dispatched
+
+
 @shared_task(ignore_result=True, expires=120, soft_time_limit=100, time_limit=110)
 def reconcile_stalled_deletions():
     """Re-dispatch unfinished storage cleanups and deletions.
@@ -581,17 +603,17 @@ def reconcile_stalled_deletions():
 
     grace = settings.DELETION_RECONCILE_GRACE_SECONDS
     limit = settings.DELETION_RECONCILE_BATCH_SIZE
-    cutoff = timezone.now() - timedelta(seconds=grace)
+    now = timezone.now()
+    cutoff = now - timedelta(seconds=grace)
     dispatched = 0
     stale_builds = Build.objects.filter(deletion_state="deleting", updated_at__lt=cutoff).order_by("updated_at")
     for public_id in stale_builds.values_list("public_id", flat=True)[:limit]:
         dispatched += _dispatch_once("build", public_id, delete_build, grace)
     registered_builds = Build.objects.filter(
         status="ready",
-        version__isnull=False,
         deletion_state="active",
         project__deletion_state="active",
-        registered_storage_cleanup_due_at__lte=timezone.now(),
+        registered_storage_cleanup_due_at__lte=now,
     ).order_by("registered_storage_cleanup_due_at", "pk")
     for public_id in registered_builds.values_list("public_id", flat=True)[:limit]:
         dispatched += _dispatch_once("registered-build-storage", public_id, cleanup_registered_build_storage, grace)
@@ -615,14 +637,12 @@ def reconcile_stalled_deletions():
     )
     for public_id in stale_jobs.values_list("public_id", flat=True)[:limit]:
         dispatched += _dispatch_once("training-job", public_id, delete_training_job, grace)
-    stale_versions = ModelVersion.objects.filter(deletion_requested=True, project__deletion_state="active").order_by("pk")
-    for public_id in stale_versions.values_list("public_id", flat=True)[:limit]:
-        dispatched += _dispatch_once("model-version", public_id, cleanup_model_version, grace)
+    stale_versions = ModelVersion.objects.filter(deletion_requested=True, project__deletion_state="active")
+    dispatched += _dispatch_due_cleanup(stale_versions, cleanup_model_version, now, limit)
     stale_monitors = DriftMonitor.objects.filter(
         deletion_requested=True, version__deletion_requested=False, version__project__deletion_state="active"
-    ).order_by("updated_at")
-    for public_id in stale_monitors.values_list("public_id", flat=True)[:limit]:
-        dispatched += _dispatch_once("drift-monitor", public_id, cleanup_drift_monitor_task, grace)
+    )
+    dispatched += _dispatch_due_cleanup(stale_monitors, cleanup_drift_monitor_task, now, limit)
     if dispatched:
         logger.warning("Re-dispatched %s pending cleanup or deletion task(s).", dispatched)
     return dispatched

@@ -7,8 +7,9 @@ from rest_framework.test import APIClient
 from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.drift.services.runs import request_run
+from apps.drift.tasks import cleanup_drift_monitor_task
 from apps.registry.models import ModelArtifact, ModelVersion
-from common.api.exceptions import Conflict
+from common.api.exceptions import Conflict, ServiceUnavailable
 
 
 @pytest.mark.django_db
@@ -49,7 +50,9 @@ def test_delete_drift_run_cancels_active_container_and_cleans_s3_and_redis(monke
 
 
 @pytest.mark.django_db
-def test_delete_drift_monitor_preserves_shared_model_artifact_reference(monkeypatch):
+def test_delete_drift_monitor_preserves_shared_model_artifact_reference(
+    monkeypatch, django_capture_on_commit_callbacks
+):
     owner = get_user_model().objects.create_user("drift-mon-del@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="Monitor Delete")
     version = ModelVersion.objects.create(project=project, version="1")
@@ -71,9 +74,21 @@ def test_delete_drift_monitor_preserves_shared_model_artifact_reference(monkeypa
 
     client = APIClient()
     client.force_authenticate(owner)
-    response = client.delete(f"/api/drift-monitors/{monitor.public_id}/")
+    url = f"/api/drift-monitors/{monitor.public_id}/"
+    dispatch = Mock()
+    monkeypatch.setattr(cleanup_drift_monitor_task, "apply_async", dispatch)
+    with django_capture_on_commit_callbacks(execute=True):
+        response = client.delete(url)
+        dispatch.assert_not_called()
+    assert response.status_code == 202
+    assert response.data["deletion_requested"] is True
+    dispatch.assert_called_once_with(args=[str(monitor.public_id)], retry=False)
+    assert client.get(url).data["deletion_requested"] is True
+    assert client.patch(url, {"trigger_threshold": 100}).status_code == 409
+    storage.delete_prefix.assert_not_called()
 
-    assert response.status_code == 204
+    assert cleanup_drift_monitor_task.run(str(monitor.public_id)) == "deleted"
+    assert client.get(url).status_code == 404
     assert not DriftMonitor.objects.filter(pk=monitor.pk).exists()
     assert shared_uri not in [call.args[0] for call in storage.delete.call_args_list]
 
@@ -112,7 +127,13 @@ def test_drift_delete_keeps_rows_on_cleanup_failure_and_can_retry(monkeypatch, f
     url = (
         f"/api/drift-monitors/{monitor.public_id}/" if delete_monitor else f"/api/drift-monitors/runs/{run.public_id}/"
     )
-    assert client.delete(url).status_code == 503
+    if delete_monitor:
+        assert client.delete(url).status_code == 202
+        with pytest.raises(ServiceUnavailable):
+            cleanup_drift_monitor_task.run(str(monitor.public_id))
+        assert client.get(url).data["deletion_requested"] is True
+    else:
+        assert client.delete(url).status_code == 503
     assert DriftMonitor.objects.filter(pk=monitor.pk).exists()
     assert DriftRun.objects.filter(pk=run.pk, report_html_uri=run.report_html_uri).exists()
 
@@ -120,6 +141,9 @@ def test_drift_delete_keeps_rows_on_cleanup_failure_and_can_retry(monkeypatch, f
     storage.delete.side_effect = None
     backend.cancel.side_effect = None
     backend.cancel.return_value = {"confirmed": True}
-    assert client.delete(url).status_code == 204
+    if delete_monitor:
+        assert cleanup_drift_monitor_task.run(str(monitor.public_id)) == "deleted"
+    else:
+        assert client.delete(url).status_code == 204
     assert not DriftRun.objects.filter(pk=run.pk).exists()
     assert DriftMonitor.objects.filter(pk=monitor.pk).exists() is not delete_monitor

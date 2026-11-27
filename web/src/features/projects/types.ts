@@ -80,6 +80,7 @@ export interface ModelVersion {
   stage: RegistryStage;
   deployability: RegistryDeployabilityStatus;
   deployability_reason: string;
+  deletion_requested?: boolean;
   metrics_summary: Record<string, unknown>;
   params_summary: Record<string, unknown>;
   insights_summary: RegistryModelInsightsSummary;

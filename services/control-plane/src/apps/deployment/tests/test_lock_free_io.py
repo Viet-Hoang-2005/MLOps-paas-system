@@ -443,6 +443,48 @@ def test_stalled_deletions_are_dispatched_again(project, dispatch):
     assert tasks.reconcile_stalled_deletions() == 0
 
 
+def test_version_and_monitor_reconciliation_batches_only_due_rows(project, dispatch, settings, monkeypatch):
+    from apps.drift.models import DriftMonitor
+    from apps.drift.tasks import cleanup_drift_monitor_task
+    from apps.registry.models import ModelVersion
+    from apps.registry.tasks import cleanup_model_version
+
+    settings.DELETION_RECONCILE_BATCH_SIZE = 1
+    now = timezone.now()
+    active_version = ModelVersion.objects.create(project=project, version="active", flavor="sklearn")
+    first_version = ModelVersion.objects.create(
+        project=project, version="first", flavor="sklearn", deletion_requested=True
+    )
+    second_version = ModelVersion.objects.create(
+        project=project, version="second", flavor="sklearn", deletion_requested=True
+    )
+    first_monitor = DriftMonitor.objects.create(version=active_version, name="first", deletion_requested=True)
+    second_monitor = DriftMonitor.objects.create(version=active_version, name="second", deletion_requested=True)
+    publish_version = Mock(side_effect=[ConnectionError("broker unavailable"), None, None])
+    publish_monitor = Mock()
+    monkeypatch.setattr(cleanup_model_version, "delay", publish_version)
+    monkeypatch.setattr(cleanup_drift_monitor_task, "delay", publish_monitor)
+    monkeypatch.setattr(tasks.timezone, "now", lambda: now)
+
+    assert tasks.reconcile_stalled_deletions() == 1
+    publish_version.assert_called_once_with(str(first_version.public_id))
+    publish_monitor.assert_called_once_with(str(first_monitor.public_id))
+    first_version.refresh_from_db()
+    first_monitor.refresh_from_db()
+    assert first_version.deletion_cleanup_due_at > now
+    assert first_monitor.deletion_cleanup_due_at > now
+
+    assert tasks.reconcile_stalled_deletions() == 2
+    publish_version.assert_called_with(str(second_version.public_id))
+    publish_monitor.assert_called_with(str(second_monitor.public_id))
+    assert tasks.reconcile_stalled_deletions() == 0
+
+    now += timedelta(seconds=settings.DELETION_RECONCILE_GRACE_SECONDS)
+    assert tasks.reconcile_stalled_deletions() == 2
+    publish_version.assert_called_with(str(first_version.public_id))
+    publish_monitor.assert_called_with(str(first_monitor.public_id))
+
+
 def test_beat_runs_the_deletion_reconciler(settings):
     from config.settings import base
 

@@ -11,6 +11,7 @@ from apps.drift.models import DriftMonitor, DriftRun
 from apps.drift.services.deletion import cleanup_drift_monitor
 from apps.registry.models import ModelArtifact, ModelVersion, RegistryAlias
 from common.api.exceptions import Conflict, ServiceUnavailable
+from common.deletion_retry import deletion_cleanup_retry_at
 from common.logging import record_transition
 from common.redis_client import redis_client
 from infrastructure.docker import DockerClient
@@ -53,8 +54,34 @@ def _remove_build_image(build):
         pass
 
 
+def _check_version_deletion(project, version):
+    if project.deletion_state != "active":
+        raise Conflict("This project is already being deleted.")
+    _check_ct_references(project, version)
+    if version.deployments.filter(status__in=("deploying", "unconfirmed")).exists():
+        raise Conflict("Stop the deployment in progress before deleting this version.")
+
+
+def request_model_version_deletion(version: ModelVersion) -> None:
+    from apps.registry.tasks import cleanup_model_version
+
+    with transaction.atomic():
+        project = ModelProject.objects.select_for_update().filter(pk=version.project_id).first()
+        locked = ModelVersion.objects.filter(pk=version.pk).first()
+        if project is None or locked is None or locked.deletion_requested:
+            return
+        _check_version_deletion(project, locked)
+        locked.deletion_requested = True
+        locked.deletion_cleanup_due_at = deletion_cleanup_retry_at()
+        locked.save(update_fields=["deletion_requested", "deletion_cleanup_due_at"])
+        transaction.on_commit(
+            lambda: cleanup_model_version.apply_async(args=[str(locked.public_id)], retry=False),
+            robust=True,
+        )
+
+
 def delete_model_version(version: ModelVersion, *, storage=None, image_remover=None) -> None:
-    """Delete a ModelVersion along with its runtime pods, monitors, S3 artifacts, and image."""
+    """Process a recorded deletion, including runtime, monitoring, storage and image cleanup."""
     image_remover = image_remover or _remove_build_image
 
     with transaction.atomic():
@@ -65,17 +92,13 @@ def delete_model_version(version: ModelVersion, *, storage=None, image_remover=N
             .filter(pk=version.pk)
             .first()
         )
-        if locked is None:
+        if locked is None or not locked.deletion_requested:
             return
-        if project.deletion_state != "active":
-            raise Conflict("This project is already being deleted.")
-        _check_ct_references(project, locked)
+        _check_version_deletion(project, locked)
 
         deployments = list(locked.deployments.select_related("endpoint").all())
-        if any(item.status in {"deploying", "unconfirmed"} for item in deployments):
-            raise Conflict("Stop the deployment in progress before deleting this version.")
-        locked.deletion_requested = True
-        locked.save(update_fields=["deletion_requested"])
+        locked.deletion_cleanup_due_at = deletion_cleanup_retry_at()
+        locked.save(update_fields=["deletion_cleanup_due_at"])
         DriftRun.objects.filter(monitor__version=locked).update(execution_stop_requested=True)
         deployment_pks = {item.pk for item in deployments}
         if project.active_deployment_id in deployment_pks:

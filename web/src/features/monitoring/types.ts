@@ -29,6 +29,7 @@ export interface DriftMonitoringJob {
   trigger_threshold: number;
   backend: string;
   is_active: boolean;
+  deletion_requested?: boolean;
   runs: DriftMonitoringResult[];
   created_at: string;
   updated_at: string;

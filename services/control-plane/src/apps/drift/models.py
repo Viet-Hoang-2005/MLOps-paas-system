@@ -16,6 +16,7 @@ class DriftMonitor(models.Model):
     backend = models.CharField(max_length=30, default="docker")
     is_active = models.BooleanField(default=True)
     deletion_requested = models.BooleanField(default=False)
+    deletion_cleanup_due_at = models.DateTimeField(null=True, blank=True, db_index=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

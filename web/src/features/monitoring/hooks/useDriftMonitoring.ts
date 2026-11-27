@@ -14,9 +14,11 @@ import {
   updateDriftMonitoringJob,
 } from "@/features/monitoring/api/driftApi";
 import { driftQueryKeys } from "@/features/monitoring/queryKeys";
+import type { DriftMonitoringJob } from "@/features/monitoring/types";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { toast } from "@/shared/lib/toastStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { useTranslation } from "react-i18next";
 
 export type {
@@ -36,8 +38,19 @@ export function useDriftMonitoringJobs(modelId?: string) {
 export function useDriftMonitor(jobId?: string) {
   return useQuery({
     queryKey: driftQueryKeys.configuration(jobId ?? ""),
-    queryFn: () => getDriftMonitor(jobId!),
+    queryFn: async () => {
+      try {
+        return await getDriftMonitor(jobId!);
+      } catch (error) {
+        if (isAxiosError(error) && error.response?.status === 404) return null;
+        throw error;
+      }
+    },
     enabled: Boolean(jobId),
+    refetchInterval: (query) => {
+      const monitor = query.state.data;
+      return monitor ? (monitor.deletion_requested ? 3000 : 15000) : false;
+    },
   });
 }
 
@@ -66,11 +79,24 @@ export function useDeleteDriftMonitoringJob() {
   return useMutation({
     mutationFn: async (payload: { id: string; project_id: string }) =>
       deleteDriftMonitoringJob(payload.id),
-    onSuccess: (_, variables) => {
-      toast.success(t("messages.deleted"));
-      queryClient.invalidateQueries({
-        queryKey: driftQueryKeys.monitors(variables.project_id),
-      });
+    onSuccess: async (_, variables) => {
+      const listKey = driftQueryKeys.monitors(variables.project_id);
+      const detailKey = driftQueryKeys.configuration(variables.id);
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: listKey }),
+        queryClient.cancelQueries({ queryKey: detailKey }),
+      ]);
+      queryClient.setQueryData<DriftMonitoringJob[]>(listKey, (jobs) =>
+        jobs?.map((job) =>
+          job.id === variables.id ? { ...job, deletion_requested: true } : job,
+        ),
+      );
+      queryClient.setQueryData<DriftMonitoringJob | null>(detailKey, (job) =>
+        job ? { ...job, deletion_requested: true } : job,
+      );
+      toast.success(t("messages.deleteQueued"));
+      void queryClient.invalidateQueries({ queryKey: listKey });
+      void queryClient.invalidateQueries({ queryKey: detailKey });
     },
     onError: (error: unknown) =>
       toast.error(getApiErrorMessage(error, t("messages.deleteFailed"))),

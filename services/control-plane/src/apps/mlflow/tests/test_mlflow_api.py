@@ -1,4 +1,5 @@
 import hashlib
+from datetime import timedelta
 from unittest.mock import patch
 from urllib.parse import urlsplit
 
@@ -316,6 +317,32 @@ class MLflowCompatibilityTests(APITestCase):
             f"training/jobs/{self.job.public_id}/mlflow/artifacts"
         )
         self.assertEqual(get_resp.data["run"]["info"]["artifact_uri"], expected_uri)
+
+    def test_mlflow_runs_get_selects_latest_metric_per_name(self):
+        timestamp = timezone.now()
+        older = TrainingJobMetric.objects.create(job=self.job, name="loss", step=4, value=0.8)
+        latest = TrainingJobMetric.objects.create(
+            job=self.job, name="loss", step=4, value=0.4, timestamp=timestamp
+        )
+        TrainingJobMetric.objects.filter(pk=older.pk).update(created_at=latest.created_at - timedelta(seconds=1))
+        TrainingJobMetric.objects.create(job=self.job, name="loss", step=3, value=0.9, timestamp=timestamp)
+        TrainingJobMetric.objects.create(job=self.job, name="accuracy", step=1, value=0.92)
+
+        response = self.client.get(
+            f"/api/2.0/mlflow/runs/get?run_id={self.job.public_id}",
+            HTTP_AUTHORIZATION=f"Bearer {self.token}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        metrics = response.data["run"]["data"]["metrics"]
+        self.assertEqual(len(metrics), 2)
+        self.assertEqual(
+            {metric["key"]: metric for metric in metrics},
+            {
+                "accuracy": {"key": "accuracy", "step": 1, "value": 0.92, "timestamp": 0},
+                "loss": {"key": "loss", "step": 4, "value": 0.4, "timestamp": int(timestamp.timestamp() * 1000)},
+            },
+        )
 
     def test_mlflow_artifact_proxy_upload_and_download(self):
         file_content = b"pickle-serialized-model-bytes-123456789"

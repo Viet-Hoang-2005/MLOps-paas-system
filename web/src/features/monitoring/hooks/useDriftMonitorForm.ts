@@ -1,11 +1,13 @@
 import {
   createDriftMonitoringJob,
-  getDriftMonitor,
   getMonitorReferenceText,
   updateDriftMonitoringJob,
 } from "@/features/monitoring/api/driftApi";
 import { driftQueryKeys } from "@/features/monitoring/queryKeys";
-import { useProductionData } from "@/features/monitoring/hooks/useDriftMonitoring";
+import {
+  useDriftMonitor,
+  useProductionData,
+} from "@/features/monitoring/hooks/useDriftMonitoring";
 import {
   useProjectOverview,
   useSnapshotText,
@@ -29,11 +31,8 @@ export function useDriftMonitorForm(
   const { t } = useTranslation("monitoring");
   const client = useQueryClient();
   const projects = useModelProjects();
-  const existing = useQuery({
-    queryKey: driftQueryKeys.configuration(monitorId ?? ""),
-    queryFn: () => getDriftMonitor(monitorId!),
-    enabled: Boolean(monitorId),
-  });
+  const existing = useDriftMonitor(monitorId);
+  const deleting = Boolean(existing.data?.deletion_requested);
   const projectId = existing.data?.project_id || requestedProjectId;
   const project = useProjectOverview(projectId);
   const endpoint = project.data?.active_endpoint;
@@ -65,7 +64,7 @@ export function useDriftMonitorForm(
   const monitorReference = useQuery({
     queryKey: driftQueryKeys.reference(monitorId ?? ""),
     queryFn: ({ signal }) => getMonitorReferenceText(monitorId!, signal),
-    enabled: Boolean(monitorId && existing.data),
+    enabled: Boolean(monitorId && existing.data && !deleting),
   });
   const localReference = useQuery({
     queryKey: driftQueryKeys.uploadPreview(upload?.id ?? ""),
@@ -98,6 +97,7 @@ export function useDriftMonitorForm(
     !loading &&
     !error &&
     !fileError &&
+    !deleting &&
     Boolean(versionId) &&
     (Boolean(monitorId) ||
       (isRunning && (hasReference || Boolean(reference)))) &&
@@ -144,6 +144,7 @@ export function useDriftMonitorForm(
     projects,
     project,
     existing,
+    deleting,
     production,
     triggerThreshold,
     allowedThresholds,
@@ -155,7 +156,10 @@ export function useDriftMonitorForm(
     error,
     canSave,
     save,
-    dirty: threshold !== null || upload !== null,
+    dirty:
+      !deleting &&
+      existing.data !== null &&
+      (threshold !== null || upload !== null),
     setThreshold,
     setReference: (file: File | null) => {
       setFileError("");

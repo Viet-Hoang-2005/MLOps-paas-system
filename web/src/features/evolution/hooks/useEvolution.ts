@@ -16,6 +16,11 @@ export function useEvolution(projectId: string, requestedId: string | null) {
     queryKey: evolutionQueryKeys.versions(projectId),
     queryFn: () => getProjectVersions(projectId),
     enabled: Boolean(projectId),
+    staleTime: 0,
+    refetchInterval: (query) =>
+      query.state.data?.some((version) => version.deletion_requested)
+        ? 3000
+        : false,
   });
   const project = useProjectOverview(projectId);
   const builds = useBuildHistory(projectId);
@@ -29,7 +34,7 @@ export function useEvolution(projectId: string, requestedId: string | null) {
   const detail = useQuery({
     queryKey: evolutionQueryKeys.snapshot(selected?.id ?? ""),
     queryFn: ({ signal }) => getVersionDetail(selected!.id, signal),
-    enabled: Boolean(selected),
+    enabled: Boolean(selected && !selected.deletion_requested),
   });
   // Never render a response from another project, including cached detail.
   const version =

@@ -1,5 +1,7 @@
 import uuid
 
+from django.db.models import F, Window
+from django.db.models.functions import RowNumber
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -156,18 +158,26 @@ class MLflowRunsGetView(APIView):
         if err_job:
             return err_job
 
-        # Query all latest metrics in one query
-        latest_by_name = {}
-        for metric in job.step_metrics.order_by("step", "created_at"):
-            latest_by_name[metric.name] = metric
+        latest_metrics = (
+            job.step_metrics.annotate(
+                rank=Window(
+                    expression=RowNumber(),
+                    partition_by=[F("name")],
+                    order_by=[F("step").desc(), F("created_at").desc(), F("pk").desc()],
+                )
+            )
+            .filter(rank=1)
+            .order_by("name")
+            .values_list("name", "value", "step", "timestamp")
+        )
         metrics_list = [
             {
-                "key": latest.name,
-                "value": latest.value,
-                "step": latest.step,
-                "timestamp": int(latest.timestamp.timestamp() * 1000) if latest.timestamp else 0,
+                "key": name,
+                "value": value,
+                "step": step,
+                "timestamp": int(timestamp.timestamp() * 1000) if timestamp else 0,
             }
-            for latest in latest_by_name.values()
+            for name, value, step, timestamp in latest_metrics
         ]
 
         params_list = [{"key": p.name, "value": p.value} for p in job.hyperparameters.all()]

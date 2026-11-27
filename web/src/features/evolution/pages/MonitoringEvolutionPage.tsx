@@ -33,6 +33,7 @@ export function MonitoringEvolutionPage({
   versionId,
 }: MonitoringEvolutionPageProps) {
   const { t, i18n } = useTranslation("evolution");
+  const { t: tMonitoring } = useTranslation("monitoring");
   const navigate = useNavigate();
 
   const { data: jobs, isLoading: isLoadingJobs } =
@@ -42,8 +43,9 @@ export function MonitoringEvolutionPage({
     jobs?.find((j) => j.version_id === versionId) ??
     (jobs && jobs.length === 1 ? jobs[0] : undefined);
 
-  const { data: results, isLoading: isLoadingResults } =
-    useDriftMonitoringResults(activeJob?.id);
+  const { data: results, isLoading: isLoadingResults } = useDriftMonitoringResults(
+    activeJob?.deletion_requested ? undefined : activeJob?.id,
+  );
 
   const totalRuns = results?.length ?? 0;
   const driftDetectedRuns =
@@ -163,6 +165,10 @@ export function MonitoringEvolutionPage({
         {t("workspace.loading", "Loading...")}
       </div>
     );
+  }
+
+  if (activeJob?.deletion_requested) {
+    return <p role="status">{tMonitoring("deleting")}</p>;
   }
 
   if (!activeJob) {

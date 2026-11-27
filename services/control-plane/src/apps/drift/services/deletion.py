@@ -7,6 +7,7 @@ from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.registry.models import ModelArtifact
 from common.api.exceptions import Conflict, ServiceUnavailable
+from common.deletion_retry import deletion_cleanup_retry_at
 from common.redis_client import redis_client
 from infrastructure.execution import drift_backend
 from infrastructure.storage import S3Storage
@@ -71,16 +72,35 @@ def _cleanup_drift_run(run: DriftRun, *, storage: S3Storage) -> None:
         logger.warning("Failed to delete Redis logs for drift run %s", run.public_id, exc_info=True)
 
 
-def delete_drift_monitor(monitor: DriftMonitor, *, storage=None) -> None:
+def request_drift_monitor_deletion(monitor: DriftMonitor) -> None:
+    from apps.drift.tasks import cleanup_drift_monitor_task
+
     with transaction.atomic():
         project = ModelProject.objects.select_for_update().filter(pk=monitor.version.project_id).first()
-        monitor = DriftMonitor.objects.select_related("version__project__owner").filter(pk=monitor.pk).first()
-        if monitor is None:
+        monitor = DriftMonitor.objects.select_related("version").filter(pk=monitor.pk).first()
+        if monitor is None or monitor.deletion_requested:
             return
         if not project or project.deletion_state != "active" or monitor.version.deletion_requested:
             raise Conflict("This project or model version is being deleted.")
         monitor.deletion_requested = True
-        monitor.save(update_fields=["deletion_requested"])
+        monitor.deletion_cleanup_due_at = deletion_cleanup_retry_at()
+        monitor.save(update_fields=["deletion_requested", "deletion_cleanup_due_at"])
+        transaction.on_commit(
+            lambda: cleanup_drift_monitor_task.apply_async(args=[str(monitor.public_id)], retry=False),
+            robust=True,
+        )
+
+
+def delete_drift_monitor(monitor: DriftMonitor, *, storage=None) -> None:
+    with transaction.atomic():
+        project = ModelProject.objects.select_for_update().filter(pk=monitor.version.project_id).first()
+        monitor = DriftMonitor.objects.select_related("version__project__owner").filter(pk=monitor.pk).first()
+        if monitor is None or not monitor.deletion_requested:
+            return
+        if not project or project.deletion_state != "active" or monitor.version.deletion_requested:
+            raise Conflict("This project or model version is being deleted.")
+        monitor.deletion_cleanup_due_at = deletion_cleanup_retry_at()
+        monitor.save(update_fields=["deletion_cleanup_due_at"])
         monitor.runs.update(execution_stop_requested=True)
 
     cleanup_drift_monitor(monitor, storage=storage or S3Storage())

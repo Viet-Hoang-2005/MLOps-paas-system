@@ -69,6 +69,7 @@ class DriftMonitorSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="public_id", read_only=True)
     version_id = serializers.UUIDField(source="version.public_id", read_only=True)
     project_id = serializers.UUIDField(source="version.project.public_id", read_only=True)
+    deletion_requested = serializers.SerializerMethodField()
     version = serializers.SlugRelatedField(
         slug_field="public_id", queryset=ModelVersion.objects.none(), write_only=True
     )
@@ -91,12 +92,16 @@ class DriftMonitorSerializer(serializers.ModelSerializer):
             "trigger_threshold",
             "backend",
             "is_active",
+            "deletion_requested",
             "runs",
             "created_at",
             "updated_at",
         )
         read_only_fields = ("backend", "reference_name")
         validators = ()
+
+    def get_deletion_requested(self, monitor):
+        return monitor.deletion_requested or monitor.version.deletion_requested
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
