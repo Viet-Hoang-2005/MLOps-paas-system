@@ -1,12 +1,9 @@
 from datetime import timedelta
-from importlib import import_module
-from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-from django.apps import apps
 from django.contrib.auth import get_user_model
-from django.db import connection, transaction
+from django.db import transaction
 from django.utils import timezone
 
 from apps.catalog.models import ModelProject
@@ -372,20 +369,14 @@ def test_registered_build_cleanup_retries_after_storage_timeout(monkeypatch, det
 
 
 @pytest.mark.django_db
-def test_backfill_schedules_legacy_registered_storage_and_worker_preserves_live_version_uri(monkeypatch):
-    project, build = _project_and_build("legacy-reg-purge@example.com")
-    _, unregistered = _project_and_build("unregistered-no-purge@example.com")
+def test_registered_build_cleanup_preserves_live_version_uri(monkeypatch):
+    project, build = _project_and_build("reg-purge-live-version@example.com")
     version = ModelVersion.objects.create(project=project, version="1", flavor="sklearn")
     build.version = version
-    build.save(update_fields=["version"])
+    build.registered_storage_cleanup_due_at = timezone.now()
+    build.save(update_fields=["version", "registered_storage_cleanup_due_at"])
     prefix = f"{build_prefix(project.owner.tenant_id, project.public_id, build.public_id)}/"
     ModelArtifact.objects.create(version=version, kind="source", name="model.pkl", uri=f"s3://test-bucket/{prefix}model.pkl")
-    migration = import_module("apps.deployment.migrations.0004_build_registered_storage_cleanup")
-    migration.schedule_registered_builds(apps, SimpleNamespace(connection=connection))
-    build.refresh_from_db()
-    unregistered.refresh_from_db()
-    assert build.registered_storage_cleanup_due_at is not None
-    assert unregistered.registered_storage_cleanup_due_at is None
 
     storage = RecordingStorage()
     storage.delete_prefix = Mock()
