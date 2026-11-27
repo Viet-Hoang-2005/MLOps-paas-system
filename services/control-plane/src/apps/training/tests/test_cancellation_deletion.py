@@ -195,14 +195,30 @@ def test_hard_delete_preserves_registered_version_and_ready_image(monkeypatch):
 
 @pytest.mark.django_db
 def test_execute_failure_does_not_overwrite_cancelling(monkeypatch):
+    from contextlib import nullcontext
+
     _, job = training_job(status="queued")
+    TrainingJob.objects.filter(pk=job.pk).update(
+        submitted_at=timezone.now(),
+        observation_status="ok",
+        next_execution_check_at=timezone.now(),
+    )
 
     class Backend:
+        docker = SimpleNamespace(client=None)
+
+        def poll(self, selected_job):
+            return {"status": "not_found"}
+
         def run(self, selected_job):
             TrainingJob.objects.filter(pk=selected_job.pk).update(status="cancelling")
             raise RuntimeError("container stopped")
 
-    monkeypatch.setattr("apps.training.tasks.training_backend", lambda _backend: Backend())
+        def cleanup(self, selected_job):
+            return {"confirmed": True}
+
+    monkeypatch.setattr("apps.observability.services.executions.backend_for", lambda *_args: Backend())
+    monkeypatch.setattr("apps.training.services.local_resources.dispatch_guard", lambda *_args: nullcontext())
     monkeypatch.setattr("apps.training.services.logs.append_training_log", lambda *_args: None)
 
     assert execute_training_job.run(str(job.public_id)) == "cancelling"

@@ -129,4 +129,4 @@ class UserSerializer(serializers.ModelSerializer):
             "auth_provider",
             "date_joined",
         )
-        read_only_fields = ("email", "tenant_id", "date_joined", "avatar")
+        read_only_fields = ("email", "tenant_id", "auth_provider", "date_joined", "avatar")

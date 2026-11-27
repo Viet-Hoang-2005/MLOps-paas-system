@@ -13,7 +13,7 @@ def complete_build(
     """Record a build result without publishing a registry version."""
     with transaction.atomic():
         ModelProject.objects.select_for_update().get(pk=build.project_id)
-        build = Build.objects.select_for_update().select_related("project").get(pk=build.pk)
+        build = Build.objects.select_for_update(of=("self",)).select_related("project").get(pk=build.pk)
         if build.status in {"ready", "cancelled", "failed"}:
             return build
         build.status = (
@@ -47,7 +47,7 @@ def request_registration(build):
 
     with transaction.atomic():
         ModelProject.objects.select_for_update().get(pk=build.project_id)
-        build = Build.objects.select_for_update().select_related("project").get(pk=build.pk)
+        build = Build.objects.select_for_update(of=("self",)).select_related("project").get(pk=build.pk)
         if build.status != "ready" or build.project.deletion_state != "active" or build.deletion_state != "active":
             raise Conflict("Only a successful build can be registered.")
         if build.version_id:

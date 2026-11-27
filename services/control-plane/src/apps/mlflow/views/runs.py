@@ -66,9 +66,6 @@ class MLflowRunsCreateView(APIView):
             except (ValueError, TypeError):
                 pass
 
-        target_job.mlflow_run_id = str(target_job.public_id)
-        target_job.save(update_fields=["mlflow_run_id", "updated_at"])
-
         # Persist tags
         for t in tags:
             k = str(t.get("key", "")).strip()[:160]
@@ -118,15 +115,22 @@ class MLflowRunsUpdateView(APIView):
         status_str = str(request.data.get("status", "")).upper()
         end_time = request.data.get("end_time")
 
-        current_tracking = dict(job.tracking or {})
         if status_str:
-            current_tracking["mlflow_status"] = status_str
+            TrainingJobTag.objects.update_or_create(
+                job=job, name="mlflow.runStatus", defaults={"value": status_str[:500]}
+            )
         if end_time is not None:
-            current_tracking["end_time"] = end_time
-        job.tracking = current_tracking
-        job.save(update_fields=["tracking", "updated_at"])
+            TrainingJobTag.objects.update_or_create(
+                job=job, name="mlflow.endTime", defaults={"value": str(end_time)[:500]}
+            )
 
-        mlflow_status = status_str or current_tracking.get("mlflow_status") or "FINISHED"
+        mlflow_status = (
+            status_str
+            or TrainingJobTag.objects.filter(job=job, name="mlflow.runStatus")
+            .values_list("value", flat=True)
+            .first()
+            or "FINISHED"
+        )
 
         return Response(
             {
@@ -152,30 +156,31 @@ class MLflowRunsGetView(APIView):
         if err_job:
             return err_job
 
-        # Query all latest metrics
-        metrics_list = []
-        for name in job.step_metrics.values_list("name", flat=True).distinct():
-            latest = job.step_metrics.filter(name=name).order_by("-step", "-created_at").first()
-            if latest:
-                metrics_list.append(
-                    {
-                        "key": latest.name,
-                        "value": latest.value,
-                        "step": latest.step,
-                        "timestamp": int(latest.timestamp.timestamp() * 1000) if latest.timestamp else 0,
-                    }
-                )
+        # Query all latest metrics in one query
+        latest_by_name = {}
+        for metric in job.step_metrics.order_by("step", "created_at"):
+            latest_by_name[metric.name] = metric
+        metrics_list = [
+            {
+                "key": latest.name,
+                "value": latest.value,
+                "step": latest.step,
+                "timestamp": int(latest.timestamp.timestamp() * 1000) if latest.timestamp else 0,
+            }
+            for latest in latest_by_name.values()
+        ]
 
         params_list = [{"key": p.name, "value": p.value} for p in job.hyperparameters.all()]
         tags_list = [{"key": t.name, "value": t.value} for t in job.tags.all()]
+        tags_map = {t["key"]: t["value"] for t in tags_list}
 
         artifact_uri = _mlflow_artifact_uri(job)
 
-        current_tracking = dict(job.tracking or {})
-        mlflow_status = current_tracking.get("mlflow_status") or (
+        mlflow_status = tags_map.get("mlflow.runStatus") or (
             "FINISHED" if job.status == "completed" else "RUNNING" if job.status == "running" else job.status.upper()
         )
-        end_time = current_tracking.get("end_time") or (
+        raw_end = tags_map.get("mlflow.endTime")
+        end_time = int(raw_end) if raw_end and raw_end.isdigit() else (
             int(job.completed_at.timestamp() * 1000) if job.completed_at else None
         )
 

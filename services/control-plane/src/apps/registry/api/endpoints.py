@@ -28,8 +28,28 @@ class ProjectVersionListCreateEndpoint(generics.ListAPIView):
         return (
             ModelVersion.objects.filter(project=self.project())
             .select_related("source_job")
-            .prefetch_related("artifacts")
+            .prefetch_related("artifacts", "metrics")
         )
+
+    def list(self, request, *args, **kwargs):
+        from collections import defaultdict
+        from apps.observability.models import LifecycleEvent
+
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        items = list(page if page is not None else queryset)
+        events_by_version_id = defaultdict(list)
+        if items:
+            version_ids = [item.public_id for item in items]
+            for ev in LifecycleEvent.objects.filter(
+                aggregate_type="model_version", aggregate_id__in=version_ids
+            ).order_by("-created_at"):
+                events_by_version_id[ev.aggregate_id].append(ev)
+        context = {**self.get_serializer_context(), "events_by_version_id": events_by_version_id}
+        serializer = self.get_serializer(items, many=True, context=context)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
 
     def get_serializer_context(self):
         return {**super().get_serializer_context(), "project": self.project()}
@@ -49,47 +69,6 @@ class ModelVersionDetailEndpoint(generics.RetrieveDestroyAPIView):
 
     def perform_destroy(self, instance):
         delete_model_version(instance)
-
-
-class ProjectAliasListCreateEndpoint(generics.ListCreateAPIView):
-    serializer_class = RegistryAliasSerializer
-
-    def project(self):
-        if not hasattr(self, "_project"):
-            self._project = project_for_user(self.request.user, self.kwargs["project_id"])
-        return self._project
-
-    def get_queryset(self):
-        return RegistryAlias.objects.filter(project=self.project()).select_related("version")
-
-    def get_serializer_context(self):
-        return {**super().get_serializer_context(), "project": self.project()}
-
-    def perform_create(self, serializer):
-        serializer.instance = set_alias(
-            project=self.project(),
-            actor=self.request.user,
-            name=serializer.validated_data["name"],
-            version=serializer.validated_data["version"],
-        )
-
-
-class AliasPredictionEndpoint(APIView):
-    def post(self, request, project_id, alias_name):
-        project = project_for_user(request.user, project_id)
-        return Response(
-            predict_alias(
-                project=project,
-                alias_name=alias_name,
-                payload=request.data,
-            )
-        )
-
-
-class VersionSmokeTestEndpoint(APIView):
-    def post(self, request, version_id):
-        version = version_for_user(request.user, version_id)
-        return Response(predict_version(version=version, payload=request.data))
 
 
 class ModelVersionSupplementalArtifactsEndpoint(APIView):

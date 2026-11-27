@@ -3,7 +3,7 @@
 from django.db import transaction
 
 from apps.catalog.models import ModelProject
-from apps.drift.models import DriftMonitor
+from apps.drift.models import DriftMonitor, DriftRun
 from apps.drift.services.runs import request_run
 from apps.production.models import PredictionRecord
 
@@ -45,9 +45,11 @@ def request_automatic_drift_runs(model_version_id: str) -> int:
             if threshold <= 0 or current_count - monitor.last_automatic_trigger_count < threshold:
                 continue
 
-            threshold_bucket = current_count // threshold
-            request_run(monitor, f"automatic-drift:{monitor.public_id}:{threshold_bucket}")
+            run_key = f"automatic-drift:{monitor.public_id}:{monitor.last_automatic_trigger_count}:{current_count}"
+            existed = DriftRun.objects.filter(monitor=monitor, idempotency_key=run_key).exists()
+            request_run(monitor, run_key)
             monitor.last_automatic_trigger_count = current_count
             monitor.save(update_fields=["last_automatic_trigger_count", "updated_at"])
-            triggered += 1
+            if not existed:
+                triggered += 1
         return triggered

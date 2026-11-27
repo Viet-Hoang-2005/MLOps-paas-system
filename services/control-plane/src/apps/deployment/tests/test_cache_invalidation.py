@@ -47,9 +47,12 @@ class CacheInvalidationTests(TestCase):
         Endpoint.objects.create(deployment=deployment, runtime_name="runtime-test", health_status="unknown")
 
         invalidated_ids = []
-        with patch(
-            "apps.deployment.tasks.invalidate_model_server_cache",
-            side_effect=lambda version_id: invalidated_ids.append(version_id),
+        with (
+            patch(
+                "apps.deployment.tasks.invalidate_model_server_cache",
+                side_effect=lambda version_id: invalidated_ids.append(version_id),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             _mark_deployment_succeeded(deployment)
 

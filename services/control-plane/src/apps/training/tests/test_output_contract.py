@@ -482,3 +482,37 @@ def test_output_purge_clears_selection_and_preserves_input(output_job, monkeypat
     assert current.output_revision == 2
     purge_training_job_outputs.run(str(job.public_id))
     assert set(storage.objects) == {input_uri}
+
+
+def test_enqueue_output_debounces_across_task_time_limit(output_job, monkeypatch, django_capture_on_commit_callbacks):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.training.services.output_finalization import enqueue_output
+
+    _, job, _ = output_job
+    queued = []
+    monkeypatch.setattr("apps.training.services.output_finalization.finalize_output.delay", queued.append)
+    base = timezone.now()
+
+    monkeypatch.setattr("apps.training.services.output_finalization.timezone.now", lambda: base)
+    with django_capture_on_commit_callbacks(execute=True):
+        enqueue_output(job)
+    assert len(queued) == 1
+
+    # Within 3600s time_limit (e.g. 1800s elapsed), enqueue_output must not dispatch a duplicate worker
+    monkeypatch.setattr(
+        "apps.training.services.output_finalization.timezone.now", lambda: base + timedelta(seconds=1800)
+    )
+    with django_capture_on_commit_callbacks(execute=True):
+        enqueue_output(job)
+    assert len(queued) == 1
+
+    # Once past 3600s, enqueue_output can re-dispatch
+    monkeypatch.setattr(
+        "apps.training.services.output_finalization.timezone.now", lambda: base + timedelta(seconds=3601)
+    )
+    with django_capture_on_commit_callbacks(execute=True):
+        enqueue_output(job)
+    assert len(queued) == 2

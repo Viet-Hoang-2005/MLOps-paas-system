@@ -10,7 +10,7 @@ from apps.training.services.capabilities import issue_capability
 from apps.training.services.storage_scope import validate_training_uri
 from infrastructure.argo import ArgoWebhookClient
 from infrastructure.http import HttpClient
-from infrastructure.runtime_health import healthy_payload
+from infrastructure.runtime_health import healthy_payload, is_dl_flavor
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import build_prefix, drift_run_prefix
 
@@ -147,22 +147,14 @@ class ArgoBuildBackend(_ArgoBackend):
             current = type(build).objects.select_for_update().get(pk=build.pk)
             if locked_project.deletion_state != "active" or current.deletion_state != "active":
                 raise Conflict("The build or project is being deleted.")
-            return self.trigger(payload)
+            if current.status in {"cancelled", "failed"}:
+                return {"dispatched": False, "cancelled": True}
+        return self.trigger(payload)
 
     def cancel(self, build):
-        """Ask the cluster to terminate the build's Workflow; late output is cleaned up by callbacks."""
-        if not settings.ARGO_CANCEL_BUILD_WEBHOOK_URL:
-            return None
-        project = build.project
-        response = self.client.trigger(
-            settings.ARGO_CANCEL_BUILD_WEBHOOK_URL,
-            {
-                "build_id": str(build.public_id),
-                "project_id": str(project.public_id),
-                "tenant_id": project.owner.tenant_id,
-            },
-        )
-        return {"dispatched": True, "response": response}
+        if not (build.started_at or build.execution_deadline_at or build.execution_completed_at or build.status == "building"):
+            return {"confirmed": True}
+        return self.request_runtime_stop(build, "build")
 
 
 class ArgoTrainingBackend(_ArgoBackend):
@@ -272,7 +264,7 @@ class ArgoDeploymentBackend(_ArgoBackend):
         version = deployment.version
         project = version.project
         container_name = f"deploy-{str(deployment.public_id).lower()}"
-        model_type = "dl" if version.flavor in {"pytorch", "tensorflow", "keras"} else "ml"
+        model_type = "dl" if is_dl_flavor(version.flavor) else "ml"
         target_port = 5002 if model_type == "dl" else 5001
         public_url = (
             f"{settings.MODEL_SERVER_PUBLIC_URL}/{project.owner.tenant_id}/models/"
@@ -328,7 +320,7 @@ class ArgoDeploymentBackend(_ArgoBackend):
         if not endpoint or not endpoint.internal_url:
             return False, {"status": "missing"}
         try:
-            method = "POST" if deployment.version.flavor in {"pytorch", "tensorflow"} else "GET"
+            method = "POST" if is_dl_flavor(deployment.version.flavor) else "GET"
             response = self.http.request(
                 method, f"{endpoint.internal_url}/health", **({"json": {}} if method == "POST" else {})
             )

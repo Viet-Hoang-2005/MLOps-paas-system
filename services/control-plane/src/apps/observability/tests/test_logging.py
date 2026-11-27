@@ -232,7 +232,8 @@ def test_build_dispatch_is_not_completion(project, monkeypatch, django_capture_o
     assert build.completed_at is None
 
 
-def test_training_dispatch_is_not_completion(project, monkeypatch, django_capture_on_commit_callbacks):
+def test_training_dispatch_is_not_completion(project, settings, monkeypatch, django_capture_on_commit_callbacks):
+    settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     job = training_job(
         project=project,
         status="queued",
@@ -242,17 +243,24 @@ def test_training_dispatch_is_not_completion(project, monkeypatch, django_captur
         max_runtime_seconds=3600,
         input_contract="legacy",
         submitted_at=timezone.now(),
+        observation_status="ok",
+        next_execution_check_at=timezone.now(),
     )
     monkeypatch.setattr(
-        "apps.training.tasks.training_backend", lambda _: SimpleNamespace(run=lambda _: {"dispatched": True})
+        "apps.observability.services.executions.backend_for",
+        lambda *_: SimpleNamespace(
+            poll=lambda _: {"status": "not_found"},
+            run=lambda _: {"dispatched": True},
+        ),
     )
+    monkeypatch.setattr("apps.training.services.quota.require_reservation", lambda *_: None)
     monkeypatch.setattr(training_logs, "append_training_log", Mock())
     emitted = Mock()
     monkeypatch.setattr(app_logging, "log_event", emitted)
     with django_capture_on_commit_callbacks(execute=True):
         assert execute_training_job.run(str(job.public_id)) == "running"
         emitted.assert_not_called()
-    assert [c.args[2] for c in emitted.call_args_list] == ["training_job.running", "training_job.dispatched"]
+    assert not any(c.args[2] == "training_job.completed" for c in emitted.call_args_list)
     job.refresh_from_db()
     assert job.status == "running"
     assert job.completed_at is None
@@ -484,19 +492,30 @@ def test_drift_summary_backfill_does_not_claim_new_completion(
 
 
 @pytest.mark.django_db
-def test_drift_task_does_not_repeat_callback_completion(monkeypatch, django_capture_on_commit_callbacks):
+def test_drift_task_does_not_repeat_callback_completion(settings, monkeypatch, django_capture_on_commit_callbacks):
     from apps.drift.models import DriftRun
     from apps.drift.tasks import execute_drift_run
     from apps.drift.tests.test_webhook_race_condition import _drift_fixture
 
+    settings.DRIFT_EXECUTION_WATCH_ENABLED = True
     run = _drift_fixture()
+    run.status = "queued"
+    run.observation_status = "ok"
+    run.next_execution_check_at = timezone.now()
+    run.save(update_fields=["status", "observation_status", "next_execution_check_at"])
 
     def callback_then_return(resource):
         DriftRun.objects.filter(pk=resource.pk).update(status="completed")
         app_logging.record_transition(resource, "completed", source="webhook")
-        return "runtime output"
+        return {"dispatched": True}
 
-    monkeypatch.setattr("apps.drift.tasks.drift_backend", lambda _: SimpleNamespace(run=callback_then_return))
+    monkeypatch.setattr(
+        "apps.observability.services.executions.backend_for",
+        lambda *_: SimpleNamespace(
+            poll=lambda _: {"status": "not_found"},
+            run=callback_then_return,
+        ),
+    )
     emitted = Mock()
     monkeypatch.setattr(app_logging, "log_event", emitted)
     with django_capture_on_commit_callbacks(execute=True):

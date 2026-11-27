@@ -86,7 +86,7 @@ def _fetch_model_version_from_db(version_id: str) -> dict[str, Any] | None:
             ORDER BY d.created_at DESC LIMIT 1
         ) AS deployment ON TRUE
         LEFT JOIN deployment_endpoint AS endpoint ON endpoint.deployment_id = deployment.id
-        WHERE version.public_id = :version_id AND project.is_active = TRUE AND project.deletion_state = 'active'
+        WHERE version.public_id = :version_id AND project.is_active = TRUE AND project.deletion_state = 'active' AND users.is_active = TRUE
         LIMIT 1
     """)
     with model_registry_engine.connect() as connection:
@@ -147,6 +147,7 @@ def verify_project_api_key(raw_key: str, project_pk: int):
         WHERE api_key.key_prefix = :prefix
           AND api_key.key_hash = :digest
           AND api_key.revoked_at IS NULL
+          AND users.is_active = TRUE
           AND allowed.modelproject_id = :project_pk
         LIMIT 1
     """)

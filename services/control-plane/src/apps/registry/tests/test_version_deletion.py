@@ -1,13 +1,15 @@
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from unittest.mock import Mock
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connection, connections
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
-from apps.ct.models import EvidenceWindow
+from apps.ct.models import DatasetSnapshot, EvidenceWindow, MaintenancePolicy
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.deployments import request_deployment
 from apps.deployment.tasks import register_build
@@ -167,6 +169,59 @@ def test_delete_version_removes_runtime_monitors_s3_image_and_unlocks_build(monk
     invalidate_cache.assert_called_with(str(version.public_id))
     assert remove_image.call_args.args[0].image_uri == f"image-{project.public_id}:{version.public_id}"
     assert storage.delete_prefix.called
+
+
+@pytest.mark.django_db
+def test_delete_version_preserves_resources_referenced_by_ct_when_disabled(monkeypatch, settings):
+    settings.CT_ENABLED = False
+    owner = get_user_model().objects.create_user("reg-ct@example.com", "password123")
+    project = ModelProject.objects.create(owner=owner, name="CT lineage")
+    version = ModelVersion.objects.create(project=project, version="1")
+    build = Build.objects.create(project=project, version=version, status="ready", image_uri="model:v1")
+    deployment = Deployment.objects.create(version=version, build=build, status="succeeded")
+    project.active_deployment = deployment
+    project.save(update_fields=["active_deployment"])
+    artifact = ModelArtifact.objects.create(version=version, kind="model", name="model.pkl", uri="s3://bucket/model.pkl")
+    policy = MaintenancePolicy.objects.create(project=project, version=1, policy_kind="b0", checksum="policy")
+    snapshot = DatasetSnapshot.objects.create(project=project, role="reference", manifest_uri="s3://bucket/reference.json")
+    now = timezone.now()
+    window = EvidenceWindow.objects.create(
+        project=project,
+        champion=version,
+        policy=policy,
+        reference_snapshot=snapshot,
+        ordinal=1,
+        starts_at=now,
+        ends_at=now + timedelta(hours=1),
+    )
+
+    backend = Mock()
+    remove_image = Mock()
+    storage = Mock(bucket="bucket")
+    invalidate_cache = Mock()
+    monkeypatch.setattr("apps.registry.services.deletion.deployment_backend", backend)
+    monkeypatch.setattr("apps.registry.services.deletion._remove_build_image", remove_image)
+    monkeypatch.setattr("apps.registry.services.deletion.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.registry.services.deletion.invalidate_model_server_cache", invalidate_cache)
+    monkeypatch.setattr("apps.registry.services.deletion.redis_client", Mock())
+
+    client = APIClient()
+    client.force_authenticate(owner)
+    response = client.delete(f"/api/registry/versions/{version.public_id}/")
+
+    assert response.status_code == 409
+    assert "continuous training lineage" in str(response.data)
+    version.refresh_from_db()
+    project.refresh_from_db()
+    assert not version.deletion_requested
+    assert project.active_deployment_id == deployment.pk
+    assert ModelArtifact.objects.filter(pk=artifact.pk, uri=artifact.uri).exists()
+    assert EvidenceWindow.objects.filter(pk=window.pk, champion=version).exists()
+    backend.assert_not_called()
+    remove_image.assert_not_called()
+    storage.delete_prefix.assert_not_called()
+    storage.delete.assert_not_called()
+    invalidate_cache.assert_not_called()
 
 
 @pytest.mark.django_db

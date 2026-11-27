@@ -181,14 +181,17 @@ def test_local_cleanup_removes_only_known_build_container(project, monkeypatch):
     stop_build_for_deletion(build)
 
 
-def test_argo_cleanup_waits_for_trusted_terminal_callback_even_if_cancelled(project):
+def test_argo_cleanup_waits_for_trusted_terminal_callback_even_if_cancelled(project, monkeypatch):
     build = Build.objects.create(
         project=project, flavor="sklearn", backend="argo", status="cancelled", started_at=timezone.now()
     )
-    with pytest.raises(RuntimeError, match="Waiting"):
-        stop_build_for_deletion(build)
+    backend = Mock()
+    backend.cancel.return_value = {"confirmed": False}
+    monkeypatch.setattr("infrastructure.execution.build_backend", lambda _: backend)
     build.execution_completed_at = timezone.now()
-    stop_build_for_deletion(build)
+    assert stop_build_for_deletion(build) is False
+    backend.cancel.return_value = {"confirmed": True}
+    assert stop_build_for_deletion(build) is True
 
 
 @pytest.mark.parametrize("status", ["building", "cancelled"])

@@ -85,7 +85,32 @@ spec:
               root_url: https://grafana.mlops-nids-nt114.id.vn
               serve_from_sub_path: false
         alertmanager:
+          config:
+            global:
+              resolve_timeout: 5m
+            route:
+              group_by: ["alertname", "project_id", "severity"]
+              group_wait: 30s
+              group_interval: 5m
+              repeat_interval: 4h
+              receiver: control-plane-webhook
+              routes:
+                - receiver: "null"
+                  matchers:
+                    - alertname = "Watchdog"
+            receivers:
+              - name: "null"
+              - name: control-plane-webhook
+                webhook_configs:
+                  - url: http://mlops-paas-control-plane.mlops-paas-core.svc.cluster.local:8000/internal/webhooks/alerts/
+                    send_resolved: true
+                    http_config:
+                      authorization:
+                        type: Bearer
+                        credentials_file: /etc/alertmanager/secrets/alertmanager-control-plane-webhook/CONTROL_PLANE_WEBHOOK_SECRET
           alertmanagerSpec:
+            secrets:
+              - alertmanager-control-plane-webhook
             nodeSelector:
               workload-type: worker
             resources:

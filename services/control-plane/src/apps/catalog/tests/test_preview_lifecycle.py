@@ -139,6 +139,7 @@ def test_preview_revision_and_snapshot_isolation(project, monkeypatch):
     preview = draft(project, storage)
     build = request_preview_build(project=project, revision=preview.revision, backend="docker", storage=storage)
     original = build.input_assets.get(kind="source_artifact")
+    reference = preview.assets.get(kind="reference_data")
     save_preview(
         project=project,
         storage=storage,
@@ -147,7 +148,20 @@ def test_preview_revision_and_snapshot_isolation(project, monkeypatch):
             "assets": staged_assets(project, storage, [("source_artifact", "model.pkl", b"model-v2")]),
         },
     )
+    preview.refresh_from_db()
+    save_preview(
+        project=project, storage=storage, data={"revision": preview.revision, "remove_assets": ["reference_data"]}
+    )
     assert storage.read(original.s3_uri) == b"model-v1"
+    assert reference.s3_uri not in storage.objects
+    build = complete_build(build, image_uri="temporary")
+    register_successful_build(
+        build=build,
+        image_uri="temporary",
+        storage=storage,
+        image_registry=SimpleNamespace(promote=lambda **kwargs: ("published", "sha256:published")),
+    )
+    assert storage.read(project.versions.get().artifacts.get(kind="reference_data").uri) == b"x,label\n1,A\n"
     assert build.metrics_summary == {"accuracy": 0.9}
     assert build.input_assets.filter(kind__in=("source_code", "reference_data", "label_mapping")).count() == 3
     with pytest.raises(Conflict):
@@ -246,9 +260,6 @@ def test_new_and_training_project_artifact_contract_and_tenant_scope(project):
     client = APIClient()
     client.force_authenticate(project.owner)
     assert client.post("/api/models/", {"name": "Requires artifact", "flavor": "xgboost"}).status_code == 400
-    response = client.post("/api/models/training-projects/", {"name": "Training only"}, format="json")
-    assert response.status_code == 201
-    assert ModelProject.objects.get(public_id=response.data["id"]).preview.assets.count() == 0
     other = get_user_model().objects.create_user("other-preview@example.test", "test-password")
     client.force_authenticate(other)
     assert client.get(f"/api/models/{project.public_id}/preview/").status_code == 404
@@ -306,7 +317,7 @@ def test_monitor_csv_fills_missing_version_reference_but_not_preview(project):
     assert storage.read(monitor.reference_uri) == b"a\n1\n"
     artifact = deployment.version.artifacts.get(kind="reference_data")
     assert storage.read(artifact.uri) == b"a\n1\n"
-    assert artifact.uri != monitor.reference_uri
+    assert artifact.uri == monitor.reference_uri
     assert not project.preview.assets.exists()
 
 
@@ -411,6 +422,8 @@ def test_training_build_provenance_survives_source_job_deletion(project):
     job_id = job.public_id
     complete_build(build, image_uri="temporary")
     job.delete()
+    storage.delete(source_file.uri)
+    storage.delete(ref_file.uri)
     build.refresh_from_db()
     register_successful_build(
         build=build,

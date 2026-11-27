@@ -9,7 +9,7 @@ from django.utils import timezone
 from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.training.services.storage_scope import expected_training_uris
-from apps.training.tasks import execute_training_job, poll_training_job_status
+from apps.training.tasks import execute_training_job
 from infrastructure.execution.docker_backends import DockerTrainingBackend
 from infrastructure.execution.job_containers import labels_for
 
@@ -112,59 +112,3 @@ class DockerTrainingAsyncTests(TestCase):
         self.assertEqual(result["exit_code"], 1)
         self.assertIn("ValueError: bad data", result["error"])
         container_mock.remove.assert_not_called()
-
-    def test_execute_training_job_dispatches_and_enqueues_poll(self):
-        fake_backend = Mock()
-        fake_backend.run.return_value = {"dispatched": True, "container_id": "c123"}
-        fake_backend.poll = Mock()
-
-        with (
-            patch("apps.training.tasks.training_backend", return_value=fake_backend),
-            patch("apps.training.tasks.poll_training_job_status.apply_async") as mock_apply_async,
-        ):
-            status = execute_training_job(str(self.job.public_id))
-
-        self.assertEqual(status, "running")
-        mock_apply_async.assert_called_once_with(args=[str(self.job.public_id)], countdown=3)
-        self.job.refresh_from_db()
-        self.assertEqual(self.job.status, "running")
-
-    def test_poll_training_job_status_completes_job(self):
-        self.job.status = "running"
-        self.job.save(update_fields=["status"])
-
-        fake_backend = Mock()
-        fake_backend.poll.return_value = {
-            "status": "completed",
-            "logs": "Training finished successfully",
-            "exit_code": 0,
-        }
-
-        from celery.exceptions import Retry
-
-        with patch("apps.training.tasks.training_backend", return_value=fake_backend), self.assertRaises(Retry):
-            poll_training_job_status(str(self.job.public_id))
-
-        self.job.refresh_from_db()
-        self.assertEqual(self.job.status, "uploading")
-        self.assertFalse(self.job.outputs.exists())
-
-    def test_poll_training_job_status_fails_job_on_nonzero_exit(self):
-        self.job.status = "running"
-        self.job.save(update_fields=["status"])
-
-        fake_backend = Mock()
-        fake_backend.poll.return_value = {
-            "status": "failed",
-            "error": "Error in train.py",
-            "logs": "Error in train.py",
-            "exit_code": 1,
-        }
-
-        with patch("apps.training.tasks.training_backend", return_value=fake_backend):
-            result = poll_training_job_status(str(self.job.public_id))
-
-        self.assertEqual(result, "failed")
-        self.job.refresh_from_db()
-        self.assertEqual(self.job.status, "failed")
-        self.assertIn("Error in train.py", self.job.error_message)

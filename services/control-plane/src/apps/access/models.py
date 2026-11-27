@@ -20,7 +20,13 @@ class UserAPIKey(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        constraints = [models.UniqueConstraint(fields=["user", "name"], name="api_key_user_name_unique")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "name"],
+                condition=models.Q(revoked_at__isnull=True),
+                name="api_key_user_name_unique",
+            )
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.key_prefix})"

@@ -141,7 +141,6 @@ def test_soft_delete_endpoint_marks_user_deleted_and_enqueues_runtime_stop(
     User = get_user_model()
     user = User.objects.create_user("soft-del@example.com", "password123")
     enqueued = []
-    monkeypatch.setattr("apps.observability.tasks.publish_outbox.delay", lambda: None)
     monkeypatch.setattr(
         "apps.auth.tasks.stop_user_active_executions.delay",
         lambda user_id: enqueued.append(user_id),
@@ -156,7 +155,7 @@ def test_soft_delete_endpoint_marks_user_deleted_and_enqueues_runtime_stop(
     user.refresh_from_db()
     assert user.is_active is False
     assert user.deleted_at is not None
-    assert EventOutbox.objects.filter(aggregate_id=user.public_id, event_type="tenant.disabled").exists()
+    assert not EventOutbox.objects.filter(aggregate_id=user.public_id, event_type="tenant.disabled").exists()
     assert enqueued == [user.pk]
 
 
@@ -401,3 +400,112 @@ def test_failed_account_purge_waits_until_its_next_attempt(expired_account, monk
     assert storage.prefixes == []
     now += timedelta(seconds=1)
     assert purge_expired_deleted_accounts_batch(storage=storage)["purged"] == 1
+
+
+@pytest.mark.django_db
+def test_profile_put_cannot_overwrite_auth_provider():
+    User = get_user_model()
+    user = User.objects.create_user("provider-ro@example.com", "password123", auth_provider="password")
+    client = APIClient()
+    client.force_authenticate(user)
+
+    response = client.put("/api/auth/profile/", {"auth_provider": "google", "full_name": "Updated"}, format="json")
+    assert response.status_code == 200
+    user.refresh_from_db()
+    assert user.auth_provider == "password"
+    assert user.full_name == "Updated"
+
+
+@pytest.mark.django_db
+def test_soft_delete_revokes_credentials_clears_cookie_and_is_idempotent(
+    monkeypatch,
+    django_capture_on_commit_callbacks,
+):
+    from django.conf import settings
+    from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+
+    from apps.access.models import UserAPIKey
+    from apps.auth.api.serializers import TenantTokenSerializer
+    from apps.auth.services.account_lifecycle import deactivate_user_account
+    from apps.mlflow.auth import authenticate_mlflow_request
+
+    User = get_user_model()
+    user = User.objects.create_user("revoke-all@example.com", "password123")
+    raw_key, key_prefix, key_hash = UserAPIKey.issue()
+    api_key = UserAPIKey.objects.create(user=user, name="mlflow-key", key_prefix=key_prefix, key_hash=key_hash)
+    TenantTokenSerializer.get_token(user)
+    assert OutstandingToken.objects.filter(user=user).count() == 1
+    initial_version = user.session_version
+
+    enqueued = []
+    monkeypatch.setattr("apps.auth.tasks.stop_user_active_executions.delay", lambda uid: enqueued.append(uid))
+
+    client = APIClient()
+    client.force_authenticate(user)
+    with django_capture_on_commit_callbacks(execute=True):
+        response = client.delete("/api/auth/profile/delete/")
+
+    assert response.status_code == 204
+    cookie_name = settings.AUTH_COOKIE_NAME
+    assert cookie_name in response.cookies
+    assert response.cookies[cookie_name].value == ""
+
+    user.refresh_from_db()
+    api_key.refresh_from_db()
+    assert not user.is_active
+    assert user.session_version == initial_version + 1
+    assert api_key.revoked_at is not None
+    assert BlacklistedToken.objects.filter(token__user=user).count() == 1
+    assert enqueued == [user.pk]
+
+    # Idempotent repeat call does not emit duplicate task or dead outbox event
+    with django_capture_on_commit_callbacks(execute=True):
+        deactivate_user_account(user)
+    assert enqueued == [user.pk]
+    assert not EventOutbox.objects.filter(aggregate_id=user.public_id, event_type="tenant.disabled").exists()
+
+    # MLflow rejects both revoked/inactive user API key and inactive authenticated user
+    factory_req = type("Req", (), {"headers": {"Authorization": f"Bearer {raw_key}"}, "user": user})()
+    assert authenticate_mlflow_request(factory_req) == (None, None, None, None, None)
+
+
+@pytest.mark.django_db
+def test_run_project_cleanup_skips_storage_migration_during_account_purge(monkeypatch):
+    from apps.catalog.services.deletion import run_project_cleanup
+
+    User = get_user_model()
+    user = User.objects.create_user("purge-skip-mig@example.com", "password123")
+    user.soft_delete()
+    User.objects.filter(pk=user.pk).update(purge_started_at=timezone.now())
+    user.refresh_from_db()
+    project = ModelProject.objects.create(owner=user, name="Skip Migration", deletion_state="deleting", is_active=False)
+
+    called = []
+    monkeypatch.setattr("apps.training.services.storage_migration.migrate_project_storage", lambda p: called.append(p.pk))
+    monkeypatch.setattr(
+        "apps.catalog.services.deletion.project_cleanup_backend",
+        lambda: type("B", (), {"run": lambda self, p, m: {"dispatched": True}})(),
+    )
+    run_project_cleanup(project)
+    assert called == []
+
+
+@pytest.mark.django_db
+def test_deactivate_user_account_invalidates_model_server_caches(monkeypatch, django_capture_on_commit_callbacks):
+    from apps.auth.services.account_lifecycle import deactivate_user_account
+
+    User = get_user_model()
+    user = User.objects.create_user("cache-evict@example.com", "password123")
+    project = ModelProject.objects.create(owner=user, name="Cache Evict Project")
+    version = ModelVersion.objects.create(project=project, version="1")
+    build = Build.objects.create(project=project, version=version, flavor="sklearn", status="ready")
+    Deployment.objects.create(version=version, build=build, backend="docker", status="succeeded")
+
+    invalidated = []
+    monkeypatch.setattr("apps.deployment.services.cache.invalidate_model_server_cache", invalidated.append)
+    monkeypatch.setattr("apps.auth.tasks.stop_user_active_executions.delay", lambda uid: None)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        deactivate_user_account(user)
+
+    assert invalidated == [str(version.public_id)]

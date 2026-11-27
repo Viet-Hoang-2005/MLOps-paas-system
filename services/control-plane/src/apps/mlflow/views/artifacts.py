@@ -100,49 +100,6 @@ def _parse_artifact_path(subpath: str):
     return None, None, None, clean
 
 
-class MLflowArtifactsUploadUrlView(APIView):
-    """Generates a presigned S3 PUT URL for uploading artifacts into tenant-isolated storage."""
-
-    authentication_classes = ()
-    permission_classes = ()
-
-    def post(self, request):
-        job_from_auth, project, user, tenant_id, api_key, err_resp = _require_auth(request)
-        if err_resp:
-            return err_resp
-
-        run_id = request.data.get("run_id")
-        artifact_path = request.data.get("path", "").strip().lstrip("/")
-        _safe_relative(artifact_path)
-        if not artifact_path:
-            return Response(
-                {"error_code": "INVALID_PARAMETER_VALUE", "message": "Path is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        job, err_job = _resolve_target_job(job_from_auth, run_id, tenant_id, api_key=api_key, for_mutation=True)
-        if err_job:
-            return err_job
-
-        bucket = _bucket_name()
-        s3_key = f"{training_prefix_for(job)}/mlflow/artifacts/{artifact_path}"
-        storage = S3Storage()
-        upload_url = storage.presigned_put(f"s3://{bucket}/{s3_key}", expires_in=3600, public=job_from_auth is None)
-
-        # Record output in TrainingOutput
-        TrainingOutput.objects.update_or_create(
-            job=job,
-            relative_path=f"artifacts/{artifact_path}",
-            defaults={
-                "kind": "file",
-                "s3_uri": f"s3://{bucket}/{s3_key}",
-                "metadata": {"uploaded_via": "mlflow_log_artifact", "path": artifact_path},
-            },
-        )
-
-        return Response({"upload_url": upload_url, "s3_uri": f"s3://{bucket}/{s3_key}"})
-
-
 class MLflowArtifactsProxyView(APIView):
     """
     MLflow Standard Artifact Proxy View.
@@ -597,7 +554,12 @@ class MLflowArtifactsProxyView(APIView):
                 storage.delete_prefix(f"{s3_key}/")
             except Exception:
                 pass
-            TrainingOutput.objects.filter(job=job, relative_path__startswith=f"artifacts/{rel_path}").delete()
+            from django.db.models import Q
+
+            target = f"artifacts/{rel_path}"
+            TrainingOutput.objects.filter(job=job).filter(
+                Q(relative_path=target) | Q(relative_path__startswith=f"{target}/")
+            ).delete()
         else:
             s3_prefix = training_prefix_for(job) + "/mlflow/artifacts/"
             try:

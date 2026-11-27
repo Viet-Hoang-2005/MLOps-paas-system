@@ -124,8 +124,6 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "code_snapshot_uri",
             "data_snapshot_uri",
             "output_revision",
-            "mlflow_artifact_uri",
-            "mlflow_run_id",
             "backend",
             "external_job_id",
             "celery_task_id",
@@ -169,7 +167,6 @@ class TrainingJobSerializer(serializers.ModelSerializer):
             "code_snapshot_uri",
             "data_snapshot_uri",
             "output_revision",
-            "mlflow_artifact_uri",
             "external_job_id",
             "celery_task_id",
             "status",
@@ -207,12 +204,26 @@ class TrainingJobSerializer(serializers.ModelSerializer):
     def get_output_available(instance):
         from apps.training.services.output_index import public_outputs
 
-        return (
-            instance.status == "completed"
-            and instance.outputs_purged_at is None
-            and instance.tracking.get("output_contract") == 2
-            and public_outputs(instance).filter(kind="model").exists()
-        )
+        if (
+            instance.status != "completed"
+            or instance.outputs_purged_at is not None
+            or instance.deletion_requested_at is not None
+            or instance.tracking.get("output_contract") != 2
+        ):
+            return False
+        prefetched = getattr(instance, "_prefetched_objects_cache", {})
+        if "outputs" in prefetched:
+            return any(
+                o.kind == "model"
+                and isinstance(o.metadata, dict)
+                and o.metadata.get("contract") == 2
+                and (
+                    (o.metadata.get("group") == "model" and o.relative_path.startswith("Model/"))
+                    or (o.metadata.get("group") == "metadata" and o.relative_path.startswith("Metadata/"))
+                )
+                for o in instance.outputs.all()
+            )
+        return public_outputs(instance).filter(kind="model").exists()
 
     @staticmethod
     def get_registration_build(instance):

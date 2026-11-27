@@ -200,7 +200,8 @@ def fake_response(monkeypatch, body=None, status_code=200, error=None):
 
 
 @pytest.mark.parametrize(
-    "flavor,method", [("xgboost", "GET"), ("sklearn", "GET"), ("pytorch", "POST"), ("tensorflow", "POST")]
+    "flavor,method",
+    [("xgboost", "GET"), ("sklearn", "GET"), ("pytorch", "POST"), ("tensorflow", "POST"), ("keras", "POST")],
 )
 def test_probe_method_identity_and_network_bounds(monkeypatch, flavor, method):
     session = fake_response(

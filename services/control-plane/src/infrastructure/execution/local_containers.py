@@ -2,7 +2,6 @@
 
 from datetime import timedelta
 
-import docker.errors
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -11,6 +10,8 @@ from django.utils.dateparse import parse_datetime
 from apps.catalog.models import ModelProject
 from common.api.exceptions import Conflict
 from infrastructure.docker import DockerClient
+
+from .docker_runtime import create_or_attach_container, get_owned_container, remove_owned_container
 
 
 class ContainerOwnershipError(RuntimeError):
@@ -27,38 +28,37 @@ def identity(resource, kind):
 
 
 def owned_container(client, resource, kind):
-    container = client.containers.get(f"{kind}-{resource.public_id}")
-    container.reload()
-    labels = container.attrs.get("Config", {}).get("Labels") or {}
-    has_mlops_labels = any(key.startswith("mlops_") for key in labels)
-    if has_mlops_labels:
-        if any(labels.get(key) != value for key, value in identity(resource, kind).items()):
-            raise ContainerOwnershipError("Docker container ownership does not match this execution.")
     recorded = getattr(resource, "external_build_id" if kind == "build" else "external_deployment_id")
-    if recorded and recorded != container.id:
-        raise ContainerOwnershipError("Docker container identity changed for this execution.")
-    return container
+    return get_owned_container(
+        client,
+        f"{kind}-{resource.public_id}",
+        identity(resource, kind),
+        recorded,
+        error_cls=ContainerOwnershipError,
+        ownership_msg="Docker container ownership does not match this execution.",
+        identity_msg="Docker container identity changed for this execution.",
+    )
 
 
 def start_container(docker_client, resource, kind, **kwargs):
     project = resource.project if kind == "build" else resource.version.project
-    client = docker_client.client
+    recorded = getattr(resource, "external_build_id" if kind == "build" else "external_deployment_id")
     try:
-        container = owned_container(client, resource, kind)
-    except docker.errors.NotFound:
-        recorded = getattr(resource, "external_build_id" if kind == "build" else "external_deployment_id")
-        if recorded:
-            raise RuntimeError("The recorded Docker execution is missing; create a new attempt.") from None
-        kwargs["labels"] = {**kwargs.get("labels", {}), **identity(resource, kind)}
-        try:
-            container = docker_client.run(**kwargs)
-        except docker.errors.APIError as exc:
-            if exc.status_code != 409:
-                raise
-            # Another delivery created this same attempt while our lookup ran.
-            container = owned_container(client, resource, kind)
-    if container.attrs.get("State", {}).get("Status") == "created":
-        container.start()
+        container = create_or_attach_container(
+            docker_client,
+            f"{kind}-{resource.public_id}",
+            identity(resource, kind),
+            recorded,
+            error_cls=ContainerOwnershipError,
+            ownership_msg="Docker container ownership does not match this execution.",
+            identity_msg="Docker container identity changed for this execution.",
+            missing_msg="The recorded Docker execution is missing; create a new attempt.",
+            **kwargs,
+        )
+    except ContainerOwnershipError as exc:
+        if "missing" in str(exc):
+            raise RuntimeError(str(exc)) from None
+        raise
     container.reload()
     field = "external_build_id" if kind == "build" else "external_deployment_id"
     rejected = False
@@ -107,7 +107,4 @@ def inspect_container(resource, kind, client=None):
 
 
 def remove_container(resource, kind, client=None):
-    try:
-        inspect_container(resource, kind, client).remove(force=True)
-    except docker.errors.NotFound:
-        pass
+    remove_owned_container(lambda: inspect_container(resource, kind, client))

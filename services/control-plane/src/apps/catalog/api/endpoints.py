@@ -35,13 +35,22 @@ class ModelProjectListCreateEndpoint(generics.ListCreateAPIView):
     serializer_class = ModelProjectSerializer
 
     def get_queryset(self):
+        from django.db.models import Exists, OuterRef, Subquery
+        from apps.registry.models import ModelVersion
+
+        version_qs = ModelVersion.objects.filter(project_id=OuterRef("pk"))
         return (
             ModelProject.objects.filter(owner=self.request.user)
             .exclude(deletion_state="deleted")
             .select_related(
                 "preview", "active_deployment__version", "active_deployment__endpoint", "active_deployment__build"
             )
-            .prefetch_related("versions__deployments__endpoint", "builds")
+            .prefetch_related("active_deployment__version__artifacts")
+            .annotate(
+                _has_versions=Exists(version_qs),
+                _latest_version_id=Subquery(version_qs.order_by("-registered_at", "-id").values("public_id")[:1]),
+                _latest_version_number=Subquery(version_qs.order_by("-registered_at", "-id").values("version")[:1]),
+            )
         )
 
     def create(self, request, *args, **kwargs):
@@ -60,13 +69,22 @@ class ModelProjectDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
     lookup_url_kwarg = "project_id"
 
     def get_queryset(self):
+        from django.db.models import Exists, OuterRef, Subquery
+        from apps.registry.models import ModelVersion
+
+        version_qs = ModelVersion.objects.filter(project_id=OuterRef("pk"))
         return (
             ModelProject.objects.filter(owner=self.request.user)
             .exclude(deletion_state="deleted")
             .select_related(
                 "preview", "active_deployment__version", "active_deployment__endpoint", "active_deployment__build"
             )
-            .prefetch_related("versions__deployments__endpoint", "builds")
+            .prefetch_related("active_deployment__version__artifacts")
+            .annotate(
+                _has_versions=Exists(version_qs),
+                _latest_version_id=Subquery(version_qs.order_by("-registered_at", "-id").values("public_id")[:1]),
+                _latest_version_number=Subquery(version_qs.order_by("-registered_at", "-id").values("version")[:1]),
+            )
         )
 
     def update(self, request, *args, **kwargs):
@@ -90,17 +108,6 @@ class ModelProjectDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
 
         notify_project_deleted(project)
         return Response(ModelProjectSerializer(project).data, status=status.HTTP_202_ACCEPTED)
-
-
-class TrainingProjectCreateEndpoint(APIView):
-    def post(self, request):
-        serializer = ProjectMetadataWriteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        project = save_project_metadata(actor=request.user, validated_data=serializer.validated_data)
-        from apps.notifications.hooks import notify_project_created
-
-        notify_project_created(project)
-        return Response(ModelProjectSerializer(project).data, status=status.HTTP_201_CREATED)
 
 
 class ProjectPreviewEndpoint(APIView):
@@ -153,14 +160,6 @@ class ProjectCreateUploadUrlsEndpoint(APIView):
         return Response({"project_id": str(project_id), "files": files})
 
 
-class ProjectPreviewReferencePreviewEndpoint(APIView):
-    def get(self, request, project_id):
-        from apps.catalog.services.preview import get_preview_reference_preview
-
-        project = project_for_user(request.user, project_id)
-        return Response(get_preview_reference_preview(project))
-
-
 class RunningSourceEndpoint(APIView):
     def get(self, request, project_id):
         from apps.catalog.services.snapshots import running_source
@@ -184,18 +183,6 @@ class PreviewAttributesEndpoint(APIView):
         from apps.catalog.services.snapshots import preview_attributes
 
         return Response(preview_attributes(project_for_user(request.user, project_id)))
-
-
-class RunningLabelMappingEndpoint(APIView):
-    def get(self, request, project_id):
-        from apps.catalog.services.snapshots import running_label_mapping
-
-        project = project_for_user(request.user, project_id)
-        version_id = request.query_params.get("version_id")
-        result = running_label_mapping(project, version_id=version_id)
-        if result is None:
-            return Response({"filename": "", "mapping": {}}, status=status.HTTP_200_OK)
-        return Response(result)
 
 
 class ProjectBuildEndpoint(APIView):

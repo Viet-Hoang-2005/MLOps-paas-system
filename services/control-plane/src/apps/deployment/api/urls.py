@@ -13,7 +13,6 @@ from .endpoints import (
     DeploymentRuntimeLogsEndpoint,
     DeploymentStopEndpoint,
     EndpointListEndpoint,
-    EndpointLogsEndpoint,
 )
 
 build_patterns = [
@@ -33,5 +32,4 @@ deployment_patterns = [
 ]
 endpoint_patterns = [
     path("", EndpointListEndpoint.as_view(), name="endpoint-list"),
-    path("<uuid:endpoint_id>/logs/", EndpointLogsEndpoint.as_view(), name="endpoint-logs"),
 ]

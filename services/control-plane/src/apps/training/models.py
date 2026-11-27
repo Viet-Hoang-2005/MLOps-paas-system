@@ -143,18 +143,6 @@ class TrainingJob(ExecutionWatch):
     submitted_at = models.DateTimeField(null=True, blank=True, editable=False)
     environment_snapshot = models.JSONField(default=dict, blank=True)
     secret_snapshot = models.JSONField(default=dict, blank=True, editable=False)
-    trigger_kind = models.CharField(
-        max_length=32,
-        choices=(("manual", "Manual"), ("retry", "Retry"), ("maintenance", "Maintenance")),
-        default="manual",
-    )
-    baseline_version = models.ForeignKey(
-        "registry.ModelVersion", on_delete=models.SET_NULL, related_name="baseline_training_jobs", null=True, blank=True
-    )
-    dataset_snapshot = models.ForeignKey(
-        "ct.DatasetSnapshot", on_delete=models.SET_NULL, related_name="training_jobs", null=True, blank=True
-    )
-    recipe_version = models.CharField(max_length=80, blank=True)
     model_flavor = models.CharField(max_length=40, choices=MODEL_FLAVORS, default="sklearn")
     entry_point = models.CharField(max_length=512, blank=True, default="")
     requirements_text = models.TextField(blank=True)
@@ -163,8 +151,6 @@ class TrainingJob(ExecutionWatch):
     data_snapshot_uri = models.CharField(max_length=1024)
     output_uri = models.CharField(max_length=1024)
     output_revision = models.PositiveIntegerField(default=1)
-    mlflow_artifact_uri = models.CharField(max_length=1024, blank=True)
-    mlflow_run_id = models.CharField(max_length=255, blank=True, db_index=True)
     backend = models.CharField(max_length=30, default="local")
     external_job_id = models.CharField(max_length=255, blank=True)
     celery_task_id = models.CharField(max_length=255, blank=True, db_index=True)

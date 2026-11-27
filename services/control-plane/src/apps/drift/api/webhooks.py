@@ -61,7 +61,7 @@ class DriftRunWebhookEndpoint(APIView):
             or "insufficient" in str(summary.get("reason", "")).lower()
         )
         verified_summary = None
-        if settings.DRIFT_EXECUTION_WATCH_ENABLED and not is_skipped:
+        if not is_skipped:
             from apps.observability.services.executions import _completion_data, resource_for
 
             candidate = resource_for("drift", run_id)

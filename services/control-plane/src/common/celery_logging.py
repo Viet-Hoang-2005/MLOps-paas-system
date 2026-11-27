@@ -36,7 +36,6 @@ def _resource_context(name, args, kwargs):
             f"apps.training.tasks.{task}": ("job_id", "training_job_id")
             for task in (
                 "execute_training_job",
-                "poll_training_job_status",
                 "cancel_training_job",
                 "delete_training_job",
                 "purge_training_job_outputs",
@@ -46,7 +45,6 @@ def _resource_context(name, args, kwargs):
             f"apps.drift.tasks.{task}": ("run_id", "drift_run_id")
             for task in (
                 "execute_drift_run",
-                "poll_drift_run_status",
             )
         },
         **{

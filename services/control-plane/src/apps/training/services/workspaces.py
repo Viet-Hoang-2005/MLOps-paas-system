@@ -120,12 +120,14 @@ def _parent_exists(workspace, path):
         raise ValidationError({"path": "Parent folder does not exist."})
 
 
-def snapshot_input(workspace, *, revision, storage=None, preparing=False, checkpoint=None):
+def snapshot_input(workspace, *, revision, storage=None, preparing=False, checkpoint=None, spooled=False):
     """Build a revision-checked Input archive without holding a DB lock during I/O.
 
     This prepares the immutable input contract; dispatch must separately verify
     the revision again before committing a run.
     """
+    from tempfile import SpooledTemporaryFile
+
     with transaction.atomic():
         locked = _lock(workspace, revision, preparing=preparing)
         entries = list(locked.entries.order_by("relative_path"))
@@ -141,7 +143,7 @@ def snapshot_input(workspace, *, revision, storage=None, preparing=False, checkp
     storage = storage or S3Storage()
     prefix = f"users/{tenant_id}/training/workspaces/{workspace_id}/draft/objects/"
     total = 0
-    bundle = BytesIO()
+    bundle = SpooledTemporaryFile(max_size=8 * 1024 * 1024) if spooled else BytesIO()
     with ZipFile(bundle, "w", ZIP_DEFLATED) as archive:
         for entry in entries:
             if checkpoint:
@@ -169,8 +171,25 @@ def snapshot_input(workspace, *, revision, storage=None, preparing=False, checkp
             archive.writestr(path, payload)
 
     if not TrainingWorkspace.objects.filter(pk=workspace.pk, revision=snapshot_revision).exists():
+        if spooled:
+            bundle.close()
         raise Conflict("Workspace changed. Reload before running training.")
-    return {"archive": bundle.getvalue(), "revision": snapshot_revision, "entry_point": entry_point}
+    if not spooled:
+        return {"archive": bundle.getvalue(), "revision": snapshot_revision, "entry_point": entry_point}
+    bundle.seek(0)
+    hasher = hashlib.sha256()
+    size_bytes = 0
+    while chunk := bundle.read(1024 * 1024):
+        hasher.update(chunk)
+        size_bytes += len(chunk)
+    bundle.seek(0)
+    return {
+        "archive_file": bundle,
+        "checksum": hasher.hexdigest(),
+        "size_bytes": size_bytes,
+        "revision": snapshot_revision,
+        "entry_point": entry_point,
+    }
 
 
 def serialize_entries(entries):
@@ -386,10 +405,18 @@ def delete_entry(workspace, entry_id, *, revision, storage=None):
         return locked.revision
 
 
+from functools import lru_cache
+
+
+@lru_cache(maxsize=4)
+def _cached_fernet(key: str) -> Fernet:
+    return Fernet(key.encode("ascii"))
+
+
 def cipher():
     try:
         key = getattr(settings, "TRAINING_SECRET_ENCRYPTION_KEY", "")
-        return Fernet(key.encode("ascii"))
+        return _cached_fernet(key)
     except (ValueError, UnicodeError, TypeError) as exc:
         raise ServiceUnavailable("Training secrets are not configured.") from exc
 

@@ -10,7 +10,7 @@ from apps.training.services.capabilities import issue_capability
 from apps.training.services.storage_scope import validate_training_uri
 from infrastructure.docker import DockerClient
 from infrastructure.http import HttpClient
-from infrastructure.runtime_health import healthy_payload
+from infrastructure.runtime_health import healthy_payload, is_dl_flavor
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import build_prefix, drift_run_prefix
 
@@ -222,7 +222,7 @@ class DockerDeploymentBackend:
         project = deployment.version.project
         image = immutable_image_reference(deployment.build)
         container_name = f"deploy-{deployment.public_id}"
-        target_port = 5002 if deployment.version.flavor in {"pytorch", "tensorflow", "keras"} else 5001
+        target_port = 5002 if is_dl_flavor(deployment.version.flavor) else 5001
         internal_url = f"http://{container_name}:{target_port}"
         public_path = f"/{project.owner.tenant_id}/models/{project.public_id}/{deployment.version.public_id}"
         public_url = f"{settings.MODEL_SERVER_PUBLIC_URL}{public_path}"
@@ -274,7 +274,7 @@ class DockerDeploymentBackend:
         if not endpoint:
             return False, {"status": "missing"}
         try:
-            method = "POST" if deployment.version.flavor in {"pytorch", "tensorflow"} else "GET"
+            method = "POST" if is_dl_flavor(deployment.version.flavor) else "GET"
             response = self.http.request(
                 method, f"{endpoint.internal_url}/health", **({"json": {}} if method == "POST" else {})
             )

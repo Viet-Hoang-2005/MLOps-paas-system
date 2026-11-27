@@ -133,15 +133,3 @@ class EndpointListEndpoint(generics.ListAPIView):
 
     def get_queryset(self):
         return endpoints_for_user(self.request.user)
-
-
-class EndpointLogsEndpoint(APIView):
-    def get(self, request, endpoint_id):
-        endpoint = endpoint_for_user(request.user, endpoint_id)
-        return Response(
-            {
-                "endpoint_id": str(endpoint.public_id),
-                "runtime_name": endpoint.runtime_name,
-                "logs": endpoint_logs(endpoint),
-            }
-        )

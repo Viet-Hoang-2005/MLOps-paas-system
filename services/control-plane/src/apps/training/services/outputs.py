@@ -126,7 +126,56 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
     new_uploaded_uris: list[str] = []
     old_uris_to_delete: list[str] = []
 
+    expected_revision = validate_output_revision(data.get("output_revision"))
+    if "build_requirements_text" in data:
+        requirements = data["build_requirements_text"]
+        if not isinstance(requirements, str) or len(requirements.encode()) > 64 * 1024:
+            raise ValidationError({"build_requirements_text": "Requirements must be text up to 64 KiB."})
+    if job.owner_id != user.pk:
+        raise Conflict("This training job is unavailable.")
+    if job.status != "completed":
+        raise Conflict("Cannot edit output of a job that is not completed.")
+    if job.outputs_purged_at:
+        raise Conflict("Outputs for this training job have been purged.")
+    if expected_revision != job.output_revision:
+        raise Conflict("Revision conflict. Please reload latest outputs before saving.")
+
+    remove_assets = data.get("remove_assets") or []
+    if isinstance(remove_assets, str):
+        try:
+            remove_assets = json.loads(remove_assets)
+        except Exception:
+            remove_assets = [remove_assets]
+    remove_assets_set = set(remove_assets)
+
+    source_code_file = data.get("source_code_file")
+    reference_data_file = data.get("reference_data_file")
+
+    if job.storage_layout == "tenant":
+        out_prefix = f"{tenant_training_job_prefix(job.owner.tenant_id, job.public_id)}/output/"
+    elif job.storage_project_id:
+        out_prefix = training_output_prefix(job.owner.tenant_id, job.storage_project_id, job.public_id)
+    else:
+        raise Conflict("Training storage identity is unavailable.")
+
+    source_filename = None
+    stored_source = None
+    ref_filename = None
+    stored_ref = None
+
     try:
+        if source_code_file:
+            source_filename = validate_source_code_file(source_code_file)
+            source_key = f"{out_prefix}supplemental/source/{uuid.uuid4().hex[:8]}_{source_filename}"
+            stored_source = storage.put(source_key, source_code_file, "text/x-python")
+            new_uploaded_uris.append(stored_source.uri)
+
+        if reference_data_file:
+            ref_filename, _ = validate_reference_data_file(reference_data_file)
+            ref_key = f"{out_prefix}supplemental/reference/{uuid.uuid4().hex[:8]}_{ref_filename}"
+            stored_ref = storage.put(ref_key, reference_data_file, "text/csv")
+            new_uploaded_uris.append(stored_ref.uri)
+
         with transaction.atomic():
             project = None
             if job.project_id:
@@ -144,51 +193,26 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
                 raise Conflict("Cannot edit output of a job that is not completed.")
             if job.outputs_purged_at:
                 raise Conflict("Outputs for this training job have been purged.")
-
-            expected_revision = validate_output_revision(data.get("output_revision"))
             if expected_revision != job.output_revision:
                 raise Conflict("Revision conflict. Please reload latest outputs before saving.")
 
-            remove_assets = data.get("remove_assets") or []
-            if isinstance(remove_assets, str):
-                try:
-                    remove_assets = json.loads(remove_assets)
-                except Exception:
-                    remove_assets = [remove_assets]
-            remove_assets_set = set(remove_assets)
-
-            source_code_file = data.get("source_code_file")
-            reference_data_file = data.get("reference_data_file")
-
             # Removals
-            if "source_code" in remove_assets_set and not source_code_file:
+            if "source_code" in remove_assets_set and not stored_source:
                 old_source = job.outputs.filter(kind="source_code").first()
                 if old_source:
                     if old_source.s3_uri:
                         old_uris_to_delete.append(old_source.s3_uri)
                     old_source.delete()
 
-            if "reference_data" in remove_assets_set and not reference_data_file:
+            if "reference_data" in remove_assets_set and not stored_ref:
                 old_ref = job.outputs.filter(kind="reference_data").first()
                 if old_ref:
                     if old_ref.s3_uri:
                         old_uris_to_delete.append(old_ref.s3_uri)
                     old_ref.delete()
 
-            if job.storage_layout == "tenant":
-                out_prefix = f"{tenant_training_job_prefix(job.owner.tenant_id, job.public_id)}/output/"
-            elif job.storage_project_id:
-                out_prefix = training_output_prefix(job.owner.tenant_id, job.storage_project_id, job.public_id)
-            else:
-                raise Conflict("Training storage identity is unavailable.")
-
             # Source code mutation
-            if source_code_file:
-                filename = validate_source_code_file(source_code_file)
-                key = f"{out_prefix}supplemental/source/{uuid.uuid4().hex[:8]}_{filename}"
-                stored = storage.put(key, source_code_file, "text/x-python")
-                new_uploaded_uris.append(stored.uri)
-
+            if stored_source:
                 old_source = job.outputs.filter(kind="source_code").first()
                 if old_source:
                     if old_source.s3_uri:
@@ -198,10 +222,10 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
                 TrainingOutput.objects.create(
                     job=job,
                     kind="source_code",
-                    relative_path=filename,
-                    s3_uri=stored.uri,
-                    checksum=stored.checksum,
-                    size_bytes=stored.size_bytes,
+                    relative_path=source_filename,
+                    s3_uri=stored_source.uri,
+                    checksum=stored_source.checksum,
+                    size_bytes=stored_source.size_bytes,
                     content_type="text/x-python",
                     metadata={
                         "updated_by": getattr(user, "username", getattr(user, "email", "system")),
@@ -210,13 +234,7 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
                 )
 
             # Reference data mutation
-            if reference_data_file:
-                filename, _ = validate_reference_data_file(reference_data_file)
-                content_type = "text/csv"
-                key = f"{out_prefix}supplemental/reference/{uuid.uuid4().hex[:8]}_{filename}"
-                stored = storage.put(key, reference_data_file, content_type)
-                new_uploaded_uris.append(stored.uri)
-
+            if stored_ref:
                 old_ref = job.outputs.filter(kind="reference_data").first()
                 if old_ref:
                     if old_ref.s3_uri:
@@ -226,11 +244,11 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
                 TrainingOutput.objects.create(
                     job=job,
                     kind="reference_data",
-                    relative_path=filename,
-                    s3_uri=stored.uri,
-                    checksum=stored.checksum,
-                    size_bytes=stored.size_bytes,
-                    content_type=content_type,
+                    relative_path=ref_filename,
+                    s3_uri=stored_ref.uri,
+                    checksum=stored_ref.checksum,
+                    size_bytes=stored_ref.size_bytes,
+                    content_type="text/csv",
                     metadata={
                         "format": "csv",
                         "updated_by": getattr(user, "username", getattr(user, "email", "system")),
@@ -239,10 +257,7 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
                 )
 
             if "build_requirements_text" in data:
-                requirements = data["build_requirements_text"]
-                if not isinstance(requirements, str) or len(requirements.encode()) > 64 * 1024:
-                    raise ValidationError({"build_requirements_text": "Requirements must be text up to 64 KiB."})
-                job.build_requirements_text = requirements
+                job.build_requirements_text = data["build_requirements_text"]
             job.output_revision += 1
             job.save(update_fields=["output_revision", "build_requirements_text", "updated_at"])
 
@@ -273,13 +288,22 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
 
 
 def get_job_reference_preview(job: TrainingJob, storage=None) -> dict[str, Any]:
+    from io import BytesIO
+
+    from common.validation.artifacts import parse_reference_preview_stream
+
     storage = storage or S3Storage()
     ref_output = job.outputs.filter(kind="reference_data").first()
     if not ref_output or not ref_output.s3_uri:
         raise ValidationError({"reference_data": "This training job does not have a reference dataset."})
     try:
+        if hasattr(storage, "open_stream"):
+            body, _, _ = storage.open_stream(ref_output.s3_uri)
+            try:
+                return parse_reference_preview_stream(body, ref_output.relative_path, max_rows=100)
+            finally:
+                body.close()
         raw = storage.read(ref_output.s3_uri, max_bytes=MAX_REFERENCE_DATA_BYTES)
+        return parse_reference_preview_stream(BytesIO(raw), ref_output.relative_path, max_rows=100)
     except Exception as exc:
         raise ValidationError({"reference_data": "Could not read reference data from storage."}) from exc
-
-    return parse_reference_preview(raw, ref_output.relative_path, max_rows=100)

@@ -7,6 +7,8 @@ from django.utils import timezone
 from common.api.exceptions import Conflict
 from common.logging_utils import sanitize
 
+from .docker_runtime import create_or_attach_container, get_owned_container, remove_owned_container
+
 
 def project_for(resource, kind):
     return resource.project if kind == "training" else resource.monitor.version.project
@@ -26,18 +28,15 @@ def identity_field(kind):
 
 
 def owned(client, resource, kind):
-    container = client.containers.get(f"{kind}-{resource.public_id}")
-    container.reload()
-    labels = container.attrs.get("Config", {}).get("Labels") or {}
-    expected_labels = labels_for(resource, kind)
-    has_mlops_labels = any(key.startswith("mlops_") for key in labels)
-    if has_mlops_labels:
-        if any(labels.get(key) != value for key, value in expected_labels.items()):
-            raise Conflict("Runtime ownership does not match this execution.")
-    recorded = getattr(resource, identity_field(kind))
-    if recorded and recorded != container.id:
-        raise Conflict("Runtime identity changed for this execution.")
-    return container
+    return get_owned_container(
+        client,
+        f"{kind}-{resource.public_id}",
+        labels_for(resource, kind),
+        getattr(resource, identity_field(kind)),
+        error_cls=Conflict,
+        ownership_msg="Runtime ownership does not match this execution.",
+        identity_msg="Runtime identity changed for this execution.",
+    )
 
 
 def start(docker_client, resource, kind, **kwargs):
@@ -58,20 +57,17 @@ def start(docker_client, resource, kind, **kwargs):
             or current.status in {"cancelled", "cancelling", "failed", "completed"}
         ):
             raise Conflict("Execution is no longer active.")
-    try:
-        container = owned(docker_client.client, resource, kind)
-    except docker.errors.NotFound:
-        if getattr(resource, identity_field(kind)):
-            raise Conflict("Recorded runtime is missing; create a new attempt.")
-        kwargs.update(name=f"{kind}-{resource.public_id}", labels=labels_for(resource, kind))
-        try:
-            container = docker_client.run(**kwargs)
-        except docker.errors.APIError as exc:
-            if exc.status_code != 409:
-                raise
-            container = owned(docker_client.client, resource, kind)
-    if container.attrs.get("State", {}).get("Status") == "created":
-        container.start()
+    container = create_or_attach_container(
+        docker_client,
+        f"{kind}-{resource.public_id}",
+        labels_for(resource, kind),
+        getattr(resource, identity_field(kind)),
+        error_cls=Conflict,
+        ownership_msg="Runtime ownership does not match this execution.",
+        identity_msg="Runtime identity changed for this execution.",
+        missing_msg="Recorded runtime is missing; create a new attempt.",
+        **{**kwargs, "name": f"{kind}-{resource.public_id}"},
+    )
     field = identity_field(kind)
     rows = type(resource).objects.filter(pk=resource.pk)
     if lease:
@@ -117,11 +113,9 @@ def observe(client, resource, kind):
 
 
 def remove(client, resource, kind):
-    try:
+    def _get():
         container = owned(client, resource, kind)
-        if container.attrs.get("State", {}).get("Status") in {"running", "paused", "restarting"}:
-            container.stop(timeout=30)
-        container.remove(force=True)
-    except docker.errors.NotFound:
-        pass
+        return container
+
+    remove_owned_container(_get, stop_timeout=30)
     return {"confirmed": True}

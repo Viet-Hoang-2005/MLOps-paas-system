@@ -6,6 +6,7 @@ metadata:
 spec:
   serviceAccountName: argo-workflow-basic-sa
   entrypoint: build-model
+  activeDeadlineSeconds: 14400
   podMetadata:
     labels:
       app.kubernetes.io/name: mlops-paas-model-packager
@@ -275,6 +276,13 @@ spec:
               secretKeyRef: {name: argo-build-callback-secret, key: CONTROL_PLANE_WEBHOOK_SECRET}
     - name: notify-build-exit
       nodeSelector: {workload-type: worker}
+      retryStrategy:
+        limit: "3"
+        retryPolicy: Always
+        backoff:
+          duration: "5s"
+          factor: 2
+          maxDuration: "1m"
       container:
         image: curlimages/curl:8.8.0
         resources:
@@ -286,6 +294,7 @@ spec:
             memory: 64Mi
         args:
           - -sS
+          - --fail-with-body
           - -X
           - POST
           - "{{workflow.parameters.control_plane_webhook_url}}"

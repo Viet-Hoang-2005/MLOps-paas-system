@@ -174,15 +174,3 @@ export const getRunningAttributes = async (
     )
   ).data;
 };
-
-export const getRunningLabelMapping = async (
-  modelId: string,
-  versionId?: string,
-): Promise<ModelLabelMappingData> => {
-  const query = versionId ? `?version_id=${encodeURIComponent(versionId)}` : "";
-  return (
-    await apiClient.get<ModelLabelMappingData>(
-      controlPlaneURL(`/models/${modelId}/label-mapping/${query}`),
-    )
-  ).data;
-};

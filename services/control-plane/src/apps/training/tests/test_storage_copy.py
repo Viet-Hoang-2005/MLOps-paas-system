@@ -47,7 +47,7 @@ def test_storage_copy_verifies_before_switching_and_resumes():
     )
     storage = CopyStorage()
     uris = expected_training_uris(job, storage.bucket)
-    job.code_snapshot_uri, job.data_snapshot_uri, job.output_uri, job.mlflow_artifact_uri = uris.values()
+    job.code_snapshot_uri, job.data_snapshot_uri, job.output_uri = uris["code"], uris["data"], uris["output"]
     job.save()
     for name in ("code", "data", "output"):
         storage.put(storage.parse_uri(uris[name])[1], name.encode())

@@ -10,11 +10,6 @@ class DriftMonitor(models.Model):
     version = models.ForeignKey("registry.ModelVersion", on_delete=models.CASCADE, related_name="drift_monitors")
     reference_uri = models.CharField(max_length=1024, blank=True)
     reference_name = models.CharField(max_length=255, blank=True)
-    reference_snapshot = models.ForeignKey(
-        "ct.DatasetSnapshot", on_delete=models.SET_NULL, related_name="drift_monitors", null=True, blank=True
-    )
-    detector_version = models.CharField(max_length=80, blank=True)
-    detector_config = models.JSONField(default=dict, blank=True)
     name = models.CharField(max_length=160)
     trigger_threshold = models.PositiveIntegerField(default=1000)
     last_automatic_trigger_count = models.PositiveBigIntegerField(default=0)
@@ -45,15 +40,11 @@ class DriftRun(ExecutionWatch):
     report_html_uri = models.CharField(max_length=1024, blank=True)
     report_json_uri = models.CharField(max_length=1024, blank=True)
     summary_uri = models.CharField(max_length=1024, blank=True)
-    evidence_window = models.ForeignKey(
-        "ct.EvidenceWindow", on_delete=models.SET_NULL, related_name="linked_drift_runs", null=True, blank=True
-    )
-    report_manifest_uri = models.CharField(max_length=1024, blank=True)
     drift_score = models.FloatField(null=True, blank=True)
     has_drift = models.BooleanField(null=True)
     summary = models.JSONField(default=dict, blank=True)
     error_message = models.TextField(blank=True)
-    idempotency_key = models.CharField(max_length=255, unique=True)
+    idempotency_key = models.CharField(max_length=255)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     argo_stop_confirmed_at = models.DateTimeField(null=True, blank=True)
@@ -61,6 +52,9 @@ class DriftRun(ExecutionWatch):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["monitor", "idempotency_key"], name="drift_monitor_idempotency_unique"),
+        ]
 
     def __str__(self):
         return f"Drift run {self.public_id} ({self.status})"

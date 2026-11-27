@@ -31,32 +31,6 @@ def test_version_endpoint_rejects_direct_manual_registration():
     assert not ModelVersion.objects.filter(project=project).exists()
 
 
-@pytest.mark.django_db
-def test_version_smoke_test_is_tenant_scoped(monkeypatch):
-    owner = get_user_model().objects.create_user("smoke-owner@example.com", "password123")
-    other = get_user_model().objects.create_user("smoke-other@example.com", "password123")
-    project = ModelProject.objects.create(owner=owner, name="Smoke")
-    version = ModelVersion.objects.create(project=project, version="1")
-    client = APIClient()
-    url = f"/api/registry/versions/{version.public_id}/smoke-test/"
-
-    client.force_authenticate(other)
-    assert client.post(url, {"features": {}}, format="json").status_code == 404
-
-    client.force_authenticate(owner)
-    calls = []
-
-    def fake_predict_version(**kwargs):
-        calls.append(kwargs)
-        return {"success": True}
-
-    monkeypatch.setattr("apps.registry.api.endpoints.predict_version", fake_predict_version)
-    response = client.post(url, {"features": {"value": 1}}, format="json")
-
-    assert response.status_code == 200
-    assert len(calls) == 1
-
-
 class FakeResponse:
     status_code = 200
 

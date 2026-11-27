@@ -50,54 +50,68 @@ def get_monitor_reference_preview(monitor, storage=None) -> dict:
     return parse_reference_preview(raw, monitor.reference_name or "reference.csv", max_rows=100)
 
 
+def _validate_monitor_target(project, version, data, *, upload):
+    if not project.is_active or project.deletion_state != "active":
+        raise Conflict("This project is being deleted.")
+    if version.deletion_requested:
+        raise Conflict("This model version is being deleted.")
+    if (
+        not project.active_deployment_id
+        or project.active_deployment.version_id != version.pk
+        or project.active_deployment.status != "succeeded"
+    ):
+        raise Conflict("Select the project's Running version. Reload if deployment changed.")
+    if DriftMonitor.objects.filter(version=version, name=data.get("name", "")).exists():
+        raise Conflict("A monitor with this name already exists for the version.")
+    artifact = version.artifacts.filter(kind="reference_data").first()
+    if upload and artifact:
+        raise Conflict("This version already has reference data. It cannot be replaced from monitoring.")
+    if not upload and not artifact:
+        raise ValidationError({"reference_file": "A reference CSV file is required."})
+    return artifact
+
+
 def create_monitor(*, data, backend, storage=None):
     storage = storage or S3Storage()
     data = dict(data)
     upload = data.pop("reference_file", None)
     version = data["version"]
     written = []
+    public_id = uuid.uuid4()
+    upload_name = None
+    upload_key = None
+    stored = None
     try:
+        if upload:
+            upload_name, _ = validate_reference_data_file(upload)
+        with transaction.atomic():
+            project = ModelProject.objects.select_for_update().get(pk=version.project_id)
+            version = ModelVersion.objects.select_for_update().get(pk=version.pk)
+            _validate_monitor_target(project, version, data, upload=upload)
+            if upload:
+                upload_key = (
+                    f"{version_prefix(project.owner.tenant_id, project.public_id, version.public_id)}"
+                    f"/artifacts/reference_data/{public_id}/{upload_name}"
+                )
+        if upload and upload_key:
+            stored = storage.put(upload_key, upload, "text/csv")
+            written.append(stored.uri)
         with transaction.atomic():
             project = ModelProject.objects.select_for_update().get(pk=version.project_id)
             version = ModelVersion.objects.select_for_update().get(pk=version.pk)
             data["version"] = version
-            if not project.is_active or project.deletion_state != "active":
-                raise Conflict("This project is being deleted.")
-            if version.deletion_requested:
-                raise Conflict("This model version is being deleted.")
-            if (
-                not project.active_deployment_id
-                or project.active_deployment.version_id != version.pk
-                or project.active_deployment.status != "succeeded"
-            ):
-                raise Conflict("Select the project's Running version. Reload if deployment changed.")
-            if DriftMonitor.objects.filter(version=version, name=data.get("name", "")).exists():
-                raise Conflict("A monitor with this name already exists for the version.")
-            public_id = uuid.uuid4()
-            artifact = version.artifacts.filter(kind="reference_data").first()
-            if upload and artifact:
-                raise Conflict("This version already has reference data. It cannot be replaced from monitoring.")
-            if upload:
-                name, _ = validate_reference_data_file(upload)
-                content_type = "text/csv"
-                key = (
-                    f"{version_prefix(project.owner.tenant_id, project.public_id, version.public_id)}"
-                    f"/artifacts/reference_data/{public_id}/{name}"
-                )
-                stored = storage.put(key, upload, content_type)
-                written.append(stored.uri)
+            artifact = _validate_monitor_target(project, version, data, upload=upload)
+            if stored:
                 artifact = ModelArtifact.objects.create(
                     version=version,
                     kind="reference_data",
-                    name=name,
+                    name=upload_name,
                     uri=stored.uri,
                     checksum=stored.checksum,
                     size_bytes=stored.size_bytes,
-                    content_type=content_type,
+                    content_type="text/csv",
                     metadata={"source": "drift_monitor", "monitor_id": str(public_id), "format": "csv"},
                 )
-            if not artifact:
-                raise ValidationError({"reference_file": "A reference CSV file is required."})
             return DriftMonitor.objects.create(
                 public_id=public_id, reference_uri=artifact.uri, reference_name=artifact.name, backend=backend, **data
             )

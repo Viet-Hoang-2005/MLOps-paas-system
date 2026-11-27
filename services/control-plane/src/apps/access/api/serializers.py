@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.access.models import UserAPIKey
 from apps.catalog.models import ModelProject
+from common.api.exceptions import Conflict
 
 
 class APIKeySerializer(serializers.ModelSerializer):
@@ -32,6 +33,17 @@ class APIKeySerializer(serializers.ModelSerializer):
                 owner=request.user,
                 is_active=True,
             )
+
+    def validate_name(self, value):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return value
+        qs = UserAPIKey.objects.filter(user=request.user, name=value, revoked_at__isnull=True)
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise Conflict("An active API key with this name already exists.")
+        return value
 
 
 class CreatedAPIKeySerializer(APIKeySerializer):

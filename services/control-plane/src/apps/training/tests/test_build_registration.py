@@ -15,6 +15,7 @@ from apps.registry.services.versions import register_successful_build
 from apps.training.models import TrainingJob, TrainingOutput
 from apps.training.services import jobs as job_service
 from common.api.exceptions import Conflict
+from infrastructure.storage.paths import build_input_prefix
 from infrastructure.storage.s3 import StoredObject
 
 
@@ -100,7 +101,10 @@ def test_training_build_reuses_active_attempt_and_snapshots_output(monkeypatch, 
     assert first.flavor == "xgboost"
     assert first.requirements_snapshot == "xgboost==2.0.3"
     assert first.input_assets.get(kind="training_output").s3_uri != job.output_uri
-    assert first.input_assets.get(kind="source_code").s3_uri != "s3://bucket/train.py"
+    source_prefix = build_input_prefix(job.project.owner.tenant_id, job.project.public_id, first.public_id, "source_code")
+    source_key = f"{source_prefix}train.py"
+    assert ("s3://bucket/train.py", source_key) in storage.copies
+    assert first.input_assets.get(kind="source_code").s3_uri == f"s3://bucket/{source_key}"
     assert queued == [str(first.public_id)]
 
 

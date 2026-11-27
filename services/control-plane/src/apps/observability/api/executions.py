@@ -5,7 +5,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.deployment.models import Deployment
+from apps.deployment.models import Build, Deployment
 from apps.drift.models import DriftRun
 from apps.observability.services.argo_stops import (
     STOP_TOKEN_SALT,
@@ -67,6 +67,8 @@ class ArgoRuntimeStopEndpoint(APIView):
             rows = Deployment.objects.filter(backend="argo").select_related("version__project__owner")
         elif kind == "drift":
             rows = DriftRun.objects.filter(monitor__backend="argo").select_related("monitor__version__project__owner")
+        elif kind == "build":
+            rows = Build.objects.filter(backend="argo").select_related("project__owner")
         else:
             raise PermissionDenied("Unsupported runtime kind.")
         resource = rows.filter(public_id=public_id).first()
@@ -82,11 +84,31 @@ class ArgoRuntimeStopEndpoint(APIView):
 
 def _resume_stop(resource, kind):
     from apps.catalog.tasks import execute_project_deletion
-    from apps.deployment.tasks import stop_deployment
+    from apps.deployment.tasks import cleanup_failed_build_artifacts, delete_build, stop_deployment
+    from apps.drift.tasks import cleanup_drift_monitor_task
+    from apps.registry.tasks import cleanup_model_version
 
-    project = resource.version.project if kind == "deployment" else resource.monitor.version.project
+    if kind == "build":
+        project = resource.project
+    elif kind == "deployment":
+        project = resource.version.project
+    else:
+        project = resource.monitor.version.project
     if project.deletion_state == "deleting":
         if not project_has_unconfirmed_argo_stops(project):
             execute_project_deletion.delay(str(project.public_id))
-    elif kind == "deployment" and resource.status in {"stopped", "failed"} and not resource.version.deletion_requested:
-        stop_deployment.delay(str(resource.public_id))
+    elif kind == "build":
+        if resource.deletion_state != "active":
+            delete_build.delay(str(resource.public_id))
+        elif resource.status in {"failed", "cancelled"}:
+            cleanup_failed_build_artifacts.delay(str(resource.public_id), True)
+    elif kind == "deployment":
+        if resource.version.deletion_requested:
+            cleanup_model_version.delay(str(resource.version.public_id))
+        elif resource.status in {"stopped", "failed"}:
+            stop_deployment.delay(str(resource.public_id))
+    elif kind == "drift":
+        if resource.monitor.version.deletion_requested:
+            cleanup_model_version.delay(str(resource.monitor.version.public_id))
+        elif resource.monitor.deletion_requested:
+            cleanup_drift_monitor_task.delay(str(resource.monitor.public_id))

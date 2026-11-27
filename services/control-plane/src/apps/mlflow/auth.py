@@ -83,7 +83,7 @@ def authenticate_mlflow_request(request):
     if token and token.startswith("mlp_"):
         prefix = token[:16]
         api_key = (
-            UserAPIKey.objects.filter(key_prefix=prefix, revoked_at__isnull=True)
+            UserAPIKey.objects.filter(key_prefix=prefix, revoked_at__isnull=True, user__is_active=True)
             .select_related("user")
             .prefetch_related("allowed_projects")
             .first()
@@ -95,9 +95,22 @@ def authenticate_mlflow_request(request):
             return None, None, user, user.tenant_id, api_key
 
     # 3. Standard Django User Authentication (Web session or Bearer JWT)
-    if request.user and request.user.is_authenticated:
+    if request.user and request.user.is_authenticated and getattr(request.user, "is_active", False):
         user = request.user
         return None, None, user, getattr(user, "tenant_id", ""), None
+
+    if token and not token.startswith("mlp_") and hasattr(request, "META"):
+        from rest_framework_simplejwt.authentication import JWTAuthentication
+        from rest_framework_simplejwt.exceptions import AuthenticationFailed, InvalidToken
+
+        try:
+            auth_result = JWTAuthentication().authenticate(request)
+        except (AuthenticationFailed, InvalidToken):
+            auth_result = None
+        if auth_result is not None:
+            jwt_user, _ = auth_result
+            if jwt_user and getattr(jwt_user, "is_active", False):
+                return None, None, jwt_user, getattr(jwt_user, "tenant_id", ""), None
 
     return None, None, None, None, None
 

@@ -58,7 +58,6 @@ def _cleanup_drift_run(run: DriftRun, *, storage: S3Storage) -> None:
             run.report_json_uri,
             run.summary_uri,
             run.current_data_uri,
-            run.report_manifest_uri,
         ):
             if uri and uri.startswith(f"s3://{storage.bucket}/"):
                 storage.delete(uri)

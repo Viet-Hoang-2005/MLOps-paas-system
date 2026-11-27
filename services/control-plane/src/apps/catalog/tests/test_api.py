@@ -27,34 +27,28 @@ def test_project_api_uses_uuid_and_tenant_scope():
 
 @pytest.mark.django_db
 def test_duplicate_project_name_returns_conflict_with_clear_message():
+    from apps.catalog.services.project_metadata import save_project_metadata
+    from common.api.exceptions import Conflict
+
     owner = get_user_model().objects.create_user("duplicate-owner@example.com", "password123")
     ModelProject.objects.create(owner=owner, name="NIDS")
-    client = APIClient()
-    client.force_authenticate(owner)
 
-    response = client.post("/api/models/training-projects/", {"name": "NIDS", "access_mode": "public"}, format="json")
-
-    assert response.status_code == 409
-    assert response.data == {
-        "error": {
-            "code": "conflict",
-            "detail": "A model project named NIDS already exists.",
-        }
-    }
+    with pytest.raises(Conflict, match="A model project named NIDS already exists."):
+        save_project_metadata(actor=owner, validated_data={"name": "NIDS", "access_mode": "public"})
 
 
 @pytest.mark.django_db
 def test_inactive_project_with_same_name_does_not_block_new_project():
+    from apps.catalog.services.project_metadata import save_project_metadata
+
     owner = get_user_model().objects.create_user("reuse-owner@example.com", "password123")
     # Projects deleted before names were suffixed, or still being deleted, keep the original name.
     ModelProject.objects.create(owner=owner, name="NIDS", is_active=False, deletion_state="deleted")
     ModelProject.objects.create(owner=owner, name="NIDS", is_active=False, deletion_state="deleting")
-    client = APIClient()
-    client.force_authenticate(owner)
 
-    response = client.post("/api/models/training-projects/", {"name": "NIDS", "access_mode": "public"}, format="json")
+    project = save_project_metadata(actor=owner, validated_data={"name": "NIDS", "access_mode": "public"})
 
-    assert response.status_code == 201
+    assert project.name == "NIDS"
     assert ModelProject.objects.filter(owner=owner, name="NIDS", is_active=True).count() == 1
 
 
@@ -185,12 +179,6 @@ def test_running_attributes_and_label_mapping_with_json(monkeypatch):
     assert res.data["label_mapping"]["filename"] == "labels.json"
     assert res.data["label_mapping"]["mapping"] == {"0": "benign", "1": "attack"}
 
-    # Test label-mapping standalone endpoint
-    res_lm = client.get(f"/api/models/{project.public_id}/label-mapping/")
-    assert res_lm.status_code == 200
-    assert res_lm.data["filename"] == "labels.json"
-    assert res_lm.data["mapping"] == {"0": "benign", "1": "attack"}
-
 
 @pytest.mark.django_db
 def test_running_snapshot_never_falls_back_to_registered_or_preview():
@@ -202,7 +190,6 @@ def test_running_snapshot_never_falls_back_to_registered_or_preview():
 
     assert client.get(f"/api/models/{project.public_id}/running-source/").status_code == 409
     assert client.get(f"/api/models/{project.public_id}/running-attributes/").status_code == 409
-    assert client.get(f"/api/models/{project.public_id}/label-mapping/").status_code == 409
     assert client.get(f"/api/models/{project.public_id}/preview/attributes/").status_code == 200
     detail = client.get(f"/api/models/{project.public_id}/").data
     assert detail["source_code"] is None

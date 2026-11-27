@@ -8,9 +8,13 @@ from fastapi import HTTPException
 DEEP_LEARNING_FLAVORS = frozenset({"pytorch", "tensorflow", "keras"})
 
 
+def is_dl_flavor(flavor: Any) -> bool:
+    """Return whether a model flavor is served by the BentoML deep-learning runtime."""
+    return str(flavor or "").strip().lower() in DEEP_LEARNING_FLAVORS
+
+
 def serving_engine_for_flavor(flavor: Any) -> str:
-    normalized_flavor = str(flavor or "").strip().lower()
-    return "dl" if normalized_flavor in DEEP_LEARNING_FLAVORS else "ml"
+    return "dl" if is_dl_flavor(flavor) else "ml"
 
 
 def resolve_worker_url(model_record: dict[str, Any], endpoint_path: str) -> str:

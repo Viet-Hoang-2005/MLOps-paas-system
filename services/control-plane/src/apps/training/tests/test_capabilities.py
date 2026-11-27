@@ -33,8 +33,7 @@ def _job(email="owner@example.com"):
     job.code_snapshot_uri = uris["code"]
     job.data_snapshot_uri = uris["data"]
     job.output_uri = uris["output"]
-    job.mlflow_artifact_uri = uris["mlflow"]
-    job.save(update_fields=["code_snapshot_uri", "data_snapshot_uri", "output_uri", "mlflow_artifact_uri"])
+    job.save(update_fields=["code_snapshot_uri", "data_snapshot_uri", "output_uri"])
     return job
 
 
@@ -207,7 +206,9 @@ def test_cancel_reporter_is_job_bound_one_time_and_confirms_cancellation():
 
     assert response.status_code == 200
     job.refresh_from_db()
-    assert job.status == "cancelled"
+    assert job.status == "cancelling"
+    assert job.execution_stop_requested is True
+    assert job.observation_status == "cleanup_pending"
     duplicate = client.post(
         url,
         {"workflow_status": "Succeeded"},

@@ -6,6 +6,14 @@ import time
 import requests
 
 
+DEEP_LEARNING_FLAVORS = frozenset({"pytorch", "tensorflow", "keras"})
+
+
+def is_dl_flavor(flavor) -> bool:
+    """Return whether a model flavor is served by the BentoML deep-learning runtime."""
+    return str(flavor or "").strip().lower() in DEEP_LEARNING_FLAVORS
+
+
 def healthy_payload(payload, *, project_id, version_id):
     return (
         isinstance(payload, dict)
@@ -22,7 +30,7 @@ class RuntimeHealthProbe:
     def check(self, *, url, flavor, project_id, version_id):
         if not url:
             return "unknown"
-        method = "POST" if flavor in {"pytorch", "tensorflow"} else "GET"
+        method = "POST" if is_dl_flavor(flavor) else "GET"
         try:
             with requests.Session() as session:
                 session.trust_env = False

@@ -208,3 +208,126 @@ def test_project_lifecycle_notifications():
     assert any("Project Metadata Updated" in t for t in titles)
     assert any("Model Preview Updated" in t for t in titles)
     assert any("Model Project Deleted" in t for t in titles)
+
+
+@pytest.mark.django_db
+def test_alertmanager_webhook_dedupes_fingerprint_resets_on_resolved_and_checks_tenant():
+    from django.core.cache import cache
+
+    cache.clear()
+    user = get_user_model().objects.create_user("dedupe-owner@example.com", "pass123")
+    project = ModelProject.objects.create(owner=user, name="FraudShield")
+
+    client = APIClient()
+    secret = settings.CONTROL_PLANE_WEBHOOK_SECRET
+    fp = "abc123fingerprint"
+
+    def make_payload(alert_status="firing", tenant_id=None):
+        labels = {
+            "alertname": "HighInferenceLatency",
+            "severity": "critical",
+            "project_id": str(project.public_id),
+        }
+        if tenant_id is not None:
+            labels["tenant_id"] = tenant_id
+        return {
+            "alerts": [
+                {
+                    "status": alert_status,
+                    "fingerprint": fp,
+                    "startsAt": "2026-11-27T08:00:00Z",
+                    "labels": labels,
+                    "annotations": {"summary": "Latency spike"},
+                }
+            ]
+        }
+
+    # Mismatched tenant_id must be rejected
+    resp_wrong_tenant = client.post(
+        "/internal/webhooks/alerts/",
+        make_payload(tenant_id="T-wrong-tenant"),
+        format="json",
+        HTTP_X_CONTROL_PLANE_SECRET=secret,
+    )
+    assert resp_wrong_tenant.status_code == 200
+    assert resp_wrong_tenant.data["created_notifications"] == 0
+
+    # First firing with matching tenant_id creates 1 notification
+    resp_first = client.post(
+        "/internal/webhooks/alerts/",
+        make_payload(tenant_id=user.tenant_id),
+        format="json",
+        HTTP_X_CONTROL_PLANE_SECRET=secret,
+    )
+    assert resp_first.status_code == 200
+    assert resp_first.data["created_notifications"] == 1
+
+    # Repeated firing within repeat_interval is deduplicated
+    resp_repeat = client.post(
+        "/internal/webhooks/alerts/",
+        make_payload(tenant_id=user.tenant_id),
+        format="json",
+        HTTP_X_CONTROL_PLANE_SECRET=secret,
+    )
+    assert resp_repeat.status_code == 200
+    assert resp_repeat.data["created_notifications"] == 0
+
+    # Resolved clears dedupe so a later firing creates a new notification
+    resp_resolved = client.post(
+        "/internal/webhooks/alerts/",
+        make_payload(alert_status="resolved", tenant_id=user.tenant_id),
+        format="json",
+        HTTP_X_CONTROL_PLANE_SECRET=secret,
+    )
+    assert resp_resolved.status_code == 200
+    assert resp_resolved.data["created_notifications"] == 0
+
+    # Mark existing notification read so DB unread check doesn't block re-firing after resolved
+    Notification.objects.filter(user=user).update(is_read=True)
+
+    resp_refire = client.post(
+        "/internal/webhooks/alerts/",
+        make_payload(tenant_id=user.tenant_id),
+        format="json",
+        HTTP_X_CONTROL_PLANE_SECRET=secret,
+    )
+    assert resp_refire.status_code == 200
+    assert resp_refire.data["created_notifications"] == 1
+    assert Notification.objects.filter(user=user, metadata__fingerprint=fp).count() == 2
+
+
+@pytest.mark.django_db
+def test_execution_finish_dispatches_training_and_drift_notifications(django_capture_on_commit_callbacks):
+    from apps.drift.models import DriftMonitor, DriftRun
+    from apps.observability.services.executions import _finish
+    from apps.registry.models import ModelVersion
+    from apps.training.tests.factories import training_job
+
+    user = get_user_model().objects.create_user("exec-notify@example.com", "pass123")
+    project = ModelProject.objects.create(owner=user, name="NotifyModel")
+    version = ModelVersion.objects.create(project=project, version="1")
+    job = training_job(project=project, status="running", backend="docker")
+    monitor = DriftMonitor.objects.create(
+        version=version,
+        reference_uri="s3://bucket/ref.csv",
+        is_active=True,
+    )
+    drift_run = DriftRun.objects.create(
+        monitor=monitor,
+        status="running",
+        has_drift=True,
+        drift_score=0.42,
+    )
+
+    with (
+        patch("apps.notifications.hooks.notify_training_result") as mock_train,
+        patch("apps.notifications.hooks.notify_drift_result") as mock_drift,
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        _finish(job, "training", "failed", message="OOMKilled")
+        _finish(drift_run, "drift", "completed")
+
+    assert mock_train.call_count == 1
+    assert mock_train.call_args[0][0].pk == job.pk
+    assert mock_drift.call_count == 1
+    assert mock_drift.call_args[0][0].pk == drift_run.pk

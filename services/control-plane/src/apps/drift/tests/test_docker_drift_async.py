@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
-from apps.drift.tasks import execute_drift_run, poll_drift_run_status
+from apps.drift.tasks import execute_drift_run
 from apps.registry.models import ModelVersion
 from infrastructure.execution.docker_backends import DockerDriftBackend
 from infrastructure.execution.job_containers import labels_for
@@ -113,47 +113,6 @@ class DockerDriftAsyncTests(TestCase):
         self.assertIn("Missing required feature columns", result["error"])
         container_mock.remove.assert_not_called()
 
-    def test_execute_drift_run_dispatches_and_schedules_poll(self):
-        fake_backend = Mock()
-        fake_backend.run.return_value = {"dispatched": True, "container_id": "c123"}
-        fake_backend.poll = Mock()
-
-        with (
-            patch("apps.drift.tasks.drift_backend", return_value=fake_backend),
-            patch("apps.drift.tasks.poll_drift_run_status.apply_async") as mock_apply_async,
-        ):
-            status = execute_drift_run(str(self.drift_run.public_id))
-
-        self.assertEqual(status, "running")
-        mock_apply_async.assert_called_once_with(args=[str(self.drift_run.public_id)], countdown=5)
-        self.drift_run.refresh_from_db()
-        self.assertEqual(self.drift_run.status, "running")
-
-    def test_poll_drift_run_status_records_drift_without_triggering_anything(self):
-        self.drift_run.status = "running"
-        self.drift_run.summary = {"drift_score": 0.35, "has_drift": True}
-        self.drift_run.drift_score = 0.35
-        self.drift_run.has_drift = True
-        self.drift_run.save(update_fields=["status", "summary", "drift_score", "has_drift"])
-
-        fake_backend = Mock()
-        fake_backend.poll.return_value = {"status": "completed", "logs": "Done", "exit_code": 0}
-
-        with (
-            patch("apps.drift.tasks.drift_backend", return_value=fake_backend),
-            patch("celery.app.task.Task.apply_async") as queued,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            result = poll_drift_run_status(str(self.drift_run.public_id))
-
-        self.assertEqual(result, "completed")
-        self.drift_run.refresh_from_db()
-        self.assertEqual(self.drift_run.status, "completed")
-        self.assertTrue(self.drift_run.has_drift)
-        # Continuous Training is not wired yet: detecting drift must not enqueue any follow-up work.
-        queued.assert_not_called()
-
-
 @override_settings(CONTROL_PLANE_WEBHOOK_SECRET="test-secret")
 class DriftWebhookDriftDetectionTests(TestCase):
     def setUp(self):
@@ -170,7 +129,11 @@ class DriftWebhookDriftDetectionTests(TestCase):
                 "share_of_drifted_columns": 0.55,
             }
         }
-        with patch("celery.app.task.Task.apply_async") as queued, self.captureOnCommitCallbacks(execute=True):
+        with (
+            patch("apps.observability.services.executions._completion_data", return_value=payload["drift_summary"]),
+            patch("celery.app.task.Task.apply_async") as queued,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             response = self.client.post(
                 f"/internal/webhooks/drift-runs/{self.drift_run.public_id}/",
                 payload,
@@ -194,12 +157,13 @@ class DriftWebhookDriftDetectionTests(TestCase):
                 "share_of_drifted_columns": 0.05,
             }
         }
-        response = self.client.post(
-            f"/internal/webhooks/drift-runs/{self.drift_run.public_id}/",
-            payload,
-            format="json",
-            **self.headers,
-        )
+        with patch("apps.observability.services.executions._completion_data", return_value=payload["drift_summary"]):
+            response = self.client.post(
+                f"/internal/webhooks/drift-runs/{self.drift_run.public_id}/",
+                payload,
+                format="json",
+                **self.headers,
+            )
 
         self.assertEqual(response.status_code, 200)
         self.drift_run.refresh_from_db()

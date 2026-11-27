@@ -62,12 +62,10 @@ class TrainingConcurrencyExceeded(Conflict):
     default_code = "training_concurrency_exceeded"
 
 
-def reserve(job):
-    """Caller holds the owner lock within the submit transaction."""
+def check_quota(job):
+    """Validate concurrency and weekly quota for an Argo training job without mutating state."""
     if job.backend != "argo":
-        return
-    if not settings.TRAINING_EXECUTION_WATCH_ENABLED:
-        raise ServiceUnavailable("Production training requires execution monitoring.")
+        return None
     if TrainingQuotaReservation.objects.filter(owner_id=job.owner_id, active=True).exists():
         raise TrainingConcurrencyExceeded("Another training job is still active or being cleaned up.")
     now = timezone.now()
@@ -89,6 +87,15 @@ def reserve(job):
                     "reset_at": (week + WEEK).isoformat(),
                 }
             )
+    return now, deadline, resource, overlaps
+
+
+def reserve(job):
+    """Caller holds the owner lock within the submit transaction."""
+    checked = check_quota(job)
+    if not checked:
+        return
+    now, deadline, resource, overlaps = checked
     reservation = TrainingQuotaReservation.objects.create(
         owner_id=job.owner_id,
         job_id=job.public_id,

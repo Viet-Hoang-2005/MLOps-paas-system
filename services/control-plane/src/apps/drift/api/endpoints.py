@@ -20,7 +20,16 @@ class DriftMonitorListCreateEndpoint(generics.ListCreateAPIView):
     serializer_class = DriftMonitorSerializer
 
     def get_queryset(self):
-        return monitors_for_user(self.request.user).prefetch_related("runs")
+        from django.db.models import Prefetch
+        from apps.drift.models import DriftRun
+
+        return (
+            monitors_for_user(self.request.user)
+            .select_related("version", "version__project")
+            .prefetch_related(
+                Prefetch("runs", queryset=DriftRun.objects.select_related("monitor__version__project"))
+            )
+        )
 
     def perform_create(self, serializer):
         from apps.drift.services.monitors import create_monitor
@@ -37,7 +46,23 @@ class DriftMonitorDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
     lookup_url_kwarg = "monitor_id"
 
     def get_queryset(self):
-        return monitors_for_user(self.request.user).prefetch_related("runs")
+        from django.db.models import Prefetch
+        from apps.drift.models import DriftRun
+
+        return (
+            monitors_for_user(self.request.user)
+            .select_related("version", "version__project")
+            .prefetch_related(
+                Prefetch("runs", queryset=DriftRun.objects.select_related("monitor__version__project"))
+            )
+        )
+
+    def perform_update(self, serializer):
+        from common.api.exceptions import Conflict
+
+        if serializer.instance.deletion_requested:
+            raise Conflict("This drift monitor is being deleted.")
+        serializer.save()
 
     def perform_destroy(self, instance):
         delete_drift_monitor(instance)

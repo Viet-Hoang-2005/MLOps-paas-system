@@ -18,6 +18,7 @@ class TrainingJobExperimentMetricsEndpoint(APIView):
         metrics = job.step_metrics.order_by("name", "step").values("name", "value", "step", "timestamp")
 
         grouped = {}
+        metrics_summary = {}
         for m in metrics:
             name = m["name"]
             if name not in grouped:
@@ -29,12 +30,14 @@ class TrainingJobExperimentMetricsEndpoint(APIView):
                     "timestamp": m["timestamp"].isoformat() if m["timestamp"] else None,
                 }
             )
+            metrics_summary[name] = m["value"]
 
         params = {p.name: p.value for p in job.hyperparameters.all()}
         if not params and isinstance(job.tracking, dict) and "params" in job.tracking:
             params = job.tracking["params"]
 
-        metrics_summary = dict(job.tracking.get("metrics", {})) if isinstance(job.tracking, dict) else {}
+        if not metrics_summary and isinstance(job.tracking, dict):
+            metrics_summary = dict(job.tracking.get("metrics", {}))
 
         return Response(
             {
@@ -86,7 +89,8 @@ class TrainingJobsCompareEndpoint(APIView):
             all_param_names.update(params.keys())
 
             grouped = {}
-            for m in job.step_metrics.order_by("step"):
+            metrics_summary = {}
+            for m in sorted(job.step_metrics.all(), key=lambda item: (item.step, item.created_at)):
                 name = m.name
                 all_metric_names.add(name)
                 if name not in grouped:
@@ -97,8 +101,10 @@ class TrainingJobsCompareEndpoint(APIView):
                         "value": m.value,
                     }
                 )
+                metrics_summary[name] = m.value
 
-            metrics_summary = dict(job.tracking.get("metrics", {})) if isinstance(job.tracking, dict) else {}
+            if not metrics_summary and isinstance(job.tracking, dict):
+                metrics_summary = dict(job.tracking.get("metrics", {}))
             all_metric_names.update(metrics_summary.keys())
 
             runs.append(

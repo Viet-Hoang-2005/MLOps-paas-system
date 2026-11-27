@@ -15,6 +15,7 @@ def drift_run_logs(run, offset: int) -> tuple[list[str], int]:
     try:
         redis = redis_client()
         key = f"drift_logs:{run.public_id}"
-        return _decode_logs(redis.lrange(key, offset, -1)), redis.llen(key)
+        lines = _decode_logs(redis.lrange(key, offset, -1))
+        return lines, offset + len(lines)
     except RedisError:
-        return [], 0
+        return [], offset

@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from apps.auth.api.serializers import UserSerializer
 from apps.auth.services.account_lifecycle import deactivate_user_account
 from apps.auth.services.avatars import update_profile
-from apps.auth.services.cookies import verify_auth_security_headers
+from apps.auth.services.cookies import clear_refresh_token_cookie, verify_auth_security_headers
 from apps.auth.services.otp import send_otp, verify_otp
 from apps.auth.services.passwords import complete_password_update
 from apps.auth.throttles import PasswordChangeRateThrottle
@@ -33,7 +33,9 @@ class ProfileEndpoint(APIView):
 class AccountDeleteEndpoint(APIView):
     def delete(self, request):
         deactivate_user_account(request.user)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        clear_refresh_token_cookie(response)
+        return response
 
 
 class PasswordChangeRequestEndpoint(APIView):

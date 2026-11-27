@@ -87,6 +87,9 @@ class ModelVersionSerializer(serializers.ModelSerializer):
         return instance.source_job_reference or (instance.source_job.public_id if instance.source_job_id else None)
 
     def get_events(self, instance):
+        events_map = self.context.get("events_by_version_id")
+        if events_map is not None:
+            return RegistryEventSerializer(events_map.get(instance.public_id, []), many=True).data
         return RegistryEventSerializer(
             events_for_aggregate(aggregate_type="model_version", aggregate_id=instance.public_id), many=True
         ).data

@@ -8,7 +8,6 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.observability.services.lifecycle import record_registry_event
-from apps.observability.services.outbox import enqueue_event
 from apps.registry.models import ModelArtifact, ModelMetric, ModelVersion
 from common.validation.artifacts import MAX_REFERENCE_DATA_BYTES
 from infrastructure.execution.image_references import repository_from_reference
@@ -81,7 +80,9 @@ def _plan_registration(build, metrics_summary, params_summary, insights_summary)
     """
     with transaction.atomic():
         project = type(build.project).objects.select_for_update().get(pk=build.project_id)
-        build = type(build).objects.select_for_update().select_related("project", "project__owner").get(pk=build.pk)
+        build = (
+            type(build).objects.select_for_update(of=("self",)).select_related("project", "project__owner").get(pk=build.pk)
+        )
         if build.status != "ready" or project.deletion_state != "active" or build.deletion_state != "active":
             raise ValidationError({"build": "Only successful builds of active projects can be registered."})
         if build.version_id:
@@ -200,7 +201,9 @@ def _commit_registration(build, plan, copies, *, image_uri, version_image_uri, i
     asset_copies, package = copies
     with transaction.atomic():
         project = type(build.project).objects.select_for_update().get(pk=build.project_id)
-        build = type(build).objects.select_for_update().select_related("project", "project__owner").get(pk=build.pk)
+        build = (
+            type(build).objects.select_for_update(of=("self",)).select_related("project", "project__owner").get(pk=build.pk)
+        )
         if build.version_id:
             # A concurrent registration finished first; keep its version, drop our copies.
             raise _AlreadyRegistered(build)
@@ -317,17 +320,6 @@ def set_alias(*, project, actor, name, version):
         raise Conflict("This project or model version is being deleted.")
     alias, _ = RegistryAlias.objects.update_or_create(project=project, name=name, defaults={"version": version})
     record_registry_event(version=version, actor=actor, event_type="alias_updated", to_state=name)
-    enqueue_event(
-        topic="registry.events",
-        aggregate_type="model_project",
-        aggregate_id=project.public_id,
-        event_type="model.promoted",
-        payload={
-            "project_id": str(project.public_id),
-            "version_id": str(version.public_id),
-            "alias": name,
-        },
-    )
     return alias
 
 
@@ -565,15 +557,22 @@ def add_supplemental_artifacts(
 
 
 def get_version_reference_preview(version, storage=None) -> dict:
-    from common.validation.artifacts import parse_reference_preview
+    from io import BytesIO
+
+    from common.validation.artifacts import parse_reference_preview_stream
 
     storage = storage or S3Storage()
     artifact = version.artifacts.filter(kind="reference_data").first()
     if not artifact or not artifact.uri:
         raise ValidationError({"reference_data": "This version does not have a reference dataset."})
     try:
+        if hasattr(storage, "open_stream"):
+            body, _, _ = storage.open_stream(artifact.uri)
+            try:
+                return parse_reference_preview_stream(body, artifact.name, max_rows=100)
+            finally:
+                body.close()
         raw = storage.read(artifact.uri, max_bytes=MAX_REFERENCE_DATA_BYTES)
+        return parse_reference_preview_stream(BytesIO(raw), artifact.name, max_rows=100)
     except Exception as exc:
         raise ValidationError({"reference_data": "Could not read reference data from storage."}) from exc
-
-    return parse_reference_preview(raw, artifact.name, max_rows=100)

@@ -49,7 +49,7 @@ def test_automatic_drift_webhook_creates_one_durable_threshold_crossing(monkeypa
     assert monitor.last_automatic_trigger_count == 100
     created_runs.assert_called_once_with(
         monitor,
-        f"automatic-drift:{monitor.public_id}:1",
+        f"automatic-drift:{monitor.public_id}:0:100",
     )
 
 

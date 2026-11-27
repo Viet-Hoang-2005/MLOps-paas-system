@@ -7,7 +7,7 @@ from django.db.models import Q
 from apps.catalog.models import ModelProject, PreviewAsset
 from apps.deployment.models import Build, BuildInputAsset, Deployment
 from apps.deployment.services.cache import invalidate_model_server_cache
-from apps.drift.models import DriftRun
+from apps.drift.models import DriftMonitor, DriftRun
 from apps.drift.services.deletion import cleanup_drift_monitor
 from apps.registry.models import ModelArtifact, ModelVersion, RegistryAlias
 from common.api.exceptions import Conflict, ServiceUnavailable
@@ -15,7 +15,6 @@ from common.logging import record_transition
 from common.redis_client import redis_client
 from infrastructure.docker import DockerClient
 from infrastructure.execution import deployment_backend
-from infrastructure.execution.image_references import version_image_tag
 from infrastructure.harbor import HarborClient
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import version_prefix
@@ -26,6 +25,7 @@ logger = logging.getLogger(__name__)
 def _check_ct_references(project, version):
     from apps.ct.models import EvaluationGate, EvidenceWindow, MaintenanceDecision, MaintenanceRun
 
+    # Stored lineage still protects versions when continuous training is disabled.
     if (
         MaintenanceRun.objects.filter(project=project, state__in=MaintenanceRun.ACTIVE_STATES)
         .filter(Q(expected_champion=version) | Q(candidate=version))
@@ -45,7 +45,7 @@ def _remove_build_image(build):
     if not build.image_uri:
         return
     if build.backend == "argo":
-        HarborClient().delete_tag(build.image_uri, version_image_tag(build.version.version))
+        HarborClient().delete_artifact(build.image_uri)
         return
     try:
         DockerClient().client.images.remove(build.image_uri, force=True, noprune=False)
@@ -55,7 +55,6 @@ def _remove_build_image(build):
 
 def delete_model_version(version: ModelVersion, *, storage=None, image_remover=None) -> None:
     """Delete a ModelVersion along with its runtime pods, monitors, S3 artifacts, and image."""
-    storage = storage or S3Storage()
     image_remover = image_remover or _remove_build_image
 
     with transaction.atomic():
@@ -90,6 +89,7 @@ def delete_model_version(version: ModelVersion, *, storage=None, image_remover=N
         s3_prefix = version_prefix(project.owner.tenant_id, project.public_id, locked.public_id).rstrip("/") + "/"
         version_public_id = locked.public_id
 
+    storage = storage or S3Storage()
     invalidate_model_server_cache(str(version_public_id))
 
     for deployment in deployments:
@@ -123,12 +123,7 @@ def delete_model_version(version: ModelVersion, *, storage=None, image_remover=N
             logger.warning("Failed to remove image %s for version %s", uri, version_public_id, exc_info=True)
             raise ServiceUnavailable("Could not delete the version image. Retry deletion.") from exc
 
-    try:
-        storage.delete_prefix(s3_prefix)
-    except Exception as exc:
-        logger.warning("Failed to delete S3 version prefix %s", s3_prefix, exc_info=True)
-        raise ServiceUnavailable("Could not delete the version files. Retry deletion.") from exc
-
+    shared_uris = set()
     for uri in artifact_uris:
         if not uri or not uri.startswith(f"s3://{storage.bucket}/"):
             continue
@@ -136,13 +131,26 @@ def delete_model_version(version: ModelVersion, *, storage=None, image_remover=N
             ModelArtifact.objects.exclude(pk__in=artifact_pks).filter(uri=uri).exists()
             or BuildInputAsset.objects.filter(s3_uri=uri).exists()
             or PreviewAsset.objects.filter(s3_uri=uri).exists()
+            or DriftMonitor.objects.exclude(version=version).filter(reference_uri=uri).exists()
         )
-        if not shared:
-            try:
-                storage.delete(uri)
-            except Exception as exc:
-                logger.warning("Failed to delete version artifact %s", uri, exc_info=True)
-                raise ServiceUnavailable("Could not delete the version files. Retry deletion.") from exc
+        if shared:
+            shared_uris.add(uri)
+
+    if not shared_uris:
+        try:
+            storage.delete_prefix(s3_prefix)
+        except Exception as exc:
+            logger.warning("Failed to delete S3 version prefix %s", s3_prefix, exc_info=True)
+            raise ServiceUnavailable("Could not delete the version files. Retry deletion.") from exc
+
+    for uri in artifact_uris:
+        if not uri or not uri.startswith(f"s3://{storage.bucket}/") or uri in shared_uris:
+            continue
+        try:
+            storage.delete(uri)
+        except Exception as exc:
+            logger.warning("Failed to delete version artifact %s", uri, exc_info=True)
+            raise ServiceUnavailable("Could not delete the version files. Retry deletion.") from exc
 
     with transaction.atomic():
         project = ModelProject.objects.select_for_update().get(pk=version.project_id)

@@ -267,7 +267,7 @@ def test_submit_writes_snapshots_outside_any_transaction(project, job_storage):
     result = submit(job, job_storage)
     assert job_storage.inside_transaction == []
     assert result.workspace_id == job.pk and result.submitted_at
-    assert len(job_storage.objects) == 3
+    assert len(job_storage.objects) == 2
 
 
 def test_deleting_an_unrelated_project_does_not_prevent_a_draft(project, job_storage):

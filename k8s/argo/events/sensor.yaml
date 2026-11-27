@@ -252,7 +252,7 @@ spec:
         data:
           - path: body.kind
             type: string
-            value: ['^(training|drift|deployment)$']
+            value: ['^(build|training|drift|deployment)$']
           - path: body.resource_id
             type: string
             value: ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
@@ -264,7 +264,7 @@ spec:
             value: ['^T-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$']
           - path: body.callback_url
             type: string
-            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/executions/((training|drift)/[0-9a-f-]{36}/observations|(drift|deployment)/[0-9a-f-]{36}/stops)/$']
+            value: ['^http://mlops-paas-control-plane(:8000|\.mlops-paas-core\.svc\.cluster\.local:8000)/internal/executions/((training|drift)/[0-9a-f-]{36}/observations|(build|drift|deployment)/[0-9a-f-]{36}/stops)/$']
         exprs:
           - expr: callback =~ resource_id && callback =~ kind
             fields:
@@ -282,110 +282,20 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: build-model-job-
+                generateName: build-submission-
                 namespace: mlops-paas-execution
               spec:
                 workflowTemplateRef:
-                  name: mlops-paas-model-packager-template
+                  name: mlops-paas-job-submit-template
                 arguments:
                   parameters:
-                    - name: build_id
-                      value: ""
-                    - name: project_id
-                      value: ""
-                    - name: tenant_id
-                      value: ""
-                    - name: image_repository
-                      value: ""
-                    - name: image_tag
-                      value: ""
-                    - name: flavor
-                      value: ""
-                    - name: task_type
-                      value: ""
-                    - name: requirements_text
-                      value: ""
-                    - name: source_artifact_name
-                      value: ""
-                    - name: source_type
-                      value: "manual_upload"
-                    - name: source_download_url
-                      value: ""
-                    - name: output_upload_url
-                      value: ""
-                    - name: control_plane_webhook_url
-                      value: ""
-                    - name: label_mapping_download_url
-                      value: ""
-                    - name: label_mapping_filename
-                      value: ""
-                    - name: input_schema_download_url
-                      value: ""
+                    - {name: execution_kind, value: "build"}
+                    - {name: execution_payload, value: ""}
           parameters:
             - src:
                 dependencyName: build-dep
-                dataKey: body.build_id
-              dest: spec.arguments.parameters.0.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.project_id
+                dataTemplate: '{{ .Input.body | toJson }}'
               dest: spec.arguments.parameters.1.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.tenant_id
-              dest: spec.arguments.parameters.2.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.image_repository
-              dest: spec.arguments.parameters.3.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.image_tag
-              dest: spec.arguments.parameters.4.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.flavor
-              dest: spec.arguments.parameters.5.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.task_type
-              dest: spec.arguments.parameters.6.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.requirements_text
-              dest: spec.arguments.parameters.7.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.source_artifact_name
-              dest: spec.arguments.parameters.8.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.source_type
-              dest: spec.arguments.parameters.9.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.source_download_url
-              dest: spec.arguments.parameters.10.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.output_upload_url
-              dest: spec.arguments.parameters.11.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.control_plane_webhook_url
-              dest: spec.arguments.parameters.12.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.label_mapping_download_url
-              dest: spec.arguments.parameters.13.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.label_mapping_filename
-              dest: spec.arguments.parameters.14.value
-            - src:
-                dependencyName: build-dep
-                dataKey: body.input_schema_download_url
-              dest: spec.arguments.parameters.15.value
 
     - template:
         name: cancel-build-workflow-trigger

@@ -175,11 +175,9 @@ class MLflowCompatibilityTests(APITestCase):
         self.assertTrue(TrainingJobParam.objects.filter(job=self.job, name="learning_rate", value="0.001").exists())
         self.assertTrue(TrainingJobParam.objects.filter(job=self.job, name="batch_size", value="32").exists())
 
-        # Verify job.tracking summary updated
+        # Verify job.tracking is NOT mutated by MLflow logging (avoids lost-update race with output_contract)
         self.job.refresh_from_db()
-        self.assertEqual(self.job.tracking["metrics"]["loss"], 0.25)
-        self.assertEqual(self.job.tracking["metrics"]["accuracy"], 0.95)
-        self.assertEqual(self.job.tracking["params"]["learning_rate"], "0.001")
+        self.assertEqual(self.job.tracking, {})
 
     def test_mlflow_tenant_isolation(self):
         """Ensure a token from Tenant A cannot log or read runs of Tenant B."""
@@ -322,7 +320,7 @@ class MLflowCompatibilityTests(APITestCase):
     def test_mlflow_artifact_proxy_upload_and_download(self):
         file_content = b"pickle-serialized-model-bytes-123456789"
         upload_path = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/"
             f"{self.project.public_id}/training/jobs/{self.job.public_id}/mlflow/artifacts/model/model.pkl"
         )
 
@@ -353,7 +351,7 @@ class MLflowCompatibilityTests(APITestCase):
     def test_mlflow_artifact_proxy_list_and_rest_list(self):
         # Upload two files under model/
         base_url = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/"
             f"{self.project.public_id}/training/jobs/{self.job.public_id}/mlflow/artifacts/model"
         )
         self.client.put(
@@ -371,7 +369,7 @@ class MLflowCompatibilityTests(APITestCase):
 
         # 1. Standard MLflow client list (GET /mlflow-artifacts/artifacts?path=...)
         list_url = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts?path=users/{self.user.tenant_id}/models/"
+            f"/api/2.0/mlflow-artifacts/artifacts?path=users/{self.user.tenant_id}/models/"
             f"{self.project.public_id}/training/jobs/{self.job.public_id}/mlflow/artifacts/model"
         )
         resp = self.client.get(list_url, HTTP_AUTHORIZATION=f"Bearer {self.token}")
@@ -392,7 +390,7 @@ class MLflowCompatibilityTests(APITestCase):
 
     def test_mlflow_artifact_proxy_delete(self):
         file_path = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/"
             f"{self.project.public_id}/training/jobs/{self.job.public_id}/mlflow/artifacts/temp_file.txt"
         )
         self.client.put(
@@ -423,7 +421,7 @@ class MLflowCompatibilityTests(APITestCase):
         attacker_token = issue_capability(attacker_job, "tracking")
 
         target_url = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/"
             f"{self.project.public_id}/training/jobs/{self.job.public_id}/mlflow/artifacts/secret.txt"
         )
 
@@ -439,7 +437,7 @@ class MLflowCompatibilityTests(APITestCase):
 
     def test_mlflow_multipart_upload_fallback_501(self):
         mpu_url = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/mpu/create/users/{self.user.tenant_id}/models/"
+            f"/api/2.0/mlflow-artifacts/mpu/create/users/{self.user.tenant_id}/models/"
             f"{self.project.public_id}/training/jobs/{self.job.public_id}/mlflow/artifacts/model/weights.bin"
         )
         resp = self.client.post(
@@ -495,8 +493,15 @@ class MLflowCompatibilityTests(APITestCase):
         self.job.refresh_from_db()
         self.assertEqual(self.job.status, "running")
         self.assertIsNone(self.job.completed_at)
-        self.assertEqual(self.job.tracking.get("mlflow_status"), "FINISHED")
-        self.assertEqual(self.job.tracking.get("end_time"), 1700000000000)
+        self.assertEqual(self.job.tracking, {})
+        self.assertEqual(
+            TrainingJobTag.objects.get(job=self.job, name="mlflow.runStatus").value,
+            "FINISHED",
+        )
+        self.assertEqual(
+            TrainingJobTag.objects.get(job=self.job, name="mlflow.endTime").value,
+            "1700000000000",
+        )
 
         # But runs/get reports FINISHED to MLflow client
         get_resp = self.client.get(
@@ -584,7 +589,7 @@ class MLflowCompatibilityTests(APITestCase):
 
         # 7. Upload artifact to Job B proxy path
         resp = self.client.put(
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/{self.project.public_id}/training/jobs/{job_b.public_id}/mlflow/artifacts/malicious.txt",
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/{self.project.public_id}/training/jobs/{job_b.public_id}/mlflow/artifacts/malicious.txt",
             data=b"malicious content",
             content_type="text/plain",
             **headers,
@@ -697,7 +702,7 @@ class MLflowCompatibilityTests(APITestCase):
 
         # 7. Upload artifact to job in project2
         resp = self.client.put(
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/{project2.public_id}/training/jobs/{job_in_project2.public_id}/mlflow/artifacts/model.bin",
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/{project2.public_id}/training/jobs/{job_in_project2.public_id}/mlflow/artifacts/model.bin",
             data=b"model binary",
             content_type="application/octet-stream",
             **headers,
@@ -711,7 +716,7 @@ class MLflowCompatibilityTests(APITestCase):
         and streams the content properly without buffering the entire file into RAM.
         """
         upload_url = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
             f"models/{self.project.public_id}/training/jobs/{self.job.public_id}/mlflow/artifacts/test_stream.bin"
         )
         test_content = b"streaming-payload-" * 1000  # ~18 KB test payload
@@ -735,7 +740,7 @@ class MLflowCompatibilityTests(APITestCase):
         api_key = UserAPIKey.objects.create(user=self.user, name="host-client", key_prefix=prefix, key_hash=key_hash)
         api_key.allowed_projects.add(self.project)
         artifact_url = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
             f"models/{self.project.public_id}/training/jobs/{self.job.public_id}/mlflow/artifacts/test_presigned.bin"
         )
         seed_response = self.client.put(
@@ -750,15 +755,6 @@ class MLflowCompatibilityTests(APITestCase):
         for token, host in ((self.token, "minio"), (raw_key, "localhost")):
             with self.subTest(host=host):
                 headers = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
-                upload = self.client.post(
-                    "/api/2.0/mlflow/artifacts/upload-url",
-                    data={"run_id": str(self.job.public_id), "path": "new_artifact.bin"},
-                    format="json",
-                    **headers,
-                )
-                self.assertEqual(upload.status_code, status.HTTP_200_OK, upload.data)
-                self.assertEqual(urlsplit(upload.data["upload_url"]).hostname, host)
-
                 download = self.client.get(f"{artifact_url}?presigned=true", **headers)
                 self.assertEqual(download.status_code, status.HTTP_200_OK, download.data)
                 self.assertEqual(urlsplit(download.data["download_url"]).hostname, host)
@@ -769,7 +765,7 @@ class MLflowCompatibilityTests(APITestCase):
         returns a clear 413 MAX_SIZE_EXCEEDED error instead of masking it as a 404.
         """
         upload_url = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
             f"models/{self.project.public_id}/training/jobs/{self.job.public_id}/mlflow/artifacts/large_model.bin"
         )
         # Upload a 200-byte artifact
@@ -793,7 +789,7 @@ class MLflowCompatibilityTests(APITestCase):
         rejects it with a clear 413 MAX_SIZE_EXCEEDED error.
         """
         upload_url = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
             f"models/{self.project.public_id}/training/jobs/{self.job.public_id}/mlflow/artifacts/huge_model.bin"
         )
         # Set max upload limit to 100 bytes
@@ -902,19 +898,9 @@ class MLflowCompatibilityTests(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(resp.data["error_code"], "INVALID_STATE")
 
-        # 6. artifacts/upload-url
-        resp = self.client.post(
-            "/api/2.0/mlflow/artifacts/upload-url",
-            data={"run_id": run_id, "path": "model.pkl"},
-            format="json",
-            **api_headers,
-        )
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(resp.data["error_code"], "INVALID_STATE")
-
-        # 7. Artifact proxy PUT
+        # 6. Artifact proxy PUT
         artifact_path = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
             f"models/{self.project.public_id}/training/jobs/{self.job.public_id}/mlflow/artifacts/model.pkl"
         )
         resp = self.client.put(
@@ -950,7 +936,7 @@ class MLflowCompatibilityTests(APITestCase):
 
         # First, upload an artifact while running
         artifact_url = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
             f"models/{self.project.public_id}/training/jobs/{self.job.public_id}/mlflow/artifacts/result.txt"
         )
         self.client.put(
@@ -1061,7 +1047,7 @@ class MLflowCompatibilityTests(APITestCase):
         )
 
         exp_artifact_path = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
             f"models/{self.project.public_id}/training/jobs"
         )
         resp = self.client.get(exp_artifact_path, HTTP_AUTHORIZATION=f"Bearer {self.token}")
@@ -1080,7 +1066,7 @@ class MLflowCompatibilityTests(APITestCase):
         """
         file_data = b"model-weights-derived-from-experiment"
         upload_path = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/"
             f"{self.project.public_id}/training/jobs/{self.job.public_id}/artifacts/weights.bin"
         )
 
@@ -1101,7 +1087,7 @@ class MLflowCompatibilityTests(APITestCase):
 
         # 3. Directory listing of job artifacts via experiment-derived path
         dir_path = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/models/"
             f"{self.project.public_id}/training/jobs/{self.job.public_id}/artifacts"
         )
         list_resp = self.client.get(dir_path, HTTP_AUTHORIZATION=f"Bearer {self.token}")
@@ -1114,7 +1100,7 @@ class MLflowCompatibilityTests(APITestCase):
         experiment-level path (without a job ID) returns 400 with a clear error message.
         """
         exp_artifact_path = (
-            f"/api/2.0/mlflow/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
+            f"/api/2.0/mlflow-artifacts/artifacts/users/{self.user.tenant_id}/"
             f"models/{self.project.public_id}/training/jobs"
         )
 

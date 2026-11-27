@@ -80,7 +80,10 @@ class ModelProjectSerializer(serializers.ModelSerializer):
         """Return the current user-facing lifecycle state for the management list."""
         if self._has_running(instance):
             return "running"
-        return "registered" if instance.versions.exists() else "preview"
+        has_versions = getattr(instance, "_has_versions", None)
+        if has_versions is None:
+            has_versions = instance.versions.exists()
+        return "registered" if has_versions else "preview"
 
     def get_active_endpoint(self, instance):
         """Return only the explicitly selected Running deployment endpoint."""
@@ -112,12 +115,16 @@ class ModelProjectSerializer(serializers.ModelSerializer):
     def get_latest_version_id(self, instance):
         if self._has_running(instance):
             return str(instance.active_deployment.version.public_id)
+        if hasattr(instance, "_latest_version_id"):
+            return str(instance._latest_version_id) if instance._latest_version_id else None
         latest = instance.versions.order_by("-registered_at", "-id").first()
         return str(latest.public_id) if latest else None
 
     def get_latest_version_number(self, instance):
         if self._has_running(instance):
             return instance.active_deployment.version.version
+        if hasattr(instance, "_latest_version_number"):
+            return instance._latest_version_number
         latest = instance.versions.order_by("-registered_at", "-id").first()
         return latest.version if latest else None
 
@@ -126,18 +133,24 @@ class ModelProjectSerializer(serializers.ModelSerializer):
             return instance.active_deployment.version.version
         return None
 
+    def _storage(self):
+        if not hasattr(self, "_cached_storage"):
+            self._cached_storage = self.context.get("storage") or S3Storage()
+        return self._cached_storage
+
     def _asset_summary(self, instance, kind):
         if not self._has_running(instance):
             return None
         version = instance.active_deployment.version
-        artifact = version.artifacts.filter(kind={"code": "source_code", "data": "reference_data"}[kind]).first()
+        target_kind = {"code": "source_code", "data": "reference_data"}[kind]
+        artifact = next((item for item in version.artifacts.all() if item.kind == target_kind), None)
         return (
             {
                 "name": artifact.name,
                 "checksum": artifact.checksum,
                 "size_bytes": artifact.size_bytes,
                 "content_type": artifact.content_type,
-                "download_url": S3Storage().presigned_get(artifact.uri, 900, public=True),
+                "download_url": self._storage().presigned_get(artifact.uri, 900, public=True),
             }
             if artifact
             else None

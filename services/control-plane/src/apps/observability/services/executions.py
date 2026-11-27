@@ -136,6 +136,35 @@ def claim(kind, public_id=None):
         return claimed
 
 
+def _reconcile_argo_deadlines():
+    from apps.deployment.models import Build, Deployment
+    from apps.deployment.tasks import cleanup_failed_build_artifacts, mark_deployment_unconfirmed
+
+    now = timezone.now()
+    for deployment_id in Deployment.objects.filter(
+        backend="argo", status="deploying", execution_deadline_at__lte=now
+    ).values_list("public_id", flat=True)[:50]:
+        try:
+            mark_deployment_unconfirmed(str(deployment_id))
+        except Exception:
+            logger.warning("Failed to mark expired Argo deployment %s unconfirmed", deployment_id, exc_info=True)
+
+    for build_id in Build.objects.filter(
+        backend="argo", status="building", execution_deadline_at__lte=now
+    ).values_list("public_id", flat=True)[:50]:
+        with transaction.atomic():
+            build = Build.objects.select_for_update().filter(public_id=build_id, status="building").first()
+            if not build or not build.execution_deadline_at or build.execution_deadline_at > now:
+                continue
+            build.status = "failed"
+            build.error_message = "Build execution exceeded its deadline."
+            build.completed_at = now
+            build.next_execution_check_at = now
+            build.save(update_fields=["status", "error_message", "completed_at", "next_execution_check_at", "updated_at"])
+            record_transition(build, "failed", reason="Argo build execution deadline exceeded")
+            transaction.on_commit(lambda bid=str(build.public_id): cleanup_failed_build_artifacts.delay(bid, True))
+
+
 def scan():
     from apps.observability.tasks import reconcile_job_execution
 
@@ -309,6 +338,27 @@ def _finish(row, kind, status, message="", finished_at=None):
     row.error_message = message[:12000]
     row.save(update_fields=["error_message"])
     transaction.on_commit(lambda: record_transition(row, status, reason=message or None))
+    transaction.on_commit(lambda row_id=row.pk, exec_kind=kind: _notify_execution_finished(exec_kind, row_id))
+
+
+def _notify_execution_finished(kind, row_id):
+    try:
+        if kind == "training":
+            from apps.notifications.hooks import notify_training_result
+            from apps.training.models import TrainingJob
+
+            job = TrainingJob.objects.select_related("workspace", "project", "owner").filter(pk=row_id).first()
+            if job:
+                notify_training_result(job)
+        else:
+            from apps.drift.models import DriftRun
+            from apps.notifications.hooks import notify_drift_result
+
+            run = DriftRun.objects.select_related("monitor__version__project__owner").filter(pk=row_id).first()
+            if run:
+                notify_drift_result(run)
+    except Exception:
+        logger.exception("Failed to dispatch %s completion notification for id=%s", kind, row_id)
 
 
 def _store_runtime_metadata(current, kind, observation):
@@ -352,16 +402,19 @@ def _completion_data(row, kind):
 
     project = project_for(row, kind)
     prefix = f"s3://{storage.bucket}/{drift_run_prefix(project.owner.tenant_id, project.public_id, row.monitor.public_id, row.public_id)}"
+    if getattr(row, "summary_uri", "") != prefix + "summary.json":
+        raise ValueError("Drift output does not belong to this run.")
+    summary = json.loads(storage.read(row.summary_uri))
+    if not isinstance(summary, dict):
+        raise ValueError("Invalid drift summary.")
+    if summary.get("status") == "skipped":
+        return summary
     for field, filename in (
-        ("summary_uri", "summary.json"),
         ("report_html_uri", "report.html"),
         ("report_json_uri", "report.json"),
     ):
         if getattr(row, field) != prefix + filename:
             raise ValueError("Drift output does not belong to this run.")
-    summary = json.loads(storage.read(row.summary_uri))
-    if not isinstance(summary, dict):
-        raise ValueError("Invalid drift summary.")
     for uri in (row.report_html_uri, row.report_json_uri):
         bucket, key = storage.parse_uri(uri)
         storage.client.head_object(Bucket=bucket, Key=key)
@@ -377,6 +430,9 @@ def apply_observation(kind, public_id, token, observation):
     if observed == "completed" and row.status not in TERMINAL and not row.execution_stop_requested:
         try:
             data = _completion_data(row, kind)
+            if kind == "drift" and isinstance(data, dict) and data.get("status") == "skipped":
+                observed = "skipped"
+                observation = {**observation, "status": "skipped"}
         except Exception as exc:
             from botocore.exceptions import ClientError
 
@@ -449,6 +505,9 @@ def apply_observation(kind, public_id, token, observation):
                 from apps.training.services.local_resources import release
 
                 release(current)
+            if kind == "drift" and current.monitor.backend == "argo" and not current.argo_stop_confirmed_at:
+                current.argo_stop_confirmed_at = timezone.now()
+                current.save(update_fields=["argo_stop_confirmed_at"])
             if not quota_settled:
                 current.observation_status = "cleanup_pending"
                 _release(current, "Training runtime timing is unavailable; quota reconciliation is pending.")

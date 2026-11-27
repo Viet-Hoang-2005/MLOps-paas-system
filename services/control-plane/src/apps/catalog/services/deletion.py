@@ -77,9 +77,10 @@ def run_project_cleanup(project):
         raise ValidationError({"project": "Project deletion is not active."})
     if not _stop_project_jobs(project):
         return {"dispatched": True, "waiting_for_stop": True}
-    from apps.training.services.storage_migration import migrate_project_storage
+    if not project.owner.purge_started_at:
+        from apps.training.services.storage_migration import migrate_project_storage
 
-    migrate_project_storage(project)
+        migrate_project_storage(project)
     return project_cleanup_backend().run(project, project_cleanup_manifest(project))
 
 
@@ -87,15 +88,25 @@ def _stop_project_jobs(project):
     from apps.drift.models import DriftRun
     from infrastructure.execution import build_backend, deployment_backend, drift_backend, training_backend
 
-    for build in project.builds.exclude(status__in=("ready", "failed", "cancelled")):
+    confirmed = True
+    builds = project.builds.filter(
+        Q(backend="argo", argo_stop_confirmed_at__isnull=True)
+        & (Q(started_at__isnull=False) | Q(execution_deadline_at__isnull=False) | Q(execution_completed_at__isnull=False))
+        | ~Q(status__in=("ready", "failed", "cancelled"))
+    )
+    for build in builds:
         result = build_backend(build.backend).cancel(build)
         if build.backend == "argo" and (not isinstance(result, dict) or not result.get("confirmed")):
-            raise ValidationError("Wait for the active build workflow to finish before retrying cleanup.")
-        type(build).objects.filter(pk=build.pk).update(status="cancelled", completed_at=timezone.now())
+            confirmed = False
+            continue
+        type(build).objects.filter(pk=build.pk).exclude(status__in=("ready", "failed", "cancelled")).update(
+            status="cancelled", completed_at=timezone.now()
+        )
     for job in project.training_jobs.exclude(status__in=("completed", "failed", "cancelled")):
         result = training_backend(job.backend).cancel(job)
         if isinstance(result, dict) and not result.get("confirmed", False):
-            raise ValidationError("Training cancellation has not completed; retry project cleanup.")
+            confirmed = False
+            continue
         type(job).objects.filter(pk=job.pk).update(
             status="cancelled",
             completed_at=timezone.now(),
@@ -103,13 +114,20 @@ def _stop_project_jobs(project):
             observation_status="cleanup_pending",
             next_execution_check_at=timezone.now(),
         )
-    confirmed = True
-    for deployment in Deployment.objects.filter(version__project=project, backend="argo"):
+    for deployment in (
+        Deployment.objects.filter(version__project=project, backend="argo", argo_stop_confirmed_at__isnull=True)
+        .exclude(status="failed", external_deployment_id="")
+    ):
         result = deployment_backend("argo").stop(deployment)
         if not isinstance(result, dict) or not result.get("confirmed"):
             confirmed = False
-    for run in DriftRun.objects.filter(monitor__version__project=project).filter(
-        Q(monitor__backend="argo") | Q(status__in=("pending", "queued", "running"))
+    for run in (
+        DriftRun.objects.filter(monitor__version__project=project)
+        .filter(
+            Q(monitor__backend="argo", argo_stop_confirmed_at__isnull=True)
+            | Q(status__in=("pending", "queued", "running"))
+        )
+        .exclude(status__in=("completed", "skipped", "failed"), runtime_started_at__isnull=True, external_run_id="")
     ):
         backend = drift_backend(run.monitor.backend)
         result = backend.cancel(run)

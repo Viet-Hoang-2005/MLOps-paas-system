@@ -8,26 +8,47 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from apps.auth.models import CustomUser
-from apps.observability.services.outbox import enqueue_event
 from infrastructure.storage.s3 import S3Storage
 
 logger = logging.getLogger(__name__)
 
 
+def _invalidate_user_model_caches(version_ids):
+    from apps.deployment.services.cache import invalidate_model_server_cache
+
+    for version_id in version_ids:
+        invalidate_model_server_cache(version_id)
+
+
 def deactivate_user_account(user):
-    """Soft-delete the user, emit tenant.disabled, and enqueue runtime cleanup."""
+    """Soft-delete the user, revoke credentials, invalidate model caches, and enqueue runtime cleanup."""
+    from apps.access.models import UserAPIKey
+    from apps.auth.services.tokens import revoke_user_refresh_tokens
     from apps.auth.tasks import stop_user_active_executions
+    from apps.deployment.models import Deployment
 
     with transaction.atomic():
-        user.soft_delete()
-        enqueue_event(
-            topic="identity.events",
-            aggregate_type="user",
-            aggregate_id=user.public_id,
-            event_type="tenant.disabled",
-            payload={"user_id": str(user.public_id), "tenant_id": user.tenant_id},
-        )
-        transaction.on_commit(lambda user_id=user.pk: stop_user_active_executions.delay(user_id))
+        locked_user = CustomUser.objects.select_for_update().get(pk=user.pk)
+        if not locked_user.is_active and locked_user.deleted_at is not None:
+            return
+        locked_user.soft_delete()
+        UserAPIKey.objects.filter(user=locked_user, revoked_at__isnull=True).update(revoked_at=locked_user.deleted_at)
+        revoke_user_refresh_tokens(locked_user)
+        active_version_ids = [
+            str(vid)
+            for vid in Deployment.objects.filter(
+                version__project__owner=locked_user,
+                status="succeeded",
+            )
+            .values_list("version__public_id", flat=True)
+            .distinct()
+        ]
+        if active_version_ids:
+            transaction.on_commit(lambda vids=active_version_ids: _invalidate_user_model_caches(vids))
+        transaction.on_commit(lambda user_id=locked_user.pk: stop_user_active_executions.delay(user_id))
+    user.is_active = locked_user.is_active
+    user.deleted_at = locked_user.deleted_at
+    user.session_version = locked_user.session_version
 
 
 def stop_user_active_runtimes(user_id):

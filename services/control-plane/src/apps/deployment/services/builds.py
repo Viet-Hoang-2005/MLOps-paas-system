@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.catalog.models import ModelPreview
@@ -78,10 +79,15 @@ def _asset_from_copy(build, staged):
         name=source.name,
         s3_uri=copied.uri,
         checksum=copied.checksum or source.checksum,
-        size_bytes=copied.size_bytes or source.size_bytes,
+        size_bytes=copied.size_bytes if copied.size_bytes is not None else (source.size_bytes or 0),
         content_type=copied.content_type or source.content_type,
         metadata=source.metadata,
     )
+
+
+def _stage_source(storage, tenant_id, project_public_id, build_public_id, source):
+    prefix = build_input_prefix(tenant_id, project_public_id, build_public_id, source.kind)
+    return _Staged(source, storage.copy(source.uri, f"{prefix}{source.name}"))
 
 
 def request_training_build(*, job, backend, output_revision=None, storage=None):
@@ -161,13 +167,7 @@ def request_training_build(*, job, backend, output_revision=None, storage=None):
     # 2. Copy with no lock held.
     try:
         staged = [
-            _Staged(
-                source,
-                storage.copy(
-                    source.uri,
-                    f"{build_input_prefix(tenant_id, project_public_id, build_public_id, source.kind)}{source.name}",
-                ),
-            )
+            _stage_source(storage, tenant_id, project_public_id, build_public_id, source)
             for source in sources
         ]
         summaries = _training_summaries(storage, summary_sources)
@@ -256,7 +256,17 @@ def request_preview_build(*, project, revision, backend, storage=None):
     with transaction.atomic():
         project = type(project).objects.select_for_update().get(pk=project.pk)
         preview = _check_preview(project, revision)
-        sources = [_Source(kind=asset.kind, name=asset.name, uri=asset.s3_uri) for asset in preview.assets.all()]
+        sources = [
+            _Source(
+                kind=asset.kind,
+                name=asset.name,
+                uri=asset.s3_uri,
+                checksum=asset.checksum,
+                size_bytes=asset.size_bytes,
+                content_type=asset.content_type,
+            )
+            for asset in preview.assets.all()
+        ]
         flavor, artifact_format, requirements = preview.flavor, preview.artifact_format, preview.requirements_text
         tenant_id, project_public_id = project.owner.tenant_id, project.public_id
     build_public_id = uuid.uuid4()
@@ -264,13 +274,7 @@ def request_preview_build(*, project, revision, backend, storage=None):
     # 2. Copy and read with no lock held.
     try:
         staged = [
-            _Staged(
-                source,
-                storage.copy(
-                    source.uri,
-                    f"{build_input_prefix(tenant_id, project_public_id, build_public_id, source.kind)}{source.name}",
-                ),
-            )
+            _stage_source(storage, tenant_id, project_public_id, build_public_id, source)
             for source in sources
         ]
         summaries = _preview_summaries(storage, staged)
@@ -315,7 +319,7 @@ def _preview_summaries(storage, staged):
         field_name = PREVIEW_SUMMARY_FIELDS.get(item.source.kind)
         if not field_name:
             continue
-        value = json.loads(storage.read(item.copied.uri))
+        value = json.loads(storage.read(item.copied.uri, max_bytes=1024**2 + 1))
         if isinstance(value, list) and item.source.kind == "feature_importance":
             value = {"kind": "feature_importance", "items": value}
         if isinstance(value, dict):
@@ -330,7 +334,11 @@ def request_cancel(build):
         if build.status in {"ready", "failed", "cancelled"}:
             return build
         build.status = "cancelled"
-        build.save(update_fields=["status", "updated_at"])
+        fields = ["status", "updated_at"]
+        if build.backend == "argo":
+            build.next_execution_check_at = timezone.now()
+            fields.append("next_execution_check_at")
+        build.save(update_fields=fields)
         transaction.on_commit(lambda: cancel_build.delay(str(build.public_id)))
     return build
 

@@ -36,7 +36,6 @@ def test_argo_training_backend_records_runtime_selectors():
         code_snapshot_uri="s3://bucket/code.zip",
         data_snapshot_uri="s3://bucket/train.csv",
         output_uri="s3://bucket/model.tar.gz",
-        mlflow_artifact_uri="s3://bucket/mlflow/",
         vcpu=2,
         memory_mb=4096,
         max_runtime_seconds=3600,
@@ -48,8 +47,7 @@ def test_argo_training_backend_records_runtime_selectors():
     job.code_snapshot_uri = scoped_uris["code"]
     job.data_snapshot_uri = scoped_uris["data"]
     job.output_uri = scoped_uris["output"]
-    job.mlflow_artifact_uri = scoped_uris["mlflow"]
-    job.save(update_fields=["code_snapshot_uri", "data_snapshot_uri", "output_uri", "mlflow_artifact_uri"])
+    job.save(update_fields=["code_snapshot_uri", "data_snapshot_uri", "output_uri"])
     client = FakeArgoClient()
 
     ArgoTrainingBackend(client=client, storage=FakeStorage()).run(job)
@@ -110,35 +108,3 @@ def test_argo_cancel_uses_job_bound_callback_capability(settings):
     from apps.training.services.capabilities import capability_for_token
 
     assert capability_for_token(job=job, purpose="cancel_reporter", token=payload["cancel_reporter_capability"])
-
-
-@pytest.mark.django_db
-def test_argo_training_is_not_status_polled_without_the_watcher(settings, monkeypatch):
-    from apps.training.tasks import poll_training_job_status
-    from infrastructure.execution import polls_runtime_status
-    from infrastructure.execution.argo_backends import ArgoDriftBackend
-    from infrastructure.execution.docker_backends import DockerTrainingBackend
-
-    settings.TRAINING_EXECUTION_WATCH_ENABLED = False
-    backend = ArgoTrainingBackend(client=FakeArgoClient(), storage=FakeStorage())
-    assert not polls_runtime_status(backend)
-    assert not polls_runtime_status(ArgoDriftBackend(client=FakeArgoClient(), storage=FakeStorage()))
-    assert polls_runtime_status(object.__new__(DockerTrainingBackend))
-
-    owner = get_user_model().objects.create_user("argo-poll@example.com", "test-password")
-    project = ModelProject.objects.create(owner=owner, name="argo-poll")
-    job = training_job(
-        project=project,
-        model_flavor="sklearn",
-        backend="argo",
-        status="running",
-        vcpu=2,
-        memory_mb=4096,
-        max_runtime_seconds=3600,
-        input_contract="legacy",
-        submitted_at=timezone.now(),
-    )
-    monkeypatch.setattr("apps.training.tasks.training_backend", lambda _: backend)
-    assert poll_training_job_status.run(str(job.public_id)) == "running"
-    job.refresh_from_db()
-    assert job.status == "running"

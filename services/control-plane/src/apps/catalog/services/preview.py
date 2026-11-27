@@ -319,7 +319,16 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
                 preview.revision += 1
                 preview.save()
 
-            for uri in old_uris + staged_uris_to_clean:
+            from apps.deployment.models import BuildInputAsset
+
+            for uri in old_uris:
+                if BuildInputAsset.objects.filter(s3_uri=uri).exists():
+                    continue
+                try:
+                    storage.delete(uri)
+                except Exception:
+                    pass
+            for uri in staged_uris_to_clean:
                 try:
                     storage.delete(uri)
                 except Exception:
@@ -396,14 +405,23 @@ def create_project_preview(*, actor, data, storage=None):
 
 
 def get_preview_reference_preview(project, storage=None) -> dict:
+    from io import BytesIO
+
+    from common.validation.artifacts import parse_reference_preview_stream
+
     storage = storage or S3Storage()
     preview = project.preview
     asset = preview.assets.filter(kind="reference_data").first()
     if not asset or not asset.s3_uri:
         raise ValidationError({"reference_data": "This project preview does not have a reference dataset."})
     try:
+        if hasattr(storage, "open_stream"):
+            body, _, _ = storage.open_stream(asset.s3_uri)
+            try:
+                return parse_reference_preview_stream(body, asset.name, max_rows=100)
+            finally:
+                body.close()
         raw = storage.read(asset.s3_uri, max_bytes=MAX_REFERENCE_DATA_BYTES)
+        return parse_reference_preview_stream(BytesIO(raw), asset.name, max_rows=100)
     except Exception as exc:
         raise ValidationError({"reference_data": "Could not read reference data from storage."}) from exc
-
-    return parse_reference_preview(raw, asset.name, max_rows=100)

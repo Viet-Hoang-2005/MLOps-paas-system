@@ -35,7 +35,7 @@ def migrate_job_storage(job, *, storage=None):
     outputs = list(job.outputs.values_list("s3_uri", flat=True))
     pointers = {
         field: getattr(job, field)
-        for field in ("code_snapshot_uri", "data_snapshot_uri", "output_uri", "mlflow_artifact_uri")
+        for field in ("code_snapshot_uri", "data_snapshot_uri", "output_uri")
     }
     if any(uri and not uri.startswith(source) for uri in [*pointers.values(), *outputs]):
         raise Conflict("A training object is outside its original storage scope; deletion is blocked.")

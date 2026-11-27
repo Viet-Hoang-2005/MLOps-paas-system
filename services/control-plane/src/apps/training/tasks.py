@@ -17,157 +17,9 @@ from infrastructure.storage import S3Storage
     time_limit=55,
 )
 def execute_training_job(self, job_id):
-    from django.conf import settings
+    from apps.observability.services.executions import reconcile
 
-    if settings.TRAINING_EXECUTION_WATCH_ENABLED:
-        from apps.observability.services.executions import reconcile
-
-        return reconcile("training", job_id)
-    from apps.observability.services.lifecycle import record_training_event
-
-    from .models import TrainingJob
-    from .services.logs import append_training_log
-
-    with transaction.atomic():
-        job = (
-            TrainingJob.objects.select_for_update(of=("self",))
-            .select_related("project", "project__owner")
-            .get(public_id=job_id)
-        )
-        if (
-            job.status != "queued"
-            or job.deletion_requested_at
-            or (job.project_id and job.project.deletion_state != "active")
-        ):
-            return job.status
-        job.mark_started()
-        job.celery_task_id = self.request.id or job.celery_task_id
-        job.error_message = ""
-        job.save(update_fields=["status", "started_at", "celery_task_id", "error_message", "updated_at"])
-        record_training_event(job=job, event_type="started", message="Training execution started.")
-        record_transition(job, "running")
-    append_training_log(job.public_id, "[SYSTEM] Training execution started.")
-    with transaction.atomic():
-        job = (
-            TrainingJob.objects.select_for_update(of=("self",))
-            .select_related("project", "project__owner")
-            .get(pk=job.pk)
-        )
-        if job.status in {"cancelling", "cancelled"} or job.deletion_requested_at:
-            should_confirm = job.status == "cancelling"
-        else:
-            should_confirm = False
-    if should_confirm:
-        confirm_training_cancellation(job_id)
-        return "cancelled"
-    try:
-        append_training_log(job.public_id, f"[SYSTEM] Dispatching {job.backend} training backend.")
-        result = training_backend(job.backend).run(job)
-    except Exception as exc:
-        with transaction.atomic():
-            job = TrainingJob.objects.select_for_update().get(pk=job.pk)
-            if job.status in {"cancelling", "cancelled"} or job.deletion_requested_at:
-                append_training_log(job.public_id, "[SYSTEM] Training stopped by cancellation.")
-                return job.status
-            job.mark_finished("failed")
-            job.error_message = str(exc)[:12000]
-            job.save(update_fields=["status", "completed_at", "runtime_seconds", "error_message", "updated_at"])
-            record_training_event(
-                job=job, event_type="failed", message="Training execution failed.", metadata={"error": str(exc)[:1000]}
-            )
-        record_transition(
-            job,
-            "failed",
-            reason="Training backend execution failed",
-            error_type=type(exc).__name__,
-            exc_info=True,
-        )
-        append_training_log(job.public_id, f"[ERROR] Training failed: {exc}")
-        raise
-    if isinstance(result, dict) and result.get("dispatched"):
-        record_transition(job, "running", phase="dispatched")
-        append_training_log(job.public_id, f"[SYSTEM] Training workload dispatched ({job.backend}).")
-        if polls_runtime_status(training_backend(job.backend)):
-            poll_training_job_status.apply_async(args=[str(job.public_id)], countdown=3)
-        else:
-            append_training_log(job.public_id, "[SYSTEM] Waiting for trusted callback.")
-        return "running"
-    from .services.output_finalization import enqueue_output
-
-    enqueue_output(job)
-    return "uploading"
-
-
-@shared_task(bind=True, max_retries=7200, soft_time_limit=50, time_limit=55)
-def poll_training_job_status(self, job_id):
-    from django.conf import settings
-
-    if settings.TRAINING_EXECUTION_WATCH_ENABLED:
-        from apps.observability.services.executions import reconcile
-
-        return reconcile("training", job_id)
-    from apps.observability.services.lifecycle import record_training_event
-
-    from .models import TrainingJob
-    from .services.logs import append_training_log
-
-    try:
-        job = TrainingJob.objects.select_related("project", "project__owner").get(public_id=job_id)
-    except TrainingJob.DoesNotExist:
-        return "not_found"
-
-    if job.status in {"completed", "failed", "cancelled"} or job.deletion_requested_at:
-        return job.status
-
-    backend = training_backend(job.backend)
-    if not polls_runtime_status(backend):
-        return job.status
-
-    result = backend.poll(job)
-    current_status = result.get("status")
-
-    if current_status == "running":
-        raise self.retry(countdown=5)
-
-    if current_status == "completed":
-        from .services.output_finalization import enqueue_output
-
-        enqueue_output(job)
-        raise self.retry(countdown=5)
-
-    if current_status == "failed":
-        logs = result.get("logs", "")
-        error_msg = result.get("error") or f"Training failed with exit code {result.get('exit_code')}"
-        with transaction.atomic():
-            job = TrainingJob.objects.select_for_update().get(pk=job.pk)
-            if job.status in {"cancelling", "cancelled"} or job.deletion_requested_at:
-                return job.status
-            job.mark_finished("failed")
-            job.error_message = error_msg[:12000]
-            job.save(update_fields=["status", "completed_at", "runtime_seconds", "error_message", "updated_at"])
-            record_training_event(
-                job=job, event_type="failed", message="Training execution failed.", metadata={"error": error_msg[:1000]}
-            )
-            record_transition(job, "failed", reason="Training runtime reported failure")
-        for line in logs.splitlines()[-500:]:
-            append_training_log(job.public_id, line)
-        append_training_log(job.public_id, f"[ERROR] Training failed: {error_msg}")
-        return "failed"
-
-    if current_status in {"not_found", "error"}:
-        with transaction.atomic():
-            job = TrainingJob.objects.select_for_update().get(pk=job.pk)
-            if job.status in {"cancelling", "cancelled"} or job.deletion_requested_at:
-                return job.status
-            job.mark_finished("failed")
-            job.error_message = f"Training container error: {result.get('error') or 'Container not found'}"
-            job.save(update_fields=["status", "completed_at", "runtime_seconds", "error_message", "updated_at"])
-            record_training_event(job=job, event_type="failed", message="Training runtime disappeared or errored.")
-            record_transition(job, "failed", reason="Training runtime disappeared or errored")
-        append_training_log(job.public_id, f"[ERROR] {job.error_message}")
-        return "failed"
-
-    return job.status
+    return reconcile("training", job_id)
 
 
 @shared_task(
@@ -180,41 +32,9 @@ def poll_training_job_status(self, job_id):
     time_limit=55,
 )
 def cancel_training_job(self, job_id):
-    from django.conf import settings
+    from apps.observability.services.executions import reconcile
 
-    if settings.TRAINING_EXECUTION_WATCH_ENABLED:
-        from apps.observability.services.executions import reconcile
-
-        return reconcile("training", job_id)
-    from .models import TrainingJob
-    from .services.logs import append_training_log
-
-    try:
-        job = TrainingJob.objects.select_related("project", "project__owner").get(public_id=job_id)
-    except TrainingJob.DoesNotExist:
-        return "deleted"
-    if job.celery_task_id:
-        self.app.control.revoke(job.celery_task_id, terminate=False)
-    try:
-        result = training_backend(job.backend).cancel(job)
-    except Exception as exc:
-        TrainingJob.objects.filter(pk=job.pk).update(deletion_error=str(exc)[:12000])
-        append_training_log(job.public_id, f"[ERROR] Training cancellation failed: {exc}")
-        raise
-    if isinstance(result, dict):
-        if result.get("retry"):
-            raise RuntimeError(
-                result.get("detail") or "Training runtime is not registered yet; cancellation will be retried."
-            )
-        if result.get("dispatched"):
-            record_transition(job, "cancelling", phase="cancellation_dispatched")
-            append_training_log(
-                job.public_id,
-                "[SYSTEM] Runtime cancellation dispatched; waiting for confirmation.",
-            )
-            return "cancelling"
-    confirm_training_cancellation(job_id)
-    return "cancelled"
+    return reconcile("training", job_id)
 
 
 def confirm_training_cancellation(job_id):
@@ -280,6 +100,13 @@ def delete_training_job(self, job_id):
 
     if settings.TRAINING_EXECUTION_WATCH_ENABLED and job.observation_status == "cleanup_pending":
         return "waiting-for-runtime-cleanup"
+    from .models import LocalTrainingReservation, TrainingQuotaReservation
+
+    if (
+        TrainingQuotaReservation.objects.filter(job_id=job.public_id, active=True).exists()
+        or LocalTrainingReservation.objects.filter(job_id=job.public_id, active=True).exists()
+    ):
+        return "waiting-for-quota-release"
     if job.builds.exclude(status__in=("failed", "cancelled")).exists() or job.registered_versions.exists():
         TrainingJob.objects.filter(pk=job.pk).update(
             deletion_error="Delete the model version or build referencing this training job first."

@@ -573,6 +573,31 @@ def _run():
             samples=len(production_df),
             reason=f"minimum_samples={MIN_SAMPLES}",
         )
+        if SUMMARY_JSON_UPLOAD_URL:
+            try:
+                requests.put(
+                    SUMMARY_JSON_UPLOAD_URL,
+                    data=json.dumps(
+                        {
+                            "status": "skipped",
+                            "reason": f"Insufficient production samples ({len(production_df)} < {MIN_SAMPLES})",
+                            "samples": len(production_df),
+                            "minimum_samples": MIN_SAMPLES,
+                            "dataset_drift": False,
+                            "has_drift": False,
+                            "drift_score": None,
+                        }
+                    ).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    timeout=30,
+                ).raise_for_status()
+            except Exception as exc:
+                runtime_log.event(
+                    logging.WARNING,
+                    "drift_skipped_summary_upload_failed",
+                    "Failed to upload skipped summary JSON",
+                    reason=sanitize(str(exc)),
+                )
         if CONTROL_PLANE_WEBHOOK_URL:
             skipped_summary = {
                 "status": "skipped",

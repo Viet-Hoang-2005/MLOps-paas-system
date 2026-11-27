@@ -1,3 +1,5 @@
+from django.db import IntegrityError
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -5,6 +7,7 @@ from rest_framework.views import APIView
 
 from apps.access.models import UserAPIKey
 from apps.access.selectors import active_api_keys
+from common.api.exceptions import Conflict
 
 from .serializers import APIKeySerializer, CreatedAPIKeySerializer
 
@@ -20,9 +23,12 @@ class APIKeyListCreateEndpoint(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         projects = serializer.validated_data.pop("allowed_projects", [])
         raw, prefix, digest = UserAPIKey.issue()
-        api_key = UserAPIKey.objects.create(
-            user=request.user, key_prefix=prefix, key_hash=digest, **serializer.validated_data
-        )
+        try:
+            api_key = UserAPIKey.objects.create(
+                user=request.user, key_prefix=prefix, key_hash=digest, **serializer.validated_data
+            )
+        except IntegrityError as exc:
+            raise Conflict("An active API key with this name already exists.") from exc
         api_key.allowed_projects.set(projects)
         payload = CreatedAPIKeySerializer(api_key, context=self.get_serializer_context()).data
         payload["key"] = raw
@@ -44,7 +50,7 @@ class APIKeyDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
 
 class APIKeyRegenerateEndpoint(APIView):
     def post(self, request, key_id):
-        api_key = UserAPIKey.objects.get(user=request.user, public_id=key_id, revoked_at__isnull=True)
+        api_key = get_object_or_404(UserAPIKey, user=request.user, public_id=key_id, revoked_at__isnull=True)
         raw, prefix, digest = UserAPIKey.issue()
         api_key.key_prefix = prefix
         api_key.key_hash = digest

@@ -22,15 +22,15 @@ def deployment(db, settings, monkeypatch):
     deployment = Deployment.objects.create(version=version, build=build, backend="argo", status="deploying")
     Endpoint.objects.create(deployment=deployment, public_url="https://example.test/model")
     for module in ("apps.deployment.tasks", "apps.deployment.api.webhooks"):
-        for name in ("invalidate_model_server_cache", "append_deployment_log", "enqueue_event"):
+        for name in ("invalidate_model_server_cache", "append_deployment_log"):
             monkeypatch.setattr(f"{module}.{name}", Mock())
     return deployment
 
 
-def report(deployment, phase="Succeeded", token=None):
+def report(deployment, phase="Succeeded", token=None, workflow_name=None):
     return APIClient().post(
         f"/internal/webhooks/deployments/{deployment.public_id}/",
-        {"status": phase, "workflow_name": "deploy-model-job-test"},
+        {"status": phase, "workflow_name": workflow_name or f"deploy-{deployment.public_id}"},
         format="json",
         HTTP_X_DEPLOYMENT_CALLBACK_TOKEN=token or issue_callback_token(deployment.public_id),
     )
@@ -41,10 +41,34 @@ def test_reporter_confirms_readiness_and_replay_is_idempotent(deployment):
     deployment.refresh_from_db()
     assert deployment.deployed_at is not None
     assert deployment.endpoint.health_status == "healthy"
-    assert deployment.external_deployment_id == "deploy-model-job-test"
+    assert deployment.external_deployment_id == f"deploy-{deployment.public_id}"
     assert report(deployment, "Failed").data["duplicate"] is True
     deployment.refresh_from_db()
     assert deployment.status == "succeeded"
+
+
+def test_reporter_rejects_legacy_or_mismatched_workflow_name(deployment):
+    import importlib.util
+    from pathlib import Path
+    import uuid
+
+    job_ops_path = Path(__file__).resolve().parents[6] / "k8s/argo/workflows/operations/scripts/job_ops.py"
+    spec = importlib.util.spec_from_file_location("job_ops", job_ops_path)
+    job_ops = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(job_ops)
+
+    workflow_name, _ = job_ops.identity(
+        {
+            "deployment_id": str(deployment.public_id),
+            "project_id": str(deployment.version.project.public_id),
+            "tenant_id": deployment.version.project.owner.tenant_id,
+        },
+        "deployment",
+    )
+    assert workflow_name == f"deploy-{deployment.public_id}"
+    assert report(deployment, workflow_name="deploy-model-job-test").status_code == 400
+    assert report(deployment, workflow_name=f"deploy-{uuid.uuid4()}").status_code == 400
+    assert report(deployment, workflow_name=workflow_name).status_code == 200
 
 
 def test_reporter_rejects_missing_wrong_resource_expired_token(deployment, monkeypatch):

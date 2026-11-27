@@ -105,6 +105,10 @@ def run_workspace(workspace, *, revision, run_key):
             **{field: getattr(locked, field) for field in CONFIG_FIELDS},
         )
         validate_resources({}, job, static_only=True)
+        if job.backend == "argo":
+            from apps.training.services.quota import check_quota
+
+            check_quota(job)
         try:
             with transaction.atomic():
                 job.save()
@@ -169,12 +173,37 @@ def prepare_workspace(job_id, token, *, storage=None):
     try:
         storage = storage or PreparationStorage(checkpoint)
         checkpoint()
-        snapshot = workspaces.snapshot_input(locked, revision=revision, storage=storage, preparing=True, checkpoint=checkpoint)
+        use_spool = hasattr(storage, "upload_fileobj")
+        snapshot = workspaces.snapshot_input(
+            locked, revision=revision, storage=storage, preparing=True, checkpoint=checkpoint, spooled=use_spool
+        )
         checkpoint()
         uris = expected_training_uris(job, storage.bucket)
-        with ZipFile(BytesIO(snapshot["archive"])) as archive:
-            requirements = archive.read("requirements.txt").decode("utf-8") if "requirements.txt" in archive.namelist() else ""
-        storage.put(storage.parse_uri(uris["code"])[1], snapshot["archive"], "application/zip")
+        if use_spool:
+            archive_file = snapshot["archive_file"]
+            try:
+                with ZipFile(archive_file) as archive:
+                    requirements = (
+                        archive.read("requirements.txt").decode("utf-8")
+                        if "requirements.txt" in archive.namelist()
+                        else ""
+                    )
+                archive_file.seek(0)
+                storage.upload_fileobj(
+                    archive_file,
+                    storage.parse_uri(uris["code"])[1],
+                    content_type="application/zip",
+                    checksum=snapshot["checksum"],
+                    size_bytes=snapshot["size_bytes"],
+                )
+            finally:
+                archive_file.close()
+        else:
+            with ZipFile(BytesIO(snapshot["archive"])) as archive:
+                requirements = (
+                    archive.read("requirements.txt").decode("utf-8") if "requirements.txt" in archive.namelist() else ""
+                )
+            storage.put(storage.parse_uri(uris["code"])[1], snapshot["archive"], "application/zip")
         checkpoint()
         capacity = None
         if job.backend == "docker":
@@ -187,6 +216,10 @@ def prepare_workspace(job_id, token, *, storage=None):
             require_device(job.local_gpu_id)
             verified_gpu_id = job.local_gpu_id
         with transaction.atomic():
+            if job.backend == "argo":
+                from apps.training.services.quota import lock_owner
+
+                lock_owner(job.owner_id)
             current_workspace = TrainingWorkspace.objects.select_for_update().get(pk=locked.pk)
             current = TrainingJob.objects.select_for_update().get(pk=job.pk)
             checkpoint()
@@ -194,7 +227,7 @@ def prepare_workspace(job_id, token, *, storage=None):
                 raise Conflict("The preparation is no longer current.")
             current.requirements_text = requirements
             current.code_snapshot_uri, current.data_snapshot_uri = uris["code"], ""
-            current.output_uri, current.mlflow_artifact_uri = uris["output"], uris["mlflow"]
+            current.output_uri = uris["output"]
             current.save()
             return _submit_job_atomic(current, verified_gpu_id=verified_gpu_id, local_capacity=capacity)
     except Exception:

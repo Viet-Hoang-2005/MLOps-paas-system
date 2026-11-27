@@ -96,4 +96,5 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     def soft_delete(self):
         self.is_active = False
         self.deleted_at = timezone.now()
-        self.save(update_fields=["is_active", "deleted_at"])
+        self.session_version = int(self.session_version or 0) + 1
+        self.save(update_fields=["is_active", "deleted_at", "session_version"])

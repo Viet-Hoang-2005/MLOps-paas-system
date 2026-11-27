@@ -20,7 +20,6 @@ from apps.deployment.tasks import (
     delete_build,
     stop_deployment,
 )
-from apps.observability.services.outbox import enqueue_event
 from common.api.permissions import HasInternalWebhookSecret
 from common.logging import record_transition
 from infrastructure.execution.image_references import temporary_image_reference
@@ -56,15 +55,14 @@ class DeploymentWebhookEndpoint(APIView):
         payload = _dict_payload(request.data)
         incoming = str(payload.get("status", "")).lower()
         workflow = str(payload.get("workflow_name", ""))
-        if incoming not in {"succeeded", "failed", "error"} or not re.fullmatch(
-            r"deploy-model-job-[a-z0-9-]{1,100}", workflow
-        ):
+        expected_workflow = f"deploy-{str(deployment_id).lower()}"
+        if incoming not in {"succeeded", "failed", "error"} or workflow != expected_workflow:
             return Response({"detail": "A terminal workflow result and workflow name are required."}, status=400)
         with transaction.atomic():
             candidate = get_object_or_404(Deployment.objects.select_related("version"), public_id=deployment_id)
             ModelProject.objects.select_for_update().get(pk=candidate.version.project_id)
             deployment = get_object_or_404(
-                Deployment.objects.select_for_update().select_related("version__project"),
+                Deployment.objects.select_for_update(of=("self",)).select_related("version__project"),
                 public_id=deployment_id,
             )
             if deployment.backend != "argo":
@@ -95,16 +93,11 @@ class DeploymentWebhookEndpoint(APIView):
                 Endpoint.objects.filter(deployment=deployment).update(
                     health_status="unhealthy", last_checked_at=timezone.now()
                 )
-                invalidate_model_server_cache(str(deployment.version.public_id))
-                append_deployment_log(deployment, deployment.error_message)
+                version_id = str(deployment.version.public_id)
+                error_message = deployment.error_message
+                transaction.on_commit(lambda: invalidate_model_server_cache(version_id))
+                transaction.on_commit(lambda: append_deployment_log(deployment, error_message))
                 record_transition(deployment, result, source="webhook", reason="Deployment workflow failed")
-                enqueue_event(
-                    topic="deployment.events",
-                    aggregate_type="deployment",
-                    aggregate_id=deployment.public_id,
-                    event_type="deployment.changed",
-                    payload={"deployment_id": str(deployment.public_id), "status": result},
-                )
         try:
             from apps.notifications.hooks import notify_deployment_result
 
@@ -222,8 +215,13 @@ class BuildWebhookEndpoint(APIView):
                 build.image_digest = str(request.data["image_digest"])
             build.error_message = str(request.data.get("error_message", "Build failed."))[:12000]
             build.completed_at = timezone.now()
+            if build.backend == "argo":
+                build.next_execution_check_at = build.completed_at
             build.save(
-                update_fields=["status", "image_uri", "image_digest", "error_message", "completed_at", "updated_at"]
+                update_fields=[
+                    "status", "image_uri", "image_digest", "error_message", "completed_at", "next_execution_check_at",
+                    "updated_at",
+                ]
             )
             if build.deletion_state != "active":
                 transaction.on_commit(lambda: delete_build.delay(str(build.public_id)))

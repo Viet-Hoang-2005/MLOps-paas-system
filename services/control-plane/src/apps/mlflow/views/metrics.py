@@ -1,5 +1,3 @@
-import json
-import logging
 from datetime import datetime
 from datetime import timezone as dt_timezone
 
@@ -13,14 +11,11 @@ from apps.training.models import (
     TrainingJobParam,
     TrainingJobTag,
 )
-from common.redis_client import redis_client
 
 from ..auth import (
     _require_auth,
     _resolve_target_job,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class MLflowRunsLogBatchView(APIView):
@@ -43,9 +38,10 @@ class MLflowRunsLogBatchView(APIView):
 
         # 1. Bulk insert metrics
         metric_objects = []
-        tracking_metrics_update = {}
         for m in metrics:
             k = str(m.get("key", "")).strip()[:160]
+            if not k:
+                continue
             try:
                 val = float(m.get("value"))
             except (TypeError, ValueError):
@@ -54,19 +50,16 @@ class MLflowRunsLogBatchView(APIView):
             raw_ts = m.get("timestamp")
             ts = datetime.fromtimestamp(raw_ts / 1000.0, tz=dt_timezone.utc) if raw_ts else timezone.now()
             metric_objects.append(TrainingJobMetric(job=job, name=k, value=val, step=step, timestamp=ts))
-            tracking_metrics_update[k] = val
 
         if metric_objects:
             TrainingJobMetric.objects.bulk_create(metric_objects)
 
         # 2. Upsert params
-        tracking_params_update = {}
         for p in params:
             k = str(p.get("key", "")).strip()[:160]
             v = str(p.get("value", ""))[:500]
             if k:
                 TrainingJobParam.objects.update_or_create(job=job, name=k, defaults={"value": v})
-                tracking_params_update[k] = v
 
         # 3. Upsert tags
         for t in tags:
@@ -74,34 +67,6 @@ class MLflowRunsLogBatchView(APIView):
             v = str(t.get("value", ""))[:500]
             if k:
                 TrainingJobTag.objects.update_or_create(job=job, name=k, defaults={"value": v})
-
-        # 4. Update job tracking summary
-        if tracking_metrics_update or tracking_params_update:
-            current_tracking = dict(job.tracking or {})
-            if "metrics" not in current_tracking:
-                current_tracking["metrics"] = {}
-            if "params" not in current_tracking:
-                current_tracking["params"] = {}
-            current_tracking["metrics"].update(tracking_metrics_update)
-            current_tracking["params"].update(tracking_params_update)
-            job.tracking = current_tracking
-            job.save(update_fields=["tracking", "updated_at"])
-
-        # 5. Realtime emission to Redis
-        try:
-            r = redis_client(1)
-            event_payload = json.dumps(
-                {
-                    "job_id": str(job.public_id),
-                    "metrics": [{"key": m.name, "value": m.value, "step": m.step} for m in metric_objects[:50]],
-                    "params": tracking_params_update,
-                }
-            )
-            r.publish(f"training_metrics:{job.public_id}", event_payload)
-            r.rpush(f"training_metric_events:{job.public_id}", event_payload)
-            r.expire(f"training_metric_events:{job.public_id}", 86400 * 7)
-        except Exception as exc:
-            logger.warning("Failed to emit realtime metric event to Redis: %s", exc)
 
         return Response({})
 
@@ -121,6 +86,11 @@ class MLflowRunsLogMetricView(APIView):
             return err_job
 
         key = str(request.data.get("key", "")).strip()[:160]
+        if not key:
+            return Response(
+                {"error_code": "INVALID_PARAMETER_VALUE", "message": "Metric key is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
             val = float(request.data.get("value"))
         except (TypeError, ValueError):
@@ -134,14 +104,6 @@ class MLflowRunsLogMetricView(APIView):
         ts = datetime.fromtimestamp(raw_ts / 1000.0, tz=dt_timezone.utc) if raw_ts else timezone.now()
 
         TrainingJobMetric.objects.create(job=job, name=key, value=val, step=step, timestamp=ts)
-
-        current_tracking = dict(job.tracking or {})
-        if "metrics" not in current_tracking:
-            current_tracking["metrics"] = {}
-        current_tracking["metrics"][key] = val
-        job.tracking = current_tracking
-        job.save(update_fields=["tracking", "updated_at"])
-
         return Response({})
 
 
@@ -160,17 +122,14 @@ class MLflowRunsLogParameterView(APIView):
             return err_job
 
         key = str(request.data.get("key", "")).strip()[:160]
+        if not key:
+            return Response(
+                {"error_code": "INVALID_PARAMETER_VALUE", "message": "Parameter key is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         value = str(request.data.get("value", ""))[:500]
 
         TrainingJobParam.objects.update_or_create(job=job, name=key, defaults={"value": value})
-
-        current_tracking = dict(job.tracking or {})
-        if "params" not in current_tracking:
-            current_tracking["params"] = {}
-        current_tracking["params"][key] = value
-        job.tracking = current_tracking
-        job.save(update_fields=["tracking", "updated_at"])
-
         return Response({})
 
 
@@ -189,6 +148,11 @@ class MLflowRunsSetTagView(APIView):
             return err_job
 
         key = str(request.data.get("key", "")).strip()[:160]
+        if not key:
+            return Response(
+                {"error_code": "INVALID_PARAMETER_VALUE", "message": "Tag key is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         value = str(request.data.get("value", ""))[:500]
 
         TrainingJobTag.objects.update_or_create(job=job, name=key, defaults={"value": value})

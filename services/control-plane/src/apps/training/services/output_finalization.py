@@ -31,6 +31,10 @@ def cleanup_output_archive(job_id):
     storage.delete(job.output_uri)
 
 
+_FINALIZE_TIME_LIMIT_SECONDS = 3600
+_FINALIZE_DEBOUNCE_SECONDS = _FINALIZE_TIME_LIMIT_SECONDS
+
+
 def enqueue_output(job, finished_at=None):
     if job.status in {"completed", "failed", "cancelled", "cancelling"} or job.deletion_requested_at:
         return
@@ -39,7 +43,7 @@ def enqueue_output(job, finished_at=None):
     if finished_at:
         job.tracking = {**job.tracking, "output_runtime_finished_at": finished_at.isoformat()}
         job.save(update_fields=["tracking", "updated_at"])
-    if previous and now.timestamp() - float(previous) < 600:
+    if previous and now.timestamp() - float(previous) < _FINALIZE_DEBOUNCE_SECONDS:
         return
     job.status = "uploading"
     job.tracking = {

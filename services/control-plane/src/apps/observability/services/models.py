@@ -1,8 +1,20 @@
+import logging
+
 from apps.deployment.models import Build
 from apps.deployment.services.runtime_health import effective_health
 from apps.drift.models import DriftRun
 from apps.training.models import TrainingJob
 from infrastructure.prometheus import PrometheusClient
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_prom_query(client, expr):
+    try:
+        return client.query(expr)
+    except Exception as exc:
+        logger.warning("Prometheus query failed (%s): %s", type(exc).__name__, expr)
+        return []
 
 
 def model_observability(project, prometheus=None):
@@ -12,6 +24,8 @@ def model_observability(project, prometheus=None):
     latest_training = TrainingJob.objects.filter(project=project).order_by("-created_at").first()
     latest_drift = DriftRun.objects.filter(monitor__version__project=project).order_by("-created_at").first()
     metrics_client = prometheus or PrometheusClient()
+    tenant_id = getattr(getattr(project, "owner", None), "tenant_id", "")
+    scope = f'project_id="{project.public_id}",tenant_id="{tenant_id}"'
     return {
         "project_id": str(project.public_id),
         "build": _resource(latest_build),
@@ -27,9 +41,11 @@ def model_observability(project, prometheus=None):
         "training": _resource(latest_training),
         "drift": _resource(latest_drift),
         "metrics": {
-            "requests": metrics_client.query(f'paas_predictions_total{{project_id="{project.public_id}"}}'),
-            "latency": metrics_client.query(
-                f'paas_prediction_latency_seconds_count{{project_id="{project.public_id}"}}'
+            "requests": _safe_prom_query(metrics_client, f"paas_predictions_total{{{scope}}}"),
+            "latency": _safe_prom_query(
+                metrics_client,
+                f"rate(paas_prediction_latency_seconds_sum{{{scope}}}[5m]) / "
+                f"clamp_min(rate(paas_prediction_latency_seconds_count{{{scope}}}[5m]), 1)",
             ),
         },
     }

@@ -9,12 +9,14 @@ def revoke_user_refresh_tokens(user) -> int:
     """
     Blacklist the user's outstanding refresh tokens.
     """
-    outstanding_tokens = OutstandingToken.objects.filter(user=user).exclude(blacklistedtoken__isnull=False)
-    revoked = 0
-    for token in outstanding_tokens:
-        BlacklistedToken.objects.get_or_create(token=token)
-        revoked += 1
-    return revoked
+    outstanding_tokens = list(OutstandingToken.objects.filter(user=user).exclude(blacklistedtoken__isnull=False))
+    if not outstanding_tokens:
+        return 0
+    BlacklistedToken.objects.bulk_create(
+        [BlacklistedToken(token=token) for token in outstanding_tokens],
+        ignore_conflicts=True,
+    )
+    return len(outstanding_tokens)
 
 
 def create_auth_response(user, extra_data=None, status=200):

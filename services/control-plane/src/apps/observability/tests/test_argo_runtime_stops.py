@@ -11,17 +11,18 @@ from apps.catalog.services.deletion import run_project_cleanup
 from apps.deployment.models import Build, Deployment
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.registry.models import ModelVersion
-from infrastructure.execution.argo_backends import ArgoDeploymentBackend, ArgoDriftBackend
+from infrastructure.execution.argo_backends import ArgoBuildBackend, ArgoDeploymentBackend, ArgoDriftBackend
 
 
 @pytest.mark.django_db
-def test_project_waits_for_both_argo_runtime_confirmations(monkeypatch, settings):
+def test_project_waits_for_all_argo_runtime_confirmations(monkeypatch, settings):
     cache.clear()
     settings.ARGO_RECONCILE_WEBHOOK_URL = "http://events/reconcile"
     owner = get_user_model().objects.create_user("argo-stop@example.test", "password")
     project = ModelProject.objects.create(owner=owner, name="Argo stop", deletion_state="deleting")
     version = ModelVersion.objects.create(project=project, version="1")
     build = Build.objects.create(project=project, version=version, status="ready")
+    failed_build = Build.objects.create(project=project, backend="argo", status="failed", started_at=timezone.now())
     deployment = Deployment.objects.create(
         version=version, build=build, status="stopped", backend="argo", stopped_at=timezone.now()
     )
@@ -29,10 +30,12 @@ def test_project_waits_for_both_argo_runtime_confirmations(monkeypatch, settings
     run = DriftRun.objects.create(monitor=monitor, status="cancelled", idempotency_key="argo-stop")
 
     argo = Mock()
+    build_backend = ArgoBuildBackend(client=argo, storage=Mock())
     serving = ArgoDeploymentBackend(client=argo, storage=Mock())
     drift = ArgoDriftBackend(client=argo, storage=Mock())
     monkeypatch.setattr("infrastructure.execution.deployment_backend", lambda _: serving)
     monkeypatch.setattr("infrastructure.execution.drift_backend", lambda _: drift)
+    monkeypatch.setattr("infrastructure.execution.build_backend", lambda _: build_backend)
     project_cleanup = Mock()
     project_cleanup.run.return_value = {"dispatched": True}
     monkeypatch.setattr("apps.catalog.services.deletion.project_cleanup_backend", lambda: project_cleanup)
@@ -41,13 +44,14 @@ def test_project_waits_for_both_argo_runtime_confirmations(monkeypatch, settings
 
     assert run_project_cleanup(project)["waiting_for_stop"]
     assert run_project_cleanup(project)["waiting_for_stop"]
-    assert argo.trigger.call_count == 2
-    serving_request, drift_request = [call.args[1] for call in argo.trigger.call_args_list]
+    assert argo.trigger.call_count == 3
+    build_request, serving_request, drift_request = [call.args[1] for call in argo.trigger.call_args_list]
     project_cleanup.run.assert_not_called()
 
     client = APIClient()
     serving_path = f"/internal/executions/deployment/{deployment.public_id}/stops/"
     drift_path = f"/internal/executions/drift/{run.public_id}/stops/"
+    build_path = f"/internal/executions/build/{failed_build.public_id}/stops/"
 
     def report(path, payload, status):
         return client.post(
@@ -60,6 +64,10 @@ def test_project_waits_for_both_argo_runtime_confirmations(monkeypatch, settings
     assert report(serving_path, serving_request, "stopped") == 200
     resume.assert_not_called()
     assert report(drift_path, drift_request, "stopped") == 200
+    resume.assert_not_called()
+    assert report(build_path, drift_request, "stopped") == 403
+    assert report(build_path, build_request, "stopped") == 200
+    assert report(build_path, build_request, "stopped") == 200
     resume.assert_called_once_with(str(project.public_id))
     assert run_project_cleanup(project) == {"dispatched": True}
     project_cleanup.run.assert_called_once()

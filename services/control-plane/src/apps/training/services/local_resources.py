@@ -181,8 +181,6 @@ def public_capacity(snapshot):
 
 def reserve(job, snapshot):
     """Called in the submit transaction. The pool row serializes all tenants."""
-    if not settings.TRAINING_EXECUTION_WATCH_ENABLED:
-        raise ServiceUnavailable("Local training requires execution monitoring.")
     pool, _ = LocalTrainingPool.objects.get_or_create(daemon_id=snapshot["daemon_id"])
     pool = LocalTrainingPool.objects.select_for_update().get(pk=pool.pk)
     large = next(p for p in snapshot["cpu_profiles"] if p["id"] == "large")

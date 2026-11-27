@@ -47,8 +47,9 @@ def workflow_path(name=""):
 
 
 def identity(payload, kind):
-    resource_id = payload.get("resource_id", payload.get("deployment_id" if kind == "deployment" else "job_id", ""))
-    resource_label = {"training": "training-job", "drift": "drift-run", "deployment": "deployment"}.get(kind)
+    id_field = {"build": "build_id", "deployment": "deployment_id"}.get(kind, "job_id")
+    resource_id = payload.get("resource_id", payload.get(id_field, ""))
+    resource_label = {"build": "build", "training": "training-job", "drift": "drift-run", "deployment": "deployment"}.get(kind)
     if not resource_label or not re.fullmatch(UUID, resource_id):
         raise ValueError("Invalid execution identity.")
     if not (re.fullmatch(UUID, payload["project_id"]) or (kind == "training" and payload["project_id"] == "")) or not re.fullmatch("T-" + UUID, payload["tenant_id"]):
@@ -94,6 +95,7 @@ def submit(api, payload, kind):
         verify(existing, labels)
         return existing
     template = {
+        "build": "mlops-paas-model-packager-template",
         "training": "mlops-paas-training-pipeline-template",
         "drift": "mlops-paas-evidently-template",
         "deployment": "mlops-paas-model-server-deploy-template",
@@ -104,7 +106,7 @@ def submit(api, payload, kind):
         "spec": {"workflowTemplateRef": {"name": template},
             "arguments": {"parameters": [{"name": key, "value": str(value)} for key, value in payload.items()]}},
     }
-    if kind != "deployment":
+    if kind in {"training", "drift"}:
         workflow["spec"]["activeDeadlineSeconds"] = (
             int(payload.get("max_runtime_seconds", 3600)) + int(payload.get("dispatch_timeout_seconds", 1800)) + 60
         )
@@ -186,9 +188,56 @@ def _delete_owned(api, path, resource):
     api.request("DELETE", path, {"preconditions": {"uid": uid}, "propagationPolicy": "Foreground"})
 
 
+def reconcile_build_stop(api, name, labels):
+    path = workflow_path(name)
+    workflow = api.request("GET", path)
+    if not workflow:
+        api.request("POST", workflow_path(), {
+            "apiVersion": "argoproj.io/v1alpha1",
+            "kind": "Workflow",
+            "metadata": {"name": name, "namespace": EXECUTION_NS, "labels": labels},
+            "spec": {
+                "shutdown": "Terminate",
+                "workflowTemplateRef": {"name": "mlops-paas-job-tombstone-template"},
+                "ttlStrategy": {"secondsAfterCompletion": TOMBSTONE_TTL_SECONDS},
+            },
+        })
+        workflow = api.request("GET", path)
+    if not workflow:
+        raise RuntimeError("Build stop fence is not visible.")
+    verify(workflow, labels)
+
+    # Older producers used generateName. Include any of those owned workflows too.
+    selector = urllib.parse.urlencode({"labelSelector": ",".join(f"{k}={v}" for k, v in labels.items())})
+    workflows = {item["metadata"]["name"]: item for item in _owned_list(api, workflow_path(), selector, labels)}
+    workflows[name] = workflow
+    waiting = False
+    for workflow_name, item in workflows.items():
+        spec = item["spec"]
+        tombstone = spec.get("workflowTemplateRef", {}).get("name") == "mlops-paas-job-tombstone-template"
+        if tombstone and spec.get("shutdown") == "Terminate":
+            continue
+        if item.get("status", {}).get("phase") not in {"Succeeded", "Failed", "Error"}:
+            if spec.get("shutdown") != "Terminate":
+                api.request("PATCH", workflow_path(workflow_name), {"spec": {"shutdown": "Terminate"}})
+            waiting = True
+    # Historical Build pods only have the Build label. This read-only check also
+    # covers pods whose workflow reached terminal before their containers exited.
+    build_selector = urllib.parse.urlencode({"labelSelector": f"mlops-paas.io/build-id={labels['mlops-paas.io/build-id']}"})
+    pods_path = f"/api/v1/namespaces/{EXECUTION_NS}/pods"
+    pods = api.request("GET", f"{pods_path}?{build_selector}")["items"]
+    if waiting or any(pod.get("status", {}).get("phase") not in {"Succeeded", "Failed"} for pod in pods):
+        return {"status": "error", "error": "Build runtime cleanup is pending."}
+    return {"status": "stopped"}
+
+
 def reconcile(api, payload):
     kind = payload["kind"]
     name, labels = identity(payload, kind)
+    if kind == "build":
+        if payload.get("stop") is not True:
+            raise ValueError("Only Build stops are supported.")
+        return reconcile_build_stop(api, name, labels)
     if kind == "deployment" and payload.get("stop") is not True:
         raise ValueError("Only deployment stops are supported.")
     workflow = api.request("GET", workflow_path(name))
@@ -278,11 +327,12 @@ def reconcile(api, payload):
         workflow = api.request("GET", workflow_path(name))
         if workflow:
             verify(workflow, labels)
+        phase = (workflow or {}).get("status", {}).get("phase")
         never_started = never_started and not result.get("started_at")
         # A Workflow with no observed phase can still have an in-flight resource step.
         # Only our never-started tombstone may be considered stopped before a terminal phase.
         terminating = not workflow or (
-            workflow.get("status", {}).get("phase") not in {"Succeeded", "Failed", "Error"} and not never_started
+            phase not in {"Succeeded", "Failed", "Error"} and not never_started
         )
         serving_remaining = serving_paths and (
             any(api.request("GET", path) for path in serving_paths)
@@ -290,6 +340,9 @@ def reconcile(api, payload):
         )
         if remaining or remaining_job or remaining_children or terminating or serving_remaining:
             return {**result, "status": "error", "error": "Runtime cleanup is pending."}
+        # If the workflow reached a terminal phase and all runtime resources are gone
+        # without ever recording a container start time, the runtime never started.
+        never_started = (never_started or phase in {"Succeeded", "Failed", "Error"}) and not result.get("started_at")
         return {**result, "status": "stopped", "never_started": never_started}
     condition = training_condition(job)
     phase = (workflow or {}).get("status", {}).get("phase")
@@ -325,7 +378,7 @@ def main():
     url = urllib.parse.urlsplit(payload["callback_url"])
     prefix = f"/internal/executions/{payload['kind']}/{payload['resource_id']}/"
     stop_callback = url.path == f"{prefix}stops/" and payload.get("stop") is True and payload["kind"] in {
-        "deployment", "drift"
+        "build", "deployment", "drift"
     }
     expected_path = f"{prefix}{'stops' if stop_callback else 'observations'}/"
     if url.scheme != "http" or url.netloc not in {"mlops-paas-control-plane:8000", "mlops-paas-control-plane.mlops-paas-core.svc.cluster.local:8000"} or url.path != expected_path or url.query:

@@ -66,7 +66,19 @@ def cancel_job(job):
             raise Conflict("This job has no submitted runtime to cancel.")
         job.status = "cancelling"
         job.deletion_error = ""
-        job.save(update_fields=["status", "deletion_error", "updated_at"])
+        job.execution_stop_requested = True
+        job.observation_status = "cleanup_pending"
+        job.next_execution_check_at = timezone.now()
+        job.save(
+            update_fields=[
+                "status",
+                "deletion_error",
+                "execution_stop_requested",
+                "observation_status",
+                "next_execution_check_at",
+                "updated_at",
+            ]
+        )
         job.capabilities.filter(purpose="tracking").delete()
         record_training_event(
             job=job,
@@ -108,7 +120,7 @@ def request_job_deletion(job):
             task = delete_training_job
             event_type = "deletion_requested"
             message = "Training deletion requested."
-        if settings.TRAINING_EXECUTION_WATCH_ENABLED and job.submitted_at:
+        if job.submitted_at:
             job.execution_stop_requested = True
             job.observation_status = "cleanup_pending"
             job.next_execution_check_at = timezone.now()

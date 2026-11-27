@@ -3,6 +3,7 @@ from unittest.mock import Mock
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
@@ -82,31 +83,26 @@ class DriftWebhookRaceConditionTests(TestCase):
 
     def test_execute_drift_run_preserves_webhook_summary_and_handles_s3_fallback(self):
         run = _drift_fixture()
+        run.status = "queued"
         run.summary_uri = "s3://test-bucket/prefix/summary.json"
-        run.save(update_fields=["summary_uri"])
+        run.observation_status = "ok"
+        run.save(update_fields=["status", "summary_uri", "observation_status"])
 
-        fake_backend = Mock()
-        fake_backend.run.return_value = "logs"
-
-        fake_s3_client = Mock()
-        fake_s3_client.get_object.return_value = {
-            "Body": Mock(read=lambda: json.dumps({"drift_score": 0.33, "has_drift": False}).encode("utf-8"))
-        }
-        storage_instance = type(
-            "Storage",
-            (),
-            {
-                "parse_uri": lambda self, uri: ("test-bucket", "prefix/summary.json"),
-                "client": fake_s3_client,
-            },
-        )()
+        fake_backend = Mock(setting_name="")
+        fake_backend.run.return_value = {"dispatched": False}
+        fake_backend.poll.side_effect = [{"status": "not_found"}, {"status": "completed", "logs": "logs"}]
 
         from unittest.mock import patch
 
         with (
-            patch("apps.drift.tasks.drift_backend", return_value=fake_backend),
-            patch("apps.drift.tasks.S3Storage", return_value=storage_instance),
+            patch("apps.observability.services.executions.backend_for", return_value=fake_backend),
+            patch(
+                "apps.observability.services.executions._completion_data",
+                return_value={"drift_score": 0.33, "has_drift": False},
+            ),
         ):
+            execute_drift_run(str(run.public_id))
+            DriftRun.objects.filter(pk=run.pk).update(next_execution_check_at=timezone.now())
             result = execute_drift_run(str(run.public_id))
             self.assertEqual(result, "completed")
 

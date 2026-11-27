@@ -14,7 +14,6 @@ from apps.deployment.health_tasks import probe_runtime_health, scan_runtime_heal
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.cache import invalidate_model_server_cache
 from apps.deployment.services.logs import append_deployment_log, reset_deployment_logs
-from apps.observability.services.outbox import enqueue_event
 from apps.registry.services.versions import register_successful_build
 from common.logging import failure_reported, record_transition
 from infrastructure.execution import build_backend, deployment_backend
@@ -77,16 +76,12 @@ def _mark_deployment_succeeded(deployment):
         if old_id and old_id != deployment.pk:
             old = Deployment.objects.select_for_update(of=("self",)).select_related("version").get(pk=old_id)
             claim_deployment_stop(project, old)
-    invalidate_model_server_cache(str(deployment.version.public_id))
-    append_deployment_log(deployment, "Runtime passed readiness checks; deployment succeeded.")
+        version_id = str(deployment.version.public_id)
+        transaction.on_commit(lambda: invalidate_model_server_cache(version_id))
+        transaction.on_commit(
+            lambda: append_deployment_log(deployment, "Runtime passed readiness checks; deployment succeeded.")
+        )
     record_transition(deployment, "succeeded")
-    enqueue_event(
-        topic="deployment.events",
-        aggregate_type="deployment",
-        aggregate_id=deployment.public_id,
-        event_type="deployment.changed",
-        payload={"deployment_id": str(deployment.public_id), "status": "succeeded"},
-    )
     return True
 
 
@@ -99,7 +94,9 @@ def execute_build(self, build_id):
         from apps.catalog.models import ModelProject
 
         ModelProject.objects.select_for_update().get(pk=candidate.project_id)
-        build = Build.objects.select_for_update().select_related("project", "project__owner").get(public_id=build_id)
+        build = (
+            Build.objects.select_for_update(of=("self",)).select_related("project", "project__owner").get(public_id=build_id)
+        )
         if build.deletion_state != "active":
             return "deleting"
         if build.status in {"ready", "cancelled", "failed"}:
@@ -121,6 +118,11 @@ def execute_build(self, build_id):
                 or timezone.now() + timedelta(seconds=settings.LOCAL_BUILD_TIMEOUT_SECONDS),
                 next_execution_check_at=timezone.now(),
             )
+        elif build.backend == "argo":
+            Build.objects.filter(pk=build.pk).update(
+                execution_deadline_at=build.execution_deadline_at
+                or timezone.now() + timedelta(seconds=min(settings.LOCAL_BUILD_TIMEOUT_SECONDS, 14400)),
+            )
         record_transition(build, "building")
     try:
         result = build_backend(build.backend).run(build)
@@ -129,8 +131,10 @@ def execute_build(self, build_id):
             Build.objects.filter(pk=build.pk).update(status="cancelled", completed_at=timezone.now())
             return "cancelled"
         already_failed = Build.objects.filter(pk=build.pk, status="failed").exists()
+        now = timezone.now()
+        fields = {"next_execution_check_at": now} if build.backend == "argo" else {}
         Build.objects.filter(pk=build.pk).exclude(status__in=("cancelled", "ready")).update(
-            status="failed", error_message=str(exc)[:12000], completed_at=timezone.now()
+            status="failed", error_message=str(exc)[:12000], completed_at=now, **fields
         )
         if not already_failed:
             record_transition(
@@ -145,6 +149,8 @@ def execute_build(self, build_id):
             failure_reported.set(True)
         cleanup_failed_build_artifacts.delay(str(build.public_id), False)
         raise
+    if isinstance(result, dict) and result.get("cancelled"):
+        return "cancelled"
     if isinstance(result, dict) and result.get("dispatched"):
         build.refresh_from_db()
         if build.status != "building":
@@ -229,6 +235,15 @@ def cancel_build(self, build_id):
     build = Build.objects.select_related("project").filter(public_id=build_id).first()
     if not build or build.deletion_state != "active":
         return "deleting"
+    if build.backend == "argo":
+        if build.status != "cancelled":
+            return build.status
+        if Build.objects.filter(pk=build.pk, status="cancelled", completed_at__isnull=True).update(
+            completed_at=timezone.now()
+        ):
+            record_transition(build, "cancelled")
+        cleanup_failed_build_artifacts.delay(build_id, bool(build.image_uri))
+        return "cancelled"
     build_backend(build.backend).cancel(build)
     Build.objects.filter(pk=build.pk).update(status="cancelled", completed_at=timezone.now())
     record_transition(build, "cancelled")
@@ -253,16 +268,35 @@ def cleanup_failed_build_artifacts(self, build_id, delete_image=False):
     )
     if not build:
         return "not_found"
-    if build.status == "ready" or build.deletion_state != "active" or build.version_id:
+    if build.status not in {"failed", "cancelled"} or build.deletion_state != "active" or build.version_id:
         return "retained"
     if build.backend == "docker" and build.next_execution_check_at:
         # The watcher must stop/observe the runner before outputs are removed.
         return "waiting-for-execution"
-    if delete_image and build.image_uri:
+    if build.backend == "argo":
+        retry_at = timezone.now() + timedelta(seconds=max(1, settings.DELETION_RECONCILE_GRACE_SECONDS))
+        Build.objects.filter(pk=build.pk).update(next_execution_check_at=retry_at)
+        if stop_build_for_deletion(build) is False:
+            return "waiting-for-execution"
+        if (
+            delete_image or build.started_at or build.execution_deadline_at or build.execution_completed_at
+            or build.image_uri
+        ):
+            build.image_uri = temporary_image_reference(
+                build.project.public_id,
+                build.public_id,
+                registry=settings.HARBOR_REGISTRY_URL,
+                registry_project=settings.HARBOR_USER_PROJECT,
+            )
+            BuildImageCleaner().delete(build)
+    elif delete_image and build.image_uri:
         BuildImageCleaner().delete(build)
     storage = S3Storage()
-    storage.delete_prefix(build_prefix(build.project.owner.tenant_id, build.project.public_id, build.public_id))
+    prefix = build_prefix(build.project.owner.tenant_id, build.project.public_id, build.public_id)
+    storage.delete_prefix(f"{prefix}/")
     build.input_assets.update(s3_uri="", purged_at=timezone.now())
+    if build.backend == "argo":
+        Build.objects.filter(pk=build.pk, next_execution_check_at=retry_at).update(next_execution_check_at=None)
     return "purged"
 
 
@@ -315,7 +349,8 @@ def cleanup_build_for_deletion(build_id):
         build = Build.objects.select_related("project").filter(pk=build.pk).first()
         if not build:
             return "deleted"
-        stop_build_for_deletion(build)
+        if stop_build_for_deletion(build) is False:
+            return "waiting-for-execution"
         # Use the server-generated build tag even if the runner failed before
         # reporting image_uri. Never delete a caller-supplied repository/digest.
         build.image_uri = temporary_image_reference(
@@ -387,6 +422,8 @@ def execute_deployment(self, deployment_id):
         backend.log_sink = lambda message: append_deployment_log(deployment, message)
         endpoint = backend.deploy(deployment)
     except Exception as exc:
+        if isinstance(exc, (ConnectionError, TimeoutError)) and self.request.retries < self.max_retries:
+            raise
         invalidate_model_server_cache(str(deployment.version.public_id))
         changed = Deployment.objects.filter(pk=deployment.pk, status="deploying").update(
             status="failed", error_message=str(exc)[:12000]
@@ -424,29 +461,33 @@ def execute_deployment(self, deployment_id):
     append_deployment_log(deployment, "Runtime resource dispatched; waiting for readiness confirmation.")
     record_transition(deployment, "deploying", phase="dispatched")
     if deployment.backend == "argo":
+        Deployment.objects.filter(pk=deployment.pk, execution_deadline_at__isnull=True).update(
+            execution_deadline_at=timezone.now() + timedelta(minutes=33)
+        )
         mark_deployment_unconfirmed.apply_async(args=[str(deployment.public_id)], countdown=33 * 60)
     return "deploying"
 
 
 @shared_task
 def mark_deployment_unconfirmed(deployment_id):
+    from apps.catalog.models import ModelProject
+
+    candidate = Deployment.objects.select_related("version").get(public_id=deployment_id)
     with transaction.atomic():
-        deployment = Deployment.objects.select_for_update().select_related("version").get(public_id=deployment_id)
+        ModelProject.objects.select_for_update().get(pk=candidate.version.project_id)
+        deployment = (
+            Deployment.objects.select_for_update(of=("self",)).select_related("version").get(public_id=deployment_id)
+        )
         if deployment.status != "deploying" or deployment.backend != "argo":
             return deployment.status
         deployment.status = "unconfirmed"
         deployment.error_message = "No deployment result callback arrived before the deadline. Check the workflow logs."
         deployment.save(update_fields=["status", "error_message", "updated_at"])
-        invalidate_model_server_cache(str(deployment.version.public_id))
-        append_deployment_log(deployment, deployment.error_message)
+        version_id = str(deployment.version.public_id)
+        error_message = deployment.error_message
+        transaction.on_commit(lambda: invalidate_model_server_cache(version_id))
+        transaction.on_commit(lambda: append_deployment_log(deployment, error_message))
         record_transition(deployment, "unconfirmed", reason="Deployment result callback timed out")
-        enqueue_event(
-            topic="deployment.events",
-            aggregate_type="deployment",
-            aggregate_id=deployment.public_id,
-            event_type="deployment.changed",
-            payload={"deployment_id": str(deployment.public_id), "status": "unconfirmed"},
-        )
     return "unconfirmed"
 
 
@@ -480,13 +521,6 @@ def stop_deployment(self, deployment_id):
         return locked.status
     append_deployment_log(deployment, "Deployment stopped.")
     record_transition(deployment, "stopped")
-    enqueue_event(
-        topic="deployment.events",
-        aggregate_type="deployment",
-        aggregate_id=deployment.public_id,
-        event_type="deployment.changed",
-        payload={"deployment_id": str(deployment.public_id), "status": "stopped"},
-    )
     return "stopped"
 
 
@@ -538,6 +572,10 @@ def reconcile_stalled_deletions():
     """
     from apps.catalog.models import ModelProject
     from apps.catalog.tasks import execute_project_deletion
+    from apps.drift.models import DriftMonitor
+    from apps.drift.tasks import cleanup_drift_monitor_task
+    from apps.registry.models import ModelVersion
+    from apps.registry.tasks import cleanup_model_version
     from apps.training.models import TrainingJob
     from apps.training.tasks import delete_training_job
 
@@ -550,12 +588,23 @@ def reconcile_stalled_deletions():
         dispatched += _dispatch_once("build", public_id, delete_build, grace)
     registered_builds = Build.objects.filter(
         status="ready",
+        version__isnull=False,
         deletion_state="active",
         project__deletion_state="active",
         registered_storage_cleanup_due_at__lte=timezone.now(),
     ).order_by("registered_storage_cleanup_due_at", "pk")
     for public_id in registered_builds.values_list("public_id", flat=True)[:limit]:
         dispatched += _dispatch_once("registered-build-storage", public_id, cleanup_registered_build_storage, grace)
+    argo_builds = Build.objects.filter(
+        backend="argo",
+        status__in=("failed", "cancelled"),
+        version__isnull=True,
+        deletion_state="active",
+        project__deletion_state="active",
+        next_execution_check_at__lte=timezone.now(),
+    ).order_by("next_execution_check_at", "pk")
+    for public_id in argo_builds.values_list("public_id", flat=True)[:limit]:
+        dispatched += _dispatch_once("argo-build-cleanup", public_id, cleanup_failed_build_artifacts, grace)
     stale_projects = ModelProject.objects.filter(deletion_state="deleting", updated_at__lt=cutoff).order_by(
         "updated_at"
     )
@@ -566,6 +615,14 @@ def reconcile_stalled_deletions():
     )
     for public_id in stale_jobs.values_list("public_id", flat=True)[:limit]:
         dispatched += _dispatch_once("training-job", public_id, delete_training_job, grace)
+    stale_versions = ModelVersion.objects.filter(deletion_requested=True, project__deletion_state="active").order_by("pk")
+    for public_id in stale_versions.values_list("public_id", flat=True)[:limit]:
+        dispatched += _dispatch_once("model-version", public_id, cleanup_model_version, grace)
+    stale_monitors = DriftMonitor.objects.filter(
+        deletion_requested=True, version__deletion_requested=False, version__project__deletion_state="active"
+    ).order_by("updated_at")
+    for public_id in stale_monitors.values_list("public_id", flat=True)[:limit]:
+        dispatched += _dispatch_once("drift-monitor", public_id, cleanup_drift_monitor_task, grace)
     if dispatched:
         logger.warning("Re-dispatched %s pending cleanup or deletion task(s).", dispatched)
     return dispatched

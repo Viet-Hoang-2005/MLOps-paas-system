@@ -32,6 +32,7 @@ def _enqueue(run):
 
 
 def request_cancel(run):
+    from django.conf import settings
     from django.utils import timezone
 
     from apps.drift.tasks import cancel_drift_run
@@ -43,7 +44,18 @@ def request_cancel(run):
             return run
         run.status = "cancelled"
         run.completed_at = run.completed_at or timezone.now()
-        run.save(update_fields=["status", "completed_at"])
+        run.execution_stop_requested = True
+        run.observation_status = "cleanup_pending"
+        run.next_execution_check_at = timezone.now()
+        run.save(
+            update_fields=[
+                "status",
+                "completed_at",
+                "execution_stop_requested",
+                "observation_status",
+                "next_execution_check_at",
+            ]
+        )
         record_transition(run, "cancelled")
         transaction.on_commit(lambda: cancel_drift_run.delay(str(run.public_id)))
     return run

@@ -28,8 +28,6 @@ class DriftRunSerializer(serializers.ModelSerializer):
                 val = run.summary.get(key)
                 if val is not None:
                     return val
-        if run.evidence_window_id:
-            return run.evidence_window.samples.count()
         try:
             from apps.production.models import PredictionRecord
 

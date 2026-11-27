@@ -98,10 +98,11 @@ def validate_reference_data_file(upload) -> tuple[str, str]:
         upload.seek(0)
 
 
-def parse_reference_preview(data_bytes: bytes, filename: str, max_rows: int = 100) -> dict[str, Any]:
-    """Extract schema and first max_rows rows from CSV bytes."""
-    text = data_bytes.decode("utf-8-sig", errors="replace")
-    reader = csv.reader(io.StringIO(text))
+def parse_reference_preview_stream(stream, filename: str, max_rows: int = 100) -> dict[str, Any]:
+    """Stream CSV bytes without buffering the full payload in RAM and extract first max_rows rows."""
+    import codecs
+
+    reader = csv.reader(codecs.iterdecode(stream, "utf-8-sig", errors="replace"))
     header = next(reader, [])
     rows = []
     total_rows = 0
@@ -118,3 +119,8 @@ def parse_reference_preview(data_bytes: bytes, filename: str, max_rows: int = 10
         "rows": rows,
         "total_rows": total_rows,
     }
+
+
+def parse_reference_preview(data_bytes: bytes, filename: str, max_rows: int = 100) -> dict[str, Any]:
+    """Extract schema and first max_rows rows from CSV bytes."""
+    return parse_reference_preview_stream(io.BytesIO(data_bytes), filename, max_rows=max_rows)

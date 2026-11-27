@@ -3,7 +3,6 @@ from .artifacts import (
     MLflowArtifactsListView,
     MLflowArtifactsMultipartFallbackView,
     MLflowArtifactsProxyView,
-    MLflowArtifactsUploadUrlView,
     _bucket_name,
     _combine_effective_path,
     _parse_artifact_path,

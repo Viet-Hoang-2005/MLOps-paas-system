@@ -151,7 +151,9 @@ class TrainingCancellationWebhookEndpoint(APIView):
     permission_classes = ()
 
     def post(self, request, job_id):
-        from apps.training.tasks import confirm_training_cancellation
+        from django.conf import settings
+
+        from apps.training.tasks import cancel_training_job, confirm_training_cancellation
 
         key = request.headers.get("Idempotency-Key") or str(request.data.get("idempotency_key", ""))
         workflow_status = str(request.data.get("workflow_status", "")).lower()
@@ -188,6 +190,19 @@ class TrainingCancellationWebhookEndpoint(APIView):
             if not succeeded:
                 job.deletion_error = "Kubernetes training cancellation workflow failed."
                 job.save(update_fields=["deletion_error", "updated_at"])
+            else:
+                job.execution_stop_requested = True
+                job.observation_status = "cleanup_pending"
+                job.next_execution_check_at = timezone.now()
+                job.save(
+                    update_fields=[
+                        "execution_stop_requested",
+                        "observation_status",
+                        "next_execution_check_at",
+                        "updated_at",
+                    ]
+                )
+                transaction.on_commit(lambda: cancel_training_job.delay(str(job.public_id)))
             record_training_event(
                 job=job,
                 event_type="cancellation_confirmed" if succeeded else "cancellation_failed",
@@ -199,9 +214,7 @@ class TrainingCancellationWebhookEndpoint(APIView):
                 metadata={"workflow_status": workflow_status},
                 idempotency_key=key,
             )
-        if succeeded:
-            confirm_training_cancellation(str(job.public_id))
-        else:
+        if not succeeded:
             record_transition(
                 job,
                 job.status,
@@ -211,7 +224,7 @@ class TrainingCancellationWebhookEndpoint(APIView):
             )
         return Response(
             {
-                "status": "cancelled" if succeeded else "cancelling",
+                "status": "cancelling",
                 "deletion_error": "" if succeeded else job.deletion_error,
             }
         )

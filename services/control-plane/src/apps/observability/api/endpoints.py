@@ -1,3 +1,5 @@
+import logging
+
 from django.db import connections
 from django.http import HttpResponse, JsonResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -12,6 +14,9 @@ from common.metrics import shared_celery_metrics
 from common.redis_client import redis_client
 
 from .serializers import ProductionDataQuerySerializer
+
+
+logger = logging.getLogger(__name__)
 
 
 class LiveEndpoint(APIView):
@@ -31,12 +36,14 @@ class ReadyEndpoint(APIView):
         try:
             connections["default"].cursor().execute("SELECT 1")
             checks["postgres"] = "ok"
-        except Exception as exc:
-            checks["postgres"] = str(exc)
+        except Exception:
+            logger.warning("Readiness check failed for postgres", exc_info=True)
+            checks["postgres"] = "unavailable"
         try:
-            checks["redis"] = "ok" if redis_client().ping() else "failed"
-        except Exception as exc:
-            checks["redis"] = str(exc)
+            checks["redis"] = "ok" if redis_client().ping() else "unavailable"
+        except Exception:
+            logger.warning("Readiness check failed for redis", exc_info=True)
+            checks["redis"] = "unavailable"
         status_code = 200 if all(value == "ok" for value in checks.values()) else 503
         return JsonResponse(
             {"status": "ok" if status_code == 200 else "unavailable", "checks": checks}, status=status_code
@@ -82,10 +89,11 @@ class ProductionDataEndpoint(APIView):
             if serializer.validated_data.get("version_id"):
                 qs = qs.filter(model_version__public_id=serializer.validated_data["version_id"])
             return Response({"count": qs.count()})
-        return Response(
-            latest_production_data(
-                project,
-                limit=serializer.validated_data.get("limit"),
-                version_id=serializer.validated_data.get("version_id"),
-            )
-        )
+        kwargs = {
+            "limit": serializer.validated_data.get("limit"),
+            "version_id": serializer.validated_data.get("version_id"),
+        }
+        offset = serializer.validated_data.get("offset", 0)
+        if offset:
+            kwargs["offset"] = offset
+        return Response(latest_production_data(project, **kwargs))

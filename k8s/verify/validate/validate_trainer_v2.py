@@ -104,6 +104,39 @@ class FakeAPI:
 
 
 @pytest.mark.validate
+def validate_build_stop_waits_for_existing_workflows_and_fences_late_submissions():
+    payload = {
+        "kind": "build",
+        "resource_id": PAYLOAD["job_id"],
+        "project_id": PAYLOAD["job_id"],
+        "tenant_id": PAYLOAD["tenant_id"],
+        "stop": True,
+    }
+    name, labels = ops.identity(payload, "build")
+    api = FakeAPI(workflow=False)
+    legacy_name = "build-model-job-existing"
+    legacy_path = ops.workflow_path(legacy_name)
+    api.objects[legacy_path] = {
+        "metadata": {"name": legacy_name, "labels": labels},
+        "spec": {},
+        "status": {"phase": "Running"},
+    }
+    pod_path = f"/api/v1/namespaces/{ops.EXECUTION_NS}/pods/build-pod"
+    api.objects[pod_path] = {"status": {"phase": "Running"}}
+    assert ops.reconcile(api, payload)["status"] == "error"
+    assert ("PATCH", legacy_path, {"spec": {"shutdown": "Terminate"}}) in api.calls
+    assert ops.reconcile(api, payload)["status"] == "error"
+    api.objects[pod_path]["status"]["phase"] = "Failed"
+    assert ops.reconcile(api, payload)["status"] == "stopped"
+    submitted = ops.submit(
+        api, {"build_id": payload["resource_id"], "project_id": payload["project_id"], "tenant_id": payload["tenant_id"]},
+        "build",
+    )
+    assert submitted["metadata"]["name"] == name
+    assert submitted["spec"]["workflowTemplateRef"]["name"] == "mlops-paas-job-tombstone-template"
+
+
+@pytest.mark.validate
 @pytest.mark.parametrize("conditions,state", [([], None), ([{"type": "Complete", "status": "False"}], None),
     ([{"type": "Suspended", "status": "False"}, {"type": "Complete", "status": "True"}], "completed"),
     ([{"type": "Failed", "status": "True", "reason": "DeadlineExceeded"}], "failed")])

@@ -39,7 +39,7 @@ def runtimes(db, settings, monkeypatch):
     stops = []
     monkeypatch.setattr("apps.deployment.tasks.stop_deployment.delay", stops.append)
     for module in ("apps.deployment.tasks", "apps.deployment.api.webhooks"):
-        for name in ("invalidate_model_server_cache", "append_deployment_log", "enqueue_event"):
+        for name in ("invalidate_model_server_cache", "append_deployment_log"):
             monkeypatch.setattr(f"{module}.{name}", Mock())
     return project, running, candidate, stops
 
@@ -119,7 +119,7 @@ def test_late_argo_success_for_stopped_deployment_removes_runtime_again(runtimes
         request_stop(candidate)
         response = APIClient().post(
             f"/internal/webhooks/deployments/{candidate.public_id}/",
-            {"status": "Succeeded", "workflow_name": "deploy-model-job-test"},
+            {"status": "Succeeded", "workflow_name": f"deploy-{candidate.public_id}"},
             format="json",
             HTTP_X_DEPLOYMENT_CALLBACK_TOKEN=issue_callback_token(candidate.public_id),
         )
