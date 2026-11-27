@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.catalog.models import ModelPreview, ModelProject, PreviewAsset, WorkspaceAsset
+from apps.catalog.models import ModelPreview, ModelProject, PreviewAsset
 from apps.deployment.services.runtime_health import effective_health
 from common.api.exceptions import Conflict
 from infrastructure.storage import S3Storage
@@ -148,47 +148,6 @@ class ModelProjectSerializer(serializers.ModelSerializer):
 
     def get_reference_data(self, instance):
         return self._asset_summary(instance, "data")
-
-
-class WorkspaceAssetSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(source="public_id", read_only=True)
-    download_url = serializers.SerializerMethodField()
-
-    class Meta:
-        model = WorkspaceAsset
-        fields = (
-            "id",
-            "kind",
-            "relative_path",
-            "s3_uri",
-            "download_url",
-            "checksum",
-            "size_bytes",
-            "content_type",
-            "created_at",
-            "updated_at",
-        )
-        read_only_fields = ("kind", "s3_uri", "checksum", "size_bytes", "content_type", "created_at", "updated_at")
-
-    def get_download_url(self, instance):
-        return S3Storage().presigned_get(instance.s3_uri, 900, public=True)
-
-
-class WorkspaceUploadSerializer(serializers.Serializer):
-    file = serializers.FileField()
-    relative_path = serializers.CharField(max_length=512)
-
-
-class ProjectAssetSummarySerializer(serializers.ModelSerializer):
-    name = serializers.CharField(source="relative_path", read_only=True)
-    download_url = serializers.SerializerMethodField()
-
-    class Meta:
-        model = WorkspaceAsset
-        fields = ("name", "download_url", "checksum", "size_bytes", "content_type")
-
-    def get_download_url(self, instance):
-        return S3Storage().presigned_get(instance.s3_uri, 900, public=True)
 
 
 class ProjectMetadataWriteSerializer(serializers.Serializer):

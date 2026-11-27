@@ -14,7 +14,6 @@ from apps.catalog.services.preview import (
     save_preview,
 )
 from apps.catalog.services.project_metadata import save_project_metadata
-from apps.catalog.services.workspace import delete_workspace_file, save_workspace_file
 from apps.deployment.api.serializers import (
     BuildSerializer,
 )
@@ -29,8 +28,6 @@ from .serializers import (
     ProjectCreateSerializer,
     ProjectMetadataWriteSerializer,
     ProjectPreviewUploadUrlsRequestSerializer,
-    WorkspaceAssetSerializer,
-    WorkspaceUploadSerializer,
 )
 
 
@@ -44,7 +41,7 @@ class ModelProjectListCreateEndpoint(generics.ListCreateAPIView):
             .select_related(
                 "preview", "active_deployment__version", "active_deployment__endpoint", "active_deployment__build"
             )
-            .prefetch_related("workspace_assets", "versions__deployments__endpoint", "builds")
+            .prefetch_related("versions__deployments__endpoint", "builds")
         )
 
     def create(self, request, *args, **kwargs):
@@ -69,7 +66,7 @@ class ModelProjectDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
             .select_related(
                 "preview", "active_deployment__version", "active_deployment__endpoint", "active_deployment__build"
             )
-            .prefetch_related("workspace_assets", "versions__deployments__endpoint", "builds")
+            .prefetch_related("versions__deployments__endpoint", "builds")
         )
 
     def update(self, request, *args, **kwargs):
@@ -104,29 +101,6 @@ class TrainingProjectCreateEndpoint(APIView):
 
         notify_project_created(project)
         return Response(ModelProjectSerializer(project).data, status=status.HTTP_201_CREATED)
-
-
-class WorkspaceFilesEndpoint(APIView):
-    def get(self, request, project_id, kind):
-        project = project_for_user(request.user, project_id)
-        return Response(WorkspaceAssetSerializer(project.workspace_assets.filter(kind=kind), many=True).data)
-
-    def post(self, request, project_id, kind):
-        project = project_for_user(request.user, project_id)
-        serializer = WorkspaceUploadSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        asset = save_workspace_file(
-            project=project,
-            kind=kind,
-            relative_path=serializer.validated_data["relative_path"],
-            uploaded_file=serializer.validated_data["file"],
-        )
-        return Response(WorkspaceAssetSerializer(asset).data, status=status.HTTP_201_CREATED)
-
-    def delete(self, request, project_id, kind):
-        project = project_for_user(request.user, project_id)
-        delete_workspace_file(project=project, kind=kind, relative_path=str(request.data.get("relative_path", "")))
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ProjectPreviewEndpoint(APIView):

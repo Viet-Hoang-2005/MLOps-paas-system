@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from apps.catalog.models import ModelProject, WorkspaceAsset
+from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.drift.tasks import execute_drift_run
 from apps.registry.models import ModelVersion
@@ -15,13 +15,7 @@ def _drift_fixture():
     owner = get_user_model().objects.create_user("drift-race@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="drift race")
     version = ModelVersion.objects.create(project=project, version="1")
-    asset = WorkspaceAsset.objects.create(
-        project=project,
-        kind="data",
-        relative_path="ref.csv",
-        s3_uri="s3://bucket/ref.csv",
-    )
-    monitor = DriftMonitor.objects.create(version=version, reference_asset=asset, name="default")
+    monitor = DriftMonitor.objects.create(version=version, reference_uri="s3://bucket/ref.csv", name="default")
     run = DriftRun.objects.create(monitor=monitor, idempotency_key="drift-race-1", status="running")
     return run
 

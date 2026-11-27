@@ -1,4 +1,10 @@
-import type { WorkspaceFile } from "@/shared/api/catalogApi";
+export interface WorkspaceFile {
+  key: string;
+  relative_path: string;
+  size_bytes: number;
+  updated_at: string;
+  download_url: string;
+}
 
 export type CreatingFileState = {
   type: "file" | "folder";

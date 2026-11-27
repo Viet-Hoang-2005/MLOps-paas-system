@@ -1,14 +1,27 @@
+from datetime import timedelta
+from importlib import import_module
+from types import SimpleNamespace
+from unittest.mock import Mock
+
 import pytest
+from django.apps import apps
 from django.contrib.auth import get_user_model
+from django.db import connection, transaction
+from django.utils import timezone
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, BuildInputAsset
+from apps.deployment.services.completion import request_registration
+from apps.deployment.tasks import cleanup_registered_build_storage, reconcile_stalled_deletions
 from apps.registry.models import ModelArtifact, ModelVersion
 from apps.registry.services.versions import register_successful_build
+from infrastructure.storage.paths import build_prefix
 from infrastructure.storage.s3 import StoredObject
 
 
 class FakeCopyStorage:
+    bucket = "test-bucket"
+
     def copy(self, source_uri, destination_key):
         return StoredObject(
             destination_key,
@@ -45,7 +58,8 @@ def build_for(project, name="model.pkl"):
 
 
 @pytest.mark.django_db
-def test_successful_manual_build_registers_one_version_and_is_idempotent(django_capture_on_commit_callbacks):
+def test_successful_manual_build_registers_one_version_and_is_idempotent(django_capture_on_commit_callbacks, monkeypatch):
+    monkeypatch.setattr(cleanup_registered_build_storage, "delay", Mock())
     user = get_user_model().objects.create_user("version-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="NIDS")
     build = build_for(project)
@@ -269,3 +283,103 @@ def test_build_is_marked_registering_during_the_unlocked_phase():
     assert seen["status"] == "registering"
     build.refresh_from_db()
     assert build.registration_status == "registered"
+
+
+@pytest.mark.django_db
+def test_registration_schedules_purge_after_commit_and_keeps_version_artifacts(
+    monkeypatch, django_capture_on_commit_callbacks
+):
+    project, build = _project_and_build("reg-purge-build@example.com")
+    prefix = f"{build_prefix(project.owner.tenant_id, project.public_id, build.public_id)}/"
+    build.package_uri = f"s3://test-bucket/{prefix}artifacts/model-package.zip"
+    build.save(update_fields=["package_uri"])
+    storage = RecordingStorage()
+    storage.delete_prefix = Mock()
+    monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: storage)
+    dispatch = Mock(side_effect=cleanup_registered_build_storage.run)
+    monkeypatch.setattr(cleanup_registered_build_storage, "delay", dispatch)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        _register(build, storage)
+        build.refresh_from_db()
+        assert build.registered_storage_cleanup_due_at is not None
+        assert build.package_uri
+        storage.delete_prefix.assert_not_called()
+
+    dispatch.assert_called_once_with(str(build.public_id))
+    storage.delete_prefix.assert_called_once_with(prefix)
+    build.refresh_from_db()
+    assert build.registered_storage_cleanup_due_at is None
+    assert build.package_uri == ""
+    asset = build.input_assets.get()
+    assert asset.s3_uri == ""
+    assert asset.purged_at is not None
+    assert build.version.artifacts.filter(kind="package", name="model-package.zip").exists()
+    assert build.version.artifacts.filter(kind="source", name="model.pkl").exists()
+
+
+@pytest.mark.django_db
+def test_registration_rollback_does_not_dispatch_cleanup(monkeypatch, django_capture_on_commit_callbacks):
+    _, build = _project_and_build("reg-purge-rollback@example.com")
+    dispatch = Mock()
+    monkeypatch.setattr(cleanup_registered_build_storage, "delay", dispatch)
+    with django_capture_on_commit_callbacks(execute=True), pytest.raises(RuntimeError, match="roll back"):
+        with transaction.atomic():
+            _register(build, RecordingStorage())
+            raise RuntimeError("roll back")
+    build.refresh_from_db()
+    assert build.version_id is None
+    assert build.registered_storage_cleanup_due_at is None
+    dispatch.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_registered_build_cleanup_retries_after_storage_timeout(monkeypatch, django_capture_on_commit_callbacks):
+    project, build = _project_and_build("reg-purge-retry@example.com")
+    storage = RecordingStorage()
+    storage.delete_prefix = Mock(side_effect=[TimeoutError("S3 timeout"), None])
+    monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: storage)
+
+    registered = _register(build, storage)
+    with pytest.raises(TimeoutError, match="S3 timeout"):
+        cleanup_registered_build_storage.run(str(build.public_id))
+    build.refresh_from_db()
+    assert build.input_assets.get().s3_uri
+    assert build.registered_storage_cleanup_due_at > timezone.now()
+    assert cleanup_registered_build_storage.run(str(build.public_id)) == "not_due"
+
+    Build.objects.filter(pk=build.pk).update(registered_storage_cleanup_due_at=timezone.now() - timedelta(seconds=1))
+    dispatch = Mock(side_effect=cleanup_registered_build_storage.run)
+    monkeypatch.setattr(cleanup_registered_build_storage, "delay", dispatch)
+    assert reconcile_stalled_deletions.run() == 1
+    assert request_registration(build).version_id == registered.version_id
+    assert ModelVersion.objects.filter(project=project).count() == 1
+    assert storage.delete_prefix.call_count == 2
+    build.refresh_from_db()
+    assert build.registered_storage_cleanup_due_at is None
+    assert build.input_assets.get().s3_uri == ""
+
+
+@pytest.mark.django_db
+def test_backfill_schedules_legacy_registered_storage_and_worker_preserves_live_version_uri(monkeypatch):
+    project, build = _project_and_build("legacy-reg-purge@example.com")
+    _, unregistered = _project_and_build("unregistered-no-purge@example.com")
+    version = ModelVersion.objects.create(project=project, version="1", flavor="sklearn")
+    build.version = version
+    build.save(update_fields=["version"])
+    prefix = f"{build_prefix(project.owner.tenant_id, project.public_id, build.public_id)}/"
+    ModelArtifact.objects.create(version=version, kind="source", name="model.pkl", uri=f"s3://test-bucket/{prefix}model.pkl")
+    migration = import_module("apps.deployment.migrations.0004_build_registered_storage_cleanup")
+    migration.schedule_registered_builds(apps, SimpleNamespace(connection=connection))
+    build.refresh_from_db()
+    unregistered.refresh_from_db()
+    assert build.registered_storage_cleanup_due_at is not None
+    assert unregistered.registered_storage_cleanup_due_at is None
+
+    storage = RecordingStorage()
+    storage.delete_prefix = Mock()
+    monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: storage)
+    with pytest.raises(RuntimeError, match="still referenced"):
+        cleanup_registered_build_storage.run(str(build.public_id))
+    storage.delete_prefix.assert_not_called()
+    assert build.input_assets.get().s3_uri

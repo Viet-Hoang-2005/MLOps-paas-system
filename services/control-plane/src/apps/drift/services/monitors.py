@@ -13,7 +13,7 @@ from common.validation.artifacts import (
     validate_reference_data_file,
 )
 from infrastructure.storage import S3Storage
-from infrastructure.storage.paths import project_prefix, version_prefix
+from infrastructure.storage.paths import version_prefix
 
 MAX_REFERENCE_BYTES = 100 * 1024 * 1024
 
@@ -98,12 +98,8 @@ def create_monitor(*, data, backend, storage=None):
                 )
             if not artifact:
                 raise ValidationError({"reference_file": "A reference CSV file is required."})
-            name = artifact.name
-            key = f"{project_prefix(project.owner.tenant_id, project.public_id)}/drift/{public_id}/reference/{name}"
-            stored = storage.copy(artifact.uri, key)
-            written.append(stored.uri)
             return DriftMonitor.objects.create(
-                public_id=public_id, reference_uri=stored.uri, reference_name=name, backend=backend, **data
+                public_id=public_id, reference_uri=artifact.uri, reference_name=artifact.name, backend=backend, **data
             )
     except Exception:
         for uri in reversed(written):

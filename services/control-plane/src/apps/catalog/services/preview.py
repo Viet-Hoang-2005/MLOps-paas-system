@@ -354,12 +354,23 @@ def save_preview(*, project, data, storage=None, require_artifact=False):
             )
         elif require_artifact:
             raise ValidationError({"source_artifact": "A model artifact is required."})
-        preview.assets.filter(kind__in=remove).delete()
+        removed_uris = (
+            list(preview.assets.filter(kind__in=remove).exclude(s3_uri="").values_list("s3_uri", flat=True))
+            if remove
+            else []
+        )
+        if remove:
+            preview.assets.filter(kind__in=remove).delete()
         preview.flavor = flavor
         preview.artifact_format = artifact_format
         preview.requirements_text = data.get("requirements_text", preview.requirements_text)
         preview.revision += 1
         preview.save()
+    for uri in removed_uris:
+        try:
+            storage.delete(uri)
+        except Exception:
+            pass
     return preview
 
 

@@ -38,7 +38,6 @@ def execute_drift_run(self, run_id):
                 "monitor__version",
                 "monitor__version__project",
                 "monitor__version__project__owner",
-                "monitor__reference_asset",
             )
             .filter(public_id=run_id)
             .first()

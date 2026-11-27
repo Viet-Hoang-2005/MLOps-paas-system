@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from apps.catalog.models import ModelProject, WorkspaceAsset
+from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.registry.models import ModelArtifact, ModelVersion
 from infrastructure.execution.argo_backends import ArgoDriftBackend
@@ -23,16 +23,9 @@ class TestDriftRunModelPackageURLEndpoint(TestCase):
         self.owner = get_user_model().objects.create_user("drift-user@example.com", "password123")
         self.project = ModelProject.objects.create(owner=self.owner, name="test-drift-project")
         self.version = ModelVersion.objects.create(project=self.project, version="1")
-        self.asset = WorkspaceAsset.objects.create(
-            project=self.project,
-            kind="data",
-            relative_path="ref.csv",
-            s3_uri="s3://bucket/ref.csv",
-        )
         self.monitor = DriftMonitor.objects.create(
             version=self.version,
-            reference_asset=self.asset,
-            reference_uri=self.asset.s3_uri,
+            reference_uri="s3://bucket/ref.csv",
             name="default-monitor",
         )
         self.package_artifact = ModelArtifact.objects.create(

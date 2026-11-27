@@ -8,9 +8,6 @@ from common.execution_watch import ExecutionWatch
 class DriftMonitor(models.Model):
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     version = models.ForeignKey("registry.ModelVersion", on_delete=models.CASCADE, related_name="drift_monitors")
-    reference_asset = models.ForeignKey(
-        "catalog.WorkspaceAsset", on_delete=models.PROTECT, related_name="drift_monitors", null=True, blank=True
-    )
     reference_uri = models.CharField(max_length=1024, blank=True)
     reference_name = models.CharField(max_length=255, blank=True)
     reference_snapshot = models.ForeignKey(

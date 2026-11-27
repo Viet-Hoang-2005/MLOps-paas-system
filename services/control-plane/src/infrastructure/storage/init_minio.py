@@ -57,6 +57,19 @@ def ensure_bucket(endpoint: str, bucket: str, region: str) -> None:
             client.create_bucket(Bucket=bucket)
         else:
             raise
+    client.put_bucket_lifecycle_configuration(
+        Bucket=bucket,
+        LifecycleConfiguration={
+            "Rules": [
+                {
+                    "ID": "ephemeral-staging-cleanup",
+                    "Filter": {"Prefix": "staging/"},
+                    "Status": "Enabled",
+                    "Expiration": {"Days": 1},
+                }
+            ]
+        },
+    )
 
 
 def main() -> int:

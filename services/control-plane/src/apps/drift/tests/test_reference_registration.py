@@ -34,33 +34,20 @@ def create(version, storage, name="default", upload=True):
     return create_monitor(data=data, backend="docker", storage=storage)
 
 
-def test_upload_registers_once_and_subsequent_monitors_copy_same_reference(running_version):
+def test_upload_registers_once_and_subsequent_monitors_share_same_reference(running_version):
     storage = MemoryStorage()
     first = create(running_version, storage)
     artifact = running_version.artifacts.get(kind="reference_data")
     assert f"/versions/{running_version.public_id}/" in artifact.uri
     assert artifact.checksum and artifact.size_bytes == len(b"feature,label\n1,safe\n")
-    assert storage.read(artifact.uri) == storage.read(first.reference_uri)
-    assert first.reference_uri != artifact.uri
+    assert first.reference_uri == artifact.uri
     second = create(running_version, storage, name="second", upload=False)
-    assert storage.read(second.reference_uri) == storage.read(artifact.uri)
-    assert second.reference_uri != first.reference_uri
+    assert second.reference_uri == artifact.uri
     assert running_version.artifacts.filter(kind="reference_data").count() == 1
     assert not running_version.project.preview.assets.exists()
     with pytest.raises(Conflict, match="already has reference"):
         create(running_version, storage, name="replacement")
-    assert len(storage.objects) == 3
-
-
-def test_failed_snapshot_copy_rolls_back_version_artifact_and_removes_upload(running_version):
-    storage = MemoryStorage()
-    storage.fail_copy = True
-    with pytest.raises(RuntimeError):
-        create(running_version, storage)
-    assert not running_version.artifacts.exists()
-    assert not DriftMonitor.objects.exists()
-    assert storage.objects == {}
-    assert len(storage.deleted) == 1
+    assert len(storage.objects) == 1
 
 
 def test_monitor_insert_failure_cleans_only_new_objects(running_version, monkeypatch):
@@ -72,7 +59,7 @@ def test_monitor_insert_failure_cleans_only_new_objects(running_version, monkeyp
         create(running_version, storage)
     assert not running_version.artifacts.exists()
     assert storage.objects == {}
-    assert len(storage.deleted) == 2
+    assert len(storage.deleted) == 1
 
 
 def test_missing_reference_and_changed_running_rejected(running_version):

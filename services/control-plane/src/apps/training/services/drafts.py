@@ -176,11 +176,6 @@ def prepare_workspace(job_id, token, *, storage=None):
             requirements = archive.read("requirements.txt").decode("utf-8") if "requirements.txt" in archive.namelist() else ""
         storage.put(storage.parse_uri(uris["code"])[1], snapshot["archive"], "application/zip")
         checkpoint()
-        empty = BytesIO()
-        with ZipFile(empty, "w"):
-            pass
-        storage.put(storage.parse_uri(uris["data"])[1], empty.getvalue(), "application/zip")
-        checkpoint()
         capacity = None
         if job.backend == "docker":
             from .local_resources import require_capacity
@@ -198,7 +193,7 @@ def prepare_workspace(job_id, token, *, storage=None):
             if current_workspace.revision != revision or current.owner_id != current_workspace.owner_id:
                 raise Conflict("The preparation is no longer current.")
             current.requirements_text = requirements
-            current.code_snapshot_uri, current.data_snapshot_uri = uris["code"], uris["data"]
+            current.code_snapshot_uri, current.data_snapshot_uri = uris["code"], ""
             current.output_uri, current.mlflow_artifact_uri = uris["output"], uris["mlflow"]
             current.save()
             return _submit_job_atomic(current, verified_gpu_id=verified_gpu_id, local_capacity=capacity)

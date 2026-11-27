@@ -45,30 +45,6 @@ class ModelProject(models.Model):
         return f"{self.name} ({self.public_id})"
 
 
-class WorkspaceAsset(models.Model):
-    KINDS = (("code", "Code"), ("data", "Data"))
-
-    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    project = models.ForeignKey(ModelProject, on_delete=models.CASCADE, related_name="workspace_assets")
-    kind = models.CharField(max_length=20, choices=KINDS)
-    relative_path = models.CharField(max_length=512)
-    s3_uri = models.CharField(max_length=1024)
-    checksum = models.CharField(max_length=128, blank=True)
-    size_bytes = models.PositiveBigIntegerField(default=0)
-    content_type = models.CharField(max_length=160, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ["kind", "relative_path"]
-        constraints = [
-            models.UniqueConstraint(fields=["project", "kind", "relative_path"], name="workspace_asset_path_unique")
-        ]
-
-    def __str__(self):
-        return f"{self.project.name}/{self.kind}/{self.relative_path}"
-
-
 class ModelPreview(models.Model):
     """The single editable input draft; builds and versions never read it after snapshotting."""
 

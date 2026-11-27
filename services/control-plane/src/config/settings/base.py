@@ -268,6 +268,9 @@ STOP_RECONCILE_BATCH_SIZE = env_int("STOP_RECONCILE_BATCH_SIZE", 50)
 DELETION_RECONCILE_INTERVAL_SECONDS = env_int("DELETION_RECONCILE_INTERVAL_SECONDS", 120)
 DELETION_RECONCILE_GRACE_SECONDS = env_int("DELETION_RECONCILE_GRACE_SECONDS", 600)
 DELETION_RECONCILE_BATCH_SIZE = env_int("DELETION_RECONCILE_BATCH_SIZE", 20)
+ACCOUNT_DELETION_RETENTION_DAYS = env_int("ACCOUNT_DELETION_RETENTION_DAYS", 30)
+ACCOUNT_DELETION_PURGE_INTERVAL_SECONDS = env_int("ACCOUNT_DELETION_PURGE_INTERVAL_SECONDS", 3600)
+ACCOUNT_DELETION_PURGE_BATCH_SIZE = env_int("ACCOUNT_DELETION_PURGE_BATCH_SIZE", 20)
 CELERY_BEAT_SCHEDULE = {
     "runtime-health-scan": {
         "task": "apps.deployment.health_tasks.scan_runtime_health",
@@ -283,6 +286,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.deployment.tasks.reconcile_stalled_deletions",
         "schedule": DELETION_RECONCILE_INTERVAL_SECONDS,
         "options": {"queue": "celery", "expires": 120},
+    },
+    "expired-account-purge": {
+        "task": "apps.auth.tasks.purge_expired_deleted_accounts",
+        "schedule": ACCOUNT_DELETION_PURGE_INTERVAL_SECONDS,
+        "options": {"queue": "celery", "expires": 3600},
     },
 }
 if LOCAL_DEPLOYMENT_WATCH_ENABLED:

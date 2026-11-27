@@ -544,7 +544,6 @@ def test_training_history_preserves_frozen_inputs_not_updated_project_workspace(
     from io import BytesIO
     from zipfile import ZipFile
 
-    from apps.catalog.models import WorkspaceAsset
     from apps.training.services.snapshots import input_snapshot
     from apps.training.services.storage_scope import expected_training_uris
 
@@ -568,28 +567,9 @@ def test_training_history_preserves_frozen_inputs_not_updated_project_workspace(
         zipped.writestr("data.csv", b"x\n1\n")
     job.code_snapshot_uri = storage.put(storage.parse_uri(uris["code"])[1], archive.getvalue()).uri
     job.save()
-    WorkspaceAsset.objects.create(
-        project=project, kind="data", relative_path="data.csv", s3_uri="s3://test-bucket/new-workspace.csv"
-    )
     assert input_snapshot(job, path="train.py", storage=storage)["content"] == "print('old code')"
     assert input_snapshot(job, path="data.csv", storage=storage)["content"] == "x\n1\n"
     assert job.status == "failed"
-
-
-@pytest.mark.parametrize("path", ["../outside.csv", "/absolute.csv", "data\\outside.csv"])
-def test_workspace_rejects_unsafe_paths(project, path):
-    from apps.catalog.services.workspace import save_workspace_file
-
-    storage = MemoryStorage()
-    with pytest.raises(ValidationError):
-        save_workspace_file(
-            project=project,
-            kind="data",
-            relative_path=path,
-            uploaded_file=SimpleUploadedFile("data.csv", b"x\n1\n"),
-            storage=storage,
-        )
-    assert storage.objects == {}
 
 
 @pytest.mark.parametrize("state", ["deleting", "delete_failed"])

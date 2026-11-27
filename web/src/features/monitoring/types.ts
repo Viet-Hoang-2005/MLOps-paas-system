@@ -24,8 +24,6 @@ export interface DriftMonitoringJob {
   id: ResourceId;
   project_id: ResourceId;
   version_id: ResourceId;
-  reference_asset_id: ResourceId;
-  reference_asset_name: string;
   reference_name: string;
   name: string;
   trigger_threshold: number;

@@ -11,26 +11,6 @@ import type {
   ModelVersion,
 } from "@/features/projects/types";
 
-export interface WorkspaceFile {
-  key: string;
-  relative_path: string;
-  size_bytes: number;
-  updated_at: string;
-  download_url: string;
-}
-
-interface WorkspaceFileDTO {
-  relative_path: string;
-  size_bytes: number;
-  updated_at: string;
-  download_url: string;
-}
-
-const toWorkspaceFile = (file: WorkspaceFileDTO): WorkspaceFile => ({
-  ...file,
-  key: file.relative_path,
-});
-
 const toModelProject = (project: ModelProject): ModelProject => {
   const endpoint = project.active_endpoint;
   const endpointStatus =
@@ -92,34 +72,6 @@ export const getRunningSource = async (
   ).data.content;
 };
 
-export const createTrainingProject = async (
-  payload: ModelProjectFormValues,
-): Promise<ModelProject> => {
-  const { data } = await apiClient.post<ModelProject>(
-    controlPlaneURL("/models/training-projects/"),
-    {
-      name: payload.name,
-      description: payload.description,
-      access_mode: payload.access_mode,
-    },
-  );
-  if (payload.source_code_file) {
-    await uploadSourceCodeFile(
-      data.id,
-      payload.source_code_file,
-      payload.source_code_file.name,
-    );
-  }
-  if (payload.reference_data_file) {
-    await uploadReferenceFile(
-      data.id,
-      payload.reference_data_file,
-      payload.reference_data_file.name,
-    );
-  }
-  return data;
-};
-
 export const updateModelProject = async (
   modelId: string,
   payload: ModelProjectFormValues,
@@ -150,84 +102,6 @@ export const predictWithModelProject = async (
     await inferenceClient.post<ModelPredictionResponse>(endpointUrl, {
       features,
     })
-  ).data;
-
-export const listSourceCodeFiles = async (
-  modelId: string,
-): Promise<WorkspaceFile[]> =>
-  (
-    await apiClient.get<WorkspaceFileDTO[]>(
-      controlPlaneURL(`/models/${modelId}/workspace/code/files/`),
-    )
-  ).data.map(toWorkspaceFile);
-
-export const uploadSourceCodeFile = async (
-  modelId: string,
-  file: File,
-  path: string,
-): Promise<{ message: string }> => {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("relative_path", path);
-  return (
-    await apiClient.post<{ message: string }>(
-      controlPlaneURL(`/models/${modelId}/workspace/code/files/`),
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" } },
-    )
-  ).data;
-};
-
-export const deleteSourceCodeFile = async (
-  modelId: string,
-  path: string,
-): Promise<MessageResponse> =>
-  (
-    await apiClient.delete<MessageResponse>(
-      controlPlaneURL(`/models/${modelId}/workspace/code/files/`),
-      {
-        data: { relative_path: path },
-      },
-    )
-  ).data;
-
-export const listReferenceFiles = async (
-  modelId: string,
-): Promise<WorkspaceFile[]> =>
-  (
-    await apiClient.get<WorkspaceFileDTO[]>(
-      controlPlaneURL(`/models/${modelId}/workspace/data/files/`),
-    )
-  ).data.map(toWorkspaceFile);
-
-export const uploadReferenceFile = async (
-  modelId: string,
-  file: File,
-  path: string,
-): Promise<{ message: string }> => {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("relative_path", path);
-  return (
-    await apiClient.post<{ message: string }>(
-      controlPlaneURL(`/models/${modelId}/workspace/data/files/`),
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" } },
-    )
-  ).data;
-};
-
-export const deleteReferenceFile = async (
-  modelId: string,
-  path: string,
-): Promise<MessageResponse> =>
-  (
-    await apiClient.delete<MessageResponse>(
-      controlPlaneURL(`/models/${modelId}/workspace/data/files/`),
-      {
-        data: { relative_path: path },
-      },
-    )
   ).data;
 
 export interface ModelInsightItem {

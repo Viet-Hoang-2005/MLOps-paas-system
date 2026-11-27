@@ -137,6 +137,8 @@ services:
       MODEL_SERVER_PUBLIC_URL: ${MODEL_SERVER_PUBLIC_URL:-http://localhost:5002}
       MODEL_SERVER_INTERNAL_URL: ${MODEL_SERVER_INTERNAL_URL:-http://traefik:5000}
       DOCKER_NETWORK_NAME: ${DOCKER_NETWORK_NAME:-mlops_paas_network}
+      ACCOUNT_DELETION_RETENTION_DAYS: ${ACCOUNT_DELETION_RETENTION_DAYS:-30}
+      ACCOUNT_DELETION_PURGE_BATCH_SIZE: ${ACCOUNT_DELETION_PURGE_BATCH_SIZE:-20}
     volumes:
       - ./services/control-plane:/app
       - /var/run/docker.sock:/var/run/docker.sock
@@ -181,6 +183,7 @@ services:
       LOCAL_DEPLOYMENT_WATCH_ENABLED: ${LOCAL_DEPLOYMENT_WATCH_ENABLED:-true}
       TRAINING_EXECUTION_WATCH_ENABLED: ${TRAINING_EXECUTION_WATCH_ENABLED:-true}
       DRIFT_EXECUTION_WATCH_ENABLED: ${DRIFT_EXECUTION_WATCH_ENABLED:-true}
+      ACCOUNT_DELETION_PURGE_INTERVAL_SECONDS: ${ACCOUNT_DELETION_PURGE_INTERVAL_SECONDS:-3600}
     volumes:
       - ./services/control-plane:/app
     command: sh -c "until python manage.py migrate --check; do sleep 2; done; exec celery -A config beat --schedule=/tmp/celerybeat-schedule"

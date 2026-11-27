@@ -33,6 +33,14 @@ def complete_build(
     return build
 
 
+def enqueue_registered_storage_cleanup(build):
+    from apps.deployment.tasks import cleanup_registered_build_storage
+
+    due_at = build.registered_storage_cleanup_due_at
+    if due_at is not None and due_at <= timezone.now():
+        transaction.on_commit(lambda: cleanup_registered_build_storage.delay(str(build.public_id)), robust=True)
+
+
 def request_registration(build):
     from apps.deployment.tasks import register_build
     from common.api.exceptions import Conflict
@@ -43,6 +51,7 @@ def request_registration(build):
         if build.status != "ready" or build.project.deletion_state != "active" or build.deletion_state != "active":
             raise Conflict("Only a successful build can be registered.")
         if build.version_id:
+            enqueue_registered_storage_cleanup(build)
             return build
         if not build.image_uri:
             raise Conflict("This build has no image. Rebuild it before registering a model version.")

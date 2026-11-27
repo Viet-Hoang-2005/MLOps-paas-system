@@ -173,7 +173,10 @@ def test_finalization_deletes_project_s3_prefix_and_database_rows(monkeypatch):
 
     project_id, project_pk = project.public_id, project.pk
     finalize_project_deletion(project, storage=storage)
-    assert storage.prefixes == [f"users/{owner.tenant_id}/models/{project_id}"]
+    assert storage.prefixes == [
+        f"users/{owner.tenant_id}/models/{project_id}",
+        f"staging/users/{owner.tenant_id}/models/{project_id}/preview/",
+    ]
     assert not ModelProject.objects.filter(pk=project_pk).exists()
     assert not Deployment.objects.filter(pk=deployment.pk).exists()
     assert not Endpoint.objects.filter(pk=endpoint.pk).exists()

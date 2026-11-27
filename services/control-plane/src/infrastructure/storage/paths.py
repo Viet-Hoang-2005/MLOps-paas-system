@@ -19,12 +19,6 @@ def preview_committed_prefix(tenant_id, project_id, commit_token=None):
     return f"{base}/{_clean(commit_token)}/" if commit_token else f"{base}/"
 
 
-def workspace_prefix(tenant_id, project_id, kind):
-    if kind not in {"code", "data"}:
-        raise ValueError("Workspace kind must be code or data")
-    return f"{project_prefix(tenant_id, project_id)}/{kind}/"
-
-
 def build_input_prefix(tenant_id, project_id, build_id, kind):
     if kind not in {
         "source_artifact",

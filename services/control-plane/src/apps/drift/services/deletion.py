@@ -3,7 +3,7 @@ import logging
 from django.db import transaction
 from django.utils import timezone
 
-from apps.catalog.models import ModelProject, WorkspaceAsset
+from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.registry.models import ModelArtifact
 from common.api.exceptions import Conflict, ServiceUnavailable
@@ -102,7 +102,6 @@ def cleanup_drift_monitor(monitor: DriftMonitor, *, storage: S3Storage) -> None:
     if in_bucket:
         shared = (
             ModelArtifact.objects.filter(uri=ref_uri).exists()
-            or WorkspaceAsset.objects.filter(s3_uri=ref_uri).exists()
             or DriftMonitor.objects.exclude(pk=monitor.pk).filter(reference_uri=ref_uri).exists()
         )
     try:

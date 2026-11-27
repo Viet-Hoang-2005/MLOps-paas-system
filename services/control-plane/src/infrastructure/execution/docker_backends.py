@@ -105,7 +105,12 @@ class DockerTrainingBackend:
 
             require_device(job.local_gpu_id, client=self.docker.client)
         validate_training_uri(job, self.storage.bucket, "code", job.code_snapshot_uri)
-        validate_training_uri(job, self.storage.bucket, "data", job.data_snapshot_uri)
+        training_data_uri = ""
+        if job.input_contract != "workspace":
+            validate_training_uri(job, self.storage.bucket, "data", job.data_snapshot_uri)
+            training_data_uri = self.storage.presigned_get(
+                job.data_snapshot_uri, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS
+            )
         validate_training_uri(job, self.storage.bucket, "output", job.output_uri)
         output_upload_capability = issue_capability(job, "output_upload", preserve_existing=True)
         environment = {
@@ -113,9 +118,7 @@ class DockerTrainingBackend:
             "S3_SOURCE_URI": self.storage.presigned_get(
                 job.code_snapshot_uri, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS
             ),
-            "S3_TRAINING_DATA_URI": self.storage.presigned_get(
-                job.data_snapshot_uri, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS
-            ),
+            "S3_TRAINING_DATA_URI": training_data_uri,
             "S3_OUTPUT_UPLOAD_URL": (
                 f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/training-jobs/{job.public_id}/output-upload-url/"
             ),

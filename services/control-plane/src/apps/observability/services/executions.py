@@ -58,7 +58,7 @@ def resource_for(kind, public_id):
     related = (
         ("project__owner", "owner")
         if kind == "training"
-        else ("monitor__version__project__owner", "monitor__reference_asset")
+        else ("monitor__version__project__owner",)
     )
     return model_for(kind).objects.select_related(*related).filter(public_id=public_id).first()
 

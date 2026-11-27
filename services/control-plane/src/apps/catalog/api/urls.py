@@ -13,7 +13,6 @@ from .endpoints import (
     RunningLabelMappingEndpoint,
     RunningSourceEndpoint,
     TrainingProjectCreateEndpoint,
-    WorkspaceFilesEndpoint,
 )
 
 urlpatterns = [
@@ -41,5 +40,4 @@ urlpatterns = [
     ),
     path("<uuid:project_id>/label-mapping/", RunningLabelMappingEndpoint.as_view(), name="project-label-mapping"),
     path("<uuid:project_id>/builds/", ProjectBuildEndpoint.as_view(), name="project-builds"),
-    path("<uuid:project_id>/workspace/<str:kind>/files/", WorkspaceFilesEndpoint.as_view(), name="workspace-files"),
 ]

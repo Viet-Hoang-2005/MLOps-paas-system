@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from django.core.cache import cache
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.observability.services.lifecycle import record_registry_event
@@ -194,6 +195,8 @@ def _copy_registration_artifacts(build, plan, storage):
 
 def _commit_registration(build, plan, copies, *, image_uri, version_image_uri, image_digest):
     """Phase 3: write the version, artifacts and build state under a short lock."""
+    from apps.deployment.services.completion import enqueue_registered_storage_cleanup
+
     asset_copies, package = copies
     with transaction.atomic():
         project = type(build.project).objects.select_for_update().get(pk=build.project_id)
@@ -283,6 +286,7 @@ def _commit_registration(build, plan, copies, *, image_uri, version_image_uri, i
         build.error_message = ""
         build.registration_status = "registered"
         build.registration_error = ""
+        build.registered_storage_cleanup_due_at = timezone.now()
         build.save(
             update_fields=[
                 "version",
@@ -292,9 +296,11 @@ def _commit_registration(build, plan, copies, *, image_uri, version_image_uri, i
                 "error_message",
                 "registration_status",
                 "registration_error",
+                "registered_storage_cleanup_due_at",
                 "updated_at",
             ]
         )
+        enqueue_registered_storage_cleanup(build)
     return build
 
 

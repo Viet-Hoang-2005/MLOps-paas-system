@@ -171,7 +171,12 @@ class ArgoTrainingBackend(_ArgoBackend):
     def run(self, job):
         runtime_name = f"training-{str(job.public_id).lower()}"
         validate_training_uri(job, self.storage.bucket, "code", job.code_snapshot_uri)
-        validate_training_uri(job, self.storage.bucket, "data", job.data_snapshot_uri)
+        training_data_uri = ""
+        if job.input_contract != "workspace":
+            validate_training_uri(job, self.storage.bucket, "data", job.data_snapshot_uri)
+            training_data_uri = self.storage.presigned_get(
+                job.data_snapshot_uri, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS
+            )
         validate_training_uri(job, self.storage.bucket, "output", job.output_uri)
         output_upload_capability = issue_capability(job, "output_upload", preserve_existing=True)
         reporter_capability = issue_capability(job, "trusted_reporter", preserve_existing=True)
@@ -208,9 +213,7 @@ class ArgoTrainingBackend(_ArgoBackend):
                 "s3_source_uri": self.storage.presigned_get(
                     job.code_snapshot_uri, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS
                 ),
-                "s3_training_data_uri": self.storage.presigned_get(
-                    job.data_snapshot_uri, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS
-                ),
+                "s3_training_data_uri": training_data_uri,
                 "output_upload_url": (
                     f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/training-jobs/{job.public_id}/output-upload-url/"
                 ),

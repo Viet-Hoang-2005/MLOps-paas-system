@@ -122,3 +122,16 @@ def test_init_minio_creates_missing_bucket(monkeypatch):
     init_minio.ensure_bucket("http://minio:9000", "mlops-paas-artifacts", "ap-southeast-1")
     client.head_bucket.assert_called_once_with(Bucket="mlops-paas-artifacts")
     client.create_bucket.assert_called_once_with(Bucket="mlops-paas-artifacts")
+    client.put_bucket_lifecycle_configuration.assert_called_once_with(
+        Bucket="mlops-paas-artifacts",
+        LifecycleConfiguration={
+            "Rules": [
+                {
+                    "ID": "ephemeral-staging-cleanup",
+                    "Filter": {"Prefix": "staging/"},
+                    "Status": "Enabled",
+                    "Expiration": {"Days": 1},
+                }
+            ]
+        },
+    )

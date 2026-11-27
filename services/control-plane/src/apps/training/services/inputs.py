@@ -27,8 +27,11 @@ def input_download_urls(job_id, token):
         capability.save(update_fields=["consumed_at"])
     storage = S3Storage()
     validate_training_uri(job, storage.bucket, "code", job.code_snapshot_uri)
-    validate_training_uri(job, storage.bucket, "data", job.data_snapshot_uri)
+    data_url = ""
+    if job.input_contract != "workspace":
+        validate_training_uri(job, storage.bucket, "data", job.data_snapshot_uri)
+        data_url = storage.presigned_get(job.data_snapshot_uri, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS)
     return {
         "source_url": storage.presigned_get(job.code_snapshot_uri, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS),
-        "data_url": storage.presigned_get(job.data_snapshot_uri, settings.TRAINING_PRESIGNED_URL_TTL_SECONDS),
+        "data_url": data_url,
     }

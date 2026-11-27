@@ -62,11 +62,23 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    purge_started_at = models.DateTimeField(null=True, blank=True, editable=False)
+    purge_next_attempt_at = models.DateTimeField(null=True, blank=True, editable=False)
     date_joined = models.DateTimeField(auto_now_add=True)
 
     objects = CustomUserManager()
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(purge_started_at__isnull=True) | models.Q(is_active=False, deleted_at__isnull=False)
+                ),
+                name="identity_user_purge_requires_inactive",
+            ),
+        ]
 
     def clean(self):
         super().clean()

@@ -74,8 +74,6 @@ class DriftMonitorSerializer(serializers.ModelSerializer):
     version = serializers.SlugRelatedField(
         slug_field="public_id", queryset=ModelVersion.objects.none(), write_only=True
     )
-    reference_asset_id = serializers.UUIDField(source="reference_asset.public_id", read_only=True)
-    reference_asset_name = serializers.CharField(source="reference_asset.relative_path", read_only=True)
     reference_file = serializers.FileField(write_only=True, required=False)
     trigger_threshold = serializers.IntegerField(min_value=1, max_value=2147483647)
     runs = DriftRunSerializer(many=True, read_only=True)
@@ -87,8 +85,6 @@ class DriftMonitorSerializer(serializers.ModelSerializer):
             "version",
             "version_id",
             "project_id",
-            "reference_asset_id",
-            "reference_asset_name",
             "reference_file",
             "reference_name",
             "name",

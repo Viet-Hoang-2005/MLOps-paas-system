@@ -636,3 +636,44 @@ def test_save_preview_validates_source_code_and_reference_data_content(project, 
     assert res3.status_code == 200, res3.data
     project.refresh_from_db()
     assert project.preview.assets.count() == 2
+
+
+@pytest.mark.django_db
+def test_remove_assets_without_upload_deletes_s3_objects(project, owner, monkeypatch):
+    storage = MemoryStorage()
+    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.api.serializers.S3Storage", lambda: storage)
+
+    prefix = project_prefix(owner.tenant_id, project.public_id)
+    staged = storage.put(
+        f"staging/{prefix}/preview/b-rm/source_code/serve.py",
+        SimpleUploadedFile("serve.py", b"def predict(x): return x\n"),
+        "text/x-python",
+    )
+
+    client = APIClient()
+    client.force_authenticate(owner)
+    save_res = client.patch(
+        f"/api/models/{project.public_id}/preview/",
+        {
+            "revision": project.preview.revision,
+            "assets": [{"kind": "source_code", "name": "serve.py", "s3_uri": staged.uri}],
+        },
+        format="json",
+    )
+    assert save_res.status_code == 200
+    project.preview.refresh_from_db()
+    committed_uri = project.preview.assets.get(kind="source_code").s3_uri
+    assert committed_uri in storage.objects
+
+    remove_res = client.patch(
+        f"/api/models/{project.public_id}/preview/",
+        {
+            "revision": project.preview.revision,
+            "remove_assets": ["source_code"],
+        },
+        format="json",
+    )
+    assert remove_res.status_code == 200
+    assert not project.preview.assets.filter(kind="source_code").exists()
+    assert committed_uri not in storage.objects

@@ -6,6 +6,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
+from django.db.models.functions import Coalesce, Now
 from django.utils import timezone
 
 from apps.deployment.execution_tasks import check_local_execution, scan_local_executions  # noqa: F401
@@ -174,6 +175,46 @@ def register_build(build_id):
         raise
     # Another worker may still hold this build; it finishes (or fails) the registration.
     return "registered" if registered.version_id else "in_progress"
+
+
+@shared_task(acks_late=True, reject_on_worker_lost=True)
+def cleanup_registered_build_storage(build_id):
+    from apps.registry.models import ModelArtifact
+
+    with transaction.atomic():
+        now = timezone.now()
+        build = (
+            Build.objects.select_for_update(of=("self",))
+            .select_related("project__owner")
+            .filter(
+                public_id=build_id,
+                status="ready",
+                deletion_state="active",
+                project__deletion_state="active",
+                registered_storage_cleanup_due_at__lte=now,
+            )
+            .first()
+        )
+        if not build:
+            return "not_due"
+        # The next scan can retry after this lease if the worker or storage fails.
+        retry_at = now + timedelta(seconds=max(1, settings.DELETION_RECONCILE_GRACE_SECONDS))
+        build.registered_storage_cleanup_due_at = retry_at
+        build.save(update_fields=["registered_storage_cleanup_due_at"])
+
+    storage = S3Storage()
+    prefix = f"{build_prefix(build.project.owner.tenant_id, build.project.public_id, build.public_id)}/"
+    if ModelArtifact.objects.filter(uri__startswith=f"s3://{storage.bucket}/{prefix}").exists():
+        raise RuntimeError(f"Build {build.public_id} storage is still referenced by a model version.")
+    storage.delete_prefix(prefix)
+
+    with transaction.atomic():
+        updated = Build.objects.filter(pk=build.pk, registered_storage_cleanup_due_at=retry_at).update(
+            package_uri="", registered_storage_cleanup_due_at=None
+        )
+        if updated:
+            build.input_assets.update(s3_uri="", purged_at=Coalesce("purged_at", Now()))
+    return "purged"
 
 
 @shared_task(
@@ -486,7 +527,7 @@ def _dispatch_once(kind, public_id, task, grace):
 
 @shared_task(ignore_result=True, expires=120, soft_time_limit=100, time_limit=110)
 def reconcile_stalled_deletions():
-    """Re-dispatch deletions whose task was lost.
+    """Re-dispatch unfinished storage cleanups and deletions.
 
     Deleting a build, project or training job is first recorded in the database and then
     carried out by a queued task. If that task is lost (broker or worker down between the
@@ -507,6 +548,14 @@ def reconcile_stalled_deletions():
     stale_builds = Build.objects.filter(deletion_state="deleting", updated_at__lt=cutoff).order_by("updated_at")
     for public_id in stale_builds.values_list("public_id", flat=True)[:limit]:
         dispatched += _dispatch_once("build", public_id, delete_build, grace)
+    registered_builds = Build.objects.filter(
+        status="ready",
+        deletion_state="active",
+        project__deletion_state="active",
+        registered_storage_cleanup_due_at__lte=timezone.now(),
+    ).order_by("registered_storage_cleanup_due_at", "pk")
+    for public_id in registered_builds.values_list("public_id", flat=True)[:limit]:
+        dispatched += _dispatch_once("registered-build-storage", public_id, cleanup_registered_build_storage, grace)
     stale_projects = ModelProject.objects.filter(deletion_state="deleting", updated_at__lt=cutoff).order_by(
         "updated_at"
     )
@@ -518,5 +567,5 @@ def reconcile_stalled_deletions():
     for public_id in stale_jobs.values_list("public_id", flat=True)[:limit]:
         dispatched += _dispatch_once("training-job", public_id, delete_training_job, grace)
     if dispatched:
-        logger.warning("Re-dispatched %s stalled deletion(s).", dispatched)
+        logger.warning("Re-dispatched %s pending cleanup or deletion task(s).", dispatched)
     return dispatched

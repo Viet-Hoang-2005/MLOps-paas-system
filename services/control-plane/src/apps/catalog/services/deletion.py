@@ -10,7 +10,7 @@ from common.logging import record_transition
 from infrastructure.execution.cleanup_backends import project_cleanup_backend
 from infrastructure.execution.image_references import temporary_image_reference
 from infrastructure.storage import S3Storage
-from infrastructure.storage.paths import project_prefix
+from infrastructure.storage.paths import preview_staging_prefix, project_prefix
 
 
 def request_project_deletion(project):
@@ -140,6 +140,7 @@ def finalize_project_deletion(project, *, storage=None):
         raise ValidationError({"project": "Training cancellation has not completed; retry project cleanup."})
     storage = storage or S3Storage()
     storage.delete_prefix(project_prefix(project.owner.tenant_id, project.public_id))
+    storage.delete_prefix(preview_staging_prefix(project.owner.tenant_id, project.public_id))
     with transaction.atomic():
         project = ModelProject.objects.select_for_update().get(pk=project.pk)
         from apps.ct import models as ct
