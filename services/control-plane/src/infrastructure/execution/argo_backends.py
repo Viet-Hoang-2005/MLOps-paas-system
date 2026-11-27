@@ -1,3 +1,6 @@
+import uuid
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
@@ -12,7 +15,7 @@ from infrastructure.argo import ArgoWebhookClient
 from infrastructure.http import HttpClient
 from infrastructure.runtime_health import healthy_payload, is_dl_flavor
 from infrastructure.storage import S3Storage
-from infrastructure.storage.paths import build_prefix, drift_run_prefix
+from infrastructure.storage.paths import build_prefix, build_result_key, drift_run_prefix
 
 from .build_inputs import label_mapping_input
 from .image_references import (
@@ -136,6 +139,11 @@ class ArgoBuildBackend(_ArgoBackend):
             if build.input_assets.filter(kind="input_schema").exists()
             else "",
             "output_upload_url": self.storage.presigned_put(package_uri, 14400),
+            "result_upload_url": self.storage.presigned_put(
+                f"s3://{self.storage.bucket}/{build_result_key(project.owner.tenant_id, project.public_id, build.public_id)}",
+                14400,
+                "application/json",
+            ),
             "control_plane_webhook_url": (
                 f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/builds/{build.public_id}/"
             ),
@@ -224,28 +232,53 @@ class ArgoTrainingBackend(_ArgoBackend):
         )
 
     def cancel(self, job):
-        if settings.ARGO_CANCEL_TRAINING_WEBHOOK_URL:
-            cancellation_capability = issue_capability(
-                job,
-                "cancel_reporter",
-                ttl_seconds=min(600, settings.TRAINING_CAPABILITY_MAX_TTL_SECONDS or 600),
+        with transaction.atomic():
+            current = type(job).objects.select_for_update().get(pk=job.pk)
+            if (
+                current.status == "cancelled"
+                and current.observation_status == "ok"
+                and not current.execution_stop_requested
+            ):
+                return {"confirmed": True, "dispatched": False}
+            if not (
+                current.submitted_at
+                or current.execution_deadline_at
+                or current.status in {"queued", "running", "uploading", "cancelling"}
+            ):
+                return {"confirmed": True, "dispatched": False}
+
+            now = timezone.now()
+            if (
+                current.execution_check_token
+                and current.execution_check_lease_until
+                and current.execution_check_lease_until > now
+            ):
+                # All observers share this lease. Keep in-flight callbacks valid while recording the stop intent.
+                if not current.execution_stop_requested or current.observation_status != "cleanup_pending":
+                    current.execution_stop_requested = True
+                    current.observation_status = "cleanup_pending"
+                    current.save(update_fields=["execution_stop_requested", "observation_status", "updated_at"])
+                return {"confirmed": False, "dispatched": False}
+
+            token = uuid.uuid4()
+            lease = now + timedelta(seconds=settings.EXECUTION_CHECK_LEASE_SECONDS)
+            current.execution_stop_requested = True
+            current.observation_status = "cleanup_pending"
+            current.execution_check_token = token
+            current.execution_check_lease_until = lease
+            current.next_execution_check_at = lease
+            current.save(
+                update_fields=[
+                    "execution_stop_requested",
+                    "observation_status",
+                    "execution_check_token",
+                    "execution_check_lease_until",
+                    "next_execution_check_at",
+                    "updated_at",
+                ]
             )
-            response = self.client.trigger(
-                settings.ARGO_CANCEL_TRAINING_WEBHOOK_URL,
-                {
-                    "job_id": str(job.public_id),
-                    "job_name": job.external_job_id or f"training-{str(job.public_id).lower()}",
-                    "project_id": job.runtime_project_id,
-                    "tenant_id": job.owner.tenant_id,
-                    "control_plane_callback_url": (
-                        f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/"
-                        f"training-jobs/{job.public_id}/cancellation/"
-                    ),
-                    "cancel_reporter_capability": cancellation_capability,
-                },
-            )
-            return {"dispatched": True, "response": response}
-        return None
+        response = self.reconcile(current, "training", token, stop=True)
+        return {"dispatched": True, "confirmed": False, "response": response}
 
 
 class ArgoDeploymentBackend(_ArgoBackend):
@@ -290,7 +323,6 @@ class ArgoDeploymentBackend(_ArgoBackend):
                 "project_id": str(project.public_id),
                 "model_version_id": str(version.public_id),
                 "version": version.version,
-                "image_uri": immutable_image_reference(deployment.build),
                 "image_name": immutable_image_reference(deployment.build),
                 "container_name": container_name,
                 "model_type": model_type,
@@ -299,14 +331,7 @@ class ArgoDeploymentBackend(_ArgoBackend):
                     f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/deployments/{deployment.public_id}/"
                 ),
                 "callback_token": issue_callback_token(deployment.public_id),
-                "model_uri": next(
-                    (
-                        artifact.uri
-                        for artifact in version.artifacts.all()
-                        if artifact.kind in {"source", "training_output"}
-                    ),
-                    "",
-                ),
+                "model_uri": "/app/model_artifact",
             }
         )
         self._log("Argo workflow submitted; waiting for its readiness result callback.")
@@ -379,7 +404,6 @@ class ArgoDriftBackend(_ArgoBackend):
                 "html_s3_uri": uris["report.html"],
                 "report_json_s3_uri": uris["report.json"],
                 "summary_json_s3_uri": uris["summary.json"],
-                "html_public_url": "",
                 "html_upload_url": self.storage.presigned_put(uris["report.html"], 7200, "text/html"),
                 "report_json_upload_url": self.storage.presigned_put(uris["report.json"], 7200, "application/json"),
                 "summary_json_upload_url": self.storage.presigned_put(uris["summary.json"], 7200, "application/json"),

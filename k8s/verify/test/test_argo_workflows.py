@@ -66,7 +66,6 @@ def test_argo_service_accounts_exist(k8s_core_api: client.CoreV1Api) -> None:
     expected_sas = {
         "argo-workflow-basic-sa",
         "argo-workflow-deploy-sa",
-        "argo-workflow-delete-sa",
         "argo-workflow-training-sa",
         "argo-job-operations-sa",
     }
@@ -133,7 +132,6 @@ def test_argo_rbac_bindings(k8s_rbac_api: client.RbacAuthorizationV1Api) -> None
     assert "argo-workflow-executor" in exec_names
     assert "argo-job-operations" in exec_names
     assert "argo-workflow-deploy" in serving_names
-    assert "argo-workflow-delete" in serving_names
     assert "argo-training-job-role-binding" in training_names
 
 

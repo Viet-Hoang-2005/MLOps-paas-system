@@ -1,6 +1,9 @@
+from datetime import timedelta
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from rest_framework.test import APIClient
 
 from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
@@ -73,7 +76,8 @@ def test_argo_training_backend_records_runtime_selectors():
 
 
 @pytest.mark.django_db
-def test_argo_cancel_uses_job_bound_callback_capability(settings):
+@pytest.mark.parametrize("expire_lease", [False, True])
+def test_argo_cancel_uses_job_bound_callback_capability(settings, expire_lease):
     user = get_user_model().objects.create_user("cancel-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="Cancel NIDS")
     job = training_job(
@@ -81,6 +85,7 @@ def test_argo_cancel_uses_job_bound_callback_capability(settings):
         code_snapshot_uri="s3://bucket/code.zip",
         data_snapshot_uri="s3://bucket/train.csv",
         output_uri="s3://bucket/model.tar.gz",
+        backend="argo",
         status="cancelling",
         vcpu=2,
         memory_mb=4096,
@@ -89,22 +94,51 @@ def test_argo_cancel_uses_job_bound_callback_capability(settings):
         submitted_at=timezone.now(),
     )
     client = FakeArgoClient()
-    settings.ARGO_CANCEL_TRAINING_WEBHOOK_URL = "http://argo-events/cancel-train"
+    settings.ARGO_RECONCILE_WEBHOOK_URL = "http://argo-events/reconcile"
     settings.CONTROL_PLANE_INTERNAL_URL = "http://control-plane:8000"
 
-    result = ArgoTrainingBackend(client=client, storage=FakeStorage()).cancel(job)
+    backend = ArgoTrainingBackend(client=client, storage=FakeStorage())
+    result = backend.cancel(job)
 
-    payload = client.calls[0][1]
+    url, payload = client.calls[0]
+    assert url == "http://argo-events/reconcile"
     assert result["dispatched"] is True
-    assert payload["job_id"] == str(job.public_id)
-    assert payload["job_name"] == f"training-{job.public_id}"
+    assert result["confirmed"] is False
+    assert payload["kind"] == "training"
+    assert payload["resource_id"] == str(job.public_id)
     assert payload["tenant_id"] == job.owner.tenant_id
     assert payload["project_id"] == str(project.public_id)
-    assert "namespace" not in payload
-    assert payload["control_plane_callback_url"].endswith(
-        f"/internal/webhooks/training-jobs/{job.public_id}/cancellation/"
+    assert payload["stop"] is True
+    assert payload["callback_url"].endswith(
+        f"/internal/executions/training/{job.public_id}/observations/"
     )
-    assert payload["cancel_reporter_capability"]
-    from apps.training.services.capabilities import capability_for_token
+    assert payload["callback_token"]
 
-    assert capability_for_token(job=job, purpose="cancel_reporter", token=payload["cancel_reporter_capability"])
+    job.refresh_from_db()
+    original_lease = job.execution_check_token
+    original_expiry = job.execution_check_lease_until
+    if expire_lease:
+        type(job).objects.filter(pk=job.pk).update(execution_check_lease_until=timezone.now() - timedelta(seconds=1))
+
+    repeated = backend.cancel(job)
+    job.refresh_from_db()
+    assert repeated["confirmed"] is False
+    assert repeated["dispatched"] is expire_lease
+    assert len(client.calls) == (2 if expire_lease else 1)
+    assert (job.execution_check_token != original_lease) is expire_lease
+    if not expire_lease:
+        assert job.execution_check_lease_until == original_expiry
+
+    callback = APIClient()
+    url = f"/internal/executions/training/{job.public_id}/observations/"
+
+    def report(token):
+        return callback.post(url, {"status": "stopped"}, format="json", HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    if expire_lease:
+        assert report(payload["callback_token"]).status_code == 403
+    response = report(client.calls[-1][1]["callback_token"])
+    assert response.status_code == 200
+    assert response.data["status"] == "cancelled"
+    assert backend.cancel(job) == {"confirmed": True, "dispatched": False}
+    assert len(client.calls) == (2 if expire_lease else 1)

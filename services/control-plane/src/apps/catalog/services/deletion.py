@@ -6,6 +6,7 @@ from rest_framework.exceptions import ValidationError
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Deployment
 from apps.deployment.services.cache import invalidate_model_server_cache
+from apps.observability.services.argo_stops import unconfirmed_argo_deployment_stops
 from common.logging import record_transition
 from infrastructure.execution.cleanup_backends import project_cleanup_backend
 from infrastructure.execution.image_references import temporary_image_reference
@@ -104,20 +105,17 @@ def _stop_project_jobs(project):
         )
     for job in project.training_jobs.exclude(status__in=("completed", "failed", "cancelled")):
         result = training_backend(job.backend).cancel(job)
-        if isinstance(result, dict) and not result.get("confirmed", False):
+        if job.backend == "argo" and (not isinstance(result, dict) or not result.get("confirmed")):
             confirmed = False
             continue
-        type(job).objects.filter(pk=job.pk).update(
+        type(job).objects.filter(pk=job.pk).exclude(status__in=("completed", "failed", "cancelled")).update(
             status="cancelled",
             completed_at=timezone.now(),
             execution_stop_requested=True,
             observation_status="cleanup_pending",
             next_execution_check_at=timezone.now(),
         )
-    for deployment in (
-        Deployment.objects.filter(version__project=project, backend="argo", argo_stop_confirmed_at__isnull=True)
-        .exclude(status="failed", external_deployment_id="")
-    ):
+    for deployment in unconfirmed_argo_deployment_stops(project):
         result = deployment_backend("argo").stop(deployment)
         if not isinstance(result, dict) or not result.get("confirmed"):
             confirmed = False
@@ -138,13 +136,6 @@ def _stop_project_jobs(project):
             status="cancelled", completed_at=timezone.now()
         )
     return confirmed
-
-
-def delete_project_build_images(project):
-    """Run after Argo has confirmed all project runtimes were removed."""
-    if project.deletion_state != "deleting":
-        raise ValidationError({"project": "Project deletion is not active."})
-    return project_cleanup_backend().delete_images(project, project_cleanup_manifest(project))
 
 
 def finalize_project_deletion(project, *, storage=None):

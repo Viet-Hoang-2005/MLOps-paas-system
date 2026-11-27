@@ -31,8 +31,5 @@ subjects:
     name: argo-workflow-deploy-sa
     namespace: mlops-paas-execution
   - kind: ServiceAccount
-    name: argo-workflow-delete-sa
-    namespace: mlops-paas-execution
-  - kind: ServiceAccount
     name: argo-workflow-training-sa
     namespace: mlops-paas-execution

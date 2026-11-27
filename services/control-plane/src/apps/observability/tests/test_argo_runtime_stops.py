@@ -15,7 +15,8 @@ from infrastructure.execution.argo_backends import ArgoBuildBackend, ArgoDeploym
 
 
 @pytest.mark.django_db
-def test_project_waits_for_all_argo_runtime_confirmations(monkeypatch, settings):
+@pytest.mark.parametrize("deployment_status", ["stopped", "failed"])
+def test_project_waits_for_all_argo_runtime_confirmations(monkeypatch, settings, deployment_status):
     cache.clear()
     settings.ARGO_RECONCILE_WEBHOOK_URL = "http://events/reconcile"
     owner = get_user_model().objects.create_user("argo-stop@example.test", "password")
@@ -24,7 +25,12 @@ def test_project_waits_for_all_argo_runtime_confirmations(monkeypatch, settings)
     build = Build.objects.create(project=project, version=version, status="ready")
     failed_build = Build.objects.create(project=project, backend="argo", status="failed", started_at=timezone.now())
     deployment = Deployment.objects.create(
-        version=version, build=build, status="stopped", backend="argo", stopped_at=timezone.now()
+        version=version,
+        build=build,
+        status=deployment_status,
+        backend="argo",
+        external_deployment_id="",
+        stopped_at=timezone.now() if deployment_status == "stopped" else None,
     )
     monitor = DriftMonitor.objects.create(version=version, backend="argo")
     run = DriftRun.objects.create(monitor=monitor, status="cancelled", idempotency_key="argo-stop")
@@ -61,13 +67,17 @@ def test_project_waits_for_all_argo_runtime_confirmations(monkeypatch, settings)
     assert report(drift_path, serving_request, "stopped") == 403
     assert report(serving_path, serving_request, "error") == 200
     assert run_project_cleanup(project)["waiting_for_stop"]
-    assert report(serving_path, serving_request, "stopped") == 200
-    resume.assert_not_called()
     assert report(drift_path, drift_request, "stopped") == 200
     resume.assert_not_called()
     assert report(build_path, drift_request, "stopped") == 403
     assert report(build_path, build_request, "stopped") == 200
     assert report(build_path, build_request, "stopped") == 200
+    resume.assert_not_called()
+    assert run_project_cleanup(project)["waiting_for_stop"]
+    project_cleanup.run.assert_not_called()
+    assert serving_request["resource_id"] == str(deployment.public_id)
+    assert serving_request["stop"] is True
+    assert report(serving_path, serving_request, "stopped") == 200
     resume.assert_called_once_with(str(project.public_id))
     assert run_project_cleanup(project) == {"dispatched": True}
     project_cleanup.run.assert_called_once()

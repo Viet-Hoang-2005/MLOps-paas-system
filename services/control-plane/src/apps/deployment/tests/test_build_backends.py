@@ -24,7 +24,7 @@ class RecordingStorage:
         return "https://storage.example/download"
 
     @staticmethod
-    def presigned_put(_uri, _ttl):
+    def presigned_put(_uri, _ttl, _content_type=None):
         return "https://storage.example/upload"
 
 

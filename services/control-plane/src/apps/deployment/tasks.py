@@ -86,6 +86,17 @@ def _mark_deployment_succeeded(deployment):
     return True
 
 
+def mark_argo_deployment_failed(deployment, message):
+    deployment.status = "failed"
+    deployment.error_message = message
+    deployment.save(update_fields=["status", "error_message", "updated_at"])
+    Endpoint.objects.filter(deployment=deployment).update(health_status="unhealthy", last_checked_at=timezone.now())
+    version_id = str(deployment.version.public_id)
+    transaction.on_commit(lambda: invalidate_model_server_cache(version_id))
+    transaction.on_commit(lambda: append_deployment_log(deployment, message))
+    record_transition(deployment, "failed", reason="Deployment workflow failed")
+
+
 @shared_task(bind=True)
 def execute_build(self, build_id):
     candidate = Build.objects.filter(public_id=build_id).first()
@@ -123,6 +134,7 @@ def execute_build(self, build_id):
             Build.objects.filter(pk=build.pk).update(
                 execution_deadline_at=build.execution_deadline_at
                 or timezone.now() + timedelta(seconds=min(settings.LOCAL_BUILD_TIMEOUT_SECONDS, 14400)),
+                next_execution_check_at=timezone.now(),
             )
         record_transition(build, "building")
     try:
@@ -414,6 +426,11 @@ def execute_deployment(self, deployment_id):
                 or timezone.now() + timedelta(seconds=settings.LOCAL_DEPLOY_READINESS_TIMEOUT_SECONDS),
                 next_execution_check_at=timezone.now(),
             )
+        elif deployment.backend == "argo":
+            Deployment.objects.filter(pk=deployment.pk).update(
+                execution_deadline_at=deployment.execution_deadline_at or timezone.now() + timedelta(minutes=33),
+                next_execution_check_at=timezone.now(),
+            )
         record_transition(deployment, "deploying")
     if starting:
         reset_deployment_logs(deployment, "Starting deployment process.")
@@ -462,9 +479,6 @@ def execute_deployment(self, deployment_id):
     append_deployment_log(deployment, "Runtime resource dispatched; waiting for readiness confirmation.")
     record_transition(deployment, "deploying", phase="dispatched")
     if deployment.backend == "argo":
-        Deployment.objects.filter(pk=deployment.pk, execution_deadline_at__isnull=True).update(
-            execution_deadline_at=timezone.now() + timedelta(minutes=33)
-        )
         mark_deployment_unconfirmed.apply_async(args=[str(deployment.public_id)], countdown=33 * 60)
     return "deploying"
 

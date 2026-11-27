@@ -3,12 +3,14 @@ from unittest.mock import Mock
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.callbacks import issue_callback_token
 from apps.deployment.tasks import execute_deployment, mark_deployment_unconfirmed
+from apps.observability.services.executions import claim, signed_observation_token
 from apps.registry.models import ModelVersion
 
 
@@ -21,9 +23,8 @@ def deployment(db, settings, monkeypatch):
     build = Build.objects.create(project=project, version=version, flavor="sklearn", status="ready")
     deployment = Deployment.objects.create(version=version, build=build, backend="argo", status="deploying")
     Endpoint.objects.create(deployment=deployment, public_url="https://example.test/model")
-    for module in ("apps.deployment.tasks", "apps.deployment.api.webhooks"):
-        for name in ("invalidate_model_server_cache", "append_deployment_log"):
-            monkeypatch.setattr(f"{module}.{name}", Mock())
+    for name in ("invalidate_model_server_cache", "append_deployment_log"):
+        monkeypatch.setattr(f"apps.deployment.tasks.{name}", Mock())
     return deployment
 
 
@@ -104,4 +105,28 @@ def test_argo_dispatch_schedules_only_one_result_deadline(deployment, monkeypatc
     assert execute_deployment.run(str(deployment.public_id)) == "deploying"
     deadline.assert_called_once_with(args=[str(deployment.public_id)], countdown=33 * 60)
     deployment.refresh_from_db()
-    assert deployment.next_execution_check_at is None
+    assert deployment.next_execution_check_at is not None
+
+
+@pytest.mark.parametrize("healthy", [False, True])
+def test_observation_recovers_unconfirmed_deployment_after_health_check(deployment, monkeypatch, healthy):
+    assert mark_deployment_unconfirmed(str(deployment.public_id)) == "unconfirmed"
+    Deployment.objects.filter(pk=deployment.pk).update(execution_deadline_at=timezone.now())
+    backend = Mock()
+    backend.health.return_value = healthy, {}
+    monkeypatch.setattr("apps.deployment.services.argo_recovery.deployment_backend", lambda _: backend)
+    _, lease = claim("deployment", deployment.public_id)[0]
+    token = signed_observation_token("deployment", deployment, lease)
+    path = f"/internal/executions/deployment/{deployment.public_id}/observations/"
+    client = APIClient()
+    assert client.post(path, {"status": "completed"}, format="json").status_code == 403
+    assert client.post(
+        path, {"status": "completed"}, format="json", HTTP_AUTHORIZATION=f"Bearer {token}"
+    ).status_code == 200
+    deployment.refresh_from_db()
+    backend.health.assert_called_once()
+    assert deployment.status == ("succeeded" if healthy else "unconfirmed")
+    assert deployment.execution_check_token is None
+    assert client.post(
+        path, {"status": "completed"}, format="json", HTTP_AUTHORIZATION=f"Bearer {token}"
+    ).status_code == 403

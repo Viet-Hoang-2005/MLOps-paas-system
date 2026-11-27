@@ -31,21 +31,9 @@ spec:
       authSecret: &webhookAuth
         name: argo-events-webhook-server
         key: token
-    cancel-build:
-      port: "12000"
-      endpoint: /cancel-build
-      method: POST
-      maxPayloadSize: 262144
-      authSecret: *webhookAuth
     deploy:
       port: "12000"
       endpoint: /deploy
-      method: POST
-      maxPayloadSize: 262144
-      authSecret: *webhookAuth
-    delete:
-      port: "12000"
-      endpoint: /delete
       method: POST
       maxPayloadSize: 262144
       authSecret: *webhookAuth
@@ -58,12 +46,6 @@ spec:
     train:
       port: "12000"
       endpoint: /train
-      method: POST
-      maxPayloadSize: 262144
-      authSecret: *webhookAuth
-    cancel-train:
-      port: "12000"
-      endpoint: /cancel-train
       method: POST
       maxPayloadSize: 262144
       authSecret: *webhookAuth

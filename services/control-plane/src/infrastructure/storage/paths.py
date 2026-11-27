@@ -40,6 +40,10 @@ def build_prefix(tenant_id, project_id, build_id):
     return f"{project_prefix(tenant_id, project_id)}/builds/{_clean(build_id)}"
 
 
+def build_result_key(tenant_id, project_id, build_id):
+    return f"{build_prefix(tenant_id, project_id, build_id)}/artifacts/build-result.json"
+
+
 def training_job_prefix(tenant_id, project_id, job_id):
     return f"{project_prefix(tenant_id, project_id)}/training/jobs/{_clean(job_id)}"
 

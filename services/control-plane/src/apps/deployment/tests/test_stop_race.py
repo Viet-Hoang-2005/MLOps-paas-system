@@ -38,9 +38,8 @@ def runtimes(db, settings, monkeypatch):
     project.save(update_fields=["active_deployment"])
     stops = []
     monkeypatch.setattr("apps.deployment.tasks.stop_deployment.delay", stops.append)
-    for module in ("apps.deployment.tasks", "apps.deployment.api.webhooks"):
-        for name in ("invalidate_model_server_cache", "append_deployment_log"):
-            monkeypatch.setattr(f"{module}.{name}", Mock())
+    for name in ("invalidate_model_server_cache", "append_deployment_log"):
+        monkeypatch.setattr(f"apps.deployment.tasks.{name}", Mock())
     return project, running, candidate, stops
 
 

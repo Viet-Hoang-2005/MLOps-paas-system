@@ -69,6 +69,15 @@ class HarborClient:
             return "moved"
         return "created"
 
+    def artifact_digest(self, image_uri):
+        """Read the OCI digest currently held by a registry reference."""
+        project, repository, reference = self._parse_image_uri(image_uri)
+        url = (
+            f"{self.base_url}/api/v2.0/projects/{quote(project, safe='')}/repositories/"
+            f"{quote(repository, safe='')}/artifacts/{quote(reference, safe='')}"
+        )
+        return self.http.request("GET", url, auth=(settings.HARBOR_USERNAME, settings.HARBOR_PASSWORD)).json()["digest"]
+
     def delete_tag(self, image_uri, tag):
         """Remove one tag while preserving the manifest and its version tag."""
         if not self.enabled:

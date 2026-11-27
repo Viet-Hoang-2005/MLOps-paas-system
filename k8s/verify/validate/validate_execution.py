@@ -92,7 +92,6 @@ def validate_argo_workflows_inventory(context: ValidationContext) -> None:
     required_sas = {
         "argo-workflow-basic-sa",
         "argo-workflow-deploy-sa",
-        "argo-workflow-delete-sa",
         "argo-workflow-training-sa",
         "argo-job-operations-sa",
     }
@@ -118,7 +117,7 @@ def validate_workflow_build_task(context: ValidationContext) -> None:
     spec = template.get("spec") or {}
     assert spec.get("serviceAccountName") == "argo-workflow-basic-sa"
     assert spec.get("entrypoint") == "build-model"
-    assert spec.get("onExit") == "notify-build-exit"
+    assert spec.get("onExit") == "build-exit-handler"
 
     # VolumeClaimTemplates
     vc_templates = spec.get("volumeClaimTemplates") or []
@@ -130,7 +129,8 @@ def validate_workflow_build_task(context: ValidationContext) -> None:
     vc_spec = workspace_vc.get("spec") or {}
     assert vc_spec.get("accessModes") == ["ReadWriteOnce"]
     storage_req = ((vc_spec.get("resources") or {}).get("requests") or {}).get("storage")
-    assert storage_req == "2Gi", f"Workspace storage request must be 2Gi, got {storage_req}"
+    assert storage_req == "10Gi", f"Workspace storage request must be 10Gi, got {storage_req}"
+    assert (spec.get("volumeClaimGC") or {}).get("strategy") == "OnWorkflowCompletion"
 
     # Volumes check
     volumes = {v.get("name"): v for v in spec.get("volumes") or []}
@@ -140,7 +140,7 @@ def validate_workflow_build_task(context: ValidationContext) -> None:
         == "harbor-registry-dockerconfig"
     )
 
-    # Step templates: prepare -> build -> push -> notify
+    # Persist the result after image push so it remains available without the callback.
     step_templates = {t.get("name"): t for t in spec.get("templates") or []}
     main_step = step_templates.get("build-model")
     assert main_step, "Build workflow must have 'build-model' entrypoint template"
@@ -149,18 +149,29 @@ def validate_workflow_build_task(context: ValidationContext) -> None:
         "prepare-package",
         "build-image",
         "push-image",
+        "persist-result",
         "notify-success",
     ], f"Build workflow step order mismatch: {step_names}"
 
     # Kaniko & Skopeo containers
     kaniko_img = ((step_templates.get("build-image") or {}).get("container") or {}).get("image", "")
-    assert "gcr.io/kaniko-project/executor" in kaniko_img
+    assert "gcr.io/kaniko-project/executor:" in kaniko_img and not kaniko_img.endswith(":latest")
     skopeo_img = ((step_templates.get("push-image") or {}).get("container") or {}).get("image", "")
     assert "quay.io/skopeo/stable" in skopeo_img
 
     # OnExit callback
+    exit_handler = step_templates.get("build-exit-handler")
+    assert exit_handler, "Build workflow must declare 'build-exit-handler' template"
+    exit_handler_step = (exit_handler.get("steps") or [[{}]])[0][0]
+    assert exit_handler_step.get("template") == "notify-build-exit"
+    assert exit_handler_step.get("when") == "{{workflow.status}} != Succeeded"
+
     exit_step = step_templates.get("notify-build-exit")
     assert exit_step, "Build workflow must declare 'notify-build-exit' template"
+    assert exit_step.get("nodeSelector") == {"workload-type": "worker"}
+    exit_args = (exit_step.get("container") or {}).get("args") or []
+    assert "--fail-with-body" in exit_args
+    assert "--connect-timeout" in exit_args and "--max-time" in exit_args
     exit_env = {e.get("name"): e for e in (exit_step.get("container") or {}).get("env") or []}
     assert "CONTROL_PLANE_WEBHOOK_SECRET" in exit_env
     secret_ref = exit_env["CONTROL_PLANE_WEBHOOK_SECRET"].get("valueFrom", {}).get("secretKeyRef", {})
@@ -195,17 +206,9 @@ def validate_workflow_deploy_task(context: ValidationContext) -> None:
     )
     assert pod_spec.get("nodeSelector", {}).get("workload-type") == "worker"
     container = pod_spec.get("containers", [{}])[0]
-    assert container.get("resources", {}).get("limits", {}).get("memory") == "1Gi"
+    assert "inputs.parameters.model_type == 'dl' ? '2Gi' : '1Gi'" in raw_manifest
     assert "startupProbe" in container and "readinessProbe" in container
-
-    # 2. Delete Template
-    delete_tmpl = find_resource(execution, "WorkflowTemplate", "mlops-paas-model-server-delete-template")
-    assert delete_tmpl, "WorkflowTemplate mlops-paas-model-server-delete-template must exist"
-    del_spec = delete_tmpl.get("spec") or {}
-    assert del_spec.get("serviceAccountName") == "argo-workflow-delete-sa"
-    assert del_spec.get("entrypoint") == "delete-model-project"
-    assert (del_spec.get("ttlStrategy") or {}).get("secondsAfterCompletion") == 300
-    assert (del_spec.get("podGC") or {}).get("strategy") == "OnPodCompletion"
+    assert container["readinessProbe"]["failureThreshold"] <= 5
 
 
 @pytest.mark.validate
@@ -265,6 +268,12 @@ def validate_workflow_training_task(context: ValidationContext) -> None:
     assert {s["name"] for s in steps} == {"run-cpu-train-job", "run-gpu-train-job"}
     assert "!= 'gpu'" in steps[0]["when"] and "== 'gpu'" in steps[1]["when"]
     assert templates["wait-training"]["container"]["command"] == ["python", "/ops/job_ops.py", "wait-training"]
+    assert templates["wait-training"].get("nodeSelector") == {"workload-type": "worker"}
+    assert templates["report-status"].get("nodeSelector") == {"workload-type": "worker"}
+    assert (templates["report-status"].get("retryStrategy") or {}).get("limit") == "5"
+    report_status_args = templates["report-status"]["container"]["args"]
+    assert "--fail-with-body" in report_status_args
+    assert "--connect-timeout" in report_status_args and "--max-time" in report_status_args
     for name in ("cpu-train-job", "gpu-train-job"):
         resource = templates[name]["resource"]
         assert resource["action"] == "create" and not resource["setOwnerReference"]
@@ -285,8 +294,6 @@ def validate_workflow_training_task(context: ValidationContext) -> None:
     gpu_filter = next(item for item in dependency["filters"]["exprs"] if "accelerator_count" in item["expr"])
     assert 'accelerator_count == 1' in gpu_filter["expr"]
     assert 'accelerator_model == "t4"' in gpu_filter["expr"] and 'accelerator_model == "a10g"' in gpu_filter["expr"]
-    cancel = find_resource(execution, "WorkflowTemplate", "mlops-paas-training-cancel-template")
-    assert cancel["spec"]["serviceAccountName"] == "argo-job-operations-sa"
 
 
 @pytest.mark.validate
@@ -344,6 +351,54 @@ def validate_workflow_operations_task(context: ValidationContext) -> None:
     assert '"T-" + UUID' in content
     assert "TOMBSTONE_TTL_SECONDS = 7 * 24 * 3600" in content
 
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("job_ops_validate", script_path)
+    job_ops = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(job_ops)
+
+    class FakeApi:
+        def __init__(self, responses):
+            self.responses = responses
+
+        def request(self, method, path, body=None):
+            if method == "PATCH":
+                return {}
+            val = self.responses.get(path)
+            if val is None and "?" in path:
+                return {"items": []}
+            return val
+
+    build_payload = {
+        "kind": "build",
+        "resource_id": "11111111-1111-1111-1111-111111111111",
+        "project_id": "22222222-2222-2222-2222-222222222222",
+        "tenant_id": "T-33333333-3333-3333-3333-333333333333",
+        "stop": False,
+    }
+    b_name, b_labels = job_ops.identity(build_payload, "build")
+    assert job_ops.reconcile(
+        FakeApi({f"/apis/argoproj.io/v1alpha1/namespaces/mlops-paas-execution/workflows/{b_name}": {"metadata": {"name": b_name, "labels": b_labels}, "status": {"phase": "Succeeded"}}}),
+        build_payload,
+    )["status"] == "completed"
+    assert job_ops.reconcile(FakeApi({}), build_payload)["status"] == "not_found"
+
+    dep_payload = {**build_payload, "kind": "deployment"}
+    d_name, d_labels = job_ops.identity(dep_payload, "deployment")
+    assert job_ops.reconcile(
+        FakeApi({
+            f"/apis/apps/v1/namespaces/mlops-paas-serving/deployments/{d_name}": {
+                "metadata": {"name": d_name, "labels": d_labels, "generation": 1},
+                "status": {"availableReplicas": 1, "observedGeneration": 1},
+            },
+            f"/api/v1/namespaces/mlops-paas-serving/services/{d_name}-svc": {
+                "metadata": {"labels": d_labels},
+            },
+        }),
+        dep_payload,
+    )["status"] == "completed"
+    assert job_ops.reconcile(FakeApi({}), dep_payload)["status"] == "not_found"
+
 
 @pytest.mark.validate
 def validate_workflow_rbac_isolation(context: ValidationContext) -> None:
@@ -399,8 +454,10 @@ def validate_workflow_network_policies(context: ValidationContext) -> None:
     required_policies = {
         ("mlops-paas-execution", "np-mlops-paas-model-packager"),
         ("mlops-paas-serving", "np-mlops-paas-serving"),
+        ("mlops-paas-execution", "np-mlops-paas-deploy-execution"),
         ("mlops-paas-execution", "np-mlops-paas-evidently"),
         ("mlops-paas-training", "np-mlops-paas-training"),
+        ("mlops-paas-execution", "np-mlops-paas-training-execution"),
         ("mlops-paas-execution", "np-mlops-paas-job-operations"),
         ("mlops-paas-execution", "default-deny-all-ingress-execution"),
     }

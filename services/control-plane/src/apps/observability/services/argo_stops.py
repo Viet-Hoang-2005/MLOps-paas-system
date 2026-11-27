@@ -6,8 +6,16 @@ from django.utils import timezone
 STOP_TOKEN_SALT = "argo-runtime-stop"
 
 
-def project_has_unconfirmed_argo_stops(project):
+def unconfirmed_argo_deployment_stops(project):
     from apps.deployment.models import Deployment
+
+    # A failed dispatch can still have reached Argo before the HTTP response was lost.
+    return Deployment.objects.filter(
+        version__project=project, backend="argo", argo_stop_confirmed_at__isnull=True
+    )
+
+
+def project_has_unconfirmed_argo_stops(project):
     from apps.drift.models import DriftRun
 
     return (
@@ -17,11 +25,7 @@ def project_has_unconfirmed_argo_stops(project):
             | Q(execution_completed_at__isnull=False) | Q(status="building")
         )
         .exists()
-        or Deployment.objects.filter(
-            version__project=project, backend="argo", argo_stop_confirmed_at__isnull=True
-        )
-        .exclude(status="failed", external_deployment_id="")
-        .exists()
+        or unconfirmed_argo_deployment_stops(project).exists()
         or DriftRun.objects.filter(
             monitor__version__project=project, monitor__backend="argo", argo_stop_confirmed_at__isnull=True
         )

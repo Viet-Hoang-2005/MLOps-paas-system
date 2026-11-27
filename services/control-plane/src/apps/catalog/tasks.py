@@ -30,29 +30,3 @@ def execute_project_deletion(self, project_id):
         record_transition(project, "deleting", phase="deletion_dispatched")
         return "deleting"
     return "deleted"
-
-
-@shared_task(bind=True, reject_on_worker_lost=True)
-def complete_project_deletion(self, project_id):
-    """Complete an Argo deletion only after its runtime stop callback is trusted."""
-    from apps.catalog.services.deletion import (
-        delete_project_build_images,
-        finalize_project_deletion,
-        mark_project_deletion_failed,
-    )
-    from apps.observability.services.argo_stops import project_has_unconfirmed_argo_stops
-
-    project = ModelProject.objects.select_related("owner").filter(public_id=project_id).first()
-    if project is None:
-        return "deleted"
-    if project.deletion_state != "deleting":
-        return project.deletion_state
-    if project_has_unconfirmed_argo_stops(project):
-        return "deleting"
-    try:
-        delete_project_build_images(project)
-        finalize_project_deletion(project)
-    except Exception as exc:
-        mark_project_deletion_failed(project, exc)
-        raise
-    return "deleted"

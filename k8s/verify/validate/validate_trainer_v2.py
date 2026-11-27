@@ -245,6 +245,29 @@ def validate_deployment_stop_waits_for_workflow_and_serving_pods():
 
 
 @pytest.mark.validate
+def validate_deployment_observation_requires_owned_available_runtime():
+    payload = {**PAYLOAD, "kind": "deployment", "project_id": "33333333-3333-3333-3333-333333333333",
+               "resource_id": PAYLOAD["job_id"], "stop": False}
+    name, labels = ops.identity(payload, "deployment")
+    api = FakeAPI(workflow=False)
+    deployment_path = f"/apis/apps/v1/namespaces/{ops.SERVING_NS}/deployments/{name}"
+    service_path = f"/api/v1/namespaces/{ops.SERVING_NS}/services/{name}-svc"
+    deployment = {
+        "metadata": {"name": name, "generation": 2, "labels": labels},
+        "status": {"availableReplicas": 1, "observedGeneration": 1},
+    }
+    api.objects[deployment_path] = deployment
+    assert ops.reconcile(api, payload)["status"] == "running"
+    api.objects[service_path] = {"metadata": {"labels": labels}}
+    assert ops.reconcile(api, payload)["status"] == "running"
+    deployment["status"]["observedGeneration"] = 2
+    assert ops.reconcile(api, payload)["status"] == "completed"
+    api.objects[service_path]["metadata"]["labels"] = {}
+    with pytest.raises(ValueError, match="ownership"):
+        ops.reconcile(api, payload)
+
+
+@pytest.mark.validate
 def validate_unobserved_workflow_is_not_reported_stopped():
     api = FakeAPI()
     api.objects[ops.workflow_path(NAME)]["status"] = {}

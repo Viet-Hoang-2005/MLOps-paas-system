@@ -119,31 +119,6 @@ def submit(api, payload, kind):
     return created
 
 
-def cancel_build(api, payload):
-    """Terminate the Workflow of one build; ownership comes from labels set at creation."""
-    build_id = payload.get("build_id", "")
-    if not re.fullmatch(UUID, build_id) or not re.fullmatch(UUID, payload.get("project_id", "")) or not re.fullmatch("T-" + UUID, payload.get("tenant_id", "")):
-        raise ValueError("Invalid build identity.")
-    labels = {
-        "mlops-paas.io/tenant-id": payload["tenant_id"],
-        "mlops-paas.io/project-id": payload["project_id"],
-        "mlops-paas.io/build-id": build_id,
-    }
-    selector = urllib.parse.urlencode({"labelSelector": ",".join(f"{key}={value}" for key, value in labels.items())})
-    for workflow in (api.request("GET", f"{workflow_path()}?{selector}") or {}).get("items", []):
-        verify(workflow, labels)
-        if workflow.get("status", {}).get("phase") in {"Succeeded", "Failed", "Error"}:
-            continue
-        name = workflow["metadata"]["name"]
-        for attempt in range(3):
-            try:
-                api.request("PATCH", workflow_path(name), {"spec": {"shutdown": "Terminate"}})
-                break
-            except RuntimeError as exc:
-                if attempt == 2 or "409" not in str(exc):
-                    raise
-
-
 def trainjob_path(name):
     return f"/apis/{TRAINER_API}/namespaces/{TRAINING_NS}/trainjobs/{name}"
 
@@ -234,23 +209,26 @@ def reconcile_build_stop(api, name, labels):
 def reconcile(api, payload):
     kind = payload["kind"]
     name, labels = identity(payload, kind)
-    if kind == "build":
-        if payload.get("stop") is not True:
-            raise ValueError("Only Build stops are supported.")
+    if kind == "build" and payload.get("stop") is True:
         return reconcile_build_stop(api, name, labels)
-    if kind == "deployment" and payload.get("stop") is not True:
-        raise ValueError("Only deployment stops are supported.")
     workflow = api.request("GET", workflow_path(name))
     if workflow:
         verify(workflow, labels)
+    selector = urllib.parse.urlencode({"labelSelector": ",".join(f"{key}={value}" for key, value in labels.items())})
+    if kind == "build" and not workflow:
+        owned_workflows = _owned_list(api, workflow_path(), selector, labels)
+        if owned_workflows:
+            workflow = owned_workflows[-1]
     workload_path = trainjob_path(name)
     job = api.request("GET", workload_path) if kind == "training" else None
     if job:
         verify(job, labels)
     pod_ns = TRAINING_NS if kind == "training" else EXECUTION_NS
-    selector = urllib.parse.urlencode({"labelSelector": ",".join(f"{key}={value}" for key, value in labels.items())})
     pods_path = f"/api/v1/namespaces/{pod_ns}/pods"
     pods = _owned_list(api, pods_path, selector, labels)
+    if kind == "build" and not pods:
+        build_selector = urllib.parse.urlencode({"labelSelector": f"mlops-paas.io/build-id={labels['mlops-paas.io/build-id']}"})
+        pods = api.request("GET", f"{pods_path}?{build_selector}")["items"]
     result = runtime_times(pods, kind)
     # Preserve trusted pod timing across foreground GC, worker restarts and repeated cancellation.
     annotations = (workflow or {}).get("metadata", {}).get("annotations", {})
@@ -348,11 +326,22 @@ def reconcile(api, payload):
     phase = (workflow or {}).get("status", {}).get("phase")
     if condition == "failed":
         return {**result, "status": "failed", "error": "TrainJob failed."}
-    if condition == "completed" or (kind != "training" and phase == "Succeeded"):
-        return {**result, "status": "completed"}
+    if kind == "deployment":
+        service, dep = (api.request("GET", path) for path in serving_paths)
+        for resource in (service, dep):
+            if resource:
+                verify(resource, labels)
+        rollout = (dep or {}).get("status", {})
+        generation = (dep or {}).get("metadata", {}).get("generation", 1)
+        if service and rollout.get("observedGeneration", 0) >= generation and rollout.get("availableReplicas", 0) >= 1:
+            return {**result, "status": "completed"}
+        if phase not in {"Failed", "Error"}:
+            return {**result, "status": "running" if (workflow or dep or service) else "not_found"}
     if phase in {"Failed", "Error"}:
         return {**result, "status": "failed", "error": "Argo workload failed."}
-    return {**result, "status": "running" if workflow or job else "not_found"}
+    if condition == "completed" or (kind != "training" and phase == "Succeeded"):
+        return {**result, "status": "completed"}
+    return {**result, "status": "running" if (workflow or job or (kind == "build" and pods)) else "not_found"}
 
 
 def main():
@@ -361,18 +350,8 @@ def main():
     if sys.argv[1] == "wait-training":
         wait_training(api, payload)
         return
-    if sys.argv[1] == "cancel-training":
-        deadline = time.monotonic() + 120
-        while time.monotonic() < deadline:
-            if reconcile(api, {**payload, "stop": True})["status"] == "stopped":
-                return
-            time.sleep(2)
-        raise RuntimeError("Runtime cleanup is pending.")
     if sys.argv[1] == "submit":
-        if os.environ["EXECUTION_KIND"] == "cancel-build":
-            cancel_build(api, payload)
-        else:
-            submit(api, payload, os.environ["EXECUTION_KIND"])
+        submit(api, payload, os.environ["EXECUTION_KIND"])
         return
     _name, _ = identity(payload, payload["kind"])
     url = urllib.parse.urlsplit(payload["callback_url"])
@@ -394,7 +373,7 @@ def main():
         observation = {"status": "error", "error": "Argo observation unavailable."}
     request = urllib.request.Request(payload["callback_url"], method="POST", data=json.dumps(observation).encode(),
         headers={"Authorization": f"Bearer {payload['callback_token']}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(request, timeout=5) as response:
+    with urllib.request.urlopen(request, timeout=20 if payload["kind"] in {"build", "deployment"} and not stop_callback else 5) as response:
         response.read()
 
 

@@ -42,17 +42,8 @@ class ArgoProjectCleanupBackend:
         self.harbor = harbor_client or HarborClient()
 
     def run(self, project, manifest):
-        response = self.client.trigger(
-            settings.ARGO_DELETE_WEBHOOK_URL,
-            {
-                "project_id": str(project.public_id),
-                "container_names": manifest["container_names"],
-                "control_plane_webhook_url": (
-                    f"{settings.CONTROL_PLANE_INTERNAL_URL}/internal/webhooks/project-deletions/{project.public_id}/"
-                ),
-            },
-        )
-        return {"dispatched": True, "response": response}
+        images = self.delete_images(project, manifest)
+        return {"dispatched": False, "removed": {"images": images}}
 
     def delete_images(self, project, manifest):
         repository = local_image_repository(project.public_id)

@@ -3,7 +3,6 @@ kind: Kustomization
 
 resources:
   - workflow.yaml
-  - external-secrets.yaml
   - rbac.yaml
   - network-policy.yaml
 

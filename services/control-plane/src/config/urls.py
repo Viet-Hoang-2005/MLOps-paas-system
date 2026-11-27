@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.urls import include, path
 
-from apps.catalog.api.webhooks import ProjectDeletionWebhookEndpoint
 from apps.deployment.api.urls import build_patterns, deployment_patterns, endpoint_patterns
 from apps.deployment.api.webhooks import BuildWebhookEndpoint, DeploymentWebhookEndpoint
 from apps.drift.api.webhooks import (
@@ -57,7 +56,6 @@ urlpatterns = [
     path("health/", include("apps.observability.api.urls")),
     path("internal/webhooks/builds/<uuid:build_id>/", BuildWebhookEndpoint.as_view()),
     path("internal/webhooks/deployments/<uuid:deployment_id>/", DeploymentWebhookEndpoint.as_view()),
-    path("internal/webhooks/project-deletions/<uuid:project_id>/", ProjectDeletionWebhookEndpoint.as_view()),
     path("internal/webhooks/training-jobs/<uuid:job_id>/", TrainingJobWebhookEndpoint.as_view()),
     path(
         "internal/webhooks/training-jobs/<uuid:job_id>/cancellation/",

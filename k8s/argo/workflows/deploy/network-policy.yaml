@@ -80,4 +80,62 @@ spec:
       ports:
         - protocol: TCP
           port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-mlops-paas-deploy-execution
+  namespace: mlops-paas-execution
+  labels:
+    app.kubernetes.io/part-of: mlops-paas
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mlops-paas-deploy-operator
+  policyTypes:
+    - Egress
+  egress:
+    # 1. DNS resolution (CoreDNS)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # 2. Kubernetes API Server (argoexec wait, await-model-ready rollout status)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.169.254/32
+      ports:
+        - protocol: TCP
+          port: 6443
+    # 3. Webhook callback về Control Plane (report-deployment-result, notify-delete-exit)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlops-paas-core
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mlops-paas-control-plane
+      ports:
+        - protocol: TCP
+          port: 8000
+
 

@@ -7,8 +7,17 @@ spec:
   serviceAccountName: argo-workflow-training-sa
   entrypoint: training-pipeline
   onExit: report-status
+  ttlStrategy:
+    secondsAfterCompletion: 3600
+  podGC:
+    strategy: OnPodCompletion
   podMetadata:
     labels:
+      app.kubernetes.io/name: mlops-paas-training-operator
+      app.kubernetes.io/part-of: mlops-paas
+      app.kubernetes.io/component: training
+      app.kubernetes.io/managed-by: argo-workflows
+      mlops-paas.io/domain: training
       mlops-paas.io/training-job-id: '{{workflow.parameters.job_id}}'
   arguments:
     parameters:
@@ -504,6 +513,7 @@ spec:
                                 - name: S3_INPUT_DOWNLOAD_CAPABILITY
                                   value: {{=toJson(inputs.parameters.input_download_capability)}}
     - name: wait-training
+      nodeSelector: {workload-type: worker}
       inputs:
         parameters:
           - name: job_id
@@ -530,8 +540,13 @@ spec:
             mountPath: /ops
             readOnly: true
     - name: report-status
+      nodeSelector: {workload-type: worker}
+      retryStrategy:
+        limit: "5"
+        retryPolicy: Always
+        backoff: {duration: "2s", factor: "2", maxDuration: "120s"}
       container:
-        image: curlimages/curl:8.7.1
+        image: curlimages/curl:8.8.0
         resources:
           requests:
             cpu: 20m
@@ -541,6 +556,11 @@ spec:
             memory: 64Mi
         args:
           - -sS
+          - --fail-with-body
+          - --connect-timeout
+          - "5"
+          - --max-time
+          - "15"
           - -X
           - POST
           - '{{workflow.parameters.control_plane_webhook_url}}'
@@ -556,82 +576,3 @@ spec:
     - name: operations
       configMap:
         name: argo-job-operations
----
-apiVersion: argoproj.io/v1alpha1
-kind: WorkflowTemplate
-metadata:
-  name: mlops-paas-training-cancel-template
-  namespace: mlops-paas-execution
-spec:
-  serviceAccountName: argo-job-operations-sa
-  entrypoint: cancel-training
-  onExit: report-cancellation
-  ttlStrategy:
-    secondsAfterCompletion: 300
-  podGC:
-    strategy: OnPodCompletion
-  arguments:
-    parameters:
-      - name: job_id
-      - name: job_name
-      - name: control_plane_callback_url
-      - name: cancel_reporter_capability
-      - name: project_id
-      - name: tenant_id
-  templates:
-    - name: cancel-training
-      container:
-        image: python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df
-        command:
-          - python
-          - /ops/job_ops.py
-          - cancel-training
-        env:
-          - name: EXECUTION_PAYLOAD
-            value: '{"kind":"training","job_id":"{{workflow.parameters.job_id}}","project_id":"{{workflow.parameters.project_id}}","tenant_id":"{{workflow.parameters.tenant_id}}","stop":true}'
-        resources:
-          requests:
-            cpu: 20m
-            memory: 32Mi
-          limits:
-            cpu: 100m
-            memory: 64Mi
-        volumeMounts:
-          - name: operations
-            mountPath: /ops
-            readOnly: true
-    - name: report-cancellation
-      container:
-        image: curlimages/curl:8.7.1
-        resources:
-          requests:
-            cpu: 20m
-            memory: 32Mi
-          limits:
-            cpu: 100m
-            memory: 64Mi
-        command:
-          - curl
-        args:
-          - --fail-with-body
-          - --silent
-          - --show-error
-          - --request
-          - POST
-          - --header
-          - 'Authorization: Bearer {{workflow.parameters.cancel_reporter_capability}}'
-          - --header
-          - 'Content-Type: application/json'
-          - --header
-          - 'Idempotency-Key: cancel-{{workflow.uid}}'
-          - --data
-          - '{"workflow_status":"{{workflow.status}}","job_id":"{{workflow.parameters.job_id}}"}'
-          - '{{workflow.parameters.control_plane_callback_url}}'
-  volumes:
-    - name: operations
-      configMap:
-        name: argo-job-operations
-  podMetadata:
-    labels:
-      app.kubernetes.io/name: mlops-paas-job-operations
-      mlops-paas.io/domain: operations

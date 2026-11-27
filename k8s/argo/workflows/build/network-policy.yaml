@@ -33,6 +33,8 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: default
+        - ipBlock:
+            cidr: 10.43.0.1/32
       ports:
         - protocol: TCP
           port: 443
@@ -44,8 +46,6 @@ spec:
       ports:
         - protocol: TCP
           port: 6443
-        - protocol: TCP
-          port: 443
     # 3. Control Plane Webhook Exit Callback
     - to:
         - namespaceSelector:

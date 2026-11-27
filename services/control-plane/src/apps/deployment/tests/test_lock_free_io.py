@@ -501,7 +501,6 @@ def test_beat_runs_the_deletion_reconciler(settings):
         tasks.cleanup_failed_build_artifacts,
         tasks.stop_deployment,
         catalog_tasks.execute_project_deletion,
-        catalog_tasks.complete_project_deletion,
         training_tasks.delete_training_job,
         training_tasks.purge_training_job_outputs,
     ],

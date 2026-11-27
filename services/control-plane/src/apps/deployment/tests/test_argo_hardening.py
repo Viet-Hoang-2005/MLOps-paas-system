@@ -1,10 +1,12 @@
 """Argo build webhook trust, build cancellation and failed-deployment runtime cleanup."""
 
+import json
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
+from botocore.exceptions import ClientError
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.utils import timezone
@@ -14,7 +16,8 @@ from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.deployment.services.callbacks import issue_callback_token
 from apps.deployment.tasks import cleanup_failed_build_artifacts, stop_deployment
-from apps.observability.services.executions import _reconcile_argo_deadlines
+from apps.observability.services.executions import _reconcile_argo_deadlines, reconcile, scan
+from apps.observability.tasks import reconcile_job_execution
 from apps.registry.models import ModelVersion
 from infrastructure.execution.argo_backends import ArgoBuildBackend
 from infrastructure.execution.image_references import temporary_image_reference
@@ -68,6 +71,54 @@ def success_payload(build, **overrides):
     }
 
 
+@pytest.mark.parametrize("correct_digest, deadline_elapsed", [(True, False), (False, False), (True, True)])
+def test_build_recovers_from_storage_without_workflow_or_callback(
+    build, monkeypatch, settings, correct_digest, deadline_elapsed
+):
+    settings.ARGO_RECONCILE_WEBHOOK_URL = "http://argo-events/reconcile"
+    settings.CONTROL_PLANE_INTERNAL_URL = "http://mlops-paas-control-plane:8000"
+    argo = Mock()
+    queued = Mock()
+    storage = Mock(bucket="bucket")
+    storage.read.return_value = json.dumps(success_payload(build, build_id=str(build.public_id)))
+    storage.head.return_value.size_bytes = 1024
+    harbor = Mock()
+    harbor.artifact_digest.return_value = DIGEST if correct_digest else "sha256:" + "b" * 64
+    monkeypatch.setattr(reconcile_job_execution, "apply_async", queued)
+    monkeypatch.setattr("apps.observability.services.executions.build_backend", lambda _: ArgoBuildBackend(
+        client=argo, storage=storage,
+    ))
+    monkeypatch.setattr("apps.deployment.services.argo_recovery.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.services.argo_recovery.HarborClient", lambda: harbor)
+    if deadline_elapsed:
+        past = timezone.now() - timedelta(minutes=1)
+        Build.objects.filter(pk=build.pk).update(execution_deadline_at=past, callback_wait_until=past)
+
+    assert scan() == 1
+    kind, public_id, token = queued.call_args.kwargs["args"]
+    assert (kind, public_id) == ("build", str(build.public_id))
+    worker_status = reconcile(kind, public_id, token)
+    if deadline_elapsed:
+        assert worker_status == "ready"
+        argo.trigger.assert_not_called()
+    else:
+        assert worker_status == "awaiting_observation"
+        payload = argo.trigger.call_args.args[1]
+        assert payload["stop"] is False
+        path = f"/internal/executions/build/{build.public_id}/observations/"
+        result = APIClient().post(
+            path, {"status": "not_found"}, format="json", HTTP_AUTHORIZATION=f"Bearer {payload['callback_token']}"
+        )
+        assert result.status_code == 200
+
+    build.refresh_from_db()
+    assert build.status == ("ready" if correct_digest else "building")
+    assert build.image_digest == (DIGEST if correct_digest else "")
+    assert build.execution_check_token is None
+    assert storage.read.call_args.args[0].endswith(f"/builds/{build.public_id}/artifacts/build-result.json")
+    assert harbor.artifact_digest.call_args.args[0] == expected_image(build)
+
+
 @pytest.mark.parametrize(
     "overrides",
     [
@@ -81,7 +132,7 @@ def success_payload(build, **overrides):
 )
 def test_argo_success_rejects_values_not_scoped_to_the_build(build, monkeypatch, overrides):
     complete = Mock()
-    monkeypatch.setattr("apps.deployment.api.webhooks.complete_build", complete)
+    monkeypatch.setattr("apps.deployment.services.completion.complete_build", complete)
     assert post_build(build, **success_payload(build, **overrides)).status_code == 400
     complete.assert_not_called()
     build.refresh_from_db()
@@ -90,7 +141,7 @@ def test_argo_success_rejects_values_not_scoped_to_the_build(build, monkeypatch,
 
 def test_argo_success_registers_only_the_build_scoped_image(build, monkeypatch):
     complete = Mock(side_effect=lambda build, **kwargs: build)
-    monkeypatch.setattr("apps.deployment.api.webhooks.complete_build", complete)
+    monkeypatch.setattr("apps.deployment.services.completion.complete_build", complete)
     assert post_build(build, **success_payload(build)).status_code == 200
     kwargs = complete.call_args.kwargs
     assert kwargs["image_uri"] == expected_image(build)
@@ -168,14 +219,23 @@ def test_argo_deadline_waits_for_stop_before_cleaning_generated_tag(
     now = timezone.now()
     Build.objects.filter(pk=build.pk).update(started_at=now, execution_deadline_at=now - timedelta(seconds=1))
     argo, storage, cleaner, cleanup = Mock(), Mock(), Mock(), Mock()
+    storage.read.side_effect = ClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject")
     backend = ArgoBuildBackend(client=argo, storage=storage)
     monkeypatch.setattr("infrastructure.execution.build_backend", lambda _: backend)
     monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.services.argo_recovery.S3Storage", lambda: storage)
     monkeypatch.setattr("apps.deployment.tasks.BuildImageCleaner", lambda: cleaner)
     monkeypatch.setattr(cleanup_failed_build_artifacts, "delay", cleanup)
 
+    _reconcile_argo_deadlines()
+    build.refresh_from_db()
+    assert build.status == "building"
+    assert build.callback_wait_until > now
+    cleanup.assert_not_called()
+    Build.objects.filter(pk=build.pk).update(callback_wait_until=now - timedelta(seconds=1))
+
     with django_capture_on_commit_callbacks(execute=True):
-        _reconcile_argo_deadlines()
+        assert reconcile("build", str(build.public_id)) == "failed"
     build.refresh_from_db()
     assert build.status == "failed"
     assert build.execution_completed_at is None
@@ -208,9 +268,8 @@ def failed_deployment(project, monkeypatch):
     build = Build.objects.create(project=project, version=version, flavor="sklearn", status="ready")
     deployment = Deployment.objects.create(version=version, build=build, backend="argo", status="failed")
     Endpoint.objects.create(deployment=deployment, public_url="https://example.test/model", runtime_name="deploy-x")
-    for module in ("apps.deployment.tasks", "apps.deployment.api.webhooks"):
-        for name in ("invalidate_model_server_cache", "append_deployment_log"):
-            monkeypatch.setattr(f"{module}.{name}", Mock())
+    for name in ("invalidate_model_server_cache", "append_deployment_log"):
+        monkeypatch.setattr(f"apps.deployment.tasks.{name}", Mock())
     return deployment
 
 

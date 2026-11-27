@@ -49,10 +49,7 @@ def _resource_context(name, args, kwargs):
         },
         **{
             f"apps.catalog.tasks.{task}": ("project_id", "project_id")
-            for task in (
-                "execute_project_deletion",
-                "complete_project_deletion",
-            )
+            for task in ("execute_project_deletion",)
         },
     }
     if name not in tasks:

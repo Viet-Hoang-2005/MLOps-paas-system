@@ -33,8 +33,6 @@ spec:
                   mlops-paas.io/domain: training
               spec:
                 automountServiceAccountToken: false
-                imagePullSecrets:
-                - name: harbor-registry-pull-secret
                 securityContext:
                   runAsUser: 10001
                   runAsGroup: 10001
@@ -47,11 +45,14 @@ spec:
                   emptyDir:
                     sizeLimit: 512Mi
                 - name: training-work
-                  emptyDir: {}
+                  emptyDir:
+                    sizeLimit: 4Gi
                 - name: training-output
-                  emptyDir: {}
+                  emptyDir:
+                    sizeLimit: 4Gi
                 - name: training-model
-                  emptyDir: {}
+                  emptyDir:
+                    sizeLimit: 4Gi
                 initContainers:
                 - name: prepare-input
                   image: registry.mlops-nids-nt114.id.vn/mlops-paas/mlops-paas-training-runner:ffb45dc8489f81e36b27fe7ea7979f7775cb163f

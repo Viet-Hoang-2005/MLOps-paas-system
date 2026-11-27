@@ -12,15 +12,21 @@ spec:
       app.kubernetes.io/name: mlops-paas-model-packager
       app.kubernetes.io/part-of: mlops-paas
       app.kubernetes.io/component: packaging
-      mlops-paas.io/domain: packaging
       app.kubernetes.io/managed-by: argo-workflows
+      mlops-paas.io/domain: packaging
       mlops-paas.io/build-id: "{{workflow.parameters.build_id}}"
   workflowMetadata:
     labelsFrom:
       mlops-paas.io/build-id: {expression: workflow.parameters.build_id}
       mlops-paas.io/project-id: {expression: workflow.parameters.project_id}
       mlops-paas.io/tenant-id: {expression: workflow.parameters.tenant_id}
-  onExit: notify-build-exit
+  onExit: build-exit-handler
+  ttlStrategy:
+    secondsAfterCompletion: 3600
+  podGC:
+    strategy: OnPodCompletion
+  volumeClaimGC:
+    strategy: OnWorkflowCompletion
   arguments:
     parameters:
       - name: build_id
@@ -30,6 +36,8 @@ spec:
       - name: tenant_id
         value: ""
       - name: control_plane_webhook_url
+      - name: result_upload_url
+        default: ""
       - name: label_mapping_download_url
       - name: input_schema_download_url
         default: ""
@@ -41,18 +49,11 @@ spec:
         accessModes: ["ReadWriteOnce"]
         resources:
           requests:
-            storage: 2Gi
+            storage: 10Gi
   volumes:
     - name: harbor-config
       secret:
         secretName: harbor-registry-dockerconfig
-        items:
-          - key: config.json
-            path: config.json
-    - name: harbor-base-pull
-      secret:
-        secretName: harbor-base-pull-dockerconfig
-        optional: true
         items:
           - key: config.json
             path: config.json
@@ -112,8 +113,17 @@ spec:
                 - {name: build_id, value: "{{inputs.parameters.build_id}}"}
                 - {name: image_repository, value: "{{inputs.parameters.image_repository}}"}
                 - {name: image_tag, value: "{{inputs.parameters.image_tag}}"}
+        - - name: persist-result
+            template: persist-result
+            when: "{{=workflow.parameters.result_upload_url != ''}}"
+            continueOn: {failed: true, error: true}
+            arguments:
+              parameters:
+                - {name: image_repository, value: "{{inputs.parameters.image_repository}}"}
+                - {name: image_tag, value: "{{inputs.parameters.image_tag}}"}
         - - name: notify-success
             template: notify-success
+            continueOn: {failed: true, error: true}
             arguments:
               parameters:
                 - {name: build_id, value: "{{inputs.parameters.build_id}}"}
@@ -192,7 +202,7 @@ spec:
           - {name: image_repository}
           - {name: image_tag}
       container:
-        image: gcr.io/kaniko-project/executor:latest
+        image: gcr.io/kaniko-project/executor:v1.23.2
         resources:
           requests:
             cpu: 250m
@@ -208,7 +218,6 @@ spec:
           - --tar-path=/workspace/image.tar
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
-          - {name: harbor-base-pull, mountPath: /kaniko/.docker/, readOnly: true}
     - name: push-image
       nodeSelector: {workload-type: worker}
       inputs:
@@ -235,6 +244,43 @@ spec:
         volumeMounts:
           - {name: workspace, mountPath: /workspace}
           - {name: harbor-config, mountPath: /auth, readOnly: true}
+    - name: persist-result
+      nodeSelector: {workload-type: worker}
+      inputs:
+        parameters:
+          - {name: image_repository}
+          - {name: image_tag}
+      retryStrategy:
+        limit: "3"
+        retryPolicy: Always
+        backoff: {duration: "2s", factor: "2", maxDuration: "30s"}
+      script:
+        image: python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df
+        command: [python]
+        env:
+          - {name: RESULT_UPLOAD_URL, value: "{{workflow.parameters.result_upload_url}}"}
+          - {name: IMAGE_URI, value: "{{inputs.parameters.image_repository}}:{{inputs.parameters.image_tag}}"}
+        volumeMounts:
+          - {name: workspace, mountPath: /workspace, readOnly: true}
+        resources:
+          requests: {cpu: 20m, memory: 32Mi}
+          limits: {cpu: 100m, memory: 128Mi}
+        source: |
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+
+          workspace = Path("/workspace")
+          result = json.loads((workspace / "webhook_payload.json").read_text(encoding="utf-8"))
+          result["image_uri"] = os.environ["IMAGE_URI"]
+          result["image_digest"] = (workspace / "image-digest").read_text(encoding="utf-8").strip()
+          upload = urllib.request.Request(
+              os.environ["RESULT_UPLOAD_URL"], data=json.dumps(result, allow_nan=False).encode(),
+              headers={"Content-Type": "application/json"}, method="PUT",
+          )
+          with urllib.request.urlopen(upload, timeout=15):
+              pass
     - name: notify-success
       nodeSelector: {workload-type: worker}
       inputs:
@@ -274,6 +320,11 @@ spec:
           - name: CONTROL_PLANE_WEBHOOK_SECRET
             valueFrom:
               secretKeyRef: {name: argo-build-callback-secret, key: CONTROL_PLANE_WEBHOOK_SECRET}
+    - name: build-exit-handler
+      steps:
+        - - name: notify-build-exit
+            template: notify-build-exit
+            when: "{{workflow.status}} != Succeeded"
     - name: notify-build-exit
       nodeSelector: {workload-type: worker}
       retryStrategy:
@@ -295,6 +346,10 @@ spec:
         args:
           - -sS
           - --fail-with-body
+          - --connect-timeout
+          - "5"
+          - --max-time
+          - "15"
           - -X
           - POST
           - "{{workflow.parameters.control_plane_webhook_url}}"

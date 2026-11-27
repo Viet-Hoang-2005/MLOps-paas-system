@@ -63,21 +63,16 @@ WORKLOAD_APPLICATIONS = {
 }
 ARGO_WEBHOOK_EVENTS = {
     "build",
-    "cancel-build",
     "deploy",
-    "delete",
     "drift",
     "train",
-    "cancel-train",
     "reconcile",
 }
 ARGO_WORKFLOW_TEMPLATES = {
     "build": "mlops-paas-model-packager-template",
     "deploy": "mlops-paas-model-server-deploy-template",
-    "deploy-delete": "mlops-paas-model-server-delete-template",
     "evidently": "mlops-paas-evidently-template",
     "training": "mlops-paas-training-pipeline-template",
-    "training-cancel": "mlops-paas-training-cancel-template",
     "operations-submit": "mlops-paas-job-submit-template",
     "operations-reconcile": "mlops-paas-job-reconcile-template",
     "operations-tombstone": "mlops-paas-job-tombstone-template",
@@ -103,11 +98,8 @@ EXTERNAL_SECRET_OWNERS = {
     "k8s/argo": {
         ("mlops-paas-execution", "argo-build-callback-secret"),
         ("mlops-paas-execution", "harbor-registry-dockerconfig"),
-        ("mlops-paas-execution", "argo-delete-callback-secret"),
         ("mlops-paas-execution", "argo-evidently-secret"),
         ("argo-events", "argo-events-webhook-server"),
-        ("mlops-paas-training", "harbor-registry-pull-secret"),
-        ("mlops-paas-serving", "harbor-registry-pull-secret"),
     },
 }
 

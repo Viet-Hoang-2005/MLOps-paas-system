@@ -1,6 +1,5 @@
 import re
 
-from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -9,33 +8,22 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.catalog.models import ModelProject
-from apps.deployment.models import Build, Deployment, Endpoint
-from apps.deployment.services.cache import invalidate_model_server_cache
+from apps.deployment.models import Build, Deployment
 from apps.deployment.services.callbacks import valid_callback_token
-from apps.deployment.services.completion import complete_build
-from apps.deployment.services.logs import append_deployment_log
+from apps.deployment.services.completion import complete_reported_build, expected_build_image, valid_build_result
 from apps.deployment.tasks import (
     _mark_deployment_succeeded,
     cleanup_failed_build_artifacts,
     delete_build,
+    mark_argo_deployment_failed,
     stop_deployment,
 )
 from common.api.permissions import HasInternalWebhookSecret
 from common.logging import record_transition
-from infrastructure.execution.image_references import temporary_image_reference
 
 
 def _dict_payload(value):
     return value if isinstance(value, dict) else {}
-
-
-def _expected_image_reference(build):
-    return temporary_image_reference(
-        build.project.public_id,
-        build.public_id,
-        registry=settings.HARBOR_REGISTRY_URL if build.backend == "argo" else "",
-        registry_project=settings.HARBOR_USER_PROJECT,
-    )
 
 
 class HasDeploymentCallbackToken(BasePermission):
@@ -85,19 +73,9 @@ class DeploymentWebhookEndpoint(APIView):
                 result = deployment.status
             else:
                 result = "failed"
-                deployment.status = result
-                deployment.error_message = (
-                    f"Deployment workflow {workflow} finished with {incoming}. See execution logs."
+                mark_argo_deployment_failed(
+                    deployment, f"Deployment workflow {workflow} finished with {incoming}. See execution logs."
                 )
-                deployment.save(update_fields=["status", "error_message", "updated_at"])
-                Endpoint.objects.filter(deployment=deployment).update(
-                    health_status="unhealthy", last_checked_at=timezone.now()
-                )
-                version_id = str(deployment.version.public_id)
-                error_message = deployment.error_message
-                transaction.on_commit(lambda: invalidate_model_server_cache(version_id))
-                transaction.on_commit(lambda: append_deployment_log(deployment, error_message))
-                record_transition(deployment, result, source="webhook", reason="Deployment workflow failed")
         try:
             from apps.notifications.hooks import notify_deployment_result
 
@@ -137,7 +115,7 @@ class BuildWebhookEndpoint(APIView):
                 # The workflow outlived the cancel and may have published an image and package
                 # after the cancel-time cleanup ran. The image reference is server-generated.
                 if not build.image_uri:
-                    build.image_uri = _expected_image_reference(build)
+                    build.image_uri = expected_build_image(build)
                     build.save(update_fields=["image_uri"])
                 transaction.on_commit(lambda: cleanup_failed_build_artifacts.delay(str(build.public_id), True))
             return Response(
@@ -149,24 +127,16 @@ class BuildWebhookEndpoint(APIView):
             )
         # The only image a build may publish is the one named after its own identity; a
         # reporter-supplied reference is never trusted, whichever backend ran the build.
-        expected_image = _expected_image_reference(build)
+        expected_image = expected_build_image(build)
         will_register = (
             incoming in {"success", "succeeded", "ready", "completed"}
             and build.deletion_state == "active"
             and build.project.deletion_state == "active"
         )
-        if will_register:  # a result that is discarded anyway must still be able to finish the build
-            if (
-                request.data.get("image_uri") != expected_image
-                or not re.fullmatch(r"sha256:[a-f0-9]{64}", str(request.data.get("image_digest", "")))
-                or not isinstance(request.data.get("package_manifest"), dict)
-                or not request.data.get("package_manifest")
-                or not build.package_uri
-                or request.data.get("package_uri", build.package_uri) != build.package_uri
-            ):
-                return Response(
-                    {"detail": "A valid build-scoped image, digest and package manifest are required."}, status=400
-                )
+        if will_register and not valid_build_result(build, request.data, expected_image):
+            return Response(
+                {"detail": "A valid build-scoped image, digest and package manifest are required."}, status=400
+            )
         if build.backend == "docker" and build.execution_deadline_at and build.execution_deadline_at <= timezone.now():
             return Response({"detail": "Build result arrived after the execution deadline."}, status=409)
         build.execution_completed_at = timezone.now()
@@ -189,23 +159,7 @@ class BuildWebhookEndpoint(APIView):
                 else:
                     transaction.on_commit(lambda: cleanup_failed_build_artifacts.delay(str(build.public_id), True))
             else:
-                build.package_uri = str(request.data.get("package_uri") or build.package_uri)
-                build.save(update_fields=["package_uri", "updated_at"])
-                build = complete_build(
-                    build,
-                    image_uri=image_uri,
-                    image_digest=image_digest,
-                    metrics=None if build.source_job_reference else _dict_payload(request.data.get("metrics_summary")),
-                    params=None if build.source_job_reference else _dict_payload(request.data.get("params_summary")),
-                    insights=None
-                    if build.source_job_reference
-                    else _dict_payload(request.data.get("insights_summary")),
-                    requirements=request.data.get("requirements_snapshot")
-                    if isinstance(request.data.get("requirements_snapshot"), str)
-                    else None,
-                )
-                build.completed_at = timezone.now()
-                build.save(update_fields=["completed_at", "updated_at"])
+                build = complete_reported_build(build, request.data, expected_image)
         else:
             build.status = "failed"
             # Cleanup deletes build.image_uri from the registry, so it must stay build-scoped.

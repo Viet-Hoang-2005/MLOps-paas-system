@@ -8,19 +8,22 @@ from datetime import timedelta
 from django.conf import settings
 from django.core import signing
 from django.db import transaction
-from django.db.models import Case, CharField, Q, Value, When
+from django.db.models import Case, CharField, F, Q, Value, When
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from apps.deployment.models import Build, Deployment
 from apps.drift.models import DriftRun
 from apps.training.models import TrainingJob
 from common.logging import record_transition
-from infrastructure.execution import drift_backend, training_backend
+from infrastructure.execution import build_backend, deployment_backend, drift_backend, training_backend
 from infrastructure.storage import S3Storage
 
 logger = logging.getLogger(__name__)
 TERMINAL = {"completed", "failed", "cancelled", "skipped"}
 ACTIVE = {"queued", "running", "uploading", "cancelling"}
+ARGO_SERVING_KINDS = {"build", "deployment"}
+MODELS = {"training": TrainingJob, "drift": DriftRun, "build": Build, "deployment": Deployment}
 WATCH_FIELDS = [
     field.name
     for field in TrainingJob._meta.fields
@@ -49,22 +52,27 @@ def _enqueue_observation_status():
 
 
 def model_for(kind):
-    if kind not in {"training", "drift"}:
+    if kind not in MODELS:
         raise ValueError("Unsupported execution kind")
-    return TrainingJob if kind == "training" else DriftRun
+    return MODELS[kind]
 
 
 def resource_for(kind, public_id):
-    related = (
-        ("project__owner", "owner")
-        if kind == "training"
-        else ("monitor__version__project__owner",)
-    )
-    return model_for(kind).objects.select_related(*related).filter(public_id=public_id).first()
+    related = {
+        "training": ("project__owner", "owner"),
+        "drift": ("monitor__version__project__owner",),
+        "build": ("project__owner",),
+        "deployment": ("version__project__owner", "endpoint"),
+    }
+    return model_for(kind).objects.select_related(*related[kind]).filter(public_id=public_id).first()
 
 
 def project_for(row, kind):
-    return row.project if kind == "training" else row.monitor.version.project
+    if kind in {"training", "build"}:
+        return row.project
+    if kind == "deployment":
+        return row.version.project
+    return row.monitor.version.project
 
 
 def ownership_for(row, kind):
@@ -75,6 +83,10 @@ def ownership_for(row, kind):
 
 
 def backend_for(row, kind):
+    if kind == "build":
+        return build_backend(row.backend)
+    if kind == "deployment":
+        return deployment_backend(row.backend)
     return training_backend(row.backend) if kind == "training" else drift_backend(row.monitor.backend)
 
 
@@ -107,15 +119,26 @@ def enqueue_safely(row, task):
 def claim(kind, public_id=None):
     now = timezone.now()
     with transaction.atomic():
-        candidates = Q(status__in=ACTIVE) | Q(observation_status="cleanup_pending")
-        if kind == "training":
+        if kind == "build":
+            candidates = Q(backend="argo", status="building", deletion_state="active", project__deletion_state="active")
+        elif kind == "deployment":
+            candidates = Q(
+                backend="argo",
+                status__in=("deploying", "unconfirmed"),
+                version__deletion_requested=False,
+                version__project__deletion_state="active",
+            )
+        elif kind == "training":
+            candidates = Q(status__in=ACTIVE) | Q(observation_status="cleanup_pending")
             candidates |= Q(deletion_requested_at__isnull=False)
             candidates &= Q(submitted_at__isnull=False)
-        elif kind == "drift":
-            candidates &= Q(monitor__deletion_requested=False, monitor__version__deletion_requested=False)
+        else:
+            candidates = (Q(status__in=ACTIVE) | Q(observation_status="cleanup_pending")) & Q(
+                monitor__deletion_requested=False, monitor__version__deletion_requested=False
+            )
         rows = (
             model_for(kind)
-            .objects.select_for_update(skip_locked=True)
+            .objects.select_for_update(of=("self",), skip_locked=True)
             .filter(candidates)
             .filter(Q(execution_check_lease_until__isnull=True) | Q(execution_check_lease_until__lte=now))
         )
@@ -125,20 +148,24 @@ def claim(kind, public_id=None):
             rows = rows.filter(Q(next_execution_check_at__isnull=True) | Q(next_execution_check_at__lte=now))
         claimed = []
         lease_seconds = getattr(settings, "EXECUTION_CHECK_LEASE_SECONDS", 300)
-        for row in rows.order_by("pk")[:100]:
+        ordering = (F("next_execution_check_at").asc(nulls_first=True), "pk") if kind in ARGO_SERVING_KINDS else ("pk",)
+        for row in rows.order_by(*ordering)[:100]:
             row.execution_check_token = uuid.uuid4()
             row.execution_check_lease_until = now + timedelta(seconds=lease_seconds)
-            row.dispatch_deadline_at = row.dispatch_deadline_at or now + timedelta(
-                seconds=settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS
-            )
-            row.save(update_fields=WATCH_FIELDS)
+            if kind in ARGO_SERVING_KINDS:
+                row.save(update_fields=["execution_check_token", "execution_check_lease_until"])
+            else:
+                row.dispatch_deadline_at = row.dispatch_deadline_at or now + timedelta(
+                    seconds=settings.EXECUTION_DISPATCH_TIMEOUT_SECONDS
+                )
+                row.save(update_fields=WATCH_FIELDS)
             claimed.append((str(row.public_id), str(row.execution_check_token)))
         return claimed
 
 
 def _reconcile_argo_deadlines():
-    from apps.deployment.models import Build, Deployment
-    from apps.deployment.tasks import cleanup_failed_build_artifacts, mark_deployment_unconfirmed
+    from apps.deployment.services.argo_recovery import fail_unconfirmed_build
+    from apps.deployment.tasks import mark_deployment_unconfirmed
 
     now = timezone.now()
     for deployment_id in Deployment.objects.filter(
@@ -149,30 +176,31 @@ def _reconcile_argo_deadlines():
         except Exception:
             logger.warning("Failed to mark expired Argo deployment %s unconfirmed", deployment_id, exc_info=True)
 
-    for build_id in Build.objects.filter(
+    expired = Build.objects.filter(
         backend="argo", status="building", execution_deadline_at__lte=now
-    ).values_list("public_id", flat=True)[:50]:
+    )
+    if settings.ARGO_RECONCILE_WEBHOOK_URL:
+        expired.filter(callback_wait_until__isnull=True).update(
+            callback_wait_until=now + timedelta(seconds=2 * settings.EXECUTION_CHECK_LEASE_SECONDS),
+            next_execution_check_at=now,
+        )
+        return
+    for build_id in expired.values_list("public_id", flat=True)[:50]:
         with transaction.atomic():
             build = Build.objects.select_for_update().filter(public_id=build_id, status="building").first()
             if not build or not build.execution_deadline_at or build.execution_deadline_at > now:
                 continue
-            build.status = "failed"
-            build.error_message = "Build execution exceeded its deadline."
-            build.completed_at = now
-            build.next_execution_check_at = now
-            build.save(update_fields=["status", "error_message", "completed_at", "next_execution_check_at", "updated_at"])
-            record_transition(build, "failed", reason="Argo build execution deadline exceeded")
-            transaction.on_commit(lambda bid=str(build.public_id): cleanup_failed_build_artifacts.delay(bid, True))
+            fail_unconfirmed_build(build, "Build execution exceeded its deadline.")
 
 
 def scan():
     from apps.observability.tasks import reconcile_job_execution
 
-    if not (settings.DRIFT_EXECUTION_WATCH_ENABLED or settings.TRAINING_EXECUTION_WATCH_ENABLED):
-        return 0
     count = 0
     lease_seconds = getattr(settings, "EXECUTION_CHECK_LEASE_SECONDS", 300)
-    for kind in ("training", "drift"):
+    for kind in ("training", "drift", "build", "deployment"):
+        if kind in ARGO_SERVING_KINDS and not settings.ARGO_RECONCILE_WEBHOOK_URL:
+            continue
         if kind == "training" and not settings.TRAINING_EXECUTION_WATCH_ENABLED:
             continue
         if kind == "drift" and not settings.DRIFT_EXECUTION_WATCH_ENABLED:
@@ -182,11 +210,10 @@ def scan():
                 reconcile_job_execution.apply_async(args=[kind, public_id, token], expires=min(60, lease_seconds))
                 count += 1
             except Exception:
-                model_for(kind).objects.filter(public_id=public_id, execution_check_token=token).update(
-                    execution_check_lease_until=None,
-                    observation_status=_enqueue_observation_status(),
-                    observation_error="Broker unavailable.",
-                )
+                updates = {"execution_check_lease_until": None}
+                if kind not in ARGO_SERVING_KINDS:
+                    updates.update(observation_status=_enqueue_observation_status(), observation_error="Broker unavailable.")
+                model_for(kind).objects.filter(public_id=public_id, execution_check_token=token).update(**updates)
     return count
 
 
@@ -229,6 +256,23 @@ def reconcile(kind, public_id, token=None):
     row = resource_for(kind, public_id)
     if not _valid(row, token):
         return "ignored"
+    if kind in ARGO_SERVING_KINDS:
+        if kind == "build" and row.callback_wait_until:
+            from apps.deployment.services.argo_recovery import apply_argo_observation
+
+            # At the deadline the durable result can be recovered even if Argo Events is unavailable.
+            deadline_elapsed = row.callback_wait_until <= timezone.now()
+            status = apply_argo_observation(
+                row, kind, token, {"status": "not_found"},
+                retain_lease=not deadline_elapsed, deadline_check=deadline_elapsed,
+            )
+            if status is not None:
+                return status
+        try:
+            backend_for(row, kind).reconcile(row, kind, token)
+            return "awaiting_observation"
+        except Exception as exc:
+            return apply_observation(kind, public_id, token, {"status": "error", "error": type(exc).__name__})
     try:
         backend = backend_for(row, kind)
     except Exception as exc:
@@ -425,6 +469,10 @@ def apply_observation(kind, public_id, token, observation):
     row = resource_for(kind, public_id)
     if not _valid(row, token):
         return "ignored"
+    if kind in ARGO_SERVING_KINDS:
+        from apps.deployment.services.argo_recovery import apply_argo_observation
+
+        return apply_argo_observation(row, kind, token, observation)
     observed = observation["status"]
     data = None
     if observed == "completed" and row.status not in TERMINAL and not row.execution_stop_requested:
@@ -519,10 +567,19 @@ def apply_observation(kind, public_id, token, observation):
             _release(current)
             current.next_execution_check_at = None
             current.save(update_fields=["next_execution_check_at"])
-            if kind == "training" and current.deletion_requested_at:
-                from apps.training.tasks import delete_training_job
+            if kind == "training":
+                if project and project.deletion_state == "deleting":
+                    from apps.catalog.tasks import execute_project_deletion
+                    from apps.observability.services.argo_stops import project_has_unconfirmed_argo_stops
 
-                transaction.on_commit(lambda: enqueue_safely(current, delete_training_job))
+                    if not project_has_unconfirmed_argo_stops(project) and not project.training_jobs.exclude(
+                        status__in=("completed", "failed", "cancelled")
+                    ).exists():
+                        transaction.on_commit(lambda: execute_project_deletion.delay(str(project.public_id)))
+                elif current.deletion_requested_at:
+                    from apps.training.tasks import delete_training_job
+
+                    transaction.on_commit(lambda: enqueue_safely(current, delete_training_job))
             return current.status
         if inactive or current.execution_stop_requested or current.status in TERMINAL or current.status == "cancelling":
             current.observation_status = "cleanup_pending"

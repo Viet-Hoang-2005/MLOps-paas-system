@@ -1,10 +1,50 @@
+import re
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build
+from infrastructure.execution.image_references import temporary_image_reference
+
+
+def expected_build_image(build):
+    return temporary_image_reference(
+        build.project.public_id,
+        build.public_id,
+        registry=settings.HARBOR_REGISTRY_URL if build.backend == "argo" else "",
+        registry_project=settings.HARBOR_USER_PROJECT,
+    )
+
+
+def valid_build_result(build, payload, expected_image):
+    return (
+        payload.get("image_uri") == expected_image
+        and re.fullmatch(r"sha256:[a-f0-9]{64}", str(payload.get("image_digest", "")))
+        and isinstance(payload.get("package_manifest"), dict)
+        and bool(payload["package_manifest"])
+        and bool(build.package_uri)
+        and payload.get("package_uri", build.package_uri) == build.package_uri
+    )
+
+
+def complete_reported_build(build, payload, expected_image):
+    summaries = {
+        field: payload[field] if isinstance(payload.get(field), dict) and not build.source_job_reference else None
+        for field in ("metrics_summary", "params_summary", "insights_summary")
+    }
+    requirements = payload.get("requirements_snapshot")
+    return complete_build(
+        build,
+        image_uri=expected_image,
+        image_digest=str(payload["image_digest"]),
+        metrics=summaries["metrics_summary"],
+        params=summaries["params_summary"],
+        insights=summaries["insights_summary"],
+        requirements=requirements if isinstance(requirements, str) else None,
+    )
 
 
 def complete_build(
