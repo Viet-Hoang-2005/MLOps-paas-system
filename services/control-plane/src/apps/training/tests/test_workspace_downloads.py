@@ -1,4 +1,5 @@
 from io import BytesIO
+from unittest.mock import Mock
 from zipfile import ZipFile, ZipInfo
 
 import pytest
@@ -135,6 +136,48 @@ def test_output_download_is_binary_safe_and_download_all_is_a_zip(files):
         assert archive.namelist() == ["nested/b.bin"]
     with ZipFile(BytesIO(body(get(client, job, "outputs")))) as archive:
         assert len(archive.namelist()) == 4 and archive.read("Model/model.pkl") == b"\x00\xff\x80model"
+
+
+def test_original_downloads_sign_exact_objects_without_opening_stream(files, monkeypatch):
+    job, storage, client = files
+    freeze_uri = expected_training_uris(job, storage.bucket)["code"]
+    sign = Mock(return_value="https://storage.test/signed")
+    stream = Mock()
+    monkeypatch.setattr(storage, "presigned_get", sign)
+    monkeypatch.setattr(storage, "open_stream", stream)
+
+    def assert_download(response, uri, filename):
+        assert response.status_code == 200
+        assert response.data == {"download_url": "https://storage.test/signed"}
+        assert response["Cache-Control"] == "private, no-store"
+        sign.assert_called_with(uri, expires_in=300, public=True, filename=filename)
+
+    job.workspace.refresh_from_db()
+    entry = job.workspace.entries.get(relative_path="data/a.csv")
+    assert_download(
+        get(client, job, "input", entry.relative_path, delivery="direct", revision=job.workspace.revision),
+        entry.s3_uri, "a.csv",
+    )
+    assert get(client, job, "input", entry.relative_path, delivery="direct", revision=999).status_code == 409
+    assert get(client, job, "input", "data", delivery="direct", revision=job.workspace.revision).status_code == 404
+    output = job.outputs.get(relative_path="Metadata/reports/a.json")
+    assert_download(
+        get(client, job, "outputs", output.relative_path, delivery="direct"),
+        output.s3_uri, "a.json",
+    )
+    TrainingOutput.objects.filter(pk=output.pk).update(s3_uri="s3://test-bucket/another-project/a.json")
+    assert get(client, job, "outputs", output.relative_path, delivery="direct").status_code == 409
+    assert get(client, job, "outputs", "_mlops/manifest.json", delivery="direct").status_code == 404
+    job.outputs_purged_at = timezone.now()
+    job.save(update_fields=["outputs_purged_at"])
+    assert get(client, job, "outputs", output.relative_path, delivery="direct").status_code == 409
+    freeze(job, storage)
+    assert_download(get(client, job, "input", delivery="direct"), freeze_uri, "input.zip")
+    assert get(client, job, "input", "train.py", delivery="direct").status_code == 400
+    client.force_authenticate(get_user_model().objects.create_user("wrong-downloads@example.test"))
+    assert get(client, job, "input", delivery="direct").status_code == 404
+    assert sign.call_count == 3
+    stream.assert_not_called()
 
 
 def test_empty_missing_invalid_and_stale_selections_are_rejected(files):

@@ -23,6 +23,7 @@ from apps.training.api.webhooks import (
     TrainingOutputUploadURLEndpoint,
     TrainingRuntimeConfigEndpoint,
 )
+from common.api.csv_uploads import CSVUploadURLEndpoint
 
 urlpatterns = [
     path("internal/executions/<str:kind>/<uuid:public_id>/observations/", ExecutionObservationEndpoint.as_view()),
@@ -30,6 +31,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.auth.api.urls")),
     path("api/api-keys/", include("apps.access.api.urls")),
+    path("api/csv-upload-urls/<str:purpose>/<uuid:resource_id>/", CSVUploadURLEndpoint.as_view()),
     path("api/2.0/mlflow/", include("apps.mlflow.urls")),
     # MLflow Root Artifact Proxy routes (for root or non-prefixed tracking URIs)
     path("api/2.0/mlflow-artifacts/artifacts/<path:subpath>", MLflowArtifactsProxyView.as_view()),

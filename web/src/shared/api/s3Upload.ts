@@ -1,3 +1,6 @@
+import { apiClient } from "@/shared/api/client";
+import { controlPlaneURL } from "@/shared/api/config";
+
 /**
  * Direct-to-S3 Presigned Upload Helper
  *
@@ -5,6 +8,25 @@
  * Crucial: Does NOT attach application credentials, Authorization headers, or cookies,
  * ensuring no AWS signature mismatch or CORS credential rejection.
  */
+
+export async function stageCsvUpload(
+  purpose: "workspace" | "training-output" | "version" | "drift-monitor",
+  resourceId: string,
+  file: File,
+  revision?: number,
+): Promise<string> {
+  const { data } = await apiClient.post<{
+    upload_url: string;
+    content_type: string;
+    upload_token: string;
+  }>(controlPlaneURL(`/csv-upload-urls/${purpose}/${resourceId}/`), {
+    filename: file.name,
+    size_bytes: file.size,
+    revision,
+  });
+  await uploadFileToPresignedUrl(data.upload_url, file, data.content_type);
+  return data.upload_token;
+}
 
 export interface UploadProgressCallback {
   (percent: number): void;

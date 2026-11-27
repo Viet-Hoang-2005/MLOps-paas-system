@@ -64,6 +64,8 @@ export const monitoringVi = {
     createTitle: "Tạo cấu hình giám sát",
     back: "Quay lại Giám sát lệch dữ liệu",
     referenceTitle: "Chọn dữ liệu tham chiếu",
+    downloadOriginal: "Tải CSV gốc",
+    downloadFailed: "Không thể tải CSV gốc.",
     referenceDescription:
       "Chọn hoặc tải lên CSV nền để phát hiện lệch dữ liệu.",
     referenceData: "Dữ liệu tham chiếu",

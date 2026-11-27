@@ -73,6 +73,15 @@ def test_django_storage_uses_public_endpoint_for_url(settings):
     assert "X-Amz-Signature" in parse_qs(parsed.query)
 
 
+def test_attachment_get_presigns_unicode_filename_on_public_endpoint(settings):
+    settings.AWS_S3_ENDPOINT_URL = "http://minio:9000"
+    settings.AWS_S3_PUBLIC_ENDPOINT_URL = "http://localhost:9000"
+    url = S3Storage(bucket="bucket").presigned_get("s3://bucket/path/data.csv", 300, public=True, filename="dữ liệu.csv")
+    assert urlparse(url).netloc == "localhost:9000"
+    assert _query(url)["X-Amz-Expires"] == ["300"]
+    assert _query(url)["response-content-disposition"] == ["attachment; filename*=utf-8''d%E1%BB%AF%20li%E1%BB%87u.csv"]
+
+
 def test_init_minio_skips_when_real_aws_keys_set(monkeypatch):
     from infrastructure.storage import init_minio
 

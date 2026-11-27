@@ -1,11 +1,12 @@
 import uuid
 
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.catalog.models import ModelProject
+from apps.catalog.models import ModelProject, PreviewAsset
 from apps.catalog.selectors import project_for_user
 from apps.catalog.services.deletion import request_project_deletion
 from apps.catalog.services.preview import (
@@ -18,7 +19,9 @@ from apps.deployment.api.serializers import (
     BuildSerializer,
 )
 from apps.deployment.services.builds import request_preview_build
+from common.api.downloads import scoped_download_response
 from common.api.exceptions import Conflict
+from infrastructure.storage.paths import preview_committed_prefix
 
 from .serializers import (
     ModelPreviewSerializer,
@@ -123,6 +126,17 @@ class ProjectPreviewEndpoint(APIView):
 
         notify_project_preview_updated(project)
         return Response(ModelPreviewSerializer(preview).data)
+
+
+class ProjectPreviewReferenceDownloadEndpoint(APIView):
+    def get(self, request, project_id):
+        project = project_for_user(request.user, project_id)
+        asset = get_object_or_404(PreviewAsset, preview__project=project, kind="reference_data")
+        return scoped_download_response(
+            asset.s3_uri,
+            prefix=preview_committed_prefix(project.owner.tenant_id, project.public_id),
+            filename=asset.name,
+        )
 
 
 class ProjectPreviewUploadUrlsEndpoint(APIView):

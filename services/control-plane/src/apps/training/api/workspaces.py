@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from apps.training.models import TrainingWorkspace
 from apps.training.services import workspaces as service
+from infrastructure.storage.staged_csv import resolve_csv_upload
 
 
 def _workspace(user, workspace_id):
@@ -43,10 +44,12 @@ class WorkspaceEntriesEndpoint(APIView):
         workspace = _workspace(request.user, workspace_id)
         kind = request.data.get("kind", "")
         payload, uploaded = _payload(request, max_bytes=service.MAX_DATA if kind == "data" else service.MAX_TEXT)
-        if kind == "data" and not uploaded:
+        revision = request.data.get("revision")
+        staged = _staged_csv(request, workspace, revision, kind, payload)
+        if kind == "data" and not (uploaded or staged):
             raise ValidationError({"file": "Upload a CSV file."})
         entry, revision = service.create_entry(
-            workspace, revision=request.data.get("revision"), path=request.data.get("path"), kind=kind, payload=payload
+            workspace, revision=revision, path=request.data.get("path"), kind=kind, payload=payload, staged_csv=staged
         )
         return Response({"entry": _serialize_entry(entry), "revision": revision}, status=status.HTTP_201_CREATED)
 
@@ -62,14 +65,17 @@ class WorkspaceEntryEndpoint(APIView):
         if (kind or entry.kind) == "data" and payload is not None and not replacement:
             raise ValidationError({"file": "Upload a CSV file."})
         path = request.data.get("path")
+        revision = request.data.get("revision")
+        staged = _staged_csv(request, workspace, revision, kind or entry.kind, payload)
         entry, revision = service.edit_file(
             workspace,
             entry_id,
-            revision=request.data.get("revision"),
+            revision=revision,
             path=path,
             kind=kind,
             payload=payload,
-            replacement=replacement,
+            replacement=replacement or staged is not None,
+            staged_csv=staged,
         )
         entry.refresh_from_db()
         return Response({"entry": _serialize_entry(entry), "revision": revision})
@@ -79,6 +85,16 @@ class WorkspaceEntryEndpoint(APIView):
         _entry(workspace, entry_id)
         revision = service.delete_entry(workspace, entry_id, revision=request.data.get("revision"))
         return Response({"revision": revision})
+
+
+def _staged_csv(request, workspace, revision, kind, payload):
+    if "csv_upload_token" not in request.data:
+        return None
+    if kind != "data" or payload is not None:
+        raise ValidationError({"file": "Use one upload token for a CSV entry."})
+    return resolve_csv_upload(
+        request.data["csv_upload_token"], workspace, "workspace", revision=revision, error_field="file"
+    )
 
 
 class WorkspaceSecretEndpoint(APIView):

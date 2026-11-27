@@ -153,14 +153,17 @@ class TrainingWorkspaceDownloadEndpoint(APIView):
     def get(self, request, job_id, area):
         from django.http import FileResponse
 
-        from apps.training.services.downloads import workspace_download
+        from apps.training.services.downloads import direct_workspace_download, workspace_download
 
-        stream, filename, content_type = workspace_download(
-            job_for_user(request.user, job_id),
+        job = job_for_user(request.user, job_id)
+        options = dict(
             area=area,
             path=request.query_params.get("path"),
             revision=request.query_params.get("revision"),
         )
+        if request.query_params.get("delivery") == "direct":
+            return direct_workspace_download(job, **options)
+        stream, filename, content_type = workspace_download(job, **options)
         response = FileResponse(stream, as_attachment=True, filename=filename, content_type=content_type)
         response["Cache-Control"] = "private, no-store"
         return response
@@ -197,6 +200,8 @@ class TrainingJobModelOutputEndpoint(APIView):
         }
         if "build_requirements_text" in request.data:
             data["build_requirements_text"] = request.data["build_requirements_text"]
+        if "csv_upload_token" in request.data:
+            data["csv_upload_token"] = request.data["csv_upload_token"]
         summary = mutate_training_output(job=job, user=request.user, data=data)
         return Response(summary, status=status.HTTP_200_OK)
 

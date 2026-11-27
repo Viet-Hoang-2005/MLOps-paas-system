@@ -62,6 +62,8 @@ export const driftEn = {
     createTitle: "Create drift monitor",
     back: "Back to drift monitoring",
     referenceTitle: "Select reference data",
+    downloadOriginal: "Download original CSV",
+    downloadFailed: "Could not download the original CSV.",
     referenceDescription:
       "Select or upload a baseline CSV file to use when detecting data drift.",
     referenceData: "Reference data",

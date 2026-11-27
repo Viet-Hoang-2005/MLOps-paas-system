@@ -12,13 +12,13 @@ from apps.training.models import TrainingJob, TrainingOutput
 from common.api.exceptions import Conflict
 from common.validation.artifacts import (
     MAX_REFERENCE_DATA_BYTES,
-    parse_reference_preview,
     validate_reference_data_file,
     validate_source_code_file,
 )
 from common.validation.revisions import validate_output_revision
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import tenant_training_job_prefix, training_output_prefix
+from infrastructure.storage.staged_csv import resolve_csv_upload
 
 
 def verify_training_output(job, storage=None):
@@ -137,6 +137,8 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
         raise Conflict("Cannot edit output of a job that is not completed.")
     if job.outputs_purged_at:
         raise Conflict("Outputs for this training job have been purged.")
+    if job.deletion_requested_at:
+        raise Conflict("This training job is being deleted.")
     if expected_revision != job.output_revision:
         raise Conflict("Revision conflict. Please reload latest outputs before saving.")
 
@@ -150,6 +152,14 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
 
     source_code_file = data.get("source_code_file")
     reference_data_file = data.get("reference_data_file")
+    staged_csv = None
+    if "csv_upload_token" in data:
+        if reference_data_file is not None:
+            raise ValidationError({"reference_data_file": "Send either a CSV file or an upload token."})
+        staged_csv = resolve_csv_upload(
+            data["csv_upload_token"], job, "training-output", revision=expected_revision,
+            error_field="reference_data_file",
+        )
 
     if job.storage_layout == "tenant":
         out_prefix = f"{tenant_training_job_prefix(job.owner.tenant_id, job.public_id)}/output/"
@@ -170,7 +180,12 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
             stored_source = storage.put(source_key, source_code_file, "text/x-python")
             new_uploaded_uris.append(stored_source.uri)
 
-        if reference_data_file:
+        if staged_csv:
+            ref_filename = staged_csv.filename
+            ref_key = f"{out_prefix}supplemental/reference/{uuid.uuid4().hex}_{ref_filename}"
+            stored_ref = staged_csv.promote(storage, ref_key)
+            new_uploaded_uris.append(stored_ref.uri)
+        elif reference_data_file:
             ref_filename, _ = validate_reference_data_file(reference_data_file)
             ref_key = f"{out_prefix}supplemental/reference/{uuid.uuid4().hex[:8]}_{ref_filename}"
             stored_ref = storage.put(ref_key, reference_data_file, "text/csv")
@@ -193,6 +208,8 @@ def mutate_training_output(*, job: TrainingJob, user, data: dict[str, Any], stor
                 raise Conflict("Cannot edit output of a job that is not completed.")
             if job.outputs_purged_at:
                 raise Conflict("Outputs for this training job have been purged.")
+            if job.deletion_requested_at:
+                raise Conflict("This training job is being deleted.")
             if expected_revision != job.output_revision:
                 raise Conflict("Revision conflict. Please reload latest outputs before saving.")
 

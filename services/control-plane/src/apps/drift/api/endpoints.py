@@ -9,9 +9,11 @@ from apps.drift.services.logs import drift_run_logs
 from apps.drift.services.monitors import get_monitor_reference_preview, reference_download_url
 from apps.drift.services.reports import get_drift_report_data, report_uri_for_run
 from apps.drift.services.runs import request_run
+from common.api.downloads import scoped_download_response
 from common.api.exceptions import Conflict
 from infrastructure.runtime_logs import runtime_log_page
 from infrastructure.storage import S3Storage
+from infrastructure.storage.paths import project_prefix, version_prefix
 
 from .serializers import DriftMonitorSerializer, DriftRunSerializer
 
@@ -78,6 +80,20 @@ class DriftRunEndpoint(APIView):
 class DriftMonitorReferenceURLEndpoint(APIView):
     def get(self, request, monitor_id):
         monitor = monitor_for_user(request.user, monitor_id)
+        if request.query_params.get("download") == "1":
+            version = monitor.version
+            project = version.project
+            if monitor.deletion_requested or version.deletion_requested or project.deletion_state != "active" or not project.is_active:
+                raise Conflict("This drift reference is unavailable.")
+            tenant = project.owner.tenant_id
+            return scoped_download_response(
+                monitor.reference_uri,
+                prefix=(
+                    version_prefix(tenant, project.public_id, version.public_id) + "/",
+                    f"{project_prefix(tenant, project.public_id)}/drift/{monitor.public_id}/",
+                ),
+                filename=monitor.reference_name or "reference.csv",
+            )
         return Response({"url": reference_download_url(monitor)})
 
 

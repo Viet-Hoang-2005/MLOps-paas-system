@@ -1,6 +1,7 @@
 import hashlib
 import uuid
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -22,7 +23,7 @@ from apps.observability.services.runtime_metrics import runtime_metrics
 from apps.registry.models import ModelVersion
 from apps.registry.services.versions import register_successful_build
 from common.api.exceptions import Conflict
-from infrastructure.storage.paths import project_prefix
+from infrastructure.storage.paths import project_prefix, version_prefix
 from infrastructure.storage.s3 import StoredObject
 
 
@@ -132,6 +133,40 @@ def staged_assets(project, storage, entries):
         stored = storage.put(key, payload)
         result.append({"kind": kind, "name": name, "s3_uri": stored.uri})
     return result
+
+
+def test_reference_downloads_sign_original_objects(project, monkeypatch):
+    storage = MemoryStorage()
+    preview_reference = draft(project, storage).assets.get(kind="reference_data")
+    version = project.versions.create(version="1")
+    version_key = version_prefix(project.owner.tenant_id, project.public_id, version.public_id)
+    artifact = version.artifacts.create(
+        kind="reference_data", name="reference.csv", uri=f"s3://{storage.bucket}/{version_key}/reference.csv"
+    )
+    monitor = DriftMonitor.objects.create(
+        version=version, name="Monitor", reference_uri=artifact.uri, reference_name=artifact.name
+    )
+    sign = Mock(return_value="https://storage.test/original")
+    monkeypatch.setattr(storage, "presigned_get", sign)
+    monkeypatch.setattr("common.api.downloads.S3Storage", lambda: storage)
+    client = APIClient()
+    client.force_authenticate(project.owner)
+    paths = [
+        (f"/api/models/{project.public_id}/preview/reference-download/", preview_reference.s3_uri),
+        (f"/api/registry/versions/{version.public_id}/reference-download/", artifact.uri),
+        (f"/api/drift-monitors/{monitor.public_id}/reference-url/?download=1", artifact.uri),
+    ]
+    for path, uri in paths:
+        response = client.get(path)
+        assert response.status_code == 200
+        assert response.data == {"download_url": "https://storage.test/original"}
+        sign.assert_called_with(uri, expires_in=300, public=True, filename="reference.csv")
+    version.artifacts.filter(pk=artifact.pk).update(uri=f"s3://{storage.bucket}/elsewhere/reference.csv")
+    assert client.get(paths[1][0]).status_code == 409
+    client.force_authenticate(get_user_model().objects.create_user("wrong-reference@example.test"))
+    for path, _ in paths:
+        assert client.get(path).status_code == 404
+    assert sign.call_count == 3
 
 
 def test_preview_revision_and_snapshot_isolation(project, monkeypatch):

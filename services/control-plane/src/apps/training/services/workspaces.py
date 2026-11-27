@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import uuid
+from functools import lru_cache
 from io import BytesIO
 from pathlib import PurePosixPath
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -70,7 +71,7 @@ def validate_name(name):
     return name
 
 
-def validate_file(path, kind, payload):
+def _validate_file_path(path, kind):
     safe_path(path)
     if kind not in EXTENSIONS:
         raise ValidationError({"kind": "Unsupported file type."})
@@ -81,6 +82,11 @@ def validate_file(path, kind, payload):
         raise ValidationError({"path": "Requirements must be named requirements.txt at the Input root."})
     if not name.lower().endswith(EXTENSIONS[kind]):
         raise ValidationError({"path": "The file extension does not match its type."})
+    return name
+
+
+def validate_file(path, kind, payload):
+    name = _validate_file_path(path, kind)
     if len(payload) > (MAX_DATA if kind == "data" else MAX_TEXT):
         raise ValidationError({"file": "File exceeds the allowed size."})
     if kind == "data":
@@ -248,13 +254,15 @@ def update_workspace(workspace, *, revision, changes):
         return locked
 
 
-def create_entry(workspace, *, revision, path, kind, payload=None, storage=None):
+def create_entry(workspace, *, revision, path, kind, payload=None, staged_csv=None, storage=None):
     safe_path(path)
     if kind == "folder":
         if payload is not None:
             raise ValidationError({"file": "Folders cannot contain uploaded content."})
         if PurePosixPath(path).name.lower() == "requirements.txt":
             raise ValidationError({"path": "requirements.txt is reserved for the requirements file."})
+    elif staged_csv:
+        _validate_file_path(path, kind)
     else:
         if payload is None:
             if kind == "data":
@@ -266,7 +274,7 @@ def create_entry(workspace, *, revision, path, kind, payload=None, storage=None)
     if kind != "folder":
         key = f"users/{workspace.owner.tenant_id}/training/workspaces/{workspace.public_id}/draft/objects/{uuid.uuid4().hex}"
         content_type = "text/csv" if kind == "data" else "text/plain; charset=utf-8"
-        stored = storage.put(key, payload, content_type)
+        stored = staged_csv.promote(storage, key) if staged_csv else storage.put(key, payload, content_type)
     try:
         with transaction.atomic():
             locked = _lock(workspace, revision)
@@ -290,11 +298,13 @@ def create_entry(workspace, *, revision, path, kind, payload=None, storage=None)
         raise
 
 
-def edit_file(workspace, entry_id, *, revision, path=None, kind=None, payload=None, replacement=False, storage=None):
+def edit_file(
+    workspace, entry_id, *, revision, path=None, kind=None, payload=None, replacement=False, staged_csv=None, storage=None
+):
     """Atomically change a file's name, type, and optionally its contents."""
     entry = workspace.entries.get(public_id=entry_id)
     if entry.kind == "folder":
-        if kind is not None or payload is not None or path is None:
+        if kind is not None or payload is not None or staged_csv or path is None:
             raise ValidationError("Folders can only be moved or renamed.")
         return entry, move_entry(workspace, entry_id, revision=revision, path=path)
     path = entry.relative_path if path is None else safe_path(path)
@@ -304,7 +314,11 @@ def edit_file(workspace, entry_id, *, revision, path=None, kind=None, payload=No
     if entry.kind == "requirements" and (path != "requirements.txt" or kind != "requirements" or replacement):
         raise ValidationError({"file": "Delete requirements.txt before replacing or moving it."})
     storage = storage or S3Storage()
-    if payload is None:
+    if staged_csv:
+        _validate_file_path(path, kind)
+        key = f"users/{workspace.owner.tenant_id}/training/workspaces/{workspace.public_id}/draft/objects/{uuid.uuid4().hex}"
+        stored = staged_csv.promote(storage, key)
+    elif payload is None:
         if path == entry.relative_path and kind == entry.kind:
             with transaction.atomic():
                 locked = _lock(workspace, revision)
@@ -403,9 +417,6 @@ def delete_entry(workspace, entry_id, *, revision, storage=None):
         for uri in uris:
             transaction.on_commit(lambda uri=uri: storage.delete(uri), robust=True)
         return locked.revision
-
-
-from functools import lru_cache
 
 
 @lru_cache(maxsize=4)

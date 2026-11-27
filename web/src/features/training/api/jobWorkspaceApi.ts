@@ -1,6 +1,7 @@
 import { apiClient } from "@/shared/api/client";
 import { isAxiosError } from "axios";
 import { controlPlaneURL } from "@/shared/api/config";
+import { stageCsvUpload } from "@/shared/api/s3Upload";
 import type { TrainingJob } from "@/features/training/types";
 import type {
   InputFileKind,
@@ -96,8 +97,17 @@ export async function saveWorkspaceEntry(
   form.append("revision", String(revision));
   form.append("path", selection.path);
   form.append("kind", selection.kind);
-  if (selection.file) form.append("file", selection.file);
-  if (content !== undefined) form.append("content", content);
+  if (selection.kind === "data" && (selection.file || content !== undefined)) {
+    const file = selection.file ?? new File(
+      [content ?? ""],
+      selection.path.split("/").pop()!,
+      { type: "text/csv" },
+    );
+    form.append("csv_upload_token", await stageCsvUpload("workspace", id, file, revision));
+  } else {
+    if (selection.file) form.append("file", selection.file);
+    if (content !== undefined) form.append("content", content);
+  }
   return (
     await apiClient.request<{ entry: WorkspaceEntry; revision: number }>({
       url: `${url(id)}entries/${entryId ? `${entryId}/` : ""}`,

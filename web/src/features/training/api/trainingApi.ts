@@ -2,6 +2,7 @@ import { isAxiosError } from "axios";
 import { apiClient } from "@/shared/api/client";
 import { controlPlaneURL } from "@/shared/api/config";
 import { fetchAllPages } from "@/shared/api/pagination";
+import { stageCsvUpload } from "@/shared/api/s3Upload";
 import type {
   TrainingJob,
   TrainingJobDeletionRequest,
@@ -146,7 +147,9 @@ export const patchModelOutput = async (
     formData.append("source_code_file", payload.source_code_file);
   }
   if (payload.reference_data_file) {
-    formData.append("reference_data_file", payload.reference_data_file);
+    formData.append("csv_upload_token", await stageCsvUpload(
+      "training-output", jobId, payload.reference_data_file, payload.output_revision,
+    ));
   }
   if (payload.remove_assets && payload.remove_assets.length > 0) {
     formData.append("remove_assets", JSON.stringify(payload.remove_assets));

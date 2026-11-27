@@ -1,5 +1,6 @@
 import { apiClient } from "@/shared/api/client";
 import { controlPlaneURL } from "@/shared/api/config";
+import { stageCsvUpload } from "@/shared/api/s3Upload";
 import type { ModelVersion } from "@/features/projects/types";
 import type { ReferenceDataPreview } from "@/features/training/types";
 
@@ -32,7 +33,7 @@ export async function addSupplementalArtifacts(
     formData.append("source_code_file", payload.source_code_file);
   }
   if (payload.reference_data_file) {
-    formData.append("reference_data_file", payload.reference_data_file);
+    formData.append("csv_upload_token", await stageCsvUpload("version", versionId, payload.reference_data_file));
   }
   if (payload.label_mapping_file) {
     formData.append("label_mapping_file", payload.label_mapping_file);

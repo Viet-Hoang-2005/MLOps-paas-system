@@ -12,8 +12,9 @@ import { Placeholder } from "@/shared/components/Placeholder";
 import { Select } from "@/shared/components/Select";
 import { Slider } from "@/shared/components/Slider";
 import { Title } from "@/shared/components/Title";
+import { useOriginalDownload } from "@/shared/hooks/useOriginalDownload";
 import { formatNumber } from "@/shared/i18n/formatters";
-import { Database } from "lucide-react";
+import { Database, Download } from "lucide-react";
 import Papa from "papaparse";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -147,6 +148,10 @@ function CreateDriftMonitorContent({
   const referenceName = monitorId
     ? form.existing.data?.reference_name
     : form.project.data?.reference_data?.name || form.reference?.name;
+  const original = useOriginalDownload(t("createPage.downloadFailed"));
+  const originalPath = monitorId
+    ? form.existing.data && `/drift-monitors/${monitorId}/reference-url/`
+    : form.hasReference && form.versionId && `/registry/versions/${form.versionId}/reference-download/`;
 
   const isReferenceLoading = Boolean(
     form.projectId && (form.project.isLoading || form.referenceQuery.isLoading),
@@ -194,6 +199,17 @@ function CreateDriftMonitorContent({
               title={t("createPage.referenceTitle")}
               description={t("referenceSnapshotHint")}
             />
+            {originalPath && (
+              <Button
+                size="sm"
+                variant="secondary"
+                loading={original.loading}
+                icon={<Download className="h-4 w-4" />}
+                onClick={() => void original.download(originalPath, monitorId ? { download: 1 } : undefined)}
+              >
+                {t("createPage.downloadOriginal")}
+              </Button>
+            )}
             {form.projectId &&
             !form.project.isLoading &&
             !monitorId &&

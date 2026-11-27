@@ -12,6 +12,7 @@ import { FileDropzone } from "@/shared/components/FileDropzone";
 import { Loading } from "@/shared/components/Loading";
 import { Placeholder } from "@/shared/components/Placeholder";
 import { Title } from "@/shared/components/Title";
+import { useOriginalDownload } from "@/shared/hooks/useOriginalDownload";
 import { toast } from "@/shared/lib/toastStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FileSpreadsheet, Lock, Upload } from "lucide-react";
@@ -39,6 +40,7 @@ export function DataEvolutionPage({
 }: DataEvolutionPageProps) {
   const { t } = useTranslation("evolution");
   const queryClient = useQueryClient();
+  const original = useOriginalDownload(t("workspace.downloadFailed"));
 
   const [stagedFile, setStagedFile] = useState<File | null>(null);
 
@@ -61,20 +63,17 @@ export function DataEvolutionPage({
     : "";
   const fileName = refArtifact?.name || "reference_data.csv";
 
-  const handleDownload = () => {
-    if (!csvContent) return;
-    const blob = new Blob([csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+  const originalDownload = (
+    <Button
+      size="sm"
+      variant="secondary"
+      loading={original.loading}
+      icon={<Download className="h-4 w-4" />}
+      onClick={() => void original.download(`/registry/versions/${version.id}/reference-download/`)}
+    >
+      {t("workspace.downloadOriginal")}
+    </Button>
+  );
 
   const handleFileChange = (file: File | null) => {
     if (!file) {
@@ -139,6 +138,7 @@ export function DataEvolutionPage({
             size="lg"
             text={t("workspace.loadingData", "Loading reference data…")}
           />
+          {originalDownload}
         </Placeholder>
       );
     }
@@ -157,14 +157,7 @@ export function DataEvolutionPage({
                 {t("workspace.immutableBadge")}
               </Badge>
             }
-            actionButtons={[
-              {
-                label: t("workspace.download", "Download"),
-                icon: <Download className="h-4 w-4" />,
-                variant: "secondary",
-                onClick: handleDownload,
-              },
-            ]}
+            actions={originalDownload}
           />
         </div>
       </div>

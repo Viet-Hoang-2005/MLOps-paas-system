@@ -9,6 +9,7 @@ from zipfile import ZIP_DEFLATED, ZIP_STORED, BadZipFile, ZipFile
 
 from rest_framework.exceptions import NotFound, ValidationError
 
+from common.api.downloads import scoped_download_response
 from common.api.exceptions import Conflict
 from infrastructure.storage import S3Storage
 
@@ -128,6 +129,42 @@ def _snapshot(job, storage, path):
     finally:
         if path is not None:
             original.close()
+
+
+def direct_workspace_download(resource, *, area, path=None, revision=None):
+    storage = S3Storage()
+    if area == "input" and hasattr(resource, "submitted_at"):
+        if path is not None:
+            raise ValidationError("Only the whole Input snapshot supports direct download.")
+        try:
+            validate_training_uri(resource, storage.bucket, "code", resource.code_snapshot_uri)
+        except ValueError as exc:
+            raise Conflict("Input snapshot is not available for download.") from exc
+        return scoped_download_response(
+            resource.code_snapshot_uri, prefix=training_prefix_for(resource) + "/", filename="input.zip", storage=storage
+        )
+    if not path:
+        raise ValidationError("Select an individual file for direct download.")
+    safe_path(path)
+    if area == "input":
+        if str(resource.revision) != revision:
+            raise Conflict("Workspace changed. Reload before downloading.")
+        entry = resource.entries.filter(relative_path=path).exclude(kind="folder").first()
+        prefix = f"users/{resource.owner.tenant_id}/training/workspaces/{resource.public_id}/draft/objects/"
+        if not type(resource).objects.filter(pk=resource.pk, revision=resource.revision).exists():
+            raise Conflict("Workspace changed. Reload before downloading.")
+    elif area == "output":
+        from .output_index import public_outputs
+
+        if resource.outputs_purged_at:
+            raise Conflict("Training outputs have been purged.")
+        entry = public_outputs(resource).filter(relative_path=path).first()
+        prefix = training_prefix_for(resource) + "/"
+    else:
+        raise ValidationError("Invalid download area.")
+    if entry is None:
+        raise NotFound("File is unavailable.")
+    return scoped_download_response(entry.s3_uri, prefix=prefix, filename=_filename(path, area, True), storage=storage)
 
 
 def workspace_download(job, *, area, path=None, revision=None, storage=None):

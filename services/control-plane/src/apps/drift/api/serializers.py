@@ -73,6 +73,7 @@ class DriftMonitorSerializer(serializers.ModelSerializer):
         slug_field="public_id", queryset=ModelVersion.objects.none(), write_only=True
     )
     reference_file = serializers.FileField(write_only=True, required=False)
+    csv_upload_token = serializers.CharField(write_only=True, required=False, max_length=2048)
     trigger_threshold = serializers.IntegerField(min_value=1, max_value=2147483647)
     runs = DriftRunSerializer(many=True, read_only=True)
 
@@ -84,6 +85,7 @@ class DriftMonitorSerializer(serializers.ModelSerializer):
             "version_id",
             "project_id",
             "reference_file",
+            "csv_upload_token",
             "reference_name",
             "name",
             "trigger_threshold",
@@ -104,7 +106,7 @@ class DriftMonitorSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         version = attrs.get("version", getattr(self.instance, "version", None))
-        if self.instance and any(key in attrs for key in ("version", "reference_file")):
+        if self.instance and any(key in attrs for key in ("version", "reference_file", "csv_upload_token")):
             raise serializers.ValidationError("A monitor's version and reference snapshot are immutable.")
         name = attrs.get("name", getattr(self.instance, "name", ""))
         duplicate = DriftMonitor.objects.filter(version=version, name=name)

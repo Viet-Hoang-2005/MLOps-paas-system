@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { DataViewer } from "@/shared/components/DataViewer";
 import { Loading } from "@/shared/components/Loading";
 import { Placeholder } from "@/shared/components/Placeholder";
+import { useOriginalDownload } from "@/shared/hooks/useOriginalDownload";
 import { toast } from "@/shared/lib/toastStore";
 import {
   Download,
@@ -54,6 +55,7 @@ export function DataOverviewPage({
   onUploadSuccess,
 }: DataOverviewPageProps) {
   const { t } = useTranslation("overview");
+  const original = useOriginalDownload(t("workflow.downloadFailed"));
   const navigate = useNavigate();
   const [viewerContainerEl, setViewerContainerEl] =
     useState<HTMLDivElement | null>(null);
@@ -80,10 +82,9 @@ export function DataOverviewPage({
     setRevertKey((k) => k + 1);
   };
 
-  const handleDownload = () => {
-    const content = isPreview ? csvContent : reference.data || "";
-    if (!content) return;
-    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const handleExportEdits = () => {
+    if (!isDirty) return;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -93,6 +94,23 @@ export function DataOverviewPage({
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
+
+  const originalPath = isPreview
+    ? previewReference.asset && `/models/${modelId}/preview/reference-download/`
+    : effectiveVersionId && (referenceDataName || reference.data) &&
+      `/registry/versions/${effectiveVersionId}/reference-download/`;
+  const originalDownload = originalPath && (
+    <Button
+      size="sm"
+      variant="secondary"
+      loading={original.loading}
+      disabled={saving || deleting}
+      icon={<Download className="h-4 w-4" />}
+      onClick={() => void original.download(originalPath)}
+    >
+      {t("workflow.downloadOriginal")}
+    </Button>
+  );
 
   const handleSave = async () => {
     if (!isPreview || !isDirty || saving) return;
@@ -168,6 +186,7 @@ export function DataOverviewPage({
     return (
       <Placeholder role="tabpanel" className="flex-1 min-h-105">
         <Loading size="lg" text={t("workflow.loadingData")} />
+        {originalDownload}
       </Placeholder>
     );
   }
@@ -182,6 +201,7 @@ export function DataOverviewPage({
         <p role="alert" className="text-style-body text-color-danger">
           {t("workflow.failed")}
         </p>
+        {originalDownload}
       </Placeholder>
     );
   }
@@ -261,15 +281,18 @@ export function DataOverviewPage({
                       {t("workflow.discardChanges")}
                     </Button>
                   )}
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={handleDownload}
-                    disabled={saving || deleting}
-                    icon={<Download className="h-4 w-4" />}
-                  >
-                    {t("workflow.downloadFile")}
-                  </Button>
+                  {originalDownload}
+                  {isDirty && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleExportEdits}
+                      disabled={saving || deleting}
+                      icon={<Download className="h-4 w-4" />}
+                    >
+                      {t("workflow.exportEdits")}
+                    </Button>
+                  )}
                   <Button
                     size="icon"
                     variant="secondary"
@@ -307,18 +330,7 @@ export function DataOverviewPage({
                 {t("workflow.immutableBadge")}
               </Badge>
             }
-            actions={
-              <>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={handleDownload}
-                  icon={<Download className="h-4 w-4" />}
-                >
-                  {t("workflow.downloadFile")}
-                </Button>
-              </>
-            }
+            actions={originalDownload}
             initialCsvText={reference.data || ""}
             readOnly={true}
           />

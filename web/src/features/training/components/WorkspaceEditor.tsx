@@ -48,6 +48,7 @@ import {
   type TrainingWorkspace,
   type WorkspaceEntry,
 } from "@/features/training/api/jobWorkspaceApi";
+import { downloadOriginal } from "@/shared/api/files";
 import {
   droppedEntries,
   kindForPath,
@@ -489,10 +490,26 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
     async function download() {
       if (!canDownloadInput) return;
       if (useSnapshotInput && runId) {
+        if (!selected) {
+          await downloadOriginal(`/training-jobs/${runId}/input/download/`, {
+            delivery: "direct",
+          });
+          return;
+        }
         saveDownload(await downloadWorkspaceSelection(runId, "input", selected));
         return;
       }
       const current = readOnly ? workspace : await cleanDraft();
+      if (selected && current.entries.some(
+        (entry) => entry.path === selected && entry.kind !== "folder",
+      )) {
+        await downloadOriginal(`/training-workspaces/${workspace.id}/input/download/`, {
+          delivery: "direct",
+          path: selected,
+          revision: current.revision,
+        });
+        return;
+      }
       saveDownload(
         await downloadWorkspaceSelection(
           workspace.id,
@@ -505,12 +522,14 @@ export const WorkspaceEditor = forwardRef<WorkspaceEditorHandle, Props>(
 
     async function handleDownloadOutput(item?: TrainingOutput | null) {
       if (!canDownloadOutput) return;
+      const jobId = runId ?? workspace.id;
+      const path = item?.relative_path ?? selectedOutput;
+      if (path && outputs.some((output) => output.relative_path === path)) {
+        await downloadOriginal(`/training-jobs/${jobId}/outputs/download/`, { delivery: "direct", path });
+        return;
+      }
       saveDownload(
-        await downloadWorkspaceSelection(
-          runId ?? workspace.id,
-          "outputs",
-          item?.relative_path ?? selectedOutput,
-        ),
+        await downloadWorkspaceSelection(jobId, "outputs", path),
       );
     }
 

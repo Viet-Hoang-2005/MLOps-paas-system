@@ -158,10 +158,15 @@ class WorkspaceJob(APIView):
 
 class WorkspaceDownload(APIView):
     def get(self, request, workspace_id):
-        stream, filename, content_type = workspace_download(
-            _workspace(request.user, workspace_id),
+        from apps.training.services.downloads import direct_workspace_download
+
+        workspace = _workspace(request.user, workspace_id)
+        options = dict(
             area="input",
             path=request.query_params.get("path"),
             revision=request.query_params.get("revision"),
         )
+        if request.query_params.get("delivery") == "direct":
+            return direct_workspace_download(workspace, **options)
+        stream, filename, content_type = workspace_download(workspace, **options)
         return FileResponse(stream, as_attachment=True, filename=filename, content_type=content_type)

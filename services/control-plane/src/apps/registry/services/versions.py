@@ -14,6 +14,7 @@ from infrastructure.execution.image_references import repository_from_reference
 from infrastructure.execution.image_registry import image_registry_for
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import version_prefix
+from infrastructure.storage.staged_csv import resolve_csv_upload
 
 
 @contextmanager
@@ -342,12 +343,25 @@ class _SupplementalUpload:
     kind: str
     name: str
     content_type: str
-    body: bytes
+    body: bytes | None
     directory: str
     extra_metadata: dict = field(default_factory=dict)
     event_label: str = ""
     event_metadata: dict = field(default_factory=dict)
     summary: object = None
+
+
+def _reference_upload(filename, body):
+    return _SupplementalUpload(
+        kind="reference_data",
+        name=filename,
+        content_type="text/csv",
+        body=body,
+        directory="reference",
+        extra_metadata={"format": "csv"},
+        event_label=f"reference data {filename}",
+        event_metadata={"kind": "reference_data", "name": filename, "format": "csv"},
+    )
 
 
 def _prepare_supplemental_uploads(*, source_code_file, reference_data_file, json_files) -> list[_SupplementalUpload]:
@@ -382,18 +396,7 @@ def _prepare_supplemental_uploads(*, source_code_file, reference_data_file, json
         name = Path(getattr(reference_data_file, "name", "reference_data.csv").replace("\\", "/")).name
         body = reference_data_file.read(MAX_REFERENCE_DATA_BYTES + 1)
         filename, _ = validate_reference_data_content(name, body, error_key="reference_data_file")
-        prepared.append(
-            _SupplementalUpload(
-                kind="reference_data",
-                name=filename,
-                content_type="text/csv",
-                body=body,
-                directory="reference",
-                extra_metadata={"format": "csv"},
-                event_label=f"reference data {filename}",
-                event_metadata={"kind": "reference_data", "name": filename, "format": "csv"},
-            )
-        )
+        prepared.append(_reference_upload(filename, body))
     for kind in _JSON_SUPPLEMENTAL_KINDS:
         f_obj = json_files.get(kind)
         if not f_obj:
@@ -462,6 +465,7 @@ def add_supplemental_artifacts(
     actor,
     source_code_file=None,
     reference_data_file=None,
+    csv_upload_token=None,
     label_mapping_file=None,
     input_schema_file=None,
     metrics_file=None,
@@ -490,13 +494,19 @@ def add_supplemental_artifacts(
         "model_insights": model_insights_file,
         "feature_importance": feature_importance_file,
     }
-    if not source_code_file and not reference_data_file and not any(json_files.values()):
+    if not source_code_file and not reference_data_file and csv_upload_token is None and not any(json_files.values()):
         raise ValidationError({"artifacts": "No supplemental artifact provided."})
 
     storage = storage or S3Storage()
     uploads = _prepare_supplemental_uploads(
         source_code_file=source_code_file, reference_data_file=reference_data_file, json_files=json_files
     )
+    staged_csv = None
+    if csv_upload_token is not None:
+        if reference_data_file is not None:
+            raise ValidationError({"reference_data_file": "Send either a CSV file or an upload token."})
+        staged_csv = resolve_csv_upload(csv_upload_token, version, "version", error_field="reference_data_file")
+        uploads.append(_reference_upload(staged_csv.filename, None))
 
     current = ModelVersion.objects.select_related("project__owner").get(pk=version.pk)
     _check_supplemental_allowed(current, current.project, uploads)
@@ -509,7 +519,10 @@ def add_supplemental_artifacts(
             # A unique key keeps a request that loses the race from deleting the object
             # the winner just stored.
             key = f"{prefix}/artifacts/supplemental/{upload.directory}/{uuid.uuid4().hex}/{upload.name}"
-            stored = storage.put(key, upload.body, upload.content_type)
+            if staged_csv and upload.kind == "reference_data":
+                stored = staged_csv.promote(storage, key)
+            else:
+                stored = storage.put(key, upload.body, upload.content_type)
             uploaded_uris.append(stored.uri)
             stored_objects.append(stored)
 

@@ -14,6 +14,7 @@ from common.validation.artifacts import (
 )
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import version_prefix
+from infrastructure.storage.staged_csv import resolve_csv_upload
 
 MAX_REFERENCE_BYTES = 100 * 1024 * 1024
 
@@ -76,6 +77,12 @@ def create_monitor(*, data, backend, storage=None):
     data = dict(data)
     upload = data.pop("reference_file", None)
     version = data["version"]
+    staged_csv = None
+    if "csv_upload_token" in data:
+        if upload is not None:
+            raise ValidationError({"reference_file": "Send either a CSV file or an upload token."})
+        staged_csv = resolve_csv_upload(data.pop("csv_upload_token"), version, "drift-monitor", error_field="reference_file")
+    has_upload = bool(upload or staged_csv)
     written = []
     public_id = uuid.uuid4()
     upload_name = None
@@ -84,23 +91,25 @@ def create_monitor(*, data, backend, storage=None):
     try:
         if upload:
             upload_name, _ = validate_reference_data_file(upload)
+        elif staged_csv:
+            upload_name = staged_csv.filename
         with transaction.atomic():
             project = ModelProject.objects.select_for_update().get(pk=version.project_id)
             version = ModelVersion.objects.select_for_update().get(pk=version.pk)
-            _validate_monitor_target(project, version, data, upload=upload)
-            if upload:
+            _validate_monitor_target(project, version, data, upload=has_upload)
+            if has_upload:
                 upload_key = (
                     f"{version_prefix(project.owner.tenant_id, project.public_id, version.public_id)}"
                     f"/artifacts/reference_data/{public_id}/{upload_name}"
                 )
-        if upload and upload_key:
-            stored = storage.put(upload_key, upload, "text/csv")
+        if upload_key:
+            stored = staged_csv.promote(storage, upload_key) if staged_csv else storage.put(upload_key, upload, "text/csv")
             written.append(stored.uri)
         with transaction.atomic():
             project = ModelProject.objects.select_for_update().get(pk=version.project_id)
             version = ModelVersion.objects.select_for_update().get(pk=version.pk)
             data["version"] = version
-            artifact = _validate_monitor_target(project, version, data, upload=upload)
+            artifact = _validate_monitor_target(project, version, data, upload=has_upload)
             if stored:
                 artifact = ModelArtifact.objects.create(
                     version=version,

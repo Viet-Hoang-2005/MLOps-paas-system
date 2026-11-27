@@ -2,6 +2,7 @@ import { apiClient } from "@/shared/api/client";
 import { controlPlaneURL } from "@/shared/api/config";
 import { fetchAllPages } from "@/shared/api/pagination";
 import { downloadText } from "@/shared/api/files";
+import { stageCsvUpload } from "@/shared/api/s3Upload";
 import type {
   DriftMonitoringJob,
   DriftMonitoringResult,
@@ -75,7 +76,7 @@ export const createDriftMonitoringJob = async (
   data.append("name", "default");
   data.append("trigger_threshold", String(payload.trigger_threshold));
   if (payload.reference_file)
-    data.append("reference_file", payload.reference_file);
+    data.append("csv_upload_token", await stageCsvUpload("drift-monitor", payload.version_id, payload.reference_file));
   return (
     await apiClient.post<DriftMonitoringJob>(
       controlPlaneURL("/drift-monitors/"),

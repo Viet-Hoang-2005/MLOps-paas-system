@@ -42,6 +42,8 @@ export const registryEn = {
     copied: "Copied",
     copyFailed: "Failed to copy code",
     download: "Download",
+    downloadOriginal: "Download original CSV",
+    downloadFailed: "Could not download the original CSV.",
     dragSourceCode: "Drag & drop Python file (.py) or browse",
     maxSourceSize: "Supported: .py, max 5MB",
     dragRefData: "Drag & drop CSV file (.csv) or browse",

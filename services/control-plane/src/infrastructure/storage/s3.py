@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import boto3
 from botocore.config import Config
 from django.conf import settings
+from django.utils.http import content_disposition_header
 
 
 @dataclass(frozen=True)
@@ -101,9 +102,10 @@ class S3Storage:
         bucket, key = self.parse_uri(uri)
         self.client.download_file(bucket, key, str(destination))
 
-    def read(self, uri, max_bytes=4 * 1024 * 1024):
+    def read(self, uri, max_bytes=4 * 1024 * 1024, *, expected_etag=None):
         bucket, key = self.parse_uri(uri)
-        body = self.client.get_object(Bucket=bucket, Key=key)["Body"]
+        condition = {"IfMatch": expected_etag} if expected_etag else {}
+        body = self.client.get_object(Bucket=bucket, Key=key, **condition)["Body"]
         try:
             value = body.read(max_bytes + 1)
         finally:
@@ -139,10 +141,13 @@ class S3Storage:
             etag=response.get("ETag", ""),
         )
 
-    def presigned_get(self, uri, expires_in=900, *, public=False):
+    def presigned_get(self, uri, expires_in=900, *, public=False, filename=None):
         bucket, key = self.parse_uri(uri)
+        params = {"Bucket": bucket, "Key": key}
+        if filename is not None:
+            params["ResponseContentDisposition"] = content_disposition_header(True, filename)
         return self._presign_client(public).generate_presigned_url(
-            "get_object", Params={"Bucket": bucket, "Key": key}, ExpiresIn=expires_in
+            "get_object", Params=params, ExpiresIn=expires_in
         )
 
     def presigned_put(self, uri, expires_in=900, content_type=None, size_bytes=None, *, public=False):

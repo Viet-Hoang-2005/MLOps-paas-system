@@ -42,6 +42,8 @@ export const evolutionVi = {
     copied: "Đã sao chép",
     copyFailed: "Không thể sao chép mã",
     download: "Tải xuống",
+    downloadOriginal: "Tải CSV gốc",
+    downloadFailed: "Không thể tải CSV gốc.",
     dragSourceCode: "Kéo thả tệp Python (.py) hoặc duyệt tệp",
     maxSourceSize: "Hỗ trợ: .py, tối đa 5MB",
     dragRefData: "Kéo thả tệp CSV (.csv) hoặc duyệt tệp",
