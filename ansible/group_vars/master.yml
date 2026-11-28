@@ -1,5 +1,6 @@
 ---
-ansible_python_interpreter: /usr/bin/python3
+k3s_ansible_venv: /opt/mlops-ansible
+ansible_python_interpreter: "{{ k3s_ansible_venv }}/bin/python"
 k3s_node_labels:
   - workload-type=control-plane
 k3s_node_taints:

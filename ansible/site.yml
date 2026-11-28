@@ -11,6 +11,8 @@
   hosts: all
   gather_facts: true
   tags: [bootstrap]
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
   roles:
     - role: common
       when: bootstrap_k3s_cluster | bool
@@ -20,6 +22,8 @@
   become: true
   gather_facts: true
   tags: [bootstrap]
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
   roles:
     - role: k3s_master
       when: bootstrap_k3s_cluster | bool

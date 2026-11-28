@@ -1,4 +1,22 @@
 ---
+- name: Prepare the Kubernetes Python client on the K3s Master
+  tags: [k8s-python]
+  block:
+    - name: Install Python virtual environment support on the Master
+      ansible.builtin.apt:
+        name: python3-venv
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install the pinned Kubernetes module dependencies on the Master
+      ansible.builtin.pip:
+        name: >-
+          {{ lookup('ansible.builtin.file', playbook_dir + '/requirements.txt').splitlines()
+             | select('match', '^(kubernetes|jsonpatch|PyYAML)==') | list }}
+        virtualenv: "{{ k3s_ansible_venv }}"
+        virtualenv_command: /usr/bin/python3 -m venv
+
 - name: Create the Rancher and K3s configuration directories
   become: true
   ansible.builtin.file:

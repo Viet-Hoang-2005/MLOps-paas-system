@@ -32,7 +32,6 @@
       - nfs-common
       - open-iscsi
       - python3-jsonpatch
-      - python3-kubernetes
       - python3-yaml
       - unzip
     state: present

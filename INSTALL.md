@@ -245,8 +245,8 @@ Script sẽ nạp các thông tin mật (DB passwords, Harbor credentials, JWT R
 
 Thiết lập môi trường Ansible:
 ```bash
-python3 -m venv .venv-ansible
-source .venv-ansible/bin/activate
+python3 -m venv ~/.venv-ansible
+source ~/.venv-ansible/bin/activate
 pip install -r ansible/requirements.txt
 ansible-galaxy collection install -r ansible/requirements.yml
 ```
