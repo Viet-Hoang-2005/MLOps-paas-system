@@ -80,16 +80,23 @@ def validate_postgres_cnpg_cluster(context: ValidationContext) -> None:
 
 
 @pytest.mark.validate
-def validate_postgres_allows_migration_job(context: ValidationContext) -> None:
-    """Verify the production migration Pod can reach PostgreSQL."""
+@pytest.mark.parametrize(
+    ("workload", "kind", "name"),
+    [
+        ("control-plane", "Job", "mlops-paas-control-plane-migration"),
+        ("model-server", "Deployment", "mlops-paas-model-server"),
+    ],
+)
+def validate_postgres_allows_workload(context: ValidationContext, workload: str, kind: str, name: str) -> None:
+    """Verify production Pods that need registry or migration access can reach PostgreSQL."""
     policy = find_resource(context.render("k8s/platform/postgres"), "NetworkPolicy", "np-postgresql")
-    migration = find_resource(
-        context.render("k8s/workloads/overlays/production/control-plane"),
-        "Job",
-        "mlops-paas-control-plane-migration",
+    resource = find_resource(
+        context.render(f"k8s/workloads/overlays/production/{workload}"),
+        kind,
+        name,
     )
-    namespace = migration["metadata"]["namespace"]
-    app_name = migration["spec"]["template"]["metadata"]["labels"]["app.kubernetes.io/name"]
+    namespace = resource["metadata"]["namespace"]
+    app_name = resource["spec"]["template"]["metadata"]["labels"]["app.kubernetes.io/name"]
 
     assert any(
         {"protocol": "TCP", "port": 5432} in rule.get("ports", [])
@@ -100,7 +107,7 @@ def validate_postgres_allows_migration_job(context: ValidationContext) -> None:
         for rule in policy["spec"]["ingress"]
         for peer in rule["from"]
         for expression in peer.get("podSelector", {}).get("matchExpressions", [])
-    ), f"PostgreSQL must allow TCP/5432 from the migration Pod {namespace}/{app_name}"
+    ), f"PostgreSQL must allow TCP/5432 from {namespace}/{app_name}"
 
 
 @pytest.mark.validate
