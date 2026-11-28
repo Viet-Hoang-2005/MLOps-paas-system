@@ -32,15 +32,55 @@ spec:
       # EBS volumes are formatted root-owned; the image runs as the redpanda
       # user (101), so the kubelet must hand the data volume to that group.
       securityContext:
+        runAsNonRoot: true
         runAsUser: 101
         runAsGroup: 101
         fsGroup: 101
         fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      initContainers:
+      - name: prepare-config
+        image: docker.redpanda.com/redpandadata/redpanda:v26.2.2
+        # rpk rewrites redpanda.yaml before starting the broker.
+        command: ["/bin/cp", "/etc/redpanda/redpanda.yaml", "/tmp/redpanda.yaml"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 100m
+            memory: 32Mi
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
       containers:
       - name: redpanda
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
         image: docker.redpanda.com/redpandadata/redpanda:v26.2.2
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        command: ["rpk", "redpanda", "start"]
         args:
-        - start
+        - --config
+        - /tmp/redpanda.yaml
         - --overprovisioned
         - --smp
         - "1"
@@ -49,16 +89,28 @@ spec:
         - --reserve-memory
         - 0M
         - --kafka-addr
-        - PLAINTEXT://0.0.0.0:9092,OUTSIDE://0.0.0.0:19092
+        - PLAINTEXT://0.0.0.0:9092
         - --advertise-kafka-addr
-        - PLAINTEXT://redpanda-0.redpanda.mlops-paas-data.svc.cluster.local:9092,OUTSIDE://localhost:19092
+        - PLAINTEXT://$(POD_NAME).redpanda.mlops-paas-data.svc.cluster.local:9092
         ports:
         - containerPort: 9092
           name: kafka
-        - containerPort: 19092
-          name: kafka-ext
         - containerPort: 9644
           name: admin
+        readinessProbe:
+          httpGet:
+            path: /v1/status/ready
+            port: admin
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /v1/status/ready
+            port: admin
+          initialDelaySeconds: 20
+          periodSeconds: 20
+          timeoutSeconds: 3
         resources:
           limits:
             memory: "1536Mi"
@@ -69,11 +121,14 @@ spec:
         volumeMounts:
         - name: redpanda-data
           mountPath: /var/lib/redpanda/data
+        - name: tmp
+          mountPath: /tmp
   volumeClaimTemplates:
   - metadata:
       name: redpanda-data
     spec:
       accessModes: [ "ReadWriteOnce" ]
+      storageClassName: ebs-gp3
       resources:
         requests:
           storage: 5Gi

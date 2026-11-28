@@ -29,7 +29,7 @@ spec:
   # Node 1: Primary (RW), Node 2: Standby (RO)
   instances: 2
   enableSuperuserAccess: true
-  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.5
 
   # Khởi tạo database và application owner
   bootstrap:
@@ -46,6 +46,16 @@ spec:
     storageClass: ebs-gp3
     size: 10Gi
 
+  # Sao lưu WAL liên tục và base backup lên S3 qua IAM Role của worker node
+  backup:
+    retentionPolicy: "14d"
+    barmanObjectStore:
+      destinationPath: "s3://mlops-paas-artifacts/postgres-backups"
+      s3Credentials:
+        inheritFromIAMRole: true
+      wal:
+        compression: gzip
+
   # Khi mở rộng lại nhiều instance, anti-affinity giúp tách các pod ra khác node.
   affinity:
     nodeSelector:
@@ -54,7 +64,7 @@ spec:
     podAntiAffinityType: required
     topologyKey: kubernetes.io/hostname
 
-  # Tuning PostgreSQL parameters
+  # Tuning PostgreSQL parameters (an toàn dưới limits.memory=1Gi)
   postgresql:
     parameters:
       shared_buffers: "256MB"
@@ -69,4 +79,4 @@ spec:
       memory: "384Mi"
     limits:
       cpu: "800m"
-      memory: "1Gi"
+      memory: "1536Mi"

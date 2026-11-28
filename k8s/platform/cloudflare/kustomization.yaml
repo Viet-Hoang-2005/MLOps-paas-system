@@ -5,3 +5,4 @@ namespace: mlops-paas-routing
 resources:
   - deployment.yaml
   - external-secrets.yaml
+  - network-policy.yaml

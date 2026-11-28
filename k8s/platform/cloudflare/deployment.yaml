@@ -29,6 +29,13 @@ spec:
         app.kubernetes.io/managed-by: kustomize
         mlops-paas.io/plane: platform
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       nodeSelector:
         workload-type: worker
       affinity:
@@ -45,13 +52,24 @@ spec:
                 topologyKey: "kubernetes.io/hostname"
       containers:
         - name: cloudflared
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           # Pull image chính thức của Cloudflared từ Docker Hub
           image: cloudflare/cloudflared:2026.10.7
           imagePullPolicy: IfNotPresent
           args:
             - tunnel
             - --no-autoupdate
+            - --metrics
+            - 0.0.0.0:2000
             - run
+          ports:
+            - name: metrics
+              containerPort: 2000
           # Biến môi trường cung cấp token từ Secret cho Cloudflared
           env:
             - name: TUNNEL_TOKEN
@@ -59,6 +77,20 @@ spec:
                 secretKeyRef:
                   name: cloudflared-tunnel-token
                   key: token
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
           
           # Cấu hình tài nguyên cho Cloudflared
           resources:

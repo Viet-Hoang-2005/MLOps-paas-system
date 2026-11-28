@@ -37,6 +37,8 @@ spec:
       volumes:
         - name: prometheus-multiprocess
           emptyDir: {}
+        - name: tmp
+          emptyDir: {}
       nodeSelector:
         workload-type: worker
       topologySpreadConstraints:
@@ -50,6 +52,7 @@ spec:
         - name: model-server
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
@@ -76,17 +79,14 @@ spec:
                 secretKeyRef:
                   name: mlops-paas-model-server-secret
                   key: REDIS_PASSWORD
-            - name: REDIS_SENTINEL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mlops-paas-model-server-secret
-                  key: REDIS_SENTINEL_PASSWORD
           envFrom:
             - configMapRef:
                 name: mlops-paas-model-server-config
           volumeMounts:
             - name: prometheus-multiprocess
               mountPath: /var/run/model-server-metrics
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /health/ready

@@ -27,3 +27,8 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: mlops-paas-data
+  ignoreDifferences:
+    - group: external-secrets.io
+      kind: ExternalSecret
+      jsonPointers:
+        - /metadata/annotations/force-sync

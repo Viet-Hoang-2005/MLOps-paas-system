@@ -23,20 +23,34 @@ spec:
   ingress:
     # Nội bộ Redis & Sentinel giao tiếp với nhau
     - from:
-        - podSelector: {}
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - redis-queue-ha
+                  - redis-queue-ha-sentinel
+                  - redis-cache
       ports:
         - protocol: TCP
           port: 6379
         - protocol: TCP
           port: 26379
-    # Core platform workloads & KEDA Autoscaler truy cập Redis & Sentinel
+    # Core platform workloads (control-plane, celery, model-server), Redis Operator & KEDA truy cập Redis & Sentinel
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: mlops-paas-core
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: mlops-paas-serving
+          podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - mlops-paas-control-plane
+                  - mlops-paas-celery-worker
+                  - mlops-paas-celery-beat
+                  - mlops-paas-celery-health-worker
+                  - mlops-paas-model-server
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: redis-operator

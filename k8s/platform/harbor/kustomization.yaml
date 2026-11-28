@@ -4,6 +4,7 @@ namespace: mlops-paas-harbor
 
 resources:
   - ingress.yaml
+  - network-policy.yaml
 
 helmCharts:
   - name: harbor

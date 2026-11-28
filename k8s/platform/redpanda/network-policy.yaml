@@ -21,27 +21,32 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: redpanda
-    # Core apps, Execution engine đẩy/tiêu thụ data & KEDA Autoscaler giám sát consumer lag
+    # Consumer, Model Server đẩy/tiêu thụ data & KEDA Autoscaler giám sát consumer lag
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: mlops-paas-core
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: mlops-paas-execution
+          podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - mlops-paas-consumer
+                  - mlops-paas-model-server
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: keda
       ports:
         - protocol: TCP
           port: 9092
-        - protocol: TCP
-          port: 19092
-    # Prometheus cào metrics admin (cổng 9644)
+    # Chỉ Prometheus cào metrics admin (cổng 9644)
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
       ports:
         - protocol: TCP
           port: 9644

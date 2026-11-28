@@ -12,7 +12,7 @@ persistence:
   resourcePolicy: "keep"
   persistentVolumeClaim:
     registry:
-      storageClass: local-path
+      storageClass: ebs-gp3
       size: 5Gi
     jobservice:
       storageClass: local-path
@@ -21,7 +21,7 @@ persistence:
       storageClass: local-path
       size: 2Gi
     database:
-      storageClass: local-path
+      storageClass: ebs-gp3
       size: 3Gi
   imageChartStorage:
     type: s3
@@ -91,8 +91,8 @@ jobservice:
       memory: 256Mi
 
 database:
-  nodeSelector: { workload-type: worker }
   internal:
+    nodeSelector: { workload-type: worker }
     resources:
       requests:
         cpu: 30m
@@ -100,17 +100,10 @@ database:
       limits:
         cpu: 300m
         memory: 512Mi
-  resources:
-    requests:
-      cpu: 30m
-      memory: 128Mi
-    limits:
-      cpu: 300m
-      memory: 512Mi
 
 redis:
-  nodeSelector: { workload-type: worker }
   internal:
+    nodeSelector: { workload-type: worker }
     resources:
       requests:
         cpu: 20m
@@ -118,13 +111,6 @@ redis:
       limits:
         cpu: 150m
         memory: 128Mi
-  resources:
-    requests:
-      cpu: 20m
-      memory: 64Mi
-    limits:
-      cpu: 150m
-      memory: 128Mi
 
 nginx:
   nodeSelector: { workload-type: worker }
@@ -145,6 +131,3 @@ exporter:
     limits:
       cpu: 100m
       memory: 64Mi
-
-metrics:
-  nodeSelector: { workload-type: worker }

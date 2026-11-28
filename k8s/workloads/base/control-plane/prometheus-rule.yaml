@@ -67,7 +67,7 @@ spec:
         # Cảnh báo khi tỷ lệ thất bại của Celery task tăng cao
         - alert: CeleryHighTaskFailureRate
           expr: |
-            sum(rate(control_plane_celery_tasks_total{status="failure"}[5m])) > 0.1
+            sum(rate(control_plane_celery_shared_tasks_total{status="failure"}[5m])) > 0.1
           for: 3m
           labels:
             severity: warning

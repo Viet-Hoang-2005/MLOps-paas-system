@@ -12,7 +12,51 @@ from ..utils import (
     STANDARD_MLOPS_LABELS,
     WORKLOAD_APPLICATIONS,
     ValidationContext,
+    find_resource,
 )
+
+
+@pytest.mark.validate
+def validate_web_service_network_path(context: ValidationContext) -> None:
+    web = context.render("k8s/workloads/overlays/production/web")
+    tunnel = context.render("k8s/platform/cloudflare")
+    service = find_resource(web, "Service", "mlops-paas-web")
+    deployment = find_resource(web, "Deployment", "mlops-paas-web")
+    ingress = find_resource(web, "NetworkPolicy", "np-mlops-paas-web")
+    egress = find_resource(tunnel, "NetworkPolicy", "np-cloudflared")
+
+    service_port = next(port for port in service["spec"]["ports"] if port["port"] == 80)
+    target_port = service_port["targetPort"]
+    pod = deployment["spec"]["template"]
+    assert any(
+        port["containerPort"] == target_port
+        for container in pod["spec"]["containers"]
+        for port in container.get("ports", [])
+    )
+
+    selector = {"matchLabels": service["spec"]["selector"]}
+    assert ingress["spec"]["podSelector"] == selector
+    allowed_port = {"protocol": "TCP", "port": target_port}
+    web_peer = {
+        "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": service["metadata"]["namespace"]}},
+        "podSelector": selector,
+    }
+    for namespace, pod_selector in (
+        (egress["metadata"]["namespace"], egress["spec"]["podSelector"]),
+        ("kube-system", {"matchLabels": {"app.kubernetes.io/name": "traefik"}}),
+    ):
+        source = {
+            "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": namespace}},
+            "podSelector": pod_selector,
+        }
+        assert any(
+            source in rule["from"] and allowed_port in rule["ports"]
+            for rule in ingress["spec"]["ingress"]
+        ), f"Web ingress must allow {namespace} traffic to TCP/{target_port}"
+    assert any(
+        web_peer in rule["to"] and allowed_port in rule["ports"]
+        for rule in egress["spec"]["egress"]
+    ), f"Cloudflared egress must allow Web Pod traffic to TCP/{target_port}"
 
 
 @pytest.mark.validate

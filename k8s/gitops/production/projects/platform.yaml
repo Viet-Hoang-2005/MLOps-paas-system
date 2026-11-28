@@ -36,9 +36,3 @@ spec:
       - group: discovery.k8s.io
         kind: EndpointSlice
         name: kubernetes
-      - group: rbac.authorization.k8s.io
-        kind: Role
-        name: argo-workflows-workflow
-      - group: rbac.authorization.k8s.io
-        kind: RoleBinding
-        name: argo-workflows-workflow

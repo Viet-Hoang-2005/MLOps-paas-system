@@ -22,6 +22,6 @@ spec:
       app.kubernetes.io/name: redpanda
   endpoints:
     - port: admin
-      path: /metrics
+      path: /public_metrics
       interval: 30s
       scrapeTimeout: 15s

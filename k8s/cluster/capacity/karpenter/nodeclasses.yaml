@@ -27,10 +27,11 @@ spec:
     - tags:
         karpenter.sh/discovery: mlops-paas-cluster
   blockDeviceMappings:
-    - deviceName: /dev/xvda
+    - deviceName: /dev/sda1
       ebs:
         volumeSize: 100Gi
         volumeType: gp3
+        encrypted: true
         deleteOnTermination: true
   userData: |
     #!/bin/bash
@@ -106,10 +107,11 @@ spec:
     - tags:
         karpenter.sh/discovery: mlops-paas-cluster
   blockDeviceMappings:
-    - deviceName: /dev/xvda
+    - deviceName: /dev/sda1
       ebs:
         volumeSize: 100Gi
         volumeType: gp3
+        encrypted: true
         deleteOnTermination: true
   userData: |
     #!/bin/bash

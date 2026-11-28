@@ -41,7 +41,6 @@ spec:
   triggers:
     - type: redis-sentinel
       metadata:
-        hosts: redis-queue-ha-sentinel-0.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-1.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-2.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
         addresses: redis-queue-ha-sentinel-0.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-1.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379,redis-queue-ha-sentinel-2.redis-queue-ha-sentinel-headless.mlops-paas-data.svc.cluster.local:26379
         sentinelMaster: redis-queue-master
         listName: celery

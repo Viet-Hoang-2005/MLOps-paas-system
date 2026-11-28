@@ -2,7 +2,6 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: mlops-paas-control-plane-pdb
-  namespace: mlops-paas-core
   labels:
     app.kubernetes.io/name: mlops-paas-control-plane
     app.kubernetes.io/instance: mlops-paas-control-plane
@@ -21,7 +20,6 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: mlops-paas-celery-worker-pdb
-  namespace: mlops-paas-core
   labels:
     app.kubernetes.io/name: mlops-paas-celery-worker
     app.kubernetes.io/instance: mlops-paas-celery-worker

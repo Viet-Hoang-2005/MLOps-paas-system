@@ -63,8 +63,6 @@ spec:
             enabled: true
             interval: 30s
             honorLabels: true
-            interval: 30s
-            honorLabels: true
   destination:
     server: https://kubernetes.default.svc
     namespace: gpu-operator

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+import yaml
 
 from ..utils import (
     PRODUCTION_NAMESPACES,
@@ -12,6 +13,7 @@ from ..utils import (
     ValidationContext,
     application_name,
     application_sources,
+    find_resource,
     identity,
 )
 
@@ -26,10 +28,10 @@ EXPECTED_SYNC_OPTIONS = {
 
 @pytest.mark.validate
 def validate_gitops_application_lifecycle_and_contracts(context: ValidationContext) -> None:
-    """Verify that root GitOps renders exactly 36 child Applications with required contracts."""
+    """Verify that root GitOps renders exactly 37 child Applications with required contracts."""
     applications = context.applications
-    assert len(applications) == 36, (
-        f"root GitOps must render exactly 36 child Applications, found {len(applications)}"
+    assert len(applications) == 37, (
+        f"root GitOps must render exactly 37 child Applications, found {len(applications)}"
     )
 
     errors: list[str] = []
@@ -68,6 +70,37 @@ def validate_gitops_application_lifecycle_and_contracts(context: ValidationConte
                 errors.append(f"Helm Application {name} must belong to addons boundary")
 
     assert not errors, "\n".join(errors)
+
+
+@pytest.mark.validate
+def validate_monitoring_secret_bootstrap(context: ValidationContext) -> None:
+    """Check that root sync can install ESO before discovering its custom resource."""
+    assert all(resource["kind"] != "ExternalSecret" for resource in context.root_resources)
+
+    applications = [
+        context.application("mlops-prod-addon-external-secrets"),
+        context.application("mlops-prod-cluster-secret-store"),
+        context.application("mlops-prod-addon-monitoring-secrets"),
+        context.application("mlops-prod-addon-monitoring"),
+    ]
+    waves = [
+        int(app["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"])
+        for app in applications
+    ]
+    assert waves[0] < waves[1] < waves[2] < waves[3]
+
+    _, _, secret_app, monitoring = applications
+    source = secret_app["spec"]["source"]
+    resources = context.render(source["path"])
+    secret = find_resource(resources, "ExternalSecret", "alertmanager-control-plane-webhook-sync")
+    assert secret["metadata"]["namespace"] == secret_app["spec"]["destination"]["namespace"]
+    assert secret["spec"]["secretStoreRef"] == {
+        "kind": "ClusterSecretStore",
+        "name": "aws-secrets-manager",
+    }
+    values = yaml.safe_load(monitoring["spec"]["source"]["helm"]["values"])
+    assert secret["metadata"]["namespace"] == monitoring["spec"]["destination"]["namespace"]
+    assert secret["spec"]["target"]["name"] in values["alertmanager"]["alertmanagerSpec"]["secrets"]
 
 
 @pytest.mark.validate

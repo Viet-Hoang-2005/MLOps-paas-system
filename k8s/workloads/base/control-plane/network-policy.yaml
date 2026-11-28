@@ -74,6 +74,46 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  name: np-mlops-paas-celery-beat
+  labels:
+    app.kubernetes.io/name: mlops-paas-celery-beat
+    app.kubernetes.io/instance: mlops-paas-celery-beat
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: scheduler
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: control-plane
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mlops-paas-celery-beat
+  policyTypes:
+    - Ingress
+  ingress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-mlops-paas-celery-health-worker
+  labels:
+    app.kubernetes.io/name: mlops-paas-celery-health-worker
+    app.kubernetes.io/instance: mlops-paas-celery-health-worker
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: workload
+    mlops-paas.io/domain: control-plane
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mlops-paas-celery-health-worker
+  policyTypes:
+    - Ingress
+  ingress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
   name: np-mlops-paas-control-plane-jwks
   labels:
     app.kubernetes.io/name: mlops-paas-control-plane

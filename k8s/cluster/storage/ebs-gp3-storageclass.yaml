@@ -2,8 +2,6 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: ebs-gp3
-  annotations:
-    storageclass.kubernetes.io/is-default-class: "true"
   labels:
     app.kubernetes.io/name: ebs-gp3
     app.kubernetes.io/instance: ebs-gp3
@@ -19,4 +17,4 @@ parameters:
   allowAutoIOPSPerGBIncrease: "true"
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
-reclaimPolicy: Delete
+reclaimPolicy: Retain

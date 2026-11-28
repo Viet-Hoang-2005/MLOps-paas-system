@@ -45,11 +45,3 @@ spec:
       kind: WorkflowTemplate
   orphanedResources:
     warn: true
-    ignore:
-      # Created and maintained by the Argo Workflows controller.
-      - group: rbac.authorization.k8s.io
-        kind: Role
-        name: argo-workflows-workflow
-      - group: rbac.authorization.k8s.io
-        kind: RoleBinding
-        name: argo-workflows-workflow

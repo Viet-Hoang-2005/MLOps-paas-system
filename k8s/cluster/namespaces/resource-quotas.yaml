@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: rq-mlops-paas-core
+  namespace: mlops-paas-core
+spec:
+  hard:
+    pods: "40"
+    requests.cpu: "6"
+    requests.memory: "8Gi"
+    limits.cpu: "12"
+    limits.memory: "16Gi"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: rq-mlops-paas-execution
+  namespace: mlops-paas-execution
+spec:
+  hard:
+    pods: "40"
+    requests.cpu: "6"
+    requests.memory: "10Gi"
+    limits.cpu: "16"
+    limits.memory: "24Gi"
+    persistentvolumeclaims: "20"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: rq-mlops-paas-serving
+  namespace: mlops-paas-serving
+spec:
+  hard:
+    pods: "30"
+    requests.cpu: "8"
+    requests.memory: "12Gi"
+    limits.cpu: "16"
+    limits.memory: "32Gi"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: rq-mlops-paas-training
+  namespace: mlops-paas-training
+spec:
+  hard:
+    pods: "20"
+    requests.cpu: "16"
+    requests.memory: "32Gi"
+    limits.cpu: "32"
+    limits.memory: "64Gi"
+    requests.nvidia.com/gpu: "2"

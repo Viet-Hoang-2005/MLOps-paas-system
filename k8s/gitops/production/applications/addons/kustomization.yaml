@@ -10,7 +10,7 @@ resources:
   - argo-workflows.yaml
   - argo-events.yaml
   - argocd.yaml
-  - monitoring-alertmanager-secret.yaml
+  - monitoring-secrets.yaml
   - monitoring.yaml
   - loki.yaml
   - alloy.yaml

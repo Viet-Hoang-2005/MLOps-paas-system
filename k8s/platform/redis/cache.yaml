@@ -28,23 +28,17 @@ spec:
   redisConfig:
     maxMemoryPercentOfLimit: 75
     additionalRedisConfig: redis-cache-config
-  storage:
-    keepAfterDelete: true
-    volumeClaimTemplate:
-      spec:
-        storageClassName: ebs-gp3
-        accessModes: [ReadWriteOnce]
-        resources:
-          requests:
-            storage: 2Gi
   podSecurityContext:
+    runAsNonRoot: true
     runAsUser: 1000
     fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
   nodeSelector:
     workload-type: worker
   redisExporter:
     enabled: true
-    image: quay.io/opstree/redis-exporter:v1.44.0
+    image: quay.io/opstree/redis-exporter:v1.89.0
     resources:
       requests:
         cpu: 5m

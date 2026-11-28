@@ -93,3 +93,7 @@
   retries: 90
   delay: 20
   tags: [verify, verify-workloads]
+
+- name: Verify healthy ALB targets after GitOps sync
+  ansible.builtin.import_tasks: alb_health.yml
+  tags: [verify, verify-workloads]

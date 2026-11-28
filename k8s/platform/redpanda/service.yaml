@@ -14,9 +14,6 @@ spec:
   - port: 9092
     targetPort: 9092
     name: kafka
-  - port: 19092
-    targetPort: 19092
-    name: kafka-ext
   - port: 9644
     targetPort: 9644
     name: admin

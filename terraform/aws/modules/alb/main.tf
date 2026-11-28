@@ -50,6 +50,27 @@ resource "aws_lb_listener" "https_listener" {
   }
 }
 
+# Target health checks go directly to workers. Public requests reach this rule.
+resource "aws_lb_listener_rule" "block_public_ping" {
+  listener_arn = aws_lb_listener.https_listener.arn
+  priority     = 10
+
+  action {
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "text/plain"
+      status_code  = "404"
+    }
+  }
+
+  condition {
+    path_pattern {
+      values = ["/ping"]
+    }
+  }
+}
+
 # Listener HTTP (Cổng 80) - Tự động chuyển hướng sang HTTPS
 resource "aws_lb_listener" "http_listener" {
   load_balancer_arn = aws_lb.api_alb.arn

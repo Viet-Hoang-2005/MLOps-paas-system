@@ -44,82 +44,38 @@ spec:
             matchLabels:
               app.kubernetes.io/name: mlops-paas-control-plane
       volumes:
-        - name: staticfiles
+        - name: prometheus-multiproc
           emptyDir: {}
-      initContainers:
-        - name: collect-static
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-          image: mlops-paas-control-plane
-          imagePullPolicy: IfNotPresent
-          command: ["python", "manage.py", "collectstatic", "--noinput"]
-          env:
-            - name: DJANGO_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: mlops-paas-control-plane-secret
-                  key: DJANGO_SECRET_KEY
-            - name: JWT_PRIVATE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: mlops-paas-control-plane-secret
-                  key: JWT_PRIVATE_KEY
-            - name: JWT_PUBLIC_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: mlops-paas-control-plane-secret
-                  key: JWT_PUBLIC_KEY
-            - name: CONTROL_PLANE_WEBHOOK_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: mlops-paas-control-plane-secret
-                  key: CONTROL_PLANE_WEBHOOK_SECRET
-            - name: ARGO_EVENTS_WEBHOOK_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: mlops-paas-control-plane-secret
-                  key: ARGO_EVENTS_WEBHOOK_TOKEN
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mlops-paas-control-plane-secret
-                  key: REDIS_PASSWORD
-            - name: REDIS_SENTINEL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mlops-paas-control-plane-secret
-                  key: REDIS_SENTINEL_PASSWORD
-          envFrom:
-            - configMapRef:
-                name: mlops-paas-control-plane-config
-          volumeMounts:
-            - name: staticfiles
-              mountPath: /app/staticfiles
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 250m
-              memory: 256Mi
+        - name: tmp
+          emptyDir: {}
       containers:
         - name: control-plane
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
           image: mlops-paas-control-plane
           imagePullPolicy: IfNotPresent
-          command: ["sh", "-c"]
+          command: ["gunicorn"]
           args:
-            - "gunicorn config.wsgi:application --config python:common.gunicorn_conf --bind 0.0.0.0:8000 --workers 3 --timeout 120 --graceful-timeout 30"
+            - "config.wsgi:application"
+            - "--config"
+            - "python:common.gunicorn_conf"
+            - "--bind"
+            - "0.0.0.0:8000"
+            - "--workers"
+            - "3"
+            - "--timeout"
+            - "120"
+            - "--graceful-timeout"
+            - "30"
           ports:
             - containerPort: 8000
           env:
+            - name: PROMETHEUS_MULTIPROC_DIR
+              value: /tmp/prometheus-multiproc
             - name: TRAINING_SECRET_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
@@ -214,8 +170,10 @@ spec:
             - configMapRef:
                 name: mlops-paas-control-plane-config
           volumeMounts:
-            - name: staticfiles
-              mountPath: /app/staticfiles
+            - name: prometheus-multiproc
+              mountPath: /tmp/prometheus-multiproc
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 50m

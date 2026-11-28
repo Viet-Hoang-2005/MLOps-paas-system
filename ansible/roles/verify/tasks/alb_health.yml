@@ -1,0 +1,37 @@
+---
+- name: Verify healthy ALB targets
+  block:
+    - name: Wait for every expected ALB target to be healthy
+      delegate_to: localhost
+      become: false
+      vars:
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+      community.aws.elb_target_group_info:
+        region: "{{ aws_region }}"
+        target_group_arns:
+          - "{{ terraform_alb_target_group_arn }}"
+        collect_targets_health: true
+      register: alb_target_group_info
+      changed_when: false
+      # Re-read AWS state on every attempt; a one-shot assertion can race ALB recovery.
+      until: >-
+        alb_target_group_info is succeeded and
+        (alb_target_group_info.target_groups | default([]) | length) == 1 and
+        (alb_target_group_info.target_groups[0].targets_health_description | default([]) | length)
+        == (k3s_expected_worker_count | int) and
+        (alb_target_group_info.target_groups[0].targets_health_description | default([]) |
+        map(attribute='target_health.state') | unique | list) == ['healthy']
+      retries: 10
+      delay: 10
+  rescue:
+    - name: Report ALB target health when verification times out
+      ansible.builtin.fail:
+        msg: |-
+          ALB target health verification failed after 10 retries at 10-second intervals (plus AWS API time).
+          Expected {{ k3s_expected_worker_count }} static worker targets, all healthy.
+          Last observed targets (target.id, target_health.state, target_health.reason, target_health.description):
+          {{ ((alb_target_group_info.target_groups | default([]) | first | default({})).targets_health_description | default([])) | to_nice_json }}
+          AWS module error: {{ alb_target_group_info.msg | default('None', true) }}
+  when:
+    - (verify_alb_enabled | default(true) | bool)
+    - (terraform_alb_target_group_arn | default('') | length > 0)

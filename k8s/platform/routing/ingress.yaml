@@ -15,6 +15,42 @@ spec:
     regex: "^/[^/]+/models/[^/]+/([^/]+)/(predict|health)$"
     replacement: "/models/${1}/${2}"
 ---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: admin-security-headers
+  namespace: mlops-paas-routing
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: admin-security-headers
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
+spec:
+  headers:
+    frameDeny: true
+    browserXssFilter: true
+    contentTypeNosniff: true
+    stsSeconds: 31536000
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: admin-rate-limit
+  namespace: mlops-paas-routing
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: admin-rate-limit
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
+spec:
+  rateLimit:
+    average: 20
+    burst: 40
+---
 # Cấu hình IngressRoute cho Control Plane (Django Control Plane)
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -32,8 +68,17 @@ spec:
   entryPoints:
     - web
   routes:
-    - match: Host(`api.mlops-nids-nt114.id.vn`) && (PathPrefix(`/api`) || PathPrefix(`/admin`))
+    - match: Host(`api.mlops-nids-nt114.id.vn`) && PathPrefix(`/api`)
       kind: Rule
+      services:
+        - name: mlops-paas-control-plane
+          namespace: mlops-paas-core
+          port: 8000
+    - match: Host(`api.mlops-nids-nt114.id.vn`) && PathPrefix(`/admin`)
+      kind: Rule
+      middlewares:
+        - name: admin-security-headers
+        - name: admin-rate-limit
       services:
         - name: mlops-paas-control-plane
           namespace: mlops-paas-core
@@ -64,26 +109,3 @@ spec:
         - name: mlops-paas-model-server
           namespace: mlops-paas-core
           port: 5000
----
-# Endpoint kiểm tra sức khỏe nội bộ của Traefik
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: traefik-ping-expose
-  namespace: mlops-paas-routing
-  labels:
-    app.kubernetes.io/name: traefik
-    app.kubernetes.io/instance: traefik-ping-expose
-    app.kubernetes.io/part-of: mlops-paas
-    app.kubernetes.io/component: ingress
-    app.kubernetes.io/managed-by: kustomize
-    mlops-paas.io/plane: platform
-spec:
-  entryPoints:
-    - web
-  routes:
-    - match: PathPrefix(`/ping`)
-      kind: Rule
-      services:
-        - name: ping@internal
-          kind: TraefikService

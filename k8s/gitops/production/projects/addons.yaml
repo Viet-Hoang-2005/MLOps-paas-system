@@ -63,6 +63,8 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: monitoring
       server: https://kubernetes.default.svc
+    - namespace: monitoring-node-exporter
+      server: https://kubernetes.default.svc
     - namespace: kyverno
       server: https://kubernetes.default.svc
   clusterResourceWhitelist:

@@ -38,8 +38,11 @@ spec:
     failoverTimeout: "60000"
     parallelSyncs: "1"
   podSecurityContext:
+    runAsNonRoot: true
     runAsUser: 1000
     fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -65,7 +68,7 @@ spec:
     minAvailable: 2
   redisExporter:
     enabled: true
-    image: quay.io/opstree/redis-exporter:v1.44.0
+    image: quay.io/opstree/redis-exporter:v1.89.0
     resources:
       requests:
         cpu: 5m

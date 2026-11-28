@@ -25,15 +25,15 @@ spec:
             summary: "PostgreSQL is not responding!"
             description: "A CloudNativePG instance is down. Check the database cluster immediately!"
 
-        # Cảnh báo khi số connections gần đạt max_connections
+        # Cảnh báo khi số connections trên một instance vượt 80% max_connections (200)
         - alert: PostgresHighConnections
           expr: |
-            sum(cnpg_pg_stat_database_numbackends) by (datname) > 80
+            sum by (pod) (cnpg_pg_stat_database_numbackends) > 160
           for: 5m
           labels:
             severity: warning
             team: infrastructure
           annotations:
             summary: "PostgreSQL high connections"
-            description: "Database {{ $labels.datname }} has {{ $value }} active connections."
+            description: "Instance {{ $labels.pod }} has {{ $value }} active connections (>80% of max_connections)."
 

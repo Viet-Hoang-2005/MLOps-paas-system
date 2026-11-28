@@ -4,7 +4,7 @@ metadata:
   name: mlops-prod-addon-monitoring
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-40"
+    argocd.argoproj.io/sync-wave: "-20"
   labels:
     app.kubernetes.io/name: monitoring
     app.kubernetes.io/part-of: mlops-paas
@@ -146,6 +146,7 @@ spec:
           tls:
             enabled: false
         prometheus-node-exporter:
+          namespaceOverride: monitoring-node-exporter
           resources:
             requests: {cpu: 15m, memory: 32Mi}
             limits: {cpu: 250m, memory: 128Mi}

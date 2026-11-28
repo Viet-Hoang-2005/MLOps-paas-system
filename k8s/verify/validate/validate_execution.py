@@ -108,6 +108,34 @@ def validate_argo_workflows_inventory(context: ValidationContext) -> None:
 
 
 @pytest.mark.validate
+def validate_workflow_pod_resources(context: ValidationContext) -> None:
+    """Verify workflow containers declare the CPU and memory required by quota."""
+    application = context.application("mlops-prod-addon-argo-workflows")
+    values = yaml.safe_load(application["spec"]["source"]["helm"]["values"])
+    executor_resources = values.get("executor", {}).get("resources", {})
+    errors: list[str] = []
+    containers = [("Argo executor", executor_resources)]
+    for workflow in context.render("k8s/argo"):
+        if workflow["kind"] != "WorkflowTemplate" or resource_namespace(workflow) != "mlops-paas-execution":
+            continue
+        for template in workflow["spec"]["templates"]:
+            name = f"{workflow['metadata']['name']}/{template['name']}"
+            for kind in ("container", "script"):
+                if kind in template:
+                    containers.append((name, template[kind].get("resources", {})))
+            for kind in ("initContainers", "sidecars"):
+                for container in template.get(kind, []):
+                    containers.append((f"{name}/{container['name']}", container.get("resources", {})))
+
+    for name, resources in containers:
+        for kind in ("requests", "limits"):
+            for resource in ("cpu", "memory"):
+                if not resources.get(kind, {}).get(resource):
+                    errors.append(f"{name} must declare resources.{kind}.{resource}")
+    assert not errors, "\n".join(errors)
+
+
+@pytest.mark.validate
 def validate_workflow_build_task(context: ValidationContext) -> None:
     """Verify Build task: Kaniko/Skopeo pipeline, 2Gi workspace PVC, Harbor secrets, onExit callback."""
     execution = context.render("k8s/argo")

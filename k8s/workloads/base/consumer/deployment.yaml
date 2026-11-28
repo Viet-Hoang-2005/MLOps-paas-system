@@ -39,6 +39,9 @@ spec:
           type: RuntimeDefault
       nodeSelector:
         workload-type: worker
+      volumes:
+        - name: tmp
+          emptyDir: {}
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -55,15 +58,19 @@ spec:
         - name: init-kafka-topic
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
           image: docker.redpanda.com/redpandadata/redpanda:v26.2.2
           command: ["/bin/sh", "-c"]
-          args: ["rpk topic create mlops_paas_production_data mlops_paas_production_data.dlq --brokers redpanda.mlops-paas-data.svc.cluster.local:9092 || true"]
+          args: ["rpk topic create mlops_paas_production_data mlops_paas_production_data.dlq -p 6 --brokers redpanda.mlops-paas-data.svc.cluster.local:9092 || true"]
           env:
             - name: HOME
               value: /tmp
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 10m
@@ -75,12 +82,16 @@ spec:
         - name: consumer
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
           image: mlops-paas-consumer
           imagePullPolicy: Always
           command: ["python", "-m", "src.main"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           envFrom:
             - configMapRef:
                 name: mlops-paas-consumer-config
@@ -108,3 +119,21 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import os, socket; s = socket.create_connection((os.environ.get('REDPANDA_BROKERS', 'redpanda.mlops-paas-data.svc.cluster.local:9092').split(',')[0].split(':')[0], int(os.environ.get('REDPANDA_BROKERS', 'redpanda:9092').split(',')[0].split(':')[1])), timeout=3); s.close()"
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "grep -q 'src.main' /proc/1/cmdline"
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 3

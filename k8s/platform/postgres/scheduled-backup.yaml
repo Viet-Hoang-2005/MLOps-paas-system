@@ -1,0 +1,22 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgresql-daily
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/instance: postgresql
+    app.kubernetes.io/part-of: mlops-paas
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: kustomize
+    mlops-paas.io/plane: platform
+spec:
+  # CNPG cron includes seconds. 19:00 UTC is 02:00 in Vietnam.
+  schedule: "0 0 19 * * *"
+  immediate: true
+  backupOwnerReference: self
+  method: barmanObjectStore
+  target: prefer-standby
+  cluster:
+    name: postgresql

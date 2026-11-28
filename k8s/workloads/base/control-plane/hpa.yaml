@@ -21,17 +21,17 @@ spec:
     scaleUp:
       stabilizationWindowSeconds: 60
     scaleDown:
-      stabilizationWindowSeconds: 60
+      stabilizationWindowSeconds: 300
   metrics:
     - type: Resource
       resource:
         name: cpu
         target:
           type: AverageValue
-          averageValue: 65m
+          averageValue: 400m
     - type: Resource
       resource:
         name: memory
         target:
           type: AverageValue
-          averageValue: 384Mi
+          averageValue: 512Mi

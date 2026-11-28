@@ -55,6 +55,9 @@ def check_nodeclass(nodeclass: dict[str, Any], name: str) -> list[str]:
         )
     if 'K3S_TOKEN="K10' in user_data or "K3S_TOKEN='K10" in user_data:
         errors.append(f"EC2NodeClass {name} must not embed a K3s token in Git")
+    mappings = spec.get("blockDeviceMappings") or []
+    if not mappings or mappings[0].get("deviceName") != "/dev/sda1" or (mappings[0].get("ebs") or {}).get("encrypted") is not True:
+        errors.append(f"EC2NodeClass {name} must use /dev/sda1 root device with encrypted: true")
     return errors
 
 
@@ -212,12 +215,29 @@ def validate_cluster_secret_store(context: ValidationContext) -> None:
         ):
             errors.append(f"legacy shared Secret target {target} must not be rendered")
 
+    store_resources = context.render("k8s/cluster/secret-store")
     if any(
         resource.get("kind") == "ExternalSecret"
-        for resource in context.render("k8s/cluster/secret-store")
+        for resource in store_resources
     ):
         errors.append(
             "cluster secret-store must own only ClusterSecretStore, not ExternalSecrets"
+        )
+    store = find_resource(store_resources, "ClusterSecretStore", "aws-secrets-manager")
+    expected_namespaces = {
+        "argo-events",
+        "kyverno",
+        "mlops-paas-core",
+        "mlops-paas-data",
+        "mlops-paas-execution",
+        "mlops-paas-routing",
+        "monitoring",
+    }
+    conditions = (store or {}).get("spec", {}).get("conditions") or []
+    allowed_namespaces = {ns for cond in conditions for ns in (cond.get("namespaces") or [])}
+    if allowed_namespaces != expected_namespaces:
+        errors.append(
+            f"ClusterSecretStore aws-secrets-manager must restrict conditions.namespaces to {sorted(expected_namespaces)}, found {sorted(allowed_namespaces)}"
         )
 
     assert not errors, "\n".join(errors)
@@ -231,7 +251,8 @@ def validate_storage_class(context: ValidationContext) -> None:
     assert sc, "k8s/cluster/storage must render StorageClass ebs-gp3"
     assert sc.get("provisioner") == "ebs.csi.aws.com", "ebs-gp3 provisioner must be ebs.csi.aws.com"
     assert sc.get("volumeBindingMode") == "WaitForFirstConsumer"
-    assert sc.get("reclaimPolicy") == "Delete"
+    assert sc.get("reclaimPolicy") == "Retain"
+    assert "storageclass.kubernetes.io/is-default-class" not in ((sc.get("metadata") or {}).get("annotations") or {})
 
 
 @pytest.mark.validate

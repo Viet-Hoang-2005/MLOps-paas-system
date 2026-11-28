@@ -1,8 +1,9 @@
 import logging
+import os
 
 from django.db import connections
 from django.http import HttpResponse, JsonResponse
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, CollectorRegistry, generate_latest, multiprocess
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -57,8 +58,13 @@ class MetricsEndpoint(APIView):
     def get(self, request):
         from apps.observability.services.executions import execution_metrics
 
+        registry = REGISTRY
+        if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
+            registry = CollectorRegistry()
+            multiprocess.MultiProcessCollector(registry)
         return HttpResponse(
-            generate_latest() + shared_celery_metrics() + execution_metrics(), content_type=CONTENT_TYPE_LATEST
+            generate_latest(registry) + shared_celery_metrics() + execution_metrics(),
+            content_type=CONTENT_TYPE_LATEST,
         )
 
 

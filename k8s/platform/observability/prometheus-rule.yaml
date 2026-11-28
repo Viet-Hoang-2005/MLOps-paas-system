@@ -27,7 +27,7 @@ spec:
         # Cảnh báo khi disk vượt 80%
         - alert: NodeDiskAlmostFull
           expr: |
-            (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 80
+            (1 - (node_filesystem_avail_bytes{mountpoint="/",fstype!="rootfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!="rootfs"})) * 100 > 80
           for: 10m
           labels:
             severity: warning

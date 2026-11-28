@@ -356,3 +356,41 @@ Cấu hình resource requests đã được khảo sát toàn diện từ số l
 > - Cụm Redis HA sử dụng mô hình 2 Redis Data Nodes + 3 Sentinel Nodes. Sentinel đạt quorum khi có tối thiểu 2 node đồng thuận.
 > - Cụm PostgreSQL sử dụng CloudNative-PG với 2 instance đồng bộ streaming replication và `podAntiAffinityType: required`.
 > - Khi cần drain hoặc restart node bảo trì, chỉ được thao tác **từng node một** (`one node at a time`) và luôn kiểm tra quorum phục hồi trước khi chuyển sang node tiếp theo.
+
+### Kiểm thử khôi phục PostgreSQL từ S3
+
+`postgresql-daily` yêu cầu base backup đầu tiên khi tạo lịch và chạy hằng ngày lúc 02:00 giờ Việt Nam khi operator dùng UTC. Base backup và WAL dùng cùng đích S3 và chính sách lưu giữ 14 ngày của Cluster PostgreSQL.
+
+1. Dùng `kubectl -n mlops-paas-data get backups.postgresql.cnpg.io` để xác nhận đã có base backup ở trạng thái `completed`.
+2. Tạo Cluster thử nghiệm bên dưới với tên riêng và PVC mới. Dùng cùng image và cấu hình S3 với Cluster nguồn nếu chúng đã thay đổi.
+
+   ```yaml
+   apiVersion: postgresql.cnpg.io/v1
+   kind: Cluster
+   metadata:
+     name: postgresql-restore-check
+     namespace: mlops-paas-data
+   spec:
+     instances: 1
+     imageName: ghcr.io/cloudnative-pg/postgresql:17.5
+     affinity:
+       nodeSelector:
+         workload-type: worker
+     storage:
+       storageClass: ebs-gp3
+       size: 10Gi
+     bootstrap:
+       recovery:
+         source: source-backup
+     externalClusters:
+       - name: source-backup
+         barmanObjectStore:
+           destinationPath: s3://mlops-paas-artifacts/postgres-backups
+           serverName: postgresql
+           s3Credentials:
+             inheritFromIAMRole: true
+           wal:
+             compression: gzip
+   ```
+
+3. Khi Cluster thử nghiệm báo `Ready`, chạy truy vấn chỉ đọc trên database `mlops_paas_db` của Cluster thử nghiệm. Kiểm tra schema `control_plane` và đối chiếu một bản ghi đã biết trong phạm vi WAL được lưu. Ghi lại kết quả và thời gian phục hồi trước khi đánh dấu kiểm thử hoàn tất.

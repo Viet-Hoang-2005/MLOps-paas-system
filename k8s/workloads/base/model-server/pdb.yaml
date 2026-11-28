@@ -2,7 +2,6 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: mlops-paas-model-server-pdb
-  namespace: mlops-paas-core
   labels:
     app.kubernetes.io/name: mlops-paas-model-server
     app.kubernetes.io/instance: mlops-paas-model-server

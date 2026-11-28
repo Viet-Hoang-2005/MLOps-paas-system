@@ -14,6 +14,14 @@ spec:
   destinations:
     - namespace: mlops-paas-system
       server: https://kubernetes.default.svc
+    - namespace: mlops-paas-core
+      server: https://kubernetes.default.svc
+    - namespace: mlops-paas-execution
+      server: https://kubernetes.default.svc
+    - namespace: mlops-paas-serving
+      server: https://kubernetes.default.svc
+    - namespace: mlops-paas-training
+      server: https://kubernetes.default.svc
     - namespace: karpenter
       server: https://kubernetes.default.svc
     - namespace: kyverno
@@ -32,6 +40,8 @@ spec:
     - group: kyverno.io
       kind: ClusterPolicy
   namespaceResourceWhitelist:
+    - group: ""
+      kind: ResourceQuota
     - group: external-secrets.io
       kind: ExternalSecret
   orphanedResources:

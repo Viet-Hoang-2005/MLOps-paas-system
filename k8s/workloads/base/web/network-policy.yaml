@@ -27,7 +27,7 @@ spec:
               app.kubernetes.io/name: traefik
       ports:
         - protocol: TCP
-          port: 80
+          port: 8080
     # Cloudflare Tunnel (từ namespace mlops-paas-routing)
     - from:
         - namespaceSelector:
@@ -38,5 +38,5 @@ spec:
               app.kubernetes.io/name: cloudflared
       ports:
         - protocol: TCP
-          port: 80
+          port: 8080
 

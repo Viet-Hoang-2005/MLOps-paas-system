@@ -42,7 +42,7 @@ spec:
             summary: "Redis replica lost its master link"
             description: "Inspect Sentinel election and Redis replication before accepting more writes."
         - alert: RedisHAMemoryHigh
-          expr: redis_memory_used_bytes{namespace="mlops-paas-data"} / clamp_min(redis_memory_max_bytes{namespace="mlops-paas-data"}, 1) > 0.85
+          expr: redis_memory_used_bytes{namespace="mlops-paas-data", pod=~"redis-queue-ha-.*"} / clamp_min(redis_memory_max_bytes{namespace="mlops-paas-data", pod=~"redis-queue-ha-.*"}, 1) > 0.85
           for: 5m
           labels:
             severity: warning
@@ -51,7 +51,7 @@ spec:
             summary: "Redis memory usage exceeds 85% of maxmemory"
             description: "Investigate queue depth and key retention before Redis rejects writes."
         - alert: RedisHAPVCAlmostFull
-          expr: kubelet_volume_stats_used_bytes{namespace="mlops-paas-data"} / clamp_min(kubelet_volume_stats_capacity_bytes{namespace="mlops-paas-data"}, 1) > 0.8
+          expr: kubelet_volume_stats_used_bytes{namespace="mlops-paas-data", persistentvolumeclaim=~".*redis-queue-ha.*"} / clamp_min(kubelet_volume_stats_capacity_bytes{namespace="mlops-paas-data", persistentvolumeclaim=~".*redis-queue-ha.*"}, 1) > 0.8
           for: 10m
           labels:
             severity: warning

@@ -70,6 +70,37 @@ def validate_postgres_cnpg_cluster(context: ValidationContext) -> None:
     assert spec.get("instances") == 2, "CNPG postgresql must configure 2 instances (Primary + Standby)"
     storage = spec.get("storage") or {}
     assert storage.get("size"), "PostgreSQL storage size must be declared"
+    backup = find_resource(resources, "ScheduledBackup", "postgresql-daily")
+    assert backup, "PostgreSQL must have a ScheduledBackup for base backups"
+    assert backup["metadata"]["namespace"] == cluster["metadata"]["namespace"]
+    assert backup["spec"]["cluster"]["name"] == cluster["metadata"]["name"]
+    assert backup["spec"]["schedule"] == "0 0 19 * * *"
+    assert backup["spec"]["immediate"] is True
+    assert backup["spec"]["method"] in spec["backup"]
+
+
+@pytest.mark.validate
+def validate_postgres_allows_migration_job(context: ValidationContext) -> None:
+    """Verify the production migration Pod can reach PostgreSQL."""
+    policy = find_resource(context.render("k8s/platform/postgres"), "NetworkPolicy", "np-postgresql")
+    migration = find_resource(
+        context.render("k8s/workloads/overlays/production/control-plane"),
+        "Job",
+        "mlops-paas-control-plane-migration",
+    )
+    namespace = migration["metadata"]["namespace"]
+    app_name = migration["spec"]["template"]["metadata"]["labels"]["app.kubernetes.io/name"]
+
+    assert any(
+        {"protocol": "TCP", "port": 5432} in rule.get("ports", [])
+        and peer.get("namespaceSelector", {}).get("matchLabels", {}).get("kubernetes.io/metadata.name") == namespace
+        and expression["key"] == "app.kubernetes.io/name"
+        and expression["operator"] == "In"
+        and app_name in expression["values"]
+        for rule in policy["spec"]["ingress"]
+        for peer in rule["from"]
+        for expression in peer.get("podSelector", {}).get("matchExpressions", [])
+    ), f"PostgreSQL must allow TCP/5432 from the migration Pod {namespace}/{app_name}"
 
 
 @pytest.mark.validate
