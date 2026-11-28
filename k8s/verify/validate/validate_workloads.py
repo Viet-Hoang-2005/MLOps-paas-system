@@ -146,7 +146,7 @@ def validate_workload_layout_and_images(context: ValidationContext) -> None:
 @pytest.mark.validate
 def validate_celery_process_isolation(repo_root: Path) -> None:
     """Verify that Celery worker, beat, and health-worker remain strictly isolated Deployments."""
-    path = repo_root / "k8s/workloads/base/control-plane/celery-deployment.yaml"
+    path = repo_root / "k8s/workloads/base/control-plane/celery.yaml"
     resources = list(yaml.safe_load_all(path.read_text(encoding="utf-8")))
 
     # Assert exactly 3 deployments
