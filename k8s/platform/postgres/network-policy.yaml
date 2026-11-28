@@ -26,7 +26,7 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: cnpg-system
-    # Control Plane, Migration Job, Celery, Consumer và Evidently truy cập DB (cổng 5432)
+    # Control Plane, Migration Job, Celery, Consumer, Model Server và Evidently truy cập DB (cổng 5432)
     - from:
         - namespaceSelector:
             matchLabels:
@@ -42,6 +42,7 @@ spec:
                   - mlops-paas-celery-beat
                   - mlops-paas-celery-health-worker
                   - mlops-paas-consumer
+                  - mlops-paas-model-server
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: mlops-paas-execution
