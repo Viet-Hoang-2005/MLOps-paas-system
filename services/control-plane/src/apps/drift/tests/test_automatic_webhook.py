@@ -9,7 +9,7 @@ from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.registry.models import ModelVersion
-from infrastructure.execution.argo_backends import ArgoDriftBackend
+from infrastructure.execution.drift import ArgoDriftBackend
 
 
 def _monitor_fixture():
@@ -33,8 +33,8 @@ def test_automatic_drift_webhook_creates_one_durable_threshold_crossing(monkeypa
         trigger_threshold=100,
     )
     created_runs = Mock()
-    monkeypatch.setattr("apps.drift.services.automatic.production_data_count_for_version", lambda _version: 100)
-    monkeypatch.setattr("apps.drift.services.automatic.request_run", created_runs)
+    monkeypatch.setattr("apps.drift.runs.automatic.production_data_count_for_version", lambda _version: 100)
+    monkeypatch.setattr("apps.drift.runs.automatic.request_run", created_runs)
     client = APIClient()
     headers = {"HTTP_X_CONTROL_PLANE_SECRET": "test-webhook-secret"}
     payload = {"model_version_id": str(version.public_id)}
@@ -65,8 +65,8 @@ def test_automatic_drift_webhook_does_not_trigger_before_threshold(monkeypatch):
         last_automatic_trigger_count=50,
     )
     request_run = Mock()
-    monkeypatch.setattr("apps.drift.services.automatic.production_data_count_for_version", lambda _version: 149)
-    monkeypatch.setattr("apps.drift.services.automatic.request_run", request_run)
+    monkeypatch.setattr("apps.drift.runs.automatic.production_data_count_for_version", lambda _version: 149)
+    monkeypatch.setattr("apps.drift.runs.automatic.request_run", request_run)
 
     response = APIClient().post(
         "/internal/webhooks/automatic-drift/",

@@ -10,18 +10,18 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.catalog.services.preview import save_preview
+from apps.catalog.preview.storage import save_preview
+from apps.deployment.builds.registration import complete_build, request_registration
+from apps.deployment.builds.submission import request_preview_build
 from apps.deployment.models import Build, Deployment, Endpoint
-from apps.deployment.services.builds import request_preview_build
-from apps.deployment.services.completion import complete_build, request_registration
-from apps.deployment.tasks import _mark_deployment_succeeded
+from apps.deployment.serving.rollout_tasks import _mark_deployment_succeeded
 from apps.drift.models import DriftMonitor
-from apps.drift.services.monitors import create_monitor
-from apps.observability.services.runtime_metrics import runtime_metrics
+from apps.drift.monitors.reference import create_monitor
+from apps.observability.runtime.metrics import runtime_metrics
 from apps.registry.models import ModelVersion
-from apps.registry.services.versions import register_successful_build
+from apps.registry.versions.registration import register_successful_build
+from apps.training.tests.factories import training_job
 from common.api.exceptions import Conflict
 from infrastructure.storage.paths import project_prefix, version_prefix
 from infrastructure.storage.s3 import StoredObject
@@ -284,7 +284,7 @@ def test_build_completion_requires_explicit_idempotent_registration(project):
 def test_register_double_click_only_dispatches_once(project, monkeypatch, django_capture_on_commit_callbacks):
     build = Build.objects.create(project=project, flavor="xgboost", status="ready", image_uri="temporary")
     calls = []
-    monkeypatch.setattr("apps.deployment.tasks.register_build.delay", lambda id: calls.append(id))
+    monkeypatch.setattr("apps.deployment.builds.tasks.register_build.delay", lambda id: calls.append(id))
     with django_capture_on_commit_callbacks(execute=True):
         request_registration(build)
         request_registration(build)
@@ -324,10 +324,10 @@ def test_running_handoff_disables_old_monitor_and_stops_old_after_commit(
     candidate.status = "deploying"
     candidate.save()
     stopped = []
-    monkeypatch.setattr("apps.deployment.tasks.stop_deployment.delay", lambda id: stopped.append(id))
-    monkeypatch.setattr("apps.deployment.tasks.invalidate_model_server_cache", lambda *args: None)
-    monkeypatch.setattr("apps.deployment.tasks.append_deployment_log", lambda *args: None)
-    monkeypatch.setattr("apps.observability.services.outbox._publish_pending", lambda: None)
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.stop_deployment.delay", lambda id: stopped.append(id))
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.invalidate_model_server_cache", lambda *args: None)
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.append_deployment_log", lambda *args: None)
+    monkeypatch.setattr("apps.observability.outbox._publish_pending", lambda: None)
     with django_capture_on_commit_callbacks(execute=True):
         _mark_deployment_succeeded(candidate)
     project.refresh_from_db()
@@ -378,7 +378,7 @@ def test_late_completion_does_not_resurrect_cancelled_build(project):
 
 
 def test_preview_upload_fields_exist():
-    from apps.catalog.api.serializers import PreviewWriteSerializer
+    from apps.catalog.preview.serializers import PreviewWriteSerializer
 
     assert "assets" in PreviewWriteSerializer().fields
     assert "source_artifact_file" not in PreviewWriteSerializer().fields
@@ -422,8 +422,8 @@ def test_registration_failure_removes_partial_snapshot_and_can_retry(project):
 
 
 def test_training_build_provenance_survives_source_job_deletion(project):
-    from apps.deployment.services.builds import request_training_build
-    from apps.training.models import TrainingOutput
+    from apps.deployment.builds.submission import request_training_build
+    from apps.training.outputs.models import TrainingOutput
 
     storage = MemoryStorage()
     code = storage.put("input/code.zip", SimpleUploadedFile("code.zip", b"code"), "application/zip")
@@ -489,23 +489,25 @@ def test_monitor_reference_and_version_cannot_be_changed(project):
 
 def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, django_capture_on_commit_callbacks):
     """Real API/ORM lifecycle; replace only infrastructure and task dispatch."""
-    from apps.deployment.tasks import execute_deployment, register_build
+    from apps.deployment.builds.tasks import register_build
+    from apps.deployment.serving.rollout_tasks import execute_deployment
 
     storage = MemoryStorage()
     storage.presigned_get = lambda uri, expires, **_: f"https://storage.test/{uri}"
-    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.catalog.api.serializers.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.deployment.services.builds.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.registry.services.versions.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.storage.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.projects.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.builds.submission.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.registry.versions.registration.S3Storage", lambda: storage)
     registry = SimpleNamespace(promote=lambda **kwargs: ("published", "sha256:published"))
-    monkeypatch.setattr("apps.registry.services.versions.image_registry_for", lambda build: registry)
-    monkeypatch.setattr("apps.observability.services.outbox._publish_pending", lambda: None)
-    monkeypatch.setattr("apps.deployment.tasks.invalidate_model_server_cache", lambda *args: None)
-    monkeypatch.setattr("apps.deployment.tasks.append_deployment_log", lambda *args: None)
-    monkeypatch.setattr("apps.deployment.tasks.reset_deployment_logs", lambda *args: None)
-    monkeypatch.setattr("apps.deployment.tasks.execute_build.delay", lambda id: SimpleNamespace(id="build-task"))
-    monkeypatch.setattr("apps.deployment.tasks.register_build.delay", lambda id: register_build(id))
-    monkeypatch.setattr("apps.deployment.tasks.execute_deployment.delay", lambda id: SimpleNamespace(id="deploy-task"))
+    monkeypatch.setattr("apps.registry.versions.registration.image_registry_for", lambda build: registry)
+    monkeypatch.setattr("apps.observability.outbox._publish_pending", lambda: None)
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.invalidate_model_server_cache", lambda *args: None)
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.append_deployment_log", lambda *args: None)
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.reset_deployment_logs", lambda *args: None)
+    monkeypatch.setattr("apps.deployment.builds.tasks.execute_build.delay", lambda id: SimpleNamespace(id="build-task"))
+    monkeypatch.setattr("apps.deployment.builds.tasks.register_build.delay", lambda id: register_build(id))
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.execute_deployment.delay", lambda id: SimpleNamespace(id="deploy-task"))
     client = APIClient()
     client.force_authenticate(project.owner)
     upload = client.post(
@@ -554,7 +556,7 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
     def ready(deployment):
         return Endpoint.objects.create(deployment=deployment, public_url="http://runtime.test", health_status="healthy")
 
-    monkeypatch.setattr("apps.deployment.tasks.deployment_backend", lambda backend: SimpleNamespace(deploy=ready))
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.deployment_backend", lambda backend: SimpleNamespace(deploy=ready))
     execute_deployment(deployed.data["id"])
     import uuid
     from datetime import timedelta
@@ -562,8 +564,8 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
 
     from django.utils import timezone
 
+    from apps.deployment.execution.local_watcher import check_execution
     from apps.deployment.models import Deployment
-    from apps.deployment.services.local_execution import check_execution
 
     candidate = Deployment.objects.get(public_id=deployed.data["id"])
     token = uuid.uuid4()
@@ -592,8 +594,8 @@ def test_training_history_preserves_frozen_inputs_not_updated_project_workspace(
     from io import BytesIO
     from zipfile import ZipFile
 
-    from apps.training.services.snapshots import input_snapshot
-    from apps.training.services.storage_scope import expected_training_uris
+    from apps.training.jobs.snapshots import input_snapshot
+    from apps.training.jobs.storage_scope import expected_training_uris
 
     settings.TRAINING_BACKEND = "argo"
     storage = MemoryStorage()

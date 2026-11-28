@@ -10,7 +10,7 @@ from django.test import override_settings
 from PIL import Image
 from rest_framework.test import APIClient
 
-from apps.auth.services.oauth import _oauth_user, authenticate_github, authenticate_google
+from apps.auth.oauth.providers import _oauth_user, authenticate_github, authenticate_google
 
 
 def avatar_png():
@@ -227,7 +227,7 @@ def test_legacy_profile_me_route_is_not_available():
 @pytest.mark.django_db
 def test_complete_registration_ignores_field_of_work(monkeypatch):
     monkeypatch.setattr(
-        "apps.auth.api.registration_endpoints.read_token",
+        "apps.auth.registration.read_token",
         lambda token, purpose: {"email": "new-owner@example.com"},
     )
 
@@ -275,7 +275,7 @@ def test_cookie_issuing_endpoints_reject_missing_browser_security_headers(monkey
     assert oauth.status_code == 403
 
     monkeypatch.setattr(
-        "apps.auth.api.registration_endpoints.read_token",
+        "apps.auth.registration.read_token",
         lambda token, purpose: {"email": "csrf-registration@example.com"},
     )
     registration = client.post(
@@ -297,7 +297,7 @@ def test_cookie_issuing_endpoints_reject_missing_browser_security_headers(monkey
 def test_google_oauth_endpoint_sets_refresh_cookie(monkeypatch):
     user = get_user_model().objects.create_user("oauth-cookie@example.com", "password123")
     monkeypatch.setattr(
-        "apps.auth.api.oauth_endpoints.authenticate_google",
+        "apps.auth.oauth.api.authenticate_google",
         lambda token: (user, False),
     )
 
@@ -329,7 +329,7 @@ def test_logout_blacklist_database_error_is_not_reported_as_success(monkeypatch)
     def fail_blacklist(_self):
         raise OperationalError("blacklist storage unavailable")
 
-    monkeypatch.setattr("apps.auth.api.endpoints._KeyIdRefreshToken.blacklist", fail_blacklist)
+    monkeypatch.setattr("apps.auth.sessions.api._KeyIdRefreshToken.blacklist", fail_blacklist)
     response = client.post("/api/auth/logout/", format="json", **browser_auth_headers())
     # Revocation failed: report it, but still drop the cookie from this browser.
     assert response.status_code == 503

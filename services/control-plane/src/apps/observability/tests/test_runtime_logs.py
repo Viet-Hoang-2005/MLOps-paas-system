@@ -8,7 +8,7 @@ import requests
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from infrastructure.runtime_logs import runtime_log_page
+from infrastructure.telemetry.runtime_logs import runtime_log_page
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def response(values):
 def test_log_pages_use_signed_resource_bound_cursor_and_redact_output(resource, monkeypatch):
     ns = int((timezone.now() - timedelta(seconds=20)).timestamp() * 1_000_000_000)
     get = Mock(return_value=response([[str(ns), "one"], [str(ns), "token=private-value"]]))
-    monkeypatch.setattr("infrastructure.runtime_logs.requests.get", get)
+    monkeypatch.setattr("infrastructure.telemetry.runtime_logs.requests.get", get)
     first = runtime_log_page(SimpleNamespace(query_params={}), resource, "build", Mock())
     assert first["next_offset"] == 2
     assert "private-value" not in " ".join(first["logs"])
@@ -50,7 +50,7 @@ def test_log_pages_use_signed_resource_bound_cursor_and_redact_output(resource, 
 
 
 def test_log_outage_keeps_cursor_and_leaves_status_polling_available(resource, monkeypatch):
-    monkeypatch.setattr("infrastructure.runtime_logs.requests.get", Mock(side_effect=requests.Timeout))
+    monkeypatch.setattr("infrastructure.telemetry.runtime_logs.requests.get", Mock(side_effect=requests.Timeout))
     page = runtime_log_page(SimpleNamespace(query_params={}), resource, "deployment", Mock())
     assert page["logs"] == [] and page["log_error"] == "unavailable"
     again = runtime_log_page(
@@ -61,7 +61,7 @@ def test_log_outage_keeps_cursor_and_leaves_status_polling_available(resource, m
 
 def test_tampered_cursor_never_reaches_log_backend(resource, monkeypatch):
     get = Mock()
-    monkeypatch.setattr("infrastructure.runtime_logs.requests.get", get)
+    monkeypatch.setattr("infrastructure.telemetry.runtime_logs.requests.get", get)
     with pytest.raises(ValidationError):
         runtime_log_page(SimpleNamespace(query_params={"cursor": "tampered"}), resource, "training", Mock())
     get.assert_not_called()
@@ -91,7 +91,7 @@ def test_log_api_resolves_tenant_ownership_before_querying_loki(settings, monkey
     project = ModelProject.objects.create(owner=owner, name="task logs")
     build = Build.objects.create(project=project, backend="argo", flavor="sklearn", status="building")
     get = Mock(return_value=response([]))
-    monkeypatch.setattr("infrastructure.runtime_logs.requests.get", get)
+    monkeypatch.setattr("infrastructure.telemetry.runtime_logs.requests.get", get)
     client = APIClient()
     client.force_authenticate(other)
     assert client.get(f"/api/builds/{build.public_id}/logs/").status_code == 404
@@ -116,7 +116,7 @@ def test_deployment_runtime_logs_reject_other_tenant(settings, monkeypatch):
     deployment = Deployment.objects.create(version=version, build=build, backend="argo")
     Deployment.objects.filter(pk=deployment.pk).update(created_at=timezone.now() - timedelta(minutes=1))
     get = Mock(return_value=response([]))
-    monkeypatch.setattr("infrastructure.runtime_logs.requests.get", get)
+    monkeypatch.setattr("infrastructure.telemetry.runtime_logs.requests.get", get)
     client = APIClient()
     client.force_authenticate(other)
     assert client.get(f"/api/deployments/{deployment.public_id}/runtime-logs/").status_code == 404
@@ -129,7 +129,7 @@ def test_deployment_runtime_logs_reject_other_tenant(settings, monkeypatch):
 def test_runtime_log_query_includes_control_plane_namespace(resource, monkeypatch):
     resource.monitor = SimpleNamespace(backend="argo")
     get = Mock(return_value=response([]))
-    monkeypatch.setattr("infrastructure.runtime_logs.requests.get", get)
+    monkeypatch.setattr("infrastructure.telemetry.runtime_logs.requests.get", get)
     for kind in ("build", "deployment", "drift", "training"):
         runtime_log_page(SimpleNamespace(query_params={}), resource, kind, Mock())
         query = get.call_args.kwargs["params"]["query"]
@@ -138,7 +138,7 @@ def test_runtime_log_query_includes_control_plane_namespace(resource, monkeypatc
 
 def test_deployment_and_serving_queries_are_separate(resource, monkeypatch):
     get = Mock(return_value=response([]))
-    monkeypatch.setattr("infrastructure.runtime_logs.requests.get", get)
+    monkeypatch.setattr("infrastructure.telemetry.runtime_logs.requests.get", get)
     runtime_log_page(SimpleNamespace(query_params={}), resource, "deployment", Mock())
     assert "mlops-paas-serving" not in get.call_args.kwargs["params"]["query"]
     runtime_log_page(SimpleNamespace(query_params={}), resource, "deployment_runtime", Mock())
@@ -149,7 +149,7 @@ def test_deployment_and_serving_queries_are_separate(resource, monkeypatch):
 
 
 def test_docker_runtime_cursor_handles_duplicate_timestamps(resource, monkeypatch):
-    from apps.deployment.services.runtime_logs import docker_runtime_page
+    from apps.deployment.serving.runtime_logs import docker_runtime_page
 
     resource.backend = "docker"
     resource.external_deployment_id = "container-id"
@@ -157,8 +157,8 @@ def test_docker_runtime_cursor_handles_duplicate_timestamps(resource, monkeypatc
     lines = [f"{timestamp}.123456789Z line-{i}\n".encode() for i in range(501)]
     container = Mock()
     container.logs.side_effect = lambda **kwargs: iter(lines)
-    monkeypatch.setattr("apps.deployment.services.runtime_logs.DockerClient", Mock())
-    monkeypatch.setattr("apps.deployment.services.runtime_logs.owned_container", Mock(return_value=container))
+    monkeypatch.setattr("apps.deployment.serving.runtime_logs.DockerClient", Mock())
+    monkeypatch.setattr("apps.deployment.serving.runtime_logs.owned_container", Mock(return_value=container))
     first = docker_runtime_page(SimpleNamespace(query_params={}), resource)
     assert len(first["logs"]) == 500 and first["has_more"]
     second = docker_runtime_page(SimpleNamespace(query_params={"cursor": first["next_cursor"]}), resource)
@@ -170,7 +170,7 @@ def test_docker_runtime_cursor_handles_duplicate_timestamps(resource, monkeypatc
 
 
 def test_append_deployment_log_bypasses_redis_in_production(settings, monkeypatch):
-    from apps.deployment.services import logs as deployment_logs
+    from apps.deployment.execution import logs as deployment_logs
 
     settings.LOKI_URL = "http://loki.test:3100"
     redis = Mock()
@@ -185,7 +185,7 @@ def test_append_deployment_log_bypasses_redis_in_production(settings, monkeypatc
 
 
 def test_append_training_log_bypasses_redis_in_production(settings, monkeypatch):
-    from apps.training.services import logs as training_logs
+    from apps.training.jobs import logs as training_logs
 
     settings.LOKI_URL = "http://loki.test:3100"
     settings.TRAINING_BACKEND = "argo"
@@ -203,8 +203,8 @@ def test_only_explicit_progress_records_are_tenant_visible():
     import json
     import logging
 
-    from common.logging_utils import JsonFormatter, bind_context, reset_context
-    from infrastructure.runtime_logs import emit_tenant_log
+    from common.telemetry.logging_utils import JsonFormatter, bind_context, reset_context
+    from infrastructure.telemetry.runtime_logs import emit_tenant_log
 
     task_id = uuid.uuid4()
     formatter = JsonFormatter("control-plane")

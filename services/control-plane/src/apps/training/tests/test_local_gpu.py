@@ -8,10 +8,11 @@ import requests
 from django.core.cache import cache
 from rest_framework.exceptions import ValidationError
 
-from apps.training.tests.factories import unsaved_training_job
-from .test_job_drafts import studio as studio
 from apps.catalog.models import ModelProject
-from apps.training.services import local_gpu
+from apps.training.resources import local_gpu
+from apps.training.tests.factories import unsaved_training_job
+
+from .test_job_drafts import studio as studio
 
 GPU = "GPU-01234567-89ab-cdef-0123-456789abcdef"
 OTHER = "GPU-11234567-89ab-cdef-0123-456789abcdef"
@@ -197,7 +198,7 @@ def test_capabilities_keep_cpu_when_docker_unavailable(settings, monkeypatch):
 
 @pytest.mark.django_db
 def test_submit_checks_selected_device_before_queuing(settings, monkeypatch, studio):
-    from apps.training.services import workspaces
+    from apps.training.workspace import editing as workspaces
 
     workspace, storage, client, _ = studio
     settings.TRAINING_BACKEND = "docker"
@@ -217,7 +218,7 @@ def test_submit_checks_selected_device_before_queuing(settings, monkeypatch, stu
     )
     assert response.status_code == 202
     check.assert_not_called()
-    from apps.training.services.drafts import prepare_workspace
+    from apps.training.workspace.runs import prepare_workspace
     pending = workspace.jobs.get()
     with pytest.raises(ValidationError):
         prepare_workspace(pending.public_id, pending.submission_token, storage=storage)
@@ -236,7 +237,7 @@ def test_submit_checks_selected_device_before_queuing(settings, monkeypatch, stu
     ],
 )
 def test_rejects_invalid_device_contract(settings, backend, kind, device_id):
-    from apps.training.services.resources import validate_resources
+    from apps.training.resources.options import validate_resources
 
     settings.TRAINING_BACKEND = backend
     settings.TRAINING_GPU_ENABLED = True
@@ -277,8 +278,8 @@ def test_create_persists_only_a_verified_local_gpu(settings, monkeypatch):
 def test_docker_dispatch_uses_exact_verified_uuid(settings, monkeypatch):
     from django.contrib.auth import get_user_model
 
-    from apps.training.services.storage_scope import expected_training_uris
-    from infrastructure.execution.docker_backends import DockerTrainingBackend
+    from apps.training.jobs.storage_scope import expected_training_uris
+    from infrastructure.execution.training import DockerTrainingBackend
 
     user = get_user_model().objects.create_user("gpu-dispatch-test@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
@@ -302,7 +303,7 @@ def test_docker_dispatch_uses_exact_verified_uuid(settings, monkeypatch):
     storage.presigned_get.return_value = "https://example.invalid/object"
     check = Mock(return_value={"id": GPU})
     monkeypatch.setattr(local_gpu, "require_device", check)
-    monkeypatch.setattr("infrastructure.execution.docker_backends.issue_capability", lambda *args, **kw: "capability")
+    monkeypatch.setattr("infrastructure.execution.training.issue_capability", lambda *args, **kw: "capability")
     start = Mock(return_value=Mock(id="container-id"))
     monkeypatch.setattr("infrastructure.execution.job_containers.start", start)
     DockerTrainingBackend(docker_client=docker_client, storage=storage).run(job)

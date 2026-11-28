@@ -11,7 +11,7 @@ from django.db import connection, connections
 from PIL import Image
 from rest_framework.test import APIClient
 
-from apps.auth.services import avatars
+from apps.auth.account import avatars
 from apps.auth.tasks import delete_avatar_object
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -166,7 +166,7 @@ def test_avatar_upload_requires_a_file_and_an_authenticated_account(account):
 
 
 def test_registration_rejects_invalid_image_before_consuming_token(account, monkeypatch):
-    from apps.auth.api import registration_endpoints
+    from apps.auth import registration as registration_endpoints
 
     _, _, client = account
     client.force_authenticate(user=None)
@@ -189,7 +189,7 @@ def test_registration_rejects_invalid_image_before_consuming_token(account, monk
 
 
 def test_registration_uses_the_single_avatar_service(account, monkeypatch):
-    from apps.auth.api import registration_endpoints
+    from apps.auth import registration as registration_endpoints
 
     _, storage, client = account
     client.force_authenticate(user=None)

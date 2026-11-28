@@ -5,13 +5,7 @@ from django.core.cache import cache
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
-from apps.auth.services.otp import (
-    MAX_OTP_ATTEMPTS,
-    _cache_key,
-    read_token,
-    send_otp,
-    verify_otp,
-)
+from apps.auth.otp.challenges import MAX_OTP_ATTEMPTS, _cache_key, read_token, send_otp, verify_otp
 
 
 @pytest.fixture(autouse=True)
@@ -540,7 +534,7 @@ def test_otp_emails_clearly_distinguish_purpose_and_include_html(
 
 
 def test_send_otp_email_escapes_html_characters():
-    from apps.auth.services.otp_email import send_otp_email
+    from apps.auth.otp.email import send_otp_email
 
     mail.outbox.clear()
     send_otp_email(

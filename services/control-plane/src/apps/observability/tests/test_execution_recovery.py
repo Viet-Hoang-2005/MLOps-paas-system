@@ -9,13 +9,14 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
-from apps.observability.services import executions
+from apps.observability.execution import leases, observations
+from apps.observability.execution import reconciliation as executions
 from apps.registry.models import ModelVersion
-from apps.training.models import TrainingJob
-from apps.training.services.resources import validate_resources
+from apps.training.jobs.models import TrainingJob
+from apps.training.resources.options import validate_resources
+from apps.training.tests.factories import training_job
 from infrastructure.execution.job_containers import labels_for, observe, start
 
 
@@ -41,14 +42,14 @@ def job(db, settings):
 def backend_mock(monkeypatch):
     backend = Mock(setting_name="")
     monkeypatch.setattr(executions, "backend_for", lambda row, kind: backend)
-    monkeypatch.setattr("apps.training.services.local_resources.dispatch_guard", lambda *args: nullcontext())
+    monkeypatch.setattr("apps.training.resources.local_capacity.dispatch_guard", lambda *args: nullcontext())
     return backend
 
 
 def test_lost_enqueue_is_recoverable(job, monkeypatch):
     task = Mock()
     task.delay.side_effect = ConnectionError()
-    executions.enqueue_safely(job, task)
+    leases.enqueue_safely(job, task)
     job.refresh_from_db()
     assert job.status == "queued" and job.observation_status == "retrying"
     backend = backend_mock(monkeypatch)
@@ -66,11 +67,11 @@ def test_lost_enqueue_preserves_cleanup_intent(job):
     job.save()
     task = Mock()
     task.delay.side_effect = ConnectionError()
-    executions.enqueue_safely(job, task)
+    leases.enqueue_safely(job, task)
     job.refresh_from_db()
     assert job.status == "failed" and job.observation_status == "cleanup_pending"
     assert job.execution_stop_requested
-    assert executions.claim("training", job.public_id)
+    assert leases.claim("training", job.public_id)
 
 
 def test_beat_enqueue_failure_preserves_cleanup_intent(job, monkeypatch):
@@ -79,7 +80,7 @@ def test_beat_enqueue_failure_preserves_cleanup_intent(job, monkeypatch):
     job.execution_stop_requested = True
     job.save()
     monkeypatch.setattr(
-        "apps.observability.tasks.reconcile_job_execution.apply_async", Mock(side_effect=ConnectionError())
+        "apps.observability.execution.tasks.reconcile_job_execution.apply_async", Mock(side_effect=ConnectionError())
     )
     assert executions.scan() == 0
     job.refresh_from_db()
@@ -111,12 +112,12 @@ def test_backend_connection_failure_is_an_observation_error(job, monkeypatch):
 
 
 def test_dead_worker_lease_can_be_reclaimed_and_stale_result_ignored(job):
-    first = executions.claim("training", job.public_id)[0][1]
-    assert executions.claim("training", job.public_id) == []
+    first = leases.claim("training", job.public_id)[0][1]
+    assert leases.claim("training", job.public_id) == []
     TrainingJob.objects.filter(pk=job.pk).update(execution_check_lease_until=timezone.now() - timedelta(seconds=1))
-    second = executions.claim("training", job.public_id)[0][1]
+    second = leases.claim("training", job.public_id)[0][1]
     assert first != second
-    assert executions.apply_observation("training", job.public_id, first, {"status": "failed"}) == "ignored"
+    assert observations.apply_observation("training", job.public_id, first, {"status": "failed"}) == "ignored"
 
 
 def test_terminal_commit_precedes_cleanup(job, monkeypatch):
@@ -124,14 +125,14 @@ def test_terminal_commit_precedes_cleanup(job, monkeypatch):
     job.save()
     backend = backend_mock(monkeypatch)
     backend.poll.return_value = {"status": "completed"}
-    monkeypatch.setattr(executions, "_completion_data", lambda row, kind: None)
+    monkeypatch.setattr(observations, "_completion_data", lambda row, kind: None)
     executions.reconcile("training", job.public_id)
     job.refresh_from_db()
     assert job.status == "uploading" and not job.outputs.exists()
     backend.cleanup.assert_not_called()
-    from apps.training.services.output_finalization import finalize_output
+    from apps.training.outputs.finalization import finalize_output
 
-    monkeypatch.setattr("apps.training.services.outputs.verify_training_output", lambda job: None)
+    monkeypatch.setattr("apps.training.outputs.artifacts.verify_training_output", lambda job: None)
     finalize_output.run(str(job.public_id))
     executions.reconcile("training", job.public_id)
     backend.cleanup.assert_called_once()
@@ -208,13 +209,13 @@ def test_completed_before_runtime_deadline_recovers_after_long_outage(job, monke
         "started_at": start_time.isoformat(),
         "finished_at": (start_time + timedelta(minutes=10)).isoformat(),
     }
-    monkeypatch.setattr(executions, "_completion_data", lambda row, kind: None)
+    monkeypatch.setattr(observations, "_completion_data", lambda row, kind: None)
     executions.reconcile("training", job.public_id)
     job.refresh_from_db()
     assert job.status == "uploading"
-    from apps.training.services.output_finalization import finalize_output
+    from apps.training.outputs.finalization import finalize_output
 
-    monkeypatch.setattr("apps.training.services.outputs.verify_training_output", lambda job: None)
+    monkeypatch.setattr("apps.training.outputs.artifacts.verify_training_output", lambda job: None)
     finalize_output.run(str(job.public_id))
     job.refresh_from_db()
     assert job.status == "completed"
@@ -229,17 +230,17 @@ def test_created_container_is_started_after_worker_crash(job, monkeypatch):
 
 
 def test_cancellation_wins_over_completion(job, monkeypatch):
-    token = executions.claim("training", job.public_id)[0][1]
+    token = leases.claim("training", job.public_id)[0][1]
     TrainingJob.objects.filter(pk=job.pk).update(status="cancelling")
-    monkeypatch.setattr(executions, "_completion_data", lambda row, kind: None)
-    executions.apply_observation("training", job.public_id, token, {"status": "completed"})
+    monkeypatch.setattr(observations, "_completion_data", lambda row, kind: None)
+    observations.apply_observation("training", job.public_id, token, {"status": "completed"})
     job.refresh_from_db()
     assert job.status == "cancelling" and not job.outputs.exists()
 
 
 def test_observation_capability_resource_binding_and_replay(job):
-    token = executions.claim("training", job.public_id)[0][1]
-    auth = executions.signed_observation_token("training", job, token)
+    token = leases.claim("training", job.public_id)[0][1]
+    auth = leases.signed_observation_token("training", job, token)
     client = APIClient()
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {auth}")
     wrong = client.post(f"/internal/executions/drift/{job.public_id}/observations/", {"status": "running"})
@@ -258,8 +259,8 @@ def test_observation_token_valid_beyond_60s_within_lease(job, monkeypatch):
     base_time = time.time()
     base_now = timezone.now()
 
-    token = executions.claim("training", job.public_id)[0][1]
-    auth = executions.signed_observation_token("training", job, token)
+    token = leases.claim("training", job.public_id)[0][1]
+    auth = leases.signed_observation_token("training", job, token)
 
     job.refresh_from_db()
     # Check that lease is set to 300 seconds
@@ -270,7 +271,7 @@ def test_observation_token_valid_beyond_60s_within_lease(job, monkeypatch):
     monkeypatch.setattr(timezone, "now", lambda: base_now + timedelta(seconds=75))
 
     # Scanner will NOT claim again during active lease
-    assert executions.claim("training", job.public_id) == []
+    assert leases.claim("training", job.public_id) == []
 
     # Observation callback succeeds at 75s
     client = APIClient()
@@ -294,8 +295,8 @@ def test_observation_token_expires_after_ttl(job, monkeypatch):
     base_time = time.time()
     base_now = timezone.now()
 
-    token = executions.claim("training", job.public_id)[0][1]
-    auth = executions.signed_observation_token("training", job, token)
+    token = leases.claim("training", job.public_id)[0][1]
+    auth = leases.signed_observation_token("training", job, token)
 
     # 305 seconds later (past 300s TTL)
     monkeypatch.setattr(time, "time", lambda: base_time + 305)
@@ -356,39 +357,39 @@ def test_pre_migration_container_reconcile_cleans_up_and_stops_claiming(job):
     )
     client = SimpleNamespace(containers=SimpleNamespace(get=Mock(return_value=container)))
 
-    from infrastructure.execution.docker_backends import DockerTrainingBackend
+    from infrastructure.execution.training import DockerTrainingBackend
 
     backend = DockerTrainingBackend(docker_client=SimpleNamespace(client=client))
 
     from unittest.mock import patch
 
-    with patch("apps.observability.services.executions.backend_for", return_value=backend):
+    with patch("apps.observability.execution.reconciliation.backend_for", return_value=backend):
         executions.reconcile("training", job.public_id)
 
     job.refresh_from_db()
     assert job.observation_status == "ok"
     assert job.next_execution_check_at is None
     container.remove.assert_called_once_with(force=True)
-    assert executions.claim("training", job.public_id) == []
+    assert leases.claim("training", job.public_id) == []
 
 
 def test_terminal_deletion_request_remains_scannable(job):
     job.status = "completed"
     job.deletion_requested_at = timezone.now()
     job.save()
-    assert executions.claim("training", job.public_id)
+    assert leases.claim("training", job.public_id)
 
 
 def test_delete_request_requires_runtime_cleanup_before_hard_delete(
     job, monkeypatch, django_capture_on_commit_callbacks
 ):
-    from apps.training.services.jobs import request_job_deletion
-    from apps.training.tasks import delete_training_job
+    from apps.training.jobs.lifecycle import request_job_deletion
+    from apps.training.jobs.tasks import delete_training_job
 
     job.status = "completed"
     job.save()
     monkeypatch.setattr(
-        "apps.training.services.jobs.cancel_training_job.delay", Mock(return_value=SimpleNamespace(id="test-task"))
+        "apps.training.jobs.lifecycle.cancel_training_job.delay", Mock(return_value=SimpleNamespace(id="test-task"))
     )
     with django_capture_on_commit_callbacks(execute=True):
         request_job_deletion(job)
@@ -398,7 +399,7 @@ def test_delete_request_requires_runtime_cleanup_before_hard_delete(
 
 
 def test_stale_dispatch_cannot_create_a_runtime(job):
-    executions.claim("training", job.public_id)
+    leases.claim("training", job.public_id)
     job.refresh_from_db()
     TrainingJob.objects.filter(pk=job.pk).update(execution_check_lease_until=timezone.now() - timedelta(seconds=1))
     docker_client = SimpleNamespace(run=Mock(), client=Mock())

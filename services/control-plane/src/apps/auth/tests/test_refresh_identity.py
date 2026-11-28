@@ -6,7 +6,7 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
-from apps.auth.api.serializers import TenantTokenSerializer
+from apps.auth.sessions.serializers import TenantTokenSerializer
 from apps.auth.tests.test_auth import browser_auth_headers
 
 

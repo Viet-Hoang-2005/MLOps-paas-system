@@ -12,10 +12,10 @@ from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment, Endpoint
-from apps.deployment.services.runtime_health import dispatch_health_checks, effective_health, probe_running_health
-from apps.deployment.tasks import _mark_deployment_succeeded
+from apps.deployment.serving.health import dispatch_health_checks, effective_health, probe_running_health
+from apps.deployment.serving.rollout_tasks import _mark_deployment_succeeded
 from apps.registry.models import ModelVersion
-from infrastructure.runtime_health import RuntimeHealthProbe
+from infrastructure.telemetry.runtime_health import RuntimeHealthProbe
 
 
 @pytest.fixture
@@ -48,7 +48,7 @@ def claim(endpoint):
 def test_scan_claims_once_and_enqueues_after_commit(runtime, monkeypatch, django_capture_on_commit_callbacks):
     _, deployment, endpoint = runtime
     enqueue = Mock()
-    monkeypatch.setattr("apps.deployment.health_tasks.probe_runtime_health.apply_async", enqueue)
+    monkeypatch.setattr("apps.deployment.serving.tasks.probe_runtime_health.apply_async", enqueue)
     with django_capture_on_commit_callbacks(execute=True):
         assert dispatch_health_checks() == 1
         enqueue.assert_not_called()
@@ -64,7 +64,7 @@ def test_failed_publish_releases_lease_without_marking_runtime_unhealthy(
 ):
     _, _, endpoint = runtime
     monkeypatch.setattr(
-        "apps.deployment.health_tasks.probe_runtime_health.apply_async", Mock(side_effect=RuntimeError("broker down"))
+        "apps.deployment.serving.tasks.probe_runtime_health.apply_async", Mock(side_effect=RuntimeError("broker down"))
     )
     with django_capture_on_commit_callbacks(execute=True):
         dispatch_health_checks()
@@ -124,7 +124,7 @@ def test_expired_lease_reclaimed_and_old_delivery_does_not_probe(runtime, monkey
     probe = Mock()
     assert probe_running_health(str(deployment.public_id), token, probe) == "ignored"
     probe.check.assert_not_called()
-    monkeypatch.setattr("apps.deployment.health_tasks.probe_runtime_health.apply_async", Mock())
+    monkeypatch.setattr("apps.deployment.serving.tasks.probe_runtime_health.apply_async", Mock())
     assert dispatch_health_checks() == 1
     endpoint.refresh_from_db()
     assert str(endpoint.health_check_token) != token
@@ -177,7 +177,7 @@ def test_schema_rejects_mixed_lifecycle_and_health(runtime):
 
 
 def test_scheduler_uses_only_health_queue_and_bounded_tasks(settings):
-    from apps.deployment.health_tasks import probe_runtime_health
+    from apps.deployment.serving.tasks import probe_runtime_health
 
     schedule = settings.CELERY_BEAT_SCHEDULE["runtime-health-scan"]
     assert schedule["schedule"] == 15
@@ -195,7 +195,7 @@ def fake_response(monkeypatch, body=None, status_code=200, error=None):
     session.__enter__ = Mock(return_value=session)
     session.__exit__ = Mock(return_value=False)
     session.request = Mock(return_value=response, side_effect=error)
-    monkeypatch.setattr("infrastructure.runtime_health.requests.Session", lambda: session)
+    monkeypatch.setattr("infrastructure.telemetry.runtime_health.requests.Session", lambda: session)
     return session
 
 
@@ -276,11 +276,11 @@ def test_readiness_timeout_fails_candidate_and_preserves_running(runtime, monkey
     candidate = Deployment.objects.create(version=running.version, build=running.build, status="deploying")
     Endpoint.objects.create(deployment=candidate, public_url="http://candidate")
     monkeypatch.setattr(
-        "apps.deployment.tasks.deployment_backend", lambda _: Mock(health=Mock(return_value=(False, {})))
+        "apps.deployment.serving.rollout_tasks.deployment_backend", lambda _: Mock(health=Mock(return_value=(False, {})))
     )
     for name in ("invalidate_model_server_cache", "append_deployment_log"):
-        monkeypatch.setattr(f"apps.deployment.tasks.{name}", Mock())
-    from apps.deployment.services.local_execution import check_execution
+        monkeypatch.setattr(f"apps.deployment.serving.rollout_tasks.{name}", Mock())
+    from apps.deployment.execution.local_watcher import check_execution
 
     token = uuid.uuid4()
     Deployment.objects.filter(pk=candidate.pk).update(
@@ -305,13 +305,13 @@ def test_readiness_timeout_fails_candidate_and_preserves_running(runtime, monkey
 
 
 def test_stop_clears_health_and_scan_selection(runtime, monkeypatch):
-    from apps.deployment.tasks import stop_deployment
+    from apps.deployment.serving.rollout_tasks import stop_deployment
 
     project, deployment, endpoint = runtime
     claim(endpoint)
-    monkeypatch.setattr("apps.deployment.tasks.deployment_backend", lambda _: Mock())
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.deployment_backend", lambda _: Mock())
     for name in ("invalidate_model_server_cache", "append_deployment_log"):
-        monkeypatch.setattr(f"apps.deployment.tasks.{name}", Mock())
+        monkeypatch.setattr(f"apps.deployment.serving.rollout_tasks.{name}", Mock())
     assert stop_deployment.run(str(deployment.public_id)) == "stopped"
     endpoint.refresh_from_db()
     project.refresh_from_db()

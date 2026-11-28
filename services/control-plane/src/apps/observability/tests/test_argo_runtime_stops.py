@@ -7,11 +7,13 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
-from apps.catalog.services.deletion import run_project_cleanup
+from apps.catalog.projects.deletion import run_project_cleanup
 from apps.deployment.models import Build, Deployment
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.registry.models import ModelVersion
-from infrastructure.execution.argo_backends import ArgoBuildBackend, ArgoDeploymentBackend, ArgoDriftBackend
+from infrastructure.execution.build import ArgoBuildBackend
+from infrastructure.execution.drift import ArgoDriftBackend
+from infrastructure.execution.serving import ArgoDeploymentBackend
 
 
 @pytest.mark.django_db
@@ -44,9 +46,9 @@ def test_project_waits_for_all_argo_runtime_confirmations(monkeypatch, settings,
     monkeypatch.setattr("infrastructure.execution.build_backend", lambda _: build_backend)
     project_cleanup = Mock()
     project_cleanup.run.return_value = {"dispatched": True}
-    monkeypatch.setattr("apps.catalog.services.deletion.project_cleanup_backend", lambda: project_cleanup)
+    monkeypatch.setattr("apps.catalog.projects.deletion.project_cleanup_backend", lambda: project_cleanup)
     resume = Mock()
-    monkeypatch.setattr("apps.catalog.tasks.execute_project_deletion.delay", resume)
+    monkeypatch.setattr("apps.catalog.projects.tasks.execute_project_deletion.delay", resume)
 
     assert run_project_cleanup(project)["waiting_for_stop"]
     assert run_project_cleanup(project)["waiting_for_stop"]
@@ -94,9 +96,9 @@ def test_cancelled_argo_drift_run_can_only_be_deleted_after_confirmation(monkeyp
     argo = Mock()
     storage = Mock(bucket="artifacts")
     backend = ArgoDriftBackend(client=argo, storage=storage)
-    monkeypatch.setattr("apps.drift.services.deletion.drift_backend", lambda _: backend)
-    monkeypatch.setattr("apps.drift.services.deletion.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.drift.services.deletion.redis_client", Mock())
+    monkeypatch.setattr("apps.drift.monitors.deletion.drift_backend", lambda _: backend)
+    monkeypatch.setattr("apps.drift.monitors.deletion.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.drift.monitors.deletion.redis_client", Mock())
 
     client = APIClient()
     client.force_authenticate(owner)

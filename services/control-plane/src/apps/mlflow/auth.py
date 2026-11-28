@@ -7,7 +7,7 @@ from rest_framework.response import Response
 
 from apps.access.models import UserAPIKey
 from apps.catalog.models import ModelProject
-from apps.training.models import TrainingJob, TrainingJobCapability
+from apps.training.jobs.models import TrainingJob, TrainingJobCapability
 
 
 def _extract_bearer_token(request) -> str:

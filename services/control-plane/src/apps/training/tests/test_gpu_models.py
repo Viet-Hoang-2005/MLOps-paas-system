@@ -2,11 +2,11 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import unsaved_training_job
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.api.serializers import TrainingDraftSettingsSerializer, TrainingJobSerializer
-from apps.training.services.resources import validate_resources
+from apps.training.jobs.serializers import TrainingJobSerializer
+from apps.training.resources.options import validate_resources
+from apps.training.tests.factories import training_job, unsaved_training_job
+from apps.training.workspace.serializers import TrainingDraftSettingsSerializer
 
 from .test_job_drafts import studio as studio
 
@@ -24,7 +24,7 @@ def test_capabilities_never_advertise_more_than_one_gpu(settings, monkeypatch, b
     settings.TRAINING_GPU_ENABLED = True
     settings.TRAINING_GPU_COUNTS = (1, 2, 4)
     monkeypatch.setattr(
-        "apps.training.services.local_gpu.inventory",
+        "apps.training.resources.local_gpu.inventory",
         lambda **kwargs: {
             "status": "available",
             "reason": "",
@@ -157,8 +157,8 @@ def test_submit_rejects_legacy_production_gpu_without_model(settings):
 def test_argo_dispatch_includes_selected_gpu_model(settings, monkeypatch, model):
     from unittest.mock import Mock
 
-    from apps.training.services.storage_scope import expected_training_uris
-    from infrastructure.execution.argo_backends import ArgoTrainingBackend
+    from apps.training.jobs.storage_scope import expected_training_uris
+    from infrastructure.execution.training import ArgoTrainingBackend
 
     user = get_user_model().objects.create_user("gpu-dispatch@example.com")
     project = ModelProject.objects.create(owner=user, name="gpu project")
@@ -180,7 +180,7 @@ def test_argo_dispatch_includes_selected_gpu_model(settings, monkeypatch, model)
     storage = Mock(bucket="test-bucket")
     storage.presigned_get.return_value = "https://example.invalid/object"
     backend = ArgoTrainingBackend(storage=storage)
-    monkeypatch.setattr("infrastructure.execution.argo_backends.issue_capability", lambda *a, **kw: "capability")
+    monkeypatch.setattr("infrastructure.execution.training.issue_capability", lambda *a, **kw: "capability")
     monkeypatch.setattr(backend, "persist_dispatch", Mock())
     monkeypatch.setattr(backend, "trigger", Mock(return_value={}))
     backend.run(job)
@@ -193,7 +193,9 @@ def test_argo_dispatch_includes_selected_gpu_model(settings, monkeypatch, model)
 @pytest.mark.django_db
 def test_next_run_copies_gpu_model(studio, settings):
     import uuid
-    from apps.training.services import drafts, workspaces
+
+    from apps.training.workspace import editing as workspaces
+    from apps.training.workspace import runs as drafts
 
     workspace, storage, _, _ = studio
     settings.TRAINING_GPU_ENABLED = True

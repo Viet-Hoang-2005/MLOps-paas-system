@@ -3,8 +3,8 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
+from apps.deployment.execution import logs as log_service
 from apps.deployment.models import Build
-from apps.deployment.services import logs as log_service
 from apps.registry.models import ModelVersion
 
 

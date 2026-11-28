@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 @shared_task(bind=True, max_retries=5, acks_late=True, reject_on_worker_lost=True)
 def delete_avatar_object(self, tenant_id, key):
-    from apps.auth.services.avatars import cleanup_avatar
+    from apps.auth.account.avatars import cleanup_avatar
 
     try:
         cleanup_avatar(tenant_id, key)
@@ -18,7 +18,7 @@ def delete_avatar_object(self, tenant_id, key):
 
 @shared_task(bind=True, max_retries=3, acks_late=True, reject_on_worker_lost=True)
 def stop_user_active_executions(self, user_id):
-    from apps.auth.services.account_lifecycle import stop_user_active_runtimes
+    from apps.auth.account.lifecycle import stop_user_active_runtimes
 
     try:
         return stop_user_active_runtimes(user_id)
@@ -29,7 +29,7 @@ def stop_user_active_executions(self, user_id):
 
 @shared_task(bind=True, max_retries=2, acks_late=True, reject_on_worker_lost=True)
 def purge_expired_deleted_accounts(self):
-    from apps.auth.services.account_lifecycle import purge_expired_deleted_accounts_batch
+    from apps.auth.account.lifecycle import purge_expired_deleted_accounts_batch
 
     try:
         return purge_expired_deleted_accounts_batch()

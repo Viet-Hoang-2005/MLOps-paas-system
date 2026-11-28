@@ -8,9 +8,8 @@ from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
-from apps.drift.tasks import execute_drift_run
 from apps.registry.models import ModelVersion
-from infrastructure.execution.docker_backends import DockerDriftBackend
+from infrastructure.execution.drift import DockerDriftBackend
 from infrastructure.execution.job_containers import labels_for
 
 
@@ -130,7 +129,7 @@ class DriftWebhookDriftDetectionTests(TestCase):
             }
         }
         with (
-            patch("apps.observability.services.executions._completion_data", return_value=payload["drift_summary"]),
+            patch("apps.observability.execution.observations._completion_data", return_value=payload["drift_summary"]),
             patch("celery.app.task.Task.apply_async") as queued,
             self.captureOnCommitCallbacks(execute=True),
         ):
@@ -157,7 +156,7 @@ class DriftWebhookDriftDetectionTests(TestCase):
                 "share_of_drifted_columns": 0.05,
             }
         }
-        with patch("apps.observability.services.executions._completion_data", return_value=payload["drift_summary"]):
+        with patch("apps.observability.execution.observations._completion_data", return_value=payload["drift_summary"]):
             response = self.client.post(
                 f"/internal/webhooks/drift-runs/{self.drift_run.public_id}/",
                 payload,

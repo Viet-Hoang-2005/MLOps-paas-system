@@ -2,7 +2,7 @@
 
 import os
 
-from .test import *  # noqa: F403
+from .test import *
 
 DATABASES = {
     "default": {

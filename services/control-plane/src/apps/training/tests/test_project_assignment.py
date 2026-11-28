@@ -5,10 +5,10 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import unsaved_training_job
 from apps.catalog.models import ModelProject
-from apps.training.models import TrainingOutput
-from apps.training.services.storage_scope import expected_training_uris
+from apps.training.jobs.storage_scope import expected_training_uris
+from apps.training.outputs.models import TrainingOutput
+from apps.training.tests.factories import unsaved_training_job
 
 
 @pytest.fixture
@@ -27,7 +27,7 @@ def unassigned_job(db, monkeypatch):
     )
     job.output_uri = expected_training_uris(job, "bucket")["output"]
     job.save()
-    from apps.training.services.storage_scope import training_prefix_for
+    from apps.training.jobs.storage_scope import training_prefix_for
 
     from .test_output_contract import Storage
 
@@ -44,7 +44,7 @@ def unassigned_job(db, monkeypatch):
     )
     job.tracking = {"output_contract": 2}
     job.save(update_fields=["tracking"])
-    monkeypatch.setattr("apps.training.services.project_assignment.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.training.jobs.project_assignment.S3Storage", lambda: storage)
     client = APIClient()
     client.force_authenticate(user)
     return user, job, client
@@ -136,7 +136,7 @@ def test_unassigned_model_summary_allows_editing_but_not_building(unassigned_job
     from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
 
     _, job, client = unassigned_job
-    monkeypatch.setattr("apps.training.services.outputs.S3Storage", lambda: MemoryStorage())
+    monkeypatch.setattr("apps.training.outputs.artifacts.S3Storage", lambda: MemoryStorage())
     response = client.get(f"/api/training-jobs/{job.public_id}/model-output/")
     assert response.status_code == 200
     assert response.data["project_id"] is None

@@ -4,12 +4,12 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from apps.training.tests.factories import unsaved_training_job
 from apps.catalog.models import ModelProject
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
-from apps.training.models import TrainingOutput
-from apps.training.services.storage_migration import migrate_job_storage
-from apps.training.services.storage_scope import expected_training_uris
+from apps.training.jobs.storage_migration import migrate_job_storage
+from apps.training.jobs.storage_scope import expected_training_uris
+from apps.training.outputs.models import TrainingOutput
+from apps.training.tests.factories import unsaved_training_job
 
 
 class CopyStorage(MemoryStorage):

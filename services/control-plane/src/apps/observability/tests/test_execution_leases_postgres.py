@@ -7,12 +7,12 @@ from django.contrib.auth import get_user_model
 from django.db import connection, connections, transaction
 from django.utils import timezone
 
-from apps.training.tests.factories import unsaved_training_job
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.observability.services import executions
-from apps.observability.services.executions import claim
-from apps.training.models import TrainingJob
+from apps.observability.execution import observations
+from apps.observability.execution import reconciliation as executions
+from apps.observability.execution.leases import claim
+from apps.training.jobs.models import TrainingJob
+from apps.training.tests.factories import training_job, unsaved_training_job
 
 
 @pytest.mark.django_db(transaction=True)
@@ -83,7 +83,7 @@ def test_concurrent_observation_replay_consumes_lease_once(postgres_job):
     def report():
         try:
             gate.wait(timeout=10)
-            return executions.apply_observation("training", job.public_id, token, {"status": "running"})
+            return observations.apply_observation("training", job.public_id, token, {"status": "running"})
         finally:
             connections.close_all()
 
@@ -101,7 +101,7 @@ def test_cancellation_lock_prevents_concurrent_completion(postgres_job, monkeypa
 
     def report():
         try:
-            return executions.apply_observation("training", job.public_id, token, {"status": "completed"})
+            return observations.apply_observation("training", job.public_id, token, {"status": "completed"})
         finally:
             connections.close_all()
 

@@ -7,7 +7,7 @@ from rest_framework.test import APIClient
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.registry.models import ModelVersion, RegistryAlias
-from apps.registry.services.routing import predict_alias, predict_version
+from apps.registry.routing import predict_alias, predict_version
 
 
 @pytest.mark.django_db

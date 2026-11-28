@@ -2,8 +2,8 @@ import os
 
 from celery import Celery
 
-import common.celery_logging  # noqa: F401
-import common.metrics  # noqa: F401
+import common.telemetry.celery_logging  # noqa: F401
+import common.telemetry.metrics  # noqa: F401
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
 

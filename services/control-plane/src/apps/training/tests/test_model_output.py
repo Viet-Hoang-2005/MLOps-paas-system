@@ -4,10 +4,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
-from apps.training.models import TrainingOutput
+from apps.training.outputs.models import TrainingOutput
+from apps.training.tests.factories import training_job
 
 
 @pytest.fixture
@@ -49,7 +49,7 @@ def completed_training_job(db):
 def test_get_and_patch_model_output_flow(completed_training_job, monkeypatch):
     project, job, user = completed_training_job
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.training.services.outputs.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.training.outputs.artifacts.S3Storage", lambda: storage)
 
     client = APIClient()
     client.force_authenticate(user)
@@ -109,7 +109,7 @@ def test_get_and_patch_model_output_flow(completed_training_job, monkeypatch):
 def test_model_output_mutation_requires_valid_revision(completed_training_job, monkeypatch):
     _, job, user = completed_training_job
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.training.services.outputs.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.training.outputs.artifacts.S3Storage", lambda: storage)
     client = APIClient()
     client.force_authenticate(user)
 

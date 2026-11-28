@@ -6,11 +6,11 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
+from apps.training.jobs.storage_scope import expected_training_uris
 from apps.training.tests.factories import training_job
-from apps.training.services.storage_scope import expected_training_uris
 from infrastructure.execution import workspace_docker
-from infrastructure.execution.docker_backends import DockerTrainingBackend
 from infrastructure.execution.job_containers import labels_for
+from infrastructure.execution.training import DockerTrainingBackend
 
 
 @pytest.mark.django_db

@@ -7,9 +7,9 @@ from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment, Endpoint
-from apps.deployment.services.callbacks import issue_callback_token
-from apps.deployment.services.deployments import request_stop
-from apps.deployment.tasks import _mark_deployment_succeeded, stop_deployment
+from apps.deployment.serving.callback_tokens import issue_callback_token
+from apps.deployment.serving.rollout import request_stop
+from apps.deployment.serving.rollout_tasks import _mark_deployment_succeeded, stop_deployment
 from apps.registry.models import ModelVersion
 
 
@@ -37,9 +37,9 @@ def runtimes(db, settings, monkeypatch):
     project.active_deployment = running
     project.save(update_fields=["active_deployment"])
     stops = []
-    monkeypatch.setattr("apps.deployment.tasks.stop_deployment.delay", stops.append)
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.stop_deployment.delay", stops.append)
     for name in ("invalidate_model_server_cache", "append_deployment_log"):
-        monkeypatch.setattr(f"apps.deployment.tasks.{name}", Mock())
+        monkeypatch.setattr(f"apps.deployment.serving.rollout_tasks.{name}", Mock())
     return project, running, candidate, stops
 
 
@@ -98,7 +98,7 @@ def test_stop_task_records_runtime_stop_after_backend(runtimes, monkeypatch):
     project, running, _candidate, _stops = runtimes
     backend = Mock()
     backend.stop.return_value = {"confirmed": False}
-    monkeypatch.setattr("apps.deployment.tasks.deployment_backend", lambda _: backend)
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.deployment_backend", lambda _: backend)
     assert stop_deployment.run(str(running.public_id)) == "stopping"
     running.refresh_from_db()
     assert running.stopped_at is None
@@ -139,7 +139,7 @@ def _age(deployment, seconds):
 def test_reconcile_redispatches_stop_whose_runtime_removal_was_lost(runtimes, settings):
     from django.core.cache import cache
 
-    from apps.deployment.tasks import reconcile_stopped_deployments
+    from apps.deployment.serving.rollout_tasks import reconcile_stopped_deployments
 
     cache.clear()
     _project, running, candidate, stops = runtimes
@@ -158,7 +158,7 @@ def test_reconcile_ignores_completed_and_live_deployments(runtimes, settings):
     from django.core.cache import cache
     from django.utils import timezone
 
-    from apps.deployment.tasks import reconcile_stopped_deployments
+    from apps.deployment.serving.rollout_tasks import reconcile_stopped_deployments
 
     cache.clear()
     _project, running, candidate, stops = runtimes

@@ -8,9 +8,9 @@ from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment, Endpoint
-from apps.deployment.services.callbacks import issue_callback_token
-from apps.deployment.tasks import execute_deployment, mark_deployment_unconfirmed
-from apps.observability.services.executions import claim, signed_observation_token
+from apps.deployment.serving.callback_tokens import issue_callback_token
+from apps.deployment.serving.rollout_tasks import execute_deployment, mark_deployment_unconfirmed
+from apps.observability.execution.leases import claim, signed_observation_token
 from apps.registry.models import ModelVersion
 
 
@@ -24,7 +24,7 @@ def deployment(db, settings, monkeypatch):
     deployment = Deployment.objects.create(version=version, build=build, backend="argo", status="deploying")
     Endpoint.objects.create(deployment=deployment, public_url="https://example.test/model")
     for name in ("invalidate_model_server_cache", "append_deployment_log"):
-        monkeypatch.setattr(f"apps.deployment.tasks.{name}", Mock())
+        monkeypatch.setattr(f"apps.deployment.serving.rollout_tasks.{name}", Mock())
     return deployment
 
 
@@ -50,8 +50,8 @@ def test_reporter_confirms_readiness_and_replay_is_idempotent(deployment):
 
 def test_reporter_rejects_legacy_or_mismatched_workflow_name(deployment):
     import importlib.util
-    from pathlib import Path
     import uuid
+    from pathlib import Path
 
     job_ops_path = Path(__file__).resolve().parents[6] / "k8s/argo/workflows/operations/scripts/job_ops.py"
     spec = importlib.util.spec_from_file_location("job_ops", job_ops_path)
@@ -77,7 +77,7 @@ def test_reporter_rejects_missing_wrong_resource_expired_token(deployment, monke
     assert APIClient().post(url, {}, format="json").status_code == 403
     assert report(deployment, token=issue_callback_token(deployment.build.public_id)).status_code == 403
     token = issue_callback_token(deployment.public_id)
-    from apps.deployment.services import callbacks
+    from apps.deployment.serving import callback_tokens as callbacks
 
     original = callbacks.time.time()
     monkeypatch.setattr(callbacks.time, "time", lambda: original + 3601)
@@ -99,9 +99,9 @@ def test_timeout_is_unconfirmed_and_late_valid_callback_is_accepted(deployment):
 
 def test_argo_dispatch_schedules_only_one_result_deadline(deployment, monkeypatch):
     backend = Mock(deploy=Mock(return_value=deployment.endpoint))
-    monkeypatch.setattr("apps.deployment.tasks.deployment_backend", lambda _: backend)
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.deployment_backend", lambda _: backend)
     deadline = Mock()
-    monkeypatch.setattr("apps.deployment.tasks.mark_deployment_unconfirmed.apply_async", deadline)
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.mark_deployment_unconfirmed.apply_async", deadline)
     assert execute_deployment.run(str(deployment.public_id)) == "deploying"
     deadline.assert_called_once_with(args=[str(deployment.public_id)], countdown=33 * 60)
     deployment.refresh_from_db()
@@ -114,7 +114,7 @@ def test_observation_recovers_unconfirmed_deployment_after_health_check(deployme
     Deployment.objects.filter(pk=deployment.pk).update(execution_deadline_at=timezone.now())
     backend = Mock()
     backend.health.return_value = healthy, {}
-    monkeypatch.setattr("apps.deployment.services.argo_recovery.deployment_backend", lambda _: backend)
+    monkeypatch.setattr("apps.deployment.execution.argo_recovery.deployment_backend", lambda _: backend)
     _, lease = claim("deployment", deployment.public_id)[0]
     token = signed_observation_token("deployment", deployment, lease)
     path = f"/internal/executions/deployment/{deployment.public_id}/observations/"

@@ -5,11 +5,11 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.catalog.services.deletion import finalize_project_deletion, project_cleanup_manifest
+from apps.catalog.projects.deletion import finalize_project_deletion, project_cleanup_manifest
 from apps.deployment.models import Build, Deployment, Endpoint
 from apps.registry.models import ModelVersion
+from apps.training.tests.factories import training_job
 from infrastructure.execution.cleanup_backends import DockerProjectCleanupBackend
 
 
@@ -25,8 +25,8 @@ class FakeStorage:
 def test_project_deletion_preserves_existing_training_jobs(monkeypatch):
     from rest_framework.exceptions import ValidationError
 
-    from apps.catalog.services.deletion import request_project_deletion
-    from apps.training.models import TrainingJob
+    from apps.catalog.projects.deletion import request_project_deletion
+    from apps.training.jobs.models import TrainingJob
 
     owner = get_user_model().objects.create_user("preserve-training@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="Preserve training")
@@ -41,7 +41,7 @@ def test_project_deletion_preserves_existing_training_jobs(monkeypatch):
     )
     storage = FakeStorage()
 
-    monkeypatch.setattr("apps.catalog.services.deletion._enqueue", lambda project: None)
+    monkeypatch.setattr("apps.catalog.projects.deletion._enqueue", lambda project: None)
     request_project_deletion(project)
     project.refresh_from_db()
     assert project.deletion_state == "deleting"
@@ -54,7 +54,7 @@ def test_project_deletion_preserves_existing_training_jobs(monkeypatch):
 @pytest.mark.django_db
 def test_project_cleanup_retains_tenant_scoped_training_history(monkeypatch):
     from apps.observability.models import LifecycleEvent
-    from apps.training.models import TrainingOutput
+    from apps.training.outputs.models import TrainingOutput
 
     owner = get_user_model().objects.create_user("detached-training@example.com", "password123")
     project = ModelProject.objects.create(
@@ -79,9 +79,9 @@ def test_project_cleanup_retains_tenant_scoped_training_history(monkeypatch):
     )
     deleted_keys = []
     monkeypatch.setattr(
-        "common.redis_client.redis_client", lambda: SimpleNamespace(delete=lambda *keys: deleted_keys.extend(keys))
+        "infrastructure.redis.redis_client", lambda: SimpleNamespace(delete=lambda *keys: deleted_keys.extend(keys))
     )
-    monkeypatch.setattr("apps.catalog.services.deletion.invalidate_model_server_cache", lambda *args: None)
+    monkeypatch.setattr("apps.catalog.projects.deletion.invalidate_model_server_cache", lambda *args: None)
 
     finalize_project_deletion(project, storage=FakeStorage())
     job.refresh_from_db()
@@ -101,7 +101,7 @@ def test_delete_endpoint_marks_the_entire_project_deleting_and_enqueues_cleanup(
     project = ModelProject.objects.create(owner=owner, name="Delete me")
     queued = []
     monkeypatch.setattr(
-        "apps.catalog.tasks.execute_project_deletion.delay",
+        "apps.catalog.projects.tasks.execute_project_deletion.delay",
         lambda project_id: queued.append(project_id) or SimpleNamespace(id="cleanup-task"),
     )
     client = APIClient()
@@ -151,8 +151,8 @@ def test_cleanup_manifest_includes_all_project_build_images_and_runtime_names():
 
 @pytest.mark.django_db
 def test_finalization_deletes_project_s3_prefix_and_database_rows(monkeypatch):
-    monkeypatch.setattr("common.redis_client.redis_client", lambda: SimpleNamespace(delete=lambda *keys: None))
-    monkeypatch.setattr("apps.catalog.services.deletion.invalidate_model_server_cache", lambda *args: None)
+    monkeypatch.setattr("infrastructure.redis.redis_client", lambda: SimpleNamespace(delete=lambda *keys: None))
+    monkeypatch.setattr("apps.catalog.projects.deletion.invalidate_model_server_cache", lambda *args: None)
     owner = get_user_model().objects.create_user("finalize-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="Finalize me", deletion_state="deleting", is_active=False)
     version = ModelVersion.objects.create(project=project, version="1")
@@ -217,13 +217,13 @@ def test_local_cleanup_uses_docker_sdk_without_a_model_cleaner_container():
 
 @pytest.mark.django_db
 def test_failed_finalization_can_retry_without_affecting_other_project(monkeypatch):
-    from apps.catalog.services.deletion import request_project_deletion
-    from apps.catalog.tasks import execute_project_deletion
+    from apps.catalog.projects.deletion import request_project_deletion
+    from apps.catalog.projects.tasks import execute_project_deletion
 
     owner = get_user_model().objects.create_user("retry-cleanup@example.test", "test-password")
     project = ModelProject.objects.create(owner=owner, name="Remove", deletion_state="deleting", is_active=False)
     other = ModelProject.objects.create(owner=owner, name="Keep")
-    cleanup = "apps.catalog.services.deletion."
+    cleanup = "apps.catalog.projects.deletion."
     monkeypatch.setattr(cleanup + "run_project_cleanup", lambda project: {"dispatched": False})
     original = finalize_project_deletion
 
@@ -235,10 +235,10 @@ def test_failed_finalization_can_retry_without_affecting_other_project(monkeypat
         execute_project_deletion(str(project.public_id))
     project.refresh_from_db()
     assert project.deletion_state == "delete_failed"
-    monkeypatch.setattr("apps.catalog.tasks.execute_project_deletion.delay", lambda id: SimpleNamespace(id="retry"))
+    monkeypatch.setattr("apps.catalog.projects.tasks.execute_project_deletion.delay", lambda id: SimpleNamespace(id="retry"))
     request_project_deletion(project)
     monkeypatch.setattr(cleanup + "finalize_project_deletion", lambda project: original(project, storage=FakeStorage()))
-    monkeypatch.setattr("common.redis_client.redis_client", lambda: SimpleNamespace(delete=lambda *keys: None))
+    monkeypatch.setattr("infrastructure.redis.redis_client", lambda: SimpleNamespace(delete=lambda *keys: None))
     monkeypatch.setattr(cleanup + "invalidate_model_server_cache", lambda *args: None)
     assert execute_project_deletion(str(project.public_id)) == "deleted"
     assert ModelProject.objects.filter(pk=other.pk).exists()

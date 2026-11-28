@@ -7,12 +7,13 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.catalog.models import ModelProject
+from apps.deployment.builds.cleanup import cleanup_registered_build_storage
+from apps.deployment.builds.registration import request_registration
 from apps.deployment.models import Build, BuildInputAsset
-from apps.deployment.services.completion import request_registration
-from apps.deployment.tasks import cleanup_registered_build_storage, reconcile_stalled_deletions
+from apps.deployment.reconciliation import reconcile_stalled_deletions
 from apps.registry.models import ModelArtifact, ModelVersion
-from apps.registry.services.deletion import delete_model_version, request_model_version_deletion
-from apps.registry.services.versions import register_successful_build
+from apps.registry.versions.deletion import delete_model_version, request_model_version_deletion
+from apps.registry.versions.registration import register_successful_build
 from infrastructure.storage.paths import build_prefix
 from infrastructure.storage.s3 import StoredObject
 
@@ -150,7 +151,7 @@ class _TransactionDepth:
     """Counts open ``transaction.atomic`` blocks created by the registry service."""
 
     def __init__(self, monkeypatch):
-        import apps.registry.services.versions as module
+        import apps.registry.versions.registration as module
 
         self.depth = 0
         real_atomic = module.transaction.atomic
@@ -293,7 +294,7 @@ def test_registration_schedules_purge_after_commit_and_keeps_version_artifacts(
     build.save(update_fields=["package_uri"])
     storage = RecordingStorage()
     storage.delete_prefix = Mock()
-    monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.S3Storage", lambda: storage)
     dispatch = Mock(side_effect=cleanup_registered_build_storage.run)
     monkeypatch.setattr(cleanup_registered_build_storage, "delay", dispatch)
 
@@ -337,7 +338,7 @@ def test_registered_build_cleanup_retries_after_storage_timeout(monkeypatch, det
     project, build = _project_and_build("reg-purge-retry@example.com")
     storage = RecordingStorage()
     storage.delete_prefix = Mock(side_effect=[TimeoutError("S3 timeout"), None])
-    monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.S3Storage", lambda: storage)
 
     registered = _register(build, storage)
     with pytest.raises(TimeoutError, match="S3 timeout"):
@@ -348,7 +349,7 @@ def test_registered_build_cleanup_retries_after_storage_timeout(monkeypatch, det
     assert cleanup_registered_build_storage.run(str(build.public_id)) == "not_due"
 
     if detach:
-        monkeypatch.setattr("apps.registry.services.deletion.invalidate_model_server_cache", Mock())
+        monkeypatch.setattr("apps.registry.versions.deletion.invalidate_model_server_cache", Mock())
         request_model_version_deletion(registered.version)
         delete_model_version(registered.version, storage=Mock(bucket=storage.bucket), image_remover=Mock())
         build.refresh_from_db()
@@ -380,7 +381,7 @@ def test_registered_build_cleanup_preserves_live_version_uri(monkeypatch):
 
     storage = RecordingStorage()
     storage.delete_prefix = Mock()
-    monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.S3Storage", lambda: storage)
     with pytest.raises(RuntimeError, match="still referenced"):
         cleanup_registered_build_storage.run(str(build.public_id))
     storage.delete_prefix.assert_not_called()

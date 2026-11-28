@@ -2,7 +2,7 @@ from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase, override_settings
 
-from common.redis_client import redis_client
+from infrastructure.redis import redis_client
 
 
 class RedisSentinelClientTests(SimpleTestCase):
@@ -16,7 +16,7 @@ class RedisSentinelClientTests(SimpleTestCase):
         REDIS_URL="redis://local-cache:6379/0",
         CELERY_BROKER_URL="redis://local-queue:6380/0",
     )
-    @patch("common.redis_client.Redis.from_url")
+    @patch("infrastructure.redis.Redis.from_url")
     def test_direct_mode_uses_separate_instances_for_cache_and_queue(self, from_url):
         redis_client.cache_clear()
         redis_client(db=0)
@@ -26,7 +26,7 @@ class RedisSentinelClientTests(SimpleTestCase):
         from_url.assert_called_with("redis://local-queue:6380/0")
 
     def test_direct_mode_derives_authenticated_celery_urls(self):
-        from config.settings.base import _derive_redis_url, _inject_redis_password
+        from config.settings.redis import _derive_redis_url, _inject_redis_password
 
         url = _inject_redis_password("redis://redis:6379/1", "secret")
         self.assertEqual(url, "redis://:secret@redis:6379/1")
@@ -47,7 +47,7 @@ class RedisSentinelClientTests(SimpleTestCase):
         REDIS_PASSWORD="redis-password",
         REDIS_SENTINEL_PASSWORD="sentinel-password",
     )
-    @patch("common.redis_client.Sentinel")
+    @patch("infrastructure.redis.Sentinel")
     def test_sentinel_mode_discovers_master_with_separate_credentials(self, sentinel_class):
         redis_client.cache_clear()
         sentinel_class.return_value.master_for.return_value = Mock()
@@ -68,7 +68,7 @@ class RedisSentinelClientTests(SimpleTestCase):
         REDIS_PASSWORD="redis-password",
         CELERY_SENTINEL_PASSWORD="sentinel-password",
     )
-    @patch("common.redis_client.Sentinel")
+    @patch("infrastructure.redis.Sentinel")
     def test_celery_queue_sentinel_mode_discovers_queue_master(self, sentinel_class):
         redis_client.cache_clear()
         sentinel_class.return_value.master_for.return_value = Mock()

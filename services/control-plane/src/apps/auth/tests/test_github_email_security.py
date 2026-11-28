@@ -5,7 +5,7 @@ import requests
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
-from apps.auth.services.oauth import authenticate_github
+from apps.auth.oauth.providers import authenticate_github
 from apps.auth.tests.test_auth import browser_auth_headers
 
 
@@ -76,7 +76,7 @@ def test_github_sign_in_uses_only_verified_primary_email(github_settings, profil
 def test_github_invalid_email_list_does_not_issue_session(github_settings, monkeypatch, emails):
     victim = get_user_model().objects.create_user("victim@example.com")
     client = GitHubClient([emails])
-    monkeypatch.setattr("apps.auth.services.oauth.HttpClient", lambda: client)
+    monkeypatch.setattr("apps.auth.oauth.providers.HttpClient", lambda: client)
     response = APIClient().post(
         "/api/auth/oauth/github/",
         {"code": "code", "redirect_uri": "http://localhost/callback"},
@@ -106,7 +106,7 @@ def test_github_finds_verified_primary_on_later_page(github_settings):
 def test_github_verified_primary_issues_browser_session(github_settings, monkeypatch):
     owner = get_user_model().objects.create_user("owner@example.com")
     client = GitHubClient([[{"email": owner.email, "primary": True, "verified": True}]])
-    monkeypatch.setattr("apps.auth.services.oauth.HttpClient", lambda: client)
+    monkeypatch.setattr("apps.auth.oauth.providers.HttpClient", lambda: client)
     response = APIClient().post(
         "/api/auth/oauth/github/",
         {"code": "code", "redirect_uri": "http://localhost/callback"},
@@ -122,7 +122,7 @@ def test_github_verified_primary_issues_browser_session(github_settings, monkeyp
 @pytest.mark.django_db
 def test_github_email_pagination_is_bounded(github_settings, monkeypatch):
     client = GitHubClient([[] for _ in range(11)])
-    monkeypatch.setattr("apps.auth.services.oauth.HttpClient", lambda: client)
+    monkeypatch.setattr("apps.auth.oauth.providers.HttpClient", lambda: client)
     response = APIClient().post(
         "/api/auth/oauth/github/",
         {"code": "code", "redirect_uri": "http://localhost/callback"},
@@ -138,7 +138,7 @@ def test_github_email_pagination_is_bounded(github_settings, monkeypatch):
 def test_github_email_api_failure_never_falls_back_to_profile(github_settings, monkeypatch):
     get_user_model().objects.create_user("victim@example.com")
     client = GitHubClient([requests.ConnectionError("provider unavailable")])
-    monkeypatch.setattr("apps.auth.services.oauth.HttpClient", lambda: client)
+    monkeypatch.setattr("apps.auth.oauth.providers.HttpClient", lambda: client)
     response = APIClient(raise_request_exception=False).post(
         "/api/auth/oauth/github/",
         {"code": "code", "redirect_uri": "http://localhost/callback"},

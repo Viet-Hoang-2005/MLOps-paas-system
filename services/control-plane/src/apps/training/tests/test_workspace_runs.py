@@ -7,10 +7,10 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
-from apps.training.models import TrainingWorkspace, TrainingWorkspaceEntry
-from apps.training.services import workspaces
-from apps.training.services.capabilities import issue_capability
-from apps.training.services.drafts import run_workspace as submit_workspace
+from apps.training.jobs.capabilities import issue_capability
+from apps.training.workspace import editing as workspaces
+from apps.training.workspace.models import TrainingWorkspace, TrainingWorkspaceEntry
+from apps.training.workspace.runs import run_workspace as submit_workspace
 from common.api.exceptions import Conflict
 
 
@@ -19,7 +19,7 @@ def run_workspace(workspace, *, revision, run_key, values, storage):
     for field, value in values.items():
         setattr(workspace, field, value)
     workspace.save()
-    from apps.training.services.drafts import prepare_workspace
+    from apps.training.workspace.runs import prepare_workspace
     job = submit_workspace(workspace, revision=revision, run_key=run_key)
     return prepare_workspace(job.public_id, job.submission_token, storage=storage) or job
 
@@ -44,7 +44,7 @@ def draft(db, settings, monkeypatch):
         checksum=item.checksum,
         size_bytes=item.size_bytes,
     )
-    monkeypatch.setattr("apps.training.services.jobs._enqueue", lambda job: None)
+    monkeypatch.setattr("apps.training.jobs.lifecycle._enqueue", lambda job: None)
     values = {
         "model_flavor": "sklearn",
         "vcpu": 1,
@@ -71,7 +71,7 @@ def test_run_without_project_is_immutable_and_idempotent(draft):
         workspaces.update_workspace(workspace, revision=1, changes={"environment": {"EXAMPLE": "changed"}})
     with ZipFile(BytesIO(storage.objects[job.code_snapshot_uri])) as archive:
         assert archive.namelist() == ["train.py"]
-    from apps.training.models import TrainingQuotaReservation
+    from apps.training.resources.models import TrainingQuotaReservation
 
     assert TrainingQuotaReservation.objects.filter(job_id=job.public_id, owner=workspace.owner, active=True).exists()
 
@@ -105,7 +105,7 @@ def test_unassigned_argo_dispatch_has_job_identity_and_no_secret_values(draft):
     from types import SimpleNamespace
     from unittest.mock import Mock
 
-    from infrastructure.execution.argo_backends import ArgoTrainingBackend
+    from infrastructure.execution.training import ArgoTrainingBackend
 
     workspace, storage, values = draft
     job = run_workspace(workspace, revision=1, run_key=uuid.uuid4(), values=values, storage=storage)

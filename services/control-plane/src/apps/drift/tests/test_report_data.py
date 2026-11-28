@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 from uuid import uuid4
 
-from apps.drift.services.reports import get_drift_report_data
+from apps.drift.runs.reports import get_drift_report_data
 
 
 def read_report(monkeypatch, report, summary):

@@ -6,13 +6,14 @@ from django.utils import timezone
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build
-from apps.training.models import TrainingJob, TrainingQuotaReservation
-from apps.training.services import drafts
-from apps.training.services.workspace_lifecycle import cleanup_workspace, request_workspace_deletion
+from apps.training.jobs.models import TrainingJob
+from apps.training.resources.models import TrainingQuotaReservation
+from apps.training.workspace import runs as drafts
+from apps.training.workspace.lifecycle import cleanup_workspace, request_workspace_deletion
 from common.api.exceptions import Conflict
 
-from .test_job_drafts import studio as studio
 from .test_job_drafts import run
+from .test_job_drafts import studio as studio
 
 pytestmark = pytest.mark.django_db
 
@@ -53,7 +54,7 @@ def test_cleanup_failure_is_retryable_without_deleting_workspace(studio, monkeyp
     workspace.save()
     storage = Mock()
     storage.delete_prefix.side_effect = OSError("storage offline")
-    monkeypatch.setattr("apps.training.services.workspace_lifecycle.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.training.workspace.lifecycle.S3Storage", lambda: storage)
     with pytest.raises(OSError):
         cleanup_workspace.run(str(workspace.public_id))
     workspace.refresh_from_db()

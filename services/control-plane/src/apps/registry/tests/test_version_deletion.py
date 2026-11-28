@@ -9,15 +9,16 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
-from apps.ct.models import DatasetSnapshot, EvidenceWindow, MaintenancePolicy
+from apps.ct.models.evidence import DatasetSnapshot, EvidenceWindow
+from apps.ct.models.policy import MaintenancePolicy
+from apps.deployment.builds.tasks import register_build
 from apps.deployment.models import Build, Deployment, Endpoint
-from apps.deployment.services.deployments import request_deployment
-from apps.deployment.tasks import register_build
+from apps.deployment.serving.rollout import request_deployment
 from apps.drift.models import DriftMonitor, DriftRun
-from apps.drift.services.monitors import create_monitor
-from apps.drift.services.runs import request_run
+from apps.drift.monitors.reference import create_monitor
+from apps.drift.runs.lifecycle import request_run
 from apps.registry.models import ModelArtifact, ModelVersion, RegistryAlias
-from apps.registry.tasks import cleanup_model_version
+from apps.registry.versions.tasks import cleanup_model_version
 from apps.training.tests.factories import training_job as make_training_job
 from common.api.exceptions import Conflict, ServiceUnavailable
 
@@ -66,20 +67,20 @@ def test_delete_version_removes_runtime_monitors_s3_image_and_unlocks_build(monk
 
     backend = Mock()
     monkeypatch.setattr(
-        "apps.registry.services.deletion.deployment_backend",
+        "apps.registry.versions.deletion.deployment_backend",
         lambda _backend: backend,
     )
     invalidate_cache = Mock()
-    monkeypatch.setattr("apps.registry.services.deletion.invalidate_model_server_cache", invalidate_cache)
+    monkeypatch.setattr("apps.registry.versions.deletion.invalidate_model_server_cache", invalidate_cache)
     remove_image = Mock()
-    monkeypatch.setattr("apps.registry.services.deletion._remove_build_image", remove_image)
+    monkeypatch.setattr("apps.registry.versions.deletion._remove_build_image", remove_image)
 
     storage = Mock(bucket="bucket")
-    monkeypatch.setattr("apps.registry.services.deletion.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.drift.services.deletion.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.registry.versions.deletion.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.drift.monitors.deletion.S3Storage", lambda: storage)
     redis_mock = Mock()
-    monkeypatch.setattr("apps.registry.services.deletion.redis_client", lambda: redis_mock)
-    monkeypatch.setattr("apps.drift.services.deletion.redis_client", lambda: redis_mock)
+    monkeypatch.setattr("apps.registry.versions.deletion.redis_client", lambda: redis_mock)
+    monkeypatch.setattr("apps.drift.monitors.deletion.redis_client", lambda: redis_mock)
 
     client = APIClient()
     client.force_authenticate(owner)
@@ -221,11 +222,11 @@ def test_delete_version_preserves_resources_referenced_by_ct_when_disabled(monke
     remove_image = Mock()
     storage = Mock(bucket="bucket")
     invalidate_cache = Mock()
-    monkeypatch.setattr("apps.registry.services.deletion.deployment_backend", backend)
-    monkeypatch.setattr("apps.registry.services.deletion._remove_build_image", remove_image)
-    monkeypatch.setattr("apps.registry.services.deletion.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.registry.services.deletion.invalidate_model_server_cache", invalidate_cache)
-    monkeypatch.setattr("apps.registry.services.deletion.redis_client", Mock())
+    monkeypatch.setattr("apps.registry.versions.deletion.deployment_backend", backend)
+    monkeypatch.setattr("apps.registry.versions.deletion._remove_build_image", remove_image)
+    monkeypatch.setattr("apps.registry.versions.deletion.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.registry.versions.deletion.invalidate_model_server_cache", invalidate_cache)
+    monkeypatch.setattr("apps.registry.versions.deletion.redis_client", Mock())
 
     client = APIClient()
     client.force_authenticate(owner)

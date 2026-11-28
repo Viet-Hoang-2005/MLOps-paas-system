@@ -2,8 +2,9 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from apps.catalog.models import ModelProject
+from apps.deployment.builds.cleanup import cleanup_failed_build_artifacts
+from apps.deployment.builds.tasks import execute_build
 from apps.deployment.models import Build, BuildInputAsset
-from apps.deployment.tasks import cleanup_failed_build_artifacts, execute_build
 
 
 class FakeStorage:
@@ -41,8 +42,8 @@ def test_failed_build_cleanup_removes_binary_and_keeps_audit_metadata(monkeypatc
     )
     storage = FakeStorage()
     cleaner = FakeCleaner()
-    monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.deployment.tasks.BuildImageCleaner", lambda: cleaner)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.BuildImageCleaner", lambda: cleaner)
     assert cleanup_failed_build_artifacts.run(str(build.public_id), True) == "purged"
     asset.refresh_from_db()
     assert asset.name == "model.pkl"
@@ -57,7 +58,7 @@ def test_ready_build_is_retained(monkeypatch):
     owner = get_user_model().objects.create_user("cleanup-ready@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="retained project")
     build = Build.objects.create(project=project, flavor="sklearn", status="ready")
-    monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: FakeStorage())
+    monkeypatch.setattr("apps.deployment.builds.cleanup.S3Storage", lambda: FakeStorage())
     assert cleanup_failed_build_artifacts.run(str(build.public_id), True) == "retained"
 
 
@@ -80,8 +81,8 @@ def test_execute_build_locks_build_without_joining_nullable_version(monkeypatch)
         build.save(update_fields=["status", "image_uri", "image_digest", "updated_at"])
         return build
 
-    monkeypatch.setattr("apps.deployment.tasks.build_backend", lambda _: FakeBackend())
-    monkeypatch.setattr("apps.deployment.tasks.register_successful_build", register_build)
+    monkeypatch.setattr("apps.deployment.builds.tasks.build_backend", lambda _: FakeBackend())
+    monkeypatch.setattr("apps.deployment.builds.tasks.register_successful_build", register_build)
 
     assert execute_build.run(str(build.public_id)) == "building"
     build.refresh_from_db()

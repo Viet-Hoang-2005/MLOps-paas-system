@@ -10,8 +10,8 @@ from apps.catalog.models import ModelProject
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
 from apps.deployment.models import Build, Deployment
 from apps.drift.models import DriftMonitor
-from apps.training.models import TrainingWorkspace
 from apps.training.tests.factories import training_job
+from apps.training.workspace.models import TrainingWorkspace
 
 pytestmark = pytest.mark.django_db
 CSV = b'column,notes\r\n1,"first\nsecond"\r\n'
@@ -50,8 +50,8 @@ def resources(monkeypatch):
     storage.read = conditional_read
     storage.head = head
     for module in (
-        "infrastructure.storage.staged_csv", "apps.training.services.workspaces", "apps.training.services.outputs",
-        "apps.registry.services.versions", "apps.drift.services.monitors",
+        "infrastructure.storage.staged_csv", "apps.training.workspace.editing", "apps.training.outputs.artifacts",
+        "apps.registry.artifacts.supplemental", "apps.drift.monitors.reference",
     ):
         monkeypatch.setattr(f"{module}.S3Storage", lambda: storage)
     client = APIClient()

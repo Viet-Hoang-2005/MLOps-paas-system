@@ -1,6 +1,7 @@
 """Explicit workspace ownership for execution-only test fixtures."""
 
-from apps.training.models import TrainingJob, TrainingWorkspace
+from apps.training.jobs.models import TrainingJob
+from apps.training.workspace.models import TrainingWorkspace
 
 
 def training_job(*, persist=True, **values):

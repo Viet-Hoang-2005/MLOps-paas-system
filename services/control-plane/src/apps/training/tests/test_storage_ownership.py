@@ -1,9 +1,9 @@
 import pytest
 from django.contrib.auth import get_user_model
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.services.storage_scope import expected_training_uris
+from apps.training.jobs.storage_scope import expected_training_uris
+from apps.training.tests.factories import training_job
 
 
 @pytest.mark.django_db

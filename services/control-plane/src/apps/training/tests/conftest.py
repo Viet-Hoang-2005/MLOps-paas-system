@@ -6,7 +6,7 @@ def legacy_docker_capacity(request, monkeypatch, settings):
     """Existing API/GPU tests use a deterministic Docker capacity, not a real daemon."""
     if request.node.path.name not in {"test_jobs.py", "test_local_gpu.py", "test_gpu_models.py", "test_quota.py"}:
         return
-    from apps.training.services import local_resources
+    from apps.training.resources import local_capacity as local_resources
 
     snapshot = {
         "status": "available",

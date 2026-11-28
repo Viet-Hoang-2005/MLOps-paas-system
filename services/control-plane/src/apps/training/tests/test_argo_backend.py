@@ -5,10 +5,10 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.services.storage_scope import expected_training_uris
-from infrastructure.execution.argo_backends import ArgoTrainingBackend
+from apps.training.jobs.storage_scope import expected_training_uris
+from apps.training.tests.factories import training_job
+from infrastructure.execution.training import ArgoTrainingBackend
 
 
 class FakeArgoClient:

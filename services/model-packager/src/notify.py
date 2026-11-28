@@ -37,7 +37,7 @@ def main():
         io.post_webhook(os.environ.get("CONTROL_PLANE_WEBHOOK_URL", ""), payload, requests, headers)
         log.protocol("NOTIFY_EOF_SUCCESS")
         log.event(logging.INFO, "build_execution_completed", "Build notification completed", duration_ms=round((time.monotonic() - started) * 1000, 3))
-    except Exception as exc:  # noqa: BLE001 - boundary must not expose callback secrets
+    except Exception as exc:
         log.event(logging.ERROR, "build_execution_failed", "Build notification failed", error_type=type(exc).__name__)
         sys.exit(1)
     finally:

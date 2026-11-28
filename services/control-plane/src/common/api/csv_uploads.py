@@ -4,9 +4,9 @@ from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.registry.selectors import version_for_user
-from apps.training.models import TrainingWorkspace
-from apps.training.selectors import job_for_user
+from apps.registry.versions.selectors import version_for_user
+from apps.training.jobs.selectors import job_for_user
+from apps.training.workspace.models import TrainingWorkspace
 from common.api.exceptions import Conflict
 from common.validation.artifacts import MAX_REFERENCE_DATA_BYTES
 from infrastructure.storage.staged_csv import issue_csv_upload

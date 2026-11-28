@@ -6,15 +6,15 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job as make_training_job
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build
 from apps.registry.models import ModelVersion
-from apps.training.models import TrainingJob
-from apps.training.services import jobs as job_service
-from apps.training.tasks import delete_training_job, execute_training_job
-from infrastructure.execution.docker_backends import DockerTrainingBackend
-from infrastructure.execution.image_references import temporary_image_reference
+from apps.training.jobs import lifecycle as job_service
+from apps.training.jobs.models import TrainingJob
+from apps.training.jobs.tasks import delete_training_job, execute_training_job
+from apps.training.tests.factories import training_job as make_training_job
+from infrastructure.execution.training import DockerTrainingBackend
+from infrastructure.images.references import temporary_image_reference
 from infrastructure.storage.paths import build_prefix
 
 
@@ -129,11 +129,11 @@ def test_delete_job_quiesces_and_cleans_terminal_builds(monkeypatch, django_capt
     runtime_stop = Mock(side_effect=RuntimeError("runner still active"))
     image_cleanup = Mock()
     delete_logs = Mock()
-    monkeypatch.setattr("apps.training.tasks.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.deployment.tasks.stop_build_for_deletion", runtime_stop)
-    monkeypatch.setattr("apps.deployment.tasks.BuildImageCleaner", lambda: image_cleanup)
-    monkeypatch.setattr("apps.training.services.logs.delete_training_logs", delete_logs)
+    monkeypatch.setattr("apps.training.jobs.tasks.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.stop_build_for_deletion", runtime_stop)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.BuildImageCleaner", lambda: image_cleanup)
+    monkeypatch.setattr("apps.training.jobs.logs.delete_training_logs", delete_logs)
 
     with pytest.raises(RuntimeError, match="runner still active"):
         delete_training_job.run(str(job.public_id))
@@ -178,8 +178,8 @@ def test_hard_delete_preserves_registered_version_and_ready_image(monkeypatch):
     )
     TrainingJob.objects.filter(pk=job.pk).update(deletion_requested_at=timezone.now())
     storage = SimpleNamespace(delete_prefix=lambda _prefix: None)
-    monkeypatch.setattr("apps.training.tasks.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.training.services.logs.delete_training_logs", lambda _job_id: None)
+    monkeypatch.setattr("apps.training.jobs.tasks.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.training.jobs.logs.delete_training_logs", lambda _job_id: None)
 
     assert delete_training_job.run(str(job.public_id)) == "blocked-by-build"
 
@@ -217,9 +217,9 @@ def test_execute_failure_does_not_overwrite_cancelling(monkeypatch):
         def cleanup(self, selected_job):
             return {"confirmed": True}
 
-    monkeypatch.setattr("apps.observability.services.executions.backend_for", lambda *_args: Backend())
-    monkeypatch.setattr("apps.training.services.local_resources.dispatch_guard", lambda *_args: nullcontext())
-    monkeypatch.setattr("apps.training.services.logs.append_training_log", lambda *_args: None)
+    monkeypatch.setattr("apps.observability.execution.reconciliation.backend_for", lambda *_args: Backend())
+    monkeypatch.setattr("apps.training.resources.local_capacity.dispatch_guard", lambda *_args: nullcontext())
+    monkeypatch.setattr("apps.training.jobs.logs.append_training_log", lambda *_args: None)
 
     assert execute_training_job.run(str(job.public_id)) == "cancelling"
     job.refresh_from_db()

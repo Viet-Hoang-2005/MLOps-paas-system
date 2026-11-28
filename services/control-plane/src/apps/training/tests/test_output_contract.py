@@ -11,12 +11,12 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.models import TrainingJob
-from apps.training.services.artifact_selection import validate_json
-from apps.training.services.output_index import index_output, public_outputs
-from apps.training.services.storage_scope import expected_training_uris
+from apps.training.jobs.models import TrainingJob
+from apps.training.jobs.storage_scope import expected_training_uris
+from apps.training.outputs.index import index_output, public_outputs
+from apps.training.outputs.selection import validate_json
+from apps.training.tests.factories import training_job
 
 
 class Storage:
@@ -103,11 +103,11 @@ def output_job(db, tmp_path, monkeypatch):
     storage = Storage()
     storage.objects[job.output_uri] = archive.read_bytes()
     for module in (
-        "apps.training.services.artifact_selection",
-        "apps.training.services.project_assignment",
-        "apps.training.services.outputs",
-        "apps.training.services.snapshots",
-        "apps.training.services.downloads",
+        "apps.training.outputs.selection",
+        "apps.training.jobs.project_assignment",
+        "apps.training.outputs.artifacts",
+        "apps.training.jobs.snapshots",
+        "apps.training.outputs.downloads",
     ):
         monkeypatch.setattr(module + ".S3Storage", lambda **kwargs: storage)
     return owner, job, storage
@@ -227,14 +227,14 @@ def test_failed_index_never_publishes_partial_files_and_can_retry(output_job, mo
 def test_async_completion_preserves_runtime_end_and_is_idempotent(output_job, monkeypatch):
     from datetime import timedelta
 
-    from apps.training.services.output_finalization import finalize_output
+    from apps.training.outputs.finalization import finalize_output
 
     _, job, storage = output_job
     end = timezone.now() - timedelta(minutes=5)
     job.runtime_started_at = end - timedelta(seconds=30)
     job.tracking = {"output_runtime_finished_at": end.isoformat()}
     job.save()
-    monkeypatch.setattr("apps.training.services.output_finalization._notify_result", lambda job: None)
+    monkeypatch.setattr("apps.training.outputs.finalization._notify_result", lambda job: None)
     finalize_output.run(str(job.public_id))
     job.refresh_from_db()
     assert job.status == "completed"
@@ -247,7 +247,7 @@ def test_async_completion_preserves_runtime_end_and_is_idempotent(output_job, mo
 
 
 def test_cancelled_job_cannot_publish_output(output_job):
-    from apps.training.services.output_finalization import finalize_output
+    from apps.training.outputs.finalization import finalize_output
 
     _, job, storage = output_job
     job.status = "cancelled"
@@ -260,15 +260,15 @@ def test_cancelled_job_cannot_publish_output(output_job):
 
 
 def test_build_uses_exact_selection_without_tracking_or_filename_fallback(output_job, monkeypatch):
-    from apps.deployment.services.builds import request_training_build
-    from apps.training.services.project_assignment import assign_project
+    from apps.deployment.builds.submission import request_training_build
+    from apps.training.jobs.project_assignment import assign_project
 
     owner, job, storage = output_job
     publish(job, storage)
     project = ModelProject.objects.create(owner=owner, name="Exact selection")
     model = job.outputs.get(relative_path="Model/second.joblib")
     metadata = job.outputs.get(relative_path="Metadata/not-called-metrics.json")
-    monkeypatch.setattr("apps.deployment.services.builds._enqueue", lambda build: None)
+    monkeypatch.setattr("apps.deployment.builds.submission._enqueue", lambda build: None)
     assigned = assign_project(
         job=job,
         actor=owner,
@@ -344,8 +344,8 @@ def test_internal_files_are_indexed_but_never_downloadable_and_archive_is_delete
 ):
     from unittest.mock import Mock
 
-    from apps.training.services.output_finalization import cleanup_output_archive
-    from apps.training.services.outputs import verify_training_output
+    from apps.training.outputs.artifacts import verify_training_output
+    from apps.training.outputs.finalization import cleanup_output_archive
 
     owner, job, storage = output_job
     queued = Mock()
@@ -383,7 +383,7 @@ def test_internal_files_are_indexed_but_never_downloadable_and_archive_is_delete
 def test_archive_cleanup_failure_keeps_index_and_can_retry(output_job, monkeypatch):
     from unittest.mock import Mock
 
-    from apps.training.services.output_finalization import cleanup_output_archive
+    from apps.training.outputs.finalization import cleanup_output_archive
 
     _, job, storage = output_job
     publish(job, storage)
@@ -465,8 +465,8 @@ def test_checksum_mismatch_rolls_back_entire_index(output_job):
 
 
 def test_output_purge_clears_selection_and_preserves_input(output_job, monkeypatch):
-    from apps.training.services.jobs import request_output_purge
-    from apps.training.tasks import purge_training_job_outputs
+    from apps.training.jobs.lifecycle import request_output_purge
+    from apps.training.outputs.tasks import purge_training_job_outputs
 
     _, job, storage = output_job
     publish(job, storage)
@@ -475,7 +475,7 @@ def test_output_purge_clears_selection_and_preserves_input(output_job, monkeypat
     job.save()
     input_uri = expected_training_uris(job, storage.bucket)["code"]
     storage.objects[input_uri] = b"input snapshot"
-    monkeypatch.setattr("apps.training.tasks.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.training.outputs.tasks.S3Storage", lambda: storage)
     current = request_output_purge(job)
     assert not public_outputs(current).exists()
     assert current.artifact_selection == {}
@@ -489,21 +489,21 @@ def test_enqueue_output_debounces_across_task_time_limit(output_job, monkeypatch
 
     from django.utils import timezone
 
-    from apps.training.services.output_finalization import enqueue_output
+    from apps.training.outputs.finalization import enqueue_output
 
     _, job, _ = output_job
     queued = []
-    monkeypatch.setattr("apps.training.services.output_finalization.finalize_output.delay", queued.append)
+    monkeypatch.setattr("apps.training.outputs.finalization.finalize_output.delay", queued.append)
     base = timezone.now()
 
-    monkeypatch.setattr("apps.training.services.output_finalization.timezone.now", lambda: base)
+    monkeypatch.setattr("apps.training.outputs.finalization.timezone.now", lambda: base)
     with django_capture_on_commit_callbacks(execute=True):
         enqueue_output(job)
     assert len(queued) == 1
 
     # Within 3600s time_limit (e.g. 1800s elapsed), enqueue_output must not dispatch a duplicate worker
     monkeypatch.setattr(
-        "apps.training.services.output_finalization.timezone.now", lambda: base + timedelta(seconds=1800)
+        "apps.training.outputs.finalization.timezone.now", lambda: base + timedelta(seconds=1800)
     )
     with django_capture_on_commit_callbacks(execute=True):
         enqueue_output(job)
@@ -511,7 +511,7 @@ def test_enqueue_output_debounces_across_task_time_limit(output_job, monkeypatch
 
     # Once past 3600s, enqueue_output can re-dispatch
     monkeypatch.setattr(
-        "apps.training.services.output_finalization.timezone.now", lambda: base + timedelta(seconds=3601)
+        "apps.training.outputs.finalization.timezone.now", lambda: base + timedelta(seconds=3601)
     )
     with django_capture_on_commit_callbacks(execute=True):
         enqueue_output(job)

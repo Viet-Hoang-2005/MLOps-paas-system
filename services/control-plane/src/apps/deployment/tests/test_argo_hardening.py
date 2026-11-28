@@ -13,14 +13,15 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
+from apps.deployment.builds.cleanup import cleanup_failed_build_artifacts
 from apps.deployment.models import Build, Deployment, Endpoint
-from apps.deployment.services.callbacks import issue_callback_token
-from apps.deployment.tasks import cleanup_failed_build_artifacts, stop_deployment
-from apps.observability.services.executions import _reconcile_argo_deadlines, reconcile, scan
-from apps.observability.tasks import reconcile_job_execution
+from apps.deployment.serving.callback_tokens import issue_callback_token
+from apps.deployment.serving.rollout_tasks import stop_deployment
+from apps.observability.execution.reconciliation import _reconcile_argo_deadlines, reconcile, scan
+from apps.observability.execution.tasks import reconcile_job_execution
 from apps.registry.models import ModelVersion
-from infrastructure.execution.argo_backends import ArgoBuildBackend
-from infrastructure.execution.image_references import temporary_image_reference
+from infrastructure.execution.build import ArgoBuildBackend
+from infrastructure.images.references import temporary_image_reference
 
 SECRET = "test-webhook-secret"
 DIGEST = "sha256:" + "a" * 64
@@ -85,11 +86,11 @@ def test_build_recovers_from_storage_without_workflow_or_callback(
     harbor = Mock()
     harbor.artifact_digest.return_value = DIGEST if correct_digest else "sha256:" + "b" * 64
     monkeypatch.setattr(reconcile_job_execution, "apply_async", queued)
-    monkeypatch.setattr("apps.observability.services.executions.build_backend", lambda _: ArgoBuildBackend(
+    monkeypatch.setattr("apps.observability.execution.reconciliation.build_backend", lambda _: ArgoBuildBackend(
         client=argo, storage=storage,
     ))
-    monkeypatch.setattr("apps.deployment.services.argo_recovery.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.deployment.services.argo_recovery.HarborClient", lambda: harbor)
+    monkeypatch.setattr("apps.deployment.execution.argo_recovery.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.execution.argo_recovery.HarborClient", lambda: harbor)
     if deadline_elapsed:
         past = timezone.now() - timedelta(minutes=1)
         Build.objects.filter(pk=build.pk).update(execution_deadline_at=past, callback_wait_until=past)
@@ -132,7 +133,7 @@ def test_build_recovers_from_storage_without_workflow_or_callback(
 )
 def test_argo_success_rejects_values_not_scoped_to_the_build(build, monkeypatch, overrides):
     complete = Mock()
-    monkeypatch.setattr("apps.deployment.services.completion.complete_build", complete)
+    monkeypatch.setattr("apps.deployment.builds.registration.complete_build", complete)
     assert post_build(build, **success_payload(build, **overrides)).status_code == 400
     complete.assert_not_called()
     build.refresh_from_db()
@@ -141,7 +142,7 @@ def test_argo_success_rejects_values_not_scoped_to_the_build(build, monkeypatch,
 
 def test_argo_success_registers_only_the_build_scoped_image(build, monkeypatch):
     complete = Mock(side_effect=lambda build, **kwargs: build)
-    monkeypatch.setattr("apps.deployment.services.completion.complete_build", complete)
+    monkeypatch.setattr("apps.deployment.builds.registration.complete_build", complete)
     assert post_build(build, **success_payload(build)).status_code == 200
     kwargs = complete.call_args.kwargs
     assert kwargs["image_uri"] == expected_image(build)
@@ -149,7 +150,7 @@ def test_argo_success_registers_only_the_build_scoped_image(build, monkeypatch):
 
 
 def test_argo_failure_never_stores_a_reporter_chosen_image(build, monkeypatch):
-    monkeypatch.setattr("apps.deployment.api.webhooks.cleanup_failed_build_artifacts.delay", Mock())
+    monkeypatch.setattr("apps.deployment.builds.callbacks.cleanup_failed_build_artifacts.delay", Mock())
     response = post_build(
         build,
         status="failed",
@@ -169,7 +170,7 @@ def test_late_callback_of_a_cancelled_argo_build_cleans_up_its_output(
 ):
     Build.objects.filter(pk=build.pk).update(status="cancelled")
     cleanup = Mock()
-    monkeypatch.setattr("apps.deployment.api.webhooks.cleanup_failed_build_artifacts.delay", cleanup)
+    monkeypatch.setattr("apps.deployment.builds.callbacks.cleanup_failed_build_artifacts.delay", cleanup)
     with django_capture_on_commit_callbacks(execute=True):
         response = post_build(build, **success_payload(build))
     assert response.data["duplicate"] is True
@@ -204,7 +205,7 @@ def test_argo_cleanup_retries_when_the_cluster_cannot_be_reached(build, monkeypa
     backend = Mock(cancel=Mock(side_effect=ConnectionError("argo-events down")))
     monkeypatch.setattr("infrastructure.execution.build_backend", lambda _: backend)
     storage = Mock()
-    monkeypatch.setattr("apps.deployment.tasks.S3Storage", storage)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.S3Storage", storage)
     assert cleanup_failed_build_artifacts.autoretry_for == (Exception,)
     with pytest.raises(ConnectionError):
         cleanup_failed_build_artifacts.run(str(build.public_id))
@@ -222,9 +223,9 @@ def test_argo_deadline_waits_for_stop_before_cleaning_generated_tag(
     storage.read.side_effect = ClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject")
     backend = ArgoBuildBackend(client=argo, storage=storage)
     monkeypatch.setattr("infrastructure.execution.build_backend", lambda _: backend)
-    monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.deployment.services.argo_recovery.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.deployment.tasks.BuildImageCleaner", lambda: cleaner)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.execution.argo_recovery.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.BuildImageCleaner", lambda: cleaner)
     monkeypatch.setattr(cleanup_failed_build_artifacts, "delay", cleanup)
 
     _reconcile_argo_deadlines()
@@ -269,7 +270,7 @@ def failed_deployment(project, monkeypatch):
     deployment = Deployment.objects.create(version=version, build=build, backend="argo", status="failed")
     Endpoint.objects.create(deployment=deployment, public_url="https://example.test/model", runtime_name="deploy-x")
     for name in ("invalidate_model_server_cache", "append_deployment_log"):
-        monkeypatch.setattr(f"apps.deployment.tasks.{name}", Mock())
+        monkeypatch.setattr(f"apps.deployment.serving.rollout_tasks.{name}", Mock())
     return deployment
 
 
@@ -286,7 +287,7 @@ def test_succeeded_callback_after_failure_removes_the_orphan_runtime(
     failed_deployment, monkeypatch, django_capture_on_commit_callbacks
 ):
     stop = Mock()
-    monkeypatch.setattr("apps.deployment.api.webhooks.stop_deployment.delay", stop)
+    monkeypatch.setattr("apps.deployment.serving.callbacks.stop_deployment.delay", stop)
     with django_capture_on_commit_callbacks(execute=True):
         assert report(failed_deployment, "Succeeded").data["duplicate"] is True
     stop.assert_called_once_with(str(failed_deployment.public_id))
@@ -299,7 +300,7 @@ def test_repeated_failure_callback_does_not_trigger_a_stop(
     failed_deployment, monkeypatch, django_capture_on_commit_callbacks
 ):
     stop = Mock()
-    monkeypatch.setattr("apps.deployment.api.webhooks.stop_deployment.delay", stop)
+    monkeypatch.setattr("apps.deployment.serving.callbacks.stop_deployment.delay", stop)
     with django_capture_on_commit_callbacks(execute=True):
         report(failed_deployment, "Failed")
     stop.assert_not_called()
@@ -308,9 +309,9 @@ def test_repeated_failure_callback_does_not_trigger_a_stop(
 def test_stopping_a_failed_deployment_removes_the_runtime_but_keeps_the_outcome(failed_deployment, monkeypatch):
     backend = Mock()
     backend.stop.return_value = {"confirmed": True}
-    monkeypatch.setattr("apps.deployment.tasks.deployment_backend", lambda _: backend)
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.deployment_backend", lambda _: backend)
     transition = Mock()
-    monkeypatch.setattr("apps.deployment.tasks.record_transition", transition)
+    monkeypatch.setattr("apps.deployment.serving.rollout_tasks.record_transition", transition)
     assert stop_deployment.run(str(failed_deployment.public_id)) == "failed"
     backend.stop.assert_called_once()
     failed_deployment.refresh_from_db()

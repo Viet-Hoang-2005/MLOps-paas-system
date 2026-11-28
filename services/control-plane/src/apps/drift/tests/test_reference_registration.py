@@ -10,8 +10,7 @@ from rest_framework.test import APIClient
 from apps.catalog.models import ModelProject
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
 from apps.deployment.models import Build, Deployment
-from apps.drift.models import DriftMonitor
-from apps.drift.services.monitors import MAX_REFERENCE_BYTES, create_monitor, validate_reference_upload
+from apps.drift.monitors.reference import MAX_REFERENCE_BYTES, create_monitor, validate_reference_upload
 from common.api.exceptions import Conflict
 
 
@@ -53,7 +52,7 @@ def test_upload_registers_once_and_subsequent_monitors_share_same_reference(runn
 def test_monitor_insert_failure_cleans_only_new_objects(running_version, monkeypatch):
     storage = MemoryStorage()
     monkeypatch.setattr(
-        "apps.drift.services.monitors.DriftMonitor.objects.create", Mock(side_effect=RuntimeError("DB failed"))
+        "apps.drift.monitors.reference.DriftMonitor.objects.create", Mock(side_effect=RuntimeError("DB failed"))
     )
     with pytest.raises(RuntimeError):
         create(running_version, storage)
@@ -108,7 +107,7 @@ def test_invalid_csv_rejected_and_stream_rewound(filename, content):
 
 def test_reference_endpoints_enforce_tenant_and_existing_reference(running_version, monkeypatch):
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.drift.services.monitors.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.drift.monitors.reference.S3Storage", lambda: storage)
     client = APIClient()
     client.force_authenticate(running_version.project.owner)
     url = "/api/drift-monitors/"
@@ -123,7 +122,7 @@ def test_reference_endpoints_enforce_tenant_and_existing_reference(running_versi
     monitor_id = response.data["id"]
     reference_url = f"/api/drift-monitors/{monitor_id}/reference-url/"
     monkeypatch.setattr(
-        "apps.drift.services.monitors.S3Storage",
+        "apps.drift.monitors.reference.S3Storage",
         lambda: Mock(presigned_get=lambda uri, expires, **_: "https://s3.example/reference"),
     )
     assert client.get(reference_url).data == {"url": "https://s3.example/reference"}

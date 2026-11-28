@@ -27,7 +27,7 @@ def test_project_api_uses_uuid_and_tenant_scope():
 
 @pytest.mark.django_db
 def test_duplicate_project_name_returns_conflict_with_clear_message():
-    from apps.catalog.services.project_metadata import save_project_metadata
+    from apps.catalog.projects.metadata import save_project_metadata
     from common.api.exceptions import Conflict
 
     owner = get_user_model().objects.create_user("duplicate-owner@example.com", "password123")
@@ -39,7 +39,7 @@ def test_duplicate_project_name_returns_conflict_with_clear_message():
 
 @pytest.mark.django_db
 def test_inactive_project_with_same_name_does_not_block_new_project():
-    from apps.catalog.services.project_metadata import save_project_metadata
+    from apps.catalog.projects.metadata import save_project_metadata
 
     owner = get_user_model().objects.create_user("reuse-owner@example.com", "password123")
     # Projects deleted before names were suffixed, or still being deleted, keep the original name.
@@ -163,7 +163,7 @@ def test_running_attributes_and_label_mapping_with_json(monkeypatch):
 
             return FakeClient()
 
-    from apps.catalog.services import snapshots
+    from apps.catalog.running import snapshots
 
     monkeypatch.setattr(snapshots, "S3Storage", lambda: FakeStorage())
 

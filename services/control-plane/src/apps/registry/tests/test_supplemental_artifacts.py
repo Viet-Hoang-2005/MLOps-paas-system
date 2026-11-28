@@ -8,9 +8,9 @@ from rest_framework.exceptions import ValidationError
 from apps.catalog.models import ModelProject
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
 from apps.deployment.models import Build
-from apps.registry.api.serializers import ModelVersionSerializer
+from apps.registry.artifacts.supplemental import add_supplemental_artifacts
 from apps.registry.models import ModelArtifact, ModelVersion
-from apps.registry.services.versions import add_supplemental_artifacts
+from apps.registry.versions.serializers import ModelVersionSerializer
 from common.api.exceptions import Conflict
 
 
@@ -184,7 +184,7 @@ class _HookedStorage(MemoryStorage):
 
 @pytest.mark.django_db
 def test_supplemental_upload_holds_no_transaction_while_talking_to_s3(version_with_model_source, monkeypatch):
-    import apps.registry.services.versions as versions_module
+    import apps.registry.versions.registration as versions_module
 
     _, version, user = version_with_model_source
     depth = {"value": 0}

@@ -9,7 +9,7 @@ from django.utils.dateparse import parse_datetime
 
 from apps.catalog.models import ModelProject
 from common.api.exceptions import Conflict
-from infrastructure.docker import DockerClient
+from infrastructure.execution.docker_client import DockerClient
 
 from .docker_runtime import create_or_attach_container, get_owned_container, remove_owned_container
 

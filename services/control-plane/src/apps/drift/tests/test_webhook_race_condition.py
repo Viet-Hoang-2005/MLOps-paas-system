@@ -1,4 +1,3 @@
-import json
 from unittest.mock import Mock
 
 from django.contrib.auth import get_user_model
@@ -8,7 +7,7 @@ from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
-from apps.drift.tasks import execute_drift_run
+from apps.drift.runs.tasks import execute_drift_run
 from apps.registry.models import ModelVersion
 
 
@@ -95,9 +94,9 @@ class DriftWebhookRaceConditionTests(TestCase):
         from unittest.mock import patch
 
         with (
-            patch("apps.observability.services.executions.backend_for", return_value=fake_backend),
+            patch("apps.observability.execution.reconciliation.backend_for", return_value=fake_backend),
             patch(
-                "apps.observability.services.executions._completion_data",
+                "apps.observability.execution.observations._completion_data",
                 return_value={"drift_score": 0.33, "has_drift": False},
             ),
         ):

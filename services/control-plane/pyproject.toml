@@ -2,6 +2,7 @@
 DJANGO_SETTINGS_MODULE = "config.settings.test"
 pythonpath = ["src"]
 testpaths = ["src/apps"]
+addopts = "--ignore=src/config/settings/test_postgres_quota.py"
 
 [tool.ruff]
 extend = "../ruff.toml"

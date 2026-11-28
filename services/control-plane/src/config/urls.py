@@ -1,21 +1,19 @@
 from django.contrib import admin
 from django.urls import include, path
 
-from apps.deployment.api.urls import build_patterns, deployment_patterns, endpoint_patterns
-from apps.deployment.api.webhooks import BuildWebhookEndpoint, DeploymentWebhookEndpoint
-from apps.drift.api.webhooks import (
+from apps.deployment.builds.callbacks import BuildWebhookEndpoint
+from apps.deployment.serving.callbacks import DeploymentWebhookEndpoint
+from apps.deployment.urls import build_patterns, deployment_patterns, endpoint_patterns
+from apps.drift.runs.callbacks import (
     AutomaticDriftWebhookEndpoint,
     DriftRunModelPackageURLEndpoint,
     DriftRunWebhookEndpoint,
 )
-from apps.mlflow.views import (
-    MLflowArtifactsMultipartFallbackView,
-    MLflowArtifactsProxyView,
-)
-from apps.notifications.api.webhooks import AlertWebhookEndpoint
-from apps.observability.api.endpoints import ProductionDataEndpoint
-from apps.observability.api.executions import ArgoRuntimeStopEndpoint, ExecutionObservationEndpoint
-from apps.training.api.webhooks import (
+from apps.mlflow.artifacts.api import MLflowArtifactsMultipartFallbackView, MLflowArtifactsProxyView
+from apps.notifications.alerts import AlertWebhookEndpoint
+from apps.observability.execution.callbacks import ArgoRuntimeStopEndpoint, ExecutionObservationEndpoint
+from apps.observability.runtime.api import ProductionDataEndpoint
+from apps.training.jobs.callbacks import (
     TrainingCancellationWebhookEndpoint,
     TrainingInputDownloadURLEndpoint,
     TrainingJobWebhookEndpoint,
@@ -28,8 +26,8 @@ urlpatterns = [
     path("internal/executions/<str:kind>/<uuid:public_id>/observations/", ExecutionObservationEndpoint.as_view()),
     path("internal/executions/<str:kind>/<uuid:public_id>/stops/", ArgoRuntimeStopEndpoint.as_view()),
     path("admin/", admin.site.urls),
-    path("api/auth/", include("apps.auth.api.urls")),
-    path("api/api-keys/", include("apps.access.api.urls")),
+    path("api/auth/", include("apps.auth.urls")),
+    path("api/api-keys/", include("apps.access.urls")),
     path("api/csv-upload-urls/<str:purpose>/<uuid:resource_id>/", CSVUploadURLEndpoint.as_view()),
     path("api/2.0/mlflow/", include("apps.mlflow.urls")),
     # MLflow Root Artifact Proxy routes (for root or non-prefixed tracking URIs)
@@ -44,16 +42,16 @@ urlpatterns = [
         ProductionDataEndpoint.as_view(),
         name="model-production-data",
     ),
-    path("api/models/", include("apps.catalog.api.urls")),
-    path("api/registry/", include("apps.registry.api.urls")),
-    path("api/training-jobs/", include("apps.training.api.urls")),
-    path("api/training-workspaces/", include("apps.training.api.workspace_urls")),
+    path("api/models/", include("apps.catalog.urls")),
+    path("api/registry/", include("apps.registry.urls")),
+    path("api/training-jobs/", include("apps.training.urls")),
+    path("api/training-workspaces/", include("apps.training.workspace.urls")),
     path("api/builds/", include((build_patterns, "builds"))),
     path("api/deployments/", include((deployment_patterns, "deployments"))),
     path("api/endpoints/", include((endpoint_patterns, "endpoints"))),
-    path("api/drift-monitors/", include("apps.drift.api.urls")),
-    path("api/observability/", include("apps.observability.api.model_urls")),
-    path("health/", include("apps.observability.api.urls")),
+    path("api/drift-monitors/", include("apps.drift.urls")),
+    path("api/observability/", include("apps.observability.runtime.urls")),
+    path("health/", include("apps.observability.urls")),
     path("internal/webhooks/builds/<uuid:build_id>/", BuildWebhookEndpoint.as_view()),
     path("internal/webhooks/deployments/<uuid:deployment_id>/", DeploymentWebhookEndpoint.as_view()),
     path("internal/webhooks/training-jobs/<uuid:job_id>/", TrainingJobWebhookEndpoint.as_view()),
@@ -64,7 +62,7 @@ urlpatterns = [
     path("internal/training-jobs/<uuid:job_id>/output-upload-url/", TrainingOutputUploadURLEndpoint.as_view()),
     path("internal/training-jobs/<uuid:job_id>/input-download-urls/", TrainingInputDownloadURLEndpoint.as_view()),
     path("internal/training-jobs/<uuid:job_id>/runtime-config/", TrainingRuntimeConfigEndpoint.as_view()),
-    path("api/notifications/", include("apps.notifications.api.urls")),
+    path("api/notifications/", include("apps.notifications.urls")),
     path("internal/webhooks/drift-runs/<uuid:run_id>/", DriftRunWebhookEndpoint.as_view()),
     path("internal/drift-runs/<uuid:run_id>/model-package-url/", DriftRunModelPackageURLEndpoint.as_view()),
     path("internal/webhooks/automatic-drift/", AutomaticDriftWebhookEndpoint.as_view()),

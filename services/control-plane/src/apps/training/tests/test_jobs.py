@@ -3,10 +3,10 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment
 from apps.registry.models import ModelVersion
+from apps.training.tests.factories import training_job
 
 from .test_job_drafts import studio as studio
 
@@ -29,7 +29,7 @@ def test_runtime_capabilities_only_expose_configured_accelerators(settings, monk
 
     settings.TRAINING_GPU_ENABLED = True
     monkeypatch.setattr(
-        "apps.training.services.local_gpu.inventory",
+        "apps.training.resources.local_gpu.inventory",
         lambda **kwargs: {
             "status": "available",
             "reason": "",

@@ -159,7 +159,7 @@ def test_callback_with_nan_is_sent_as_strict_json():
     """`requests` serializes with allow_nan=False, so a raw NaN made every delivery fail."""
     sent = []
 
-    def post(url, json=None, **kwargs):  # noqa: A002 - mirrors requests
+    def post(url, json=None, **kwargs):
         import json as stdlib_json
 
         stdlib_json.dumps(json, allow_nan=False)

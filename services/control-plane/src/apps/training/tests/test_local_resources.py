@@ -7,10 +7,10 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.models import LocalTrainingReservation
-from apps.training.services import local_resources as local
+from apps.training.resources import local_capacity as local
+from apps.training.resources.models import LocalTrainingReservation
+from apps.training.tests.factories import training_job
 from common.api.exceptions import Conflict, ServiceUnavailable
 
 
@@ -105,7 +105,7 @@ def test_outstanding_memory_subtracts_verified_running_usage(settings, monkeypat
     container = client.containers.get.return_value
     container.id = "runtime-id"
     container.attrs = {"State": {"Status": "running"}, "Config": {"Labels": labels_for(other, "training")}}
-    monkeypatch.setattr("infrastructure.docker_metrics.parse_stats", lambda data: {"memory": 768})
+    monkeypatch.setattr("infrastructure.telemetry.docker_metrics.parse_stats", lambda data: {"memory": 768})
     assert local._outstanding_memory(client, "daemon", current) == 1024 + 1280
     container.exec_run.assert_not_called()
 
@@ -194,7 +194,7 @@ def test_capability_exposes_dynamic_profiles_and_only_aggregate_usage(settings, 
 
 @pytest.mark.django_db
 def test_reconciliation_releases_reservation_only_after_confirmed_stop(settings):
-    from apps.observability.services import executions
+    from apps.observability.execution import leases, observations
 
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     user = get_user_model().objects.create_user("release@example.com")
@@ -211,13 +211,13 @@ def test_reconciliation_releases_reservation_only_after_confirmed_stop(settings)
     snapshot = {"daemon_id": "daemon", "cpu_profiles": [{"id": "large", "vcpu": 2, "memory_mb": 2048}]}
     with transaction.atomic():
         local.reserve(job, snapshot)
-    token = executions.claim("training", str(job.public_id))[0][1]
-    executions.apply_observation(
+    token = leases.claim("training", str(job.public_id))[0][1]
+    observations.apply_observation(
         "training", str(job.public_id), token, {"status": "error", "error": "Docker unavailable"}
     )
     assert local.totals("daemon") == (1, 1024)
-    token = executions.claim("training", str(job.public_id))[0][1]
-    executions.apply_observation("training", str(job.public_id), token, {"status": "stopped"})
+    token = leases.claim("training", str(job.public_id))[0][1]
+    observations.apply_observation("training", str(job.public_id), token, {"status": "stopped"})
     assert local.totals("daemon") == (0, 0)
 
 

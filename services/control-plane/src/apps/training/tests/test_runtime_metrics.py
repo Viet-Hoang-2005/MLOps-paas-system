@@ -9,10 +9,10 @@ from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.services import local_gpu
-from apps.training.services import runtime_metrics as metrics
+from apps.training.resources import local_gpu
+from apps.training.resources import metrics as metrics
+from apps.training.tests.factories import training_job
 from infrastructure.execution.job_containers import labels_for
 
 GPU = "GPU-01234567-89ab-cdef-0123-456789abcdef"
@@ -195,6 +195,6 @@ def test_endpoint_requires_owner_and_does_not_accept_runtime_input(job, monkeypa
     assert client.get(url).status_code == 404
     client.force_authenticate(job.project.owner)
     sample = Mock(return_value={"status": "waiting"})
-    monkeypatch.setattr("apps.training.api.metrics_endpoints.runtime_metrics", sample)
+    monkeypatch.setattr("apps.training.jobs.metrics_api.runtime_metrics", sample)
     assert client.get(url, {"pod": "another"}).status_code == 200
     assert sample.call_args.args[0].public_id == job.public_id

@@ -9,8 +9,8 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
+from apps.deployment.execution.local_watcher import check_execution, dispatch_execution_checks
 from apps.deployment.models import Build, Deployment, Endpoint
-from apps.deployment.services.local_execution import check_execution, dispatch_execution_checks
 from infrastructure.execution.local_containers import (
     ContainerOwnershipError,
     identity,
@@ -36,10 +36,10 @@ def attempt(monkeypatch):
         next_execution_check_at=timezone.now(),
     )
     for path in (
-        "apps.deployment.tasks.invalidate_model_server_cache",
-        "apps.deployment.tasks.append_deployment_log",
-        "apps.deployment.services.local_execution.append_deployment_log",
-        "apps.deployment.tasks.cleanup_failed_build_artifacts.delay",
+        "apps.deployment.serving.rollout_tasks.invalidate_model_server_cache",
+        "apps.deployment.serving.rollout_tasks.append_deployment_log",
+        "apps.deployment.execution.local_watcher.append_deployment_log",
+        "apps.deployment.builds.cleanup.cleanup_failed_build_artifacts.delay",
     ):
         monkeypatch.setattr(path, Mock())
     return build
@@ -72,7 +72,7 @@ def test_scan_routes_only_docker_and_recovers_after_expired_lease(
     attempt, monkeypatch, django_capture_on_commit_callbacks
 ):
     enqueue = Mock()
-    monkeypatch.setattr("apps.deployment.execution_tasks.check_local_execution.apply_async", enqueue)
+    monkeypatch.setattr("apps.deployment.execution.tasks.check_local_execution.apply_async", enqueue)
     Build.objects.create(
         project=attempt.project, flavor="xgboost", backend="argo", next_execution_check_at=timezone.now()
     )
@@ -88,7 +88,7 @@ def test_scan_routes_only_docker_and_recovers_after_expired_lease(
 
 def test_publish_failure_releases_lease(attempt, monkeypatch, django_capture_on_commit_callbacks):
     monkeypatch.setattr(
-        "apps.deployment.execution_tasks.check_local_execution.apply_async", Mock(side_effect=RuntimeError("broker"))
+        "apps.deployment.execution.tasks.check_local_execution.apply_async", Mock(side_effect=RuntimeError("broker"))
     )
     with django_capture_on_commit_callbacks(execute=True):
         dispatch_execution_checks()
@@ -311,7 +311,7 @@ def test_cancelled_build_cleanup_is_dispatched_only_after_runner_stops(
     Build.objects.filter(pk=attempt.pk).update(status="cancelled")
     cleanup = Mock()
     remove = Mock()
-    monkeypatch.setattr("apps.deployment.tasks.cleanup_failed_build_artifacts.delay", cleanup)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.cleanup_failed_build_artifacts.delay", cleanup)
     with django_capture_on_commit_callbacks(execute=True):
         assert (
             check_execution(
@@ -330,11 +330,11 @@ def test_cancelled_build_cleanup_is_dispatched_only_after_runner_stops(
 
 
 def test_dispatch_error_without_recorded_id_still_waits_for_producer_cleanup(attempt, monkeypatch):
-    from apps.deployment.tasks import cleanup_failed_build_artifacts
+    from apps.deployment.builds.cleanup import cleanup_failed_build_artifacts
 
     Build.objects.filter(pk=attempt.pk).update(status="failed", external_build_id="")
     cleaner = Mock()
-    monkeypatch.setattr("apps.deployment.tasks.BuildImageCleaner", cleaner)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.BuildImageCleaner", cleaner)
     assert cleanup_failed_build_artifacts.run(str(attempt.public_id), True) == "waiting-for-execution"
     cleaner.assert_not_called()
     assert (
@@ -379,7 +379,7 @@ def test_recorded_missing_container_is_not_recreated(attempt):
 def test_cleanup_publish_failure_keeps_watch_recoverable(attempt, monkeypatch, django_capture_on_commit_callbacks):
     Build.objects.filter(pk=attempt.pk).update(status="failed")
     monkeypatch.setattr(
-        "apps.deployment.tasks.cleanup_failed_build_artifacts.delay",
+        "apps.deployment.builds.cleanup.cleanup_failed_build_artifacts.delay",
         Mock(side_effect=RuntimeError("broker unavailable")),
     )
     with django_capture_on_commit_callbacks(execute=True):

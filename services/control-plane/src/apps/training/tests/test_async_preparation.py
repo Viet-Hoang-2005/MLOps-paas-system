@@ -7,9 +7,9 @@ import pytest
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from apps.training.models import TrainingQuotaReservation
-from apps.training.services import drafts
-from apps.training.services.preparation import PreparationStorage, prepare_training_input
+from apps.training.resources.models import TrainingQuotaReservation
+from apps.training.workspace import runs as drafts
+from apps.training.workspace.preparation import PreparationStorage, prepare_training_input
 from common.api.exceptions import Conflict
 
 from .test_job_drafts import studio as studio
@@ -25,7 +25,7 @@ def test_run_returns_202_without_storage_or_reservation(studio, monkeypatch, dja
     workspace, storage, client, _ = studio
     storage.read = Mock(side_effect=AssertionError("HTTP must not read Input"))
     probe = Mock(side_effect=AssertionError("HTTP must not probe Docker"))
-    monkeypatch.setattr("apps.training.services.local_resources.require_capacity", probe)
+    monkeypatch.setattr("apps.training.resources.local_capacity.require_capacity", probe)
     with django_capture_on_commit_callbacks(execute=True) as callbacks:
         response = client.post(
             f"/api/training-workspaces/{workspace.public_id}/runs/",

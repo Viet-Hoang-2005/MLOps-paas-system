@@ -40,10 +40,10 @@ def test_build_callback_locks_only_build_with_nullable_version(
     cleanup = []
     deletion = []
     monkeypatch.setattr(
-        "apps.deployment.api.webhooks.cleanup_failed_build_artifacts.delay",
+        "apps.deployment.builds.callbacks.cleanup_failed_build_artifacts.delay",
         lambda *args: cleanup.append(args),
     )
-    monkeypatch.setattr("apps.deployment.api.webhooks.delete_build.delay", lambda *args: deletion.append(args))
+    monkeypatch.setattr("apps.deployment.callbacks.delete_build.delay", lambda *args: deletion.append(args))
     client = APIClient()
 
     with CaptureQueriesContext(connection) as queries:

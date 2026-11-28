@@ -4,7 +4,7 @@ from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
-from apps.drift.services import logs as log_service
+from apps.drift.runs import logs as log_service
 from apps.registry.models import ModelVersion
 
 

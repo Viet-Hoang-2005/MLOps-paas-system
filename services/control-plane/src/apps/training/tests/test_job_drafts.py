@@ -11,8 +11,11 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
-from apps.training.models import TrainingJob, TrainingWorkspace, TrainingQuotaReservation
-from apps.training.services import drafts, workspaces
+from apps.training.jobs.models import TrainingJob
+from apps.training.resources.models import TrainingQuotaReservation
+from apps.training.workspace import editing as workspaces
+from apps.training.workspace import runs as drafts
+from apps.training.workspace.models import TrainingWorkspace
 from common.api.exceptions import Conflict
 
 pytestmark = pytest.mark.django_db
@@ -29,7 +32,7 @@ def studio(settings, monkeypatch):
     storage = MemoryStorage()
     monkeypatch.setattr(workspaces, "S3Storage", lambda: storage)
     enqueue = Mock()
-    monkeypatch.setattr("apps.training.services.jobs._enqueue", enqueue)
+    monkeypatch.setattr("apps.training.jobs.lifecycle._enqueue", enqueue)
     workspace = drafts.create_workspace(owner=user)
     _, revision = workspaces.create_entry(
         workspace, revision=1, path="train.py", kind="script", payload=b"print('training')", storage=storage
@@ -58,7 +61,7 @@ def finish(job):
 def test_create_workspace_needs_no_project_or_docker(studio, monkeypatch):
     _, _, client, _ = studio
     monkeypatch.setattr(
-        "apps.training.services.local_resources.require_capacity", Mock(side_effect=AssertionError("must not probe"))
+        "apps.training.resources.local_capacity.require_capacity", Mock(side_effect=AssertionError("must not probe"))
     )
     response = client.post("/api/training-workspaces/", {}, format="json")
     assert response.status_code == 201
@@ -127,7 +130,7 @@ def test_storage_failure_keeps_draft_without_quota(studio):
 
 def test_broker_failure_does_not_restore_editing(studio, monkeypatch, django_capture_on_commit_callbacks):
     workspace, storage, _, _ = studio
-    monkeypatch.setattr("apps.training.services.jobs._enqueue", Mock(side_effect=OSError("broker unavailable")))
+    monkeypatch.setattr("apps.training.jobs.lifecycle._enqueue", Mock(side_effect=OSError("broker unavailable")))
     with pytest.raises(OSError), django_capture_on_commit_callbacks(execute=True):
         run(workspace, storage)
     assert workspace.jobs.get().submitted_at is not None

@@ -6,14 +6,15 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
+from apps.deployment.builds import submission as build_service
 from apps.deployment.models import Build
-from apps.deployment.services import builds as build_service
 from apps.registry.models import ModelMetric, ModelVersion
-from apps.registry.services.versions import register_successful_build
-from apps.training.models import TrainingJob, TrainingOutput
-from apps.training.services import jobs as job_service
+from apps.registry.versions.registration import register_successful_build
+from apps.training.jobs import lifecycle as job_service
+from apps.training.jobs.models import TrainingJob
+from apps.training.outputs.models import TrainingOutput
+from apps.training.tests.factories import training_job
 from common.api.exceptions import Conflict
 from infrastructure.storage.paths import build_input_prefix
 from infrastructure.storage.s3 import StoredObject

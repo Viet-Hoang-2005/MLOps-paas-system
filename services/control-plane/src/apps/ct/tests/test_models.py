@@ -6,14 +6,10 @@ from django.db import IntegrityError
 from django.utils import timezone
 
 from apps.catalog.models import ModelProject
-from apps.ct.models import (
-    DatasetSnapshot,
-    EvidenceWindow,
-    LabelBudget,
-    MaintenanceDecision,
-    MaintenancePolicy,
-    MaintenanceRun,
-)
+from apps.ct.models.evidence import DatasetSnapshot, EvidenceWindow
+from apps.ct.models.labeling import LabelBudget
+from apps.ct.models.maintenance import MaintenanceDecision, MaintenanceRun
+from apps.ct.models.policy import MaintenancePolicy
 
 
 @pytest.mark.django_db

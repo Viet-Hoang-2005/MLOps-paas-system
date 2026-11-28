@@ -62,7 +62,7 @@ spec:
           args:
             - "config.wsgi:application"
             - "--config"
-            - "python:common.gunicorn_conf"
+            - "python:config.gunicorn"
             - "--bind"
             - "0.0.0.0:8000"
             - "--workers"

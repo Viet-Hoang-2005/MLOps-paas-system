@@ -107,7 +107,7 @@ def test_completed_run_report_url_is_tenant_scoped_and_presigned(monkeypatch):
         report_html_uri="s3://bucket/report.html",
     )
     monkeypatch.setattr(
-        "apps.drift.api.endpoints.S3Storage.presigned_get",
+        "apps.drift.runs.api.S3Storage.presigned_get",
         lambda _self, uri, expires_in, **_: f"https://s3.example/{uri.removeprefix('s3://')}?ttl={expires_in}",
     )
     client = APIClient()

@@ -5,8 +5,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
-from apps.training.models import TrainingWorkspace, TrainingWorkspaceSecret
-from apps.training.services import workspaces
+from apps.training.workspace import editing as workspaces
+from apps.training.workspace.models import TrainingWorkspace, TrainingWorkspaceSecret
 
 
 @pytest.fixture

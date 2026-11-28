@@ -9,10 +9,10 @@ from django.contrib.auth import get_user_model
 from django.db import close_old_connections, connection, transaction
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.models import TrainingJob, TrainingQuotaReservation
-from apps.training.services.quota import (
+from apps.training.jobs.models import TrainingJob
+from apps.training.resources.models import TrainingQuotaReservation
+from apps.training.resources.quota import (
     QuotaExceeded,
     TrainingConcurrencyExceeded,
     lock_owner,
@@ -21,6 +21,7 @@ from apps.training.services.quota import (
     usage,
     week_start,
 )
+from apps.training.tests.factories import training_job
 from common.api.exceptions import Conflict
 
 
@@ -68,7 +69,7 @@ def test_reservation_and_concurrency_across_projects(job):
 
 def test_gpu_charges_only_gpu_quota_and_enforces_limit(job, settings, monkeypatch):
     monkeypatch.setattr(
-        "apps.training.services.quota.timezone.now", lambda: datetime(2026, 11, 4, tzinfo=dt_timezone.utc)
+        "apps.training.resources.quota.timezone.now", lambda: datetime(2026, 11, 4, tzinfo=dt_timezone.utc)
     )
     job.accelerator_type, job.accelerator_model = "gpu", "a10g"
     job.max_runtime_seconds = settings.TRAINING_GPU_A10G_WEEKLY_SECONDS + 1
@@ -82,8 +83,8 @@ def test_gpu_charges_only_gpu_quota_and_enforces_limit(job, settings, monkeypatc
 
 
 def test_runtime_cap_and_token_cover_24_hours(job, settings):
-    from apps.training.services.capabilities import _ttl_seconds
-    from apps.training.services.resources import runtime_options, validate_resources
+    from apps.training.jobs.capabilities import _ttl_seconds
+    from apps.training.resources.options import runtime_options, validate_resources
 
     settings.TRAINING_MAX_RUNTIME_SECONDS = 86400
     settings.TRAINING_CAPABILITY_MAX_TTL_SECONDS = 0
@@ -98,7 +99,7 @@ def test_runtime_cap_and_token_cover_24_hours(job, settings):
 
 def test_actual_usage_spans_weeks_and_survives_job_deletion(job, monkeypatch):
     start = datetime(2026, 11, 8, 23, 30, tzinfo=dt_timezone.utc)
-    monkeypatch.setattr("apps.training.services.quota.timezone.now", lambda: start)
+    monkeypatch.setattr("apps.training.resources.quota.timezone.now", lambda: start)
     reserve_locked(job)
     with transaction.atomic():
         lock_owner(job.project.owner_id)
@@ -113,7 +114,7 @@ def test_actual_usage_spans_weeks_and_survives_job_deletion(job, monkeypatch):
 
 def test_reservation_is_released_only_after_confirmed_stop(job, monkeypatch):
     start = datetime(2026, 11, 4, tzinfo=dt_timezone.utc)
-    monkeypatch.setattr("apps.training.services.quota.timezone.now", lambda: start)
+    monkeypatch.setattr("apps.training.resources.quota.timezone.now", lambda: start)
     reserve_locked(job)
     with transaction.atomic():
         lock_owner(job.project.owner_id)
@@ -186,7 +187,7 @@ def test_submit_enforces_single_active_job_over_all_projects(job):
     )
     client = APIClient()
     client.force_authenticate(job.project.owner)
-    from apps.training.services.jobs import _submit_job_atomic
+    from apps.training.jobs.lifecycle import _submit_job_atomic
 
     _submit_job_atomic(job, verified_gpu_id="")
     with pytest.raises(Conflict) as raised:
@@ -206,12 +207,12 @@ def test_submit_enforces_single_active_job_over_all_projects(job):
     ],
 )
 def test_execution_watchers_scan_only_enabled_kinds(settings, monkeypatch, training_enabled, drift_enabled, expected):
-    from apps.observability.services.executions import scan
+    from apps.observability.execution.reconciliation import scan
 
     settings.DRIFT_EXECUTION_WATCH_ENABLED = drift_enabled
     settings.TRAINING_EXECUTION_WATCH_ENABLED = training_enabled
     claim = Mock(return_value=[])
-    monkeypatch.setattr("apps.observability.services.executions.claim", claim)
+    monkeypatch.setattr("apps.observability.execution.reconciliation.claim", claim)
     assert scan() == 0
     assert [call.args[0] for call in claim.call_args_list] == expected
 
@@ -220,7 +221,7 @@ def test_execution_watchers_scan_only_enabled_kinds(settings, monkeypatch, train
 def test_postgres_simultaneous_submit_only_one_succeeds(job, monkeypatch):
     if connection.vendor != "postgresql":
         pytest.skip("PostgreSQL is required to test row locking")
-    from apps.training.services.jobs import _submit_job_atomic
+    from apps.training.jobs.lifecycle import _submit_job_atomic
 
     job.status = "pending"
     job.submitted_at = None
@@ -235,7 +236,7 @@ def test_postgres_simultaneous_submit_only_one_succeeds(job, monkeypatch):
         input_contract="legacy",
         status="pending",
     )
-    monkeypatch.setattr("apps.training.services.jobs._enqueue", lambda _job: None)
+    monkeypatch.setattr("apps.training.jobs.lifecycle._enqueue", lambda _job: None)
     barrier = Barrier(2)
 
     def submit(job_id):

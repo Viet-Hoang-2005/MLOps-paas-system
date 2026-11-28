@@ -32,11 +32,11 @@ def test_generate_preview_upload_urls_for_existing_project(project, owner, stran
     project.preview.save(update_fields=["flavor"])
 
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.storage.S3Storage", lambda: storage)
     monkeypatch.setattr(
-        "apps.catalog.api.endpoints.generate_preview_upload_urls",
+        "apps.catalog.preview.api.generate_preview_upload_urls",
         lambda **kwargs: __import__(
-            "apps.catalog.services.preview", fromlist=["generate_preview_upload_urls"]
+            "apps.catalog.preview.storage", fromlist=["generate_preview_upload_urls"]
         ).generate_preview_upload_urls(**kwargs, storage=storage),
     )
 
@@ -87,11 +87,11 @@ def test_generate_preview_upload_urls_for_existing_project(project, owner, stran
 @pytest.mark.django_db
 def test_generate_preview_upload_urls_for_new_project(owner, monkeypatch):
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.storage.S3Storage", lambda: storage)
     monkeypatch.setattr(
-        "apps.catalog.api.endpoints.generate_preview_upload_urls",
+        "apps.catalog.preview.api.generate_preview_upload_urls",
         lambda **kwargs: __import__(
-            "apps.catalog.services.preview", fromlist=["generate_preview_upload_urls"]
+            "apps.catalog.preview.storage", fromlist=["generate_preview_upload_urls"]
         ).generate_preview_upload_urls(**kwargs, storage=storage),
     )
 
@@ -138,8 +138,9 @@ def test_generate_preview_upload_urls_for_new_project(owner, monkeypatch):
 @pytest.mark.django_db
 def test_presigned_preview_update_promotes_to_committed_and_prevents_overwrite(project, owner, monkeypatch):
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.catalog.api.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.storage.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.projects.serializers.S3Storage", lambda: storage)
 
     # 1. Client uploads initial file to staging key via presigned PUT
     prefix = project_prefix(owner.tenant_id, project.public_id)
@@ -198,8 +199,9 @@ def test_presigned_preview_update_promotes_to_committed_and_prevents_overwrite(p
 @pytest.mark.django_db
 def test_presigned_create_project_with_preallocated_id(owner, monkeypatch):
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.catalog.api.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.storage.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.projects.serializers.S3Storage", lambda: storage)
 
     project_id = uuid.uuid4()
     prefix = project_prefix(owner.tenant_id, project_id)
@@ -247,8 +249,9 @@ def test_presigned_create_project_with_preallocated_id(owner, monkeypatch):
 @pytest.mark.django_db
 def test_presigned_security_confinement_and_validation(project, owner, monkeypatch):
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.catalog.api.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.storage.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.projects.serializers.S3Storage", lambda: storage)
 
     project.preview.flavor = "sklearn"
     project.preview.save(update_fields=["flavor"])
@@ -318,11 +321,11 @@ def test_presigned_security_confinement_and_validation(project, owner, monkeypat
 @pytest.mark.django_db
 def test_generate_upload_urls_with_mlflow_zip_format(owner, monkeypatch):
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.storage.S3Storage", lambda: storage)
     monkeypatch.setattr(
-        "apps.catalog.api.endpoints.generate_preview_upload_urls",
+        "apps.catalog.preview.api.generate_preview_upload_urls",
         lambda **kwargs: __import__(
-            "apps.catalog.services.preview", fromlist=["generate_preview_upload_urls"]
+            "apps.catalog.preview.storage", fromlist=["generate_preview_upload_urls"]
         ).generate_preview_upload_urls(**kwargs, storage=storage),
     )
 
@@ -360,11 +363,11 @@ def test_generate_upload_urls_with_mlflow_zip_format(owner, monkeypatch):
 @pytest.mark.django_db
 def test_generate_upload_urls_for_existing_project_with_new_flavor(project, owner, monkeypatch):
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.storage.S3Storage", lambda: storage)
     monkeypatch.setattr(
-        "apps.catalog.api.endpoints.generate_preview_upload_urls",
+        "apps.catalog.preview.api.generate_preview_upload_urls",
         lambda **kwargs: __import__(
-            "apps.catalog.services.preview", fromlist=["generate_preview_upload_urls"]
+            "apps.catalog.preview.storage", fromlist=["generate_preview_upload_urls"]
         ).generate_preview_upload_urls(**kwargs, storage=storage),
     )
 
@@ -392,8 +395,9 @@ def test_generate_upload_urls_for_existing_project_with_new_flavor(project, owne
 @pytest.mark.django_db
 def test_save_preview_validates_existing_retained_artifact_on_flavor_or_format_change(project, owner, monkeypatch):
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.catalog.api.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.storage.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.projects.serializers.S3Storage", lambda: storage)
 
     # Project starts with flavor="sklearn" and existing asset model.pkl
     project.preview.flavor = "sklearn"
@@ -477,8 +481,9 @@ def test_save_preview_validates_existing_retained_artifact_on_flavor_or_format_c
 @pytest.mark.django_db
 def test_save_preview_keeps_staging_objects_on_failure(project, owner, monkeypatch):
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.catalog.api.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.storage.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.projects.serializers.S3Storage", lambda: storage)
 
     prefix = project_prefix(owner.tenant_id, project.public_id)
     staging_key = f"staging/{prefix}/preview/b-fail/source_artifact/model.pkl"
@@ -506,11 +511,11 @@ def test_save_preview_keeps_staging_objects_on_failure(project, owner, monkeypat
 @pytest.mark.django_db
 def test_generate_upload_urls_flavor_and_content_size_limits(owner, monkeypatch):
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.storage.S3Storage", lambda: storage)
     monkeypatch.setattr(
-        "apps.catalog.api.endpoints.generate_preview_upload_urls",
+        "apps.catalog.preview.api.generate_preview_upload_urls",
         lambda **kwargs: __import__(
-            "apps.catalog.services.preview", fromlist=["generate_preview_upload_urls"]
+            "apps.catalog.preview.storage", fromlist=["generate_preview_upload_urls"]
         ).generate_preview_upload_urls(**kwargs, storage=storage),
     )
 
@@ -575,8 +580,9 @@ def test_generate_upload_urls_flavor_and_content_size_limits(owner, monkeypatch)
 @pytest.mark.django_db
 def test_save_preview_validates_source_code_and_reference_data_content(project, owner, monkeypatch):
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.catalog.api.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.storage.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.projects.serializers.S3Storage", lambda: storage)
 
     project.preview.flavor = "sklearn"
     project.preview.save(update_fields=["flavor"])
@@ -641,8 +647,9 @@ def test_save_preview_validates_source_code_and_reference_data_content(project, 
 @pytest.mark.django_db
 def test_remove_assets_without_upload_deletes_s3_objects(project, owner, monkeypatch):
     storage = MemoryStorage()
-    monkeypatch.setattr("apps.catalog.services.preview.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.catalog.api.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.storage.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.preview.serializers.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.catalog.projects.serializers.S3Storage", lambda: storage)
 
     prefix = project_prefix(owner.tenant_id, project.public_id)
     staged = storage.put(

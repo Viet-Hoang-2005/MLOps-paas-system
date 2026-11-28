@@ -6,8 +6,8 @@ from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
-from apps.drift.services.runs import request_run
-from apps.drift.tasks import cleanup_drift_monitor_task
+from apps.drift.monitors.tasks import cleanup_drift_monitor_task
+from apps.drift.runs.lifecycle import request_run
 from apps.registry.models import ModelArtifact, ModelVersion
 from common.api.exceptions import Conflict, ServiceUnavailable
 
@@ -29,13 +29,13 @@ def test_delete_drift_run_cancels_active_container_and_cleans_s3_and_redis(monke
 
     cancelled = []
     monkeypatch.setattr(
-        "apps.drift.services.deletion.drift_backend",
+        "apps.drift.monitors.deletion.drift_backend",
         lambda _backend: Mock(cancel=lambda item: cancelled.append(str(item.public_id))),
     )
     storage = Mock(bucket="bucket")
-    monkeypatch.setattr("apps.drift.services.deletion.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.drift.monitors.deletion.S3Storage", lambda: storage)
     redis_mock = Mock()
-    monkeypatch.setattr("apps.drift.services.deletion.redis_client", lambda: redis_mock)
+    monkeypatch.setattr("apps.drift.monitors.deletion.redis_client", lambda: redis_mock)
 
     client = APIClient()
     client.force_authenticate(owner)
@@ -62,8 +62,8 @@ def test_delete_drift_monitor_preserves_shared_model_artifact_reference(
     DriftRun.objects.create(monitor=monitor, status="completed", idempotency_key="drift-run-del-2")
 
     storage = Mock(bucket="bucket")
-    monkeypatch.setattr("apps.drift.services.deletion.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.drift.services.deletion.redis_client", lambda: Mock())
+    monkeypatch.setattr("apps.drift.monitors.deletion.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.drift.monitors.deletion.redis_client", lambda: Mock())
 
     def assert_run_blocked(_prefix):
         assert DriftMonitor.objects.get(pk=monitor.pk).deletion_requested
@@ -108,9 +108,9 @@ def test_drift_delete_keeps_rows_on_cleanup_failure_and_can_retry(monkeypatch, f
     )
     storage = Mock(bucket="bucket")
     backend = Mock()
-    monkeypatch.setattr("apps.drift.services.deletion.S3Storage", lambda: storage)
-    monkeypatch.setattr("apps.drift.services.deletion.redis_client", Mock())
-    monkeypatch.setattr("apps.drift.services.deletion.drift_backend", lambda _backend: backend)
+    monkeypatch.setattr("apps.drift.monitors.deletion.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.drift.monitors.deletion.redis_client", Mock())
+    monkeypatch.setattr("apps.drift.monitors.deletion.drift_backend", lambda _backend: backend)
     if failure in {"run-prefix", "monitor-prefix"}:
         calls = [TimeoutError("storage timeout")]
         if failure == "monitor-prefix":

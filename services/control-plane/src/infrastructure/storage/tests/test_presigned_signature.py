@@ -94,6 +94,7 @@ def test_init_minio_skips_when_real_aws_keys_set(monkeypatch):
 
 def test_init_minio_defaults_to_minio_when_aws_keys_empty(monkeypatch):
     import os
+
     from infrastructure.storage import init_minio
 
     monkeypatch.delenv("AWS_S3_ENDPOINT_URL", raising=False)
@@ -108,6 +109,7 @@ def test_init_minio_defaults_to_minio_when_aws_keys_empty(monkeypatch):
 
 def test_drop_empty_put_expect_removes_expect_for_zero_length():
     from types import SimpleNamespace
+
     from infrastructure.storage.s3 import _drop_empty_put_expect
 
     empty_req = SimpleNamespace(headers={"Content-Length": "0", "Expect": "100-continue"})
@@ -121,7 +123,9 @@ def test_drop_empty_put_expect_removes_expect_for_zero_length():
 
 def test_init_minio_creates_missing_bucket(monkeypatch):
     from unittest.mock import Mock
+
     from botocore.exceptions import ClientError
+
     from infrastructure.storage import init_minio
 
     client = Mock()

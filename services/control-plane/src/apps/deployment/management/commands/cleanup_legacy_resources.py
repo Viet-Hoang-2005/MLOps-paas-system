@@ -3,8 +3,8 @@ import os
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from infrastructure.docker import DockerClient
-from infrastructure.harbor import HarborClient
+from infrastructure.execution.docker_client import DockerClient
+from infrastructure.images.harbor import HarborClient
 from infrastructure.storage import S3Storage
 
 

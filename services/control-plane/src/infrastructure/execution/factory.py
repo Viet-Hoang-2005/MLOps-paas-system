@@ -1,7 +1,9 @@
 from django.conf import settings
 
-from .argo_backends import ArgoBuildBackend, ArgoDeploymentBackend, ArgoDriftBackend, ArgoTrainingBackend
-from .docker_backends import DockerBuildBackend, DockerDeploymentBackend, DockerDriftBackend, DockerTrainingBackend
+from infrastructure.execution.build import ArgoBuildBackend, DockerBuildBackend
+from infrastructure.execution.drift import ArgoDriftBackend, DockerDriftBackend
+from infrastructure.execution.serving import ArgoDeploymentBackend, DockerDeploymentBackend
+from infrastructure.execution.training import ArgoTrainingBackend, DockerTrainingBackend
 
 
 def build_backend(name=None):

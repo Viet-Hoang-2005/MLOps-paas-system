@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from apps.catalog.models import ModelProject
 from apps.observability.models import EventOutbox
-from apps.observability.services.outbox import claim_events, enqueue_event
+from apps.observability.outbox import claim_events, enqueue_event
 
 
 @pytest.mark.django_db

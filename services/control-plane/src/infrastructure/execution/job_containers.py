@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from common.api.exceptions import Conflict
-from common.logging_utils import sanitize
+from common.telemetry.logging_utils import sanitize
 
 from .docker_runtime import create_or_attach_container, get_owned_container, remove_owned_container
 

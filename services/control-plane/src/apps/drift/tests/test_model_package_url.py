@@ -9,8 +9,7 @@ from rest_framework.test import APIClient
 from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.registry.models import ModelArtifact, ModelVersion
-from infrastructure.execution.argo_backends import ArgoDriftBackend
-from infrastructure.execution.docker_backends import DockerDriftBackend
+from infrastructure.execution.drift import ArgoDriftBackend, DockerDriftBackend
 
 
 @pytest.mark.django_db
@@ -148,8 +147,9 @@ class TestDriftRunModelPackageURLEndpoint(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_docker_and_argo_payloads_do_not_contain_model_uri_or_package_presigned_url(self):
-        import docker.errors
         from types import SimpleNamespace
+
+        import docker.errors
 
         # 1. Test Docker Drift payload
         fake_container = SimpleNamespace(id="drift-c-1", attrs={})

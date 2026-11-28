@@ -8,17 +8,18 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject, PreviewAsset
+from apps.deployment.builds.cleanup import delete_build
+from apps.deployment.builds.registration import request_registration
+from apps.deployment.builds.submission import request_build_deletion, request_rebuild
+from apps.deployment.builds.tasks import execute_build
 from apps.deployment.models import Build, BuildInputAsset
-from apps.deployment.services.builds import request_build_deletion, request_rebuild
-from apps.deployment.services.completion import request_registration
-from apps.deployment.tasks import delete_build, execute_build
 from apps.registry.models import ModelVersion
-from apps.training.models import TrainingOutput
+from apps.training.outputs.models import TrainingOutput
+from apps.training.tests.factories import training_job
 from common.api.exceptions import Conflict
 from infrastructure.execution.build_cleanup import stop_build_for_deletion
-from infrastructure.execution.image_cleanup import BuildImageCleaner
+from infrastructure.images.cleanup import BuildImageCleaner
 from infrastructure.storage.paths import build_prefix
 
 
@@ -31,9 +32,9 @@ def project(db):
 @pytest.fixture
 def cleanup(monkeypatch):
     stop, cleaner, storage = Mock(), Mock(), Mock()
-    monkeypatch.setattr("apps.deployment.tasks.stop_build_for_deletion", stop)
-    monkeypatch.setattr("apps.deployment.tasks.BuildImageCleaner", lambda: cleaner)
-    monkeypatch.setattr("apps.deployment.tasks.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.stop_build_for_deletion", stop)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.BuildImageCleaner", lambda: cleaner)
+    monkeypatch.setattr("apps.deployment.builds.cleanup.S3Storage", lambda: storage)
     return stop, cleaner, storage
 
 
@@ -151,7 +152,7 @@ def test_deletion_blocks_registration_and_queued_execution(project, monkeypatch)
     with pytest.raises(Conflict):
         request_registration(build)
     backend = Mock()
-    monkeypatch.setattr("apps.deployment.tasks.build_backend", backend)
+    monkeypatch.setattr("apps.deployment.builds.tasks.build_backend", backend)
     assert execute_build.run(str(build.public_id)) == "deleting"
     backend.assert_not_called()
     build.delete()
@@ -249,7 +250,7 @@ def test_rebuild_copies_current_preview_into_new_build(project, status, registra
         registration_status=registration_status,
     )
     storage = CopyStorage()
-    monkeypatch.setattr("apps.deployment.services.builds._enqueue", Mock())
+    monkeypatch.setattr("apps.deployment.builds.submission._enqueue", Mock())
     result = request_rebuild(original, backend="docker", storage=storage)
     assert result.pk != original.pk
     assert result.preview_revision == 3
@@ -284,7 +285,7 @@ def test_rebuild_uses_original_completed_training_job(project, monkeypatch):
         project=project, source_job=job, source_job_reference=job.public_id, flavor="xgboost", status="failed"
     )
     storage = CopyStorage()
-    monkeypatch.setattr("apps.deployment.services.builds._enqueue", Mock())
+    monkeypatch.setattr("apps.deployment.builds.submission._enqueue", Mock())
     result = request_rebuild(original, backend="docker", storage=storage)
     assert result.pk != original.pk
     assert result.source_job_id == job.pk

@@ -12,18 +12,19 @@ from django.urls import ResolverMatch
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
+from apps.deployment.builds.tasks import execute_build
+from apps.deployment.execution import logs as deployment_logs
 from apps.deployment.models import Build
-from apps.deployment.services import logs as deployment_logs
-from apps.deployment.tasks import execute_build
-from apps.drift.services import logs as drift_logs
-from apps.training.services import logs as training_logs
-from apps.training.tasks import execute_training_job
-from common import celery_logging, gunicorn_conf
-from common import logging as app_logging
-from common.logging_utils import bind_context, current_context, reset_context
-from common.middleware import RequestContextMiddleware, request_id_context
+from apps.drift.runs import logs as drift_logs
+from apps.training.jobs import logs as training_logs
+from apps.training.jobs.tasks import execute_training_job
+from apps.training.tests.factories import training_job
+from common.api.middleware import RequestContextMiddleware, request_id_context
+from common.telemetry import celery_logging
+from common.telemetry import logging as app_logging
+from common.telemetry.logging_utils import bind_context, current_context, reset_context
+from config import gunicorn as gunicorn_conf
 
 
 @pytest.mark.parametrize("status", [200, 403, 500])
@@ -147,7 +148,7 @@ def test_retry_signal_emits_one_safe_warning_with_context(caplog, monkeypatch):
     from celery.exceptions import Retry
     from celery.signals import task_retry
 
-    from common.logging_utils import JsonFormatter
+    from common.telemetry.logging_utils import JsonFormatter
 
     task = Mock()
     task.name = "apps.training.tasks.execute_training_job"
@@ -219,7 +220,7 @@ def project(db):
 def test_build_dispatch_is_not_completion(project, monkeypatch, django_capture_on_commit_callbacks):
     build = Build.objects.create(project=project, status="queued", backend="argo", flavor="sklearn")
     monkeypatch.setattr(
-        "apps.deployment.tasks.build_backend", lambda _: SimpleNamespace(run=lambda _: {"dispatched": True})
+        "apps.deployment.builds.tasks.build_backend", lambda _: SimpleNamespace(run=lambda _: {"dispatched": True})
     )
     emitted = Mock()
     monkeypatch.setattr(app_logging, "log_event", emitted)
@@ -247,13 +248,13 @@ def test_training_dispatch_is_not_completion(project, settings, monkeypatch, dja
         next_execution_check_at=timezone.now(),
     )
     monkeypatch.setattr(
-        "apps.observability.services.executions.backend_for",
+        "apps.observability.execution.reconciliation.backend_for",
         lambda *_: SimpleNamespace(
             poll=lambda _: {"status": "not_found"},
             run=lambda _: {"dispatched": True},
         ),
     )
-    monkeypatch.setattr("apps.training.services.quota.require_reservation", lambda *_: None)
+    monkeypatch.setattr("apps.training.resources.quota.require_reservation", lambda *_: None)
     monkeypatch.setattr(training_logs, "append_training_log", Mock())
     emitted = Mock()
     monkeypatch.setattr(app_logging, "log_event", emitted)
@@ -271,7 +272,7 @@ def test_build_webhook_replay_logs_only_first_transition(
 ):
     settings.CONTROL_PLANE_WEBHOOK_SECRET = "test-callback-secret"
     build = Build.objects.create(project=project, status="building", flavor="sklearn")
-    monkeypatch.setattr("apps.deployment.api.webhooks.cleanup_failed_build_artifacts.delay", Mock())
+    monkeypatch.setattr("apps.deployment.builds.callbacks.cleanup_failed_build_artifacts.delay", Mock())
     emitted = Mock()
     monkeypatch.setattr(app_logging, "log_event", emitted)
     client = APIClient()
@@ -370,7 +371,7 @@ def test_task_failure_emits_one_safe_error(handled, monkeypatch):
         errors = [call for call in emitted.call_args_list if call.args[1] == "ERROR"]
         assert len(errors) == (0 if handled else 1)
         if errors:
-            from common.logging_utils import JsonFormatter
+            from common.telemetry.logging_utils import JsonFormatter
 
             fields = dict(errors[0].kwargs)
             record = logging.LogRecord(
@@ -417,7 +418,7 @@ def test_build_task_does_not_repeat_callback_ready(project, monkeypatch, django_
         app_logging.record_transition(resource, "ready", source="webhook")
         return {"dispatched": True}
 
-    monkeypatch.setattr("apps.deployment.tasks.build_backend", lambda _: SimpleNamespace(run=callback_then_return))
+    monkeypatch.setattr("apps.deployment.builds.tasks.build_backend", lambda _: SimpleNamespace(run=callback_then_return))
     emitted = Mock()
     monkeypatch.setattr(app_logging, "log_event", emitted)
     with django_capture_on_commit_callbacks(execute=True):
@@ -435,7 +436,7 @@ def test_django_converted_exception_retains_diagnostic_and_cleans_up(settings, m
 
     settings.ROOT_URLCONF = type("LoggingTestUrls", (), {"urlpatterns": [path("broken/", broken_view)]})
     emitted = Mock()
-    monkeypatch.setattr("common.middleware.log_event", emitted)
+    monkeypatch.setattr("common.api.middleware.log_event", emitted)
     client = APIClient()
     client.raise_request_exception = False
     response = client.get("/broken/")
@@ -494,7 +495,7 @@ def test_drift_summary_backfill_does_not_claim_new_completion(
 @pytest.mark.django_db
 def test_drift_task_does_not_repeat_callback_completion(settings, monkeypatch, django_capture_on_commit_callbacks):
     from apps.drift.models import DriftRun
-    from apps.drift.tasks import execute_drift_run
+    from apps.drift.runs.tasks import execute_drift_run
     from apps.drift.tests.test_webhook_race_condition import _drift_fixture
 
     settings.DRIFT_EXECUTION_WATCH_ENABLED = True
@@ -510,7 +511,7 @@ def test_drift_task_does_not_repeat_callback_completion(settings, monkeypatch, d
         return {"dispatched": True}
 
     monkeypatch.setattr(
-        "apps.observability.services.executions.backend_for",
+        "apps.observability.execution.reconciliation.backend_for",
         lambda *_: SimpleNamespace(
             poll=lambda _: {"status": "not_found"},
             run=callback_then_return,

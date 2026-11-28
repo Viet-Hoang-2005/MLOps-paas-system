@@ -7,10 +7,10 @@ from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment
-from apps.observability.services.runtime_metrics import runtime_metrics
+from apps.observability.runtime.metrics import runtime_metrics
 from apps.registry.models import ModelVersion
-from infrastructure.docker_metrics import DockerMetricsClient, parse_stats
-from infrastructure.local_request_metrics import LocalRequestCounterClient
+from infrastructure.telemetry.docker_metrics import DockerMetricsClient, parse_stats
+from infrastructure.telemetry.local_request_metrics import LocalRequestCounterClient
 
 
 def test_cpu_cores_and_ram_cgroup_v2():
@@ -39,7 +39,7 @@ def test_counter_read_is_bounded_scoped_and_closed(monkeypatch, settings):
     factory = Mock()
     context = Mock(__enter__=Mock(return_value=Mock(hgetall=Mock(return_value={}))), __exit__=Mock(return_value=False))
     factory.return_value = context
-    monkeypatch.setattr("infrastructure.local_request_metrics.Redis.from_url", factory)
+    monkeypatch.setattr("infrastructure.telemetry.local_request_metrics.Redis.from_url", factory)
     assert LocalRequestCounterClient().read(tenant_id="t", project_id="p", version_id="v") == {}
     factory.assert_called_once_with(settings.REDIS_URL, socket_timeout=0.2, socket_connect_timeout=0.2)
     context.__enter__.return_value.hgetall.assert_called_once_with("runtime_requests:t:p:v")
@@ -116,7 +116,7 @@ def test_sdk_client_is_closed_on_error(deployment, monkeypatch):
     client = Mock()
     client.containers.get.side_effect = RuntimeError("internal Docker error")
     factory = Mock(return_value=client)
-    monkeypatch.setattr("infrastructure.docker_metrics.docker.from_env", factory)
+    monkeypatch.setattr("infrastructure.telemetry.docker_metrics.docker.from_env", factory)
     with pytest.raises(RuntimeError):
         DockerMetricsClient().sample(deployment)
     factory.assert_called_once_with(timeout=2)
@@ -161,9 +161,9 @@ def test_no_running_or_deleting_project_never_reads_docker(deployment):
 def test_metrics_endpoint_authorizes_before_container_access(deployment, monkeypatch):
     project = deployment.version.project
     sample = Mock(return_value={"cpu": 1, "memory": 2})
-    monkeypatch.setattr("infrastructure.docker_metrics.DockerMetricsClient.sample", sample)
+    monkeypatch.setattr("infrastructure.telemetry.docker_metrics.DockerMetricsClient.sample", sample)
     monkeypatch.setattr(
-        "infrastructure.local_request_metrics.LocalRequestCounterClient.read", lambda *args, **kwargs: {}
+        "infrastructure.telemetry.local_request_metrics.LocalRequestCounterClient.read", lambda *args, **kwargs: {}
     )
     url = f"/api/observability/models/{project.public_id}/runtime-metrics/"
     client = APIClient()

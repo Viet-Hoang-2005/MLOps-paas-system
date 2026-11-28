@@ -10,19 +10,19 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.auth.admin import CustomUserPasswordChangeForm
-from apps.auth.services.account_lifecycle import (
+from apps.auth.account.lifecycle import (
     purge_expired_deleted_accounts_batch,
     purge_user_account,
     stop_user_active_runtimes,
 )
+from apps.auth.admin import CustomUserPasswordChangeForm
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment
 from apps.drift.models import DriftMonitor, DriftRun
 from apps.observability.models import EventOutbox
 from apps.registry.models import ModelVersion
-from apps.training.models import TrainingWorkspace
 from apps.training.tests.factories import training_job
+from apps.training.workspace.models import TrainingWorkspace
 
 
 class FakeStorage:
@@ -193,19 +193,19 @@ def test_stop_user_active_runtimes_stops_deployments_and_cancels_active_jobs(mon
     cancelled_runs = []
 
     monkeypatch.setattr(
-        "apps.deployment.services.deployments.request_stop",
+        "apps.deployment.serving.rollout.request_stop",
         lambda item: stopped_deployments.append(item.pk),
     )
     monkeypatch.setattr(
-        "apps.deployment.services.builds.request_cancel",
+        "apps.deployment.builds.submission.request_cancel",
         lambda item: cancelled_builds.append(item.pk),
     )
     monkeypatch.setattr(
-        "apps.training.services.jobs.cancel_job",
+        "apps.training.jobs.lifecycle.cancel_job",
         lambda item: cancelled_jobs.append(item.pk),
     )
     monkeypatch.setattr(
-        "apps.drift.services.runs.request_cancel",
+        "apps.drift.runs.lifecycle.request_cancel",
         lambda item: cancelled_runs.append(item.pk),
     )
 
@@ -268,15 +268,15 @@ def test_purge_user_account_stages_projects_jobs_workspaces_then_s3_and_user(mon
     requested_workspaces = []
 
     monkeypatch.setattr(
-        "apps.catalog.services.deletion.request_project_deletion",
+        "apps.catalog.projects.deletion.request_project_deletion",
         lambda item: requested_projects.append(item.pk),
     )
     monkeypatch.setattr(
-        "apps.training.services.jobs.request_job_deletion",
+        "apps.training.jobs.lifecycle.request_job_deletion",
         lambda item: requested_jobs.append(item.pk),
     )
     monkeypatch.setattr(
-        "apps.training.services.workspace_lifecycle.request_workspace_deletion",
+        "apps.training.workspace.lifecycle.request_workspace_deletion",
         lambda item: requested_workspaces.append(item.pk),
     )
 
@@ -343,7 +343,7 @@ def test_purge_requeues_failed_training_job(expired_account, django_capture_on_c
     )
     enqueued = []
     monkeypatch.setattr(
-        "apps.observability.services.executions.enqueue_safely", lambda row, task: enqueued.append(row.pk)
+        "apps.observability.execution.leases.enqueue_safely", lambda row, task: enqueued.append(row.pk)
     )
     storage = FakeStorage()
 
@@ -368,7 +368,7 @@ def test_blocked_purge_does_not_starve_newer_accounts_at_next_tick(expired_accou
         "later-purge@example.com", is_active=False, deleted_at=expired_account.deleted_at + timedelta(hours=1)
     )
     now = timezone.now()
-    monkeypatch.setattr("apps.auth.services.account_lifecycle.timezone.now", lambda: now)
+    monkeypatch.setattr("apps.auth.account.lifecycle.timezone.now", lambda: now)
     storage = FakeStorage()
 
     assert purge_expired_deleted_accounts_batch(limit=1, storage=storage)["waiting_projects"] == 1
@@ -389,7 +389,7 @@ def test_failed_account_purge_waits_until_its_next_attempt(expired_account, monk
             raise TimeoutError("Storage unavailable")
 
     now = timezone.now()
-    monkeypatch.setattr("apps.auth.services.account_lifecycle.timezone.now", lambda: now)
+    monkeypatch.setattr("apps.auth.account.lifecycle.timezone.now", lambda: now)
     assert purge_expired_deleted_accounts_batch(storage=UnavailableStorage())["errors"] == 1
     expired_account.refresh_from_db()
     assert expired_account.purge_next_attempt_at == now + timedelta(seconds=60)
@@ -425,8 +425,8 @@ def test_soft_delete_revokes_credentials_clears_cookie_and_is_idempotent(
     from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
     from apps.access.models import UserAPIKey
-    from apps.auth.api.serializers import TenantTokenSerializer
-    from apps.auth.services.account_lifecycle import deactivate_user_account
+    from apps.auth.account.lifecycle import deactivate_user_account
+    from apps.auth.sessions.serializers import TenantTokenSerializer
     from apps.mlflow.auth import authenticate_mlflow_request
 
     User = get_user_model()
@@ -471,7 +471,7 @@ def test_soft_delete_revokes_credentials_clears_cookie_and_is_idempotent(
 
 @pytest.mark.django_db
 def test_run_project_cleanup_skips_storage_migration_during_account_purge(monkeypatch):
-    from apps.catalog.services.deletion import run_project_cleanup
+    from apps.catalog.projects.deletion import run_project_cleanup
 
     User = get_user_model()
     user = User.objects.create_user("purge-skip-mig@example.com", "password123")
@@ -481,9 +481,9 @@ def test_run_project_cleanup_skips_storage_migration_during_account_purge(monkey
     project = ModelProject.objects.create(owner=user, name="Skip Migration", deletion_state="deleting", is_active=False)
 
     called = []
-    monkeypatch.setattr("apps.training.services.storage_migration.migrate_project_storage", lambda p: called.append(p.pk))
+    monkeypatch.setattr("apps.training.jobs.storage_migration.migrate_project_storage", lambda p: called.append(p.pk))
     monkeypatch.setattr(
-        "apps.catalog.services.deletion.project_cleanup_backend",
+        "apps.catalog.projects.deletion.project_cleanup_backend",
         lambda: type("B", (), {"run": lambda self, p, m: {"dispatched": True}})(),
     )
     run_project_cleanup(project)
@@ -492,7 +492,7 @@ def test_run_project_cleanup_skips_storage_migration_during_account_purge(monkey
 
 @pytest.mark.django_db
 def test_deactivate_user_account_invalidates_model_server_caches(monkeypatch, django_capture_on_commit_callbacks):
-    from apps.auth.services.account_lifecycle import deactivate_user_account
+    from apps.auth.account.lifecycle import deactivate_user_account
 
     User = get_user_model()
     user = User.objects.create_user("cache-evict@example.com", "password123")
@@ -502,7 +502,7 @@ def test_deactivate_user_account_invalidates_model_server_caches(monkeypatch, dj
     Deployment.objects.create(version=version, build=build, backend="docker", status="succeeded")
 
     invalidated = []
-    monkeypatch.setattr("apps.deployment.services.cache.invalidate_model_server_cache", invalidated.append)
+    monkeypatch.setattr("apps.deployment.serving.model_server_cache.invalidate_model_server_cache", invalidated.append)
     monkeypatch.setattr("apps.auth.tasks.stop_user_active_executions.delay", lambda uid: None)
 
     with django_capture_on_commit_callbacks(execute=True):

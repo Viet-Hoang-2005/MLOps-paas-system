@@ -6,11 +6,12 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.models import TrainingJobCapability, TrainingOutput
-from apps.training.services.capabilities import issue_capability
-from apps.training.services.storage_scope import expected_training_uris
+from apps.training.jobs.capabilities import issue_capability
+from apps.training.jobs.models import TrainingJobCapability
+from apps.training.jobs.storage_scope import expected_training_uris
+from apps.training.outputs.models import TrainingOutput
+from apps.training.tests.factories import training_job
 
 
 def _job(email="owner@example.com"):
@@ -61,7 +62,7 @@ def test_dispatch_retry_preserves_existing_capability_and_caps_ttl(settings):
     settings.TRAINING_CAPABILITY_MAX_TTL_SECONDS = 999999
     first = issue_capability(job, "input_download", preserve_existing=True)
     second = issue_capability(job, "input_download", preserve_existing=True)
-    from apps.training.services.capabilities import capability_for_token
+    from apps.training.jobs.capabilities import capability_for_token
 
     assert capability_for_token(job=job, purpose="input_download", token=first)
     assert capability_for_token(job=job, purpose="input_download", token=second)
@@ -76,7 +77,7 @@ def test_output_upload_capability_is_one_time_and_put_scoped(monkeypatch):
     storage = Mock()
     storage.bucket = settings.AWS_STORAGE_BUCKET_NAME
     storage.presigned_put.return_value = "https://s3.example/job-output"
-    monkeypatch.setattr("apps.training.api.webhooks.S3Storage", lambda: storage)
+    monkeypatch.setattr("apps.training.jobs.callbacks.S3Storage", lambda: storage)
     client = APIClient()
     url = f"/internal/training-jobs/{job.public_id}/output-upload-url/"
 
@@ -162,9 +163,9 @@ def test_trusted_reporter_cannot_overwrite_cancelled_job():
     "error,expected_status", [(ValueError("empty"), "failed"), (TimeoutError("temporary"), "uploading")]
 )
 def test_trusted_completion_requires_output(monkeypatch, error, expected_status):
-    from apps.training.services.output_finalization import finalize_output
+    from apps.training.outputs.finalization import finalize_output
 
-    monkeypatch.setattr("apps.training.services.outputs.verify_training_output", Mock(side_effect=error))
+    monkeypatch.setattr("apps.training.outputs.artifacts.verify_training_output", Mock(side_effect=error))
     job = _job()
     token = issue_capability(job, "trusted_reporter")
     response = APIClient().post(

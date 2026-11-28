@@ -2,9 +2,9 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
-from apps.training.tests.factories import training_job
 from apps.catalog.models import ModelProject
-from apps.training.selectors import jobs_for_user
+from apps.training.jobs.selectors import jobs_for_user
+from apps.training.tests.factories import training_job
 
 
 @pytest.mark.django_db
@@ -34,7 +34,7 @@ def test_unassigned_job_tracking_is_tenant_and_capability_scoped():
     from types import SimpleNamespace
 
     from apps.mlflow.auth import _resolve_target_job, authenticate_mlflow_request
-    from apps.training.services.capabilities import issue_capability
+    from apps.training.jobs.capabilities import issue_capability
 
     owner = get_user_model().objects.create_user("tracking-owner@example.test", "test-password")
     other = get_user_model().objects.create_user("tracking-other@example.test", "test-password")

@@ -8,19 +8,19 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.training.tests.factories import training_job
 from apps.access.models import UserAPIKey
 from apps.catalog.models import ModelProject
-from apps.training.models import (
+from apps.training.jobs.capabilities import issue_capability
+from apps.training.jobs.lifecycle import cancel_job
+from apps.training.jobs.models import (
     TrainingJob,
     TrainingJobCapability,
     TrainingJobMetric,
     TrainingJobParam,
     TrainingJobTag,
-    TrainingOutput,
 )
-from apps.training.services.capabilities import issue_capability
-from apps.training.services.jobs import cancel_job
+from apps.training.outputs.models import TrainingOutput
+from apps.training.tests.factories import training_job
 from infrastructure.storage.s3 import StoredObject
 
 
@@ -98,9 +98,10 @@ class MockS3Storage:
 class MLflowCompatibilityTests(APITestCase):
     def setUp(self):
         self.mock_storage = MockS3Storage()
-        self.storage_patcher = patch("apps.mlflow.views.artifacts.S3Storage", lambda: self.mock_storage)
-        self.storage_patcher.start()
-        self.addCleanup(self.storage_patcher.stop)
+        for module in ("upload", "download", "deletion"):
+            patcher = patch(f"apps.mlflow.artifacts.{module}.S3Storage", lambda: self.mock_storage)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
         User = get_user_model()
         self.user = User.objects.create_user(

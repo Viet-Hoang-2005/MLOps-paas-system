@@ -138,66 +138,32 @@ Mọi luồng xử lý ghi trạng thái trong Control Plane đều tuân thủ 
 
 ---
 
-## 2. Cấu trúc cây thư mục
+## 2. Cấu trúc mã nguồn
 
 ```text
-services/control-plane/
-├── Dockerfile                         # Khai báo container runtime cho Control Plane
-├── manage.py                          # Django management CLI entrypoint
-├── pyproject.toml                     # Cấu hình công cụ phát triển (Ruff, pytest)
-├── requirements.txt                   # Danh sách thư viện Python phụ thuộc
-├── staticfiles/                       # Thư mục chứa static files thu thập bởi collectstatic
-`-- src/
-    ├── config/                        # Cấu hình dự án Django & Celery
-    │   ├── asgi.py                    # Cấu hình ASGI tiêu chuẩn của Django
-    │   ├── wsgi.py                    # Cấu hình WSGI tiêu chuẩn cho Gunicorn
-    │   ├── celery.py                  # Khởi tạo instance Celery app
-    │   ├── urls.py                    # Root URL router kết nối toàn bộ public API và webhooks
-    │   `-- settings/                  # Cấu hình đa môi trường
-    │       ├── base.py                # Cài đặt nền tảng: apps, DB, auth, storage, execution
-    │       ├── local.py               # Cài đặt tối ưu cho Docker Compose / Local Dev
-    │       ├── production.py          # Cài đặt khắt khe cho K3s Production (HSTS, SSL, JWKS, IP Allowlist)
-    │       `-- test.py                # Cài đặt cho unit test (In-memory DB, Eager Celery, Mock S3)
-    ├── common/                        # Tiện ích chia sẻ nội bộ
-    │   ├── env.py                     # Tiện ích đọc biến môi trường an toàn kiểu dữ liệu
-    │   ├── middleware.py              # RequestContextMiddleware đính kèm requestId & tenant context
-    │   ├── logging.py                 # Cấu hình định dạng logger (Console hoặc JSON một dòng)
-    │   ├── logging_utils.py           # Tiện ích trích xuất và format log theo chuẩn hệ thống
-    │   ├── celery_logging.py          # Đồng bộ định dạng log giữa Django và Celery worker
-    │   ├── gunicorn_conf.py           # Cấu hình worker, bind port và metrics cho Gunicorn
-    │   ├── metrics.py                 # Định nghĩa Prometheus Metrics (HTTP latency, counter, Gauges)
-    │   └── redis_client.py            # Quản lý kết nối Redis (hỗ trợ Direct và Redis Sentinel HA)
-    ├── infrastructure/                # Các Adapter tương tác với dịch vụ bên ngoài
-    │   ├── docker.py                  # Client giao tiếp Docker Daemon (local execution)
-    │   ├── argo.py                    # Client phát webhook kích hoạt Argo Events (K8s execution)
-    │   ├── harbor.py                  # Client quản lý dự án và images trên Harbor Registry
-    │   ├── redpanda.py                # Producer đẩy sự kiện vào hàng đợi Redpanda Kafka
-    │   ├── runtime_logs.py            # Client xử lý streaming logs từ Redis / Loki
-    │   ├── prometheus.py              # Client truy vấn số liệu giám sát từ Prometheus
-    │   `-- http.py                    # Tiện ích HTTP request có tích hợp retry và timeout
-    `-- apps/                          # 10 Module chức năng độc lập
-        ├── auth/                      # Quản lý định danh người dùng và xác thực
-        ├── access/                    # Quản lý scoped API Keys
-        ├── catalog/                   # Dự án, không gian làm việc và metadata
-        ├── registry/                  # Đăng ký và quản lý phiên bản mô hình bất biến
-        ├── training/                  # Quản lý bài toán và tiến trình huấn luyện
-        ├── deployment/                # Quy trình Build ảnh và Deployment serving
-        ├── drift/                     # Quản lý và thực thi giám sát trôi dạt dữ liệu
-        ├── ct/                        # Kích hoạt quy trình Continuous Training tự động
-        ├── production/                # Lưu trữ bản ghi suy luận thực tế
-        `-- observability/             # Endpoints kiểm tra sức khỏe, Outbox và Log Proxy
+src/
+├── apps/                 # Ranh giới Django app và các luồng nghiệp vụ
+│   ├── auth/             # Phiên, tài khoản, mật khẩu, OTP và OAuth
+│   ├── catalog/          # Project, Preview và Running
+│   ├── registry/         # Version, artifact, alias và routing
+│   ├── training/         # Workspace, Job, Output và tài nguyên
+│   ├── deployment/       # Build, Serving và phục hồi thực thi
+│   ├── drift/            # Monitor, Run và báo cáo
+│   ├── observability/    # Health, lifecycle, outbox và quan sát workload
+│   └── ...               # Access, CT, Production, Notifications, MLflow
+├── config/               # URL gốc, WSGI/ASGI, Celery, Gunicorn và settings
+├── common/               # HTTP, validation và telemetry dùng chung
+└── infrastructure/       # Adapter thực thi, storage, image registry và telemetry
 ```
 
-> [!NOTE]
-> Bên trong mỗi thư mục con của `src/apps/<tên-app>/`, cấu trúc đều được chuẩn hóa theo chuẩn kiến trúc:
-> - `models.py`: Khai báo bảng dữ liệu với khóa chính UUID và schema `control_plane`.
-> - `selectors.py`: Chứa toàn bộ các hàm **truy vấn đọc (Read-only queries)**, luôn lọc theo tenant/user sở hữu.
-> - `services/`: Chứa các hàm **thực thi nghiệp vụ và ghi dữ liệu (Write operations)**, đảm bảo bọc trong `transaction.atomic()`.
-> - `tasks.py`: Các Celery tasks thực hiện điều phối tác vụ nền bất đồng bộ.
-> - `api/`: Phân tách rõ ràng giữa `endpoints.py` (REST views), `serializers.py` (validate & format dữ liệu), `urls.py` và `webhooks.py` (nhận tín hiệu callback nội bộ).
-> - `tests/`: Bộ kiểm thử đơn vị độc lập, không phụ thuộc mạng ngoài.
+Bắt đầu từ `config/urls.py` để tìm app sở hữu URL. Trong app lớn, API, callback
+và task nằm cạnh nghiệp vụ tương ứng. Ví dụ, `deployment/builds/` chứa API
+Build, tạo snapshot, nhận callback, đăng ký và dọn tài nguyên. `deployment/serving/`
+quản lý rollout, endpoint và health. App nhỏ như `access` giữ các file ở cấp gốc.
 
----
+Các thư mục `tests/` và `migrations/` nằm ở cấp app. Django tìm model qua
+`models`, còn Celery autodiscover qua `tasks.py`. Khi chuyển một task sang
+file mới, giữ nguyên tên đăng ký để Beat và các producer vẫn định tuyến đúng.
 
 ## 3. Hướng dẫn khởi chạy và các lệnh cần thiết
 
@@ -312,7 +278,7 @@ python manage.py makemigrations --check --dry-run --settings=config.settings.tes
 
 > [!IMPORTANT]
 > **Ranh giới phân tầng bất biến (Layering Boundary):**
-> Các file trong thư mục `api/` (Endpoints, Views, Serializers) **TUYỆT ĐỐI KHÔNG ĐƯỢC PHÉP** gọi trực tiếp các client hạ tầng như Docker SDK (`src/infrastructure/docker.py`), AWS S3 Boto3, Argo Events, Harbor, hay Redis. 
+> Các file trong thư mục `api/` (Endpoints, Views, Serializers) **TUYỆT ĐỐI KHÔNG ĐƯỢC PHÉP** gọi trực tiếp các client hạ tầng như Docker SDK (`src/infrastructure/execution/docker_client.py`), AWS S3 Boto3, Argo Events, Harbor, hay Redis.
 > Mọi thao tác ghi phải thông qua tầng `services/`, và mọi tác vụ mất thời gian/tương tác mạng ngoài bắt buộc phải được điều phối qua Celery Task tại ranh giới `transaction.on_commit`.
 
 > [!WARNING]

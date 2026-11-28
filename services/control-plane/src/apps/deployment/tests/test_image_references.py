@@ -6,13 +6,13 @@ import pytest
 import requests
 from requests.cookies import MockRequest, MockResponse
 
-from infrastructure.execution.image_references import (
+from infrastructure.images.harbor import HarborClient
+from infrastructure.images.references import (
     immutable_image_reference,
     repository_from_reference,
     temporary_image_reference,
 )
-from infrastructure.execution.image_registry import DockerImageRegistry, HarborImageRegistry
-from infrastructure.harbor import HarborClient
+from infrastructure.images.registry import DockerImageRegistry, HarborImageRegistry
 
 
 def test_image_reference_contract_is_project_scoped():

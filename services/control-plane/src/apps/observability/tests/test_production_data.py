@@ -39,7 +39,7 @@ def test_production_data_endpoint_requires_project_owner_and_validates_limit(mon
         return [{"id": "event-1", "features": {"feature": 1}, "prediction": "safe"}]
 
     monkeypatch.setattr(
-        "apps.observability.api.endpoints.latest_production_data",
+        "apps.observability.runtime.api.latest_production_data",
         fake_latest_production_data,
     )
     url = f"/api/models/{project.public_id}/production-data/"

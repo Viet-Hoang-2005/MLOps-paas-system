@@ -2,11 +2,10 @@ import docker
 import docker.errors
 from django.conf import settings
 
-from infrastructure.argo import ArgoWebhookClient
-from infrastructure.docker import DockerClient
-from infrastructure.harbor import HarborClient
-
-from .image_references import image_repository, local_image_repository
+from infrastructure.execution.argo_client import ArgoWebhookClient
+from infrastructure.execution.docker_client import DockerClient
+from infrastructure.images.harbor import HarborClient
+from infrastructure.images.references import image_repository, local_image_repository
 
 
 class DockerProjectCleanupBackend:

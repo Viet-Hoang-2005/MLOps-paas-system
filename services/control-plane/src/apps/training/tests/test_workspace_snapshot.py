@@ -6,8 +6,8 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.exceptions import ValidationError
 
-from apps.training.models import TrainingWorkspace, TrainingWorkspaceEntry
-from apps.training.services.workspaces import snapshot_input
+from apps.training.workspace.editing import snapshot_input
+from apps.training.workspace.models import TrainingWorkspace, TrainingWorkspaceEntry
 from common.api.exceptions import Conflict
 
 

@@ -8,12 +8,12 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
+from apps.notifications.delivery import create_notification
 from apps.notifications.models import Notification
-from apps.notifications.services import create_notification
 
 
 def test_training_notification_targets_workspace_job_snapshot():
-    from apps.notifications.hooks import notify_training_result
+    from apps.notifications.events import notify_training_result
 
     job_id, workspace_id = uuid.uuid4(), uuid.uuid4()
     job = SimpleNamespace(
@@ -23,7 +23,7 @@ def test_training_notification_targets_workspace_job_snapshot():
         status="completed",
         project_id=None,
     )
-    with patch("apps.notifications.hooks.create_notification") as create:
+    with patch("apps.notifications.events.create_notification") as create:
         notify_training_result(job)
     assert create.call_count == 1
     values = create.call_args.kwargs
@@ -178,7 +178,7 @@ def test_alertmanager_webhook_creates_notification():
 
 @pytest.mark.django_db
 def test_project_lifecycle_notifications():
-    from apps.notifications.hooks import (
+    from apps.notifications.events import (
         notify_project_created,
         notify_project_deleted,
         notify_project_metadata_updated,
@@ -299,7 +299,7 @@ def test_alertmanager_webhook_dedupes_fingerprint_resets_on_resolved_and_checks_
 @pytest.mark.django_db
 def test_execution_finish_dispatches_training_and_drift_notifications(django_capture_on_commit_callbacks):
     from apps.drift.models import DriftMonitor, DriftRun
-    from apps.observability.services.executions import _finish
+    from apps.observability.execution.observations import _finish
     from apps.registry.models import ModelVersion
     from apps.training.tests.factories import training_job
 
@@ -320,8 +320,8 @@ def test_execution_finish_dispatches_training_and_drift_notifications(django_cap
     )
 
     with (
-        patch("apps.notifications.hooks.notify_training_result") as mock_train,
-        patch("apps.notifications.hooks.notify_drift_result") as mock_drift,
+        patch("apps.notifications.events.notify_training_result") as mock_train,
+        patch("apps.notifications.events.notify_drift_result") as mock_drift,
         django_capture_on_commit_callbacks(execute=True),
     ):
         _finish(job, "training", "failed", message="OOMKilled")

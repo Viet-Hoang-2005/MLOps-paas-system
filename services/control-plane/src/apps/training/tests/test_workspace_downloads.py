@@ -8,10 +8,11 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.tests.test_preview_lifecycle import MemoryStorage
-from apps.training.models import TrainingWorkspaceEntry, TrainingOutput
+from apps.training.jobs.storage_scope import expected_training_uris, training_prefix_for
+from apps.training.outputs import downloads
+from apps.training.outputs.models import TrainingOutput
 from apps.training.tests.factories import training_job
-from apps.training.services import downloads
-from apps.training.services.storage_scope import expected_training_uris, training_prefix_for
+from apps.training.workspace.models import TrainingWorkspaceEntry
 
 pytestmark = pytest.mark.django_db
 

@@ -6,8 +6,8 @@ from redis.exceptions import RedisError
 
 from apps.catalog.models import ModelProject
 from apps.deployment.models import Build, Deployment, Endpoint
-from apps.deployment.services import cache as cache_service
-from apps.deployment.tasks import _mark_deployment_succeeded, stop_deployment
+from apps.deployment.serving import model_server_cache as cache_service
+from apps.deployment.serving.rollout_tasks import _mark_deployment_succeeded, stop_deployment
 from apps.registry.models import ModelVersion
 
 
@@ -49,7 +49,7 @@ class CacheInvalidationTests(TestCase):
         invalidated_ids = []
         with (
             patch(
-                "apps.deployment.tasks.invalidate_model_server_cache",
+                "apps.deployment.serving.rollout_tasks.invalidate_model_server_cache",
                 side_effect=lambda version_id: invalidated_ids.append(version_id),
             ),
             self.captureOnCommitCallbacks(execute=True),
@@ -73,10 +73,10 @@ class CacheInvalidationTests(TestCase):
 
         with (
             patch(
-                "apps.deployment.tasks.invalidate_model_server_cache",
+                "apps.deployment.serving.rollout_tasks.invalidate_model_server_cache",
                 side_effect=lambda version_id: invalidated_ids.append(version_id),
             ),
-            patch("apps.deployment.tasks.deployment_backend", return_value=fake_backend),
+            patch("apps.deployment.serving.rollout_tasks.deployment_backend", return_value=fake_backend),
         ):
             status = stop_deployment(str(deployment.public_id))
 

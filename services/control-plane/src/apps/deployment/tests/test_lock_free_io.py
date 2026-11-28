@@ -11,17 +11,20 @@ from django.contrib.auth import get_user_model
 from django.db import connection
 from django.utils import timezone
 
-from apps.training.tests.factories import training_job
 from apps.catalog import tasks as catalog_tasks
 from apps.catalog.models import ModelPreview, ModelProject
-from apps.deployment import tasks
+from apps.deployment import reconciliation, tasks
+from apps.deployment.builds import cleanup as build_cleanup
+from apps.deployment.builds import submission as build_service
 from apps.deployment.models import Build, BuildInputAsset
-from apps.deployment.services import builds as build_service
 from apps.training import tasks as training_tasks
-from apps.training.models import TrainingJob, TrainingOutput
-from apps.training.services import jobs as job_service
-from apps.training.services import drafts
-from apps.training.models import TrainingQuotaReservation, TrainingWorkspace
+from apps.training.jobs import lifecycle as job_service
+from apps.training.jobs.models import TrainingJob
+from apps.training.outputs.models import TrainingOutput
+from apps.training.resources.models import TrainingQuotaReservation
+from apps.training.tests.factories import training_job
+from apps.training.workspace import runs as drafts
+from apps.training.workspace.models import TrainingWorkspace
 from common.api.exceptions import Conflict
 from infrastructure.storage.s3 import StoredObject
 
@@ -232,19 +235,19 @@ def test_failure_after_commit_keeps_the_inputs_of_the_created_build(project, sto
 
 @pytest.fixture
 def job_storage(monkeypatch, storage, settings):
-    from apps.training.services import workspaces
+    from apps.training.workspace import editing as workspaces
 
     settings.TRAINING_BACKEND = "argo"
     settings.TRAINING_EXECUTION_WATCH_ENABLED = True
     monkeypatch.setattr(workspaces, "S3Storage", lambda: storage)
     monkeypatch.setattr(job_service, "_enqueue", Mock())
     monkeypatch.setattr(drafts, "enqueue_preparation", Mock())
-    monkeypatch.setattr("apps.training.services.workspace_lifecycle.cleanup_preparation.apply_async", Mock())
+    monkeypatch.setattr("apps.training.workspace.lifecycle.cleanup_preparation.apply_async", Mock())
     return storage
 
 
 def editable_job(project, storage):
-    from apps.training.services import workspaces
+    from apps.training.workspace import editing as workspaces
 
     job = drafts.create_workspace(owner=project.owner)
     _, revision = workspaces.create_entry(
@@ -337,9 +340,9 @@ def cleanup(monkeypatch):
 
         return call
 
-    monkeypatch.setattr(tasks, "stop_build_for_deletion", spy("stop"))
-    monkeypatch.setattr(tasks, "BuildImageCleaner", lambda: SimpleNamespace(delete=spy("image", "deleted")))
-    monkeypatch.setattr(tasks, "S3Storage", lambda: SimpleNamespace(delete_prefix=spy("storage")))
+    monkeypatch.setattr(build_cleanup, "stop_build_for_deletion", spy("stop"))
+    monkeypatch.setattr(build_cleanup, "BuildImageCleaner", lambda: SimpleNamespace(delete=spy("image", "deleted")))
+    monkeypatch.setattr(build_cleanup, "S3Storage", lambda: SimpleNamespace(delete_prefix=spy("storage")))
     return seen
 
 
@@ -352,14 +355,14 @@ def test_delete_build_runs_external_cleanup_outside_any_transaction(project, cle
 
 def test_delete_build_keeps_a_build_that_was_registered_during_cleanup(project, monkeypatch):
     build = deleting_build(project)
-    monkeypatch.setattr(tasks, "stop_build_for_deletion", Mock())
-    monkeypatch.setattr(tasks, "S3Storage", lambda: SimpleNamespace(delete_prefix=Mock()))
+    monkeypatch.setattr(build_cleanup, "stop_build_for_deletion", Mock())
+    monkeypatch.setattr(build_cleanup, "S3Storage", lambda: SimpleNamespace(delete_prefix=Mock()))
 
     def registers_meanwhile(*args, **kwargs):
         Build.objects.filter(pk=build.pk).update(registration_status="registering")
         return "deleted"
 
-    monkeypatch.setattr(tasks, "BuildImageCleaner", lambda: SimpleNamespace(delete=registers_meanwhile))
+    monkeypatch.setattr(build_cleanup, "BuildImageCleaner", lambda: SimpleNamespace(delete=registers_meanwhile))
     retry = Mock(side_effect=Exception("retry"))
     monkeypatch.setattr(tasks.delete_build, "retry", retry)
     with pytest.raises(Exception, match="retry"):
@@ -369,7 +372,7 @@ def test_delete_build_keeps_a_build_that_was_registered_during_cleanup(project, 
 
 def test_delete_build_failure_is_recorded_and_retried(project, monkeypatch):
     build = deleting_build(project)
-    monkeypatch.setattr(tasks, "stop_build_for_deletion", Mock(side_effect=RuntimeError("runner still active")))
+    monkeypatch.setattr(build_cleanup, "stop_build_for_deletion", Mock(side_effect=RuntimeError("runner still active")))
     monkeypatch.setattr(tasks.delete_build, "retry", Mock(side_effect=Exception("retry")))
     with pytest.raises(Exception, match="retry"):
         tasks.delete_build.run(str(build.public_id))
@@ -445,9 +448,9 @@ def test_stalled_deletions_are_dispatched_again(project, dispatch):
 
 def test_version_and_monitor_reconciliation_batches_only_due_rows(project, dispatch, settings, monkeypatch):
     from apps.drift.models import DriftMonitor
-    from apps.drift.tasks import cleanup_drift_monitor_task
+    from apps.drift.monitors.tasks import cleanup_drift_monitor_task
     from apps.registry.models import ModelVersion
-    from apps.registry.tasks import cleanup_model_version
+    from apps.registry.versions.tasks import cleanup_model_version
 
     settings.DELETION_RECONCILE_BATCH_SIZE = 1
     now = timezone.now()
@@ -464,7 +467,7 @@ def test_version_and_monitor_reconciliation_batches_only_due_rows(project, dispa
     publish_monitor = Mock()
     monkeypatch.setattr(cleanup_model_version, "delay", publish_version)
     monkeypatch.setattr(cleanup_drift_monitor_task, "delay", publish_monitor)
-    monkeypatch.setattr(tasks.timezone, "now", lambda: now)
+    monkeypatch.setattr(reconciliation.timezone, "now", lambda: now)
 
     assert tasks.reconcile_stalled_deletions() == 1
     publish_version.assert_called_once_with(str(first_version.public_id))

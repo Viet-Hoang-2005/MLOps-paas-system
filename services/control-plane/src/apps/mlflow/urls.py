@@ -1,19 +1,19 @@
 from django.urls import path
 
-from .views import (
-    MLflowArtifactsListView,
+from apps.mlflow.artifacts.api import MLflowArtifactsListView
+from apps.mlflow.experiments import (
     MLflowExperimentsCreateView,
     MLflowExperimentsGetByNameView,
     MLflowExperimentsGetView,
+)
+from apps.mlflow.metrics import (
     MLflowMetricsGetHistoryView,
-    MLflowRunsCreateView,
-    MLflowRunsGetView,
     MLflowRunsLogBatchView,
     MLflowRunsLogMetricView,
     MLflowRunsLogParameterView,
     MLflowRunsSetTagView,
-    MLflowRunsUpdateView,
 )
+from apps.mlflow.runs import MLflowRunsCreateView, MLflowRunsGetView, MLflowRunsUpdateView
 
 urlpatterns = [
     # Experiments

@@ -6,12 +6,12 @@ from django.test import override_settings
 from rest_framework.test import APIClient
 
 from apps.catalog.models import ModelProject
+from apps.deployment.builds import submission as build_service
 from apps.deployment.models import Build, Deployment
-from apps.deployment.services import builds as build_service
-from apps.deployment.services import deployments as deployment_service
+from apps.deployment.serving import rollout as deployment_service
 from apps.registry.models import ModelVersion
 from infrastructure.execution import factory
-from infrastructure.execution.argo_backends import ArgoDeploymentBackend
+from infrastructure.execution.serving import ArgoDeploymentBackend
 
 
 @pytest.mark.django_db
@@ -23,7 +23,7 @@ def test_build_webhook_is_idempotent(monkeypatch):
         project=project, flavor="sklearn", status="building", package_uri="s3://bucket/build/package.zip"
     )
     registry = SimpleNamespace(promote=lambda **_kwargs: (f"image-{project.public_id}:v1", "sha256:local-image-id"))
-    monkeypatch.setattr("apps.registry.services.versions.image_registry_for", lambda _build: registry)
+    monkeypatch.setattr("apps.registry.versions.registration.image_registry_for", lambda _build: registry)
     client = APIClient()
     headers = {"HTTP_X_CONTROL_PLANE_SECRET": "test-webhook-secret"}
     url = f"/internal/webhooks/builds/{build.public_id}/"
