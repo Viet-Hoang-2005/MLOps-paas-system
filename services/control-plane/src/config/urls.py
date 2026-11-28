@@ -3,7 +3,7 @@ from django.urls import include, path
 
 from apps.deployment.builds.callbacks import BuildWebhookEndpoint
 from apps.deployment.serving.callbacks import DeploymentWebhookEndpoint
-from apps.deployment.urls import build_patterns, deployment_patterns, endpoint_patterns
+from apps.deployment.urls import build_patterns, deployment_patterns
 from apps.drift.runs.callbacks import (
     AutomaticDriftWebhookEndpoint,
     DriftRunModelPackageURLEndpoint,
@@ -12,7 +12,6 @@ from apps.drift.runs.callbacks import (
 from apps.mlflow.artifacts.api import MLflowArtifactsMultipartFallbackView, MLflowArtifactsProxyView
 from apps.notifications.alerts import AlertWebhookEndpoint
 from apps.observability.execution.callbacks import ArgoRuntimeStopEndpoint, ExecutionObservationEndpoint
-from apps.observability.runtime.api import ProductionDataEndpoint
 from apps.training.jobs.callbacks import (
     TrainingCancellationWebhookEndpoint,
     TrainingInputDownloadURLEndpoint,
@@ -37,20 +36,14 @@ urlpatterns = [
     path("mlflow-artifacts/artifacts", MLflowArtifactsProxyView.as_view()),
     path("api/2.0/mlflow-artifacts/mpu/<path:subpath>", MLflowArtifactsMultipartFallbackView.as_view()),
     path("mlflow-artifacts/mpu/<path:subpath>", MLflowArtifactsMultipartFallbackView.as_view()),
-    path(
-        "api/models/<uuid:project_id>/production-data/",
-        ProductionDataEndpoint.as_view(),
-        name="model-production-data",
-    ),
-    path("api/models/", include("apps.catalog.urls")),
-    path("api/registry/", include("apps.registry.urls")),
+    path("api/projects/", include("apps.catalog.urls")),
+    path("api/model-versions/", include("apps.registry.urls")),
     path("api/training-jobs/", include("apps.training.urls")),
     path("api/training-workspaces/", include("apps.training.workspace.urls")),
     path("api/builds/", include((build_patterns, "builds"))),
     path("api/deployments/", include((deployment_patterns, "deployments"))),
-    path("api/endpoints/", include((endpoint_patterns, "endpoints"))),
     path("api/drift-monitors/", include("apps.drift.urls")),
-    path("api/observability/", include("apps.observability.runtime.urls")),
+    path("api/drift-runs/", include("apps.drift.runs.urls")),
     path("health/", include("apps.observability.urls")),
     path("internal/webhooks/builds/<uuid:build_id>/", BuildWebhookEndpoint.as_view()),
     path("internal/webhooks/deployments/<uuid:deployment_id>/", DeploymentWebhookEndpoint.as_view()),

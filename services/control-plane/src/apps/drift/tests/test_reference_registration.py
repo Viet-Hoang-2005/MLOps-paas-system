@@ -120,7 +120,7 @@ def test_reference_endpoints_enforce_tenant_and_existing_reference(running_versi
     response = client.post(url, payload, format="multipart")
     assert response.status_code == 201
     monitor_id = response.data["id"]
-    reference_url = f"/api/drift-monitors/{monitor_id}/reference-url/"
+    reference_url = f"/api/drift-monitors/{monitor_id}/reference-data/read-url/"
     monkeypatch.setattr(
         "apps.drift.monitors.reference.S3Storage",
         lambda: Mock(presigned_get=lambda uri, expires, **_: "https://s3.example/reference"),
@@ -142,4 +142,4 @@ def test_reference_endpoints_enforce_tenant_and_existing_reference(running_versi
         format="multipart",
     )
     assert response.status_code == 400
-    assert client.get(f"/api/drift-monitors/{uuid.uuid4()}/reference-url/").status_code == 404
+    assert client.get(f"/api/drift-monitors/{uuid.uuid4()}/reference-data/read-url/").status_code == 404

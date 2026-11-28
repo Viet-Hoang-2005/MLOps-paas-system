@@ -102,7 +102,7 @@ def test_cancelled_argo_drift_run_can_only_be_deleted_after_confirmation(monkeyp
 
     client = APIClient()
     client.force_authenticate(owner)
-    url = f"/api/drift-monitors/runs/{run.public_id}/"
+    url = f"/api/drift-runs/{run.public_id}/"
     assert client.delete(url).status_code == 503
     assert DriftRun.objects.filter(pk=run.pk).exists()
     storage.delete_prefix.assert_not_called()

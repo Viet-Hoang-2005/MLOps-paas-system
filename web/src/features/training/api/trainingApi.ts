@@ -168,7 +168,7 @@ export const getJobReferencePreview = async (
 ): Promise<ReferenceDataPreview> =>
   (
     await apiClient.get<ReferenceDataPreview>(
-      controlPlaneURL(`/training-jobs/${jobId}/reference-preview/`),
+      controlPlaneURL(`/training-jobs/${jobId}/reference-data/preview/`),
     )
   ).data;
 

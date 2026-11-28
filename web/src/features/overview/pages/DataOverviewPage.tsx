@@ -4,6 +4,10 @@ import {
   uploadPreviewSingleAsset,
   type PreviewAsset,
 } from "@/features/projects/api/previewApi";
+import {
+  projectPreviewReferenceDownloadPath,
+  versionReferenceDownloadPath,
+} from "@/shared/api/catalogApi";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
@@ -96,9 +100,9 @@ export function DataOverviewPage({
   };
 
   const originalPath = isPreview
-    ? previewReference.asset && `/models/${modelId}/preview/reference-download/`
+    ? previewReference.asset && projectPreviewReferenceDownloadPath(modelId)
     : effectiveVersionId && (referenceDataName || reference.data) &&
-      `/registry/versions/${effectiveVersionId}/reference-download/`;
+      versionReferenceDownloadPath(effectiveVersionId);
   const originalDownload = originalPath && (
     <Button
       size="sm"

@@ -5,7 +5,6 @@ import {
   useDeleteDriftMonitoringRun,
   useDriftMonitor,
   useDriftMonitoringJobs,
-  useDriftMonitoringResults,
   useProductionDataCount,
   useRunDriftMonitoringJob,
   type DriftMonitoringResult,
@@ -47,10 +46,15 @@ export default function DriftMonitoringDetailPage() {
 
   const effectiveModelId = modelId ?? selectedModel?.id;
 
-  const { data: singleJob, isLoading: isLoadingSingleJob } =
-    useDriftMonitor(monitorId);
-  const { data: jobs, isLoading: isLoadingJobs } =
-    useDriftMonitoringJobs(effectiveModelId);
+  const {
+    data: singleJob,
+    isLoading: isLoadingSingleJob,
+    isError: isMonitorError,
+    refetch: refetchMonitor,
+  } = useDriftMonitor(monitorId);
+  const { data: jobs, isLoading: isLoadingJobs } = useDriftMonitoringJobs(
+    isMonitorError && !singleJob ? effectiveModelId : undefined,
+  );
 
   const activeJob =
     singleJob === null
@@ -58,13 +62,7 @@ export default function DriftMonitoringDetailPage() {
       : singleJob ?? jobs?.find((job) => job.id === monitorId);
   const projectIdForJob = activeJob?.project_id ?? effectiveModelId;
 
-  const {
-    data: results,
-    isLoading: isLoadingResults,
-    refetch: refetchResults,
-  } = useDriftMonitoringResults(
-    activeJob?.deletion_requested ? undefined : activeJob?.id,
-  );
+  const results = activeJob?.deletion_requested ? undefined : activeJob?.runs;
 
   const { data: productionDataCount } = useProductionDataCount(
     projectIdForJob,
@@ -74,11 +72,11 @@ export default function DriftMonitoringDetailPage() {
   const { mutate: deleteJob, isPending: isDeletingJob } =
     useDeleteDriftMonitoringJob();
   const { mutate: deleteRun, isPending: isDeletingRun } =
-    useDeleteDriftMonitoringRun(activeJob?.id);
+    useDeleteDriftMonitoringRun(activeJob?.id, projectIdForJob);
   const { mutateAsync: runJob, isPending: isRunning } =
     useRunDriftMonitoringJob();
   const { mutateAsync: cancelRun, isPending: isCancelling } =
-    useCancelDriftMonitoringRun(activeJob?.id);
+    useCancelDriftMonitoringRun(activeJob?.id, projectIdForJob);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [runToDelete, setRunToDelete] = useState<DriftMonitoringResult | null>(
@@ -137,9 +135,9 @@ export default function DriftMonitoringDetailPage() {
         stream.status as (typeof DRIFT_TERMINAL_STATUSES)[number],
       )
     ) {
-      void refetchResults();
+      void refetchMonitor();
     }
-  }, [refetchResults, stream.status]);
+  }, [refetchMonitor, stream.status]);
 
   const handleRunNow = async () => {
     if (!activeJob) return;
@@ -149,7 +147,6 @@ export default function DriftMonitoringDetailPage() {
         project_id: projectIdForJob ?? activeJob.project_id,
       });
       setActiveRunId(run.id);
-      void refetchResults();
     } catch {
       // Error handled by mutation toast
     }
@@ -162,7 +159,6 @@ export default function DriftMonitoringDetailPage() {
         monitorId: activeJob.id,
         runId: activeRun?.id ?? activeRunId ?? undefined,
       });
-      void refetchResults();
     } catch {
       // Error handled by mutation toast
     }
@@ -423,7 +419,6 @@ export default function DriftMonitoringDetailPage() {
             data={results ?? []}
             columns={columns}
             getRowId={(result) => result.id}
-            loading={isLoadingResults}
             pageSize={5}
             emptyMessage={t("noRuns")}
           />

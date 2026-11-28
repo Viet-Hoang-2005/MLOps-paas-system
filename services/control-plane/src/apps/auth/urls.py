@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.auth.account.api import AccountDeleteEndpoint, ProfileEndpoint
+from apps.auth.account.api import ProfileEndpoint
 from apps.auth.oauth.api import GitHubOAuthEndpoint, GoogleOAuthEndpoint
 from apps.auth.passwords.api import (
     PasswordChangeCompleteEndpoint,
@@ -32,9 +32,8 @@ urlpatterns = [
     path("password-reset/complete/", PasswordResetCompleteEndpoint.as_view()),
     path("oauth/google/", GoogleOAuthEndpoint.as_view()),
     path("oauth/github/", GitHubOAuthEndpoint.as_view()),
-    path("profile/delete/", AccountDeleteEndpoint.as_view()),
-    path("profile/password-otp/", PasswordChangeRequestEndpoint.as_view()),
-    path("profile/password-otp/verify/", PasswordChangeVerifyEndpoint.as_view()),
-    path("profile/change-password/", PasswordChangeCompleteEndpoint.as_view()),
+    path("password-change/request-otp/", PasswordChangeRequestEndpoint.as_view(), name="password-change-request-otp"),
+    path("password-change/verify-otp/", PasswordChangeVerifyEndpoint.as_view(), name="password-change-verify-otp"),
+    path("password-change/complete/", PasswordChangeCompleteEndpoint.as_view(), name="password-change-complete"),
     path(".well-known/jwks.json", JWKSEndpoint.as_view(), name="jwks"),
 ]

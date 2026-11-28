@@ -28,10 +28,10 @@ def test_drift_run_logs_are_streamed_only_to_run_owner(monkeypatch):
     client = APIClient()
     client.force_authenticate(other)
 
-    assert client.get(f"/api/drift-monitors/runs/{run.public_id}/logs/").status_code == 404
+    assert client.get(f"/api/drift-runs/{run.public_id}/logs/").status_code == 404
 
     client.force_authenticate(owner)
-    response = client.get(f"/api/drift-monitors/runs/{run.public_id}/logs/?offset=1")
+    response = client.get(f"/api/drift-runs/{run.public_id}/logs/?offset=1")
 
     assert response.status_code == 200
     assert response.data["logs"] == ["run report"]

@@ -1,23 +1,6 @@
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
-  name: model-gateway-rewrite
-  namespace: mlops-paas-routing
-  labels:
-    app.kubernetes.io/name: traefik
-    app.kubernetes.io/instance: model-gateway-rewrite
-    app.kubernetes.io/part-of: mlops-paas
-    app.kubernetes.io/component: ingress
-    app.kubernetes.io/managed-by: kustomize
-    mlops-paas.io/plane: platform
-spec:
-  replacePathRegex:
-    regex: "^/[^/]+/models/[^/]+/([^/]+)/(predict|health)$"
-    replacement: "/models/${1}/${2}"
----
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
   name: admin-security-headers
   namespace: mlops-paas-routing
   labels:
@@ -101,10 +84,8 @@ spec:
   entryPoints:
     - web
   routes:
-    - match: Host(`mlops-nids-nt114.id.vn`) && PathRegexp(`^/[A-Za-z0-9-]+/models/[0-9A-Fa-f-]{36}/[0-9A-Fa-f-]{36}/(predict|health)$`)
+    - match: Host(`mlops-nids-nt114.id.vn`) && PathRegexp(`^/model-versions/[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}/(predict|health)$`)
       kind: Rule
-      middlewares:
-        - name: model-gateway-rewrite
       services:
         - name: mlops-paas-model-server
           namespace: mlops-paas-core

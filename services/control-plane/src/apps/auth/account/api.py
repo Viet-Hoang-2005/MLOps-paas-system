@@ -26,8 +26,6 @@ class ProfileEndpoint(APIView):
         )
         return Response({"message": "Profile updated."})
 
-
-class AccountDeleteEndpoint(APIView):
     def delete(self, request):
         deactivate_user_account(request.user)
         response = Response(status=status.HTTP_204_NO_CONTENT)

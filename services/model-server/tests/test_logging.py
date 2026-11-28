@@ -189,7 +189,7 @@ def test_http_failure_keeps_resource_context_after_handler_reset(monkeypatch, ca
     from fastapi.testclient import TestClient
 
     app = FastAPI()
-    app.add_api_route("/models/{version_id}/predict", index.predict, methods=["POST"])
+    app.add_api_route("/model-versions/{version_id}/predict", index.predict, methods=["POST"])
     app.add_middleware(RequestLoggingMiddleware)
     app.dependency_overrides[index.verify_model_access] = lambda: {
         "model_record": {
@@ -203,7 +203,7 @@ def test_http_failure_keeps_resource_context_after_handler_reset(monkeypatch, ca
     before = current_context()
     with TestClient(app) as client:
         response = client.post(
-            "/models/request-version/predict",
+            "/model-versions/request-version/predict",
             json={"features": {"project_id": "untrusted"}},
             headers={"X-Request-ID": "request-1"},
         )

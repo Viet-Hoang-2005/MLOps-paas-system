@@ -122,7 +122,7 @@ Mọi luồng xử lý ghi trạng thái trong Control Plane đều tuân thủ 
    - Khi hoàn tất, `training-runner` gọi callback `POST /internal/webhooks/training-jobs/<uuid>/`. Control Plane kiểm tra token, cập nhật trạng thái `COMPLETED`, không tự đăng ký version. Source/data/reference của job được đóng băng; retry tạo job mới từ snapshot gốc.
 
 2. **Luồng Đóng gói & Triển khai (Build & Deploy Workflow):**
-   - Khi người dùng muốn phục vụ mô hình: Client tạo `Build` từ revision Preview (`POST /api/models/<project>/builds/`) hoặc output TrainingJob completed (`POST /api/training-jobs/<job>/build/`).
+   - Khi người dùng muốn phục vụ mô hình: Client tạo `Build` từ revision Preview (`POST /api/projects/<project>/builds/`) hoặc output TrainingJob completed (`POST /api/training-jobs/<job>/build/`).
    - Celery giao việc cho `model-packager` để tải model artifact từ S3, tạo Dockerfile tối ưu (hỗ trợ MLflow / Sklearn / PyTorch) và đẩy container image lên Harbor Registry (hoặc Docker daemon nội bộ).
    - Callback chỉ hoàn tất Build. Người dùng gọi `POST /api/builds/<build>/register/` để tạo snapshot Evolution idempotent; sau đó mới gọi `POST /api/deployments/`.
    - Control Plane điều phối:
@@ -299,7 +299,7 @@ python manage.py makemigrations --check --dry-run --settings=config.settings.tes
 > - **Redis Streams** chỉ được sử dụng làm bộ đệm tạm thời (transient presentation state) để phục vụ UI streaming logs realtime. PostgreSQL luôn là nguồn chân lý duy nhất cho trạng thái của tài nguyên.
 > - Trên môi trường Production Kubernetes, logs tác vụ của Argo được lưu trữ tập trung trên **Grafana Loki** (thời gian lưu trữ 7 ngày). Control Plane đóng vai trò là Proxy bảo mật, tự động ký token con trỏ (signed task-bound cursor) để ngăn chặn việc người dùng lợi dụng LogQL để truy vấn trộm log của tenant khác.
 
-Metric runtime local dùng `infrastructure/docker_metrics.py` đọc CPU/RAM bằng Docker SDK cho đúng deployment Running và kiểm tra đủ label owner. API `/api/observability/models/<project>/runtime-metrics/` trả snapshot, không lưu lịch sử. RPS dùng counter gateway atomic ngắn hạn trong Redis; Web giữ tối đa 5 phút trong bộ nhớ lúc mở trang. Không cần Prometheus/cAdvisor local; adapter Prometheus production được giữ nguyên.
+Metric runtime local dùng `infrastructure/docker_metrics.py` đọc CPU/RAM bằng Docker SDK cho đúng deployment Running và kiểm tra đủ label owner. API `/api/projects/<project>/runtime-metrics/` trả snapshot, không lưu lịch sử. RPS dùng counter gateway atomic ngắn hạn trong Redis; Web giữ tối đa 5 phút trong bộ nhớ lúc mở trang. Không cần Prometheus/cAdvisor local; adapter Prometheus production được giữ nguyên.
 
 > [!NOTE]
 > **Chế độ Kết nối Redis (Redis Direct vs. Redis Sentinel):**

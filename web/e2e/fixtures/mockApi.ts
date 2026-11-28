@@ -109,8 +109,8 @@ export function createDefaultProjects(): MockProject[] {
         deployment_id: "deploy-1",
         version_id: "version-1",
         version_number: "v1",
-        url: "http://localhost:5002/models/project-diabetes/predict",
-        health_url: "http://localhost:5002/models/project-diabetes/health",
+        url: "http://localhost:5002/model-versions/project-diabetes/predict",
+        health_url: "http://localhost:5002/model-versions/project-diabetes/health",
         health_status: "healthy",
         deployment_status: "succeeded",
         registration_status: "registered",
@@ -267,7 +267,7 @@ export async function installMockApi(
       return jsonResponse(route, { unread_count: 0 });
     }
 
-    if (path === "/models/" && method === "GET") {
+    if (path === "/projects/" && method === "GET") {
       if (state.listProjectsFailureCount > 0) {
         state.listProjectsFailureCount -= 1;
         return jsonResponse(
@@ -279,7 +279,7 @@ export async function installMockApi(
       return jsonResponse(route, { results: state.projects, next: null });
     }
 
-    if (path === "/models/preview/upload-urls/" && method === "POST") {
+    if (path === "/projects/preview/upload-urls/" && method === "POST") {
       const payload = request.postDataJSON() as {
         files?: Array<{
           kind: string;
@@ -300,7 +300,7 @@ export async function installMockApi(
       });
     }
 
-    if (path === "/models/" && method === "POST") {
+    if (path === "/projects/" && method === "POST") {
       const payload = request.postDataJSON() as {
         project_id?: string;
         name: string;
@@ -331,7 +331,7 @@ export async function installMockApi(
       return jsonResponse(route, created, 201);
     }
 
-    const modelDetailMatch = path.match(/^\/models\/([^/]+)\/$/);
+    const modelDetailMatch = path.match(/^\/projects\/([^/]+)\/$/);
     if (modelDetailMatch && method === "GET") {
       const project = state.projects.find((p) => p.id === modelDetailMatch[1]);
       if (!project) {
@@ -340,7 +340,7 @@ export async function installMockApi(
       return jsonResponse(route, project);
     }
 
-    const previewMatch = path.match(/^\/models\/([^/]+)\/preview\/$/);
+    const previewMatch = path.match(/^\/projects\/([^/]+)\/preview\/$/);
     if (previewMatch && method === "GET") {
       const project = state.projects.find((p) => p.id === previewMatch[1]);
       return jsonResponse(route, {
@@ -358,7 +358,7 @@ export async function installMockApi(
       });
     }
 
-    if (/^\/models\/[^/]+\/running-attributes\/$/.test(path)) {
+    if (/^\/projects\/[^/]+\/running\/attributes\/$/.test(path)) {
       return jsonResponse(route, {
         metrics: { accuracy: 0.91 },
         params: { max_iter: 1000 },
@@ -368,7 +368,7 @@ export async function installMockApi(
       });
     }
 
-    const modelBuildsMatch = path.match(/^\/models\/([^/]+)\/builds\/$/);
+    const modelBuildsMatch = path.match(/^\/projects\/([^/]+)\/builds\/$/);
     if (modelBuildsMatch && method === "GET") {
       const matching = Object.values(state.builds).filter(
         (b) => b.project_id === modelBuildsMatch[1],
@@ -429,11 +429,11 @@ export async function installMockApi(
       return jsonResponse(route, { results: [], next: null });
     }
 
-    if (/^\/registry\/models\/[^/]+\/versions\/$/.test(path)) {
+    if (/^\/projects\/[^/]+\/versions\/$/.test(path)) {
       return jsonResponse(route, []);
     }
 
-    if (path === "/registry/versions/version-1/" && method === "GET") {
+    if (path === "/model-versions/version-1/" && method === "GET") {
       return jsonResponse(route, {
         id: "version-1",
         project_id: "project-diabetes",

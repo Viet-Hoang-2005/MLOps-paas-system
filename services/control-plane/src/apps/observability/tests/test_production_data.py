@@ -42,7 +42,7 @@ def test_production_data_endpoint_requires_project_owner_and_validates_limit(mon
         "apps.observability.runtime.api.latest_production_data",
         fake_latest_production_data,
     )
-    url = f"/api/models/{project.public_id}/production-data/"
+    url = f"/api/projects/{project.public_id}/production-data/"
     client = APIClient()
 
     assert client.get(url).status_code == 401
@@ -84,7 +84,7 @@ def test_production_preview_returns_at_most_available_rows_and_scopes_version():
             )
     client = APIClient()
     client.force_authenticate(owner)
-    url = f"/api/models/{project.public_id}/production-data/"
+    url = f"/api/projects/{project.public_id}/production-data/"
     assert len(client.get(f"{url}?limit=100").data) == 5
     response = client.get(f"{url}?limit=100&version_id={first.public_id}")
     assert len(response.data) == 3
@@ -104,6 +104,6 @@ def test_production_preview_empty_version_returns_empty_list():
     client = APIClient()
     client.force_authenticate(owner)
     assert (
-        client.get(f"/api/models/{project.public_id}/production-data/?limit=100&version_id={version.public_id}").data
+        client.get(f"/api/projects/{project.public_id}/production-data/?limit=100&version_id={version.public_id}").data
         == []
     )

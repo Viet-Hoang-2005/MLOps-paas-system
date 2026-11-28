@@ -8,7 +8,7 @@ export async function buildPreview(
 ): Promise<Build> {
   return (
     await apiClient.post<Build>(
-      controlPlaneURL(`/models/${projectId}/builds/`),
+      controlPlaneURL(`/projects/${projectId}/builds/`),
       { revision },
     )
   ).data;

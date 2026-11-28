@@ -15,7 +15,7 @@ export const rebuildById = async (id: string): Promise<Build> =>
 export const deleteBuildById = async (id: string): Promise<Build> =>
   (await apiClient.delete<Build>(controlPlaneURL(`/builds/${id}/`))).data;
 export const listProjectBuilds = async (id: string): Promise<Build[]> =>
-  (await apiClient.get<Build[]>(controlPlaneURL(`/models/${id}/builds/`))).data;
+  (await apiClient.get<Build[]>(controlPlaneURL(`/projects/${id}/builds/`))).data;
 export const deployBuild = async (id: string): Promise<Deployment> =>
   (
     await apiClient.post<Deployment>(controlPlaneURL("/deployments/"), {
@@ -24,9 +24,7 @@ export const deployBuild = async (id: string): Promise<Deployment> =>
   ).data;
 export const getProjectVersions = (id: string): Promise<ModelVersion[]> =>
   fetchAllPages<ModelVersion>(
-    controlPlaneURL(`/registry/models/${id}/versions/`),
+    controlPlaneURL(`/projects/${id}/versions/`),
   );
-export const listBuilds = (): Promise<Build[]> =>
-  fetchAllPages<Build>(controlPlaneURL("/builds/"));
 export const listDeployments = (): Promise<Deployment[]> =>
   fetchAllPages<Deployment>(controlPlaneURL("/deployments/"));

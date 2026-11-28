@@ -60,20 +60,19 @@ flowchart LR
 3. **Quản lý Profile & Avatar**:
    - `PUT /api/auth/profile/` validate ảnh (≤ 5 MiB), upload key UUID mới lên S3 ngoài transaction, đổi `CustomUser.avatar` trong transaction và enqueue Celery `delete_avatar_object` xóa ảnh cũ sau commit.
 4. **Xóa tài khoản 2 giai đoạn (Soft-delete → Retention Purge)**:
-   - `DELETE /api/auth/profile/delete/`: đặt `is_active=False`, `deleted_at=now()`, tăng `session_version`, blacklist toàn bộ refresh token, ghi `EventOutbox` (`tenant.disabled`), và enqueue `stop_user_active_executions` để dừng ngay các `Deployment` đang chạy + hủy `Build`, `TrainingJob`, `DriftRun` đang hoạt động.
+   - `DELETE /api/auth/profile/`: đặt `is_active=False`, `deleted_at=now()`, tăng `session_version`, blacklist toàn bộ refresh token, ghi `EventOutbox` (`tenant.disabled`), và enqueue `stop_user_active_executions` để dừng ngay các `Deployment` đang chạy + hủy `Build`, `TrainingJob`, `DriftRun` đang hoạt động.
    - Định kỳ theo `ACCOUNT_DELETION_PURGE_INTERVAL_SECONDS` (mặc định 3600s), Celery Beat gọi `purge_expired_deleted_accounts`: sau `ACCOUNT_DELETION_RETENTION_DAYS` (mặc định 30 ngày), xóa cứng lần lượt `ModelProject` → `TrainingJob` → `TrainingWorkspace` → prefix S3 (`users/{tenant_id}/`, `staging/users/{tenant_id}/`) → xóa dòng `CustomUser`.
 5. **Project API Keys (`apps.access`)**:
    - Tạo/đổi tên/thu hồi/tạo lại `UserAPIKey` (lưu SHA-256 hash + prefix, phạm vi `allowed_projects`) dùng cho client M2M gọi `model-server`.
 
 ### Luồng 2: Quản lý Model Project & Model Preview (`apps.catalog`)
 1. **Tạo dự án & Upload Staging**:
-   - Client xin presigned PUT URLs qua `POST /api/models/preview/upload-urls/` (upload vào `staging/users/{tenant_id}/...`) → gọi `POST /api/models/` tạo `ModelProject` + `ModelPreview` + `PreviewAsset` (copy staging sang `preview/committed/`).
-   - Có nhánh `POST /api/models/training-projects/` cho phép tạo project trống từ luồng assign Training Job.
+   - Client xin presigned PUT URLs qua `POST /api/projects/preview/upload-urls/` (upload vào `staging/users/{tenant_id}/...`) → gọi `POST /api/projects/` tạo `ModelProject` + `ModelPreview` + `PreviewAsset` (copy staging sang `preview/committed/`).
 2. **Chỉnh sửa Preview**:
-   - `PATCH /api/models/<project_id>/preview/` cập nhật flavor, format, `requirements_text`, thay/xóa asset và tăng `revision` (optimistic concurrency).
-   - Cung cấp xem trước thuộc tính (`preview/attributes/`), dữ liệu reference (`preview/reference-preview/`), và snapshot của deployment đang chạy (`running-source/`, `running-attributes/`, `label-mapping/`).
+   - `PATCH /api/projects/<project_id>/preview/` cập nhật flavor, format, `requirements_text`, thay/xóa asset và tăng `revision` (optimistic concurrency).
+   - Preview có route đọc thuộc tính và tải Reference CSV gốc. Snapshot Running cung cấp nguồn model và thuộc tính theo deployment đang phục vụ.
 3. **Xóa Project bất đồng bộ (Retryable Hard Delete)**:
-   - `DELETE /api/models/<project_id>/` đánh dấu `deletion_state=deleting`, enqueue `execute_project_deletion` dừng runtime/hủy job → (nếu Argo) đợi callback `POST /internal/webhooks/project-deletions/<project_id>/` rồi chạy `complete_project_deletion` xóa ảnh Harbor, S3 và dòng DB. Celery Beat `reconcile_stalled_deletions` tự phục hồi nếu task bị treo.
+   - `DELETE /api/projects/<project_id>/` đánh dấu `deletion_state=deleting`, enqueue `execute_project_deletion` dừng runtime/hủy job → (nếu Argo) đợi callback `POST /internal/webhooks/project-deletions/<project_id>/` rồi chạy `complete_project_deletion` xóa ảnh Harbor, S3 và dòng DB. Celery Beat `reconcile_stalled_deletions` tự phục hồi nếu task bị treo.
 
 ### Luồng 3: Training Workspace & Thực thi Training Job (`apps.training`, `training-runner`)
 1. **Soạn thảo Draft trên Workspace (độc lập với Project)**:
@@ -96,7 +95,7 @@ flowchart LR
 
 ### Luồng 5: Đóng gói & Build OCI Image (`apps.deployment`, `model-packager`)
 1. **Khởi tạo Build**:
-   - Từ Project Preview (`POST /api/models/<project_id>/builds/`) hoặc Training Job (`POST /api/training-jobs/<job_id>/build/`) hoặc Re-build (`POST /api/builds/<build_id>/rebuild/`).
+   - Từ Project Preview (`POST /api/projects/<project_id>/builds/`) hoặc Training Job (`POST /api/training-jobs/<job_id>/build/`) hoặc Re-build (`POST /api/builds/<build_id>/rebuild/`).
    - Snapshot các file đầu vào vào `BuildInputAsset` (S3 `builds/{build_id}/inputs/`), enqueue `execute_build`.
 2. **Thực thi `model-packager`**:
    - Chuẩn hóa model (`.pkl`, `.joblib`, `.xgb`, `.pt`, `.pth`, `.h5`, `.keras`) thành MLflow PyFunc (`MLmodel`), chọn base image (`machine-learning-serving` cho ML cổ điển, `deep-learning-serving` cho DL), build image (Docker local hoặc Argo + Kaniko) và push lên Harbor (`image_uri`, `image_digest`).
@@ -109,9 +108,7 @@ flowchart LR
    - Task `register_build` / `register_version` copy artifact sang tầng bất biến `versions/{version_id}/artifacts/`, tạo `ModelVersion`, `ModelArtifact`, `ModelMetric` (kèm metrics/params/insights summary).
    - **Tối ưu S3 (vừa triển khai)**: ngay sau khi commit version thành công, tự động xóa prefix `builds/{build_id}/` trên S3, đặt `BuildInputAsset.s3_uri=""`, `purged_at=now()`, `build.package_uri=""` để tránh lưu trùng artifact giữa Build và Version.
 2. **Supplemental Artifacts, Alias & Smoke Test**:
-   - Bổ sung artifact phụ (`POST /api/registry/versions/<version_id>/supplemental-artifacts/`).
-   - Gắn alias động (`champion`, `challenger`...) qua `POST /api/registry/models/<project_id>/aliases/` và gọi dự đoán theo alias qua `POST /api/registry/models/<project_id>/aliases/<alias_name>/predict/`.
-   - Chạy kiểm thử nhanh `POST /api/registry/versions/<version_id>/smoke-test/`.
+   - Bổ sung artifact phụ (`POST /api/model-versions/<version_id>/supplemental-artifacts/`).
 
 ### Luồng 7: Triển khai (Deployment), Readiness & Health Monitoring (`apps.deployment`)
 1. **Deploy phiên bản đã đăng ký (`POST /api/deployments/`)**:
@@ -124,7 +121,7 @@ flowchart LR
 
 ### Luồng 8: Inference Gateway & Thu thập Production Telemetry (`model-server`, `serving`, `consumer`)
 1. **Xác thực & Định tuyến tại `model-server`**:
-   - Client gửi `POST /models/{version_id}/predict` (hoặc `GET /models/{version_id}/health`).
+   - Client gửi `POST /model-versions/{version_id}/predict` (hoặc `GET /model-versions/{version_id}/health`).
    - Kiểm tra `access_mode` (`public` / `protected` / `private`): xác thực Bearer RS256 JWT (dùng JWKS cache) hoặc `X-API-Key` (SHA-256 hash cache Redis / PG).
    - Định tuyến tới worker tương ứng (`machine-learning-serving` qua `GET /health`, `POST /predict`; hoặc `deep-learning-serving` BentoML qua `POST /health`, `POST /predict`).
    - Trả kết quả ngay cho client, đồng thời ghi Prometheus metrics (`paas_predictions_total`, `paas_prediction_latency_seconds`), cập nhật bộ đếm local Redis (nếu bật) và đẩy event vào Kafka topic `mlops_paas_production_data` trong `BackgroundTasks`.
@@ -161,7 +158,7 @@ flowchart LR
 
 ### 3.1. Control Plane — Public & User APIs
 
-#### A. Auth & Identity (`/api/auth/`) — 17 endpoints
+#### A. Auth & Identity (`/api/auth/`) — 16 endpoints
 | Method | Path | Auth / Permission | Chức năng |
 | --- | --- | --- | --- |
 | `POST` | `/api/auth/token/` | Public (+ Origin/XHR check) | Đăng nhập email/password, trả Access JWT & set HttpOnly refresh cookie |
@@ -176,11 +173,10 @@ flowchart LR
 | `POST` | `/api/auth/password-reset/request-otp/` | `AllowAny` (Throttled) | Gửi OTP quên mật khẩu |
 | `POST` | `/api/auth/password-reset/verify-otp/` | `AllowAny` (Throttled) | Xác minh OTP quên mật khẩu |
 | `POST` | `/api/auth/password-reset/complete/` | `AllowAny` (Throttled) | Đặt lại mật khẩu mới |
-| `GET`, `PUT` | `/api/auth/profile/` | `JWT` (`IsAuthenticated`) | Xem / cập nhật hồ sơ & avatar người dùng |
-| `DELETE` | `/api/auth/profile/delete/` | `JWT` (`IsAuthenticated`) | Soft-delete tài khoản, dừng runtime & hẹn purge sau retention |
-| `POST` | `/api/auth/profile/password-otp/` | `JWT` (`IsAuthenticated`) | Gửi OTP đổi mật khẩu |
-| `POST` | `/api/auth/profile/password-otp/verify/` | `JWT` (`IsAuthenticated`) | Xác minh OTP đổi mật khẩu |
-| `POST` | `/api/auth/profile/change-password/` | `JWT` (`IsAuthenticated`) | Hoàn tất đổi mật khẩu |
+| `GET`, `PUT`, `DELETE` | `/api/auth/profile/` | `JWT` (`IsAuthenticated`) | Xem và cập nhật hồ sơ, hoặc yêu cầu xóa tài khoản theo thời hạn lưu giữ |
+| `POST` | `/api/auth/password-change/request-otp/` | `JWT` (`IsAuthenticated`) | Gửi OTP đổi mật khẩu |
+| `POST` | `/api/auth/password-change/verify-otp/` | `JWT` (`IsAuthenticated`) | Xác minh OTP đổi mật khẩu |
+| `POST` | `/api/auth/password-change/complete/` | `JWT` (`IsAuthenticated`) | Hoàn tất đổi mật khẩu |
 
 #### B. API Keys (`/api/api-keys/`) — 3 endpoints
 | Method | Path | Auth / Permission | Chức năng |
@@ -189,33 +185,29 @@ flowchart LR
 | `GET`, `PUT`, `PATCH`, `DELETE` | `/api/api-keys/<uuid:key_id>/` | `JWT` (`IsAuthenticated`) | Xem / sửa phạm vi project / thu hồi API Key |
 | `POST` | `/api/api-keys/<uuid:key_id>/regenerate/` | `JWT` (`IsAuthenticated`) | Tạo lại secret mới cho API Key |
 
-#### C. Catalog & Model Preview (`/api/models/`) — 13 endpoints
+#### C. Catalog & Model Preview (`/api/projects/`) — 11 endpoints
 | Method | Path | Auth / Permission | Chức năng |
 | --- | --- | --- | --- |
-| `GET`, `POST` | `/api/models/` | `JWT` (`IsAuthenticated`) | Liệt kê / tạo `ModelProject` kèm preview |
-| `POST` | `/api/models/training-projects/` | `JWT` (`IsAuthenticated`) | Tạo project trống dùng cho gán từ Training Job |
-| `POST` | `/api/models/preview/upload-urls/` | `JWT` (`IsAuthenticated`) | Cấp presigned PUT URLs để upload staging khi tạo project |
-| `GET`, `PUT`, `PATCH`, `DELETE` | `/api/models/<uuid:project_id>/` | `JWT` (`IsAuthenticated`) | Chi tiết / cập nhật / yêu cầu xóa cứng bất đồng bộ project |
-| `GET`, `PATCH` | `/api/models/<uuid:project_id>/preview/` | `JWT` (`IsAuthenticated`) | Xem / cập nhật `ModelPreview` & `PreviewAsset` |
-| `GET` | `/api/models/<uuid:project_id>/preview/attributes/` | `JWT` (`IsAuthenticated`) | Đọc input schema/attributes từ model preview |
-| `POST` | `/api/models/<uuid:project_id>/preview/upload-urls/` | `JWT` (`IsAuthenticated`) | Cấp presigned PUT URLs cập nhật asset của preview |
-| `GET` | `/api/models/<uuid:project_id>/preview/reference-preview/` | `JWT` (`IsAuthenticated`) | Xem trước mẫu dữ liệu reference CSV của preview |
-| `GET` | `/api/models/<uuid:project_id>/running-source/` | `JWT` (`IsAuthenticated`) | Xem thông tin nguồn/version đang Running của project |
-| `GET` | `/api/models/<uuid:project_id>/running-attributes/` | `JWT` (`IsAuthenticated`) | Xem schema input của bản đang Running |
-| `GET` | `/api/models/<uuid:project_id>/label-mapping/` | `JWT` (`IsAuthenticated`) | Xem ánh xạ nhãn (label mapping) của bản đang Running |
-| `GET`, `POST` | `/api/models/<uuid:project_id>/builds/` | `JWT` (`IsAuthenticated`) | Liệt kê / tạo mới Build từ Preview của project |
-| `GET` | `/api/models/<uuid:project_id>/production-data/` | `JWT` (`IsAuthenticated`) | Truy vấn dữ liệu `PredictionRecord` production của project |
+| `GET`, `POST` | `/api/projects/` | `JWT` (`IsAuthenticated`) | Liệt kê / tạo `ModelProject` kèm preview |
+| `POST` | `/api/projects/preview/upload-urls/` | `JWT` (`IsAuthenticated`) | Cấp presigned PUT URLs để upload staging khi tạo project |
+| `GET`, `PUT`, `PATCH`, `DELETE` | `/api/projects/<uuid:project_id>/` | `JWT` (`IsAuthenticated`) | Chi tiết / cập nhật / yêu cầu xóa cứng bất đồng bộ project |
+| `GET`, `PATCH` | `/api/projects/<uuid:project_id>/preview/` | `JWT` (`IsAuthenticated`) | Xem / cập nhật `ModelPreview` & `PreviewAsset` |
+| `GET` | `/api/projects/<uuid:project_id>/preview/attributes/` | `JWT` (`IsAuthenticated`) | Đọc input schema/attributes từ model preview |
+| `POST` | `/api/projects/<uuid:project_id>/preview/upload-urls/` | `JWT` (`IsAuthenticated`) | Cấp presigned PUT URLs cập nhật asset của preview |
+| `GET` | `/api/projects/<uuid:project_id>/preview/reference-data/download/` | `JWT` (`IsAuthenticated`) | Lấy presigned GET URL để tải Reference CSV gốc của Preview |
+| `GET` | `/api/projects/<uuid:project_id>/running/source/` | `JWT` (`IsAuthenticated`) | Xem thông tin nguồn/version đang Running của project |
+| `GET` | `/api/projects/<uuid:project_id>/running/attributes/` | `JWT` (`IsAuthenticated`) | Xem schema input của bản đang Running |
+| `GET`, `POST` | `/api/projects/<uuid:project_id>/builds/` | `JWT` (`IsAuthenticated`) | Liệt kê / tạo mới Build từ Preview của project |
+| `GET` | `/api/projects/<uuid:project_id>/production-data/` | `JWT` (`IsAuthenticated`) | Truy vấn dữ liệu `PredictionRecord` production của project |
 
-#### D. Model Registry (`/api/registry/`) — 7 endpoints
+#### D. Model Registry (`/api/projects/{project_id}/versions/`, `/api/model-versions/`) — 5 endpoints
 | Method | Path | Auth / Permission | Chức năng |
 | --- | --- | --- | --- |
-| `GET` | `/api/registry/models/<uuid:project_id>/versions/` | `JWT` (`IsAuthenticated`) | Liệt kê các `ModelVersion` của project |
-| `GET`, `DELETE` | `/api/registry/versions/<uuid:version_id>/` | `JWT` (`IsAuthenticated`) | Xem chi tiết / xóa `ModelVersion` |
-| `POST` | `/api/registry/versions/<uuid:version_id>/supplemental-artifacts/` | `JWT` (`IsAuthenticated`) | Bổ sung supplemental artifact (VD: reference CSV) cho version |
-| `GET` | `/api/registry/versions/<uuid:version_id>/reference-preview/` | `JWT` (`IsAuthenticated`) | Xem trước dữ liệu reference của version |
-| `POST` | `/api/registry/versions/<uuid:version_id>/smoke-test/` | `JWT` (`IsAuthenticated`) | Chạy smoke-test dự đoán nhanh cho version |
-| `GET`, `POST` | `/api/registry/models/<uuid:project_id>/aliases/` | `JWT` (`IsAuthenticated`) | Liệt kê / gán alias (`champion`, `challenger`...) |
-| `POST` | `/api/registry/models/<uuid:project_id>/aliases/<str:alias_name>/predict/` | `JWT` (`IsAuthenticated`) | Proxy dự đoán tới deployment của version mang alias |
+| `GET` | `/api/projects/<uuid:project_id>/versions/` | `JWT` (`IsAuthenticated`) | Liệt kê các `ModelVersion` của project |
+| `GET`, `DELETE` | `/api/model-versions/<uuid:version_id>/` | `JWT` (`IsAuthenticated`) | Xem chi tiết / xóa `ModelVersion` |
+| `POST` | `/api/model-versions/<uuid:version_id>/supplemental-artifacts/` | `JWT` (`IsAuthenticated`) | Bổ sung supplemental artifact (VD: reference CSV) cho version |
+| `GET` | `/api/model-versions/<uuid:version_id>/reference-data/preview/` | `JWT` (`IsAuthenticated`) | Xem trước dữ liệu reference của version |
+| `GET` | `/api/model-versions/<uuid:version_id>/reference-data/download/` | `JWT` (`IsAuthenticated`) | Lấy presigned GET URL để tải Reference CSV gốc của Version |
 
 #### E. Training Workspaces (`/api/training-workspaces/`) — 9 endpoints
 | Method | Path | Auth / Permission | Chức năng |
@@ -250,13 +242,12 @@ flowchart LR
 | `GET` | `/api/training-jobs/<uuid:job_id>/outputs/<uuid:output_id>/download/` | `JWT` (`IsAuthenticated`) | Tải 1 file `TrainingOutput` cụ thể |
 | `DELETE` | `/api/training-jobs/<uuid:job_id>/outputs/` | `JWT` (`IsAuthenticated`) | Dọn xóa output artifacts của job trên S3 |
 | `GET`, `PATCH` | `/api/training-jobs/<uuid:job_id>/model-output/` | `JWT` (`IsAuthenticated`) | Xem / chọn artifact output dùng để build model |
-| `GET` | `/api/training-jobs/<uuid:job_id>/reference-preview/` | `JWT` (`IsAuthenticated`) | Xem trước dữ liệu reference trong output của job |
+| `GET` | `/api/training-jobs/<uuid:job_id>/reference-data/preview/` | `JWT` (`IsAuthenticated`) | Xem trước dữ liệu reference trong output của job |
 | `POST` | `/api/training-jobs/<uuid:job_id>/build/` | `JWT` (`IsAuthenticated`) | Tạo `Build` trực tiếp từ output của training job |
 
-#### G. Builds, Deployments & Endpoints (`/api/builds/`, `/api/deployments/`, `/api/endpoints/`) — 13 endpoints
+#### G. Builds & Deployments (`/api/builds/`, `/api/deployments/`) — 10 endpoints
 | Method | Path | Auth / Permission | Chức năng |
 | --- | --- | --- | --- |
-| `GET` | `/api/builds/` | `JWT` (`IsAuthenticated`) | Liệt kê danh sách `Build` |
 | `GET`, `DELETE` | `/api/builds/<uuid:build_id>/` | `JWT` (`IsAuthenticated`) | Chi tiết / xóa `Build` (kèm dọn ảnh/S3 nếu chưa register) |
 | `POST` | `/api/builds/<uuid:build_id>/cancel/` | `JWT` (`IsAuthenticated`) | Hủy build đang chạy |
 | `GET` | `/api/builds/<uuid:build_id>/logs/` | `JWT` (`IsAuthenticated`) | Đọc logs quá trình build |
@@ -267,29 +258,26 @@ flowchart LR
 | `GET` | `/api/deployments/<uuid:deployment_id>/logs/` | `JWT` (`IsAuthenticated`) | Logs quá trình triển khai (deploy pipeline) |
 | `GET` | `/api/deployments/<uuid:deployment_id>/runtime-logs/` | `JWT` (`IsAuthenticated`) | Logs runtime của container/pod đang phục vụ |
 | `POST` | `/api/deployments/<uuid:deployment_id>/stop/` | `JWT` (`IsAuthenticated`) | Dừng `Deployment` & gỡ runtime |
-| `GET` | `/api/endpoints/` | `JWT` (`IsAuthenticated`) | Liệt kê các serving `Endpoint` |
-| `GET` | `/api/endpoints/<uuid:endpoint_id>/logs/` | `JWT` (`IsAuthenticated`) | Logs của endpoint đang chạy |
 
-#### H. Drift Monitors & Drift Runs (`/api/drift-monitors/`) — 11 endpoints
+#### H. Drift Monitors & Drift Runs (`/api/drift-monitors/`, `/api/drift-runs/`) — 11 endpoints
 | Method | Path | Auth / Permission | Chức năng |
 | --- | --- | --- | --- |
 | `GET`, `POST` | `/api/drift-monitors/` | `JWT` (`IsAuthenticated`) | Liệt kê / tạo mới `DriftMonitor` |
 | `GET`, `PUT`, `PATCH`, `DELETE` | `/api/drift-monitors/<uuid:monitor_id>/` | `JWT` (`IsAuthenticated`) | Chi tiết / cập nhật / xóa `DriftMonitor` |
 | `POST` | `/api/drift-monitors/<uuid:monitor_id>/cancel/` | `JWT` (`IsAuthenticated`) | Hủy các drift run đang chạy thuộc monitor |
-| `GET` | `/api/drift-monitors/<uuid:monitor_id>/reference-url/` | `JWT` (`IsAuthenticated`) | Lấy presigned GET URL của file reference CSV |
-| `GET` | `/api/drift-monitors/<uuid:monitor_id>/reference-preview/` | `JWT` (`IsAuthenticated`) | Xem trước mẫu dữ liệu reference CSV |
+| `GET` | `/api/drift-monitors/<uuid:monitor_id>/reference-data/read-url/` | `JWT` (`IsAuthenticated`) | Lấy presigned GET URL để đọc Reference CSV trực tiếp |
+| `GET` | `/api/drift-monitors/<uuid:monitor_id>/reference-data/download/` | `JWT` (`IsAuthenticated`) | Lấy presigned GET URL để tải Reference CSV dưới dạng attachment |
 | `POST` | `/api/drift-monitors/<uuid:monitor_id>/runs/` | `JWT` (`IsAuthenticated`) | Kích hoạt thủ công 1 `DriftRun` |
-| `DELETE` | `/api/drift-monitors/runs/<uuid:run_id>/` | `JWT` (`IsAuthenticated`) | Xóa 1 `DriftRun` |
-| `POST` | `/api/drift-monitors/runs/<uuid:run_id>/cancel/` | `JWT` (`IsAuthenticated`) | Hủy 1 `DriftRun` đang chạy |
-| `GET` | `/api/drift-monitors/runs/<uuid:run_id>/logs/` | `JWT` (`IsAuthenticated`) | Đọc logs thực thi của `DriftRun` |
-| `GET` | `/api/drift-monitors/runs/<uuid:run_id>/report-url/` | `JWT` (`IsAuthenticated`) | Lấy presigned URL của báo cáo Evidently HTML |
-| `GET` | `/api/drift-monitors/runs/<uuid:run_id>/report-data/` | `JWT` (`IsAuthenticated`) | Lấy dữ liệu JSON/summary phân tích drift |
+| `DELETE` | `/api/drift-runs/<uuid:run_id>/` | `JWT` (`IsAuthenticated`) | Xóa 1 `DriftRun` |
+| `POST` | `/api/drift-runs/<uuid:run_id>/cancel/` | `JWT` (`IsAuthenticated`) | Hủy 1 `DriftRun` đang chạy |
+| `GET` | `/api/drift-runs/<uuid:run_id>/logs/` | `JWT` (`IsAuthenticated`) | Đọc logs thực thi của `DriftRun` |
+| `GET` | `/api/drift-runs/<uuid:run_id>/report-url/` | `JWT` (`IsAuthenticated`) | Lấy presigned URL của báo cáo Evidently HTML |
+| `GET` | `/api/drift-runs/<uuid:run_id>/report-data/` | `JWT` (`IsAuthenticated`) | Lấy dữ liệu JSON/summary phân tích drift |
 
-#### I. Observability & Health (`/api/observability/`, `/health/`) — 5 endpoints
+#### I. Runtime Metrics & Health (`/api/projects/{project_id}/runtime-metrics/`, `/health/`) — 4 endpoints
 | Method | Path | Auth / Permission | Chức năng |
 | --- | --- | --- | --- |
-| `GET` | `/api/observability/models/<uuid:project_id>/` | `JWT` (`IsAuthenticated`) | Tổng quan observability của project (events, deployments, drift, prediction stats) |
-| `GET` | `/api/observability/models/<uuid:project_id>/runtime-metrics/` | `JWT` (`IsAuthenticated`) | Metrics CPU/RAM/RPS của deployment đang Running |
+| `GET` | `/api/projects/<uuid:project_id>/runtime-metrics/` | `JWT` (`IsAuthenticated`) | Metrics CPU/RAM/RPS của deployment đang Running |
 | `GET` | `/health/live` | `AllowAny` | Liveness probe |
 | `GET` | `/health/ready` | `AllowAny` | Readiness probe (kiểm tra DB/Redis) |
 | `GET` | `/health/metrics` | `AllowAny` | Prometheus metrics endpoint của Control Plane |
@@ -356,8 +344,8 @@ flowchart LR
 | `GET` | `/` | Public | Liveness & trạng thái kết nối Registry DB |
 | `GET` | `/health/ready` | Public | Readiness check (PostgreSQL, Redis, Kafka) |
 | `GET` | `/metrics` | Public (internal scrape) | Prometheus MultiProcess metrics |
-| `GET` | `/models/{version_id}/health` | JWT / `X-API-Key` / Public (theo `access_mode`) | Kiểm tra trạng thái sẵn sàng của worker phục vụ version |
-| `POST` | `/models/{version_id}/predict` | JWT / `X-API-Key` / Public (theo `access_mode`) | Định tuyến inference tới worker + gửi telemetry sang Redpanda |
+| `GET` | `/model-versions/{version_id}/health` | JWT / `X-API-Key` / Public (theo `access_mode`) | Kiểm tra trạng thái sẵn sàng của worker phục vụ version |
+| `POST` | `/model-versions/{version_id}/predict` | JWT / `X-API-Key` / Public (theo `access_mode`) | Định tuyến inference tới worker + gửi telemetry sang Redpanda |
 
 #### Machine Learning Serving Worker (`services/machine-learning-serving/src/api.py`) — 3 endpoints
 | Method | Path | Auth | Chức năng |

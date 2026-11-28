@@ -5,12 +5,8 @@ from rest_framework.views import APIView
 
 from apps.deployment.execution.logs import deployment_logs
 from apps.deployment.serving.rollout import request_deployment, request_stop
-from apps.deployment.serving.selectors import (
-    deployment_for_user,
-    deployments_for_user,
-    endpoints_for_user,
-)
-from apps.deployment.serving.serializers import DeploymentSerializer, EndpointSerializer
+from apps.deployment.serving.selectors import deployment_for_user, deployments_for_user
+from apps.deployment.serving.serializers import DeploymentSerializer
 from infrastructure.telemetry.runtime_logs import runtime_log_page
 
 
@@ -67,10 +63,3 @@ class DeploymentRuntimeLogsEndpoint(APIView):
         else:
             page = {"logs": [], "next_offset": 0, "log_error": "unavailable"}
         return Response({"deployment_id": str(deployment.public_id), **page, "status": deployment.status})
-
-
-class EndpointListEndpoint(generics.ListAPIView):
-    serializer_class = EndpointSerializer
-
-    def get_queryset(self):
-        return endpoints_for_user(self.request.user)

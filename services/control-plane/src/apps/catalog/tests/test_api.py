@@ -17,10 +17,10 @@ def test_project_api_uses_uuid_and_tenant_scope():
     client = APIClient()
     client.force_authenticate(stranger)
 
-    assert client.get(f"/api/models/{project.public_id}/").status_code == 404
+    assert client.get(f"/api/projects/{project.public_id}/").status_code == 404
 
     client.force_authenticate(owner)
-    response = client.get(f"/api/models/{project.public_id}/")
+    response = client.get(f"/api/projects/{project.public_id}/")
     assert response.status_code == 200
     assert uuid.UUID(response.data["id"]) == project.public_id
 
@@ -76,7 +76,7 @@ def test_project_list_returns_metadata_image_ready_and_deployed_lifecycle_status
 
     client = APIClient()
     client.force_authenticate(owner)
-    response = client.get("/api/models/")
+    response = client.get("/api/projects/")
 
     assert response.status_code == 200
     statuses = {project["name"]: project["lifecycle_status"] for project in response.data["results"]}
@@ -104,7 +104,7 @@ def test_project_list_returns_latest_active_endpoint_for_the_owner():
 
     client = APIClient()
     client.force_authenticate(owner)
-    response = client.get("/api/models/")
+    response = client.get("/api/projects/")
 
     assert response.status_code == 200
     active_endpoint = response.data["results"][0]["active_endpoint"]
@@ -171,7 +171,7 @@ def test_running_attributes_and_label_mapping_with_json(monkeypatch):
     client.force_authenticate(owner)
 
     # Test running-attributes
-    res = client.get(f"/api/models/{project.public_id}/running-attributes/")
+    res = client.get(f"/api/projects/{project.public_id}/running/attributes/")
     assert res.status_code == 200
     assert res.data["metrics"] == {"accuracy": 0.985, "f1_score": 0.978}
     assert res.data["params"] == {"n_estimators": 100, "max_depth": 5}
@@ -188,10 +188,10 @@ def test_running_snapshot_never_falls_back_to_registered_or_preview():
     client = APIClient()
     client.force_authenticate(owner)
 
-    assert client.get(f"/api/models/{project.public_id}/running-source/").status_code == 409
-    assert client.get(f"/api/models/{project.public_id}/running-attributes/").status_code == 409
-    assert client.get(f"/api/models/{project.public_id}/preview/attributes/").status_code == 200
-    detail = client.get(f"/api/models/{project.public_id}/").data
+    assert client.get(f"/api/projects/{project.public_id}/running/source/").status_code == 409
+    assert client.get(f"/api/projects/{project.public_id}/running/attributes/").status_code == 409
+    assert client.get(f"/api/projects/{project.public_id}/preview/attributes/").status_code == 200
+    detail = client.get(f"/api/projects/{project.public_id}/").data
     assert detail["source_code"] is None
     assert detail["reference_data"] is None
 
@@ -207,10 +207,10 @@ def test_unsuccessful_active_deployment_is_not_reported_as_running():
     client = APIClient()
     client.force_authenticate(owner)
 
-    detail = client.get(f"/api/models/{project.public_id}/").data
+    detail = client.get(f"/api/projects/{project.public_id}/").data
     assert detail["lifecycle_status"] == "registered"
     assert detail["active_endpoint"] is None
-    assert client.get(f"/api/models/{project.public_id}/running-attributes/").status_code == 409
+    assert client.get(f"/api/projects/{project.public_id}/running/attributes/").status_code == 409
 
 
 @pytest.mark.django_db
@@ -225,7 +225,7 @@ def test_running_snapshot_rejects_other_versions():
     client = APIClient()
     client.force_authenticate(owner)
 
-    base = f"/api/models/{project.public_id}/running-attributes/"
+    base = f"/api/projects/{project.public_id}/running/attributes/"
     assert client.get(base, {"version_id": str(other.public_id)}).status_code == 409
     assert client.get(base, {"version_id": str(uuid.uuid4())}).status_code == 404
     assert client.get(base, {"version_id": "invalid"}).status_code == 404
@@ -253,7 +253,7 @@ def test_running_insights_keep_registered_and_supplemental_content():
     client = APIClient()
     client.force_authenticate(owner)
 
-    response = client.get(f"/api/models/{project.public_id}/running-attributes/")
+    response = client.get(f"/api/projects/{project.public_id}/running/attributes/")
     assert response.status_code == 200
     assert response.data["model_insights"] == {"kind": "model_insights", "registered": True}
     assert response.data["supplemental_summaries"]["model_insights"] == {"supplemental": True}
@@ -270,7 +270,7 @@ def test_running_version_number_in_project_serializer():
     client.force_authenticate(owner)
 
     # Registered but not running: latest is 2, running is None
-    res = client.get(f"/api/models/{project.public_id}/")
+    res = client.get(f"/api/projects/{project.public_id}/")
     assert res.status_code == 200
     assert res.data["latest_version_number"] == "2"
     assert res.data["running_version_number"] is None
@@ -279,6 +279,6 @@ def test_running_version_number_in_project_serializer():
     project.active_deployment = Deployment.objects.create(version=v1, build=build, status="succeeded")
     project.save(update_fields=["active_deployment"])
 
-    res = client.get(f"/api/models/{project.public_id}/")
+    res = client.get(f"/api/projects/{project.public_id}/")
     assert res.status_code == 200
     assert res.data["running_version_number"] == "1"

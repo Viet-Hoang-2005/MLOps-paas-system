@@ -1,12 +1,12 @@
 from django.conf import settings
 from django.db import transaction
-from rest_framework import generics, status
+from rest_framework import generics, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.catalog.models import ModelProject
 from apps.drift.monitors.deletion import request_drift_monitor_deletion
-from apps.drift.monitors.reference import get_monitor_reference_preview, reference_download_url
+from apps.drift.monitors.reference import reference_download_url
 from apps.drift.monitors.serializers import DriftMonitorSerializer
 from apps.drift.runs.serializers import DriftRunSerializer
 from apps.drift.selectors import monitor_for_user, monitors_for_user
@@ -23,12 +23,12 @@ class DriftMonitorListCreateEndpoint(generics.ListCreateAPIView):
 
         from apps.drift.models import DriftRun
 
-        return (
-            monitors_for_user(self.request.user)
-            .select_related("version", "version__project")
-            .prefetch_related(
-                Prefetch("runs", queryset=DriftRun.objects.select_related("monitor__version__project"))
-            )
+        monitors = monitors_for_user(self.request.user)
+        project_id = self.request.query_params.get("project_id")
+        if project_id is not None:
+            monitors = monitors.filter(version__project__public_id=serializers.UUIDField().run_validation(project_id))
+        return monitors.select_related("version", "version__project").prefetch_related(
+            Prefetch("runs", queryset=DriftRun.objects.select_related("monitor__version__project"))
         )
 
     def perform_create(self, serializer):
@@ -77,30 +77,33 @@ class DriftMonitorDetailEndpoint(generics.RetrieveUpdateDestroyAPIView):
         return Response({"id": monitor.public_id, "deletion_requested": True}, status=status.HTTP_202_ACCEPTED)
 
 
-class DriftMonitorReferenceURLEndpoint(APIView):
+class DriftMonitorReferenceReadURLEndpoint(APIView):
     def get(self, request, monitor_id):
         monitor = monitor_for_user(request.user, monitor_id)
-        if request.query_params.get("download") == "1":
-            version = monitor.version
-            project = version.project
-            if monitor.deletion_requested or version.deletion_requested or project.deletion_state != "active" or not project.is_active:
-                raise Conflict("This drift reference is unavailable.")
-            tenant = project.owner.tenant_id
-            return scoped_download_response(
-                monitor.reference_uri,
-                prefix=(
-                    version_prefix(tenant, project.public_id, version.public_id) + "/",
-                    f"{project_prefix(tenant, project.public_id)}/drift/{monitor.public_id}/",
-                ),
-                filename=monitor.reference_name or "reference.csv",
-            )
         return Response({"url": reference_download_url(monitor)})
 
 
-class DriftMonitorReferencePreviewEndpoint(APIView):
+class DriftMonitorReferenceDownloadEndpoint(APIView):
     def get(self, request, monitor_id):
         monitor = monitor_for_user(request.user, monitor_id)
-        return Response(get_monitor_reference_preview(monitor))
+        version = monitor.version
+        project = version.project
+        if (
+            monitor.deletion_requested
+            or version.deletion_requested
+            or project.deletion_state != "active"
+            or not project.is_active
+        ):
+            raise Conflict("This drift reference is unavailable.")
+        tenant = project.owner.tenant_id
+        return scoped_download_response(
+            monitor.reference_uri,
+            prefix=(
+                version_prefix(tenant, project.public_id, version.public_id) + "/",
+                f"{project_prefix(tenant, project.public_id)}/drift/{monitor.public_id}/",
+            ),
+            filename=monitor.reference_name or "reference.csv",
+        )
 
 
 class DriftMonitorCancelEndpoint(APIView):

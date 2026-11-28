@@ -1,21 +1,9 @@
-import logging
-
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.catalog.projects.selectors import project_for_user
-from apps.observability.runtime.overview import model_observability
 from apps.observability.selectors import latest_production_data
 from apps.observability.serializers import ProductionDataQuerySerializer
-
-logger = logging.getLogger(__name__)
-
-
-class ModelObservabilityEndpoint(APIView):
-    def get(self, request, project_id):
-        project = project_for_user(request.user, project_id)
-        return Response(model_observability(project))
-
 
 class RuntimeMetricsEndpoint(APIView):
     def get(self, request, project_id):

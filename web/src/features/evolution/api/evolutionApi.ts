@@ -7,7 +7,7 @@ import type { ReferenceDataPreview } from "@/features/training/types";
 export async function getVersionDetail(id: string, signal?: AbortSignal) {
   return (
     await apiClient.get<ModelVersion>(
-      controlPlaneURL(`/registry/versions/${id}/`),
+      controlPlaneURL(`/model-versions/${id}/`),
       { signal },
     )
   ).data;
@@ -56,7 +56,7 @@ export async function addSupplementalArtifacts(
   return (
     await apiClient.post<ModelVersion>(
       controlPlaneURL(
-        `/registry/versions/${versionId}/supplemental-artifacts/`,
+        `/model-versions/${versionId}/supplemental-artifacts/`,
       ),
       formData,
       { headers: { "Content-Type": "multipart/form-data" } },
@@ -69,11 +69,11 @@ export async function getVersionReferencePreview(
 ): Promise<ReferenceDataPreview> {
   return (
     await apiClient.get<ReferenceDataPreview>(
-      controlPlaneURL(`/registry/versions/${versionId}/reference-preview/`),
+      controlPlaneURL(`/model-versions/${versionId}/reference-data/preview/`),
     )
   ).data;
 }
 
 export async function deleteModelVersion(versionId: string): Promise<void> {
-  await apiClient.delete(controlPlaneURL(`/registry/versions/${versionId}/`));
+  await apiClient.delete(controlPlaneURL(`/model-versions/${versionId}/`));
 }

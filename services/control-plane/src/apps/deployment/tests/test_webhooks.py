@@ -137,7 +137,8 @@ def test_deployment_backend_does_not_follow_build_backend(monkeypatch):
 
 @pytest.mark.django_db
 @override_settings(MODEL_RUNTIME_NAMESPACE="mlops-paas-serving")
-def test_argo_deployment_persists_the_dedicated_runtime_namespace():
+def test_argo_deployment_persists_the_dedicated_runtime_namespace(settings):
+    settings.MODEL_SERVER_PUBLIC_URL = "https://gateway.example"
     user = get_user_model().objects.create_user("runtime-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=user, name="runtime project")
     version = ModelVersion.objects.create(project=project, version="1", flavor="sklearn")
@@ -157,6 +158,7 @@ def test_argo_deployment_persists_the_dedicated_runtime_namespace():
 
     endpoint = backend.deploy(deployment)
 
+    assert endpoint.public_url == f"https://gateway.example/model-versions/{version.public_id}"
     assert endpoint.runtime_namespace == "mlops-paas-serving"
     assert (
         endpoint.internal_url == f"http://deploy-{deployment.public_id}-svc.mlops-paas-serving.svc.cluster.local:5001"

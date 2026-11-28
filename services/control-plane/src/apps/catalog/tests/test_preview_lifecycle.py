@@ -152,9 +152,9 @@ def test_reference_downloads_sign_original_objects(project, monkeypatch):
     client = APIClient()
     client.force_authenticate(project.owner)
     paths = [
-        (f"/api/models/{project.public_id}/preview/reference-download/", preview_reference.s3_uri),
-        (f"/api/registry/versions/{version.public_id}/reference-download/", artifact.uri),
-        (f"/api/drift-monitors/{monitor.public_id}/reference-url/?download=1", artifact.uri),
+        (f"/api/projects/{project.public_id}/preview/reference-data/download/", preview_reference.s3_uri),
+        (f"/api/model-versions/{version.public_id}/reference-data/download/", artifact.uri),
+        (f"/api/drift-monitors/{monitor.public_id}/reference-data/download/", artifact.uri),
     ]
     for path, uri in paths:
         response = client.get(path)
@@ -294,10 +294,10 @@ def test_register_double_click_only_dispatches_once(project, monkeypatch, django
 def test_new_and_training_project_artifact_contract_and_tenant_scope(project):
     client = APIClient()
     client.force_authenticate(project.owner)
-    assert client.post("/api/models/", {"name": "Requires artifact", "flavor": "xgboost"}).status_code == 400
+    assert client.post("/api/projects/", {"name": "Requires artifact", "flavor": "xgboost"}).status_code == 400
     other = get_user_model().objects.create_user("other-preview@example.test", "test-password")
     client.force_authenticate(other)
-    assert client.get(f"/api/models/{project.public_id}/preview/").status_code == 404
+    assert client.get(f"/api/projects/{project.public_id}/preview/").status_code == 404
 
 
 def running(project, version_name="1"):
@@ -388,7 +388,7 @@ def test_preview_api_rejects_legacy_multipart_files(project):
     client = APIClient()
     client.force_authenticate(project.owner)
     response = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {"revision": project.preview.revision, "metrics_file": SimpleUploadedFile("metrics.json", b"{}")},
         format="multipart",
     )
@@ -511,7 +511,7 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
     client = APIClient()
     client.force_authenticate(project.owner)
     upload = client.post(
-        "/api/models/preview/upload-urls/",
+        "/api/projects/preview/upload-urls/",
         {
             "name": "API lifecycle",
             "flavor": "xgboost",
@@ -529,7 +529,7 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
         storage.objects[item["s3_uri"]] = payloads[item["kind"]]
         assets.append({"kind": item["kind"], "name": item["filename"], "s3_uri": item["s3_uri"]})
     created = client.post(
-        "/api/models/",
+        "/api/projects/",
         {
             "name": "API lifecycle",
             "flavor": "xgboost",
@@ -540,7 +540,7 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
     )
     assert created.status_code == 201, created.data
     id = created.data["id"]
-    built = client.post(f"/api/models/{id}/builds/", {"revision": created.data["preview_revision"]}, format="json")
+    built = client.post(f"/api/projects/{id}/builds/", {"revision": created.data["preview_revision"]}, format="json")
     assert built.status_code == 201, built.data
     build = Build.objects.get(public_id=built.data["id"])
     assert client.post("/api/deployments/", {"build": str(build.public_id)}, format="json").status_code == 400
@@ -584,7 +584,7 @@ def test_api_lifecycle_preview_build_register_deploy(project, monkeypatch, djang
         )
         == "succeeded"
     )
-    overview = client.get(f"/api/models/{id}/")
+    overview = client.get(f"/api/projects/{id}/")
     assert overview.data["lifecycle_status"] == "running"
     assert overview.data["active_endpoint"]["version_id"] == str(build.version.public_id)
     assert overview.data["reference_data"]["name"] == "reference.csv"

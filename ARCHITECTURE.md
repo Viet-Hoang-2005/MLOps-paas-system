@@ -274,7 +274,7 @@ flowchart TB
     %% Client Traffic
     UI & EXT_API --> ING
     ING -->|"Quản trị: /api/*"| CP
-    ING -->|"Dự đoán: /models/*/predict"| MS
+    ING -->|"Dự đoán: /model-versions/*/predict"| MS
 
     %% Control Plane & Celery
     CP <-->|"Query & Mutate (SSOT)"| PG
@@ -387,7 +387,7 @@ sequenceDiagram
     participant CP as Control Plane
     participant Evidently as Evidently AI Runner
 
-    Client->>MS: POST /models/{version_id}/predict (Kèm JWT / API Key)
+    Client->>MS: POST /model-versions/{version_id}/predict (Kèm JWT / API Key)
     MS->>MS: Xác thực JWT RS256 qua JWKS hoặc API Key
     MS->>Serving: Forward features tới Worker nội bộ
     Serving-->>MS: Trả kết quả dự đoán (Prediction & Confidence)

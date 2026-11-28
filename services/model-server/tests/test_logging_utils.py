@@ -90,12 +90,12 @@ class LoggingTests(unittest.TestCase):
             "http.request.finished",
             "HTTP request finished",
             method="GET",
-            route="/models/{version_id}/predict",
+            route="/model-versions/{version_id}/predict",
             status_code=200,
             duration_ms=12.5,
         )
         line = self.output.getvalue()
-        self.assertIn("GET /models/{version_id}/predict; HTTP 200; duration=12.5ms", line)
+        self.assertIn("GET /model-versions/{version_id}/predict; HTTP 200; duration=12.5ms", line)
         self.assertEqual(len(line.splitlines()), 1)
 
     def test_json_format_keeps_metadata_and_numeric_fields(self):
@@ -355,7 +355,7 @@ class LoggingTests(unittest.TestCase):
 
     def test_asgi_route_resolver_uses_template(self):
         class Candidate:
-            path = "/models/{version_id}/predict"
+            path = "/model-versions/{version_id}/predict"
 
             @staticmethod
             def matches(scope):
@@ -363,6 +363,6 @@ class LoggingTests(unittest.TestCase):
 
         middleware = RequestLoggingMiddleware(lambda *_: None, routes=[Candidate()])
         self.assertEqual(
-            middleware._route({"type": "http", "path": "/models/private-id/predict"}),
-            "/models/{version_id}/predict",
+            middleware._route({"type": "http", "path": "/model-versions/private-id/predict"}),
+            "/model-versions/{version_id}/predict",
         )

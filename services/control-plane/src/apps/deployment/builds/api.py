@@ -10,13 +10,6 @@ from apps.deployment.execution.logs import build_logs
 from infrastructure.telemetry.runtime_logs import runtime_log_page
 
 
-class BuildListEndpoint(generics.ListAPIView):
-    serializer_class = BuildSerializer
-
-    def get_queryset(self):
-        return builds_for_user(self.request.user)
-
-
 class BuildDetailEndpoint(generics.RetrieveDestroyAPIView):
     serializer_class = BuildSerializer
     lookup_field = "public_id"

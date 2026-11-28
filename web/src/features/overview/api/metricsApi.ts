@@ -25,7 +25,7 @@ export async function getRuntimeMetrics(
 ) {
   return (
     await apiClient.get<RuntimeMetricsResponse>(
-      controlPlaneURL(`/observability/models/${projectId}/runtime-metrics/`),
+      controlPlaneURL(`/projects/${projectId}/runtime-metrics/`),
       { params: { window }, signal },
     )
   ).data;

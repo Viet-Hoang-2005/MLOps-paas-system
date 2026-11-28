@@ -8,7 +8,7 @@ from apps.registry.versions.selectors import version_for_user
 from apps.registry.versions.serializers import ModelVersionSerializer
 
 
-class ProjectVersionListCreateEndpoint(generics.ListAPIView):
+class ProjectVersionListEndpoint(generics.ListAPIView):
     serializer_class = ModelVersionSerializer
 
     def project(self):

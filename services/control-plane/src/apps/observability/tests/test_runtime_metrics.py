@@ -165,7 +165,7 @@ def test_metrics_endpoint_authorizes_before_container_access(deployment, monkeyp
     monkeypatch.setattr(
         "infrastructure.telemetry.local_request_metrics.LocalRequestCounterClient.read", lambda *args, **kwargs: {}
     )
-    url = f"/api/observability/models/{project.public_id}/runtime-metrics/"
+    url = f"/api/projects/{project.public_id}/runtime-metrics/"
     client = APIClient()
     assert client.get(url).status_code == 401
     stranger = get_user_model().objects.create_user("metrics-stranger@example.test", "password")

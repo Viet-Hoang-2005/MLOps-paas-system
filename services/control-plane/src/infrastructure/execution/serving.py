@@ -13,6 +13,10 @@ from infrastructure.images.references import immutable_image_reference
 from infrastructure.telemetry.runtime_health import healthy_payload, is_dl_flavor
 
 
+def _version_public_url(version):
+    return f"{settings.MODEL_SERVER_PUBLIC_URL}/model-versions/{version.public_id}"
+
+
 class ArgoDeploymentBackend(_ArgoBackend):
     setting_name = "ARGO_DEPLOY_WEBHOOK_URL"
 
@@ -31,14 +35,10 @@ class ArgoDeploymentBackend(_ArgoBackend):
         container_name = f"deploy-{str(deployment.public_id).lower()}"
         model_type = "dl" if is_dl_flavor(version.flavor) else "ml"
         target_port = 5002 if model_type == "dl" else 5001
-        public_url = (
-            f"{settings.MODEL_SERVER_PUBLIC_URL}/{project.owner.tenant_id}/models/"
-            f"{project.public_id}/{version.public_id}"
-        )
         endpoint = Endpoint.objects.update_or_create(
             deployment=deployment,
             defaults={
-                "public_url": public_url,
+                "public_url": _version_public_url(version),
                 "internal_url": (
                     f"http://{container_name}-svc.{settings.MODEL_RUNTIME_NAMESPACE}.svc.cluster.local:{target_port}"
                 ),
@@ -108,8 +108,6 @@ class DockerDeploymentBackend:
         container_name = f"deploy-{deployment.public_id}"
         target_port = 5002 if is_dl_flavor(deployment.version.flavor) else 5001
         internal_url = f"http://{container_name}:{target_port}"
-        public_path = f"/{project.owner.tenant_id}/models/{project.public_id}/{deployment.version.public_id}"
-        public_url = f"{settings.MODEL_SERVER_PUBLIC_URL}{public_path}"
         labels = {
             "traefik.enable": "false",
             "mlops_project_id": str(project.public_id),
@@ -141,7 +139,7 @@ class DockerDeploymentBackend:
         endpoint, _ = Endpoint.objects.update_or_create(
             deployment=deployment,
             defaults={
-                "public_url": public_url,
+                "public_url": _version_public_url(deployment.version),
                 "internal_url": internal_url,
                 "runtime_name": container_name,
                 "health_status": "unknown",

@@ -122,7 +122,7 @@ export function useDriftMonitorForm(
           queryKey: driftQueryKeys.monitors(projectId),
         }),
         client.invalidateQueries({
-          queryKey: driftQueryKeys.configuration(monitorId ?? ""),
+          queryKey: driftQueryKeys.detail(monitorId ?? ""),
         }),
         client.invalidateQueries({
           queryKey: overviewQueryKeys.detail(projectId),

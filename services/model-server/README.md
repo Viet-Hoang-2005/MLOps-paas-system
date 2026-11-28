@@ -11,7 +11,7 @@ Thư mục `services/model-server/` chứa mã nguồn của **Model Server Serv
 Trong kiến trúc MLOps PaaS, các worker phục vụ mô hình (`machine-learning-serving`, `deep-learning-serving` hoặc container đóng gói bởi `model-packager`) được thiết kế phi trạng thái (stateless) và không tích hợp sẵn tầng xác thực để tối ưu hóa hiệu năng tính toán. **Model Server** đóng vai trò là "Người gác cổng tin cậy" (Trusted Inference Gateway) với các trọng trách cốt lõi:
 
 1. **Điểm đón đầu lưu lượng suy luận tập trung (Centralized Ingress for Inference):**
-   - Cung cấp một giao diện API duy nhất cho các ứng dụng client (Web Dashboard, ứng dụng bên thứ ba, hệ thống CI/CD) truy vấn dự đoán mô hình thông qua đường dẫn chuẩn: `POST /models/{version_id}/predict`.
+   - Cung cấp một giao diện API duy nhất cho các ứng dụng client (Web Dashboard, ứng dụng bên thứ ba, hệ thống CI/CD) truy vấn dự đoán mô hình thông qua đường dẫn chuẩn: `POST /model-versions/{version_id}/predict`.
 2. **Xác thực & Phân quyền Đa phương thức (Multi-Modal Auth & Access Control):**
    - Kiểm tra quyền truy cập mô hình dựa trên chế độ bảo vệ (`public`, `protected`, `private`).
    - Xác thực người dùng thông qua Bearer Token JWT (sử dụng thuật toán `RS256`, tự động tải và cache khóa công khai từ endpoint JWKS của Control Plane: `/api/auth/.well-known/jwks.json`).
@@ -30,7 +30,7 @@ Trong kiến trúc MLOps PaaS, các worker phục vụ mô hình (`machine-learn
                       |       Client / Frontend / External    |
                       +---------------------------------------+
                                           │
-                                          │ POST /models/{version_id}/predict
+                                          │ POST /model-versions/{version_id}/predict
                                           │ Headers: Authorization / X-API-Key
                                           ▼
                       +---------------------------------------+
@@ -60,7 +60,7 @@ Trong kiến trúc MLOps PaaS, các worker phục vụ mô hình (`machine-learn
 | Module / File | Trách nhiệm chính |
 |---|---|
 | **`src/main.py`** | Entrypoint mỏng (Thin ASGI Entrypoint), nạp ứng dụng FastAPI từ `src.api:app`. |
-| **`src/api.py`** | Router chính của gateway: quản lý vòng đời ứng dụng (`lifespan`), khởi tạo kết nối Redis / Kafka / DB, khai báo các endpoints (`/`, `/models/{version_id}/health`, `/models/{version_id}/predict`). |
+| **`src/api.py`** | Router chính của gateway: quản lý vòng đời ứng dụng (`lifespan`), khởi tạo kết nối Redis / Kafka / DB, khai báo các endpoints (`/`, `/model-versions/{version_id}/health`, `/model-versions/{version_id}/predict`). |
 | **`src/auth.py`** | Xử lý logic ủy quyền và xác thực: lấy và cache JWKS từ Control Plane, xác thực JWT RS256, kiểm tra tính hợp lệ của Project API Key, kiểm tra quyền sở hữu Tenant. |
 | **`src/routing.py`** | Xử lý logic định tuyến: đọc cấu hình Deployment/Endpoint từ metadata mô hình để sinh ra URL nội bộ chính xác trỏ đến worker container (tương thích cả Docker và Kubernetes). |
 | **`src/events.py`** | Quản lý Producer Kafka/Redpanda: đóng gói payload sự kiện suy luận, gửi tin nhắn bất đồng bộ, xử lý ghi nhận số liệu và log tóm tắt mà không gây gián đoạn luồng chính. |
@@ -73,7 +73,7 @@ Trong kiến trúc MLOps PaaS, các worker phục vụ mô hình (`machine-learn
 ### 1.3. Luồng hoạt động
 
 1. **Tiếp nhận Request & Gắn ngữ cảnh:**
-   - Client gửi request `POST /models/{version_id}/predict`.
+   - Client gửi request `POST /model-versions/{version_id}/predict`.
    - Middleware ghi nhận `X-Request-ID` (hoặc tự sinh UUID mới), khởi tạo ngữ cảnh log.
 2. **Xác thực và Phân quyền (`verify_model_access`):**
    - Tra cứu cache Redis để lấy thông tin phiên bản mô hình theo `version_id`. Nếu cache miss, truy vấn PostgreSQL schema `control_plane` và nạp vào Redis.
@@ -129,7 +129,7 @@ services/model-server/
 
 ### 3.1. Khởi chạy bằng Docker Compose (Môi trường phát triển cục bộ)
 
-Model Server được cấu hình sẵn trong `docker-compose.yml` (chạy trên cổng `5002`):
+Docker Compose công bố API dự đoán qua Traefik tại `http://localhost:5002/model-versions/{version_id}/predict`. Runtime health của Version dùng cùng đường dẫn với hậu tố `/health`.
 
 ```bash
 # Khởi động Model Server cùng các dịch vụ phụ trợ
@@ -141,7 +141,7 @@ docker compose logs -f model-server
 
 Kiểm tra trạng thái sức khỏe của Gateway:
 ```bash
-curl http://localhost:5002/
+curl http://localhost:5001/health/ready
 ```
 
 ### 3.2. Khởi chạy trực tiếp trên máy chủ / Virtualenv (Không dùng Docker)

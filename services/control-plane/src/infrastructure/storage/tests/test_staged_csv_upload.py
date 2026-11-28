@@ -107,7 +107,7 @@ def test_upload_token_commits_object_without_proxying_the_file(resources, purpos
         )
         uri = job.outputs.get(kind="reference_data").s3_uri
     elif purpose == "version":
-        response = client.post(f"/api/registry/versions/{version.public_id}/supplemental-artifacts/", payload)
+        response = client.post(f"/api/model-versions/{version.public_id}/supplemental-artifacts/", payload)
         uri = version.artifacts.get(kind="reference_data").uri
     else:
         response = client.post(
@@ -131,7 +131,7 @@ def test_upload_scope_revision_and_content_are_checked(resources):
         "/api/drift-monitors/",
         {"csv_upload_token": token, "version": str(version.public_id), "name": "default", "trigger_threshold": 100},
     ).status_code == 400
-    version_url = f"/api/registry/versions/{version.public_id}/supplemental-artifacts/"
+    version_url = f"/api/model-versions/{version.public_id}/supplemental-artifacts/"
     del storage.objects[uri]
     assert client.post(version_url, {"csv_upload_token": token}).status_code == 400
     token, _ = issue(client, storage, "version", version, payload=b"x,y\n1\n")
@@ -162,7 +162,7 @@ def test_object_replaced_after_validation_cannot_be_promoted(resources, monkeypa
 
     monkeypatch.setattr(storage, "copy", replaced_during_copy)
     response = client.post(
-        f"/api/registry/versions/{version.public_id}/supplemental-artifacts/", {"csv_upload_token": token}
+        f"/api/model-versions/{version.public_id}/supplemental-artifacts/", {"csv_upload_token": token}
     )
     assert response.status_code == 400
     assert not version.artifacts.exists()

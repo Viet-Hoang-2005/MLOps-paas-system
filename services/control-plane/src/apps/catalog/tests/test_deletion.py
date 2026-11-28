@@ -108,7 +108,7 @@ def test_delete_endpoint_marks_the_entire_project_deleting_and_enqueues_cleanup(
     client.force_authenticate(owner)
 
     with django_capture_on_commit_callbacks(execute=True):
-        response = client.delete(f"/api/models/{project.public_id}/")
+        response = client.delete(f"/api/projects/{project.public_id}/")
 
     project.refresh_from_db()
     assert response.status_code == 202

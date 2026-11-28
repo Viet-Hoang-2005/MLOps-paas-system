@@ -149,7 +149,7 @@ def test_soft_delete_endpoint_marks_user_deleted_and_enqueues_runtime_stop(
     client = APIClient()
     client.force_authenticate(user)
     with django_capture_on_commit_callbacks(execute=True):
-        response = client.delete("/api/auth/profile/delete/")
+        response = client.delete("/api/auth/profile/")
 
     assert response.status_code == 204
     user.refresh_from_db()
@@ -443,7 +443,7 @@ def test_soft_delete_revokes_credentials_clears_cookie_and_is_idempotent(
     client = APIClient()
     client.force_authenticate(user)
     with django_capture_on_commit_callbacks(execute=True):
-        response = client.delete("/api/auth/profile/delete/")
+        response = client.delete("/api/auth/profile/")
 
     assert response.status_code == 204
     cookie_name = settings.AUTH_COOKIE_NAME

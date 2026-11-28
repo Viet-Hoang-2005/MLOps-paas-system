@@ -44,7 +44,7 @@ def test_generate_preview_upload_urls_for_existing_project(project, owner, stran
     client.force_authenticate(owner)
 
     response = client.post(
-        f"/api/models/{project.public_id}/preview/upload-urls/",
+        f"/api/projects/{project.public_id}/preview/upload-urls/",
         {
             "files": [
                 {
@@ -77,7 +77,7 @@ def test_generate_preview_upload_urls_for_existing_project(project, owner, stran
     # Stranger should receive 404
     client.force_authenticate(stranger)
     res_stranger = client.post(
-        f"/api/models/{project.public_id}/preview/upload-urls/",
+        f"/api/projects/{project.public_id}/preview/upload-urls/",
         {"files": [{"kind": "source_artifact", "filename": "model.joblib", "size_bytes": 1024}]},
         format="json",
     )
@@ -100,7 +100,7 @@ def test_generate_preview_upload_urls_for_new_project(owner, monkeypatch):
 
     # 1. Successful pre-allocation
     response = client.post(
-        "/api/models/preview/upload-urls/",
+        "/api/projects/preview/upload-urls/",
         {
             "name": "New Preallocated Model",
             "flavor": "sklearn",
@@ -124,7 +124,7 @@ def test_generate_preview_upload_urls_for_new_project(owner, monkeypatch):
     # 2. Duplicate name validation returns 409 Conflict
     ModelProject.objects.create(owner=owner, name="Existing Name")
     dup_res = client.post(
-        "/api/models/preview/upload-urls/",
+        "/api/projects/preview/upload-urls/",
         {
             "name": "Existing Name",
             "flavor": "sklearn",
@@ -154,7 +154,7 @@ def test_presigned_preview_update_promotes_to_committed_and_prevents_overwrite(p
 
     # 2. Client saves preview
     response = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": project.preview.revision,
             "flavor": "sklearn",
@@ -214,7 +214,7 @@ def test_presigned_create_project_with_preallocated_id(owner, monkeypatch):
     client.force_authenticate(owner)
 
     response = client.post(
-        "/api/models/",
+        "/api/projects/",
         {
             "project_id": str(project_id),
             "name": "Created Via Presigned S3",
@@ -264,7 +264,7 @@ def test_presigned_security_confinement_and_validation(project, owner, monkeypat
         f"s3://{storage.bucket}/staging/users/other-tenant/models/{uuid.uuid4()}/preview/x/source_artifact/model.pkl"
     )
     res1 = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": project.preview.revision,
             "assets": [{"kind": "source_artifact", "name": "model.pkl", "s3_uri": malicious_uri}],
@@ -278,7 +278,7 @@ def test_presigned_security_confinement_and_validation(project, owner, monkeypat
     prefix = project_prefix(owner.tenant_id, project.public_id)
     direct_committed_uri = f"s3://{storage.bucket}/{prefix}/preview/committed/b1/source_artifact/model.pkl"
     res2 = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": project.preview.revision,
             "assets": [{"kind": "source_artifact", "name": "model.pkl", "s3_uri": direct_committed_uri}],
@@ -291,7 +291,7 @@ def test_presigned_security_confinement_and_validation(project, owner, monkeypat
     # 3. Attempt to reference an object that does not exist in S3 staging
     nonexistent_uri = f"s3://{storage.bucket}/staging/{prefix}/preview/b1/source_artifact/missing.pkl"
     res3 = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": project.preview.revision,
             "assets": [{"kind": "source_artifact", "name": "missing.pkl", "s3_uri": nonexistent_uri}],
@@ -305,7 +305,7 @@ def test_presigned_security_confinement_and_validation(project, owner, monkeypat
     empty_key = f"staging/{prefix}/preview/b1/source_artifact/empty.pkl"
     stored_empty = storage.put(empty_key, SimpleUploadedFile("empty.pkl", b""), "application/octet-stream")
     res4 = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": project.preview.revision,
             "assets": [{"kind": "source_artifact", "name": "empty.pkl", "s3_uri": stored_empty.uri}],
@@ -334,7 +334,7 @@ def test_generate_upload_urls_with_mlflow_zip_format(owner, monkeypatch):
 
     # 1. Request URL with artifact_format="mlflow_zip" and model.zip -> SUCCESS
     res_zip = client.post(
-        "/api/models/preview/upload-urls/",
+        "/api/projects/preview/upload-urls/",
         {
             "name": "MLflow Model",
             "flavor": "sklearn",
@@ -347,7 +347,7 @@ def test_generate_upload_urls_with_mlflow_zip_format(owner, monkeypatch):
 
     # 2. Request URL with artifact_format="mlflow_zip" but non-zip filename -> 400 Validation Error
     res_bad = client.post(
-        "/api/models/preview/upload-urls/",
+        "/api/projects/preview/upload-urls/",
         {
             "name": "MLflow Bad Model",
             "flavor": "sklearn",
@@ -380,7 +380,7 @@ def test_generate_upload_urls_for_existing_project_with_new_flavor(project, owne
 
     # User in UI changes flavor to "pytorch" and uploads a ".pt" file
     res = client.post(
-        f"/api/models/{project.public_id}/preview/upload-urls/",
+        f"/api/projects/{project.public_id}/preview/upload-urls/",
         {
             "flavor": "pytorch",
             "artifact_format": "raw",
@@ -427,7 +427,7 @@ def test_save_preview_validates_existing_retained_artifact_on_flavor_or_format_c
 
     # 1. User changes flavor to "pytorch" without re-uploading artifact (model.pkl is incompatible with pytorch)
     res_bad_flavor = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": project.preview.revision,
             "flavor": "pytorch",
@@ -445,7 +445,7 @@ def test_save_preview_validates_existing_retained_artifact_on_flavor_or_format_c
         staging_metrics_key_2, SimpleUploadedFile("metrics.json", b'{"acc": 0.9}'), "application/json"
     )
     res_bad_format = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": project.preview.revision,
             "flavor": "sklearn",
@@ -464,7 +464,7 @@ def test_save_preview_validates_existing_retained_artifact_on_flavor_or_format_c
         staging_metrics_key_3, SimpleUploadedFile("metrics.json", b'{"acc": 0.9}'), "application/json"
     )
     res_ok = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": project.preview.revision,
             "flavor": "xgboost",
@@ -496,7 +496,7 @@ def test_save_preview_keeps_staging_objects_on_failure(project, owner, monkeypat
 
     # Attempt to save preview with conflicting revision (revision mismatch)
     response = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": 9999,  # Mismatch triggers Conflict
             "flavor": "sklearn",
@@ -525,7 +525,7 @@ def test_generate_upload_urls_flavor_and_content_size_limits(owner, monkeypatch)
     # 1. XGBoost raw artifact <= 200 MiB succeeds
     limit_200 = 200 * 1024 * 1024
     res_ok = client.post(
-        "/api/models/preview/upload-urls/",
+        "/api/projects/preview/upload-urls/",
         {
             "name": "XGB Valid",
             "flavor": "xgboost",
@@ -538,7 +538,7 @@ def test_generate_upload_urls_flavor_and_content_size_limits(owner, monkeypatch)
 
     # 2. XGBoost raw artifact > 200 MiB fails
     res_xgb_oversize = client.post(
-        "/api/models/preview/upload-urls/",
+        "/api/projects/preview/upload-urls/",
         {
             "name": "XGB Oversize",
             "flavor": "xgboost",
@@ -552,7 +552,7 @@ def test_generate_upload_urls_flavor_and_content_size_limits(owner, monkeypatch)
 
     # 3. Source code > 5 MB fails
     res_code_oversize = client.post(
-        "/api/models/preview/upload-urls/",
+        "/api/projects/preview/upload-urls/",
         {
             "name": "Code Oversize",
             "flavor": "sklearn",
@@ -565,7 +565,7 @@ def test_generate_upload_urls_flavor_and_content_size_limits(owner, monkeypatch)
 
     # 4. Reference data > 100 MB fails
     res_data_oversize = client.post(
-        "/api/models/preview/upload-urls/",
+        "/api/projects/preview/upload-urls/",
         {
             "name": "Data Oversize",
             "flavor": "sklearn",
@@ -596,7 +596,7 @@ def test_save_preview_validates_source_code_and_reference_data_content(project, 
     bad_code_key = f"staging/{prefix}/preview/b-code/source_code/serve.py"
     stored_bad_code = storage.put(bad_code_key, SimpleUploadedFile("serve.py", b"import math\x00"), "text/x-python")
     res1 = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": project.preview.revision,
             "assets": [{"kind": "source_code", "name": "serve.py", "s3_uri": stored_bad_code.uri}],
@@ -610,7 +610,7 @@ def test_save_preview_validates_source_code_and_reference_data_content(project, 
     bad_csv_key = f"staging/{prefix}/preview/b-csv/reference_data/ref.csv"
     stored_bad_csv = storage.put(bad_csv_key, SimpleUploadedFile("ref.csv", b"col_a,col_b\n"), "text/csv")
     res2 = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": project.preview.revision,
             "assets": [{"kind": "reference_data", "name": "ref.csv", "s3_uri": stored_bad_csv.uri}],
@@ -629,7 +629,7 @@ def test_save_preview_validates_source_code_and_reference_data_content(project, 
     stored_good_csv = storage.put(good_csv_key, SimpleUploadedFile("ref.csv", b"f1,f2\n1.0,2.0\n3.0,4.0\n"), "text/csv")
 
     res3 = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": project.preview.revision,
             "assets": [
@@ -661,7 +661,7 @@ def test_remove_assets_without_upload_deletes_s3_objects(project, owner, monkeyp
     client = APIClient()
     client.force_authenticate(owner)
     save_res = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": project.preview.revision,
             "assets": [{"kind": "source_code", "name": "serve.py", "s3_uri": staged.uri}],
@@ -674,7 +674,7 @@ def test_remove_assets_without_upload_deletes_s3_objects(project, owner, monkeyp
     assert committed_uri in storage.objects
 
     remove_res = client.patch(
-        f"/api/models/{project.public_id}/preview/",
+        f"/api/projects/{project.public_id}/preview/",
         {
             "revision": project.preview.revision,
             "remove_assets": ["source_code"],

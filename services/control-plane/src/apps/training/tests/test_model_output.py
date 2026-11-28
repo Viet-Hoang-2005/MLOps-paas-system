@@ -87,7 +87,7 @@ def test_get_and_patch_model_output_flow(completed_training_job, monkeypatch):
     assert job.entry_point == "train.py"
 
     # 3. GET reference preview
-    prev_res = client.get(f"/api/training-jobs/{job.public_id}/reference-preview/")
+    prev_res = client.get(f"/api/training-jobs/{job.public_id}/reference-data/preview/")
     assert prev_res.status_code == 200
     assert prev_res.data["filename"] == "baseline.csv"
     assert prev_res.data["columns"] == ["feature1", "label"]

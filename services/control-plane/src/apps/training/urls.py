@@ -64,7 +64,7 @@ urlpatterns = [
     path("<uuid:job_id>/build/", TrainingJobBuildEndpoint.as_view(), name="training-job-build"),
     path("<uuid:job_id>/model-output/", TrainingJobModelOutputEndpoint.as_view(), name="training-job-model-output"),
     path(
-        "<uuid:job_id>/reference-preview/",
+        "<uuid:job_id>/reference-data/preview/",
         TrainingJobReferencePreviewEndpoint.as_view(),
         name="training-job-reference-preview",
     ),

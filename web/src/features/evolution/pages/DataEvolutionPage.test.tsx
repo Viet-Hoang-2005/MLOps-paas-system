@@ -55,6 +55,6 @@ it.each(["sample", "error"])("downloads the original CSV with a preview %s", asy
   }
   await user.click(screen.getByRole("button", { name: "Download original CSV" }));
   await waitFor(() => expect(download).toHaveBeenCalledExactlyOnceWith(
-    "/registry/versions/version/reference-download/", undefined,
+    "/model-versions/version/reference-data/download/", undefined,
   ));
 });

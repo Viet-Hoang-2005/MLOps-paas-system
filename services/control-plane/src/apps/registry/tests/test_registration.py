@@ -18,7 +18,7 @@ def test_version_endpoint_rejects_direct_manual_registration():
     client = APIClient()
     client.force_authenticate(user)
     response = client.post(
-        f"/api/registry/models/{project.public_id}/versions/",
+        f"/api/projects/{project.public_id}/versions/",
         {
             "version": "v1",
             "flavor": "sklearn",

@@ -1,6 +1,6 @@
 import {
   useDriftMonitoringJobs,
-  useDriftMonitoringResults,
+  useDriftMonitor,
   type DriftMonitoringResult,
 } from "@/features/monitoring/hooks/useDriftMonitoring";
 import { Badge } from "@/shared/components/Badge";
@@ -43,9 +43,10 @@ export function MonitoringEvolutionPage({
     jobs?.find((j) => j.version_id === versionId) ??
     (jobs && jobs.length === 1 ? jobs[0] : undefined);
 
-  const { data: results, isLoading: isLoadingResults } = useDriftMonitoringResults(
+  const { data: monitor, isLoading: isLoadingResults } = useDriftMonitor(
     activeJob?.deletion_requested ? undefined : activeJob?.id,
   );
+  const results = monitor?.deletion_requested ? undefined : monitor?.runs;
 
   const totalRuns = results?.length ?? 0;
   const driftDetectedRuns =

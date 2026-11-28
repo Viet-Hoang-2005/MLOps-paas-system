@@ -1,5 +1,7 @@
+import { monitorReferenceDownloadPath } from "@/features/monitoring/api/driftApi";
 import { useDriftMonitorForm } from "@/features/monitoring/hooks/useDriftMonitorForm";
 import { productionPreview } from "@/features/monitoring/productionPreview";
+import { versionReferenceDownloadPath } from "@/shared/api/catalogApi";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
@@ -150,8 +152,10 @@ function CreateDriftMonitorContent({
     : form.project.data?.reference_data?.name || form.reference?.name;
   const original = useOriginalDownload(t("createPage.downloadFailed"));
   const originalPath = monitorId
-    ? form.existing.data && `/drift-monitors/${monitorId}/reference-url/`
-    : form.hasReference && form.versionId && `/registry/versions/${form.versionId}/reference-download/`;
+    ? form.existing.data && monitorReferenceDownloadPath(monitorId)
+    : form.hasReference &&
+      form.versionId &&
+      versionReferenceDownloadPath(form.versionId);
 
   const isReferenceLoading = Boolean(
     form.projectId && (form.project.isLoading || form.referenceQuery.isLoading),
@@ -217,7 +221,7 @@ function CreateDriftMonitorContent({
                 variant="secondary"
                 loading={original.loading}
                 icon={<Download className="h-4 w-4" />}
-                onClick={() => void original.download(originalPath, monitorId ? { download: 1 } : undefined)}
+                onClick={() => void original.download(originalPath)}
               >
                 {t("createPage.downloadOriginal")}
               </Button>

@@ -121,7 +121,7 @@ async def test_gateway_enforces_a_default_limit_and_keeps_cors_headers():
     big = b"{" + b" " * (index.MAX_REQUEST_BODY_BYTES + 1) + b"}"
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=index.app), base_url="http://gw") as client:
         reply = await client.post(
-            f"/models/{VERSION}/predict",
+            f"/model-versions/{VERSION}/predict",
             content=big,
             headers={"Origin": "http://localhost:5173", "Content-Type": "application/json"},
         )

@@ -48,6 +48,30 @@ def test_monitor_api_returns_the_frontend_drift_contract():
 
 
 @pytest.mark.django_db
+def test_monitor_list_filters_by_project_before_pagination_and_keeps_owner_scope():
+    owner, project, version = _monitor_fixture()
+    monitor = DriftMonitor.objects.create(version=version, name="target")
+    other_project = ModelProject.objects.create(owner=owner, name="Other")
+    other_version = ModelVersion.objects.create(project=other_project, version="1")
+    DriftMonitor.objects.create(version=other_version, name="other")
+    _, foreign_project, foreign_version = _monitor_fixture("other-owner@example.com")
+    DriftMonitor.objects.create(version=foreign_version, name="foreign")
+    client = APIClient()
+    client.force_authenticate(owner)
+    url = "/api/drift-monitors/"
+
+    response = client.get(url, {"project_id": project.public_id, "page_size": 1})
+
+    assert response.status_code == 200
+    assert response.data["count"] == 1
+    assert response.data["next"] is None
+    assert [item["id"] for item in response.data["results"]] == [str(monitor.public_id)]
+    assert client.get(url).data["count"] == 2
+    assert client.get(url, {"project_id": foreign_project.public_id}).data["count"] == 0
+    assert client.get(url, {"project_id": "invalid"}).status_code == 400
+
+
+@pytest.mark.django_db
 def test_duplicate_monitor_returns_conflict_with_clear_message():
     owner, _project, version = _monitor_fixture("drift-duplicate@example.com")
     DriftMonitor.objects.create(version=version, reference_uri="s3://bucket/reference.csv", name="default")
@@ -113,7 +137,7 @@ def test_completed_run_report_url_is_tenant_scoped_and_presigned(monkeypatch):
     client = APIClient()
     client.force_authenticate(other)
 
-    url = f"/api/drift-monitors/runs/{run.public_id}/report-url/"
+    url = f"/api/drift-runs/{run.public_id}/report-url/"
     assert client.get(url).status_code == 404
 
     client.force_authenticate(owner)
@@ -134,7 +158,7 @@ def test_report_url_is_unavailable_before_run_completes():
     client = APIClient()
     client.force_authenticate(owner)
 
-    response = client.get(f"/api/drift-monitors/runs/{run.public_id}/report-url/")
+    response = client.get(f"/api/drift-runs/{run.public_id}/report-url/")
 
     assert response.status_code == 409
     assert response.data["error"]["detail"] == "The drift report is not available until the run has completed."

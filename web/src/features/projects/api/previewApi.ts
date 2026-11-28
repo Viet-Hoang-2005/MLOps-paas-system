@@ -47,7 +47,7 @@ interface PendingUploadFile {
 }
 
 export const getPreview = async (id: string): Promise<ModelPreview> =>
-  (await apiClient.get<ModelPreview>(controlPlaneURL(`/models/${id}/preview/`)))
+  (await apiClient.get<ModelPreview>(controlPlaneURL(`/projects/${id}/preview/`)))
     .data;
 
 function extractFilesFromForm(form: ModelBuildFormValues): PendingUploadFile[] {
@@ -80,7 +80,7 @@ export async function getPreviewUploadUrls(
 ): Promise<PresignedUploadResponse> {
   return (
     await apiClient.post<PresignedUploadResponse>(
-      controlPlaneURL(`/models/${projectId}/preview/upload-urls/`),
+      controlPlaneURL(`/projects/${projectId}/preview/upload-urls/`),
       {
         files,
         flavor: flavor || undefined,
@@ -103,7 +103,7 @@ export async function getNewProjectUploadUrls(
 ): Promise<PresignedUploadResponse> {
   return (
     await apiClient.post<PresignedUploadResponse>(
-      controlPlaneURL("/models/preview/upload-urls/"),
+      controlPlaneURL("/projects/preview/upload-urls/"),
       {
         name,
         files,
@@ -175,7 +175,7 @@ export async function createPreviewProject(
 
   // Phase 3: Register project and preview in Django with verified asset references
   return (
-    await apiClient.post<ModelProject>(controlPlaneURL("/models/"), {
+    await apiClient.post<ModelProject>(controlPlaneURL("/projects/"), {
       project_id: presignedResponse.project_id,
       name: form.name,
       description: form.description,
@@ -224,7 +224,7 @@ export async function updatePreview(
   // Phase 3: Patch preview metadata and asset references
   return (
     await apiClient.patch<ModelPreview>(
-      controlPlaneURL(`/models/${id}/preview/`),
+      controlPlaneURL(`/projects/${id}/preview/`),
       {
         revision,
         flavor: form.flavor,
@@ -305,7 +305,7 @@ export async function uploadPreviewSingleAsset(
 
   return (
     await apiClient.patch<ModelPreview>(
-      controlPlaneURL(`/models/${projectId}/preview/`),
+      controlPlaneURL(`/projects/${projectId}/preview/`),
       {
         revision: currentPreview.revision,
         assets: [
@@ -327,7 +327,7 @@ export async function removePreviewAsset(
   const currentPreview = await getPreview(projectId);
   return (
     await apiClient.patch<ModelPreview>(
-      controlPlaneURL(`/models/${projectId}/preview/`),
+      controlPlaneURL(`/projects/${projectId}/preview/`),
       {
         revision: currentPreview.revision,
         remove_assets: [kind],

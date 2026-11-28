@@ -17,7 +17,7 @@ const runtimeLogPath = (source: RuntimeLogSource) => {
   if (source.kind === "deployment") return `/deployments/${source.id}/logs/`;
   if (source.kind === "deployment_runtime") return `/deployments/${source.id}/runtime-logs/`;
   if (source.kind === "training") return `/training-jobs/${source.id}/logs/`;
-  return `/drift-monitors/runs/${source.id}/logs/`;
+  return `/drift-runs/${source.id}/logs/`;
 };
 
 export const getRuntimeLogs = async (

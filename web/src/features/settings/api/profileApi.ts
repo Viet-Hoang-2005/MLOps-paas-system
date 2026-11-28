@@ -29,17 +29,17 @@ export const updateProfileAvatar = async (
 };
 
 export const deleteAccount = async (): Promise<MessageResponse> =>
-  (await apiClient.delete<MessageResponse>("/auth/profile/delete/")).data;
+  (await apiClient.delete<MessageResponse>("/auth/profile/")).data;
 
 export const requestPasswordChangeOTP = async (): Promise<MessageResponse> =>
-  (await apiClient.post<MessageResponse>("/auth/profile/password-otp/")).data;
+  (await apiClient.post<MessageResponse>("/auth/password-change/request-otp/")).data;
 
 export const verifyPasswordChangeOTP = async (
   otpCode: string,
 ): Promise<PasswordChangeVerifyResponse> =>
   (
     await apiClient.post<PasswordChangeVerifyResponse>(
-      "/auth/profile/password-otp/verify/",
+      "/auth/password-change/verify-otp/",
       { otp_code: otpCode },
     )
   ).data;
@@ -55,7 +55,7 @@ export const completePasswordChange = async (
 ): Promise<PasswordChangeResponse> =>
   (
     await apiClient.post<PasswordChangeResponse>(
-      "/auth/profile/change-password/",
+      "/auth/password-change/complete/",
       {
         password_change_token: passwordChangeToken,
         new_password: newPassword,

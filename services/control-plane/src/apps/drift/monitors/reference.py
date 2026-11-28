@@ -7,11 +7,7 @@ from apps.catalog.models import ModelProject
 from apps.drift.models import DriftMonitor
 from apps.registry.models import ModelArtifact, ModelVersion
 from common.api.exceptions import Conflict
-from common.validation.artifacts import (
-    MAX_REFERENCE_DATA_BYTES,
-    parse_reference_preview,
-    validate_reference_data_file,
-)
+from common.validation.artifacts import validate_reference_data_file
 from infrastructure.storage import S3Storage
 from infrastructure.storage.paths import version_prefix
 from infrastructure.storage.staged_csv import resolve_csv_upload
@@ -38,17 +34,6 @@ def validate_reference_upload(upload):
     except Exception:
         upload.seek(0)
         raise
-
-
-def get_monitor_reference_preview(monitor, storage=None) -> dict:
-    storage = storage or S3Storage()
-    if not monitor.reference_uri:
-        raise ValidationError({"reference_file": "This monitor does not have a reference snapshot."})
-    try:
-        raw = storage.read(monitor.reference_uri, max_bytes=MAX_REFERENCE_DATA_BYTES)
-    except Exception as exc:
-        raise ValidationError({"reference_file": "Could not read reference data from storage."}) from exc
-    return parse_reference_preview(raw, monitor.reference_name or "reference.csv", max_rows=100)
 
 
 def _validate_monitor_target(project, version, data, *, upload):

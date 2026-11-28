@@ -8,7 +8,6 @@ import {
   getDriftReportData,
   getProductionDataCount,
   listDriftMonitoringJobs,
-  listDriftMonitoringResults,
   listProductionData,
   runDriftMonitoringJob,
   updateDriftMonitoringJob,
@@ -37,7 +36,7 @@ export function useDriftMonitoringJobs(modelId?: string) {
 
 export function useDriftMonitor(jobId?: string) {
   return useQuery({
-    queryKey: driftQueryKeys.configuration(jobId ?? ""),
+    queryKey: driftQueryKeys.detail(jobId ?? ""),
     queryFn: async () => {
       try {
         return await getDriftMonitor(jobId!);
@@ -51,14 +50,6 @@ export function useDriftMonitor(jobId?: string) {
       const monitor = query.state.data;
       return monitor ? (monitor.deletion_requested ? 3000 : 15000) : false;
     },
-  });
-}
-
-export function useDriftMonitoringResults(jobId?: string) {
-  return useQuery({
-    queryKey: driftQueryKeys.results(jobId ?? ""),
-    queryFn: () => listDriftMonitoringResults(jobId!),
-    enabled: Boolean(jobId),
   });
 }
 
@@ -81,7 +72,7 @@ export function useDeleteDriftMonitoringJob() {
       deleteDriftMonitoringJob(payload.id),
     onSuccess: async (_, variables) => {
       const listKey = driftQueryKeys.monitors(variables.project_id);
-      const detailKey = driftQueryKeys.configuration(variables.id);
+      const detailKey = driftQueryKeys.detail(variables.id);
       await Promise.all([
         queryClient.cancelQueries({ queryKey: listKey }),
         queryClient.cancelQueries({ queryKey: detailKey }),
@@ -107,10 +98,14 @@ export function useUpdateDriftMonitoringJob() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateDriftMonitoringJob,
-    onSuccess: (_, variables) =>
-      queryClient.invalidateQueries({
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({
         queryKey: driftQueryKeys.monitors(variables.project_id),
-      }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: driftQueryKeys.detail(variables.id),
+      });
+    },
   });
 }
 
@@ -123,7 +118,10 @@ export function useRunDriftMonitoringJob() {
     onSuccess: (_, variables) => {
       toast.success(t("messages.runQueued"));
       void queryClient.invalidateQueries({
-        queryKey: driftQueryKeys.results(variables.id),
+        queryKey: driftQueryKeys.detail(variables.id),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: driftQueryKeys.monitors(variables.project_id),
       });
     },
     onError: (error: unknown) =>
@@ -153,7 +151,10 @@ export function useProductionDataCount(projectId?: string, versionId?: string) {
   });
 }
 
-export function useDeleteDriftMonitoringRun(monitorId?: string) {
+export function useDeleteDriftMonitoringRun(
+  monitorId?: string,
+  projectId?: string,
+) {
   const queryClient = useQueryClient();
   const { t } = useTranslation("monitoring");
   return useMutation({
@@ -162,10 +163,12 @@ export function useDeleteDriftMonitoringRun(monitorId?: string) {
       toast.success(t("messages.runDeleted"));
       if (monitorId) {
         void queryClient.invalidateQueries({
-          queryKey: driftQueryKeys.results(monitorId),
+          queryKey: driftQueryKeys.detail(monitorId),
         });
+      }
+      if (projectId) {
         void queryClient.invalidateQueries({
-          queryKey: driftQueryKeys.configuration(monitorId),
+          queryKey: driftQueryKeys.monitors(projectId),
         });
       }
     },
@@ -174,7 +177,10 @@ export function useDeleteDriftMonitoringRun(monitorId?: string) {
   });
 }
 
-export function useCancelDriftMonitoringRun(monitorId?: string) {
+export function useCancelDriftMonitoringRun(
+  monitorId?: string,
+  projectId?: string,
+) {
   const queryClient = useQueryClient();
   const { t } = useTranslation("monitoring");
   return useMutation({
@@ -193,20 +199,19 @@ export function useCancelDriftMonitoringRun(monitorId?: string) {
       }
       throw new Error("Missing runId or monitorId");
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast.success(t("messages.runCancelled"));
-      const targetMonitorId = monitorId;
+      const targetMonitorId = variables.monitorId ?? monitorId;
       if (targetMonitorId) {
         void queryClient.invalidateQueries({
-          queryKey: driftQueryKeys.results(targetMonitorId),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: driftQueryKeys.configuration(targetMonitorId),
+          queryKey: driftQueryKeys.detail(targetMonitorId),
         });
       }
-      void queryClient.invalidateQueries({
-        queryKey: driftQueryKeys.all,
-      });
+      if (projectId) {
+        void queryClient.invalidateQueries({
+          queryKey: driftQueryKeys.monitors(projectId),
+        });
+      }
     },
     onError: (error: unknown) =>
       toast.error(getApiErrorMessage(error, t("messages.runCancelFailed"))),

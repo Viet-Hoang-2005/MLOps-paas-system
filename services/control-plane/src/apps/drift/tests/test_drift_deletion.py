@@ -39,7 +39,7 @@ def test_delete_drift_run_cancels_active_container_and_cleans_s3_and_redis(monke
 
     client = APIClient()
     client.force_authenticate(owner)
-    response = client.delete(f"/api/drift-monitors/runs/{run.public_id}/")
+    response = client.delete(f"/api/drift-runs/{run.public_id}/")
 
     assert response.status_code == 204
     assert not DriftRun.objects.filter(pk=run.pk).exists()
@@ -125,7 +125,7 @@ def test_drift_delete_keeps_rows_on_cleanup_failure_and_can_retry(monkeypatch, f
     client.force_authenticate(owner)
     delete_monitor = failure == "monitor-prefix"
     url = (
-        f"/api/drift-monitors/{monitor.public_id}/" if delete_monitor else f"/api/drift-monitors/runs/{run.public_id}/"
+        f"/api/drift-monitors/{monitor.public_id}/" if delete_monitor else f"/api/drift-runs/{run.public_id}/"
     )
     if delete_monitor:
         assert client.delete(url).status_code == 202

@@ -11,6 +11,12 @@ import type {
   ModelVersion,
 } from "@/features/projects/types";
 
+export const projectPreviewReferenceDownloadPath = (projectId: string) =>
+  `/projects/${projectId}/preview/reference-data/download/`;
+
+export const versionReferenceDownloadPath = (versionId: string) =>
+  `/model-versions/${versionId}/reference-data/download/`;
+
 const toModelProject = (project: ModelProject): ModelProject => {
   const endpoint = project.active_endpoint;
   const endpointStatus =
@@ -39,7 +45,7 @@ const toModelProject = (project: ModelProject): ModelProject => {
 
 export const listModelProjects =
   async (): Promise<ModelProjectListResponse> => {
-    const data = await fetchAllPages<ModelProject>(controlPlaneURL("/models/"));
+    const data = await fetchAllPages<ModelProject>(controlPlaneURL("/projects/"));
     return {
       models: data.map(toModelProject),
     };
@@ -47,7 +53,7 @@ export const listModelProjects =
 
 export const getModelProject = async (modelId: string): Promise<ModelProject> =>
   toModelProject(
-    (await apiClient.get<ModelProject>(controlPlaneURL(`/models/${modelId}/`)))
+    (await apiClient.get<ModelProject>(controlPlaneURL(`/projects/${modelId}/`)))
       .data,
   );
 
@@ -56,7 +62,7 @@ export const getVersionSnapshot = async (
 ): Promise<ModelVersion> =>
   (
     await apiClient.get<ModelVersion>(
-      controlPlaneURL(`/registry/versions/${versionId}/`),
+      controlPlaneURL(`/model-versions/${versionId}/`),
     )
   ).data;
 
@@ -67,7 +73,7 @@ export const getRunningSource = async (
   const query = versionId ? `?version_id=${encodeURIComponent(versionId)}` : "";
   return (
     await apiClient.get<{ content: string }>(
-      controlPlaneURL(`/models/${id}/running-source/${query}`),
+      controlPlaneURL(`/projects/${id}/running/source/${query}`),
     )
   ).data.content;
 };
@@ -77,7 +83,7 @@ export const updateModelProject = async (
   payload: ModelProjectFormValues,
 ): Promise<ModelProject> =>
   (
-    await apiClient.put<ModelProject>(controlPlaneURL(`/models/${modelId}/`), {
+    await apiClient.put<ModelProject>(controlPlaneURL(`/projects/${modelId}/`), {
       name: payload.name,
       description: payload.description,
       access_mode: payload.access_mode,
@@ -90,7 +96,7 @@ export const deleteModelProject = async (
 ): Promise<MessageResponse> =>
   (
     await apiClient.delete<MessageResponse>(
-      controlPlaneURL(`/models/${modelId}/${force ? "?force=true" : ""}`),
+      controlPlaneURL(`/projects/${modelId}/${force ? "?force=true" : ""}`),
     )
   ).data;
 
@@ -159,7 +165,7 @@ export const getPreviewAttributes = async (
 ): Promise<ModelAttributesResponse> =>
   (
     await apiClient.get<ModelAttributesResponse>(
-      controlPlaneURL(`/models/${modelId}/preview/attributes/`),
+      controlPlaneURL(`/projects/${modelId}/preview/attributes/`),
     )
   ).data;
 
@@ -170,7 +176,7 @@ export const getRunningAttributes = async (
   const query = versionId ? `?version_id=${encodeURIComponent(versionId)}` : "";
   return (
     await apiClient.get<ModelAttributesResponse>(
-      controlPlaneURL(`/models/${modelId}/running-attributes/${query}`),
+      controlPlaneURL(`/projects/${modelId}/running/attributes/${query}`),
     )
   ).data;
 };

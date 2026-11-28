@@ -327,7 +327,7 @@ def test_password_change_enforces_validators_and_revokes_old_refresh_tokens():
 
     # 3. Numeric password fails validation
     weak_res = client.post(
-        "/api/auth/profile/change-password/",
+        "/api/auth/password-change/complete/",
         {"password_change_token": change_token, "new_password": "123456789"},
         format="json",
         **browser_auth_headers(),
@@ -337,7 +337,7 @@ def test_password_change_enforces_validators_and_revokes_old_refresh_tokens():
 
     # 4. Valid new password succeeds and sets new session cookie
     success_res = client.post(
-        "/api/auth/profile/change-password/",
+        "/api/auth/password-change/complete/",
         {"password_change_token": change_token, "new_password": "ChangedPass#2026!"},
         format="json",
         **browser_auth_headers(),

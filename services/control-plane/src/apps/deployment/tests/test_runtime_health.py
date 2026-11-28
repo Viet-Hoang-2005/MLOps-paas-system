@@ -148,7 +148,7 @@ def test_api_reads_saved_health_and_is_tenant_scoped(runtime, monkeypatch):
     monkeypatch.setattr(RuntimeHealthProbe, "check", Mock(side_effect=AssertionError("API must not probe")))
     client = APIClient()
     client.force_authenticate(project.owner)
-    url = f"/api/models/{project.public_id}/"
+    url = f"/api/projects/{project.public_id}/"
     result = client.get(url)
     assert result.data["active_endpoint"]["registration_status"] == "registered"
     assert result.data["active_endpoint"]["health_status"] == "healthy"

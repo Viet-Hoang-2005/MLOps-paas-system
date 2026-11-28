@@ -350,7 +350,7 @@ def readiness():
     )
 
 
-@app.get("/models/{version_id}/health")
+@app.get("/model-versions/{version_id}/health")
 async def model_health(version_id: str, token_payload: dict = Depends(verify_model_access)):
     model_record = token_payload["model_record"]
     worker_url = resolve_worker_url(model_record, "/health")
@@ -392,7 +392,7 @@ async def model_health(version_id: str, token_payload: dict = Depends(verify_mod
         )
 
 
-@app.post("/models/{version_id}/predict")
+@app.post("/model-versions/{version_id}/predict")
 async def predict(
     version_id: str,
     request: Request,

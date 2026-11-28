@@ -226,10 +226,7 @@ services:
       LOCAL_RUNTIME_METRICS_ENABLED: "true"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.model-server.rule=PathRegexp(`^/[A-Za-z0-9-]+/models/[0-9A-Fa-f-]{36}/[0-9A-Fa-f-]{36}/(predict|health)$`)"
-      - "traefik.http.routers.model-server.middlewares=model-server-rewrite"
-      - "traefik.http.middlewares.model-server-rewrite.replacepathregex.regex=^/[^/]+/models/[^/]+/([^/]+)/(predict|health)$"
-      - "traefik.http.middlewares.model-server-rewrite.replacepathregex.replacement=/models/$${1}/$${2}"
+      - "traefik.http.routers.model-server.rule=PathRegexp(`^/model-versions/[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}/(predict|health)$`)"
       - "traefik.http.services.model-server.loadbalancer.server.port=5000"
     depends_on:
       postgres:

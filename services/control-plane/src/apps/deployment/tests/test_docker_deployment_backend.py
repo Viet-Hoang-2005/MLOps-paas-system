@@ -40,9 +40,10 @@ class RecordingDockerClient:
 
 
 @pytest.mark.django_db
-def test_local_deployment_uses_embedded_model_artifact_without_waiting(monkeypatch):
+def test_local_deployment_uses_embedded_model_artifact_without_waiting(monkeypatch, settings):
     monkeypatch.setenv("LOG_SUMMARY_INTERVAL_SECONDS", "15")
     monkeypatch.setenv("LOG_FORMAT", "console")
+    settings.MODEL_SERVER_PUBLIC_URL = "http://localhost:5002"
     owner = get_user_model().objects.create_user("runtime-owner@example.com", "password123")
     project = ModelProject.objects.create(owner=owner, name="runtime model")
     version = ModelVersion.objects.create(project=project, version="1", flavor="xgboost")
@@ -70,6 +71,7 @@ def test_local_deployment_uses_embedded_model_artifact_without_waiting(monkeypat
     }
     assert docker.kwargs["image"] == "sha256:local-image-id"
     assert endpoint.internal_url == f"http://deploy-{deployment.public_id}:5001"
+    assert endpoint.public_url == f"http://localhost:5002/model-versions/{version.public_id}"
     assert endpoint.health_status == "unknown"
     assert deployment.execution_deadline_at is not None
 

@@ -24,7 +24,8 @@ def test_dependency_checks_report_outages_without_secrets():
 
 
 @pytest.mark.asyncio
-async def test_preflight_and_auth_errors_do_not_require_cookies(monkeypatch):
+@pytest.mark.parametrize(("action", "method"), [("predict", "POST"), ("health", "GET")])
+async def test_preflight_and_auth_errors_do_not_require_cookies(monkeypatch, action, method):
     monkeypatch.setattr(
         api,
         "get_model_version_record",
@@ -32,19 +33,19 @@ async def test_preflight_and_auth_errors_do_not_require_cookies(monkeypatch):
     )
     transport = httpx.ASGITransport(app=api.app)
     async with httpx.AsyncClient(transport=transport, base_url="http://gateway") as client:
-        url = "/models/00000000-0000-0000-0000-000000000001/predict"
+        url = f"/model-versions/00000000-0000-0000-0000-000000000001/{action}"
         response = await client.options(
             url,
             headers={
                 "Origin": "http://localhost:5173",
-                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Method": method,
                 "Access-Control-Request-Headers": "authorization,content-type,x-api-key",
             },
         )
         assert response.status_code == 200
         assert response.headers["access-control-allow-origin"] == "*"
         assert "access-control-allow-credentials" not in response.headers
-        response = await client.post(url, headers={"Origin": "http://localhost:5173"}, json={"data": []})
+        response = await client.request(method, url, headers={"Origin": "http://localhost:5173"})
         assert response.status_code == 401
         assert response.headers["access-control-allow-origin"] == "*"
         assert "access-control-allow-credentials" not in response.headers

@@ -84,7 +84,7 @@ def test_delete_version_removes_runtime_monitors_s3_image_and_unlocks_build(monk
 
     client = APIClient()
     client.force_authenticate(owner)
-    url = f"/api/registry/versions/{version.public_id}/"
+    url = f"/api/model-versions/{version.public_id}/"
     dispatched_after_commit = []
 
     def capture_dispatch(**_):
@@ -230,7 +230,7 @@ def test_delete_version_preserves_resources_referenced_by_ct_when_disabled(monke
 
     client = APIClient()
     client.force_authenticate(owner)
-    response = client.delete(f"/api/registry/versions/{version.public_id}/")
+    response = client.delete(f"/api/model-versions/{version.public_id}/")
 
     assert response.status_code == 409
     assert "continuous training lineage" in str(response.data)
@@ -256,4 +256,4 @@ def test_delete_version_requires_owner(monkeypatch):
 
     client = APIClient()
     client.force_authenticate(other)
-    assert client.delete(f"/api/registry/versions/{version.public_id}/").status_code == 404
+    assert client.delete(f"/api/model-versions/{version.public_id}/").status_code == 404

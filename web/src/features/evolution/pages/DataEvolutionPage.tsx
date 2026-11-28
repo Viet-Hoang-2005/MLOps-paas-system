@@ -4,6 +4,7 @@ import {
 } from "@/features/evolution/api/evolutionApi";
 import { evolutionQueryKeys } from "@/features/evolution/queryKeys";
 import type { ModelVersion } from "@/features/projects/types";
+import { versionReferenceDownloadPath } from "@/shared/api/catalogApi";
 import { getApiErrorMessage } from "@/shared/api/errors";
 import { Badge } from "@/shared/components/Badge";
 import { Button } from "@/shared/components/Button";
@@ -69,7 +70,7 @@ export function DataEvolutionPage({
       variant="secondary"
       loading={original.loading}
       icon={<Download className="h-4 w-4" />}
-      onClick={() => void original.download(`/registry/versions/${version.id}/reference-download/`)}
+      onClick={() => void original.download(versionReferenceDownloadPath(version.id))}
     >
       {t("workspace.downloadOriginal")}
     </Button>
