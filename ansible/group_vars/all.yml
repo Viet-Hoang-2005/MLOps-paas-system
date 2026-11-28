@@ -71,7 +71,7 @@ core_addon_workloads:
   - {namespace: kube-system, release: aws-ebs-csi-driver}
   - {namespace: external-secrets, release: external-secrets}
   - {namespace: cnpg-system, release: cloudnative-pg}
-  - {namespace: redis-operator, release: redis-operator}
+  - {namespace: redis-operator, release: redis-operator, pod_selector: "name=redis-operator"}
   - {namespace: keda, release: keda}
   - {namespace: argo, release: argo-workflows}
   - {namespace: argo-events, release: argo-events}

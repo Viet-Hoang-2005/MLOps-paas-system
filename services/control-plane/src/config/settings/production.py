@@ -32,8 +32,15 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 AUTH_COOKIE_SECURE = env_bool("AUTH_COOKIE_SECURE", True)
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", True)
-# In-cluster callers use plain HTTP; the model gateway fetches JWKS to verify user JWTs.
-SECURE_REDIRECT_EXEMPT = [r"^health/", r"^internal/", r"^api/auth/\.well-known/jwks\.json$"]
+# In-cluster callers use plain HTTP; the model gateway fetches JWKS and training pods call MLflow over HTTP.
+SECURE_REDIRECT_EXEMPT = [
+    r"^health/",
+    r"^internal/",
+    r"^api/auth/\.well-known/jwks\.json$",
+    r"^api/2\.0/mlflow/",
+    r"^api/2\.0/mlflow-artifacts/",
+    r"^mlflow-artifacts/",
+]
 SECURE_HSTS_SECONDS = env_int("DJANGO_HSTS_SECONDS", 31536000)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True

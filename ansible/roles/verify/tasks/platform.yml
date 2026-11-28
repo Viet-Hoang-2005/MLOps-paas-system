@@ -52,7 +52,7 @@
     namespace: "{{ item.namespace }}"
     kubeconfig: "{{ k3s_remote_kubeconfig }}"
     label_selectors:
-      - "app.kubernetes.io/instance={{ item.release }}"
+      - "{{ item.pod_selector | default('app.kubernetes.io/instance=' ~ item.release) }}"
   register: verified_core_addon_pods
   until:
     - verified_core_addon_pods.resources | length > 0

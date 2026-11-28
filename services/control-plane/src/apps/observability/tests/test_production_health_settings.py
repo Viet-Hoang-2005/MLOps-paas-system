@@ -20,6 +20,9 @@ def test_production_settings_exempt_health_endpoints_from_ssl_redirect(monkeypat
         r"^health/",
         r"^internal/",
         r"^api/auth/\.well-known/jwks\.json$",
+        r"^api/2\.0/mlflow/",
+        r"^api/2\.0/mlflow-artifacts/",
+        r"^mlflow-artifacts/",
     ]
     assert "10.42.2.44" in production_settings.ALLOWED_HOSTS
 
@@ -51,3 +54,24 @@ def test_in_cluster_jwks_request_is_not_redirected():
 
     assert middleware(factory.get("/api/auth/.well-known/jwks.json", HTTP_HOST=host)).status_code == 200
     assert middleware(factory.get("/api/auth/token/", HTTP_HOST=host)).status_code == 301
+
+
+def test_in_cluster_mlflow_requests_are_not_redirected(monkeypatch):
+    monkeypatch.setenv("DJANGO_SECRET_KEY", "test-production-secret-key")
+    monkeypatch.setenv("JWT_PRIVATE_KEY", "test-private-key")
+    monkeypatch.setenv("JWT_PUBLIC_KEY", "test-public-key")
+    monkeypatch.setenv("CONTROL_PLANE_WEBHOOK_SECRET", "test-webhook-secret-with-at-least-32-characters")
+    monkeypatch.setenv("ARGO_EVENTS_WEBHOOK_TOKEN", "x" * 32)
+    production_settings = importlib.import_module("config.settings.production")
+
+    factory = RequestFactory()
+    host = "mlops-paas-control-plane.mlops-paas-core.svc.cluster.local:8000"
+    with override_settings(
+        ALLOWED_HOSTS=["mlops-paas-control-plane.mlops-paas-core.svc.cluster.local"],
+        SECURE_SSL_REDIRECT=True,
+        SECURE_REDIRECT_EXEMPT=production_settings.SECURE_REDIRECT_EXEMPT,
+    ):
+        middleware = SecurityMiddleware(CommonMiddleware(lambda _request: HttpResponse(status=200)))
+        assert middleware(factory.get("/api/2.0/mlflow/experiments/get-by-name", HTTP_HOST=host)).status_code == 200
+        assert middleware(factory.get("/api/2.0/mlflow-artifacts/artifacts/run-1/model.bin", HTTP_HOST=host)).status_code == 200
+        assert middleware(factory.get("/mlflow-artifacts/artifacts/run-1/model.bin", HTTP_HOST=host)).status_code == 200

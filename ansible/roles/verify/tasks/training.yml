@@ -161,7 +161,9 @@
     kubernetes.core.k8s:
       state: present
       kubeconfig: '{{ k3s_remote_kubeconfig }}'
-      definition: '{{ item }}'
+      definition: >-
+        {{ item | combine({'spec': {'activeDeadlineSeconds': training_smoke_timeout_seconds | int}},
+                          recursive=true) | to_json }}
     loop:
     - apiVersion: trainer.kubeflow.org/v1alpha1
       kind: TrainJob
@@ -172,7 +174,6 @@
         runtimeRef:
           kind: TrainingRuntime
           name: ansible-single-node
-        activeDeadlineSeconds: '{{ training_smoke_timeout_seconds | int }}'
         trainer:
           numNodes: 1
           image: '{{ training_smoke_image }}'
@@ -209,7 +210,6 @@
         runtimeRef:
           kind: TrainingRuntime
           name: ansible-single-node
-        activeDeadlineSeconds: '{{ training_smoke_timeout_seconds | int }}'
         trainer:
           numNodes: 1
           image: '{{ training_smoke_image }}'
