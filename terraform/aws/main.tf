@@ -78,6 +78,12 @@ module "iam" {
   )
 }
 
+resource "aws_key_pair" "mlops" {
+  count      = local.enable_k3s_compute_stack && fileexists(pathexpand("~/.ssh/aws_key.pub")) ? 1 : 0
+  key_name   = var.key_name
+  public_key = trimspace(file(pathexpand("~/.ssh/aws_key.pub")))
+}
+
 module "compute" {
   count                = local.enable_k3s_compute_stack ? 1 : 0
   source               = "./modules/compute"
@@ -87,7 +93,7 @@ module "compute" {
   worker_sg_id         = module.security[0].worker_sg_id
   worker_profile_name  = module.iam[0].worker_profile_name
 
-  key_name              = var.key_name
+  key_name              = length(aws_key_pair.mlops) > 0 ? aws_key_pair.mlops[0].key_name : var.key_name
   master_instance_type  = var.master_instance_type
   master_volume_size    = var.master_volume_size
   worker_instance_count = var.worker_instance_count

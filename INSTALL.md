@@ -147,8 +147,16 @@ Quy trình triển khai trên môi trường sản xuất tuân thủ kiến tr�
 
 - Máy điều khiển (Control Host) chạy Ubuntu 22.04 LTS hoặc WSL2 trên Windows.
 - Đã cài đặt: `terraform >= 1.5`, `awscli v2`, `ansible >= 2.15`, `kubectl >= 1.28`.
-- Khóa SSH Keypair trên AWS EC2 mang tên `mlops-keypair` trỏ tới file private key bí mật (ví dụ `~/.ssh/aws_key` với quyền `chmod 600`).
+- Cặp khóa SSH RSA lưu tại `~/.ssh/aws_key` (private key, `chmod 600`) và `~/.ssh/aws_key.pub` (public key) - Terraform sẽ tự động dùng `~/.ssh/aws_key.pub` để tạo EC2 Key Pair `mlops-keypair` trên AWS, còn Ansible/SSH dùng `~/.ssh/aws_key`.
 - Tên miền đã trỏ DNS về Cloudflare hoặc Route 53 (ví dụ `mlops-nids-nt114.id.vn`).
+
+Tạo cặp khóa SSH (nếu chưa có):
+```bash
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/aws_key -N "" -C "mlops-keypair"
+chmod 600 ~/.ssh/aws_key
+chmod 644 ~/.ssh/aws_key.pub
+```
 
 ---
 

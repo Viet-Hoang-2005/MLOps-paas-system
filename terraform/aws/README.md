@@ -136,7 +136,14 @@ terraform/aws/
 ### 3.1. Yêu cầu chuẩn bị
 - Đã cài đặt **Terraform CLI >= 1.5** (`terraform version`).
 - Đã cài đặt và cấu hình **AWS CLI v2** (`aws configure`) với tài khoản có quyền quản trị hạ tầng (Administrator hoặc PowerUser).
-- Đã tạo sẵn **EC2 Key Pair** tên `mlops-keypair` trên AWS vùng `ap-southeast-1` (dùng để SSH vào các node).
+- Đã tạo cặp khóa SSH RSA tại `~/.ssh/aws_key` và `~/.ssh/aws_key.pub`. Terraform sẽ tự động đọc `~/.ssh/aws_key.pub` để tạo **EC2 Key Pair** `mlops-keypair` trên AWS vùng `ap-southeast-1`, đồng thời Ansible và SSH sử dụng `~/.ssh/aws_key`:
+
+```bash
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/aws_key -N "" -C "mlops-keypair"
+chmod 600 ~/.ssh/aws_key
+chmod 644 ~/.ssh/aws_key.pub
+```
 
 ---
 
