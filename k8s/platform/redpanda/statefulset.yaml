@@ -116,7 +116,7 @@ spec:
             memory: "1536Mi"
             cpu: "1000m"
           requests:
-            memory: "768Mi"
+            memory: "384Mi"
             cpu: "50m"
         volumeMounts:
         - name: redpanda-data

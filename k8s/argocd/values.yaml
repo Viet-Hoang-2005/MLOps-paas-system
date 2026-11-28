@@ -91,7 +91,7 @@ dex:
   resources:
     requests:
       cpu: 15m
-      memory: 128Mi
+      memory: 64Mi
     limits:
       cpu: 250m
       memory: 256Mi
@@ -101,7 +101,7 @@ redis:
   resources:
     requests:
       cpu: 20m
-      memory: 128Mi
+      memory: 64Mi
     limits:
       cpu: 200m
       memory: 256Mi
@@ -121,7 +121,7 @@ repoServer:
   resources:
     requests:
       cpu: 50m
-      memory: 256Mi
+      memory: 128Mi
     limits:
       cpu: 1000m
       memory: 2Gi
