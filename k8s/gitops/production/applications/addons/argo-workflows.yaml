@@ -45,7 +45,7 @@ spec:
             - mlops-paas-execution
             - argo
           workflowRestrictions:
-            templateReferencing: Secure
+            templateReferencing: Strict
           nodeSelector:
             workload-type: worker
           resources:
